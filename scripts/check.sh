@@ -22,14 +22,15 @@ else
   echo "goimports not installed — skipping (install: golang.org/x/tools/cmd/goimports)"
 fi
 
-# Substrate boundary. DynamoDB is accidental complexity — the problem is a personal
-# longitudinal record, not a key-value store — so the choice must stay reversible.
-# Only internal/store may name the AWS SDK; the domain must not know it exists.
-echo "→ substrate boundary (aws-sdk confined to internal/store)"
+# Substrate boundary. The store is accidental complexity — the problem is a personal
+# longitudinal record, not a database — so the choice must stay reversible. Only
+# internal/store may name SQLite or database/sql; the domain must not know what it is
+# stored in. Because Anam owns no source fact, a substrate swap is a re-ingest.
+echo "→ substrate boundary (sql confined to internal/store)"
 boundary="$(go list -f '{{.ImportPath}}{{range .Imports}} {{.}}{{end}}{{range .TestImports}} {{.}}{{end}}' ./... 2>/dev/null \
-  | grep 'aws-sdk-go' | grep -v '^github.com/mattjoyce/anam/internal/store' || true)"
+  | grep -E 'database/sql|sqlite|aws-sdk-go' | grep -v '^github.com/mattjoyce/anam/internal/store' || true)"
 if [ -n "$boundary" ]; then
-  echo "  FAILED: AWS SDK imported outside internal/store:" >&2
+  echo "  FAILED: the store substrate is named outside internal/store:" >&2
   echo "$boundary" | awk '{print "    " $1}' >&2
   fail=1
 fi

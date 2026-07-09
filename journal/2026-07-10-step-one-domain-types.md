@@ -107,15 +107,44 @@ wrong order entirely. The comment now says what is actually true, and warns agai
 `gosec` flagged `os.Stat` on an operator-supplied path (G703, taint). `filepath.Clean` satisfied it
 honestly, so no `#nosec` was needed.
 
+## The ladder, planned under Brooks × Beck
+
+Called the second lens of the session — `Brooks × Beck` (*triage × step*), the pair whose subject is
+literally "how we approach the work" — on the remaining build order, as a *Before* pass.
+
+It reordered the MVP. `mint` sat before `fold` in §2's chain, but a checkpoint is a **cache of the
+fold**: it bounds replay, and there is no replay cost to bound yet. Meanwhile `anam timeline` — the
+thesis, the one claim Anam exists to make — was rung six. Timeline moved to four, mint to eight.
+
+The synthesis is [[brooks-below-the-gate-beck-above-it]]: the error kernel already tells you where each
+lens applies. Depth-first below the gate, where corruption is unrecoverable; smallest-step above it,
+where everything is disposable and rebuildable.
+
+Brooks's triage also named what we had not admitted: [[substrate-is-accidental|DynamoDB is accidental
+complexity]]. Fixed-width timestamps, single-table modelling, GSIs, the marshalling envelope — none of it
+is the problem, all of it is the substrate. It stays, for good reasons, but `scripts/check.sh` now
+enforces that only `internal/store` may import the AWS SDK. The check was verified to fire before the
+store exists.
+
+**And rung one turned out not to be code.** The riskiest assumption in the project — that DynamoDB Local
+supports the atomic conditional `TransactWriteItems` the crash-clean property rests on — was retired
+with five minutes of `curl` against a scratch table, since deleted. Transactions, conditional rejection,
+`BETWEEN` over our fixed-width keys, GSI2, and opaque Binary payloads all behave. Brooks's "plan to throw
+one away" and Beck's "smallest step that yields information" are the same instruction.
+
 ## Where we are
 
 `internal/{facet,clock,config}` committed on `master`. The three packages hold no I/O and no DynamoDB;
 they are the values everything above will be written in terms of.
 
-Next: the `store.DDB` layer against the live endpoint — single-table `CreateTable` with GSI1/GSI2,
-`toItem`/`fromItem` per domain value with the `kind` discriminator
-[[verbatim-payload-metadata-separation|quarantined to the store package]], payload as an opaque Binary
-attribute, and `ConditionalCheckFailed` mapped to a typed conflict.
+Next is **R2** on the ladder (`MVP.md` §2): the `store.DDB` layer against the live endpoint —
+single-table `CreateTable` with GSI1/GSI2, `toItem`/`fromItem` per domain value with the `kind`
+discriminator [[verbatim-payload-metadata-separation|quarantined to the store package]], payload as an
+opaque Binary attribute, and `ConditionalCheckFailed` mapped to a typed conflict. Every one of those
+mechanisms is now known to work — the spike proved them before we commit to them.
+
+Then **R3**, the gate, which is where the error kernel begins and where
+[[brooks-below-the-gate-beck-above-it|the step size changes]].
 
 ## Open threads
 

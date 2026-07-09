@@ -32,5 +32,6 @@ Two kinds of note:
   - [[fixed-width-timestamps-lexical-order]] · [[canonicalisation-fixes-serialisation-not-values]]
   - [[invariants-as-structural-tests]]
   - [[partition-key-has-no-default]] · [[config-explicit-fails-discovered-defaults]]
+  - [[brooks-below-the-gate-beck-above-it]] · [[substrate-is-accidental]]
 - Reference notes
   - [[reference-implementation-mint-cli]] · [[source-data-locations]]

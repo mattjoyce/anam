@@ -22,13 +22,51 @@ Everything in scope serves that sentence. Everything out of scope waits until it
 One thin end-to-end path must work before anything is widened:
 
 ```text
-capture (health-db / bp-csv) → ingest gate (resolve → commit, three pillars)
-       → append-only ledger (DynamoDB Local) → mint (checkpoint over the whole timeline)
-       → canonical fold → one projection + CLI timeline viewer → receipt
+ingest gate (resolve → commit, three pillars) → append-only ledger (DynamoDB Local)
+       → canonical fold → CLI timeline viewer          ← the thesis, made observable
+       → capture (health-db, then bp-csv) → changes_since
+       → one projection + receipt → mint (checkpoint over the whole timeline)
 ```
 
 Build it for **one facet type first**, then add the rest along the same path. **No step is stubbed —
 depth before breadth.**
+
+**Mint comes late, and deliberately.** A checkpoint is a *cache of the fold*: it exists to bound replay,
+and at this scale there is no replay cost to bound. Building it before the fold would be solving an
+unmeasured performance problem. The *seam* (a record-time watermark) is present from the start; the
+machinery arrives once it earns its place.
+
+**`timeline` comes early, and deliberately.** The whole-person read is the one claim Anam exists to make
+(§1). It is the first thing that should be observable, not the sixth.
+
+### The rungs
+
+Each rung ends somewhere you can stop, look, and learn something. The rule for sizing them follows the
+**error kernel** (`ARCHITECTURE.md` §6a): the ledger and the gate must be complete and un-provisional,
+because nothing above them can repair a corrupt core. Everything above is disposable and rebuildable, so
+it is built in the smallest steps that yield information.
+
+> **Depth-first below the gate. Smallest-step above it.**
+
+| Rung | Delivers | What it teaches |
+|---|---|---|
+| R0 ✅ | `facet`, `clock`, `config` | the domain values |
+| R1 ✅ | substrate spike, then thrown away | transactions, conditional writes, GSIs and key ordering all behave on DynamoDB Local |
+| R2 | `store.DDB` — idempotent `init`, one facet round-tripped | the key layout is real |
+| R3 | the gate — `resolve` + `commit`, atomic, idempotent, supersession, tombstone | **the error kernel.** Complete, or not at all |
+| R4 | `fold` + **`anam timeline`** | the inversion, visible. Plus the rebuild test (§7) as an automated check |
+| R5 | capture worker `health-db`, one `health.metric-group` definition | real payloads, real time semantics |
+| R6 | `changes_since` (GSI2) | record-time queries |
+| R7 | one projection + receipt | governance made real |
+| R8 | mint / `checkpoint` | replay bounded, once measurable |
+| R9 | derived insight, admitted `proposed` | the agentic path, isolated |
+
+`bp-csv` attaches at R5 whenever the export is available; it gates nothing.
+
+**The substrate is accidental, and stays reversible.** DynamoDB is a choice, not the problem: Anam is a
+single-user, single-partition, local store. Only `internal/store` may import the AWS SDK — no SDK type
+and no sort-key string escapes it, and `scripts/check.sh` enforces this. Swapping the substrate must
+never mean touching the domain.
 
 ---
 
@@ -106,8 +144,10 @@ a harness for proving the model, not a shipped product.
 - A **checkpoint** is content-addressed: **stable** when nothing changed, and its hash **moves** after
   new ingest.
 - A projection **receipt** reproduces exactly the facet set served at its watermark.
-- Switching Anam off loses **no** record — **rebuildable-from-source** demonstrated: drop the table,
-  `init`, re-ingest → identical canonical fold.
+- Switching Anam off loses **no** record — **rebuildable-from-source**: drop the table, `init`,
+  re-ingest → identical canonical fold. This is the executable specification of "Anam owns no fact", so
+  it is an **automated test from R4 onward**, not a closing demo; the fold's content hash is the
+  equality oracle.
 - `scripts/check.sh` passes (fmt, vet, golangci-lint, gosec, `-race` tests).
 
 ---

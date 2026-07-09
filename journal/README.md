@@ -24,8 +24,12 @@ Two kinds of note:
 
 - Journal entries
   - [[2026-07-10-genesis]] — the first session: from "my own Anam" to a committed spec.
+  - [[2026-07-10-step-one-domain-types]] — building `facet`/`clock`/`config`, and a trap in the stdlib.
 - Decision notes
   - [[the-inversion]] · [[person-substrate-grain]] · [[mint-unit-whole-timeline]]
   - [[facet-types-dotted-namespaced]] · [[facet-definition-format]]
   - [[verbatim-payload-metadata-separation]] · [[guiding-lens-hickey-armstrong]]
-  - [[reference-implementation-mint-cli]]
+  - [[fixed-width-timestamps-lexical-order]] · [[canonicalisation-fixes-serialisation-not-values]]
+  - [[invariants-as-structural-tests]]
+- Reference notes
+  - [[reference-implementation-mint-cli]] · [[source-data-locations]]

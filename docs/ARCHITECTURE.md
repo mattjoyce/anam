@@ -181,12 +181,14 @@ The gate is exposed as two calls:
 
 - The facet's id is **deterministic**: `facet_id = uuidv5(namespace, source_ref)`, so the same source
   row always maps to the same logical facet.
-- `commit` writes the artifact and an idempotency marker (`sref#<source_ref>#<content_hash>`) in a
-  **single atomic `TransactWriteItems`**, conditional on the marker not already existing.
-  - Same `source_ref` **and** same hash → **no-op** (safe re-ingest).
+- `commit` writes the artifact and its `admitted` record-event in **one transaction**. Idempotency is a
+  `UNIQUE (source_ref, content_hash)` constraint, so the marker is not a separate row to be kept
+  consistent — it *is* the artifact's own key (§8).
+  - Same `source_ref` **and** same hash → **no-op** (safe re-ingest); the insert conflicts and is ignored.
   - Same `source_ref`, **different** hash → the source row changed: write a **new artifact version** and
     append a `superseded` record-event against the prior. Nothing is mutated; the old artifact stays.
-- **Retraction is a tombstone** — a `tombstoned` record-event, never a delete.
+- **Retraction is a tombstone** — a `tombstoned` record-event, never a delete. The `facet` table's
+  `BEFORE DELETE` trigger makes this structural rather than aspirational.
 
 > **Design note (Armstrong).** Because `commit` is idempotent and atomic, a capture worker may **crash
 > mid-batch and simply be re-run to known-good**. There is no partial facet and no corruption. This — the
@@ -211,35 +213,67 @@ The gate is exposed as two calls:
 
 ---
 
-## 8. Storage — single-table on DynamoDB
+## 8. Storage — an embedded SQLite ledger
 
-Anam stores on a single DynamoDB table (`anam`) against **DynamoDB Local** (the unraid instance;
-endpoint configurable). Times are formatted UTC, fixed-width RFC3339Nano, so **lexical order equals
-chronological order** for range queries.
+Anam stores in a single **SQLite** file (`db_path`), opened in WAL mode through `database/sql`. There is
+no server, no network, and no daemon: the store is a library call, and the ledger is a file you can copy.
 
-```text
-PK = person#<id>                    (e.g. person#matt)
-SK:
-  facet#<event_time>#<facet_id>     the timeline           (Query: SK BETWEEN)
-  rec#<record_time>#<seq>#<facet_id> record-events
-  def#<type>#v<version>             facet definitions
-  ckpt#<watermark>                  checkpoints
-  span#<span_id>                    saved span bookmarks (a stored query, not a unit)
-  sync#<source>                     capture cursor (a cache, not truth — safe to lose)
-  rcpt#<created_at>#<id>            receipts
-  sref#<source_ref>#<hash>          idempotency markers
-GSI1 (by facet type):  gsi1_pk = person#<id>#type#<type>   gsi1_sk = <event_time>#<facet_id>
-GSI2 (changes_since):  gsi2_pk = person#<id>               gsi2_sk = <record_time>#<seq>
+**The substrate is accidental, not essential.** Anam is a single-user, single-partition, local store; the
+problem is a personal longitudinal record, not a key-value service. SQLite is chosen because it is the
+*simplest thing that satisfies the invariants* — and because it can enforce two of them directly, which
+no remote key-value store can. Only `internal/store` may name SQLite or `database/sql`; the domain does
+not know what it is stored in, and `scripts/check.sh` enforces that. Because Anam owns no source fact,
+**changing substrate is a re-ingest, not a migration.**
+
+The seven domain values get seven tables. There is no marshalling envelope and no `kind` discriminator —
+they were artefacts of single-table key-value modelling, and they are gone.
+
+```sql
+facet(facet_id, artifact_version, type, event_time, recorded_time, ingested_time,
+      person_id, classification, confidence, definition_version,
+      binding_assurance, span_hint, source, injector, source_ref,
+      method, model, watermark, birth_status,
+      source_schema, schema_version, content_hash, payload_kind, media_type,
+      payload BLOB NOT NULL,                          -- opaque; never a structured column
+      PRIMARY KEY (facet_id, artifact_version),
+      UNIQUE (source_ref, content_hash))              -- the idempotency marker (§6a)
+
+record_event(seq INTEGER PRIMARY KEY AUTOINCREMENT,   -- monotonic, allocated in-transaction
+      kind, facet_id, artifact_version, prior_artifact_version,
+      record_time, person_id)
+
+definition(type, definition_version, ...)   checkpoint(watermark, ...)
+span(span_id, ...)                          cursor(source, ...)   receipt(id, ...)
+
+CREATE INDEX timeline    ON facet(person_id, event_time);          -- was GSI1
+CREATE INDEX by_type     ON facet(person_id, type, event_time);    -- was GSI1
+CREATE INDEX changes     ON record_event(person_id, record_time, seq);  -- was GSI2
 ```
 
-> **Design note (Hickey).** The single-table `item` is a **marshalling envelope, quarantined to the
-> store package** — not a domain type. The seven domain values (facet, record-event, definition,
-> checkpoint, span, cursor, receipt) stay un-braided in code; each owns its `toItem`/`fromItem`. The
-> `kind` discriminator exists only at the storage edge. The **verbatim payload is stored as opaque
-> bytes (Binary), never a structured map** — this is where metadata/payload separation (§3) is enforced.
+Times are stored as **fixed-width UTC RFC3339Nano text**, so lexical order still equals chronological
+order and `BETWEEN` still gives the timeline window (§5). That decision survives the substrate change
+untouched: any ordered text timestamp needs it.
 
-Every store method takes a `context` with a deadline and **fails fast** on an unreachable endpoint —
-never a hang. `commit`'s conditional writes surface `ConditionalCheckFailed` as a typed conflict.
+> **Design note (Hickey).** Storing a `Facet` no longer requires braiding seven values into one item
+> shape. Each domain value maps to its own table, and the **payload is a `BLOB`, never a set of typed
+> columns** — this is where metadata/payload separation (§3) is enforced. Current status remains absent
+> from `facet`: it is folded from `record_event` (§9).
+
+> **Design note (Armstrong).** Two invariants are enforced **by the substrate rather than by our
+> vigilance**, which is the strongest form the error kernel can take:
+>
+> - **Append-only** — `BEFORE UPDATE` and `BEFORE DELETE` triggers on `facet` and `record_event`
+>   `RAISE(ABORT)`. A future refactor *cannot* overwrite a fact; the database refuses.
+> - **Idempotency** — `UNIQUE(source_ref, content_hash)`. Re-ingesting an unchanged row is
+>   `INSERT … ON CONFLICT DO NOTHING`; there is no marker to keep atomically consistent with the artifact,
+>   because the constraint *is* the marker.
+>
+> `commit` is therefore one ordinary transaction: insert the artifact, insert the `admitted`
+> record-event, commit. A worker may crash mid-batch and be re-run to known-good. `SQLITE_CONSTRAINT`
+> surfaces as a typed conflict.
+
+Every store method still takes a `context` with a deadline: SQLite can block on a write lock, and a hung
+call is a hung call whatever its cause.
 
 ---
 
@@ -252,7 +286,7 @@ stays; it is superseded or re-statused, never pruned by retraction.*
 - **Fold** reads facet artifacts in a window (default: **the whole timeline** — the inversion) plus the
   record-events up to a watermark, and derives each facet's current status (`admitted` / `superseded` /
   `tombstoned` / `endorsed` / `rejected`).
-- **`changes_since`** reads GSI2 by record-time and reports what changed between two points.
+- **`changes_since`** reads `record_event` by record-time and reports what changed between two points.
 
 From the canonical account, Anam publishes governed **projections** (variants): **versioned templates
 that prune — never reshape, never generate.** The only knobs are **metadata filters**: a facet-type
@@ -306,7 +340,7 @@ Anam later as an ordinary source fact.
 - **Storage is partitioned by the person (one timeline).** The **whole-person read is the default**; a
   Span is an optional derived filter, never a stored/minted/sealed unit.
 - **Append-only**: facts are added and superseded by status events (tombstones) — **never modified,
-  never deleted.**
+  never deleted.** Enforced by the substrate: `BEFORE UPDATE`/`BEFORE DELETE` triggers abort (§8).
 - **Current status is derived** by the fold from record-events — **never stored** on the artifact (no
   place-oriented programming).
 - **Metadata / payload separation**: the payload is verbatim, immutable, stored opaque, never parsed

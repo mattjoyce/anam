@@ -22,7 +22,7 @@ Everything in scope serves that sentence. Everything out of scope waits until it
 One thin end-to-end path must work before anything is widened:
 
 ```text
-ingest gate (resolve → commit, three pillars) → append-only ledger (DynamoDB Local)
+ingest gate (resolve → commit, three pillars) → append-only ledger (SQLite)
        → canonical fold → CLI timeline viewer          ← the thesis, made observable
        → capture (health-db, then bp-csv) → changes_since
        → one projection + receipt → mint (checkpoint over the whole timeline)
@@ -51,22 +51,24 @@ it is built in the smallest steps that yield information.
 | Rung | Delivers | What it teaches |
 |---|---|---|
 | R0 ✅ | `facet`, `clock`, `config` | the domain values |
-| R1 ✅ | substrate spike, then thrown away | transactions, conditional writes, GSIs and key ordering all behave on DynamoDB Local |
-| R2 | `store.DDB` — idempotent `init`, one facet round-tripped | the key layout is real |
+| R1 ✅ | substrate spike, twice, then thrown away | DynamoDB Local works; SQLite works *and* enforces append-only and idempotency itself — so SQLite it is |
+| R2 | `store.SQLite` — idempotent `init` (schema + triggers), one facet round-tripped | the schema is real |
 | R3 | the gate — `resolve` + `commit`, atomic, idempotent, supersession, tombstone | **the error kernel.** Complete, or not at all |
 | R4 | `fold` + **`anam timeline`** | the inversion, visible. Plus the rebuild test (§7) as an automated check |
 | R5 | capture worker `health-db`, one `health.metric-group` definition | real payloads, real time semantics |
-| R6 | `changes_since` (GSI2) | record-time queries |
+| R6 | `changes_since` over `record_event` | record-time queries |
 | R7 | one projection + receipt | governance made real |
 | R8 | mint / `checkpoint` | replay bounded, once measurable |
 | R9 | derived insight, admitted `proposed` | the agentic path, isolated |
 
 `bp-csv` attaches at R5 whenever the export is available; it gates nothing.
 
-**The substrate is accidental, and stays reversible.** DynamoDB is a choice, not the problem: Anam is a
-single-user, single-partition, local store. Only `internal/store` may import the AWS SDK — no SDK type
-and no sort-key string escapes it, and `scripts/check.sh` enforces this. Swapping the substrate must
-never mean touching the domain.
+**The substrate is accidental, and stays reversible.** The store is a choice, not the problem: Anam is a
+single-user, single-partition, local store, so it uses an embedded **SQLite** ledger — which, uniquely
+among the candidates, enforces append-only (triggers) and idempotency (a `UNIQUE` constraint) itself.
+Only `internal/store` may name SQLite or `database/sql`, and `scripts/check.sh` enforces that. Swapping
+the substrate must never mean touching the domain — and because Anam owns no source fact, such a swap is
+a re-ingest, not a migration.
 
 ---
 
@@ -85,13 +87,13 @@ never mean touching the domain.
 - **Mint:** a manual checkpoint over the whole timeline; canonical account folded on read.
 - **`timeline`:** the whole-person read (the inversion) — default, no span required — with optional
   `--from/--to`, `--type`, and `--span` narrowing.
-- **`changes_since`** between two record-times (GSI2).
+- **`changes_since`** between two record-times.
 - **At least one prune-only projection** (e.g. `bp`, `sleep`) plus the **CLI timeline viewer** (the
   diagnostic harness — proves the model, not a shipped UI).
 - **Receipts:** prove exactly what a projection served at a watermark.
 - **One derived-facet path:** an **insight** admitted as `proposed`, visible on the timeline, no
   write-back.
-- **`init`** creates the table + GSIs idempotently; **`version`** reports the ldflags build.
+- **`init`** creates the schema, indexes and append-only triggers idempotently; **`version`** reports the ldflags build.
 - **Read-only** throughout — Anam never writes back to a source.
 
 ---

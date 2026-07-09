@@ -17,15 +17,17 @@ Every design review and code audit runs through **Hickey × Armstrong** (*struct
   - Anam is **Datomic-shaped**: append-only accreting **immutable facts**, epochal time
     (event-time / record-time), **current state derived as a fold**. Never overwrite a fact. Never
     store a fact's current status as mutable place — derive it.
-  - The single-table `item` is a **marshalling envelope quarantined to `internal/store`**, not a
-    domain type. Domain types stay un-braided.
+  - The **substrate is accidental**, not essential — the problem is a personal longitudinal record, not a
+    store. Only `internal/store` may name SQLite or `database/sql`; `scripts/check.sh` enforces it.
 - **Armstrong (runtime).** For each component, name its failure and its recovery. What is the **error
   kernel** — the small trusted core that must not corrupt? What crashes, and what restarts it clean?
   - Anam's **error kernel** is the *append-only ledger + admission-gate invariants* (three pillars,
     idempotency, immutability). Everything else — capture workers, fold, projection, CLI — is
     **disposable and rebuildable from source** (Anam owns no facts).
-  - `commit` is **idempotent**; the facet+marker write is one atomic `TransactWriteItems`. A worker may
-    crash mid-batch and simply be re-run to known-good. No partial facet, ever.
+  - `commit` is **idempotent**; the artifact and its record-event are one transaction, and idempotency is
+    a `UNIQUE(source_ref, content_hash)` constraint. Append-only is enforced by `BEFORE UPDATE`/`DELETE`
+    triggers — the substrate refuses to overwrite a fact. A worker may crash mid-batch and simply be
+    re-run to known-good. No partial facet, ever.
   - The **`Envelope` is the only ingress** (share-nothing). Every external call carries a `context`
     deadline and **fails fast** — never a hang.
 
@@ -55,7 +57,7 @@ Use these defaults unless a task clearly requires otherwise.
 - Define interfaces **where they are used**; keep them small.
 - **Accept interfaces, return concrete types.** Constructors return concrete types.
   → each consumer (ingest, canonical, mint) declares the *narrow* store interface it needs; all are
-  satisfied by concrete `*store.DDB`. No god `Store`.
+  satisfied by concrete `*store.SQLite`. No god `Store`.
 
 **Style**
 - `gofmt` + `goimports` mandatory. `golangci-lint` must pass.
@@ -69,9 +71,9 @@ Use these defaults unless a task clearly requires otherwise.
 
 **Tests**
 - **Prefer real components over mocks.** Mock only truly uncontrollable externals.
-- Use **real DynamoDB-Local** (spun up / checked in `TestMain`; skip with a clear message if
-  unreachable) and **real SQLite** testdata. Test behaviour, not internals. Tests beside code. No
-  flaky tests. Table-driven for multiple meaningful cases. Target >80% coverage.
+- Use a **real SQLite ledger** (a temp file per test run — never a shared one; parallel packages and
+  `-shuffle=on` make shared state flaky) and **real SQLite** testdata. Test behaviour, not internals.
+  Tests beside code. No flaky tests. Table-driven for multiple meaningful cases. Target >80% coverage.
 
 **Embedded assets**
 - `//go:embed` (`embed.FS`) for small, static, versioned assets only (projection templates, bundled
@@ -106,10 +108,10 @@ go test -race -count=1 -shuffle=on -vet=all ./...
 | **Facet type** | lower-case **dotted**, namespaced | `health.blood-pressure`, `calendar.event` |
 | Source / operator identity | lower-case **hyphenated** | `health-db`, `bp-csv` |
 | CLI command | lower-case hyphenated | `ingest`, `def load` |
-| Config / payload / data key | **snake_case** | `ddb_endpoint`, `period_start`, `systolic` |
-| DynamoDB attribute | snake_case | `event_time`, `content_hash` |
-| Env var | UPPER_SNAKE | `ANAM_DDB_ENDPOINT` |
-| DynamoDB key value | lower-case, `#`-delimited | `person#matt`, `facet#…` |
+| Config / payload / data key | **snake_case** | `db_path`, `period_start`, `systolic` |
+| SQL column | snake_case | `event_time`, `content_hash` |
+| Env var | UPPER_SNAKE | `ANAM_DB_PATH` |
+| Person partition value | lower-case, `#`-delimited | `person#matt` |
 
 Facet types are **dotted and namespaced** on purpose — the namespace earns its keep as sources
 multiply (`health.*`, `calendar.*`, `mail.*`, `note.*`). This deviates from Arch's snake_case facet

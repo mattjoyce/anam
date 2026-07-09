@@ -118,8 +118,10 @@ a harness for proving the model, not a shipped product.
 - One static ingest token map; no rotation.
 - One or two projection templates; the viewer is diagnostic.
 - Consent is default-allow; classification is carried but not gated.
-- The `/mnt` copy of `healthdata.db` holds only `month`/`year` periods — the mapping is period-agnostic,
-  so daily rows slot in unchanged when present.
+- The source database is **`/home/matt/admin/data/healthdata.db`** — `day` periods across 2026-03-07 to
+  2026-06-06, plus `week`, `month` and `year` back to 2024-01. (The `/mnt/Projects/healthdata` copy holds
+  a single `month` and a single `year` period and cannot demonstrate a timeline at all.) The mapping is
+  period-agnostic, so whichever periods a copy holds slot in unchanged.
 
 ---
 

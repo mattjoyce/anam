@@ -9,24 +9,20 @@
 # The user config dir is $XDG_CONFIG_HOME if set, otherwise ~/.config.
 #
 # Every key can be overridden by an ANAM_-prefixed environment variable
-# (ANAM_DDB_ENDPOINT, ANAM_TABLE_NAME, ...). An unrecognised key is an error,
-# not a shrug: a silently-ignored `ddb_endpont` would leave Anam talking to the
-# default endpoint while you believed it was talking to yours.
+# (ANAM_DB_PATH, ANAM_PERSON_ID, ANAM_TIMEOUT). An unrecognised key is an error,
+# not a shrug: a silently-ignored `db_pth` would leave Anam writing to the
+# default ledger while you believed it was writing to yours.
 
 # The storage substrate. Every facet is partitioned under person#<person_id>.
 # Required, and deliberately without a default: a wrong partition key must fail
 # loudly rather than write your facts somewhere nobody chose.
 person_id: matt
 
-# The single DynamoDB table holding every item kind.
-table_name: anam
+# The SQLite ledger — a file, not a service. Anam owns no source fact, so losing
+# this file costs a re-ingest, not a fact.
+# Defaults to $XDG_DATA_HOME/anam/anam.db, else ~/.local/share/anam/anam.db.
+db_path: ~/.local/share/anam/anam.db
 
-# DynamoDB Local. It does not authenticate; the AWS credentials are literally fake.
-ddb_endpoint: http://localhost:8000
-
-# Nominal against DynamoDB Local, but the AWS SDK insists on one.
-ddb_region: us-east-1
-
-# Bounds every call to the store. Anam fails fast on an unreachable endpoint
-# rather than hanging.
+# Bounds every call to the store. SQLite can block on a write lock, and a hung
+# call is a hung call whatever its cause.
 timeout: 5s

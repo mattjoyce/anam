@@ -174,7 +174,7 @@ func TestResolveThenLoad(t *testing.T) {
 
 	path := filepath.Join(dir, "anam", "config.yaml")
 	touch(t, path)
-	if err := os.WriteFile(path, []byte("person_id: matt\ntable_name: anam-xdg\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte("person_id: matt\ndb_path: /srv/xdg.db\n"), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 
@@ -190,7 +190,7 @@ func TestResolveThenLoad(t *testing.T) {
 	if origin != config.OriginUserDir {
 		t.Errorf("origin = %q, want %q", origin, config.OriginUserDir)
 	}
-	if cfg.PersonID != "matt" || cfg.TableName != "anam-xdg" {
-		t.Errorf("Load() = %+v, want person_id=matt table_name=anam-xdg", cfg)
+	if cfg.PersonID != "matt" || cfg.DBPath != "/srv/xdg.db" {
+		t.Errorf("Load() = %+v, want person_id=matt db_path=/srv/xdg.db", cfg)
 	}
 }

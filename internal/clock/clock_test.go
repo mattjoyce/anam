@@ -44,7 +44,7 @@ func TestFormatIsFixedWidthUTC(t *testing.T) {
 }
 
 // TestFormatLexicalOrderMatchesChronologicalOrder guards ARCHITECTURE.md §8: the
-// DynamoDB range queries assume sorting the formatted strings sorts the instants.
+// ledger's range queries assume sorting the formatted strings sorts the instants.
 // time.RFC3339Nano fails this test; that is precisely why Layout exists.
 func TestFormatLexicalOrderMatchesChronologicalOrder(t *testing.T) {
 	t.Parallel()

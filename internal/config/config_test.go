@@ -26,6 +26,7 @@ func TestLoadWithoutPersonIDFails(t *testing.T) {
 
 func TestLoadDefaults(t *testing.T) {
 	t.Setenv("ANAM_PERSON_ID", "matt")
+	t.Setenv("XDG_DATA_HOME", "/data")
 
 	got, err := config.Load("")
 	if err != nil {
@@ -33,14 +34,25 @@ func TestLoadDefaults(t *testing.T) {
 	}
 
 	want := config.Config{
-		PersonID:    "matt",
-		TableName:   "anam",
-		DDBEndpoint: "http://localhost:8000",
-		DDBRegion:   "us-east-1",
-		Timeout:     5 * time.Second,
+		PersonID: "matt",
+		DBPath:   "/data/anam/anam.db",
+		Timeout:  5 * time.Second,
 	}
 	if got != want {
 		t.Errorf("Load() = %+v, want %+v", got, want)
+	}
+}
+
+func TestDefaultDBPath(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "/data")
+	if got, want := config.DefaultDBPath(), "/data/anam/anam.db"; got != want {
+		t.Errorf("DefaultDBPath() = %q, want %q (XDG_DATA_HOME honoured)", got, want)
+	}
+
+	t.Setenv("XDG_DATA_HOME", "")
+	t.Setenv("HOME", "/home/tester")
+	if got, want := config.DefaultDBPath(), "/home/tester/.local/share/anam/anam.db"; got != want {
+		t.Errorf("DefaultDBPath() = %q, want %q (XDG fallback)", got, want)
 	}
 }
 
@@ -62,9 +74,7 @@ func TestPersonIDComesFromEnvWithoutADefault(t *testing.T) {
 func TestLoadFromFile(t *testing.T) {
 	path := writeConfig(t, `
 person_id: matt
-table_name: anam-test
-ddb_endpoint: http://192.168.20.4:8000
-ddb_region: ap-southeast-2
+db_path: /srv/anam/ledger.db
 timeout: 12s
 `)
 
@@ -74,11 +84,9 @@ timeout: 12s
 	}
 
 	want := config.Config{
-		PersonID:    "matt",
-		TableName:   "anam-test",
-		DDBEndpoint: "http://192.168.20.4:8000",
-		DDBRegion:   "ap-southeast-2",
-		Timeout:     12 * time.Second,
+		PersonID: "matt",
+		DBPath:   "/srv/anam/ledger.db",
+		Timeout:  12 * time.Second,
 	}
 	if got != want {
 		t.Errorf("Load() = %+v, want %+v", got, want)
@@ -86,14 +94,14 @@ timeout: 12s
 }
 
 func TestLoadFileLeavesUnsetKeysAtDefaults(t *testing.T) {
-	path := writeConfig(t, "person_id: matt\ntable_name: anam-partial\n")
+	path := writeConfig(t, "person_id: matt\ndb_path: /srv/partial.db\n")
 
 	got, err := config.Load(path)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if got.TableName != "anam-partial" {
-		t.Errorf("TableName = %q, want %q", got.TableName, "anam-partial")
+	if got.DBPath != "/srv/partial.db" {
+		t.Errorf("DBPath = %q, want %q", got.DBPath, "/srv/partial.db")
 	}
 	if got.PersonID != "matt" {
 		t.Errorf("PersonID = %q, want the file value %q", got.PersonID, "matt")
@@ -104,9 +112,9 @@ func TestLoadFileLeavesUnsetKeysAtDefaults(t *testing.T) {
 }
 
 func TestEnvOverridesFileAndDefaults(t *testing.T) {
-	path := writeConfig(t, "person_id: matt\nddb_endpoint: http://from-file:8000\ntable_name: from-file\n")
+	path := writeConfig(t, "person_id: from-file\ndb_path: /srv/from-file.db\n")
 
-	t.Setenv("ANAM_DDB_ENDPOINT", "http://from-env:8000")
+	t.Setenv("ANAM_DB_PATH", "/srv/from-env.db")
 	t.Setenv("ANAM_TIMEOUT", "30s")
 
 	got, err := config.Load(path)
@@ -114,28 +122,28 @@ func TestEnvOverridesFileAndDefaults(t *testing.T) {
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	if got.DDBEndpoint != "http://from-env:8000" {
-		t.Errorf("DDBEndpoint = %q, want the environment to override the file", got.DDBEndpoint)
+	if got.DBPath != "/srv/from-env.db" {
+		t.Errorf("DBPath = %q, want the environment to override the file", got.DBPath)
 	}
 	if got.Timeout != 30*time.Second {
 		t.Errorf("Timeout = %s, want the environment to override the default", got.Timeout)
 	}
-	if got.TableName != "from-file" {
-		t.Errorf("TableName = %q, want the file value where the environment is silent", got.TableName)
+	if got.PersonID != "from-file" {
+		t.Errorf("PersonID = %q, want the file value where the environment is silent", got.PersonID)
 	}
 }
 
 // TestLoadRejectsUnknownKey is the fail-fast guard: a mistyped key must not be
-// silently ignored, leaving Anam pointed at the default endpoint while the operator
-// believes it is pointed at theirs.
+// silently ignored, leaving Anam writing to the default ledger while the operator
+// believes it is writing to theirs.
 func TestLoadRejectsUnknownKey(t *testing.T) {
 	tests := []struct {
 		name string
 		body string
 	}{
-		{"typo'd key", "ddb_endpont: http://192.168.20.4:8000\n"},
+		{"typo'd key", "db_pth: /srv/anam.db\n"},
 		{"key from a future version", "seal_point: true\n"},
-		{"camelCase instead of snake_case", "tableName: anam\n"},
+		{"camelCase instead of snake_case", "dbPath: /srv/anam.db\n"},
 	}
 
 	for _, tt := range tests {
@@ -184,11 +192,9 @@ func TestValidate(t *testing.T) {
 	t.Parallel()
 
 	valid := config.Config{
-		PersonID:    "matt",
-		TableName:   "anam",
-		DDBEndpoint: "http://localhost:8000",
-		DDBRegion:   "us-east-1",
-		Timeout:     5 * time.Second,
+		PersonID: "matt",
+		DBPath:   "/srv/anam.db",
+		Timeout:  5 * time.Second,
 	}
 
 	tests := []struct {
@@ -198,9 +204,7 @@ func TestValidate(t *testing.T) {
 	}{
 		{"valid", func(*config.Config) {}, false},
 		{"missing person_id", func(c *config.Config) { c.PersonID = "" }, true},
-		{"missing table_name", func(c *config.Config) { c.TableName = "" }, true},
-		{"missing ddb_endpoint", func(c *config.Config) { c.DDBEndpoint = "" }, true},
-		{"missing ddb_region", func(c *config.Config) { c.DDBRegion = "" }, true},
+		{"missing db_path", func(c *config.Config) { c.DBPath = "" }, true},
 		{"zero timeout", func(c *config.Config) { c.Timeout = 0 }, true},
 		{"negative timeout", func(c *config.Config) { c.Timeout = -time.Second }, true},
 	}

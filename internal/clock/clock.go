@@ -2,9 +2,10 @@
 // control, and the single wire format for every timestamp Anam stores.
 //
 // Timestamps are formatted fixed-width, in UTC, at nanosecond precision, so that
-// lexical order equals chronological order (ARCHITECTURE.md §8). The DynamoDB sort
-// keys — facet#<event_time>#…, rec#<record_time>#… — are range-queried on that
-// equivalence; nothing else guarantees it.
+// lexical order equals chronological order (ARCHITECTURE.md §8). Event-time and
+// record-time are stored as text and range-queried with BETWEEN / ORDER BY on that
+// equivalence; nothing else guarantees it. (This outlived the move off DynamoDB: any
+// ordered text timestamp needs it.)
 //
 // Consumers needing a clock declare their own single-method interface at the point of
 // use (AGENTS.md); this package returns concrete types.

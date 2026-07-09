@@ -10,7 +10,23 @@ import (
 	"github.com/mattjoyce/anam/internal/config"
 )
 
+// TestLoadWithoutPersonIDFails guards the partition key. person_id has no default:
+// defaulting it would let Anam write facets into a partition nobody chose.
+func TestLoadWithoutPersonIDFails(t *testing.T) {
+	t.Setenv("ANAM_PERSON_ID", "") // hermetic: ignore the developer's own environment
+
+	_, err := config.Load("")
+	if err == nil {
+		t.Fatal("Load() = nil error with no person_id, want error")
+	}
+	if !errors.Is(err, config.ErrInvalid) {
+		t.Errorf("Load() error = %v, want it to wrap ErrInvalid", err)
+	}
+}
+
 func TestLoadDefaults(t *testing.T) {
+	t.Setenv("ANAM_PERSON_ID", "matt")
+
 	got, err := config.Load("")
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
@@ -25,6 +41,21 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if got != want {
 		t.Errorf("Load() = %+v, want %+v", got, want)
+	}
+}
+
+// TestPersonIDComesFromEnvWithoutADefault pins the reason person_id is bound rather
+// than left alone: a key with no default and no config entry is unknown to viper, so
+// Unmarshal would silently ignore ANAM_PERSON_ID.
+func TestPersonIDComesFromEnvWithoutADefault(t *testing.T) {
+	t.Setenv("ANAM_PERSON_ID", "someone-else")
+
+	got, err := config.Load("")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got.PersonID != "someone-else" {
+		t.Errorf("PersonID = %q, want the environment value %q", got.PersonID, "someone-else")
 	}
 }
 
@@ -55,7 +86,7 @@ timeout: 12s
 }
 
 func TestLoadFileLeavesUnsetKeysAtDefaults(t *testing.T) {
-	path := writeConfig(t, "table_name: anam-partial\n")
+	path := writeConfig(t, "person_id: matt\ntable_name: anam-partial\n")
 
 	got, err := config.Load(path)
 	if err != nil {
@@ -65,7 +96,7 @@ func TestLoadFileLeavesUnsetKeysAtDefaults(t *testing.T) {
 		t.Errorf("TableName = %q, want %q", got.TableName, "anam-partial")
 	}
 	if got.PersonID != "matt" {
-		t.Errorf("PersonID = %q, want the default %q", got.PersonID, "matt")
+		t.Errorf("PersonID = %q, want the file value %q", got.PersonID, "matt")
 	}
 	if got.Timeout != 5*time.Second {
 		t.Errorf("Timeout = %s, want the default 5s", got.Timeout)
@@ -73,7 +104,7 @@ func TestLoadFileLeavesUnsetKeysAtDefaults(t *testing.T) {
 }
 
 func TestEnvOverridesFileAndDefaults(t *testing.T) {
-	path := writeConfig(t, "ddb_endpoint: http://from-file:8000\ntable_name: from-file\n")
+	path := writeConfig(t, "person_id: matt\nddb_endpoint: http://from-file:8000\ntable_name: from-file\n")
 
 	t.Setenv("ANAM_DDB_ENDPOINT", "http://from-env:8000")
 	t.Setenv("ANAM_TIMEOUT", "30s")

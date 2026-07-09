@@ -1,0 +1,32 @@
+# Anam configuration — copy to ~/.config/anam/config.yaml
+#
+# Anam looks for a config file in this order, and stops at the first hit:
+#
+#   1. --config <path>                     explicit; missing is an error
+#   2. $ANAM_CONFIG                        explicit; missing is an error
+#   3. <user config dir>/anam/config.yaml  discovered; missing is fine
+#
+# The user config dir is $XDG_CONFIG_HOME if set, otherwise ~/.config.
+#
+# Every key can be overridden by an ANAM_-prefixed environment variable
+# (ANAM_DDB_ENDPOINT, ANAM_TABLE_NAME, ...). An unrecognised key is an error,
+# not a shrug: a silently-ignored `ddb_endpont` would leave Anam talking to the
+# default endpoint while you believed it was talking to yours.
+
+# The storage substrate. Every facet is partitioned under person#<person_id>.
+# Required, and deliberately without a default: a wrong partition key must fail
+# loudly rather than write your facts somewhere nobody chose.
+person_id: matt
+
+# The single DynamoDB table holding every item kind.
+table_name: anam
+
+# DynamoDB Local. It does not authenticate; the AWS credentials are literally fake.
+ddb_endpoint: http://localhost:8000
+
+# Nominal against DynamoDB Local, but the AWS SDK insists on one.
+ddb_region: us-east-1
+
+# Bounds every call to the store. Anam fails fast on an unreachable endpoint
+# rather than hanging.
+timeout: 5s

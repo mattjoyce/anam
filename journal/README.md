@@ -31,5 +31,6 @@ Two kinds of note:
   - [[verbatim-payload-metadata-separation]] · [[guiding-lens-hickey-armstrong]]
   - [[fixed-width-timestamps-lexical-order]] · [[canonicalisation-fixes-serialisation-not-values]]
   - [[invariants-as-structural-tests]]
+  - [[partition-key-has-no-default]] · [[config-explicit-fails-discovered-defaults]]
 - Reference notes
   - [[reference-implementation-mint-cli]] · [[source-data-locations]]

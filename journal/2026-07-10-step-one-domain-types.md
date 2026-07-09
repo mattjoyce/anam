@@ -92,6 +92,21 @@ re-checks. `Canonical` is exactly that move — Hickey's structure serving Armst
 
 Both new guards were mutation-checked, per [[invariants-as-structural-tests]].
 
+## Config discovery, settled
+
+Config now resolves `--config` → `$ANAM_CONFIG` → `<user config dir>/anam/config.yaml`, with the
+asymmetry that an explicitly-named missing file errors while a discovered missing file falls back to
+defaults ([[config-explicit-fails-discovered-defaults]]). `person_id` lost its default, because it is
+the ledger's partition key and a wrong one succeeds into the wrong partition rather than failing
+([[partition-key-has-no-default]]).
+
+Mutating the code to check a comment paid off again: the claim that `BindEnv` must follow
+`SetEnvPrefix` turned out to be true but *not* for the reason written down — `AutomaticEnv` masks the
+wrong order entirely. The comment now says what is actually true, and warns against relying on the mask.
+
+`gosec` flagged `os.Stat` on an operator-supplied path (G703, taint). `filepath.Clean` satisfied it
+honestly, so no `#nosec` was needed.
+
 ## Where we are
 
 `internal/{facet,clock,config}` committed on `master`. The three packages hold no I/O and no DynamoDB;

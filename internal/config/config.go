@@ -40,15 +40,28 @@ type Config struct {
 // Environment variables override the file, which overrides the defaults.
 func Load(path string) (Config, error) {
 	v := viper.New()
+	v.SetEnvPrefix("ANAM")
+	v.AutomaticEnv()
 
-	v.SetDefault("person_id", "matt")
+	// person_id has no default on purpose. It is the ledger's partition key
+	// (person#<id>), so a defaulted or mistyped value would not fail — it would quietly
+	// write facets into a partition nobody chose. Validate rejects it when empty.
+	//
+	// BindEnv is still required: Unmarshal decodes from viper's known keys, and a key
+	// with neither a default nor a config entry is unknown, so ANAM_PERSON_ID would be
+	// ignored. BindEnv registers the key without giving it a value.
+	//
+	// It must come after SetEnvPrefix, which BindEnv reads at call time to build the
+	// ANAM_ name. AutomaticEnv happens to paper over the wrong order today; do not rely
+	// on that.
+	if err := v.BindEnv("person_id"); err != nil {
+		return Config{}, fmt.Errorf("bind person_id: %w", err)
+	}
+
 	v.SetDefault("table_name", "anam")
 	v.SetDefault("ddb_endpoint", "http://localhost:8000")
 	v.SetDefault("ddb_region", "us-east-1")
 	v.SetDefault("timeout", 5*time.Second)
-
-	v.SetEnvPrefix("ANAM")
-	v.AutomaticEnv()
 
 	if path != "" {
 		v.SetConfigFile(path)

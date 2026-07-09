@@ -31,8 +31,8 @@ Running the *Before — design review* pass on the draft produced binding rules:
 - **Name the error kernel (Armstrong).** The append-only ledger + admission-gate invariants
   (three pillars, idempotency, immutability) are the small trusted core that must not corrupt.
   Everything else is disposable and rebuildable from source.
-- **Quarantine the braid (Hickey).** The single-table `item` is a marshalling envelope at the store
-  edge, not a domain type — the seven domain values stay un-braided in code.
+- **Quarantine the substrate (Hickey).** The store is [[substrate-is-accidental|accidental complexity]];
+  only `internal/store` may name it. The seven domain values stay un-braided, one table each.
 - **One truth per fact (Hickey, no PLOP).** The artifact stores only immutable `birth_status`; current
   status/endorsement is always a fold output, never written back.
 - **Cursor is a cache, not truth (Hickey).** Derivable, safe to lose; ingest idempotency makes a lost

@@ -57,6 +57,13 @@ Parsing is strict for the same reason: `clock.Parse` rejects `2026-01-24T06:30:0
 timestamp without its nine digits is not one Anam wrote, and accepting it would let a foreign width back
 into the keyspace.
 
+## It outlived the substrate
+
+This note was written while Anam stored on DynamoDB, whose sort keys are strings. Anam then moved to
+SQLite ([[substrate-is-accidental]]) — and the rule survived unchanged, because event-time is still a
+**text column that gets ordered**. The lesson generalises past any one store: the hazard belongs to
+*ordered serialised timestamps*, not to DynamoDB.
+
 ## Enforcement
 
 `internal/clock` owns `Layout` and `Width`; nothing else formats a time. A test asserts, over every pair

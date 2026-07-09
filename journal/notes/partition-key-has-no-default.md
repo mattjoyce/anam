@@ -12,31 +12,30 @@ related: ["[[person-substrate-grain]]", "[[config-explicit-fails-discovered-defa
 # The partition key has no default — an implicit `person_id` is a silent data hazard
 
 **Decision.** `person_id` has **no default**. `config.Load` fails if it is unset. Every other setting
-(`table_name`, `ddb_endpoint`, `ddb_region`, `timeout`) keeps a sensible default.
+(`db_path`, `timeout`) keeps a sensible default.
 
 ## The tension
 
 A personal, single-user tool wants to run with zero configuration. Anam has exactly one person, whose id
 is known; defaulting `person_id: matt` costs nothing and saves a config file before first run. That is
-the *easy* choice, and for four of the five settings it is also the *simple* one.
+the *easy* choice, and for the other settings it is also the *simple* one.
 
 `person_id` is different in kind, not degree. It is not a preference — it is the **storage substrate**.
-Every item is written under `PK = person#<id>` ([[person-substrate-grain]]). Nothing downstream
-validates it, because a person partition is created by writing to it.
+Every row is written under `person_id` ([[person-substrate-grain]]). Nothing downstream validates it,
+because a person partition is created by writing to it.
 
 So a wrong `person_id` does not fail. It **succeeds, into the wrong partition.** The ledger appears
 empty, a re-ingest looks like a first ingest, `changes_since` reports nothing, and the facts sit in
-`person#mat` where nothing will ever read them. This is the same failure class as the `ddb_endpont` typo
-that silently redirected Anam to `localhost` — but on the ledger rather than the endpoint, which is
-worse: an unreachable endpoint fails on the next call, and a reachable wrong partition never fails at
-all.
+`person#mat` where nothing will ever read them. This is the same failure class as the `db_pth` typo that
+silently redirected Anam to the default ledger — but the partition is worse: a wrong path at least
+produces a visibly empty database, and a wrong partition inside the right database never fails at all.
 
 ## The rule this generalises to
 
 > Default a setting when a wrong value **fails**. Require it when a wrong value **succeeds somewhere
 > else.**
 
-A default is a promise that the unconfigured case is safe. For an endpoint or a timeout, the
+A default is a promise that the unconfigured case is safe. For a ledger path or a timeout, the
 unconfigured case is safe: you find out immediately. For the key that decides *where your facts are
 written*, there is no immediate feedback, and a default converts a loud error into a quiet one. The
 cost of requiring it is a single line in a config file, paid once.

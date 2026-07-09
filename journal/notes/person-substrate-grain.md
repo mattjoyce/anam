@@ -29,5 +29,6 @@ cost is the point, not a tax.
 
 - Single partition key means no cross-person query, no identity graph, no merge — all dropped.
 - The `person#<id>` constant keeps a multi-person seam open in the keys, but nothing exercises it.
-- Timeline reads are a DynamoDB `Query` with `SK BETWEEN` — cheap and range-ordered because keys are
-  fixed-width UTC timestamps (lexical == chronological).
+- Timeline reads are a `WHERE person_id = ? AND event_time BETWEEN ? AND ?` over an index — cheap and
+  range-ordered because event-time is stored as a
+  [[fixed-width-timestamps-lexical-order|fixed-width UTC timestamp]] (lexical == chronological).

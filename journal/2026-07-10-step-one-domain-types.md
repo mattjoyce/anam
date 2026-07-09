@@ -132,16 +132,37 @@ with five minutes of `curl` against a scratch table, since deleted. Transactions
 `BETWEEN` over our fixed-width keys, GSI2, and opaque Binary payloads all behave. Brooks's "plan to throw
 one away" and Beck's "smallest step that yields information" are the same instruction.
 
+## The substrate changed
+
+Asked, late in the session, whether Mongo or Couch would be better. Neither — both are servers, and
+Anam is a single-user local tool. But the question was the right one, and the honest answer was that
+**SQLite** beats the incumbent too.
+
+Brooks's triage had already listed DynamoDB's costs ([[substrate-is-accidental]]). What it had not
+weighed was that DynamoDB *gave Anam nothing Anam used* — not scale, not durability, not concurrency —
+while SQLite can **enforce two of Anam's deepest invariants itself**: append-only as a trigger,
+idempotency as a `UNIQUE` constraint. That is the [[invariants-enforced-by-the-substrate|enforcement
+ladder]], and it is a better reason than any of the deleted GSIs.
+
+A second five-minute spike proved it: `INSERT OR IGNORE` is idempotent, a changed hash supersedes and
+both rows are retained, `UPDATE` and `DELETE` abort at the database, and the timeline range query works.
+`seq` is monotonic but not gapless — an ignored insert still consumes an autoincrement value — which is
+fine for ordering record-events and worth knowing before someone assumes contiguity.
+
+Cost of the change: one document rewritten, three config keys, and no store code, because the boundary
+check went in *before* the store existed. Cost of being wrong later: a re-ingest — Anam owns no source
+fact. That asymmetry is why the question was worth asking at exactly this moment and not one rung later.
+
 ## Where we are
 
 `internal/{facet,clock,config}` committed on `master`. The three packages hold no I/O and no DynamoDB;
 they are the values everything above will be written in terms of.
 
-Next is **R2** on the ladder (`MVP.md` §2): the `store.DDB` layer against the live endpoint —
-single-table `CreateTable` with GSI1/GSI2, `toItem`/`fromItem` per domain value with the `kind`
-discriminator [[verbatim-payload-metadata-separation|quarantined to the store package]], payload as an
-opaque Binary attribute, and `ConditionalCheckFailed` mapped to a typed conflict. Every one of those
-mechanisms is now known to work — the spike proved them before we commit to them.
+Next is **R2** on the ladder (`MVP.md` §2): the `store.SQLite` layer — idempotent `init` creating the
+schema, indexes and the append-only triggers; seven tables, one per domain value, with no marshalling
+envelope; payload as an opaque [[verbatim-payload-metadata-separation|`BLOB`]]; and `SQLITE_CONSTRAINT`
+mapped to a typed conflict. Every mechanism is now known to work — the spike proved them before we
+commit to them.
 
 Then **R3**, the gate, which is where the error kernel begins and where
 [[brooks-below-the-gate-beck-above-it|the step size changes]].

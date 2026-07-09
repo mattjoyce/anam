@@ -33,5 +33,6 @@ Two kinds of note:
   - [[invariants-as-structural-tests]]
   - [[partition-key-has-no-default]] · [[config-explicit-fails-discovered-defaults]]
   - [[brooks-below-the-gate-beck-above-it]] · [[substrate-is-accidental]]
+  - [[invariants-enforced-by-the-substrate]]
 - Reference notes
   - [[reference-implementation-mint-cli]] · [[source-data-locations]]

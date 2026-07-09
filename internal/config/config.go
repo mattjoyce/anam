@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
 )
 
@@ -56,9 +57,14 @@ func Load(path string) (Config, error) {
 		}
 	}
 
+	// An unrecognised key is an error, not a shrug. Config is external input, and a
+	// silently-ignored `ddb_endpont` would leave Anam talking to the default endpoint
+	// while the operator believes it is talking to theirs — the failure you never
+	// notice. Fail fast at startup instead.
 	var c Config
-	if err := v.Unmarshal(&c); err != nil {
-		return Config{}, fmt.Errorf("decode config: %w", err)
+	errorOnUnknownKeys := func(dc *mapstructure.DecoderConfig) { dc.ErrorUnused = true }
+	if err := v.Unmarshal(&c, errorOnUnknownKeys); err != nil {
+		return Config{}, fmt.Errorf("decode config: %w: %v", ErrInvalid, err)
 	}
 	if err := c.Validate(); err != nil {
 		return Config{}, err

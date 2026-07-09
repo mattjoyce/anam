@@ -94,6 +94,34 @@ func TestEnvOverridesFileAndDefaults(t *testing.T) {
 	}
 }
 
+// TestLoadRejectsUnknownKey is the fail-fast guard: a mistyped key must not be
+// silently ignored, leaving Anam pointed at the default endpoint while the operator
+// believes it is pointed at theirs.
+func TestLoadRejectsUnknownKey(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{"typo'd key", "ddb_endpont: http://192.168.20.4:8000\n"},
+		{"key from a future version", "seal_point: true\n"},
+		{"camelCase instead of snake_case", "tableName: anam\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := writeConfig(t, tt.body)
+
+			_, err := config.Load(path)
+			if err == nil {
+				t.Fatalf("Load() = nil error for %q, want an error naming the unknown key", tt.body)
+			}
+			if !errors.Is(err, config.ErrInvalid) {
+				t.Errorf("Load() error = %v, want it to wrap ErrInvalid", err)
+			}
+		})
+	}
+}
+
 func TestLoadMissingFile(t *testing.T) {
 	_, err := config.Load(filepath.Join(t.TempDir(), "absent.yaml"))
 	if err == nil {

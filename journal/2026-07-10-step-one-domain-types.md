@@ -44,6 +44,12 @@ skeleton; this one built build-order step 1 — `facet`, `clock`, `config` — a
 5. **Committed.** `scripts/check.sh` green — gofmt, goimports, vet, golangci-lint, gosec, `-race`
    `-shuffle=on`. Coverage 93.8%.
 
+6. **Then ran the audit we had skipped.** `AGENTS.md` requires the
+   [[guiding-lens-hickey-armstrong|Hickey × Armstrong]] pass on any non-trivial change, and we had
+   used the *vocabulary* — "complect", "error kernel" — without ever pointing the lens. Running it
+   properly found four things, each confirmed by executing it rather than reasoning about it. See
+   below.
+
 ## Two corrections to the spec
 
 Both recorded in [[source-data-locations]]:
@@ -55,6 +61,36 @@ Both recorded in [[source-data-locations]]:
 - **The BP CSV is gone.** Sent over LocalSend last session, never persisted, nowhere on disk. It must be
   re-sent and committed to `testdata/`. The `bp_*` metrics inside `healthdata.db` are *not* a
   substitute — they are period summaries, a different fact at a different grain.
+
+## The audit — what the lens found
+
+**Armstrong, and it was a live bug.** `config.Load` silently ignored an unrecognised key. A typo'd
+`ddb_endpont` returned no error and left `DDBEndpoint` at its default, so Anam would have talked to
+`localhost` while the operator believed it was talking to unraid — the failure you never notice. Config
+is external input; it now fails fast on any unknown key.
+
+**Hickey, and it was our own blindspot.** We wrote a reflection test guarding the *shape* of `Facet` (no
+`Status` field may appear) and took that for having made §12 executable. But shape guards say nothing
+about *values*. A `Facet` with an invalid `Type`, an empty `BirthStatus`, and a `Descriptor.ContentHash`
+that disagreed with its own `Payload` compiled and passed every test — there is no constructor and no
+`Validate()`. `Envelope` has one; the far more load-bearing `Facet` does not.
+
+**`ContentHash` accepted any bytes.** Hashing a raw, key-unsorted payload compiled and returned a
+plausible, wrong digest; the "these bytes are canonical" guarantee lived only in a doc comment. Fixed
+with a `Canonical` type — deliberately a **struct wrapping an unexported field**, not a named `[]byte`,
+because Go's assignability rules would let a raw `[]byte` pass wherever a named byte-slice type is
+expected and the misuse would still compile. It is now a compile error. This is the cheap version of
+[[canonicalisation-fixes-serialisation-not-values]]: make the invariant travel with the value.
+
+**The two lenses disagreed on the cure, and that is the useful part.** Hickey's answer to a
+badly-formed `Facet` is a smart constructor and unrepresentable illegal states. Armstrong's instinct
+runs the other way — don't scatter defensive validation through the interior, put one check at the
+single ingress and let everything inside trust it. Averaging them would give a `Validate()` sprinkled at
+every call site, which is the worst of both. Holding the tension gives the right answer: **the gate is
+the only thing that constructs a `Facet`**, and types carry the guarantees inward so the interior never
+re-checks. `Canonical` is exactly that move — Hickey's structure serving Armstrong's isolation.
+
+Both new guards were mutation-checked, per [[invariants-as-structural-tests]].
 
 ## Where we are
 
@@ -68,9 +104,34 @@ attribute, and `ConditionalCheckFailed` mapped to a typed conflict.
 
 ## Open threads
 
-- Still unsettled from genesis: whether `identity_key` lives in `meta` or derives from `source_ref`
-  ([[facet-definition-format]]).
+Carried from genesis:
+
+- Whether `identity_key` lives in `meta` or derives from `source_ref` ([[facet-definition-format]]).
+
+Deferred out of the audit — all three land with the gate in step 3, because the gate's shape decides
+theirs:
+
+- **`Facet` has no constructor.** Illegal facets are representable. The fix is *not* a `Validate()`
+  called everywhere; it is `facet.New(envelope, resolution, clock)` living at the gate, as the only way
+  to build one, computing `Descriptor.ContentHash` from the payload rather than accepting it. Writing it
+  now would be guessing at a signature `resolve`/`commit` will dictate.
+- **`Provenance` braids two concerns.** `Source`/`Injector`/`SourceRef` describe capture;
+  `Method`/`Model`/`Watermark` describe derivation. Nothing stops a captured facet carrying a `Model`.
+  A nested optional `Derivation` would make the illegal state unrepresentable.
+- **`Status` and `RecordEventKind` share five of six string values.** `Status(event.Kind)` is a legal
+  conversion that yields `Status("published")` — an invalid status the fold would carry silently. The
+  fold must map kinds to statuses explicitly, never convert. Guard it when the fold lands.
+
+Environmental:
+
 - `viper` v1.21 raised the module's Go floor from 1.22 to 1.23.0. The local toolchain is 1.22.2, so
   `GOTOOLCHAIN=auto` now downloads 1.23.0 on every build. It works; it is not free.
 - `Confidence` is a bare `float64` on `Facet`. It has no validation and no defined range yet — the spec
   never pinned one.
+
+Process:
+
+- The audit was run *after* the commit, not before. `AGENTS.md` puts it on any non-trivial change; the
+  natural checkpoint is the pass before each build-order commit. It found a live bug the full green
+  gate — fmt, vet, lint, gosec, race, 93.8% coverage — did not. A quality gate checks that the code is
+  well-made; the lens asks whether it is the right shape. They are not substitutes.

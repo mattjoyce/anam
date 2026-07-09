@@ -45,8 +45,8 @@ func TestCanonicalize(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Canonicalize() error = %v", err)
 			}
-			if string(got) != tt.want {
-				t.Errorf("Canonicalize() = %s, want %s", got, tt.want)
+			if string(got.Bytes()) != tt.want {
+				t.Errorf("Canonicalize() = %s, want %s", got.Bytes(), tt.want)
 			}
 		})
 	}
@@ -79,8 +79,8 @@ func TestCanonicalizePreservesNumbersVerbatim(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Canonicalize() error = %v", err)
 			}
-			if string(got) != tt.want {
-				t.Errorf("Canonicalize() = %s, want %s", got, tt.want)
+			if string(got.Bytes()) != tt.want {
+				t.Errorf("Canonicalize() = %s, want %s", got.Bytes(), tt.want)
 			}
 		})
 	}
@@ -108,11 +108,11 @@ func TestCanonicalizeIsStableAcrossKeyOrder(t *testing.T) {
 		hash := facet.ContentHash(got)
 
 		if i == 0 {
-			wantBytes, wantHash = string(got), hash
+			wantBytes, wantHash = string(got.Bytes()), hash
 			continue
 		}
-		if string(got) != wantBytes {
-			t.Errorf("Canonicalize(%s) = %s, want %s", in, got, wantBytes)
+		if string(got.Bytes()) != wantBytes {
+			t.Errorf("Canonicalize(%s) = %s, want %s", in, got.Bytes(), wantBytes)
 		}
 		if hash != wantHash {
 			t.Errorf("ContentHash for %s = %s, want %s", in, hash, wantHash)
@@ -127,12 +127,39 @@ func TestCanonicalizeIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Canonicalize() error = %v", err)
 	}
-	twice, err := facet.Canonicalize(once)
+	twice, err := facet.Canonicalize(once.Bytes())
 	if err != nil {
 		t.Fatalf("Canonicalize() on canonical bytes error = %v", err)
 	}
-	if string(once) != string(twice) {
-		t.Errorf("Canonicalize is not idempotent: %s then %s", once, twice)
+	if string(once.Bytes()) != string(twice.Bytes()) {
+		t.Errorf("Canonicalize is not idempotent: %s then %s", once.Bytes(), twice.Bytes())
+	}
+}
+
+// TestCanonicalFromStoredCopies guards the payload against a caller who keeps, and
+// then mutates, the buffer an admitted facet was built from. The payload is an
+// immutable value (§3); Go will not enforce that on a slice, so the boundary copies.
+func TestCanonicalFromStoredCopies(t *testing.T) {
+	t.Parallel()
+
+	stored := []byte(`{"a":1}`)
+	c := facet.CanonicalFromStored(stored)
+	stored[2] = 'X'
+
+	if got := string(c.Bytes()); got != `{"a":1}` {
+		t.Errorf("payload = %s after the caller mutated its buffer, want {\"a\":1}", got)
+	}
+}
+
+func TestCanonicalZeroValue(t *testing.T) {
+	t.Parallel()
+
+	var c facet.Canonical
+	if c.Len() != 0 {
+		t.Errorf("zero Canonical Len() = %d, want 0", c.Len())
+	}
+	if c.Bytes() != nil {
+		t.Errorf("zero Canonical Bytes() = %v, want nil", c.Bytes())
 	}
 }
 

@@ -247,9 +247,10 @@ type Facet struct {
 
 	Descriptor Descriptor
 
-	// Payload is the source fragment held verbatim, in canonical bytes (see
-	// Canonicalize). It is opaque: Anam governs on Descriptor, never on this.
-	Payload []byte
+	// Payload is the source fragment held verbatim. Its type carries the proof that it
+	// is canonical, so Descriptor.ContentHash cannot have been computed over anything
+	// else. It is opaque: Anam governs on Descriptor, never on this.
+	Payload Canonical
 }
 
 // RecordEvent asserts that Anam's knowledge of a Facet changed, at record-time (§5).

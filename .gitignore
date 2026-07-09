@@ -1,0 +1,23 @@
+# Binaries
+/anam
+/dist/
+*.exe
+
+# Go build/test artifacts
+*.test
+*.out
+/coverage.*
+.ruff_cache/
+
+# Local config / secrets (Anam uses static fake Dynamo-Local creds — nothing real here,
+# but keep local overrides out of the repo)
+config.local.yaml
+*.local.yaml
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Received data drops (kept outside the repo; testdata/ holds curated fixtures only)
+/inbox/

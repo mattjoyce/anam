@@ -22,6 +22,18 @@ else
   echo "goimports not installed — skipping (install: golang.org/x/tools/cmd/goimports)"
 fi
 
+# Substrate boundary. DynamoDB is accidental complexity — the problem is a personal
+# longitudinal record, not a key-value store — so the choice must stay reversible.
+# Only internal/store may name the AWS SDK; the domain must not know it exists.
+echo "→ substrate boundary (aws-sdk confined to internal/store)"
+boundary="$(go list -f '{{.ImportPath}}{{range .Imports}} {{.}}{{end}}{{range .TestImports}} {{.}}{{end}}' ./... 2>/dev/null \
+  | grep 'aws-sdk-go' | grep -v '^github.com/mattjoyce/anam/internal/store' || true)"
+if [ -n "$boundary" ]; then
+  echo "  FAILED: AWS SDK imported outside internal/store:" >&2
+  echo "$boundary" | awk '{print "    " $1}' >&2
+  fail=1
+fi
+
 run go vet ./...
 if command -v golangci-lint >/dev/null 2>&1; then run golangci-lint run ./...; else echo "golangci-lint not installed — skipping"; fi
 if command -v gosec >/dev/null 2>&1; then run gosec -severity medium -quiet ./...; else echo "gosec not installed — skipping"; fi

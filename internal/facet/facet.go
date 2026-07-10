@@ -113,22 +113,22 @@ func (s Status) Valid() bool {
 // RecordEventKind names the way Anam's knowledge of a Facet changed.
 type RecordEventKind string
 
-// The record-event kinds. All but EventPublished advance a Facet's derived status;
-// EventPublished records that a Facet first appeared in a served account and leaves
-// status untouched.
+// The record-event kinds — exactly five, one per derivable status. Publication is
+// deliberately not among them: serving a facet changes nothing Anam knows about it,
+// and a receipt already records what was shown (§9). Every kind can change the
+// live-set, which is what makes the watermark the record-event sequence itself.
 const (
 	EventAdmitted   RecordEventKind = "admitted"
 	EventSuperseded RecordEventKind = "superseded"
 	EventTombstoned RecordEventKind = "tombstoned"
 	EventEndorsed   RecordEventKind = "endorsed"
 	EventRejected   RecordEventKind = "rejected"
-	EventPublished  RecordEventKind = "published"
 )
 
 // Valid reports whether k is a known record-event kind.
 func (k RecordEventKind) Valid() bool {
 	switch k {
-	case EventAdmitted, EventSuperseded, EventTombstoned, EventEndorsed, EventRejected, EventPublished:
+	case EventAdmitted, EventSuperseded, EventTombstoned, EventEndorsed, EventRejected:
 		return true
 	}
 	return false

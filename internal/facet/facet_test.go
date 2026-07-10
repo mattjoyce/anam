@@ -107,7 +107,7 @@ func TestEnumValid(t *testing.T) {
 		{"event tombstoned", facet.EventTombstoned, true},
 		{"event endorsed", facet.EventEndorsed, true},
 		{"event rejected", facet.EventRejected, true},
-		{"event published", facet.EventPublished, true},
+		{"event published is not a record-event", facet.RecordEventKind("published"), false},
 		{"event unknown", facet.RecordEventKind("deleted"), false},
 		{"event empty", facet.RecordEventKind(""), false},
 

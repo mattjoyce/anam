@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mattjoyce/anam/internal/capture/bpcsv"
 	"github.com/mattjoyce/anam/internal/capture/healthdb"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/def"
@@ -17,11 +18,12 @@ import (
 )
 
 // mvpScopes is the MVP's one static source → types token map (§6, authenticated
-// pillar). bp-csv joins when its worker and definition exist.
+// pillar).
 var mvpScopes = gate.StaticScopes{
 	healthdb.Source: {
 		"health.sleep", "health.body-composition", "health.heart-rate", "health.metric-group",
 	},
+	bpcsv.Source: {bpcsv.Type},
 }
 
 func initCmd(cfgPath *string) *cobra.Command {
@@ -58,21 +60,39 @@ func initCmd(cfgPath *string) *cobra.Command {
 }
 
 func ingestCmd(cfgPath *string) *cobra.Command {
-	var dbPath string
+	var dbPath, csvPath string
 
 	cmd := &cobra.Command{
-		Use:   "ingest health-db --db <path>",
+		Use:   "ingest <health-db --db <path> | bp-csv --csv <path>>",
 		Short: "capture a source and admit every row through the gate",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if args[0] != healthdb.Source {
-				return fmt.Errorf("unknown source %q (have: %s)", args[0], healthdb.Source)
-			}
-
 			cfg, err := loadConfig(*cfgPath, cmd)
 			if err != nil {
 				return err
 			}
+
+			var envs []facet.Envelope
+			switch args[0] {
+			case healthdb.Source:
+				if dbPath == "" {
+					return fmt.Errorf("%s needs --db <path>", healthdb.Source)
+				}
+				scanCtx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
+				envs, err = healthdb.Scan(scanCtx, dbPath, cfg.PersonID)
+				cancel()
+			case bpcsv.Source:
+				if csvPath == "" {
+					return fmt.Errorf("%s needs --csv <path>", bpcsv.Source)
+				}
+				envs, err = bpcsv.Scan(csvPath, cfg.PersonID)
+			default:
+				return fmt.Errorf("unknown source %q (have: %s, %s)", args[0], healthdb.Source, bpcsv.Source)
+			}
+			if err != nil {
+				return err
+			}
+
 			reg, err := def.Bundled()
 			if err != nil {
 				return err
@@ -83,26 +103,19 @@ func ingestCmd(cfgPath *string) *cobra.Command {
 			}
 			g := gate.New(l, reg, mvpScopes, clock.Real{}, cfg.PersonID)
 
-			scanCtx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
-			envs, err := healthdb.Scan(scanCtx, dbPath, cfg.PersonID)
-			cancel()
-			if err != nil {
-				return err
-			}
-
 			tally, w, err := admitAll(cmd.Context(), g, envs, cfg.Timeout)
 			if err != nil {
 				return err
 			}
 			_, err = fmt.Fprintf(cmd.OutOrStdout(),
 				"%s: %d envelopes → admitted=%d superseded=%d no-op=%d  W=%d\n",
-				healthdb.Source, len(envs),
+				args[0], len(envs),
 				tally[gate.OutcomeAdmitted], tally[gate.OutcomeSuperseded], tally[gate.OutcomeNoOp], w)
 			return err
 		},
 	}
-	cmd.Flags().StringVar(&dbPath, "db", "", "path to the source database (required)")
-	_ = cmd.MarkFlagRequired("db")
+	cmd.Flags().StringVar(&dbPath, "db", "", "path to the health-db source database")
+	cmd.Flags().StringVar(&csvPath, "csv", "", "path to the bp-csv export file")
 	return cmd
 }
 

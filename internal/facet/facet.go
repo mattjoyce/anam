@@ -183,7 +183,10 @@ type Binding struct {
 	SpanHint string
 }
 
-// Provenance is a Facet's recorded origin.
+// Provenance is a Facet's recorded origin. Capture provenance and derivation
+// provenance are different concerns: every Facet has the former, only a derived Facet
+// has the latter. Nesting Derivation keeps them unbraided — a captured facet with a
+// model, or a derived one without a watermark, is not representable.
 type Provenance struct {
 	// Source is the capture origin, lower-case hyphenated: health-db, bp-csv.
 	Source string
@@ -196,12 +199,17 @@ type Provenance struct {
 	// Facet's ID derives (§6a).
 	SourceRef string
 
-	// Method and Model are set only for derived facets: how the finding was computed.
+	// Derivation is set only on derived facets (§11); nil for captured ones.
+	Derivation *Derivation
+}
+
+// Derivation records how a derived Facet was computed.
+type Derivation struct {
+	// Method and Model name the computation.
 	Method string
 	Model  string
 
-	// Watermark is set only for derived facets: the canonical record-time the finding
-	// was computed from (§11).
+	// Watermark is the canonical watermark the finding was computed from (§11).
 	Watermark string
 }
 

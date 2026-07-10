@@ -71,6 +71,12 @@ type recordItem struct {
 }
 
 func toFacetItem(pk string, f facet.Facet) facetItem {
+	// Derivation is optional on the domain type; the item flattens it to three
+	// omitempty attributes.
+	var method, model, watermark string
+	if d := f.Provenance.Derivation; d != nil {
+		method, model, watermark = d.Method, d.Model, d.Watermark
+	}
 	return facetItem{
 		PK:   pk,
 		SK:   facetSK(f.ID, f.ArtifactVersion),
@@ -94,9 +100,9 @@ func toFacetItem(pk string, f facet.Facet) facetItem {
 		ProvSource:    f.Provenance.Source,
 		ProvInjector:  f.Provenance.Injector,
 		ProvSourceRef: f.Provenance.SourceRef,
-		ProvMethod:    f.Provenance.Method,
-		ProvModel:     f.Provenance.Model,
-		ProvWatermark: f.Provenance.Watermark,
+		ProvMethod:    method,
+		ProvModel:     model,
+		ProvWatermark: watermark,
 
 		BirthStatus: string(f.BirthStatus),
 
@@ -142,12 +148,10 @@ func fromFacetItem(it facetItem) (facet.Facet, error) {
 			SpanHint:  it.BindingSpanHint,
 		},
 		Provenance: facet.Provenance{
-			Source:    it.ProvSource,
-			Injector:  it.ProvInjector,
-			SourceRef: it.ProvSourceRef,
-			Method:    it.ProvMethod,
-			Model:     it.ProvModel,
-			Watermark: it.ProvWatermark,
+			Source:     it.ProvSource,
+			Injector:   it.ProvInjector,
+			SourceRef:  it.ProvSourceRef,
+			Derivation: derivationFromItem(it),
 		},
 
 		BirthStatus: facet.BirthStatus(it.BirthStatus),
@@ -194,6 +198,15 @@ func fromRecordItem(it recordItem) (facet.RecordEvent, error) {
 		ArtifactVersion:      it.ArtifactVersion,
 		PriorArtifactVersion: it.PriorArtifactVersion,
 	}, nil
+}
+
+// derivationFromItem rehydrates the optional Derivation: present iff any of its three
+// attributes were stored.
+func derivationFromItem(it facetItem) *facet.Derivation {
+	if it.ProvMethod == "" && it.ProvModel == "" && it.ProvWatermark == "" {
+		return nil
+	}
+	return &facet.Derivation{Method: it.ProvMethod, Model: it.ProvModel, Watermark: it.ProvWatermark}
 }
 
 // parseTime is strict: a timestamp the ledger holds was written by clock.Format, and

@@ -21,3 +21,7 @@ config.local.yaml
 
 # Received data drops (kept outside the repo; testdata/ holds curated fixtures only)
 /inbox/
+
+# personal source exports — Anam owns no source fact, and neither does its repo
+BloodPressure_*
+*.csv

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>anam — record-events</title>
+{{template "style.html"}}
+</head>
+<body>
+<header>
+  <h1>record-events</h1>
+  <nav><a href="/">facets</a> · <a href="/events">record-events</a></nav>
+</header>
+
+<p class="meta">watermark <strong>W = {{.W}}</strong> · every event advances it: W ≡ seq</p>
+
+<table>
+  <thead><tr><th>seq</th><th>record time</th><th>kind</th><th>facet</th><th>artifact v</th></tr></thead>
+  <tbody>
+    {{range .Events}}
+    <tr>
+      <td>{{.Seq}}</td>
+      <td class="mono">{{.RecordTimeText}}</td>
+      <td><span class="kind kind-{{.Kind}}">{{.Kind}}</span></td>
+      <td class="mono"><a href="/facet?id={{.FacetID}}">{{.FacetID}}</a></td>
+      <td>{{.ArtifactVersion}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="5" class="dim">no record-events yet</td></tr>
+    {{end}}
+  </tbody>
+</table>
+</body>
+</html>

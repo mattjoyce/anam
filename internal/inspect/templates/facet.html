@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>anam — facet {{.Facet.ID}}</title>
+{{template "style.html"}}
+</head>
+<body>
+<header>
+  <h1>facet <span class="mono">{{.Facet.ID}}</span></h1>
+  <nav><a href="/">facets</a> · <a href="/events">record-events</a></nav>
+</header>
+
+<h2>metadata</h2>
+<table class="kv">
+  <tr><th>type</th><td>{{.Facet.Type}}</td></tr>
+  <tr><th>artifact version</th><td>{{.Facet.ArtifactVersion}} (definition v{{.Facet.DefinitionVersion}})</td></tr>
+  <tr><th>event time</th><td class="mono">{{.EventTime}} <span class="dim">{{.Bucket}}</span></td></tr>
+  <tr><th>recorded time</th><td class="mono">{{.Recorded}}</td></tr>
+  <tr><th>ingested time</th><td class="mono">{{.Ingested}}</td></tr>
+  <tr><th>birth status</th><td>{{.Facet.BirthStatus}}</td></tr>
+  <tr><th>classification</th><td>{{.Facet.Classification}}</td></tr>
+  <tr><th>confidence</th><td>{{.Facet.Confidence}}</td></tr>
+  <tr><th>binding</th><td>{{.Facet.Binding.PersonID}} <span class="dim">assurance {{.Facet.Binding.Assurance}}</span></td></tr>
+  <tr><th>source</th><td>{{.Facet.Provenance.Source}} <span class="dim">injector {{.Facet.Provenance.Injector}}</span></td></tr>
+  <tr><th>source ref</th><td class="mono">{{.Facet.Provenance.SourceRef}}</td></tr>
+  <tr><th>content hash</th><td class="mono">{{.Facet.Descriptor.ContentHash}}</td></tr>
+  <tr><th>payload</th><td>{{.Facet.Descriptor.PayloadKind}} · {{.Facet.Descriptor.MediaType}} · schema {{.Facet.Descriptor.SourceSchema}} v{{.Facet.Descriptor.SchemaVersion}}</td></tr>
+</table>
+
+<h2>payload <span class="dim">(verbatim, canonical bytes)</span></h2>
+<pre>{{.Payload}}</pre>
+
+<h2>record-events for this facet</h2>
+<table>
+  <thead><tr><th>seq</th><th>record time</th><th>kind</th><th>artifact v</th><th>prior v</th></tr></thead>
+  <tbody>
+    {{range .Events}}
+    <tr>
+      <td>{{.Seq}}</td>
+      <td class="mono">{{.RecordTime.Format "2006-01-02T15:04:05Z07:00"}}</td>
+      <td><span class="kind kind-{{.Kind}}">{{.Kind}}</span></td>
+      <td>{{.ArtifactVersion}}</td>
+      <td>{{if .PriorArtifactVersion}}{{.PriorArtifactVersion}}{{else}}—{{end}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{{define "style.html"}}
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 72rem; padding: 0 1rem; }
+  header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid currentColor; padding-bottom: .5rem; }
+  h1 { font-size: 1.3rem; margin: 0; }
+  h2 { font-size: 1.05rem; margin-top: 2rem; }
+  nav a { margin-left: .75rem; }
+  table { border-collapse: collapse; width: 100%; margin-top: .75rem; }
+  th, td { text-align: left; padding: .35rem .6rem; border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent); vertical-align: top; }
+  thead th { border-bottom: 2px solid currentColor; }
+  table.kv th { width: 11rem; font-weight: 600; }
+  pre { padding: 1rem; overflow-x: auto; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 6px; }
+  .mono { font-family: ui-monospace, monospace; font-size: .85rem; }
+  .dim { opacity: .6; }
+  .meta { margin-top: 1rem; }
+  .kind { padding: .1rem .5rem; border-radius: 99px; font-size: .8rem; border: 1px solid currentColor; }
+  .kind-tombstoned, .kind-rejected { color: #b3261e; }
+  .kind-superseded { color: #7a5c00; }
+  .kind-admitted, .kind-endorsed { color: #1a7f37; }
+</style>
+{{end}}

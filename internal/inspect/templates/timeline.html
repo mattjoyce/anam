@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>anam — timeline</title>
+{{template "style.html"}}
+<style>
+  .viz {
+    /* validated palette (dataviz): slots in fixed order — 0 body-composition,
+       1 heart-rate, 2 sleep, 3 metric-group; 4..7 reserved for future types. */
+    --s0: #2a78d6; --s1: #e34948; --s2: #4a3aa7; --s3: #eda100;
+    --s4: #1baf7a; --s5: #e87ba4; --s6: #008300; --s7: #eb6834;
+    --ink-muted: #898781; --gridline: #e1e0d9; --axis: #c3c2b7;
+    --ring: rgba(11,11,11,0.35);
+    --select: rgba(42,120,214,0.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    .viz {
+      --s0: #3987e5; --s1: #e66767; --s2: #9085e9; --s3: #c98500;
+      --s4: #199e70; --s5: #d55181; --s6: #008300; --s7: #d95926;
+      --gridline: #2c2c2a; --axis: #383835;
+      --ring: rgba(255,255,255,0.4);
+      --select: rgba(57,135,229,0.18);
+    }
+  }
+  .band { width: 100%; height: auto; display: block; touch-action: none; cursor: crosshair; }
+  .band .stem { stroke: var(--axis); stroke-width: 1; }
+  .band .dead .stem { stroke-dasharray: 3 3; }
+  .band .dead path { opacity: .35; }
+  .band .pt path { stroke: var(--ring); stroke-width: 1; }
+  .band .pt:hover path { stroke-width: 2.5; }
+  .band .baseline { stroke: var(--axis); stroke-width: 2; }
+  .band .tick { stroke: var(--gridline); }
+  .band text { fill: var(--ink-muted); font: 11px system-ui, sans-serif; }
+  .band .sel { fill: var(--select); stroke: var(--s0); stroke-dasharray: 5 4; }
+  /* fill styles SVG marks; background-color styles the HTML swatches and strip
+     diamonds — each element listens to the one that applies to it. */
+  .c0 { fill: var(--s0); background-color: var(--s0); }
+  .c1 { fill: var(--s1); background-color: var(--s1); }
+  .c2 { fill: var(--s2); background-color: var(--s2); }
+  .c3 { fill: var(--s3); background-color: var(--s3); }
+  .c4 { fill: var(--s4); background-color: var(--s4); }
+  .c5 { fill: var(--s5); background-color: var(--s5); }
+  .c6 { fill: var(--s6); background-color: var(--s6); }
+  .c7 { fill: var(--s7); background-color: var(--s7); }
+  svg .c0, svg .c1, svg .c2, svg .c3, svg .c4, svg .c5, svg .c6, svg .c7 { background-color: transparent; }
+  .legend { display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; margin: .4rem 0 0; font-size: .85rem; }
+  .legend .sw { display: inline-block; width: 10px; height: 10px; transform: rotate(45deg); margin-right: .45rem; box-shadow: 0 0 0 1px var(--ring); }
+  .surface { border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 10px; padding: .8rem 1rem; margin-top: 1rem; }
+  .surface h2 { margin: 0 0 .35rem; }
+  .strip { display: flex; flex-wrap: wrap; gap: 7px; padding: .5rem .2rem .2rem; }
+  .strip a { display: inline-block; width: 11px; height: 11px; transform: rotate(45deg); box-shadow: 0 0 0 1px var(--ring); }
+  .strip a:hover { outline: 2px solid var(--s0); }
+  .controls { display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; margin-top: .6rem; font-size: .9rem; }
+  .controls input { font: inherit; padding: .15rem .35rem; width: 13.5rem; }
+  .hint { font-size: .8rem; }
+</style>
+</head>
+<body class="viz">
+<header>
+  <h1>anam timeline</h1>
+  <nav><a href="/">timeline</a> · <a href="/facets">facets</a> · <a href="/events">record-events</a></nav>
+</header>
+
+<p class="meta">watermark <strong>W = {{.W}}</strong> · {{.Total}} facets in the ledger · {{.Live}} live in the canonical
+<br><span class="mono dim">canonical {{.Hash}}</span></p>
+
+<div class="surface">
+  <h2>capture — the ledger <span class="dim hint">(every facet, marked at its folded status; the dead are ghosted)</span></h2>
+
+  <svg class="band" viewBox="0 0 {{.BandW}} {{.BandH}}" id="band"
+       data-left="{{.PlotLeft}}" data-right="{{.PlotRight}}">
+    {{range .Ticks}}<line class="tick" x1="{{.X}}" y1="20" x2="{{.X}}" y2="{{$.Baseline}}"/>
+    <text x="{{.X}}" y="{{$.Baseline}}" dy="16" text-anchor="middle">{{.Label}}</text>{{end}}
+    <line class="baseline" x1="{{.PlotLeft}}" y1="{{.Baseline}}" x2="{{.PlotRight}}" y2="{{.Baseline}}"/>
+    {{range .Points}}
+    <g class="pt{{if not .Live}} dead{{end}}">
+      <line class="stem" x1="{{.X}}" y1="{{.Y}}" x2="{{.X}}" y2="{{$.Baseline}}"/>
+      <a href="/facet?id={{.ID}}"><path class="c{{.Slot}}" d="M {{.X}} {{.Y}} m 0 -6 l 6 6 l -6 6 l -6 -6 z"><title>{{.Title}}</title></path></a>
+    </g>
+    {{end}}
+    <rect class="sel" id="sel" x="0" y="20" width="0" height="{{.Baseline}}" visibility="hidden" pointer-events="none"/>
+  </svg>
+
+  <div class="legend">
+    {{range .Legend}}<span><span class="sw c{{.Slot}}"></span>{{.Type}} <span class="dim">({{.Count}})</span></span>
+    {{end}}<span><span class="sw" style="opacity:.35;background-color:var(--ink-muted)"></span><span class="dim">tombstoned / rejected</span></span>
+  </div>
+
+  <form class="controls" method="get" action="/">
+    <label>from <input name="from" id="from" value="{{.From}}" placeholder="2026-03-07 or RFC 3339"></label>
+    <label>to <input name="to" id="to" value="{{.To}}" placeholder="2026-06-06 or RFC 3339"></label>
+    <button type="submit">compose</button>
+    {{if .Zoomed}}<a href="/">whole person</a>{{end}}
+    <span class="dim hint">or drag a span on the band</span>
+  </form>
+</div>
+
+<div class="surface">
+  <h2>compose — the canonical <span class="dim hint">(the live-only value at W{{if .Zoomed}}, narrowed to the span — a lens, not a different read{{end}})</span></h2>
+  <div class="strip">
+    {{range .Strip}}<a class="c{{.Slot}}" href="/facet?id={{.ID}}" title="{{.Title}}"></a>
+    {{else}}<span class="dim">no live facets in this span</span>{{end}}
+  </div>
+  <p class="dim hint">{{.StripCount}} live facet{{if ne .StripCount 1}}s{{end}} composed{{if .Zoomed}} from the span{{end}}, in event-time order</p>
+</div>
+
+<script>
+  // Drag a span on the band → from/to → compose. The band's x-scale is linear
+  // between the window bounds the server rendered; they ride along as data-*.
+  (function () {
+    const band = document.getElementById('band'), sel = document.getElementById('sel');
+    const from = {{.WindowFromMS}}, to = {{.WindowToMS}};
+    const left = parseFloat(band.dataset.left), right = parseFloat(band.dataset.right);
+    let x0 = null;
+
+    const toX = e => {
+      const r = band.getBoundingClientRect();
+      const vx = (e.clientX - r.left) * (band.viewBox.baseVal.width / r.width);
+      return Math.min(Math.max(vx, left), right);
+    };
+    const toTime = x => new Date(from + (x - left) / (right - left) * (to - from));
+
+    band.addEventListener('pointerdown', e => {
+      x0 = toX(e);
+      band.setPointerCapture(e.pointerId);
+    });
+    band.addEventListener('pointermove', e => {
+      if (x0 === null) return;
+      const x1 = toX(e);
+      sel.setAttribute('x', Math.min(x0, x1));
+      sel.setAttribute('width', Math.abs(x1 - x0));
+      sel.setAttribute('visibility', 'visible');
+    });
+    band.addEventListener('pointerup', e => {
+      if (x0 === null) return;
+      const x1 = toX(e);
+      if (Math.abs(x1 - x0) > 4) {
+        document.getElementById('from').value = toTime(Math.min(x0, x1)).toISOString();
+        document.getElementById('to').value = toTime(Math.max(x0, x1)).toISOString();
+        document.querySelector('.controls').submit();
+      }
+      x0 = null;
+      sel.setAttribute('visibility', 'hidden');
+    });
+  })();
+</script>
+</body>
+</html>

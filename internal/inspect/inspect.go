@@ -2,10 +2,11 @@
 // harness for looking at what Anam holds (MVP.md §3: a harness for proving the model,
 // not a shipped UI).
 //
-// It renders the ledger's own two surfaces and nothing more: facets at their current
-// artifact version, and the record-event stream. There is no fold here — current
-// status is the fold's to derive (R4), so the facet listing shows the *last event*
-// against each facet, which is a fact, not a status.
+// Since R4 the fold exists, so the inspector renders both of Anam's surfaces under
+// their own names (§7): the landing page is the capture→compose picture — the
+// ledger band (every facet, marked at its folded status) over the canonical strip
+// (the live-only value at W) — and the tables show folded status rather than R3's
+// last-event stand-in.
 package inspect
 
 import (
@@ -19,15 +20,17 @@ import (
 	"net"
 	"net/http"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/facet"
+	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/span"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
 // Ledger is the narrow read surface the inspector needs (interfaces at the point of
-// use; *ledger.Ledger satisfies it).
+// use; *ledger.Ledger satisfies it, and it is exactly fold.Ledger).
 type Ledger interface {
 	Head(ctx context.Context) (ledger.Watermark, error)
 	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.RecordEvent, error)
@@ -43,16 +46,51 @@ var tmpl = template.Must(template.ParseFS(templateFS, "templates/*.html"))
 type Server struct {
 	ledger  Ledger
 	timeout time.Duration
+
+	// The fold cache, keyed by watermark: a whole-person read is one replay plus
+	// one fetch per live facet, too dear to repeat per page view. Every request
+	// still reads the head (one cheap call), so a moved W is never served stale —
+	// the cache holds a *value*, and values don't go stale, they get replaced.
+	mu     sync.Mutex
+	cached fold.Result
+	warm   bool
 }
 
 // Handler returns the inspector's routes on a fresh mux.
 func Handler(l Ledger, timeout time.Duration) http.Handler {
 	s := &Server{ledger: l, timeout: timeout}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", s.index)
+	mux.HandleFunc("GET /{$}", s.timeline)
+	mux.HandleFunc("GET /facets", s.index)
 	mux.HandleFunc("GET /facet", s.facetPage)
 	mux.HandleFunc("GET /events", s.events)
 	return mux
+}
+
+// read returns the whole person at the current head, from cache when the
+// watermark has not moved.
+func (s *Server) read(ctx context.Context) (fold.Result, error) {
+	head, err := s.ledger.Head(ctx)
+	if err != nil {
+		return fold.Result{}, err
+	}
+
+	s.mu.Lock()
+	if s.warm && s.cached.W == head {
+		res := s.cached
+		s.mu.Unlock()
+		return res, nil
+	}
+	s.mu.Unlock()
+
+	res, err := fold.Read(ctx, s.ledger)
+	if err != nil {
+		return fold.Result{}, err
+	}
+	s.mu.Lock()
+	s.cached, s.warm = res, true
+	s.mu.Unlock()
+	return res, nil
 }
 
 // Serve runs the inspector at addr until ctx is cancelled.
@@ -80,20 +118,20 @@ func Serve(ctx context.Context, l Ledger, addr string, timeout time.Duration) er
 	}
 }
 
-// facetRow is one line of the index: a logical facet at its current version.
+// facetRow is one line of the index: a logical facet at its current version, at
+// its folded status.
 type facetRow struct {
 	ID        string
 	Type      facet.Type
 	EventTime string
 	Bucket    string
 	Version   int
-	LastEvent facet.RecordEventKind
+	Status    facet.Status
 	Hash      string
 }
 
 type indexData struct {
 	W      ledger.Watermark
-	Events int
 	Facets []facetRow
 }
 
@@ -101,41 +139,55 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), s.timeout)
 	defer cancel()
 
-	head, events, err := s.headAndEvents(ctx)
+	res, err := s.read(ctx)
 	if err != nil {
 		httpError(w, err)
 		return
 	}
 
-	lastEvent := map[string]facet.RecordEventKind{}
-	for _, ev := range events {
-		lastEvent[ev.FacetID] = ev.Kind
+	// The ledger surface lists everything, marked: the live set comes from the
+	// read; the dead (tombstoned, rejected) are fetched individually — few, and
+	// deliberately absent from the cached canonical.
+	rows := make([]facetRow, 0, len(res.States))
+	for _, f := range res.Live {
+		rows = append(rows, rowOf(f, res.States[f.ID].Status))
 	}
-
-	rows := make([]facetRow, 0, len(lastEvent))
-	for id, kind := range lastEvent {
+	for id, st := range res.States {
+		if st.Live() {
+			continue
+		}
 		f, err := s.ledger.CurrentVersion(ctx, id)
 		if err != nil {
 			httpError(w, err)
 			return
 		}
-		rows = append(rows, facetRow{
-			ID:        f.ID,
-			Type:      f.Type,
-			EventTime: f.EventTime.Format(time.RFC3339),
-			Bucket:    span.Of(f.EventTime).ID(),
-			Version:   f.ArtifactVersion,
-			LastEvent: kind,
-			Hash:      f.Descriptor.ContentHash,
-		})
+		rows = append(rows, rowOf(f, st.Status))
 	}
-	sort.Slice(rows, func(i, j int) bool { return rows[i].EventTime < rows[j].EventTime })
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].EventTime != rows[j].EventTime {
+			return rows[i].EventTime < rows[j].EventTime
+		}
+		return rows[i].ID < rows[j].ID
+	})
 
-	render(w, "index.html", indexData{W: head, Events: len(events), Facets: rows})
+	render(w, "index.html", indexData{W: res.W, Facets: rows})
+}
+
+func rowOf(f facet.Facet, st facet.Status) facetRow {
+	return facetRow{
+		ID:        f.ID,
+		Type:      f.Type,
+		EventTime: f.EventTime.Format(time.RFC3339),
+		Bucket:    span.Of(f.EventTime).ID(),
+		Version:   f.ArtifactVersion,
+		Status:    st,
+		Hash:      f.Descriptor.ContentHash,
+	}
 }
 
 type facetData struct {
 	Facet     facet.Facet
+	Status    facet.Status
 	EventTime string
 	Recorded  string
 	Ingested  string
@@ -175,6 +227,11 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 			mine = append(mine, ev)
 		}
 	}
+	states, err := fold.Fold(events)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
 
 	var pretty bytes.Buffer
 	if err := json.Indent(&pretty, f.Payload.Bytes(), "", "  "); err != nil {
@@ -184,6 +241,7 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 
 	render(w, "facet.html", facetData{
 		Facet:     f,
+		Status:    states[id].Status,
 		EventTime: f.EventTime.Format(time.RFC3339),
 		Recorded:  f.RecordedTime.Format(time.RFC3339),
 		Ingested:  f.IngestedTime.Format(time.RFC3339),

@@ -8,13 +8,14 @@
 <body>
 <header>
   <h1>facet <span class="mono">{{.Facet.ID}}</span></h1>
-  <nav><a href="/">facets</a> · <a href="/events">record-events</a></nav>
+  <nav><a href="/">timeline</a> · <a href="/facets">facets</a> · <a href="/events">record-events</a></nav>
 </header>
 
 <h2>metadata</h2>
 <table class="kv">
   <tr><th>type</th><td>{{.Facet.Type}}</td></tr>
   <tr><th>artifact version</th><td>{{.Facet.ArtifactVersion}} (definition v{{.Facet.DefinitionVersion}})</td></tr>
+  <tr><th>status (folded)</th><td><span class="kind kind-{{.Status}}">{{.Status}}</span></td></tr>
   <tr><th>event time</th><td class="mono">{{.EventTime}} <span class="dim">{{.Bucket}}</span></td></tr>
   <tr><th>recorded time</th><td class="mono">{{.Recorded}}</td></tr>
   <tr><th>ingested time</th><td class="mono">{{.Ingested}}</td></tr>

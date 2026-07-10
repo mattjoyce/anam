@@ -155,7 +155,26 @@ func TestServe_ShutsDownOnContextCancel(t *testing.T) {
 	}
 }
 
-func TestIndex_ListsFacetsWithWatermarkAndLastEvent(t *testing.T) {
+func TestFacetList_ShowsFoldedStatus(t *testing.T) {
+	t.Parallel()
+	srv, bpID, hrID := seededServer(t)
+
+	code, body := get(t, srv.URL+"/facets")
+	if code != http.StatusOK {
+		t.Fatalf("GET /facets = %d", code)
+	}
+	for _, want := range []string{"W = 3", bpID, hrID, "tombstoned", "health.blood-pressure", "bucket:2026-W27"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("facet list missing %q", want)
+		}
+	}
+}
+
+// The landing page draws both surfaces under their own names (§7): the capture
+// band is the ledger — everything, the dead ghosted — and the composed strip is
+// the canonical, live-only. The tombstoned facet must appear in the first and be
+// absent from the second.
+func TestTimeline_DrawsLedgerBandAndCanonicalStrip(t *testing.T) {
 	t.Parallel()
 	srv, bpID, hrID := seededServer(t)
 
@@ -163,10 +182,45 @@ func TestIndex_ListsFacetsWithWatermarkAndLastEvent(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("GET / = %d", code)
 	}
-	for _, want := range []string{"W = 3", bpID, hrID, "tombstoned", "health.blood-pressure", "bucket:2026-W27"} {
+	for _, want := range []string{"<svg", `class="pt dead"`, "canonical sha256:", "W = 3", bpID, hrID} {
 		if !strings.Contains(body, want) {
-			t.Errorf("index missing %q", want)
+			t.Errorf("timeline missing %q", want)
 		}
+	}
+
+	stripAt := strings.Index(body, "compose — the canonical")
+	if stripAt < 0 {
+		t.Fatal("no composed-context section")
+	}
+	strip := body[stripAt:]
+	if !strings.Contains(strip, bpID) {
+		t.Error("live facet absent from the canonical strip")
+	}
+	if strings.Contains(strip, hrID) {
+		t.Error("tombstoned facet leaked into the canonical strip — the strip must be live-only")
+	}
+}
+
+// Narrowing is a lens over the same read: a span that excludes the bp facet
+// composes an empty strip while the header still names the whole-person value.
+func TestTimeline_SpanNarrowsTheStrip(t *testing.T) {
+	t.Parallel()
+	srv, bpID, _ := seededServer(t)
+
+	// Both seeded facets sit at 2026-07-05; this span misses them.
+	code, body := get(t, srv.URL+"/?from=2026-01-01&to=2026-01-31")
+	if code != http.StatusOK {
+		t.Fatalf("GET /?from&to = %d", code)
+	}
+	stripAt := strings.Index(body, "compose — the canonical")
+	if stripAt < 0 {
+		t.Fatal("no composed-context section")
+	}
+	if strings.Contains(body[stripAt:], bpID) {
+		t.Error("facet outside the span composed into the strip")
+	}
+	if code, _ := get(t, srv.URL+"/?from=2026-07-09&to=2026-07-01"); code != http.StatusBadRequest {
+		t.Errorf("empty window = %d, want 400", code)
 	}
 }
 

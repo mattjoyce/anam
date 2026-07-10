@@ -4,6 +4,8 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -27,25 +29,31 @@ func TestAppendOnly_NoMutatingCallsInCode(t *testing.T) {
 		"PartiQL":          true,
 	}
 
-	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, ".", nil, 0)
+	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for _, pkg := range pkgs {
-		for filename, file := range pkg.Files {
-			ast.Inspect(file, func(n ast.Node) bool {
-				sel, ok := n.(*ast.SelectorExpr)
-				if !ok {
-					return true
-				}
-				if forbidden[sel.Sel.Name] {
-					t.Errorf("%s: %s is called at %s — the ledger is append-only, and the substrate will not hold that invariant for us",
-						filename, sel.Sel.Name, fset.Position(sel.Pos()))
-				}
-				return true
-			})
+	fset := token.NewFileSet()
+	for _, e := range entries {
+		filename := e.Name()
+		if !strings.HasSuffix(filename, ".go") {
+			continue
 		}
+		file, err := parser.ParseFile(fset, filename, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ast.Inspect(file, func(n ast.Node) bool {
+			sel, ok := n.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			if forbidden[sel.Sel.Name] {
+				t.Errorf("%s is called at %s — the ledger is append-only, and the substrate will not hold that invariant for us",
+					sel.Sel.Name, fset.Position(sel.Pos()))
+			}
+			return true
+		})
 	}
 }

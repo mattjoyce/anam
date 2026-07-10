@@ -1,0 +1,187 @@
+// Package ops is the SQLite half of Anam's store: the operational database
+// (ARCHITECTURE.md §8).
+//
+// It is a real store, not a cache. Each table is annotated with its tier — where its
+// contents come back from — because that is the only thing that tells a later reader
+// whether dropping it is survivable:
+//
+//   - derived     — rebuilt by replaying the ledger. The rebuild test drops this tier.
+//   - provisioned — reloaded from embedded assets and config; i.e. from git.
+//   - authored    — comes back from a backup, or from nowhere.
+//
+// The derived tier must stay provably derived: if a facet payload, a record-event or
+// the watermark ever acquired a second home here, the rebuild test would pass on data
+// it never rebuilt.
+package ops
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	_ "modernc.org/sqlite" // registers the pure-Go "sqlite" driver
+)
+
+// schemaVersion is bumped on any schema change. The prototype recreates rather than
+// migrates: everything derived replays, everything provisioned reloads.
+const schemaVersion = 1
+
+// ErrSchemaVersion is returned by Open for a database written by a different schema.
+var ErrSchemaVersion = errors.New("ops: schema version mismatch")
+
+// DB is a handle on the operational store.
+type DB struct {
+	db *sql.DB
+}
+
+// schema is executed idempotently by Open. Sort-ordered text columns (event_time,
+// record_time) hold fixed-width clock.Layout timestamps; bucket ids are span.Bucket
+// ids — both compare lexically in chronological order by construction.
+const schema = `
+-- tier: derived — the facet index: one row per logical facet, at its current version.
+-- The read paths that left the ledger live here: the timeline (event_time), the type
+-- filter, and bucket membership (the bucket-span seam — bucket_id is arithmetic on
+-- event_time, materialised for the joins the mint will need).
+CREATE TABLE IF NOT EXISTS facet_index (
+  facet_id        TEXT PRIMARY KEY,
+  type            TEXT NOT NULL,
+  event_time      TEXT NOT NULL,
+  bucket_id       TEXT NOT NULL,
+  current_version INTEGER NOT NULL,
+  content_hash    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS facet_index_by_time   ON facet_index (event_time);
+CREATE INDEX IF NOT EXISTS facet_index_by_type   ON facet_index (type, event_time);
+CREATE INDEX IF NOT EXISTS facet_index_by_bucket ON facet_index (bucket_id);
+
+-- tier: derived — the record-event index: changes_since by record-time, and the
+-- as-of translation (greatest seq with record_time <= T).
+CREATE TABLE IF NOT EXISTS record_event_index (
+  seq              INTEGER PRIMARY KEY,
+  record_time      TEXT NOT NULL,
+  kind             TEXT NOT NULL,
+  facet_id         TEXT NOT NULL,
+  artifact_version INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS record_event_by_time ON record_event_index (record_time, seq);
+
+-- tier: derived — the checkpoint index: every mint of every span, append-only.
+-- covers_w is the watermark the value actually folded; value_hash addresses the
+-- checkpoint file. As-of wants "greatest covers_w <= W", which is why this is a log
+-- and the head is a view.
+CREATE TABLE IF NOT EXISTS checkpoint (
+  span_id    TEXT NOT NULL,
+  v          INTEGER NOT NULL,
+  covers_w   INTEGER NOT NULL,
+  value_hash TEXT NOT NULL,
+  minted_at  TEXT NOT NULL,
+  PRIMARY KEY (span_id, v)
+);
+
+-- The head of each span is its latest checkpoint. A view, not a table: a second,
+-- overwritten copy of the same fact could drift from the log it summarises.
+CREATE VIEW IF NOT EXISTS span_head AS
+  SELECT span_id, v, covers_w, value_hash, minted_at
+  FROM checkpoint c
+  WHERE v = (SELECT MAX(v) FROM checkpoint WHERE span_id = c.span_id);
+
+-- tier: derived — per-source resumption markers. Losing one costs a re-scan, never a
+-- fact: ingest is idempotent.
+CREATE TABLE IF NOT EXISTS sync_cursor (
+  source     TEXT PRIMARY KEY,
+  cursor     TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- tier: derived — how far the derived tier has replayed the ledger. Catch-up asserts
+-- last_seq == W before any fold; behind is fixable, wrong is not representable.
+CREATE TABLE IF NOT EXISTS replay_cursor (
+  id       INTEGER PRIMARY KEY CHECK (id = 1),
+  last_seq INTEGER NOT NULL
+);
+
+-- tier: provisioned — Facet Definitions, every version, loaded from embedded JSON.
+-- Not in the ledger: a definition is not something Anam knew, it is how Anam
+-- interprets. Old artifacts stay interpretable because old versions stay loadable.
+CREATE TABLE IF NOT EXISTS definition (
+  type    TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  body    TEXT NOT NULL,
+  PRIMARY KEY (type, version)
+);
+
+-- tier: provisioned — the static source -> facet-type token map (the gate's
+-- authenticated pillar). One row per grant.
+CREATE TABLE IF NOT EXISTS token_scope (
+  source TEXT NOT NULL,
+  type   TEXT NOT NULL,
+  PRIMARY KEY (source, type)
+);
+
+-- tier: authored — Anam's own bookkeeping; comes back from a backup or not at all.
+CREATE TABLE IF NOT EXISTS meta (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+`
+
+// Open opens (creating if absent) the operational store at path and idempotently
+// applies the schema. Parent directories are created. A database written by a
+// different schema version is refused, not migrated silently.
+func Open(ctx context.Context, path string) (*DB, error) {
+	if dir := filepath.Dir(path); dir != "." {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			return nil, fmt.Errorf("ops: create data dir: %w", err)
+		}
+	}
+
+	db, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+	if err != nil {
+		return nil, fmt.Errorf("ops: open %q: %w", path, err)
+	}
+
+	if _, err := db.ExecContext(ctx, schema); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("ops: apply schema: %w", err)
+	}
+	if err := pinSchemaVersion(ctx, db); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return &DB{db: db}, nil
+}
+
+// pinSchemaVersion records the version on first open and refuses a mismatch after.
+func pinSchemaVersion(ctx context.Context, db *sql.DB) error {
+	res, err := db.ExecContext(ctx,
+		`INSERT INTO meta (key, value) VALUES ('schema_version', ?) ON CONFLICT (key) DO NOTHING`,
+		fmt.Sprintf("%d", schemaVersion))
+	if err != nil {
+		return fmt.Errorf("ops: pin schema version: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 1 {
+		return nil // fresh database, version pinned
+	}
+
+	var stored string
+	err = db.QueryRowContext(ctx,
+		`SELECT value FROM meta WHERE key = 'schema_version'`).Scan(&stored)
+	if err != nil {
+		return fmt.Errorf("ops: read schema version: %w", err)
+	}
+	if stored != fmt.Sprintf("%d", schemaVersion) {
+		return fmt.Errorf("%w: database holds %s, this build writes %d", ErrSchemaVersion, stored, schemaVersion)
+	}
+	return nil
+}
+
+// Close releases the handle.
+func (d *DB) Close() error { return d.db.Close() }
+
+// SQL exposes the underlying handle to sibling store packages and tests. The domain
+// never sees it: only internal/store may speak SQL, and the boundary check holds
+// everything above to that.
+func (d *DB) SQL() *sql.DB { return d.db }

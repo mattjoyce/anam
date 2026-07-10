@@ -232,8 +232,13 @@ The gate is exposed as two calls:
   - Same `source_ref` **and** same hash → **no-op** (safe re-ingest).
   - Same `source_ref`, **different** hash → the source row changed: write a **new artifact version** and
     append a `superseded` record-event against the prior. Nothing is mutated; the old artifact stays.
-- **Retraction is a tombstone** — a status-bearing artifact version carrying `tombstoned`, never a
-  delete. It advances `W` like any other mutation (§7).
+- **Retraction is a tombstone** — a `tombstoned` **record-event** against the current artifact version.
+  Never a delete, and never a new artifact. It advances `W` like any other mutation (§7).
+
+  > Arch writes a tombstone as a *status-bearing artifact version* (ADR 0030), and Anam inherited the
+  > sentence. It cannot be true here: Anam folds status out of the artifact (§3, §12), so there is
+  > nowhere to put one — `birth_status` admits only `admitted` and `proposed`. The status transition
+  > *is* the whole event. Corrected once code had to write one.
 
 > **Design note (Armstrong).** Because `commit` is idempotent and atomic, a capture worker may **crash
 > mid-batch and simply be re-run to known-good**. There is no partial facet and no corruption. This — the
@@ -470,7 +475,8 @@ Anam later as an ordinary source fact.
 - **Append-only**: facts are added and superseded by status events (tombstones) — **never modified,
   never deleted.** DynamoDB cannot enforce this; our code must not violate it, and a test guards it (§8).
 - **Current status is derived** by the fold from record-events — **never stored** on the artifact (no
-  place-oriented programming).
+  place-oriented programming). A tombstone is therefore a **record-event, not an artifact version**: an
+  Anam artifact has nowhere to carry a status (§6a).
 - **`source_ref` is identity, `content_hash` is content.** The natural key never contains the row's
   values, or supersession silently becomes duplication (§6a).
 - **Canonical means the live-only value; the ledger means append-everything-marked.** One word, one

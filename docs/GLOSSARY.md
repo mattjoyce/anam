@@ -184,9 +184,11 @@ lose, because ingest is idempotent; a lost cursor is a re-scan, not data loss.
 **Timeline** — A person's facts in chronological (event-time) order — the storage substrate. A Span
 selects an interval of it. See *Span*, *Event*.
 
-**Tombstone** — A status-bearing artifact version marking a Facet retracted **without** deleting it. It
-advances the watermark like any mutation. The Facet stays in the *Ledger* forever, marked; it is absent
-from the *Canonical* value by construction. See *Ledger*, *Canonical*.
+**Tombstone** — A `tombstoned` **record-event** marking a Facet retracted **without** deleting it. No new
+artifact is written: an Anam artifact has nowhere to carry a status (contrast Arch, whose tombstone *is* a
+status-bearing artifact version). It advances the watermark like any mutation. The Facet stays in the
+*Ledger* forever, marked; it is absent from the *Canonical* value by construction. See *Ledger*,
+*Canonical*, *Status*.
 
 **Watermark** — A record-time marker pinning "what was known" at a point — the basis for checkpoints and
 receipts. `W` is the **stream watermark**, a monotonic counter advanced by *every* record-event that can

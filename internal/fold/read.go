@@ -89,28 +89,80 @@ func Read(ctx context.Context, l Ledger) (Result, error) {
 	return Result{}, fmt.Errorf("%w: %d attempts", ErrOutpaced, readAttempts)
 }
 
+// fetchWorkers bounds the concurrent CurrentVersion reads. The whole-person read
+// is one fetch per live facet; serially that priced a 659-facet person at minutes.
+// The reads are independent and strongly consistent, so ordering is imposed
+// afterwards by sort, not by the fetch.
+const fetchWorkers = 16
+
 // fetchLive reads each live facet's current artifact and verifies it is the version
 // the fold derived. outpaced reports the benign race (ledger moved on); an artifact
 // behind its own events is returned as a corruption error instead.
 func fetchLive(ctx context.Context, l Ledger, states map[string]State) (live []facet.Facet, outpaced bool, err error) {
+	ids := make([]string, 0, len(states))
 	for id, st := range states {
-		if !st.Live() {
-			continue
-		}
-		f, err := l.CurrentVersion(ctx, id)
-		if err != nil {
-			return nil, false, err
-		}
-		switch {
-		case f.ArtifactVersion == st.Version:
-			live = append(live, f)
-		case f.ArtifactVersion > st.Version:
-			return nil, true, nil
-		default:
-			return nil, false, fmt.Errorf("%w: facet %s folded to v%d but the ledger holds v%d",
-				ErrCorruptStream, id, st.Version, f.ArtifactVersion)
+		if st.Live() {
+			ids = append(ids, id)
 		}
 	}
+
+	type fetched struct {
+		f        facet.Facet
+		outpaced bool
+		err      error
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel() // stops in-flight workers once a bad result lands
+
+	work := make(chan string)
+	results := make(chan fetched)
+	for range fetchWorkers {
+		go func() {
+			for id := range work {
+				f, err := l.CurrentVersion(ctx, id)
+				r := fetched{f: f, err: err}
+				if err == nil {
+					st := states[id]
+					switch {
+					case f.ArtifactVersion > st.Version:
+						r.outpaced = true
+					case f.ArtifactVersion < st.Version:
+						r.err = fmt.Errorf("%w: facet %s folded to v%d but the ledger holds v%d",
+							ErrCorruptStream, id, st.Version, f.ArtifactVersion)
+					}
+				}
+				select {
+				case results <- r:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+	go func() {
+		defer close(work)
+		for _, id := range ids {
+			select {
+			case work <- id:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	live = make([]facet.Facet, 0, len(ids))
+	for range ids {
+		r := <-results
+		switch {
+		case r.err != nil:
+			return nil, false, r.err
+		case r.outpaced:
+			return nil, true, nil
+		default:
+			live = append(live, r.f)
+		}
+	}
+
 	sort.Slice(live, func(i, j int) bool {
 		if !live[i].EventTime.Equal(live[j].EventTime) {
 			return live[i].EventTime.Before(live[j].EventTime)

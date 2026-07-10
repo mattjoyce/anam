@@ -45,7 +45,7 @@ func Fold(events []facet.RecordEvent) (map[string]State, error) {
 	states := make(map[string]State)
 	for _, ev := range events {
 		cur, known := states[ev.FacetID]
-		next, err := transition(cur, known, ev)
+		next, err := Apply(cur, known, ev)
 		if err != nil {
 			return nil, err
 		}
@@ -54,7 +54,11 @@ func Fold(events []facet.RecordEvent) (map[string]State, error) {
 	return states, nil
 }
 
-// transition applies one record-event to a facet's folded state.
+// Apply advances one facet's folded state by one record-event. It is exported so
+// that an *incremental* consumer — the operational store's catch-up, which persists
+// each facet's State as its index row — replays new events through the same map
+// rather than growing a second, drifting one. known is false only when the facet
+// has no state yet (its first event).
 //
 // This switch is the kind→status map, spelled out case by case. It must never be
 // abbreviated to facet.Status(ev.Kind): that conversion compiles — the two types
@@ -64,7 +68,7 @@ func Fold(events []facet.RecordEvent) (map[string]State, error) {
 // every corrected fact from the canonical. Spelling the arms out also means a sixth
 // event kind lands in the default arm and fails loudly instead of flowing through a
 // cast unexamined.
-func transition(cur State, known bool, ev facet.RecordEvent) (State, error) {
+func Apply(cur State, known bool, ev facet.RecordEvent) (State, error) {
 	switch ev.Kind {
 	case facet.EventAdmitted:
 		// Only a first sight admits; every later capture of the row supersedes.

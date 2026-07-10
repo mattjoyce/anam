@@ -181,12 +181,21 @@ rebuildable** — while owning, and taking responsibility for, the continuity.
 | **Event time** | Facet | When the thing happened (the reading, the night's sleep) — timeline placement |
 | **Recorded time** | Facet | When a person or system documented it |
 | **Ingested time** | Anam | When Anam received it |
-| **Published time** | Anam | When it first appeared in a served account |
+| **Published time** | Anam | When it first appeared in a served account — the earliest `served_at` over the receipts naming it (§9). Not a record-event |
 
 A **Facet event** is the domain fact — immutable, carrying its own event-time, true independently of
 Anam; placed on the timeline at its **event-time**. An **Anam record-event** asserts that Anam's
-*knowledge* changed (`admitted`, `superseded`, `tombstoned`, `endorsed`, `published`); it carries
-**record-time**.
+*knowledge* changed — `admitted`, `superseded`, `tombstoned`, `endorsed`, `rejected` — and carries
+**record-time**. There are exactly these five.
+
+> Publication is **not** among them. Serving a facet changes nothing Anam knows about it; it records what
+> Anam *showed*. That is what a **receipt** already is (§9), pinning the served bytes, the facet-id set,
+> the watermark, the template version and the span. Keeping `published` in the ledger would braid *what
+> Anam knows* with *what Anam has shown* — the same complecting §7 untangles for *ledger* vs *canonical*.
+>
+> The cost, named: published-time moves out of the ledger and into the receipts, which are published
+> artifacts — authored, backed up, not rebuilt (§1). Lose the artifact directory and published-time is
+> gone. That is the trade, and it is worth it, because every remaining kind maps one-to-one onto a status.
 
 The dependency is **one-directional**: a record-event references a Facet; a Facet **never** references a
 record-event — the world does not know Anam exists. This one-way rule is what makes rebuild-from-source
@@ -305,6 +314,10 @@ read, paid by a range-scan; it is not bought by a periodic tick.
 live-set — `admitted`, `superseded`, `tombstoned`, `endorsed`, `rejected`. A pure status transition
 advances `W` even though no facet is born; if it did not, a checkpoint could reuse a value that still
 lists a retracted facet.
+
+Because those five are *all* the record-events there are (§5), **`W` is the record-event sequence itself**:
+`W ≡ seq`. One counter, not two. Nothing takes a `seq` without moving the watermark, and nothing moves the
+watermark without taking a `seq`.
 
 Per minted span, Anam tracks `Wᵥ` — the watermark the last checkpoint actually folded — and `V`, the
 checkpoint version. Whether a span needs re-minting is then one comparison, `W > Wᵥ`.
@@ -425,8 +438,12 @@ A consumer **selects** a projection; it never defines one.
 
 Projections are **materialised as files**, content-addressed. **Receipts** make a served projection
 reproducible: `served_hash = sha256(served bytes)` plus the exact facet-id set, the watermark, the
-template version, the definition-set version, and the span. (Arch's consent-version and linkage-version
-drop out — no consent gating, no identity graph.)
+template version, the definition-set version, the `served_at` time, and the span. (Arch's consent-version
+and linkage-version drop out — no consent gating, no identity graph.)
+
+Receipts are also where **publication** is recorded. A facet's published time (§5) is the earliest
+`served_at` over the receipts naming it; there is no `published` record-event, because being shown is not
+something Anam learned about the fact.
 
 ---
 

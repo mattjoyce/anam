@@ -145,11 +145,16 @@ wanting tombstones queries the *Ledger*. See *Receipt*, *Canonical*.
 the method/model and the canonical watermark it was computed from.
 
 **Receipt** — Proof of exactly what a projection served at a watermark: `served_hash`, the facet-id set,
-watermark, template version, definition-set version, and optional span. See *Snapshot*.
+watermark, template version, definition-set version, `served_at`, and optional span. A Facet's
+*published time* is the earliest `served_at` over the receipts naming it — publication is recorded here,
+never as a record-event. See *Projection*, *Record-event*.
 
-**Record-event** — An assertion that Anam's *knowledge* changed (`admitted` / `superseded` /
-`tombstoned` / `endorsed` / `published`), carrying **record-time** and a monotonic `seq`. Append-only.
-`changes_since` is built from these. A Facet never references a record-event. See *Record-time*.
+**Record-event** — An assertion that Anam's *knowledge* changed. There are exactly five kinds —
+`admitted` / `superseded` / `tombstoned` / `endorsed` / `rejected` — each carrying **record-time** and a
+monotonic `seq`. Every kind can change the live-set, so `W ≡ seq` (one counter). Append-only.
+`changes_since` is built from these. A Facet never references a record-event.
+**Publication is not one of them**: serving a facet changes nothing Anam knows, and a *Receipt* already
+records what was shown. See *Record-time*, *Watermark*, *Receipt*.
 
 **Record-time** — When Anam's knowledge changed (an Anam clock). Orders record-events. Contrast
 *Event-time*.

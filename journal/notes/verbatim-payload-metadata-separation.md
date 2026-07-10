@@ -29,7 +29,7 @@ Anam.
 
 ## Enforcement
 
-Enforced at the storage layer: the payload is a SQLite **`BLOB`**, never a set of typed columns. The
+Enforced at the storage layer: the payload is a DynamoDB **Binary** attribute, never a Map. The
 single ingest-time inspection ([[facet-definition-format|the definition]]) reads only the few fields it
 must (identity, event/recorded time) via JSON Pointer; after admission the body is opaque.
 

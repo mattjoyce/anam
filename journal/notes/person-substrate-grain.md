@@ -29,6 +29,8 @@ cost is the point, not a tax.
 
 - Single partition key means no cross-person query, no identity graph, no merge — all dropped.
 - The `person#<id>` constant keeps a multi-person seam open in the keys, but nothing exercises it.
-- Timeline reads are a `WHERE person_id = ? AND event_time BETWEEN ? AND ?` over an index — cheap and
-  range-ordered because event-time is stored as a
-  [[fixed-width-timestamps-lexical-order|fixed-width UTC timestamp]] (lexical == chronological).
+- Timeline reads are a `Query` with `SK BETWEEN` over the person partition — cheap and range-ordered
+  because keys embed a [[fixed-width-timestamps-lexical-order|fixed-width UTC timestamp]]
+  (lexical == chronological).
+- The person partition is what Arch's keystone ADR 0035 removed. Anam re-adopts it deliberately; see
+  [[the-inversion]] and [[anam-owns-the-continuity]].

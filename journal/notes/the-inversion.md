@@ -1,48 +1,71 @@
 ---
 id: 202607100002
 type: decision
-title: "The inversion — whole-person read is the default"
+title: "The inversion — Anam re-promotes the Person to substrate, and accepts the gravity"
 created: 2026-07-10
+modified: 2026-07-10
 status: evergreen
 tags: [anam, decision, core, arch]
 project: anam
-related: ["[[person-substrate-grain]]", "[[mint-unit-whole-timeline]]", "[[2026-07-10-genesis]]"]
+related: ["[[person-substrate-grain]]", "[[anam-owns-the-continuity]]", "[[span-is-the-mint-unit-not-the-read-filter]]", "[[2026-07-10-genesis]]"]
 ---
 
-# The inversion — whole-person read is the default
+# The inversion — Anam re-promotes the Person to substrate, and accepts the gravity
 
-**Decision.** Anam keeps all of Arch's machinery and inverts exactly one thing: *the whole-person
-timeline read is the default and normal mode.* An Episode/Span is an **optional** derived lens, never a
-required filter, never minted, never sealed.
+**Decision.** Anam keeps all of Arch's machinery and inverts exactly one thing: **the Person is the
+substrate, and the whole-person timeline read is the default and normal mode.**
 
-## The tension
+## The tension, stated properly
 
-Arch person-partitions storage **but** makes every read *filtered by an Episode span, default and
-required*; a whole-person read is privileged, consent-gated, and denied by default. That is deliberate:
-a hospital context layer that could return a patient's whole life would become a de-facto system of
-record — an unbounded cost/completeness/clinical-safety trap. Arch's whole design bends to *avoid*
-becoming longitudinal.
+An earlier draft of this note said Anam inverts a *read default* — that Arch requires an Episode-span
+filter and Anam does not. That undersells it, and cites the wrong ancestor.
 
-A personal **soul-record** wants the opposite. The value *is* the longitudinal whole — "me, over time,
-with the evidence." The thing Arch refuses to be is precisely what Anam is for.
+Arch's keystone is **ADR 0035**, and it goes much further:
+
+> *"The **Episode is the unit** — of storage, cost, completeness, and the checkpoint span. The **Person
+> is a thin identity index** — a core identity record holding linkage only, never content."*
+
+Arch had *already tried* the person-as-substrate design (its own ADR 0025) and **reversed it**, because:
+
+> *"A **Person** is unbounded — a life has no edges, is never complete, is retained indefinitely… and
+> longitudinal is **system-of-record gravity**."*
+
+So Anam does not merely relax a filter. **Anam re-promotes the Person to substrate — the exact move ADR
+0035 was written to undo** — and takes on the gravity, knowingly, at the scale of one life where the cost
+Arch could not pay across a jurisdiction is affordable.
 
 ## Why this side wins (for Anam)
 
-- The consumer is one person reading themselves; there is no third party for whom the whole-life read is
-  a hazard.
-- Continuity is the product, not a leak. Composing episodes on demand (Arch's model) would be
-  ceremony that fights the goal.
+- The consumer is one person reading themselves; there is no third party for whom a whole-life read is a
+  hazard.
+- Continuity **is** the product, not a leak. Composing episodes on demand would be ceremony that fights
+  the goal.
+- The costs 0035 itemises — cost, completeness, span problems — are the costs of *a population of
+  unbounded lives*. Anam has one, and it is small.
 
-## What keeps it honest without the span filter
+## What it does *not* license
 
-Removing Arch's safety filter does **not** make Anam a rogue system of record. The line that holds is
+The inversion is a claim about **what a reader gets by default**. It says nothing about what a fold is
+bounded by. Anam once read it as licensing a whole-timeline mint unit; that was a lexical accident, and
+it is retracted ([[span-is-the-mint-unit-not-the-read-filter]]).
+
+> The read default is unbounded. **The mint unit is not.**
+
+## What keeps it honest — and what does not
+
+Removing Arch's safety filter does not make Anam a rogue system of record. The line that holds is
 [[verbatim-payload-metadata-separation|"Anam owns no source fact"]]: every payload is
-verbatim-from-source and rebuildable. Anam is a *lens over your sources*, not a second original. That
-invariant — not the span filter — is what makes the grain safe here.
+verbatim-from-source and rebuildable.
+
+But that line is **not the whole truth**, and ADR 0035 says so to our face. Under person-grain the
+continuity exists nowhere else. See [[anam-owns-the-continuity]] — the honest version of Anam's founding
+invariant, and the one that has to be stated aloud if Anam is not to become, quietly, the thing Arch
+refused to be.
 
 ## Consequences
 
 - [[person-substrate-grain]] — the person is the storage substrate and the default read.
-- [[mint-unit-whole-timeline]] — with no required span, the mint unit is the whole timeline.
+- [[anam-owns-the-continuity]] — every fact rebuilds; the composed account does not.
+- [[span-is-the-mint-unit-not-the-read-filter]] — minting stays bounded, per bucket span.
 - Arch's identity graph and merge are dropped (single person).
-- A Span survives only as a *saved query* / bookmark, never an aggregate.
+- A derived Span survives as a *saved query* / bookmark, never an aggregate.

@@ -153,6 +153,47 @@ Cost of the change: one document rewritten, three config keys, and no store code
 check went in *before* the store existed. Cost of being wrong later: a re-ingest — Anam owns no source
 fact. That asymmetry is why the question was worth asking at exactly this moment and not one rung later.
 
+## Reading the source, not the summary
+
+Late in the session Matt asked whether Mongo or Couch would suit better, then made a captain's call —
+DynamoDB for facets (EAVT-shaped), files for materialised projections, SQLite for tracking — and pointed
+at the REC repo: *"we explain how we maintain current and increments."*
+
+We had been reasoning from Anam's inherited *summary* of Arch. Reading Arch's actual ADRs (0030–0035)
+overturned three things in an hour.
+
+**ADR 0035 is the keystone, and it reverses our ground.** Arch does not merely default to episode-scoped
+reads — it **demoted the Person from substrate to a thin identity index**, reversing its own earlier
+person-centric pivot, because *"a person is unbounded… longitudinal is system-of-record gravity."* Anam
+re-promotes Person to substrate. That is the inversion, stated properly at last
+([[the-inversion]] rewritten). 0035 also aims Anam's founding invariant back at us and lands: every fact
+rebuilds, but the **continuity** exists nowhere else. [[anam-owns-the-continuity]].
+
+**MC5 — we had been calling the ledger "canonical".** ADR 0032 separates two surfaces: the *ledger* is
+append-everything-marked; the *canonical* is the live-only fold. Anam fused them, and grew a **tombstone
+visibility** knob on projections that belongs to neither. [[ledger-and-canonical-two-surfaces]].
+
+**ADR 0033 — minting is per span, never whole-life.** Our [[mint-unit-whole-timeline|retracted note]]
+had conflated the read scope with the mint scope because both wear the word "span". Worse, that note
+*saw* the cost, attributed it correctly to Arch's refusal, and filed it as "not a problem here" — never
+asking what mechanism Arch had refused it *with*. [[span-is-the-mint-unit-not-the-read-filter]].
+
+One adaptation earned its keep: Anam buckets on **event-time** where Arch buckets on record-time, because
+`facet_id = uuidv5(source_ref)` means a superseding artifact is the same row re-read and never leaves its
+bucket. Which exposed a real defect — `source_ref` in the GLOSSARY carried the row's *values*, so a
+corrected reading would have entered as a new facet and orphaned the original, silently disabling
+supersession for that source. [[source-ref-is-identity-not-content]]. That also closes genesis's open
+thread: `identity_key` lives in the definition's `meta`.
+
+And the substrate settled where Matt put it, for the reason his own ADR 0031 gives: *"be datom-shaped, do
+not build a datom engine."* Three stores, split by role, one rule — **truth is immutable and lives in
+exactly one place** ([[substrate-is-accidental]], rewritten a third time). The price is named rather than
+discovered: DynamoDB cannot refuse an `UpdateItem`, so append-only drops a rung on the
+[[invariants-enforced-by-the-substrate|enforcement ladder]]. A rung given up knowingly is not one never
+climbed.
+
+Every doc change cost no code, again, because the boundary check landed before the store did.
+
 ## Where we are
 
 `internal/{facet,clock,config}` committed on `master`. The three packages hold no I/O and no DynamoDB;

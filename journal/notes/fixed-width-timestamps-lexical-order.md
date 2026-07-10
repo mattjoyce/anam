@@ -57,12 +57,12 @@ Parsing is strict for the same reason: `clock.Parse` rejects `2026-01-24T06:30:0
 timestamp without its nine digits is not one Anam wrote, and accepting it would let a foreign width back
 into the keyspace.
 
-## It outlived the substrate
+## It outlived two substrate changes
 
-This note was written while Anam stored on DynamoDB, whose sort keys are strings. Anam then moved to
-SQLite ([[substrate-is-accidental]]) — and the rule survived unchanged, because event-time is still a
-**text column that gets ordered**. The lesson generalises past any one store: the hazard belongs to
-*ordered serialised timestamps*, not to DynamoDB.
+Written while Anam stored on DynamoDB (string sort keys). Anam then moved to SQLite (text columns that
+get ordered), then back to DynamoDB for the ledger ([[substrate-is-accidental]]). The rule survived every
+move **unchanged**. That is the tell that it was never about DynamoDB: the hazard belongs to *any ordered
+serialised timestamp*, and the store is incidental to it.
 
 ## Enforcement
 

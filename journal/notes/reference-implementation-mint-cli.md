@@ -11,10 +11,11 @@ related: ["[[facet-definition-format]]", "[[mint-unit-whole-timeline]]", "[[pers
 
 # Reference implementation — rec-mint-cli
 
-> **Status (2026-07-10):** largely **superseded** for the store layer. Anam moved to an embedded SQLite
-> ledger ([[substrate-is-accidental]]), so the AWS wiring, single-table `CreateTable` and
-> conditional-write conflict mapping below no longer apply. What survives is the **fold-over-events**
-> pattern and the **Facet Definition loader**. Kept for the record.
+> **Status (2026-07-10):** **live again.** Briefly superseded when Anam moved to an all-SQLite ledger,
+> then restored when the substrate split by role ([[substrate-is-accidental]]): DynamoDB holds the ledger.
+> The AWS wiring, single-table `CreateTable` and conditional-write conflict mapping below all apply. Note
+> that `FacetCurrent` — a mutable pointer — must **not** be copied: current status is folded, never
+> stored.
 
 **What.** `/mnt/Projects/rich-episodic-context/poc/mint-cli` (`rec-mint-cli`) is a working Go prototype
 of the Arch mint tier over **DynamoDB Local**. It is the closest thing to a reference implementation for

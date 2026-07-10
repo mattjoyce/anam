@@ -20,7 +20,7 @@ clocks (event-time / record-time), a resolve→commit **admission gate**, **mint
 Prototype. First slice proves the vertical path end-to-end against real data:
 
 ```
-capture (health-db / bp-csv) → ingest (gate) → append-only ledger (SQLite)
+capture (health-db / bp-csv) → ingest (gate) → append-only ledger (DynamoDB)
     → mint → canonical fold → projection + CLI viewer → receipt
 ```
 
@@ -44,7 +44,7 @@ Extensible to "all sorts of facets" later — `calendar.event`, `mail.thread`, `
 
 ```sh
 make build
-export ANAM_DB_PATH=~/.local/share/anam/anam.db   # the ledger; a file you can copy
+export ANAM_DDB_ENDPOINT=http://192.168.20.4:8000   # the ledger (creds are static fakes, in-code)
 ./anam init
 ./anam ingest health --db /path/to/healthdata.db
 ./anam ingest bp --csv /path/to/blood-pressure.csv

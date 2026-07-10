@@ -22,12 +22,27 @@ type Config struct {
 	// person#<id>. Anam serves exactly one person (§4).
 	PersonID string `mapstructure:"person_id"`
 
-	// DBPath is the SQLite ledger — a file, not a service (§8). Losing it costs a
-	// re-ingest, not a fact.
+	// DDBEndpoint addresses DynamoDB Local, which holds the ledger: facets,
+	// record-events and the watermark (§8).
+	DDBEndpoint string `mapstructure:"ddb_endpoint"`
+
+	// DDBRegion is nominal against DynamoDB Local, which does not authenticate, but the
+	// AWS SDK requires one.
+	DDBRegion string `mapstructure:"ddb_region"`
+
+	// TableName is the single DynamoDB table holding every ledger item kind (§8).
+	TableName string `mapstructure:"table_name"`
+
+	// DBPath is the SQLite tracking database. It holds nothing that cannot be rebuilt
+	// by replaying the ledger, so losing it costs a replay, not a fact (§8).
 	DBPath string `mapstructure:"db_path"`
 
-	// Timeout bounds every call to the store. SQLite can block on a write lock, and a
-	// hung call is a hung call whatever its cause (§8).
+	// ArtifactDir holds content-addressed checkpoint values and served receipts —
+	// published artifacts, immutable, backed up rather than rebuilt (§8).
+	ArtifactDir string `mapstructure:"artifact_dir"`
+
+	// Timeout bounds every call to a store. Anam fails fast on an unreachable endpoint
+	// rather than hanging (§8).
 	Timeout time.Duration `mapstructure:"timeout"`
 }
 
@@ -53,7 +68,11 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("bind person_id: %w", err)
 	}
 
+	v.SetDefault("ddb_endpoint", "http://localhost:8000")
+	v.SetDefault("ddb_region", "us-east-1")
+	v.SetDefault("table_name", "anam")
 	v.SetDefault("db_path", DefaultDBPath())
+	v.SetDefault("artifact_dir", DefaultArtifactDir())
 	v.SetDefault("timeout", 5*time.Second)
 
 	if path != "" {
@@ -64,9 +83,9 @@ func Load(path string) (Config, error) {
 	}
 
 	// An unrecognised key is an error, not a shrug. Config is external input, and a
-	// silently-ignored `db_pth` would leave Anam writing to the default ledger while
-	// the operator believes it is writing to theirs — the failure you never notice.
-	// Fail fast at startup instead.
+	// silently-ignored `ddb_endpont` would leave Anam talking to the default endpoint
+	// while the operator believes it is talking to theirs — the failure you never
+	// notice. Fail fast at startup instead.
 	var c Config
 	errorOnUnknownKeys := func(dc *mapstructure.DecoderConfig) { dc.ErrorUnused = true }
 	if err := v.Unmarshal(&c, errorOnUnknownKeys); err != nil {
@@ -83,23 +102,36 @@ func (c Config) Validate() error {
 	switch {
 	case c.PersonID == "":
 		return fmt.Errorf("%w: person_id is required", ErrInvalid)
+	case c.DDBEndpoint == "":
+		return fmt.Errorf("%w: ddb_endpoint is required", ErrInvalid)
+	case c.DDBRegion == "":
+		return fmt.Errorf("%w: ddb_region is required", ErrInvalid)
+	case c.TableName == "":
+		return fmt.Errorf("%w: table_name is required", ErrInvalid)
 	case c.DBPath == "":
 		return fmt.Errorf("%w: db_path is required", ErrInvalid)
+	case c.ArtifactDir == "":
+		return fmt.Errorf("%w: artifact_dir is required", ErrInvalid)
 	case c.Timeout <= 0:
 		return fmt.Errorf("%w: timeout must be positive, got %s", ErrInvalid, c.Timeout)
 	}
 	return nil
 }
 
-// DefaultDBPath is the ledger's home: $XDG_DATA_HOME/anam/anam.db, falling back to
-// ~/.local/share/anam/anam.db, and finally to a bare relative name when neither is
+// DefaultDBPath is the tracking database: <data dir>/anam/tracking.db.
+func DefaultDBPath() string { return dataPath("tracking.db") }
+
+// DefaultArtifactDir is where checkpoint values and receipts are written:
+// <data dir>/anam/artifacts.
+func DefaultArtifactDir() string { return dataPath("artifacts") }
+
+// dataPath resolves $XDG_DATA_HOME/anam/<rel>, falling back to
+// ~/.local/share/anam/<rel>, and finally to a bare relative name when neither is
 // discoverable.
 //
-// The ledger is data, not config, so it belongs under the data directory rather than
+// These are data, not config, so they belong under the data directory rather than
 // beside config.yaml. Go's standard library has no UserDataDir, so this is spelled out.
-func DefaultDBPath() string {
-	const rel = "anam.db"
-
+func dataPath(rel string) string {
 	if dir := os.Getenv("XDG_DATA_HOME"); dir != "" {
 		return filepath.Join(dir, "anam", rel)
 	}

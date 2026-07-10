@@ -21,22 +21,51 @@ One invariant governs every decision below:
 > **Anam owns no source fact, and no captured payload exists only inside it — every captured payload is
 > held verbatim from its source (rebuildable). Facts accrete; nothing is ever overwritten.**
 
-If Anam were deleted tomorrow, no fact would be lost: it rebuilds from the sources. What Anam *authors*
-— governing metadata, the ledger's order, checkpoints, receipts, and its own derived findings — is
-operational record, backed up, never authoritative. This is what keeps Anam a *context product*, not a
-second copy of your life pretending to be the original.
+If Anam were deleted tomorrow, **no fact would be lost**: every payload rebuilds from its source. What
+Anam *authors* — governing metadata, the ledger's order, checkpoints, receipts, and its own derived
+findings — is operational record, backed up, never authoritative.
+
+### Say the rest of it honestly
+
+Arch's ADR 0035 aims that invariant back at us, and it lands:
+
+> *"'Owns no facts, rebuildable from source' stays literally true under either grain — but under
+> Person-grain it stops being the whole truth: the cross-episode continuity and identity linkage exist
+> **nowhere else**."*
+
+True. Every *fact* rebuilds; the **continuity does not**. The composed, ordered, whole-life account is
+assembled by Anam and exists nowhere upstream. Anam is therefore not weightless, and pretending otherwise
+would be the lie that lets a context product quietly become a system of record.
+
+So state it plainly: **Anam owns no fact, and Anam owns the continuity.** The continuity is
+*re-derivable* (re-ingest every source and the timeline reassembles) but it is not *held* anywhere else
+while Anam is switched off. That is the whole product, and it is why the ledger's order, its watermarks
+and its checkpoints are backed up rather than assumed rebuildable.
 
 ### The one inversion (read this before anything else)
 
-Arch person-partitions storage but makes every read **filtered by an Episode span, and that filter is
-the default and required**; a whole-person read is privileged, consent-gated, and denied by default —
-deliberately, so Arch can never accrete into a longitudinal record.
+Arch's keystone is **ADR 0035**: *"The Episode is the unit — of storage, cost, completeness, and the
+checkpoint span. The Person is a thin identity index."* Arch deliberately **demoted Person from
+substrate to index**, reversing its own earlier person-centric pivot, on the grounds that a person is
+unbounded, a life has no edges, and *"longitudinal is system-of-record gravity."*
 
-**Anam inverts exactly this.** A personal soul-record *wants* to be longitudinal. So:
+**Anam inverts exactly that.** A personal soul-record *wants* to be longitudinal, so Anam re-promotes
+the Person to substrate and accepts the gravity — knowingly, at the scale of one life, where the cost
+Arch could not pay across a jurisdiction is affordable.
 
-> **The whole-person timeline read is Anam's default and normal mode. A Span (a trip, an illness, a
-> training block) is an *optional* derived lens you impose to focus — never a required filter, never a
-> minted or sealed unit.**
+> **The whole-person timeline read is Anam's default and normal mode.**
+
+Two things follow that are easy to conflate, and must not be:
+
+- **The read default is unbounded.** No span is required to read; a Span is an *optional derived lens*
+  (a trip, an illness, a training block) you impose to focus.
+- **The mint unit is bounded.** Minting is **per span**, never whole-life (Arch ADR 0033). Anam's
+  default mintable span is a **time bucket** (§7). The lifelong view **composes** bucket checkpoints; it
+  never re-folds the person.
+
+Anam's earlier reasoning — *"there is no required span, therefore the mint unit is the whole timeline"* —
+was a conflation of these two, and is retracted. Removing the span as a **required read filter** never
+required removing it as a **mint unit**.
 
 Everything else in Arch — the Facet, the ledger, the two clocks, the admission gate, mint, fold, and
 projections — carries over. The rest of this document is that machinery, re-grained to the person.
@@ -122,16 +151,26 @@ Storage is **partitioned by the person** (`person#<id>`): all their facets are c
 no required span filter and no fail-closed on a whole-person read — a longitudinal record is the point.
 A read is "my facts, in time order," optionally narrowed.
 
-- A **Span** is an inclusive interval over the timeline — a **derived** filter with query-time
-  endpoints (`[from, to]`, optionally narrowed to some facet types). It is **composed on demand, never
-  stored as a unit of consistency, never minted, never sealed.** Spans may be saved as **bookmarks**
-  (a label + endpoints) for convenience — a `SPAN#` item is a saved query, nothing more.
-- Because there is one person, there is **no identity graph and no merge** — Arch's linkage machinery is
-  dropped entirely.
+### Two kinds of Span, and they are not the same thing
 
-What keeps a person-partitioned, longitudinally-read store honest is **not** a span filter (Anam
-removed that) but the invariant of §1: **Anam owns no source fact; every payload is verbatim-from-source
-and rebuildable.** Anam is a longitudinal *lens over your sources*, not a second system of record.
+Conflating these produced the whole-timeline mint that §1 retracts. Anam has **two span tiers**
+(Arch ADR 0033, minus the inherited tier — Anam has no System of Record to inherit boundaries from):
+
+| Tier | What it is | Minted? |
+|---|---|---|
+| **Bucket span** | a calendar window over **event-time** (default: one month). Every facet is a member of exactly one, by arithmetic on its `event_time` — no lookup. Invisible to the reader; nobody asks for it. | **minted** — the unit of checkpointing (§7) |
+| **Derived span** | an inclusive interval the person names — `[from, to]`, optionally narrowed to some facet types; a saved bookmark; or "everything" | **never minted.** Composed on demand from bucket values; materialised only when a receipt is served |
+
+A derived span is a **lens**, not a unit of consistency: composed on demand, never stored as one, never
+pulsed. A saved bookmark (`span#<id>`) is a stored *query*, nothing more. The whole-life span is
+expressible and of limited use — a life is what you compose, not what you mint.
+
+Because there is one person, there is **no identity graph and no merge** — Arch's linkage machinery is
+dropped entirely.
+
+What keeps a person-partitioned, longitudinally-read store honest is **not** a span filter (Anam removed
+that) but the invariant of §1: **Anam owns no source fact; every payload is verbatim-from-source and
+rebuildable** — while owning, and taking responsibility for, the continuity.
 
 ---
 
@@ -181,14 +220,20 @@ The gate is exposed as two calls:
 
 - The facet's id is **deterministic**: `facet_id = uuidv5(namespace, source_ref)`, so the same source
   row always maps to the same logical facet.
-- `commit` writes the artifact and its `admitted` record-event in **one transaction**. Idempotency is a
-  `UNIQUE (source_ref, content_hash)` constraint, so the marker is not a separate row to be kept
-  consistent — it *is* the artifact's own key (§8).
-  - Same `source_ref` **and** same hash → **no-op** (safe re-ingest); the insert conflicts and is ignored.
+- **`source_ref` is a source row's identity, never its contents.** It composes from the Definition's
+  declared `identity_key` — the fields that say *which* row this is — and nothing else:
+  `bp-csv:2026-01-24T06:30:00`, not `bp-csv:2026-01-24T06:30:00:118/76/61`. Braiding the values into the
+  natural key would give a corrected reading a *different* `facet_id`, so it would enter as a **new
+  facet** and orphan the original instead of superseding it — silently disabling the entire
+  idempotency-and-supersession mechanism for that source. Identity decides *which fact*; `content_hash`
+  decides *whether it changed*. Keep them unbraided.
+- `commit` writes the artifact, its `admitted` record-event, and the watermark bump `W` in **one atomic
+  transaction** (§8). Idempotency is enforced on `(source_ref, content_hash)`.
+  - Same `source_ref` **and** same hash → **no-op** (safe re-ingest).
   - Same `source_ref`, **different** hash → the source row changed: write a **new artifact version** and
     append a `superseded` record-event against the prior. Nothing is mutated; the old artifact stays.
-- **Retraction is a tombstone** — a `tombstoned` record-event, never a delete. The `facet` table's
-  `BEFORE DELETE` trigger makes this structural rather than aspirational.
+- **Retraction is a tombstone** — a status-bearing artifact version carrying `tombstoned`, never a
+  delete. It advances `W` like any other mutation (§7).
 
 > **Design note (Armstrong).** Because `commit` is idempotent and atomic, a capture worker may **crash
 > mid-batch and simply be re-run to known-good**. There is no partial facet and no corruption. This — the
@@ -199,104 +244,184 @@ The gate is exposed as two calls:
 
 ## 7. Ledger, mint, and checkpoints
 
-- The **append-only ledger is Anam's record of what it knew** — its own log, never authoritative (the
-  sources are). Everything admitted stays; supersession and tombstoning are status transitions, never
-  deletes.
-- The **canonical account** of the person is the **fold over the ledger to the latest known state**,
-  produced on read — so a read is **as fresh as ingest** (§9).
-- The **mint** produces **checkpoints to bound replay**. In Anam the mint unit is the **whole person
-  timeline** (there is no required span, so no per-episode fold — the clean resolution of Arch's
-  "inherited span = mint unit" under the inversion). A checkpoint is an **immutable, content-addressed**
-  value of the canonical fold at a record-time **watermark**: `hash = sha256(canonical bytes)`.
-- The first slice mints on a **manual trigger** (`anam checkpoint`); adaptive cadence is deferred.
-- **Receipts** prove exactly what was served at a watermark (§9).
+### The ledger is the system of record
+
+The **append-only ledger is Anam's record of what it knew** — its own log, never authoritative about the
+world (the sources are). Everything admitted stays; supersession and tombstoning are status transitions,
+never deletes.
+
+> **Any state = nearest checkpoint + replay of the record-events since that checkpoint's watermark.**
+> (Arch ADR 0032.) A single indexed range-scan. The current canonical is the head case; a historical
+> as-of is the same scan with an upper bound.
+
+### Two surfaces, two names (Arch ADR 0032, MC5)
+
+The word *canonical* names exactly one of these. Anam previously used it for the other; that is corrected
+here.
+
+| Surface | Contains | Used for |
+|---|---|---|
+| **Ledger** | **every facet ever admitted, marked at its current status** — including superseded and tombstoned | forensic reads, `as-of`, `changes_since`, rebuild |
+| **Canonical** | the **live-only** fold at a watermark — superseded and tombstoned facets are *excluded from the value* | the normal serve path; what projections prune |
+
+A tombstoned facet stays in the ledger forever, marked. It is absent from the canonical *value*. Neither
+surface is "the truth about the past" more than the other — they answer different questions.
+
+### Mint = adaptive checkpointing, and its only job is to bound replay
+
+A **checkpoint** is an immutable, **content-addressed** value of the live-only fold over one span's
+members at a record-time **watermark**: `hash = sha256(canonical bytes)`.
+
+Minting exists **only to bound read-time replay depth** — *not* for freshness. The ledger is always
+current, so a read replays to the head and is **as fresh as ingest**. Freshness is a property of the
+read, paid by a range-scan; it is not bought by a periodic tick.
+
+- **Minting is per span, never whole-life** (ADR 0033). Anam's default mintable span is a **time bucket**
+  over **event-time** (default: one calendar month). Every facet is a member of exactly one bucket, so
+  the minted set is never empty and every facet sits inside a mintable scope.
+- **Anam buckets on event-time, where Arch buckets on record-time.** Anam can, and Arch cannot, because
+  `facet_id = uuidv5(source_ref)` and `source_ref` is a source row's **identity, not its contents** (§6a):
+  a superseding artifact is the same row re-read, so it carries the same `event_time` and lands in the
+  same bucket. **Every version of a logical facet lives in one bucket.** The lifelong view is therefore a
+  *disjoint union* of bucket values needing no cross-bucket version resolution — and a checkpoint aligns
+  with the time-bounded question a person actually asks.
+  - The cost: a backfilled facet (an old `event_time` ingested today) re-opens its sealed bucket and
+    re-mints it. One bucket, a few hundred facets. Garmin backfills routinely; this is cheap and correct.
+- **The lifelong / derived view composes, it never re-folds.** A Span the person names (`--from/--to`, a
+  saved bookmark, "everything") is a **derived span**: computed on demand by stitching bucket values,
+  materialised only when a receipt is served. It is never pulsed and never minted.
+- **Cadence is adaptive** — time-OR-size-OR-rate, whichever trips first. A quiet bucket mints nothing.
+  The first slice mints on a **manual trigger** (`anam checkpoint`); the adaptive trigger is deferred, the
+  seam is not.
+
+### The watermark and the head
+
+`W` is the **stream watermark**: a monotonic counter advanced by *every* record-event that can change the
+live-set — `admitted`, `superseded`, `tombstoned`, `endorsed`, `rejected`. A pure status transition
+advances `W` even though no facet is born; if it did not, a checkpoint could reuse a value that still
+lists a retracted facet.
+
+Per minted span, Anam tracks `Wᵥ` — the watermark the last checkpoint actually folded — and `V`, the
+checkpoint version. Whether a span needs re-minting is then one comparison, `W > Wᵥ`.
+
+**Receipts** prove exactly what was served at a watermark (§9). Unserved interstitial checkpoints are
+garbage-collectable once a later checkpoint subsumes them and no receipt pins them; they were only ever
+replay floors.
 
 ---
 
-## 8. Storage — an embedded SQLite ledger
+## 8. Storage — three substrates, one rule
 
-Anam stores in a single **SQLite** file (`db_path`), opened in WAL mode through `database/sql`. There is
-no server, no network, and no daemon: the store is a library call, and the ledger is a file you can copy.
+Anam stores in **three** places, because three different things want three different shapes. The rule
+that keeps them coherent:
 
-**The substrate is accidental, not essential.** Anam is a single-user, single-partition, local store; the
-problem is a personal longitudinal record, not a key-value service. SQLite is chosen because it is the
-*simplest thing that satisfies the invariants* — and because it can enforce two of them directly, which
-no remote key-value store can. Only `internal/store` may name SQLite or `database/sql`; the domain does
-not know what it is stored in, and `scripts/check.sh` enforces that. Because Anam owns no source fact,
-**changing substrate is a re-ingest, not a migration.**
+> **Truth is immutable and lives in exactly one place. The ledger holds the record. The filesystem holds
+> published artifacts. SQLite holds nothing that cannot be rebuilt by replaying the ledger.**
 
-The seven domain values get seven tables. There is no marshalling envelope and no `kind` discriminator —
-they were artefacts of single-table key-value modelling, and they are gone.
+| Substrate | Holds | Nature |
+|---|---|---|
+| **DynamoDB** | facets (metadata + opaque payload), record-events, and the watermark `W` | the **ledger** — the system of record |
+| **Filesystem** | checkpoint values (`VALUE#<hash>`) and served receipts | **published artifacts** — immutable, content-addressed |
+| **SQLite** | per-span `V`/`Wᵥ`, the span registry, checkpoint and receipt index, sync cursors, GC state | **derived** — a cache, rebuildable by replay |
 
-```sql
-facet(facet_id, artifact_version, type, event_time, recorded_time, ingested_time,
-      person_id, classification, confidence, definition_version,
-      binding_assurance, span_hint, source, injector, source_ref,
-      method, model, watermark, birth_status,
-      source_schema, schema_version, content_hash, payload_kind, media_type,
-      payload BLOB NOT NULL,                          -- opaque; never a structured column
-      PRIMARY KEY (facet_id, artifact_version),
-      UNIQUE (source_ref, content_hash))              -- the idempotency marker (§6a)
+Config is **YAML**; Facet Definitions are **JSON** (§3a).
 
-record_event(seq INTEGER PRIMARY KEY AUTOINCREMENT,   -- monotonic, allocated in-transaction
-      kind, facet_id, artifact_version, prior_artifact_version,
-      record_time, person_id)
+### The ledger — datom-shaped, not a datom engine
 
-definition(type, definition_version, ...)   checkpoint(watermark, ...)
-span(span_id, ...)                          cursor(source, ...)   receipt(id, ...)
+Following Arch ADR 0031: adopt the datom **shape**, do not build a datom **engine**. Facts are
+`[entity attribute value tx]` with `tx` = record-time; the store supplies sorted indexes, Anam supplies
+the shape and a handful of fixed query forms.
 
-CREATE INDEX timeline    ON facet(person_id, event_time);          -- was GSI1
-CREATE INDEX by_type     ON facet(person_id, type, event_time);    -- was GSI1
-CREATE INDEX changes     ON record_event(person_id, record_time, seq);  -- was GSI2
+Grain is **hybrid at the verbatim line** (ADR 0031):
+
+- **Verbatim substrate → coarse.** One item per facet artifact: the datoms cover only Anam's *envelope*
+  (its governing metadata), and the payload is a single opaque, content-addressed value. Shredding a
+  verbatim payload into per-field triples would impose a schema at ingest — crossing the line §3 draws.
+- **Derived facets and consent → fine.** Per-attribute datoms, where field-level history and per-field
+  provenance actually pay.
+
+```text
+PK = person#<id>
+SK:
+  facet#<event_time>#<facet_id>#v<n>   the timeline        (Query: SK BETWEEN)
+  rec#<seq>                            record-events       (replay-since)
+  seq                                  the watermark W     (a counter item)
+  def#<type>#v<version>                facet definitions
+GSI1 (by facet type):   gsi1_pk = person#<id>#type#<type>   gsi1_sk = <event_time>#<facet_id>
+GSI2 (changes_since):   gsi2_pk = person#<id>               gsi2_sk = <record_time>#<seq>
 ```
 
-Times are stored as **fixed-width UTC RFC3339Nano text**, so lexical order still equals chronological
-order and `BETWEEN` still gives the timeline window (§5). That decision survives the substrate change
-untouched: any ordered text timestamp needs it.
+Times are formatted **fixed-width UTC RFC3339Nano**, so lexical order equals chronological order for
+range queries (§5). The **payload is a Binary attribute, never a Map** — this is where metadata/payload
+separation (§3) is enforced.
 
-> **Design note (Hickey).** Storing a `Facet` no longer requires braiding seven values into one item
-> shape. Each domain value maps to its own table, and the **payload is a `BLOB`, never a set of typed
-> columns** — this is where metadata/payload separation (§3) is enforced. Current status remains absent
-> from `facet`: it is folded from `record_event` (§9).
+> **Design note (Hickey).** The single-table `item` is a **marshalling envelope, quarantined to the store
+> package** — not a domain type. Each domain value owns its `toItem`/`fromItem`; the `kind` discriminator
+> exists only at the storage edge. Current status is absent from the artifact: it is folded from
+> record-events (§9).
 
-> **Design note (Armstrong).** Two invariants are enforced **by the substrate rather than by our
-> vigilance**, which is the strongest form the error kernel can take:
+### `commit` is one transaction, and it is the error kernel
+
+The facet artifact, its `admitted` record-event, and the bump of `W` are written in a **single
+`TransactWriteItems`**, conditional on the idempotency marker not already existing and on `W` still
+holding the value it was read at. A concurrent writer that read a stale `W` loses with
+`ConditionalCheckFailed`, re-reads, and retries.
+
+> **Design note (Armstrong).** There is **no transaction across substrates**, so everything that must be
+> atomic lives in one: the artifact, the event, and the watermark. SQLite is never written in the same
+> breath as the ledger; it catches up afterwards by replaying record-events since its last-seen `seq`.
+> That is safe precisely because the ledger is append-only and `commit` is idempotent — **a crash leaves
+> SQLite behind, never wrong, and behind is fixable by replay.**
 >
-> - **Append-only** — `BEFORE UPDATE` and `BEFORE DELETE` triggers on `facet` and `record_event`
->   `RAISE(ABORT)`. A future refactor *cannot* overwrite a fact; the database refuses.
-> - **Idempotency** — `UNIQUE(source_ref, content_hash)`. Re-ingesting an unchanged row is
->   `INSERT … ON CONFLICT DO NOTHING`; there is no marker to keep atomically consistent with the artifact,
->   because the constraint *is* the marker.
->
-> `commit` is therefore one ordinary transaction: insert the artifact, insert the `admitted`
-> record-event, commit. A worker may crash mid-batch and be re-run to known-good. `SQLITE_CONSTRAINT`
-> surfaces as a typed conflict.
+> The price of this substrate, paid knowingly: DynamoDB cannot refuse an `UpdateItem`, so **append-only
+> drops from an invariant the substrate enforces to one our code must not violate.** It falls back to a
+> test. SQLite would have held it with a trigger. This is the single largest cost of the split, and it
+> lands on Anam's deepest promise.
 
-Every store method still takes a `context` with a deadline: SQLite can block on a write lock, and a hung
-call is a hung call whatever its cause.
+Every store method takes a `context` with a deadline and **fails fast** on an unreachable endpoint —
+never a hang. `ConditionalCheckFailed` and `TransactionCanceledException` surface as a typed conflict.
+
+**The substrate is accidental, not essential.** Only `internal/store` may name DynamoDB, SQLite, or
+`database/sql`; `scripts/check.sh` enforces it. Because Anam owns no source fact, **changing substrate is
+a re-ingest, not a migration** — as this document has already demonstrated once.
 
 ---
 
-## 9. Canonical and projections
+## 9. Ledger, canonical, and projections
 
-The **canonical account** is append-only and complete: every facet ever admitted, at its **current
-status derived from record-events** (including tombstoned items, with provenance). *What is admitted
-stays; it is superseded or re-statused, never pruned by retraction.*
+Two surfaces (§7), and the reads that go to each.
 
-- **Fold** reads facet artifacts in a window (default: **the whole timeline** — the inversion) plus the
-  record-events up to a watermark, and derives each facet's current status (`admitted` / `superseded` /
-  `tombstoned` / `endorsed` / `rejected`).
-- **`changes_since`** reads `record_event` by record-time and reports what changed between two points.
+**The ledger** is append-only and complete: every facet ever admitted, at its **current status derived
+from record-events**, with provenance — including superseded and tombstoned facets. *What is admitted
+stays; it is re-statused, never pruned by retraction.* Forensic reads, `as-of` reads, and rebuild go here.
 
-From the canonical account, Anam publishes governed **projections** (variants): **versioned templates
-that prune — never reshape, never generate.** The only knobs are **metadata filters**: a facet-type
-allow-list (deny-by-default), a datetime filter, tombstone visibility, an endorsement-status filter, and
-a maximum classification. Filtering is on **metadata only, never the payload**; a projection includes or
-excludes **whole Facets**. A consumer **selects** a projection; it never defines one.
+- **`changes_since`** reads record-events by record-time and reports what changed between two points.
+- The **raw / forensic** view of the timeline reads the ledger directly, tombstones visible.
 
-- **Receipts** make a served projection reproducible: `served_hash = sha256(served bytes)` plus the
-  exact facet-id set, the watermark, the template version, the definition-set version, and an optional
-  span. (Arch's consent-version and linkage-version drop out — no consent gating, no identity graph.)
+**The canonical** is the **live-only** fold at a watermark: every facet whose current status is live.
+Superseded and tombstoned facets are *excluded from the value* — they remain in the ledger, marked.
+
+- **Fold** reads the record-events for a span's members up to a watermark and derives each facet's
+  current status (`admitted` / `superseded` / `tombstoned` / `endorsed` / `rejected`), keeping the live
+  ones. Liveness ⇔ the current artifact version's status is live.
+- The **normal serve path** is *nearest checkpoint + replay-since* (§7), so a read is as fresh as ingest.
+- The **whole-person timeline** — Anam's default read — is a **derived span composed** from bucket
+  checkpoints plus the open bucket's replay. It never re-folds the person.
+
+From the canonical, Anam publishes governed **projections** (variants): **versioned templates that
+prune — never reshape, never generate.** The only knobs are **metadata filters**: a facet-type allow-list
+(deny-by-default), a datetime filter, an endorsement-status filter, and a maximum classification.
+Filtering is on **metadata only, never the payload**; a projection includes or excludes **whole Facets**.
+A consumer **selects** a projection; it never defines one.
+
+> *Tombstone visibility* is no longer a projection knob. It was one only while "canonical" named the
+> append-everything surface. A projection over the canonical sees live facets by construction; a reader
+> who wants tombstones is asking the **ledger** a forensic question, not asking a projection for a variant.
+
+Projections are **materialised as files**, content-addressed. **Receipts** make a served projection
+reproducible: `served_hash = sha256(served bytes)` plus the exact facet-id set, the watermark, the
+template version, the definition-set version, and the span. (Arch's consent-version and linkage-version
+drop out — no consent gating, no identity graph.)
 
 ---
 
@@ -334,18 +459,26 @@ Anam later as an ordinary source fact.
 ## 12. Invariants — the do-not-break list
 
 - Owns no source fact; **no captured payload exists only in Anam** — every one is verbatim-from-source
-  and rebuildable.
+  and rebuildable. **Anam does own the continuity**, which is re-derivable but held nowhere else (§1).
 - What is Anam-authored — governing metadata, the ledger order, watermarks, checkpoints, receipts, and
   provisional derived findings — is **authored, never authoritative**; backed up, not rebuilt.
 - **Storage is partitioned by the person (one timeline).** The **whole-person read is the default**; a
-  Span is an optional derived filter, never a stored/minted/sealed unit.
+  Span is an optional derived *read* filter. **Minting is per span, never whole-life** — the two are
+  different concerns and must not be conflated (§1, §7).
+- **Truth is immutable and lives in exactly one place.** The ledger is the system of record; files hold
+  published artifacts; **SQLite holds nothing that cannot be rebuilt by replaying the ledger** (§8).
 - **Append-only**: facts are added and superseded by status events (tombstones) — **never modified,
-  never deleted.** Enforced by the substrate: `BEFORE UPDATE`/`BEFORE DELETE` triggers abort (§8).
+  never deleted.** DynamoDB cannot enforce this; our code must not violate it, and a test guards it (§8).
 - **Current status is derived** by the fold from record-events — **never stored** on the artifact (no
   place-oriented programming).
+- **`source_ref` is identity, `content_hash` is content.** The natural key never contains the row's
+  values, or supersession silently becomes duplication (§6a).
+- **Canonical means the live-only value; the ledger means append-everything-marked.** One word, one
+  surface (§7, §9).
 - **Metadata / payload separation**: the payload is verbatim, immutable, stored opaque, never parsed
   into a canonical schema.
-- **Three-pillar admission through the one gate**; **`commit` is idempotent and atomic** (crash-clean).
+- **Three-pillar admission through the one gate**; **`commit` is idempotent and atomic** — artifact,
+  record-event and watermark in one transaction, in one substrate (crash-clean).
 - Projections **prune, never reshape or generate**; a consumer selects, never defines.
 - Agent findings are derived Facets admitted as `proposed`; **endorsement never writes back**.
 - **The Envelope is the only ingress**; every external call is timed and fails fast.
@@ -360,7 +493,8 @@ one or two projections plus a CLI timeline viewer, manual mint, and receipts. Re
 **Deferred, not forgotten:**
 
 - **Binary / native-reference facets** — reserved; no binary source in the first slice.
-- **Adaptive mint cadence and a freshness SLO** — manual `checkpoint` only.
+- **Adaptive mint cadence (time-OR-size-OR-rate)** — manual `checkpoint` only; the bucket-span seam and
+  the `W`/`Wᵥ` machinery exist from R2, the trigger does not.
 - **Sealed projections / a seal point** — receipts suffice for now.
 - **Token rotation; multi-scope tokens** — one static `source → types` map.
 - **Consent policy and classification-driven gating** — attribute + pass-through gate only (§10).

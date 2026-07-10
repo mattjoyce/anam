@@ -3,9 +3,9 @@
 //
 // Timestamps are formatted fixed-width, in UTC, at nanosecond precision, so that
 // lexical order equals chronological order (ARCHITECTURE.md §8). Event-time and
-// record-time are stored as text and range-queried with BETWEEN / ORDER BY on that
-// equivalence; nothing else guarantees it. (This outlived the move off DynamoDB: any
-// ordered text timestamp needs it.)
+// record-time are stored as text and range-queried with BETWEEN on that equivalence;
+// nothing else guarantees it. (The rule outlived two substrate changes: any ordered
+// text timestamp needs it, whatever stores it.)
 //
 // Consumers needing a clock declare their own single-method interface at the point of
 // use (AGENTS.md); this package returns concrete types.

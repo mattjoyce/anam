@@ -30,16 +30,21 @@ assurance*.
 artifact. It is **not** the facet's current status — current status is *derived* by the fold. One truth
 per fact. See *Status*, *Fold*.
 
-**Canonical account** — The append-only, complete account of the person: every Facet ever admitted, at
-its **current status derived from record-events**, with provenance. Produced as a **fold over the
-ledger** (§9). See *Fold*, *Projection*.
+**Bucket span** — Anam's default **mintable** Span: a calendar window over **event-time** (default one
+month). Every Facet is a member of exactly one, by arithmetic on its event-time. Invisible to the reader.
+The unit of checkpointing. See *Span*, *Checkpoint*.
+
+**Canonical** — The **live-only** fold at a watermark: every Facet whose current status is live.
+Superseded and tombstoned Facets are **excluded from the value** (they remain in the *Ledger*, marked).
+*Canonical* names this value and nothing else. Earlier Anam drafts used the word for the Ledger surface;
+that is corrected (Arch ADR 0032, MC5). See *Ledger*, *Fold*, *Checkpoint*.
 
 **Capture worker** — An external, pluggable client that reads a source and submits envelopes to the
 ingest gate. In the MVP: `health-db` and `bp-csv`. **Out of the kernel.** See *Source*, *Envelope*.
 
-**Checkpoint** — An immutable, content-addressed value of the canonical fold at a record-time
-*watermark*, produced by the mint to bound replay. In Anam the checkpoint is over the **whole person
-timeline** (not per-span). See *Mint*, *Watermark*.
+**Checkpoint** — An immutable, content-addressed value of the canonical (live-only) fold over **one
+minted span's** members at a record-time *watermark*. Produced by the mint solely to bound replay depth.
+Never whole-life. See *Mint*, *Watermark*, *Bucket span*.
 
 **Classification** — A governance level on the Facet Definition and each Facet:
 `Normal` / `Confidential` / `Sensitive`. Present and carried; **gating on it is deferred** (§10). See
@@ -61,13 +66,17 @@ as a record-event. **Never writes back** into source systems. See *Derived facet
 payload, asserted_person?, span_hint?}`. The **only ingress**; capture workers share nothing with the
 ledger except through it. See *Admission gate*.
 
-**Episode** — *Not a first-class Anam concept.* In Arch the Episode is the required, minted span; Anam
-has **no required span and mints nothing per-span**. What Arch calls an Episode, Anam expresses as an
-optional *Span* bookmark. See *Span*, *Inversion*.
+**Episode** — *Not a first-class Anam concept.* In Arch the Episode is the unit of storage, cost and
+checkpointing (ADR 0035); Anam has **no required read span** and inherits no boundary from any System of
+Record. Anam still mints per span — a *Bucket span* — because bounded minting was never what the Episode
+was for. What Arch calls an Episode, Anam expresses as an optional derived *Span* bookmark. See *Span*,
+*Bucket span*, *Inversion*.
 
 **Error kernel** — Armstrong's term, adopted: Anam's small trusted core that must not corrupt — the
 **append-only ledger plus the admission-gate invariants** (three pillars, idempotency, immutability).
-Everything else is disposable and rebuildable from source.
+`commit` writes artifact, record-event and watermark in **one transaction in one substrate**; there is no
+transaction across substrates. Everything else — SQLite tracking, files, fold, projections, CLI — is
+disposable and rebuildable.
 
 **Event** — A meaningful occurrence on the person's timeline, placed at its Facet *event-time* and
 carried by one or more Facets.
@@ -87,9 +96,10 @@ semantics, linking elements, validation bar, classification. Bundled as embedded
 `health.body-composition`, `health.heart-rate`, `health.blood-pressure`, `health.metric-group` (future:
 `calendar.event`, `mail.thread`, `note.zettel`). Deviates from Arch's snake_case on purpose.
 
-**Fold** — The computation that reads Facet artifacts plus record-events up to a watermark and derives
-each Facet's **current status**, producing the canonical account. Default window is the **whole
-timeline**. A read is *as fresh as ingest*. See *Canonical account*.
+**Fold** — The computation that reads a span's record-events up to a watermark and derives each Facet's
+**current status**, keeping the live ones — producing the *Canonical*. The serve path is *nearest
+checkpoint + replay-since*, so a read is **as fresh as ingest**. The whole-person view **composes** bucket
+checkpoints; it never re-folds the person. See *Canonical*, *Checkpoint*.
 
 **Idempotency** — Re-ingesting the same source row is a **no-op** (same `source_ref` + same
 `content_hash`). Guaranteed by a deterministic `facet_id = uuidv5(source_ref)` and an atomic conditional
@@ -97,19 +107,27 @@ write. What makes ingest **crash-clean**. See *Content hash*, *Supersession*.
 
 **Ingested time** — When Anam received a Facet (an Anam clock).
 
-**Insight** — An Anam-authored *derived facet*: a finding computed over the canonical account (e.g. a
-trend), admitted `proposed`, isolated from world-facts. See *Derived facet*, *Endorsement*.
+**Insight** — An Anam-authored *derived facet*: a finding computed over the *Canonical* (e.g. a trend),
+admitted `proposed`, isolated from world-facts. See *Derived facet*, *Endorsement*.
 
-**Inversion, the** — The single decision that distinguishes Anam from Arch: **the whole-person timeline
-read is Anam's default and normal mode**, whereas Arch requires an Episode-span filter and denies the
-whole-person read by default. Anam wants to be the longitudinal record Arch refuses to be.
+**Inversion, the** — The single decision that distinguishes Anam from Arch. Arch's keystone (ADR 0035)
+**demotes the Person from substrate to a thin identity index**, because a person is unbounded and
+"longitudinal is system-of-record gravity". **Anam re-promotes the Person to substrate** and accepts that
+gravity, at the scale of one life where the cost is affordable: the whole-person timeline read is Anam's
+default and normal mode. Anam wants to be the longitudinal record Arch refuses to be. Note what the
+inversion does *not* license: the **read default** is unbounded, the **mint unit** is not. See *Span*.
 
-**Ledger** — Anam's append-only record of everything it admitted; facts are **added** and superseded by
-status events (tombstones) — **never modified in place, never deleted.** Anam's own log, not an
-authoritative record (the sources are). See *Tombstone*.
+**Ledger** — Anam's **system of record**: the append-only log of everything it admitted, every Facet
+retained and **marked at its current status**, including superseded and tombstoned ones. Facts are
+**added** and re-statused — never modified in place, never deleted. Forensic reads, `as-of` reads and
+rebuild go here; the *Canonical* is derived from it. Authoritative about what Anam **knew**, never about
+the world (the sources are). See *Canonical*, *Tombstone*.
 
-**Mint** — Checkpointing to bound replay. Manual in the MVP; over the **whole timeline**. See
-*Checkpoint*.
+**Live-set** — The Facets whose current status is live at a watermark. The content of a *Checkpoint*.
+
+**Mint** — Adaptive checkpointing, **per minted span**, whose only job is to **bound read-time replay
+depth** — not freshness (the Ledger is always current, so a read replays to the head). Cadence is
+time-OR-size-OR-rate; a quiet bucket mints nothing. Manual in the MVP. See *Checkpoint*, *Bucket span*.
 
 **Native reference** — A binary Facet's payload: a pointer to a document in its source, resolved live.
 **Reserved**, not built in the first slice (Anam's early sources are all structured/verbatim).
@@ -117,10 +135,11 @@ authoritative record (the sources are). See *Tombstone*.
 **Person** — The storage **substrate**: all facets partitioned onto one **timeline** under
 `person#<id>`. In Anam there is exactly one person and **no identity graph, no merge**. See *Timeline*.
 
-**Projection** *(variant)* — A versioned template that **prunes** the canonical account for a purpose:
-metadata filters only (type allow-list, datetime, tombstone/endorsement visibility, max classification);
-whole-Facet include/exclude; **never reshapes, never generates**. A consumer *selects*, never defines.
-See *Receipt*.
+**Projection** *(variant)* — A versioned template that **prunes** the *Canonical* for a purpose: metadata
+filters only (type allow-list, datetime, endorsement status, max classification); whole-Facet
+include/exclude; **never reshapes, never generates**. Materialised as a content-addressed file. A consumer
+*selects*, never defines. Tombstone visibility is **not** a knob — the Canonical is live-only; a reader
+wanting tombstones queries the *Ledger*. See *Receipt*, *Canonical*.
 
 **Provenance** — The recorded origin of a Facet: source and injector identity, plus (for derived facets)
 the method/model and the canonical watermark it was computed from.
@@ -138,13 +157,19 @@ watermark, template version, definition-set version, and optional span. See *Sna
 **Source** — A capture origin, named **lower-case hyphenated**: `health-db`, `bp-csv`. The identity that
 appears in provenance and cursors. See *Capture worker*.
 
-**Source ref** — The deterministic natural key of a source row (e.g.
-`bp-csv:<excel_datetime>:<systolic>/<diastolic>/<pulse>`), the basis for the `facet_id` and idempotency.
+**Source ref** — The deterministic natural key identifying **which** source row this is — composed from
+the Definition's declared `identity_key` and **never from the row's values**: `bp-csv:<excel_datetime>`,
+*not* `bp-csv:<excel_datetime>:<systolic>/<diastolic>/<pulse>`. Basis for the `facet_id`. Braiding the
+values in would give a corrected reading a new `facet_id`, so it would enter as a new Facet and orphan
+the original rather than supersede it. **Identity says which fact; `content_hash` says whether it
+changed.** See *Content hash*, *Idempotency*, *Supersession*.
 
-**Span** — An inclusive interval over the person timeline, with **query-time endpoints** — a **derived
-filter**, composed on demand, **never stored as a unit, never minted, never sealed.** May be saved as a
-**bookmark** (`span#<id>`: a label + endpoints — a stored query). Anam's answer to Arch's Episode, minus
-the aggregate. See *Inversion*, *Episode*.
+**Span** — Two tiers, and conflating them is the mistake Anam already made once:
+a **Bucket span** (minted, invisible, the checkpoint unit) and a **Derived span** (a lens the person
+names: `[from, to]`, a saved bookmark, or "everything"). A derived span is **composed on demand, never
+stored as a unit, never minted, never pulsed**; it materialises only when a receipt is served. Removing
+the span as a *required read filter* never required removing it as a *mint unit*. See *Bucket span*,
+*Inversion*, *Episode*.
 
 **Status** — A Facet's **current** state — `admitted` / `superseded` / `tombstoned` / `endorsed` /
 `rejected` — **derived by the fold** from record-events, **never stored** on the artifact. Contrast
@@ -159,8 +184,11 @@ lose, because ingest is idempotent; a lost cursor is a re-scan, not data loss.
 **Timeline** — A person's facts in chronological (event-time) order — the storage substrate. A Span
 selects an interval of it. See *Span*, *Event*.
 
-**Tombstone** — A `tombstoned` record-event marking a Facet retracted/superseded **without** deleting
-it; the canonical account stays append-only, and projections may strip it. See *Ledger*.
+**Tombstone** — A status-bearing artifact version marking a Facet retracted **without** deleting it. It
+advances the watermark like any mutation. The Facet stays in the *Ledger* forever, marked; it is absent
+from the *Canonical* value by construction. See *Ledger*, *Canonical*.
 
 **Watermark** — A record-time marker pinning "what was known" at a point — the basis for checkpoints and
-receipts. See *Checkpoint*, *Receipt*.
+receipts. `W` is the **stream watermark**, a monotonic counter advanced by *every* record-event that can
+change the live-set (including a pure status transition). `Wᵥ` is the watermark the last checkpoint
+actually folded; `W > Wᵥ` is the whole re-mint test. See *Checkpoint*, *Receipt*.

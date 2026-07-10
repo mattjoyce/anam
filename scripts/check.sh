@@ -22,11 +22,11 @@ else
   echo "goimports not installed — skipping (install: golang.org/x/tools/cmd/goimports)"
 fi
 
-# Substrate boundary. The store is accidental complexity — the problem is a personal
+# Substrate boundary. The stores are accidental complexity — the problem is a personal
 # longitudinal record, not a database — so the choice must stay reversible. Only
-# internal/store may name SQLite or database/sql; the domain must not know what it is
-# stored in. Because Anam owns no source fact, a substrate swap is a re-ingest.
-echo "→ substrate boundary (sql confined to internal/store)"
+# internal/store may name DynamoDB, SQLite or database/sql; the domain must not know
+# what it is stored in. Because Anam owns no source fact, a swap is a re-ingest.
+echo "→ substrate boundary (stores confined to internal/store)"
 boundary="$(go list -f '{{.ImportPath}}{{range .Imports}} {{.}}{{end}}{{range .TestImports}} {{.}}{{end}}' ./... 2>/dev/null \
   | grep -E 'database/sql|sqlite|aws-sdk-go' | grep -v '^github.com/mattjoyce/anam/internal/store' || true)"
 if [ -n "$boundary" ]; then

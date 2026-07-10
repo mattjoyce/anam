@@ -22,10 +22,10 @@ Everything in scope serves that sentence. Everything out of scope waits until it
 One thin end-to-end path must work before anything is widened:
 
 ```text
-ingest gate (resolve → commit, three pillars) → append-only ledger (SQLite)
+ingest gate (resolve → commit, three pillars) → append-only ledger (DynamoDB)
        → canonical fold → CLI timeline viewer          ← the thesis, made observable
        → capture (health-db, then bp-csv) → changes_since
-       → one projection + receipt → mint (checkpoint over the whole timeline)
+       → one projection + receipt → mint (adaptive checkpoint, per bucket-span)
 ```
 
 Build it for **one facet type first**, then add the rest along the same path. **No step is stubbed —
@@ -51,24 +51,27 @@ it is built in the smallest steps that yield information.
 | Rung | Delivers | What it teaches |
 |---|---|---|
 | R0 ✅ | `facet`, `clock`, `config` | the domain values |
-| R1 ✅ | substrate spike, twice, then thrown away | DynamoDB Local works; SQLite works *and* enforces append-only and idempotency itself — so SQLite it is |
-| R2 | `store.SQLite` — idempotent `init` (schema + triggers), one facet round-tripped | the schema is real |
+| R1 ✅ | substrate spikes, thrice, then thrown away | DynamoDB does atomic conditional `TransactWriteItems` *and* a monotonic counter; SQLite enforces append-only and idempotency itself. Split by role (§8) |
+| R2 | `store` — idempotent `init`; one facet round-tripped through the ledger; the SQLite tracking schema, incl. the **bucket-span seam** | the key layout is real |
 | R3 | the gate — `resolve` + `commit`, atomic, idempotent, supersession, tombstone | **the error kernel.** Complete, or not at all |
 | R4 | `fold` + **`anam timeline`** | the inversion, visible. Plus the rebuild test (§7) as an automated check |
 | R5 | capture worker `health-db`, one `health.metric-group` definition | real payloads, real time semantics |
 | R6 | `changes_since` over `record_event` | record-time queries |
 | R7 | one projection + receipt | governance made real |
-| R8 | mint / `checkpoint` | replay bounded, once measurable |
+| R8 | mint / `checkpoint` per bucket-span → files | replay bounded, once measurable |
 | R9 | derived insight, admitted `proposed` | the agentic path, isolated |
 
 `bp-csv` attaches at R5 whenever the export is available; it gates nothing.
 
-**The substrate is accidental, and stays reversible.** The store is a choice, not the problem: Anam is a
-single-user, single-partition, local store, so it uses an embedded **SQLite** ledger — which, uniquely
-among the candidates, enforces append-only (triggers) and idempotency (a `UNIQUE` constraint) itself.
-Only `internal/store` may name SQLite or `database/sql`, and `scripts/check.sh` enforces that. Swapping
-the substrate must never mean touching the domain — and because Anam owns no source fact, such a swap is
-a re-ingest, not a migration.
+**Three substrates, one rule** (`ARCHITECTURE.md` §8): **DynamoDB** is the ledger (facets, record-events,
+the watermark `W` — all atomic in one `TransactWriteItems`); the **filesystem** holds checkpoint values
+and receipts, content-addressed; **SQLite** holds only what can be rebuilt by replaying the ledger
+(per-span `V`/`Wᵥ`, the span registry, cursors, GC state). Config is YAML; definitions are JSON.
+
+*Truth is immutable and lives in exactly one place.* There is no transaction across substrates, so
+everything that must be atomic lives in one. Only `internal/store` may name any of them, and
+`scripts/check.sh` enforces that — because Anam owns no source fact, a substrate swap is a re-ingest,
+not a migration.
 
 ---
 
@@ -84,12 +87,13 @@ a re-ingest, not a migration.
 - The **three-pillar admission gate** (`resolve` → `commit`) with a static `source → types` token map.
 - The **append-only ledger** as Anam's record of what it knew; **tombstone** for retraction;
   **idempotent, atomic commit** (re-ingest is a no-op; a changed row supersedes).
-- **Mint:** a manual checkpoint over the whole timeline; canonical account folded on read.
+- **Mint:** a manual checkpoint **per bucket-span**; the canonical (live-only) served as *nearest
+  checkpoint + replay-since*. The whole-person view **composes** buckets, never re-folds the person.
 - **`timeline`:** the whole-person read (the inversion) — default, no span required — with optional
   `--from/--to`, `--type`, and `--span` narrowing.
 - **`changes_since`** between two record-times.
-- **At least one prune-only projection** (e.g. `bp`, `sleep`) plus the **CLI timeline viewer** (the
-  diagnostic harness — proves the model, not a shipped UI).
+- **At least one prune-only projection** (e.g. `bp`, `sleep`), **materialised as a content-addressed
+  file**, plus the **CLI timeline viewer** (the diagnostic harness — proves the model, not a shipped UI).
 - **Receipts:** prove exactly what a projection served at a watermark.
 - **One derived-facet path:** an **insight** admitted as `proposed`, visible on the timeline, no
   write-back.

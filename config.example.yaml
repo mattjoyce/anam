@@ -9,20 +9,45 @@
 # The user config dir is $XDG_CONFIG_HOME if set, otherwise ~/.config.
 #
 # Every key can be overridden by an ANAM_-prefixed environment variable
-# (ANAM_DB_PATH, ANAM_PERSON_ID, ANAM_TIMEOUT). An unrecognised key is an error,
-# not a shrug: a silently-ignored `db_pth` would leave Anam writing to the
-# default ledger while you believed it was writing to yours.
+# (ANAM_DDB_ENDPOINT, ANAM_PERSON_ID, ...). An unrecognised key is an error, not a
+# shrug: a silently-ignored `ddb_endpont` would leave Anam talking to the default
+# endpoint while you believed it was talking to yours.
+#
+# Anam stores in three places, one rule (ARCHITECTURE.md §8):
+#
+#   truth is immutable and lives in exactly one place.
+#   the ledger is the record; files hold published artifacts;
+#   SQLite holds nothing that cannot be rebuilt by replaying the ledger.
 
 # The storage substrate. Every facet is partitioned under person#<person_id>.
 # Required, and deliberately without a default: a wrong partition key must fail
 # loudly rather than write your facts somewhere nobody chose.
 person_id: matt
 
-# The SQLite ledger — a file, not a service. Anam owns no source fact, so losing
-# this file costs a re-ingest, not a fact.
-# Defaults to $XDG_DATA_HOME/anam/anam.db, else ~/.local/share/anam/anam.db.
-db_path: ~/.local/share/anam/anam.db
+# --- the ledger: DynamoDB -----------------------------------------------------
+# Facets, record-events and the watermark W. `commit` writes all three in one
+# atomic TransactWriteItems. DynamoDB Local does not authenticate; the AWS
+# credentials are literally fake.
+ddb_endpoint: http://localhost:8000
 
-# Bounds every call to the store. SQLite can block on a write lock, and a hung
-# call is a hung call whatever its cause.
+# Nominal against DynamoDB Local, which ignores it, but the AWS SDK insists.
+ddb_region: us-east-1
+
+# The single table holding every ledger item kind.
+table_name: anam
+
+# --- tracking: SQLite ---------------------------------------------------------
+# Per-span V and Wv, the span registry, checkpoint and receipt index, sync
+# cursors, GC state. Rebuildable by replaying the ledger, so losing this file
+# costs a replay, not a fact.
+# Defaults to $XDG_DATA_HOME/anam/tracking.db, else ~/.local/share/anam/.
+db_path: ~/.local/share/anam/tracking.db
+
+# --- published artifacts: files -----------------------------------------------
+# Content-addressed checkpoint values and served receipts. Immutable. These are
+# authored, not rebuildable — back them up.
+artifact_dir: ~/.local/share/anam/artifacts
+
+# Bounds every call to a store. Anam fails fast on an unreachable endpoint rather
+# than hanging.
 timeout: 5s

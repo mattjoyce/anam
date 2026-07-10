@@ -137,8 +137,8 @@ func TestLostFile_ReopensEmptyAndUsable(t *testing.T) {
 	d, path := open(t)
 
 	if _, err := d.SQL().Exec(
-		`INSERT INTO facet_index (facet_id, type, event_time, bucket_id, current_version, content_hash)
-		 VALUES ('f1', 'health.blood-pressure', '2026-07-05T06:30:00.000000000Z', 'bucket:2026-W27', 1, 'sha256:aaa')`); err != nil {
+		`INSERT INTO facet_index (facet_id, type, event_time, bucket_id, current_version, status, content_hash)
+		 VALUES ('f1', 'health.blood-pressure', '2026-07-05T06:30:00.000000000Z', 'bucket:2026-W27', 1, 'admitted', 'sha256:aaa')`); err != nil {
 		t.Fatalf("insert: %v", err)
 	}
 	if err := d.Close(); err != nil {

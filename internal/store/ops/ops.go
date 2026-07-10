@@ -27,7 +27,7 @@ import (
 
 // schemaVersion is bumped on any schema change. The prototype recreates rather than
 // migrates: everything derived replays, everything provisioned reloads.
-const schemaVersion = 1
+const schemaVersion = 2
 
 // ErrSchemaVersion is returned by Open for a database written by a different schema.
 var ErrSchemaVersion = errors.New("ops: schema version mismatch")
@@ -41,7 +41,9 @@ type DB struct {
 // record_time) hold fixed-width clock.Layout timestamps; bucket ids are span.Bucket
 // ids — both compare lexically in chronological order by construction.
 const schema = `
--- tier: derived — the facet index: one row per logical facet, at its current version.
+-- tier: derived — the facet index: one row per logical facet, at its current version
+-- and folded status (current_version + status is exactly a persisted fold.State,
+-- which is what lets catch-up replay incrementally instead of from genesis).
 -- The read paths that left the ledger live here: the timeline (event_time), the type
 -- filter, and bucket membership (the bucket-span seam — bucket_id is arithmetic on
 -- event_time, materialised for the joins the mint will need).
@@ -51,6 +53,7 @@ CREATE TABLE IF NOT EXISTS facet_index (
   event_time      TEXT NOT NULL,
   bucket_id       TEXT NOT NULL,
   current_version INTEGER NOT NULL,
+  status          TEXT NOT NULL,
   content_hash    TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS facet_index_by_time   ON facet_index (event_time);
@@ -173,7 +176,8 @@ func pinSchemaVersion(ctx context.Context, db *sql.DB) error {
 		return fmt.Errorf("ops: read schema version: %w", err)
 	}
 	if stored != fmt.Sprintf("%d", schemaVersion) {
-		return fmt.Errorf("%w: database holds %s, this build writes %d", ErrSchemaVersion, stored, schemaVersion)
+		return fmt.Errorf("%w: database holds %s, this build writes %d — delete the file and re-run init; the derived tier replays and the provisioned tier reloads",
+			ErrSchemaVersion, stored, schemaVersion)
 	}
 	return nil
 }

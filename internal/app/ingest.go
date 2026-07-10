@@ -10,6 +10,7 @@ import (
 	"github.com/mattjoyce/anam/internal/capture/bpcsv"
 	"github.com/mattjoyce/anam/internal/capture/healthdb"
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
@@ -60,37 +61,38 @@ func initCmd(cfgPath *string) *cobra.Command {
 }
 
 func ingestCmd(cfgPath *string) *cobra.Command {
-	var dbPath, csvPath string
+	var importsPath string
 
 	cmd := &cobra.Command{
-		Use:   "ingest <health-db --db <path> | bp-csv --csv <path>>",
-		Short: "capture a source and admit every row through the gate",
-		Args:  cobra.ExactArgs(1),
+		Use:   "ingest [source]",
+		Short: "run the declared imports through the gate",
+		Long: `Ingest captures only what is declared. Imports are named in a YAML file —
+--imports, then $ANAM_IMPORTS, then <user config dir>/anam/imports.yaml:
+
+    imports:
+      - source: health-db
+        path: ~/admin/data/healthdata.db
+      - source: bp-csv
+        path: ~/exports/BloodPressure.csv
+
+With no argument every declared import runs, in order; with a source name, the
+declarations for that source. A path typed ad hoc is provenance that evaporates
+with the shell history; a declared import is reviewable and repeatable.`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := loadConfig(*cfgPath, cmd)
 			if err != nil {
 				return err
 			}
-
-			var envs []facet.Envelope
-			switch args[0] {
-			case healthdb.Source:
-				if dbPath == "" {
-					return fmt.Errorf("%s needs --db <path>", healthdb.Source)
-				}
-				scanCtx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
-				envs, err = healthdb.Scan(scanCtx, dbPath, cfg.PersonID)
-				cancel()
-			case bpcsv.Source:
-				if csvPath == "" {
-					return fmt.Errorf("%s needs --csv <path>", bpcsv.Source)
-				}
-				envs, err = bpcsv.Scan(csvPath, cfg.PersonID)
-			default:
-				return fmt.Errorf("unknown source %q (have: %s, %s)", args[0], healthdb.Source, bpcsv.Source)
-			}
+			imports, err := loadImports(importsPath, cmd)
 			if err != nil {
 				return err
+			}
+			if len(args) == 1 {
+				imports = filterImports(imports, args[0])
+				if len(imports) == 0 {
+					return fmt.Errorf("no import declared for source %q", args[0])
+				}
 			}
 
 			reg, err := def.Bundled()
@@ -103,20 +105,66 @@ func ingestCmd(cfgPath *string) *cobra.Command {
 			}
 			g := gate.New(l, reg, mvpScopes, clock.Real{}, cfg.PersonID)
 
-			tally, w, err := admitAll(cmd.Context(), g, envs, cfg.Timeout)
-			if err != nil {
-				return err
+			for _, imp := range imports {
+				envs, err := scanImport(cmd.Context(), imp, cfg)
+				if err != nil {
+					return err
+				}
+				tally, w, err := admitAll(cmd.Context(), g, envs, cfg.Timeout)
+				if err != nil {
+					return err
+				}
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(),
+					"%s: %d envelopes → admitted=%d superseded=%d no-op=%d  W=%d\n",
+					imp.Source, len(envs),
+					tally[gate.OutcomeAdmitted], tally[gate.OutcomeSuperseded], tally[gate.OutcomeNoOp], w)
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(),
-				"%s: %d envelopes → admitted=%d superseded=%d no-op=%d  W=%d\n",
-				args[0], len(envs),
-				tally[gate.OutcomeAdmitted], tally[gate.OutcomeSuperseded], tally[gate.OutcomeNoOp], w)
-			return err
+			return nil
 		},
 	}
-	cmd.Flags().StringVar(&dbPath, "db", "", "path to the health-db source database")
-	cmd.Flags().StringVar(&csvPath, "csv", "", "path to the bp-csv export file")
+	cmd.Flags().StringVar(&importsPath, "imports", "",
+		"imports file (default: $ANAM_IMPORTS, then <user config dir>/anam/imports.yaml)")
 	return cmd
+}
+
+// scanImport dispatches one declared import to its capture worker.
+func scanImport(ctx context.Context, imp config.Import, cfg config.Config) ([]facet.Envelope, error) {
+	switch imp.Source {
+	case healthdb.Source:
+		scanCtx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+		defer cancel()
+		return healthdb.Scan(scanCtx, imp.Path, cfg.PersonID)
+	case bpcsv.Source:
+		return bpcsv.Scan(imp.Path, cfg.PersonID)
+	default:
+		return nil, fmt.Errorf("import names unknown source %q (have: %s, %s)",
+			imp.Source, healthdb.Source, bpcsv.Source)
+	}
+}
+
+func filterImports(imports []config.Import, source string) []config.Import {
+	var out []config.Import
+	for _, imp := range imports {
+		if imp.Source == source {
+			out = append(out, imp)
+		}
+	}
+	return out
+}
+
+// loadImports resolves and loads the declarations, reporting provenance the same
+// way loadConfig does.
+func loadImports(explicit string, cmd *cobra.Command) ([]config.Import, error) {
+	path, origin, err := config.ResolveImports(explicit)
+	if err != nil {
+		return nil, err
+	}
+	if path == "" {
+		return nil, fmt.Errorf("no imports file found — declare imports in %s or pass --imports",
+			"<user config dir>/anam/imports.yaml")
+	}
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "imports: %s (%s)\n", path, origin)
+	return config.LoadImports(path)
 }
 
 // admitAll drives every envelope through resolve → commit, each under its own

@@ -22,6 +22,7 @@ import (
 	_ "modernc.org/sqlite" // registers the pure-Go "sqlite" driver
 
 	"github.com/mattjoyce/anam/internal/facet"
+	"github.com/mattjoyce/anam/internal/safepath"
 )
 
 // Source is this worker's identity: the token the gate scopes and the provenance
@@ -76,9 +77,17 @@ type metric struct {
 // reading is bp-csv's fact at its own reading time; the health-db copy is a lossy
 // aggregate that would enter the timeline as a duplicate with worse provenance.
 func Scan(ctx context.Context, dbPath, assertedPerson string) ([]facet.Envelope, error) {
-	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro")
+	// Resolve before the DSN is assembled: the path is operator input, and the DSN
+	// is a little language of its own — a "?" smuggled into an unresolved path
+	// would be parsed as options, not filename. After ResolveFile it is a real,
+	// regular file, symlinks already followed.
+	real, err := safepath.ResolveFile(dbPath)
 	if err != nil {
-		return nil, fmt.Errorf("healthdb: open %q: %w", dbPath, err)
+		return nil, fmt.Errorf("healthdb: %w", err)
+	}
+	db, err := sql.Open("sqlite", "file:"+real+"?mode=ro")
+	if err != nil {
+		return nil, fmt.Errorf("healthdb: open %q: %w", real, err)
 	}
 	defer func() { _ = db.Close() }()
 

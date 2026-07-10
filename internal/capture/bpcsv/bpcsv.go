@@ -12,11 +12,11 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
 	"github.com/mattjoyce/anam/internal/facet"
+	"github.com/mattjoyce/anam/internal/safepath"
 )
 
 // Source is this worker's identity: the token the gate scopes and the provenance
@@ -34,9 +34,9 @@ const Type facet.Type = "health.blood-pressure"
 // "reading" because identity is definition-owned (§6a) — the gate recomposes
 // source_ref from the payload, so everything the identity needs must be in it.
 func Scan(path, assertedPerson string) ([]facet.Envelope, error) {
-	f, err := os.Open(path) // #nosec G304 -- the path IS the input: the operator names their own export via --csv
+	f, err := safepath.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("bpcsv: open %q: %w", path, err)
+		return nil, fmt.Errorf("bpcsv: %w", err)
 	}
 	defer func() { _ = f.Close() }()
 

@@ -52,7 +52,7 @@ it is built in the smallest steps that yield information.
 |---|---|---|
 | R0 ✅ | `facet`, `clock`, `config` | the domain values |
 | R1 ✅ | substrate spikes, thrice, then thrown away | DynamoDB does atomic conditional `TransactWriteItems` *and* a monotonic counter; SQLite enforces append-only and idempotency itself. Split by role (§8) |
-| R2 | `store` — idempotent `init`; one facet round-tripped through the ledger; the SQLite tracking schema, incl. the **bucket-span seam** | the key layout is real |
+| R2 | `store` — idempotent `init` (table + seeded counter); the atomic `Append`; one facet round-tripped through the ledger; the operational schema, incl. the **bucket-span seam** | the key layout is real |
 | R3 | the gate — `resolve` + `commit`, atomic, idempotent, supersession, tombstone | **the error kernel.** Complete, or not at all |
 | R4 | `fold` + **`anam timeline`** | the inversion, visible. Plus the rebuild test (§7) as an automated check |
 | R5 | capture worker `health-db`, one `health.metric-group` definition | real payloads, real time semantics |
@@ -62,6 +62,17 @@ it is built in the smallest steps that yield information.
 | R9 | derived insight, admitted `proposed` | the agentic path, isolated |
 
 `bp-csv` attaches at R5 whenever the export is available; it gates nothing.
+
+**The atomic write is R2's, not R3's.** `commit`'s single `TransactWriteItems` *is* the error kernel, and
+"depth-first below the gate" forbids stubbing it. So R2 ships the ledger's `Append` complete — the
+transaction, the seeded counter, the three typed cancellation outcomes (`ARCHITECTURE.md` §8) — and R3 is
+then pure gate logic composed on top: three pillars, hash comparison, supersede-or-no-op. R3 adds no
+substrate semantics. The alternative, a `PutItem` at R2 replaced by a transaction at R3, builds the kernel
+twice and trusts the second one.
+
+Because a tombstone is a record-event with no artifact (§6a), the ledger's primitive is **two calls, not
+one with an optional facet**: admit an artifact with its event, or mark an existing facet with an event.
+An optional pointer would make `{no artifact, admitted}` representable.
 
 **Three substrates** (`ARCHITECTURE.md` §8): **DynamoDB** is the ledger (facet artifacts, record-events,
 the watermark `W` — all atomic in one `TransactWriteItems`); the **filesystem** holds checkpoint values
@@ -96,7 +107,10 @@ fact, a substrate swap is a re-ingest, not a migration.
 - **Receipts:** prove exactly what a projection served at a watermark.
 - **One derived-facet path:** an **insight** admitted as `proposed`, visible on the timeline, no
   write-back.
-- **`init`** creates the schema, indexes and append-only triggers idempotently; **`version`** reports the ldflags build.
+- **`init`** idempotently creates the ledger table, **seeds its watermark counter at 0**, and creates the
+  operational schema. There are **no append-only triggers**: DynamoDB cannot refuse an `UpdateItem`, so
+  append-only is enforced by a test, not by the substrate (`ARCHITECTURE.md` §8). **`version`** reports
+  the ldflags build.
 - **Read-only** throughout — Anam never writes back to a source.
 
 ---

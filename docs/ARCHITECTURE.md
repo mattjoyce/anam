@@ -475,6 +475,11 @@ never a hang. `ConditionalCheckFailed` and `TransactionCanceledException` surfac
 `database/sql`; `scripts/check.sh` enforces it. Because Anam owns no source fact, **changing substrate is
 a re-ingest, not a migration** — as this document has already demonstrated once.
 
+The one carve-out: `internal/capture` may read a **source** in its native format — a source that happens
+to be a SQLite file needs `database/sql` to be read at all. That is the *source's* substrate, not Anam's:
+a capture worker sits outside the gate, is disposable, and speaks whatever its source speaks. It never
+names the ledger's SDK, and `check.sh` enforces that too.
+
 ---
 
 ## 9. Ledger, canonical, and projections

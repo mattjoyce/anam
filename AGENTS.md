@@ -19,7 +19,9 @@ Every design review and code audit runs through **Hickey × Armstrong** (*struct
     store a fact's current status as mutable place — derive it.
   - The **substrate is accidental**, not essential — the problem is a personal longitudinal record, not a
     store. Only `internal/store` may name DynamoDB, SQLite or `database/sql`; `scripts/check.sh` enforces
-    it. The ledger is the record; files hold published artifacts; SQLite is the **operational store**,
+    it. One carve-out: `internal/capture` may read a **source** in its native format (a source that is a
+    SQLite file needs `database/sql` to be read) — that is the source's substrate, not Anam's, and the
+    ledger's SDK stays out of capture. The ledger is the record; files hold published artifacts; SQLite is the **operational store**,
     authoritative for what Anam authors. Each of its tables says where it comes back from (§8) — the
     *derived* tier by replaying the ledger, and that tier must stay provably derived.
 - **Armstrong (runtime).** For each component, name its failure and its recovery. What is the **error

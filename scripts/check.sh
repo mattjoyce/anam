@@ -26,9 +26,24 @@ fi
 # longitudinal record, not a database — so the choice must stay reversible. Only
 # internal/store may name DynamoDB, SQLite or database/sql; the domain must not know
 # what it is stored in. Because Anam owns no source fact, a swap is a re-ingest.
-echo "→ substrate boundary (stores confined to internal/store)"
+#
+# One carve-out: internal/capture may use database/sql/sqlite to READ a source in its
+# native format (healthdata.db is a SQLite file that happens to exist in the world).
+# That is not Anam's substrate — a capture worker is outside the gate, disposable, and
+# speaks whatever its source speaks. The ledger's SDK stays confined to the store.
+echo "→ substrate boundary (stores confined to internal/store; sources to internal/capture)"
 boundary="$(go list -f '{{.ImportPath}}{{range .Imports}} {{.}}{{end}}{{range .TestImports}} {{.}}{{end}}' ./... 2>/dev/null \
-  | grep -E 'database/sql|sqlite|aws-sdk-go' | grep -v '^github.com/mattjoyce/anam/internal/store' || true)"
+  | grep -E 'database/sql|sqlite|aws-sdk-go' \
+  | grep -vE '^github.com/mattjoyce/anam/internal/(store|capture)' \
+  || true)"
+# capture packages may name sql/sqlite but never the ledger's SDK:
+capture_aws="$(go list -f '{{.ImportPath}}{{range .Imports}} {{.}}{{end}}{{range .TestImports}} {{.}}{{end}}' ./internal/capture/... 2>/dev/null \
+  | grep 'aws-sdk-go' || true)"
+if [ -n "$capture_aws" ]; then
+  echo "  FAILED: a capture worker names the ledger's SDK:" >&2
+  echo "$capture_aws" | awk '{print "    " $1}' >&2
+  fail=1
+fi
 if [ -n "$boundary" ]; then
   echo "  FAILED: the store substrate is named outside internal/store:" >&2
   echo "$boundary" | awk '{print "    " $1}' >&2

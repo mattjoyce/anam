@@ -53,3 +53,24 @@ here the row's position within its minute is part of which reading it *is*.
 Both real sources are in: 893 facets, five types, one timeline from 2024-01-01 to this morning.
 Remaining rungs: R7 (projection + receipt — `bp` is now a *meaningful* projection), R8 (mint),
 R9 (the proposed insight). The demo scenario in MVP §9 is now fully stocked.
+
+## Addendum, same day: safepath and declared imports
+
+Two hardening moves, prompted by the `#nosec` needing eyes:
+
+- **`internal/safepath`** — the one place operator-supplied paths are handled. `Expand` (~/$VAR,
+  absolute, cleaned) for paths that will be created; `ResolveFile` (symlinks followed, must be a
+  regular file) for paths about to be read; `Open` as the codebase's single audited `os.Open` of a
+  variable path. The per-worker `#nosec` disappears; the justification lives once, where the
+  guarantee is established. Config's `db_path`/`artifact_dir` expand through it too. healthdb
+  resolves *before* assembling its SQLite DSN — a DSN is a little language, and an unresolved `?` in
+  a path would parse as options, not filename.
+- **Imports are declared, not improvised.** `anam ingest` reads `imports.yaml` (--imports →
+  `$ANAM_IMPORTS` → user config dir) naming each source and its file, and ingests only what is
+  declared — all of it with no argument, one source's declarations with one. The `--db`/`--csv`
+  flags are gone. A path typed ad hoc is provenance that evaporates with the shell history; a
+  declared import is reviewable and repeatable, the same reasoning that keeps config keys strict.
+
+Verified live: one naked `anam ingest` ran both declared sources — `no-op=659`, `no-op=234`, `W`
+unmoved — an undeclared source is refused, and a declared path that resolves to a directory is
+refused by name.

@@ -7,6 +7,7 @@ import (
 
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
+	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
@@ -145,9 +146,11 @@ func (g *Gate) disposition(ctx context.Context, facetID, hash string) (version i
 // Retract appends a tombstoned record-event against the facet's current version —
 // a status transition, never a delete, never a new artifact (§6a).
 //
-// Known gap, accepted at R3: without the fold (R4) the gate cannot see that a facet
-// is already tombstoned, so a repeated Retract appends a second tombstone event.
-// Harmless to the fold, wasteful in the stream; R4 can refuse it cheaply.
+// Retracting a facet that is already tombstoned is a no-op, decided the only way
+// status is ever decided: by folding the record-events. The check sits inside the
+// retry loop, against the same head the write is conditioned on, so a raced second
+// tombstone is caught on the re-read rather than appended. (Streams written by the
+// R3 gate may hold a double tombstone; the fold absorbs those.)
 func (g *Gate) Retract(ctx context.Context, facetID string) (Result, error) {
 	current, err := g.ledger.CurrentVersion(ctx, facetID)
 	if err != nil {
@@ -159,6 +162,20 @@ func (g *Gate) Retract(ctx context.Context, facetID string) (Result, error) {
 		if err != nil {
 			return Result{}, err
 		}
+
+		events, err := g.ledger.Replay(ctx, 0, head)
+		if err != nil {
+			return Result{}, err
+		}
+		states, err := fold.Fold(events)
+		if err != nil {
+			return Result{}, err
+		}
+		if st := states[facetID]; st.Status == facet.StatusTombstoned {
+			return Result{Outcome: OutcomeNoOp, FacetID: facetID,
+				ArtifactVersion: st.Version, W: head}, nil
+		}
+
 		ev := facet.RecordEvent{
 			Kind: facet.EventTombstoned, FacetID: facetID, RecordTime: g.clock.Now(),
 			Seq: int64(head) + 1, ArtifactVersion: current.ArtifactVersion,

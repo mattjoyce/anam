@@ -46,10 +46,12 @@ var (
 	ErrContention = errors.New("gate: watermark contention not resolved within retry budget")
 )
 
-// Ledger is the write-and-lookup surface the gate needs.
+// Ledger is the write-and-lookup surface the gate needs. Replay is here for one
+// read: Retract folds the facet's events to refuse marking a tombstoned facet twice.
 type Ledger interface {
 	Head(ctx context.Context) (ledger.Watermark, error)
 	CurrentVersion(ctx context.Context, facetID string) (facet.Facet, error)
+	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.RecordEvent, error)
 	Admit(ctx context.Context, readW ledger.Watermark, f facet.Facet, ev facet.RecordEvent) error
 	Mark(ctx context.Context, readW ledger.Watermark, ev facet.RecordEvent) error
 }

@@ -179,6 +179,16 @@ func TestCommit_AdmitNoopSupersedeRetract(t *testing.T) {
 		t.Fatalf("retract = %+v, want tombstoned W=3", res4)
 	}
 
+	// Retracting again is a no-op — the fold shows the facet already tombstoned, so
+	// no second tombstone is appended and the watermark stays put (the R3 gap, closed).
+	res5, err := g.Retract(ctx, res.FacetID)
+	if err != nil {
+		t.Fatalf("re-Retract: %v", err)
+	}
+	if res5.Outcome != gate.OutcomeNoOp || res5.W != 3 {
+		t.Fatalf("re-retract = %+v, want no-op with W still 3", res5)
+	}
+
 	// The stream tells the whole story in order.
 	events, err := l.Replay(ctx, 0, 3)
 	if err != nil {

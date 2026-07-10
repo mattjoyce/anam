@@ -19,8 +19,9 @@ Every design review and code audit runs through **Hickey × Armstrong** (*struct
     store a fact's current status as mutable place — derive it.
   - The **substrate is accidental**, not essential — the problem is a personal longitudinal record, not a
     store. Only `internal/store` may name DynamoDB, SQLite or `database/sql`; `scripts/check.sh` enforces
-    it. **Truth is immutable and lives in exactly one place**: the ledger is the record, files hold
-    published artifacts, SQLite holds only what a replay can rebuild.
+    it. The ledger is the record; files hold published artifacts; SQLite is the **operational store**,
+    authoritative for what Anam authors. Each of its tables says where it comes back from (§8) — the
+    *derived* tier by replaying the ledger, and that tier must stay provably derived.
 - **Armstrong (runtime).** For each component, name its failure and its recovery. What is the **error
   kernel** — the small trusted core that must not corrupt? What crashes, and what restarts it clean?
   - Anam's **error kernel** is the *append-only ledger + admission-gate invariants* (three pillars,

@@ -63,15 +63,14 @@ it is built in the smallest steps that yield information.
 
 `bp-csv` attaches at R5 whenever the export is available; it gates nothing.
 
-**Three substrates, one rule** (`ARCHITECTURE.md` §8): **DynamoDB** is the ledger (facets, record-events,
+**Three substrates** (`ARCHITECTURE.md` §8): **DynamoDB** is the ledger (facet artifacts, record-events,
 the watermark `W` — all atomic in one `TransactWriteItems`); the **filesystem** holds checkpoint values
-and receipts, content-addressed; **SQLite** holds only what can be rebuilt by replaying the ledger
-(per-span `V`/`Wᵥ`, the span registry, cursors, GC state). Config is YAML; definitions are JSON.
+and receipts, content-addressed; **SQLite** is the **operational store** — definitions, indexes, the span
+registry and per-span `V`/`Wᵥ`, cursors, bookmarks, GC state. Config is YAML; definitions are JSON.
 
-*Truth is immutable and lives in exactly one place.* There is no transaction across substrates, so
-everything that must be atomic lives in one. Only `internal/store` may name any of them, and
-`scripts/check.sh` enforces that — because Anam owns no source fact, a substrate swap is a re-ingest,
-not a migration.
+There is no transaction across substrates, so everything that must be atomic lives in one. Only
+`internal/store` may name any of them, and `scripts/check.sh` enforces that — because Anam owns no source
+fact, a substrate swap is a re-ingest, not a migration.
 
 ---
 

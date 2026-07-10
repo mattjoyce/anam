@@ -328,21 +328,39 @@ replay floors.
 
 ---
 
-## 8. Storage — three substrates, one rule
+## 8. Storage — three substrates
 
-Anam stores in **three** places, because three different things want three different shapes. The rule
-that keeps them coherent:
-
-> **Truth is immutable and lives in exactly one place. The ledger holds the record. The filesystem holds
-> published artifacts. SQLite holds nothing that cannot be rebuilt by replaying the ledger.**
+Anam stores in **three** places, because three different things want three different shapes.
 
 | Substrate | Holds | Nature |
 |---|---|---|
-| **DynamoDB** | facets (metadata + opaque payload), record-events, and the watermark `W` | the **ledger** — the system of record |
+| **DynamoDB** | facet artifacts (metadata + opaque payload), record-events, and the watermark `W` | the **ledger** — Anam's record of what it knew |
 | **Filesystem** | checkpoint values (`VALUE#<hash>`) and served receipts | **published artifacts** — immutable, content-addressed |
-| **SQLite** | per-span `V`/`Wᵥ`, the span registry, checkpoint and receipt index, sync cursors, GC state | **derived** — a cache, rebuildable by replay |
+| **SQLite** | Facet Definitions, projection templates, token scopes, the facet and record-event indexes, the span registry and per-span `V`/`Wᵥ`, the checkpoint and receipt index, saved span bookmarks, sync cursors, GC state, the operational log | Anam's **operational store** |
 
 Config is **YAML**; Facet Definitions are **JSON** (§3a).
+
+An earlier draft said *"SQLite holds nothing that cannot be rebuilt by replaying the ledger."* That named
+one recovery source for a store with several, and demoted a real database to a cache. §1's claim is about
+**source facts** — no captured payload exists only inside Anam. It says nothing about Anam's own state,
+and Anam has plenty: definitions, indexes, projection templates, roles, logs, bookmarks. The operational
+store is authoritative for those, and losing it is not free.
+
+What is worth knowing is not a rule but a fact per table — **where does this come back from?** — because a
+rebuild has to know what it may drop:
+
+| Tier | Tables | Recovery |
+|---|---|---|
+| **Derived** | facet index, record-event index, checkpoint index, `span_head`, sync cursors | replay the ledger |
+| **Provisioned** | Facet Definitions, projection templates, token scopes | the embedded assets and config — i.e. git |
+| **Authored** | saved span bookmarks, GC state, the operational log | nowhere. Back it up |
+
+The tier belongs in the schema beside each table, because it is the only thing that tells a later reader
+whether dropping it is survivable.
+
+The **derived** tier must stay *provably* derived. The rebuild test (`MVP.md` §7) drops it and re-derives
+it from the ledger: if a facet payload, a record-event or `W` ever acquired a second home there, the test
+would pass on data it never rebuilt, and "Anam owns no source fact" would stop being falsifiable.
 
 ### The ledger — datom-shaped, not a datom engine
 
@@ -386,10 +404,12 @@ holding the value it was read at. A concurrent writer that read a stale `W` lose
 `ConditionalCheckFailed`, re-reads, and retries.
 
 > **Design note (Armstrong).** There is **no transaction across substrates**, so everything that must be
-> atomic lives in one: the artifact, the event, and the watermark. SQLite is never written in the same
-> breath as the ledger; it catches up afterwards by replaying record-events since its last-seen `seq`.
-> That is safe precisely because the ledger is append-only and `commit` is idempotent — **a crash leaves
-> SQLite behind, never wrong, and behind is fixable by replay.**
+> atomic lives in one: the artifact, the event, and the watermark. The operational store's **derived**
+> tier is never written in the same breath as the ledger; it catches up afterwards by replaying
+> record-events since its last-seen `seq`. That is safe precisely because the ledger is append-only and
+> `commit` is idempotent — **a crash leaves the derived tier behind, never wrong, and behind is fixable by
+> replay.** Catch-up is not housekeeping: the fold reads its indexes, so it must assert `last_seq == W`
+> before folding, or a checkpoint can be computed from a lagging index and be wrong at its own watermark.
 >
 > The price of this substrate, paid knowingly: DynamoDB cannot refuse an `UpdateItem`, so **append-only
 > drops from an invariant the substrate enforces to one our code must not violate.** It falls back to a
@@ -487,8 +507,10 @@ Anam later as an ordinary source fact.
 - **Storage is partitioned by the person (one timeline).** The **whole-person read is the default**; a
   Span is an optional derived *read* filter. **Minting is per span, never whole-life** — the two are
   different concerns and must not be conflated (§1, §7).
-- **Truth is immutable and lives in exactly one place.** The ledger is the system of record; files hold
-  published artifacts; **SQLite holds nothing that cannot be rebuilt by replaying the ledger** (§8).
+- **The ledger is the system of record**; files hold published artifacts; SQLite is Anam's **operational
+  store** — authoritative for what Anam authors, and annotated per table with where it comes back from.
+  Its **derived** tier must stay provably rebuildable by replaying the ledger, or the rebuild test proves
+  nothing (§8).
 - **Append-only**: facts are added and superseded by status events (tombstones) — **never modified,
   never deleted.** DynamoDB cannot enforce this; our code must not violate it, and a test guards it (§8).
 - **Current status is derived** by the fold from record-events — **never stored** on the artifact (no

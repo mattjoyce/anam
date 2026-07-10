@@ -75,8 +75,8 @@ was for. What Arch calls an Episode, Anam expresses as an optional derived *Span
 **Error kernel** — Armstrong's term, adopted: Anam's small trusted core that must not corrupt — the
 **append-only ledger plus the admission-gate invariants** (three pillars, idempotency, immutability).
 `commit` writes artifact, record-event and watermark in **one transaction in one substrate**; there is no
-transaction across substrates. Everything else — SQLite tracking, files, fold, projections, CLI — is
-disposable and rebuildable.
+transaction across substrates. Everything above it — fold, projections, capture workers, CLI — is
+disposable and rebuildable. See *Operational store*.
 
 **Event** — A meaningful occurrence on the person's timeline, placed at its Facet *event-time* and
 carried by one or more Facets.
@@ -131,6 +131,14 @@ time-OR-size-OR-rate; a quiet bucket mints nothing. Manual in the MVP. See *Chec
 
 **Native reference** — A binary Facet's payload: a pointer to a document in its source, resolved live.
 **Reserved**, not built in the first slice (Anam's early sources are all structured/verbatim).
+
+**Operational store** — The SQLite database holding Anam's own state: Facet Definitions, projection
+templates, token scopes, the facet and record-event indexes, the span registry and per-span `V`/`Wᵥ`, the
+checkpoint and receipt index, saved span bookmarks, sync cursors, GC state, the operational log. It is a
+real store, not a cache — authoritative for what Anam authors. Each table records **where it comes back
+from**: the *derived* tier from replaying the *Ledger*, the *provisioned* tier from embedded assets and
+config, the *authored* tier from a backup and nowhere else. Only the derived tier is disposable, and it
+must stay provably derived (`ARCHITECTURE.md` §8). See *Ledger*, *Sync cursor*.
 
 **Person** — The storage **substrate**: all facets partitioned onto one **timeline** under
 `person#<id>`. In Anam there is exactly one person and **no identity graph, no merge**. See *Timeline*.

@@ -13,11 +13,10 @@
 # shrug: a silently-ignored `ddb_endpont` would leave Anam talking to the default
 # endpoint while you believed it was talking to yours.
 #
-# Anam stores in three places, one rule (ARCHITECTURE.md §8):
-#
-#   truth is immutable and lives in exactly one place.
-#   the ledger is the record; files hold published artifacts;
-#   SQLite holds nothing that cannot be rebuilt by replaying the ledger.
+# Anam stores in three places (ARCHITECTURE.md §8): the ledger is the record;
+# files hold published artifacts; SQLite is the operational store. Each of the
+# operational store's tables records where it comes back from — the derived tier
+# by replaying the ledger, the rest from git or from a backup.
 
 # The storage substrate. Every facet is partitioned under person#<person_id>.
 # Required, and deliberately without a default: a wrong partition key must fail
@@ -36,10 +35,12 @@ ddb_region: us-east-1
 # The single table holding every ledger item kind.
 table_name: anam
 
-# --- tracking: SQLite ---------------------------------------------------------
-# Per-span V and Wv, the span registry, checkpoint and receipt index, sync
-# cursors, GC state. Rebuildable by replaying the ledger, so losing this file
-# costs a replay, not a fact.
+# --- operational store: SQLite ------------------------------------------------
+# Definitions, projection templates, token scopes, the facet and record-event
+# indexes, the span registry and per-span V/Wv, checkpoint and receipt index,
+# saved span bookmarks, sync cursors, GC state.
+# Not a cache: the derived tables replay back from the ledger, but definitions
+# come from git and the bookmarks come from nowhere. Back this file up.
 # Defaults to $XDG_DATA_HOME/anam/tracking.db, else ~/.local/share/anam/.
 db_path: ~/.local/share/anam/tracking.db
 

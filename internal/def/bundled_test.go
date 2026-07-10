@@ -17,6 +17,15 @@ func TestBundled_HoldsTheHealthDBTypes(t *testing.T) {
 		t.Fatalf("Bundled: %v", err)
 	}
 
+	// bp-csv's type keys on (date_excel, reading) — the export carries no reading
+	// id and distinct readings share timestamps, so the ordinal is identity.
+	bp, ok := reg.Lookup("health.blood-pressure")
+	if !ok {
+		t.Error("no bundled definition for health.blood-pressure")
+	} else if len(bp.IdentityKey) != 2 || bp.IdentityKey[1] != "/reading" {
+		t.Errorf("health.blood-pressure identity_key = %v, want [/date_excel /reading]", bp.IdentityKey)
+	}
+
 	for _, typ := range []facet.Type{
 		"health.sleep", "health.body-composition", "health.heart-rate", "health.metric-group",
 	} {

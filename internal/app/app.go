@@ -33,7 +33,8 @@ func Run(ctx context.Context, info BuildInfo) error {
 	root.PersistentFlags().StringVar(&cfgPath, "config", "",
 		"config file (default: $ANAM_CONFIG, then <user config dir>/anam/config.yaml)")
 
-	root.AddCommand(versionCmd(info), inspectCmd(&cfgPath), timelineCmd(&cfgPath))
+	root.AddCommand(versionCmd(info), initCmd(&cfgPath), ingestCmd(&cfgPath),
+		inspectCmd(&cfgPath), timelineCmd(&cfgPath))
 	return root.ExecuteContext(ctx)
 }
 

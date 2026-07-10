@@ -11,6 +11,8 @@ import (
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/spf13/viper"
+
+	"github.com/mattjoyce/anam/internal/safepath"
 )
 
 // ErrInvalid is returned when the resolved configuration is unusable.
@@ -91,6 +93,18 @@ func Load(path string) (Config, error) {
 	if err := v.Unmarshal(&c, errorOnUnknownKeys); err != nil {
 		return Config{}, fmt.Errorf("decode config: %w: %v", ErrInvalid, err)
 	}
+
+	// Filesystem paths are expanded once, here, so every consumer sees the same
+	// absolute path the operator meant — a "~/" that reached SQLite verbatim would
+	// quietly create a directory literally named "~".
+	for name, p := range map[string]*string{"db_path": &c.DBPath, "artifact_dir": &c.ArtifactDir} {
+		expanded, err := safepath.Expand(*p)
+		if err != nil {
+			return Config{}, fmt.Errorf("%w: %s: %v", ErrInvalid, name, err)
+		}
+		*p = expanded
+	}
+
 	if err := c.Validate(); err != nil {
 		return Config{}, err
 	}

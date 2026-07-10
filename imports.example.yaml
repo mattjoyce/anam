@@ -1,0 +1,11 @@
+# Anam imports — the declared captures `anam ingest` runs (and the only kind it
+# accepts). Copy to <user config dir>/anam/imports.yaml (usually
+# ~/.config/anam/imports.yaml), or point at it with --imports / $ANAM_IMPORTS.
+#
+# Paths are expanded on load: ~ and $VARs work. At ingest time each path must
+# resolve (symlinks followed) to an existing regular file.
+imports:
+  - source: health-db
+    path: ~/admin/data/healthdata.db
+  - source: bp-csv
+    path: ~/exports/BloodPressure.csv

@@ -377,19 +377,47 @@ Grain is **hybrid at the verbatim line** (ADR 0031):
   provenance actually pay.
 
 ```text
-PK = person#<id>
-SK:
-  facet#<event_time>#<facet_id>#v<n>   the timeline        (Query: SK BETWEEN)
-  rec#<seq>                            record-events       (replay-since)
-  seq                                  the watermark W     (a counter item)
-  def#<type>#v<version>                facet definitions
-GSI1 (by facet type):   gsi1_pk = person#<id>#type#<type>   gsi1_sk = <event_time>#<facet_id>
-GSI2 (changes_since):   gsi2_pk = person#<id>               gsi2_sk = <record_time>#<seq>
+pk = person#<id>
+sk:
+  facet#<facet_id>#v<%06d>   facet artifacts, keyed by identity  (Query: begins_with)
+  rec#<%020d>                record-events, keyed by seq         (Query: BETWEEN — replay-since)
+  seq                        the watermark W — a counter item, seeded at 0 by init
 ```
 
-Times are formatted **fixed-width UTC RFC3339Nano**, so lexical order equals chronological order for
-range queries (§5). The **payload is a Binary attribute, never a Map** — this is where metadata/payload
-separation (§3) is enforced.
+**No secondary indexes.** The ledger serves exactly two access paths, and both are strongly-consistent
+base-table range scans that must live in the same substrate as the conditional write:
+
+- `begins_with("facet#<facet_id>#")`, descending, limit 1 — the current artifact version, whose
+  `content_hash` `commit` compares against (§6a);
+- `BETWEEN("rec#…")` — replay since a watermark.
+
+Everything else a reader wants — the timeline in event-time order, a type filter, `changes_since` — is an
+**index**, and indexes live in the operational store, rebuilt by replaying the ledger. A table with a
+partition key, a sort key and a conditional counter is *any* ordered key-value store; that is what "the
+substrate is accidental" has to mean if it means anything.
+
+### Keys are identity-first, and every integer in them is zero-padded
+
+Both halves were learned the hard way, and both are verified against DynamoDB Local rather than assumed.
+
+- **`event_time` must not appear in an artifact's sort key.** It is a *value*, read out of the payload;
+  `facet_id` is *identity*. Key an artifact on its event-time and a corrected source row whose event-time
+  moved lands at a fresh sort key: the prior-version lookup misses it, `commit` concludes "never seen",
+  and writes `v1` again. Two live artifacts, one `facet_id`, **supersession silently disabled** — the
+  `source_ref` mistake (§6a) wearing a sort key. Identity-first makes it unrepresentable rather than
+  guarded.
+- **Sort keys compare lexically, so integers are fixed-width.** Unpadded, `rec#10 < rec#9` and `v10 < v9`:
+  replay returns the wrong window, and the prior-version lookup reads the *ninth* artifact as current from
+  the tenth onward, comparing against a stale hash. Spiked: `facet#RAW#v1..v12` queried descending returns
+  `v9`; padded, `v000012`. This is the fixed-width timestamp rule (§5) again, in a different key — and it
+  is live today in the `mint-cli` reference implementation's `AllSnapshots`.
+
+Times are formatted **fixed-width UTC RFC3339Nano** for the same reason (§5). The **payload is a Binary
+attribute, never a Map** — this is where metadata/payload separation (§3) is enforced.
+
+**Facet Definitions are not in the ledger.** A Definition is not something Anam *knew*; it is how Anam
+*interprets* — governance, not record. It lives in the operational store, provisioned from embedded JSON
+(every version, so an artifact's `definition_version` still resolves). The error kernel is smaller for it.
 
 > **Design note (Hickey).** The single-table `item` is a **marshalling envelope, quarantined to the store
 > package** — not a domain type. Each domain value owns its `toItem`/`fromItem`; the `kind` discriminator
@@ -399,9 +427,33 @@ separation (§3) is enforced.
 ### `commit` is one transaction, and it is the error kernel
 
 The facet artifact, its `admitted` record-event, and the bump of `W` are written in a **single
-`TransactWriteItems`**, conditional on the idempotency marker not already existing and on `W` still
-holding the value it was read at. A concurrent writer that read a stale `W` loses with
-`ConditionalCheckFailed`, re-reads, and retries.
+`TransactWriteItems`**: artifact and event each conditional on their sort key not already existing, and
+`W` conditional on still holding the value it was read at.
+
+`TransactionCanceledException` reports its reasons **positionally**, and the three positions mean three
+different things. Collapsing them into one "conflict" would make `commit` either retry a write that
+already succeeded or reject a benign re-ingest — so this mapping *is* the idempotency, not error handling
+wrapped around it:
+
+| Cancelled item | What it means | Response |
+|---|---|---|
+| the artifact | this `(facet_id, version)` already exists | compare `content_hash`: **same** → idempotent no-op, we are seeing our own write; **different** → a lost update. Stop |
+| the record-event | that `seq` is taken *while `W` was not stale* | the counter is behind its own log. The ledger is corrupt. Stop |
+| the watermark | another writer advanced `W` | re-read, re-stamp `record_time`, retry |
+
+`ReturnValuesOnConditionCheckFailure: ALL_OLD` returns the existing artifact alongside the cancellation, so
+the hash comparison costs no second read. This is what makes a dropped connection safe: the transaction
+committed, the client saw an error, and the retry lands on the first row and reads its own write back as a
+no-op.
+
+`record_time` is stamped **inside** the retry, after the successful `seq` read, so that `seq` order and
+`record_time` order agree by construction. A retry that reused its original timestamp could place an
+earlier `record_time` at a higher `seq`, and the ledger's order — the one thing §1 admits Anam owns —
+would be ambiguous.
+
+The retry loop belongs to the **gate**, not the store. A capture worker may already crash mid-batch and be
+re-run to known-good, so the recovery is free; putting a loop, a bound and a give-up path inside the one
+component that must not fail buys nothing.
 
 > **Design note (Armstrong).** There is **no transaction across substrates**, so everything that must be
 > atomic lives in one: the artifact, the event, and the watermark. The operational store's **derived**
@@ -518,6 +570,10 @@ Anam later as an ordinary source fact.
   Anam artifact has nowhere to carry a status (§6a).
 - **`source_ref` is identity, `content_hash` is content.** The natural key never contains the row's
   values, or supersession silently becomes duplication (§6a).
+- **Sort keys are identity-first and fixed-width.** An artifact's key carries its `facet_id`, never its
+  `event_time`; every integer in a sort key is zero-padded. Otherwise supersession silently duplicates, or
+  lexical order stops being chronological (§8). The ledger carries **no secondary indexes**: an index is
+  derived, and derived things live in the operational store.
 - **Canonical means the live-only value; the ledger means append-everything-marked.** One word, one
   surface (§7, §9).
 - **Metadata / payload separation**: the payload is verbatim, immutable, stored opaque, never parsed

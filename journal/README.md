@@ -25,6 +25,7 @@ Two kinds of note:
 - Journal entries
   - [[2026-07-10-genesis]] — the first session: from "my own Anam" to a committed spec.
   - [[2026-07-10-step-one-domain-types]] — building `facet`/`clock`/`config`, and a trap in the stdlib.
+  - [[2026-07-10-r2-the-store-and-five-corrections]] — R2 built; five corrections, five different finders.
 - Decision notes
   - [[the-inversion]] · [[person-substrate-grain]] · [[mint-unit-whole-timeline]]
   - [[facet-types-dotted-namespaced]] · [[facet-definition-format]]
@@ -37,6 +38,9 @@ Two kinds of note:
   - [[anam-owns-the-continuity]] · [[ledger-and-canonical-two-surfaces]]
   - [[span-is-the-mint-unit-not-the-read-filter]] · [[state-is-checkpoint-plus-replay]]
   - [[source-ref-is-identity-not-content]]
+  - [[tombstone-is-a-record-event]] · [[published-is-a-receipt-not-a-record-event]]
+  - [[sqlite-is-the-operational-store]] · [[identity-first-keys-and-no-indexes]]
+  - [[checkpoint-is-a-replay-floor]] · [[doctrine-aphorisms-outlive-their-reasoning]]
 - Retracted
   - [[mint-unit-whole-timeline]] — superseded by [[span-is-the-mint-unit-not-the-read-filter]]
 - Reference notes

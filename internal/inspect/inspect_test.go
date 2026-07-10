@@ -72,7 +72,10 @@ func seededServer(t *testing.T) (*httptest.Server, string, string) {
 		t.Fatalf("Mark tombstone: %v", err)
 	}
 
-	srv := httptest.NewServer(inspect.Handler(l, 5*time.Second))
+	// A generous request timeout: the suite runs whole packages of integration
+	// tests against one DynamoDB Local, whose table creates/drops (the fold's
+	// rebuild test) serialise everything else. Latency is not under test here.
+	srv := httptest.NewServer(inspect.Handler(l, 30*time.Second))
 	t.Cleanup(srv.Close)
 	return srv, bp.ID, hr.ID
 }

@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "facet_type": "health.metric-group",
+    "definition_version": 1,
+    "classification": "Sensitive",
+    "validation_mode": "lenient",
+    "source_schema": "health-db/summary-group",
+    "time_semantics": {
+      "event_time": {"pointer": "/period_start", "layout": "2006-01-02T15:04:05"}
+    },
+    "identity_key": ["/group", "/period_type", "/period_start"]
+  },
+  "schema": {
+    "required": ["/group", "/period_type", "/period_start", "/metrics"],
+    "properties": {
+      "/group": {"enum": ["activity", "breath", "stress", "calories"]},
+      "/period_type": {"enum": ["day", "week", "month", "year"]}
+    }
+  }
+}

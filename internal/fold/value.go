@@ -21,30 +21,38 @@ import (
 // ingested time, and every seq/watermark. The one exception is Status — endorsed
 // is Anam-authored — and it is carried anyway because projections gate on it;
 // endorsements come back from backup, not replay (§12).
+//
+// Classification is here for that same reason and by that same test. A projection's
+// fourth knob is a maximum classification (§9), so the value has to be able to answer
+// it; and the answer is the Definition's, applied at capture, so re-ingest reproduces
+// it. A projection reads these fields and never Payload — filtering is on metadata
+// only, and a facet is included or excluded whole.
 type Entry struct {
-	FacetID      string          `json:"facet_id"`
-	Type         facet.Type      `json:"type"`
-	EventTime    string          `json:"event_time"`
-	RecordedTime string          `json:"recorded_time"`
-	Source       string          `json:"source"`
-	SourceRef    string          `json:"source_ref"`
-	Status       facet.Status    `json:"status"`
-	ContentHash  string          `json:"content_hash"`
-	Payload      json.RawMessage `json:"payload"`
+	FacetID        string               `json:"facet_id"`
+	Type           facet.Type           `json:"type"`
+	EventTime      string               `json:"event_time"`
+	RecordedTime   string               `json:"recorded_time"`
+	Source         string               `json:"source"`
+	SourceRef      string               `json:"source_ref"`
+	Status         facet.Status         `json:"status"`
+	Classification facet.Classification `json:"classification"`
+	ContentHash    string               `json:"content_hash"`
+	Payload        json.RawMessage      `json:"payload"`
 }
 
 // entryOf projects a live facet at its folded state into the value.
 func entryOf(f facet.Facet, s State) Entry {
 	return Entry{
-		FacetID:      f.ID,
-		Type:         f.Type,
-		EventTime:    clock.Format(f.EventTime),
-		RecordedTime: clock.Format(f.RecordedTime),
-		Source:       f.Provenance.Source,
-		SourceRef:    f.Provenance.SourceRef,
-		Status:       s.Status,
-		ContentHash:  f.Descriptor.ContentHash,
-		Payload:      json.RawMessage(f.Payload.Bytes()),
+		FacetID:        f.ID,
+		Type:           f.Type,
+		EventTime:      clock.Format(f.EventTime),
+		RecordedTime:   clock.Format(f.RecordedTime),
+		Source:         f.Provenance.Source,
+		SourceRef:      f.Provenance.SourceRef,
+		Status:         s.Status,
+		Classification: f.Classification,
+		ContentHash:    f.Descriptor.ContentHash,
+		Payload:        json.RawMessage(f.Payload.Bytes()),
 	}
 }
 

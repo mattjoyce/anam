@@ -94,22 +94,47 @@ func (t Template) Span() string {
 	return fmt.Sprintf("event-time[%s,%s)", from, to)
 }
 
-// admits reports whether one entry passes the template's four filters. It reads only
-// governing metadata; Entry.Payload is never consulted (§9).
-func (t Template) admits(e fold.Entry) bool {
+// Reason says why one entry is or is not served. It exists so that a projection can
+// be *explained* — "why is this reading not in the bp view?" is the question a
+// governed system has to be able to answer, and answering it from a second, parallel
+// re-implementation of the filter would produce an explanation that could disagree
+// with the filter. Apply and Explain call the same verdict, so they cannot.
+type Reason string
+
+// The verdicts. Served is the only one that includes an entry.
+const (
+	ReasonServed         Reason = "served"
+	ReasonType           Reason = "type not in the allow-list"
+	ReasonStatus         Reason = "status not in the filter"
+	ReasonClassification Reason = "above the classification ceiling"
+	ReasonBeforeWindow   Reason = "event-time before the window"
+	ReasonAfterWindow    Reason = "event-time at or after the window"
+	ReasonConsent        Reason = "denied by the consent gate"
+)
+
+// Served reports whether this verdict includes the entry.
+func (r Reason) Served() bool { return r == ReasonServed }
+
+// verdict applies the template's four filters to one entry and says which, if any,
+// excluded it. It reads only governing metadata; Entry.Payload is never consulted (§9).
+//
+// The order is the order the knobs are documented in, and it is the order the reason
+// is reported in: an entry excluded by two filters is attributed to the first, which
+// keeps the answer stable rather than dependent on evaluation order.
+func (t Template) verdict(e fold.Entry) Reason {
 	switch {
 	case !t.typeSet[e.Type]:
-		return false
+		return ReasonType
 	case !t.statusSet[e.Status]:
-		return false
+		return ReasonStatus
 	case classificationRank(e.Classification) > classificationRank(t.MaxClassification):
-		return false
+		return ReasonClassification
 	case t.From != "" && e.EventTime < t.From:
-		return false
+		return ReasonBeforeWindow
 	case t.To != "" && e.EventTime >= t.To:
-		return false
+		return ReasonAfterWindow
 	}
-	return true
+	return ReasonServed
 }
 
 // Apply prunes v through the template and the consent gate, returning the served
@@ -120,27 +145,60 @@ func (t Template) admits(e fold.Entry) bool {
 // every fact Anam holds, so a future policy's audit trail is about a real disclosure
 // rather than about the whole ledger.
 func Apply(v fold.Value, t Template, g Gate) (fold.Value, error) {
-	if g == nil {
-		return fold.Value{}, fmt.Errorf("projection: %s: a consent gate is required (§10)", t.Name)
+	verdicts, err := Explain(v, t, g)
+	if err != nil {
+		return fold.Value{}, err
 	}
 
-	kept := make([]fold.Entry, 0, v.Len())
-	for _, e := range v.Entries() {
-		if !t.admits(e) {
-			continue
+	kept := make([]fold.Entry, 0, len(verdicts))
+	for _, x := range verdicts {
+		if x.Reason.Served() {
+			kept = append(kept, x.Entry)
 		}
-		d := g.Evaluate(consent.Request{
-			Type:           e.Type,
-			Classification: e.Classification,
-			Status:         e.Status,
-			EventTime:      e.EventTime,
-		})
-		if !d.Allow {
-			continue
-		}
-		kept = append(kept, e)
 	}
 	return fold.NewValue(kept)
+}
+
+// Verdict is one entry and what the template and the gate decided about it.
+type Verdict struct {
+	Entry  fold.Entry
+	Reason Reason
+
+	// Detail carries the consent gate's own words when it denied; empty otherwise.
+	Detail string
+}
+
+// Explain runs the template and the gate over every entry and reports the decision for
+// each, served or not, in the canonical's order.
+//
+// This is the function Apply is built from, not a companion to it. A projection that
+// could not say why it excluded something would be governance by assertion; one whose
+// explanation came from separately-written code would be governance by coincidence.
+func Explain(v fold.Value, t Template, g Gate) ([]Verdict, error) {
+	if g == nil {
+		return nil, fmt.Errorf("projection: %s: a consent gate is required (§10)", t.Name)
+	}
+
+	out := make([]Verdict, 0, v.Len())
+	for _, e := range v.Entries() {
+		x := Verdict{Entry: e, Reason: t.verdict(e)}
+		if x.Reason.Served() {
+			// The gate is asked only about what a consumer would otherwise see, not
+			// about every fact Anam holds, so a future policy's audit trail is about a
+			// real disclosure rather than about the whole ledger.
+			d := g.Evaluate(consent.Request{
+				Type:           e.Type,
+				Classification: e.Classification,
+				Status:         e.Status,
+				EventTime:      e.EventTime,
+			})
+			if !d.Allow {
+				x.Reason, x.Detail = ReasonConsent, d.Reason
+			}
+		}
+		out = append(out, x)
+	}
+	return out, nil
 }
 
 // classificationRank orders the levels by restriction, so a ceiling comparison is an

@@ -513,6 +513,13 @@ A consumer **selects** a projection; it never defines one.
 > append-everything surface. A projection over the canonical sees live facets by construction; a reader
 > who wants tombstones is asking the **ledger** a forensic question, not asking a projection for a variant.
 
+A projection is also **explainable**: the same verdict that decides whether a facet is served reports
+*which* knob excluded it, so a governed variant can answer "why is this reading not here?" from the
+filter itself rather than from a second account of it. Versions no longer in force — displaced by a
+correction, or belonging to a facet no longer live — are not exclusions at all: they never reach a
+template, because the canonical is live-only by construction. They are their own standing, derived from
+the fold.
+
 Projections are **materialised as files**, content-addressed. **Receipts** make a served projection
 reproducible: `served_hash = sha256(served bytes)` plus the exact facet-id set, the watermark, the
 template version, the definition-set version, the `served_at` time, and the span. (Arch's consent-version

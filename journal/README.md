@@ -32,7 +32,7 @@ Two kinds of note:
   - [[2026-07-10-the-live-inspector]] — the inspector: capture→compose, drawn from the ledger.
   - [[2026-07-10-r6-changes-since]] — R6: `changes_since`, and the derived tier earns its first reader.
   - [[2026-07-11-bp-csv-arrives]] — the BP CSV arrives; identity isn't what the tests assumed. Plus safepath.
-  - [[2026-07-25-r7-projection-and-receipt]] — R7: the projection publishes, the receipt proves, and the retry loop disappears.
+  - [[2026-07-25-r7-projection-and-receipt]] — R7: the projection publishes, the receipt proves, the retry loop disappears; plus the viewer that switches between projections and winds the clock back.
 - Decision notes
   - [[the-inversion]] · [[person-substrate-grain]] · [[mint-unit-whole-timeline]]
   - [[facet-types-dotted-namespaced]] · [[facet-definition-format]]
@@ -49,6 +49,7 @@ Two kinds of note:
   - [[sqlite-is-the-operational-store]] · [[identity-first-keys-and-no-indexes]]
   - [[checkpoint-is-a-replay-floor]] · [[doctrine-aphorisms-outlive-their-reasoning]]
   - [[identity-is-definition-owned]] · [[as-of-reads-fetch-by-version]]
+  - [[one-decision-procedure-per-decision]]
 - Retracted
   - [[mint-unit-whole-timeline]] — superseded by [[span-is-the-mint-unit-not-the-read-filter]]
 - Reference notes

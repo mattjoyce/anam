@@ -57,7 +57,7 @@ it is built in the smallest steps that yield information.
 | R4 ✅ | `fold` + **`anam timeline`** | the inversion, visible. Plus the rebuild test (§7) as an automated check |
 | R5 ✅ | capture worker `health-db`, one `health.metric-group` definition | real payloads, real time semantics |
 | R6 ✅ | `changes_since` over `record_event` | record-time queries |
-| R7 ✅ | one projection + receipt | governance made real |
+| R7 ✅ | one projection + receipt, and the viewer that switches between them | governance made real — and *legible*: every facet can say why it is in or out, at any point in Anam's own clock |
 | R8 | mint / `checkpoint` per bucket-span → files | replay bounded, once measurable |
 | R9 | derived insight, admitted `proposed` | the agentic path, isolated |
 
@@ -104,6 +104,9 @@ fact, a substrate swap is a re-ingest, not a migration.
 - **`changes_since`** between two record-times.
 - **At least one prune-only projection** (e.g. `bp`, `sleep`), **materialised as a content-addressed
   file**, plus the **CLI timeline viewer** (the diagnostic harness — proves the model, not a shipped UI).
+  The viewer **switches projections** (`timeline --projection`) and can be wound back to a record-time
+  (`--as-of`); `--explain` shows every facet's verdict and the versions since displaced. The web
+  inspector carries the same two controls at `/projection`.
 - **Receipts:** prove exactly what a projection served at a watermark.
 - **One derived-facet path:** an **insight** admitted as `proposed`, visible on the timeline, no
   write-back.

@@ -44,9 +44,47 @@ Extensible to "all sorts of facets" later — `calendar.event`, `mail.thread`, `
 
 ```sh
 make build
+
+# person_id has no default on purpose: it is the ledger's partition key, so a
+# defaulted one would quietly write facts into a partition nobody chose.
+export ANAM_PERSON_ID=matt
 export ANAM_DDB_ENDPOINT=http://192.168.20.4:8000   # the ledger (creds are static fakes, in-code)
+
 ./anam init
-./anam ingest health --db /path/to/healthdata.db
-./anam ingest bp --csv /path/to/blood-pressure.csv
-./anam timeline --from 2025-05-01 --to 2026-07-01
+```
+
+**Ingest.** Imports are *declared*, not passed on the command line — a path typed ad hoc
+is provenance that evaporates with the shell history. Copy `imports.example.yaml` to
+`~/.config/anam/imports.yaml`, name each source and its file, then:
+
+```sh
+./anam ingest                 # every declared source
+./anam ingest bp-csv          # just one
+```
+
+**Read.** The whole-person timeline is the default; everything else is a lens over it.
+
+```sh
+./anam timeline                                    # the canonical, whole
+./anam timeline --from 2025-05-01 --to 2026-07-01  # narrowed by event-time
+./anam changes --since 2026-07-10                  # what Anam learned since, by record-time
+```
+
+**Publish and prove.** A projection prunes the canonical; a receipt proves what was served.
+
+```sh
+./anam serve                        # the menu — you select a projection, you cannot define one
+./anam serve bp                     # publish: a served value and a receipt, content-addressed
+./anam receipt list
+./anam receipt show <hash>          # what was served, from the artifact alone
+./anam receipt verify <hash>       # re-derive it from the ledger, and re-hash the file
+```
+
+**Look at a projection before publishing it**, and ask why a facet is in or out:
+
+```sh
+./anam timeline --projection bp                          # the served view, with its receipt hash
+./anam timeline --projection bp --explain                # every facet's verdict, and the reason
+./anam timeline --projection bp --as-of 2026-07-10T20:00:00Z   # what it stood on when Anam knew less
+./anam inspect                                           # the web harness; /projection switches templates
 ```

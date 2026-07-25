@@ -34,7 +34,8 @@ func Run(ctx context.Context, info BuildInfo) error {
 		"config file (default: $ANAM_CONFIG, then <user config dir>/anam/config.yaml)")
 
 	root.AddCommand(versionCmd(info), initCmd(&cfgPath), ingestCmd(&cfgPath),
-		inspectCmd(&cfgPath), timelineCmd(&cfgPath), changesCmd(&cfgPath))
+		inspectCmd(&cfgPath), timelineCmd(&cfgPath), changesCmd(&cfgPath),
+		serveCmd(&cfgPath), receiptCmd(&cfgPath))
 	return root.ExecuteContext(ctx)
 }
 

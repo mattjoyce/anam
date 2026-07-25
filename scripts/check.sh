@@ -53,7 +53,14 @@ fi
 run go vet ./...
 if command -v golangci-lint >/dev/null 2>&1; then run golangci-lint run ./...; else echo "golangci-lint not installed — skipping"; fi
 if command -v gosec >/dev/null 2>&1; then run gosec -severity medium -quiet ./...; else echo "gosec not installed — skipping"; fi
-run go test -race -count=1 -shuffle=on -vet=all ./...
+# The suite is integration-heavy by choice (AGENTS.md: real components over mocks), and
+# every package that touches the ledger creates and drops its own table on ONE DynamoDB
+# Local process. Run in parallel under -race, those creates queue: a package that takes
+# 45s alone can take many minutes behind the others. Go's default per-package timeout is
+# 10 minutes — a default, never a decision — and hitting it reports a contended server as
+# a hung test. The budget below is sized for the queue; a genuine hang still fails, it
+# just has to actually hang.
+run go test -race -count=1 -shuffle=on -vet=all -timeout 25m ./...
 
 if [ "$fail" -ne 0 ]; then echo "CHECK FAILED"; exit 1; fi
 echo "CHECK OK"

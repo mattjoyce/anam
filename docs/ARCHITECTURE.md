@@ -183,6 +183,68 @@ rebuildable** — while owning, and taking responsibility for, the continuity.
 | **Ingested time** | Anam | When Anam received it |
 | **Published time** | Anam | When it first appeared in a served account — the earliest `served_at` over the receipts naming it (§9). Not a record-event |
 
+Four times sit on the table above and a fifth — **record-time**, on the Anam record-event — carries the
+ordering. Two of them do the work of every read, and telling them apart is the difference between asking
+about the world and asking about Anam.
+
+### 5a. Reading on two clocks
+
+**Event-time is not left in the payload.** The Definition's `time_semantics.event_time` JSON Pointer
+extracts it at the gate and it becomes a first-class governed field on the Facet and on every canonical
+entry. That promotion is load-bearing: it is what lets the timeline be ordered and a window filtered
+without anything ever opening a payload. If event-time lived only inside the blob, every read would have
+to parse every blob, and the metadata/payload separation of §3 would be a fiction.
+
+So a read may name either clock, or both:
+
+| Question | Clock | How it narrows | Resolution |
+|---|---|---|---|
+| What was true **in the world** up to January? | event-time | a **derived span** (`--from`/`--to`) | full — it comes from the source |
+| What did **Anam know** on 10 July? | record-time | an **as-of** (`--as-of`) | one point per record-event — but see §5b on span |
+| Both, composed | — | `--as-of T` then the span | bitemporal |
+
+They are different *kinds* of operation, which is why they compose rather than compete: an **as-of picks
+which version of the record you are reading** — one watermark, one fold — and a **span filters inside**
+that version. Naming both "as-of" would hide that.
+
+**`as-of` is unqualified and always means record-time.** It needs no prefix because there is only one;
+this matches Datomic's `as-of` and SQL:2011's `AS OF SYSTEM TIME`. A `record-as-of` spelling would also
+collide with **recorded time**, which is the *source's* account of when it documented something — a
+Facet clock, one letter away and a different thing entirely.
+
+### 5b. A bulk import compresses record-time, and nothing can uncompress it
+
+Record-time is **fine-grained** — every record-event gets its own instant and its own watermark, so the
+first slice's 893 facets have 893 distinct record-times. What a backfill compresses is not the
+resolution but the **span**:
+
+| | |
+|---|---|
+| event-time span | 2024-01 → 2026-07, ~30 months |
+| record-time span | one afternoon, 2026-07-10 |
+
+The two axes therefore bear no relation to each other, and an as-of *inside* the import returns
+whatever prefix of the backfill had landed by then — an artefact of the order the rows were read, not of
+history. **This is honest, not broken.** Anam did not exist in 2024, so "what did Anam know in 2024"
+correctly answers *nothing*, and manufacturing a record-time per fact would be inventing provenance Anam
+does not have.
+
+The consequence is a division of labour worth stating plainly:
+
+- **Record-time is an audit instrument.** What did this receipt stand on? Has the ledger moved under a
+  published artifact? That is what `as-of`, `changes_since` and the watermark exist for, and their
+  resolution is exactly right for it.
+- **Event-time is the history instrument.** It has full resolution because it comes from the source, and
+  it is the axis the person actually experienced.
+
+Record-time gains real resolution only when ingest becomes incremental — worth knowing before minting
+(§7), because checkpoints are cut against watermarks.
+
+> **Not yet built, and named so it is not assumed:** "the facts as of January" most often means *the
+> latest reading before January*, one per identity — a last-known-value read. A derived span gives every
+> reading up to January, which is a different answer. The canonical is already ordered by
+> `(event_time, facet_id)`, so the fold is cheap; it simply does not exist yet.
+
 A **Facet event** is the domain fact — immutable, carrying its own event-time, true independently of
 Anam; placed on the timeline at its **event-time**. An **Anam record-event** asserts that Anam's
 *knowledge* changed — `admitted`, `superseded`, `tombstoned`, `endorsed`, `rejected` — and carries
@@ -367,6 +429,17 @@ would pass on data it never rebuilt, and "Anam owns no source fact" would stop b
 Following Arch ADR 0031: adopt the datom **shape**, do not build a datom **engine**. Facts are
 `[entity attribute value tx]` with `tx` = record-time; the store supplies sorted indexes, Anam supplies
 the shape and a handful of fixed query forms.
+
+> **It is not EAVT, and calling it that invites a query Anam cannot answer.** EAVT implies you could ask
+> the ledger for the `systolic` attribute. You cannot: there is no such attribute, because the payload
+> is never decomposed into per-field triples. What *is* attribute-shaped and queryable is Anam's
+> **envelope** — type, event-time, classification, provenance, content-hash — which is exactly what
+> projections filter on. The payload beneath it is one opaque, content-addressed value, and a reader who
+> wants a field gets the whole reading back and reads it themselves.
+>
+> The accurate description is **an entity, a governed envelope, an opaque payload, and two clocks**
+> (§5) — a datom with a fat, opaque value. Bare "EAVT" is one letter-string standing in for a design it
+> misdescribes, which is how it survives being wrong; prefer the sentence.
 
 Grain is **hybrid at the verbatim line** (ADR 0031):
 
@@ -615,3 +688,7 @@ one or two projections plus a CLI timeline viewer, manual mint, and receipts. Re
   precisely because Anam owns no facts and can re-ingest.
 - **Extensibility to non-health facets** (`calendar.*`, `mail.*`, `note.*`) — the model already admits
   them; they are simply not built yet.
+- **Last-known-value reads** (§5a) — "the facts as of January" usually means *the latest reading before
+  January, one per identity*, and a derived span answers the different question "every reading up to
+  January". The canonical is already ordered by `(event_time, facet_id)`, so the fold is cheap; it is
+  unbuilt, not hard. Named here so the span is not mistaken for it.

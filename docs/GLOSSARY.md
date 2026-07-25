@@ -19,6 +19,13 @@ context layer. Anam borrows its machinery wholesale and inverts its access defau
 **Artifact** — A specific version of a Facet's captured body. Re-versioned on a whole re-capture or a
 maturity change. Immutable once written. See *Facet*, *Supersession*.
 
+**As-of** — A read at a **record-time**: what Anam knew at that instant, obtained by folding the ledger
+to the watermark in force then. Unqualified and unprefixed — there is only one as-of, and it is always
+Anam's clock, never the world's. (This matches Datomic's `as-of` and SQL:2011's `AS OF SYSTEM TIME`; a
+"record-as-of" prefix would also collide with *Recorded time*, which is a different thing again.)
+Narrowing by **event-time** is not an as-of: it is a *derived span*, and the two compose. See
+*Bitemporal*, *Record-time*, *Span*, *Watermark*.
+
 **Binding** — The resolution of a Facet to the person via its Definition's linking elements. In Anam,
 with one person, binding is near-trivial but still attested; it **never requires a Span**. See *Binding
 assurance*.
@@ -29,6 +36,12 @@ assurance*.
 **Birth status** — The **immutable** state a Facet was born in (`admitted` or `proposed`), stored on the
 artifact. It is **not** the facet's current status — current status is *derived* by the fold. One truth
 per fact. See *Status*, *Fold*.
+
+**Bitemporal** — Anam carries two independent clocks, and a read may name either or both: **event-time**
+(when it happened in the world) and **record-time** (when Anam learned it). They are not two views of
+one axis — an as-of picks *which version of the record* you are reading, and a span filters *within*
+that version, so they compose rather than compete. The industry's words for the pair are *valid time*
+and *transaction time*; Anam's are event-time and record-time. See *As-of*, *Event-time*, *Record-time*.
 
 **Bucket span** — Anam's default **mintable** Span: a calendar window over **event-time** (default one
 month). Every Facet is a member of exactly one, by arithmetic on its event-time. Invisible to the reader.
@@ -81,8 +94,14 @@ disposable and rebuildable. See *Operational store*.
 **Event** — A meaningful occurrence on the person's timeline, placed at its Facet *event-time* and
 carried by one or more Facets.
 
-**Event-time** — When a fact happened (a Facet clock) — determines *where* it sits on the timeline.
-Contrast *Record-time*.
+**Event-time** — When a fact happened (a Facet clock) — determines *where* it sits on the timeline, and
+the axis the timeline is ordered by.
+
+It is **extracted from the payload at the gate**, by the Definition's `time_semantics.event_time` JSON
+Pointer, and then promoted to a first-class governed field on the Facet and on every canonical entry. It
+does not stay buried in the payload, and that promotion is load-bearing: it is why the timeline can be
+ordered and a span filtered without anything ever parsing a payload. Narrowed with `--from`/`--to`, which
+is a *derived span* and **not** an as-of. Contrast *Record-time*; see *Bitemporal*, *Span*.
 
 **Facet** — Anam's atomic unit: a captured source fragment **held verbatim** plus its governing
 metadata (attributes, a payload descriptor, an opaque payload). **Not** a normalised entity. See *Facet
@@ -152,6 +171,11 @@ wanting tombstones queries the *Ledger*. See *Receipt*, *Canonical*.
 **Provenance** — The recorded origin of a Facet: source and injector identity, plus (for derived facets)
 the method/model and the canonical watermark it was computed from.
 
+**Published time** — When a Facet first appeared in a served account: the **earliest `served_at` over
+the receipts naming it** (an Anam clock). Deliberately *not* a record-event — being shown changes
+nothing Anam knows — so it lives in the published-artifact tier and is lost with it. See *Receipt*,
+*Record-event*.
+
 **Receipt** — Proof of exactly what a projection served at a watermark: `served_hash`, the facet-id set,
 watermark, template version, definition-set version, `served_at`, and optional span. A Facet's
 *published time* is the earliest `served_at` over the receipts naming it — publication is recorded here,
@@ -164,8 +188,24 @@ monotonic `seq`. Every kind can change the live-set, so `W ≡ seq` (one counter
 **Publication is not one of them**: serving a facet changes nothing Anam knows, and a *Receipt* already
 records what was shown. See *Record-time*, *Watermark*, *Receipt*.
 
-**Record-time** — When Anam's knowledge changed (an Anam clock). Orders record-events. Contrast
-*Event-time*.
+**Record-time** — When Anam's knowledge changed (an Anam clock). Orders record-events, and `seq` ≡ `W`,
+so a record-time resolves to exactly one watermark. The clock an **as-of** reads.
+
+It is **fine-grained** — one instant and one watermark per record-event — but a bulk backfill compresses
+its **span**: thirty months of event-time can arrive in one afternoon of record-time, and the two axes
+then bear no relation to each other. An as-of *inside* such an import returns whatever prefix of the
+backfill had landed by then, which is an artefact of read order rather than history. That is honest
+rather than broken: Anam did not exist during the backfilled period, and "what did Anam know in 2024"
+really is *nothing*. It makes record-time an **audit** instrument (what did this receipt stand on; did
+the ledger move under a published artifact) rather than a *history* one — history is event-time's job.
+Record-time becomes historically meaningful only when ingest is incremental. Contrast *Event-time*,
+*Recorded time*; see *As-of*, *Bitemporal*, *Watermark*.
+
+**Recorded time** — When *a person or system documented* a fact (a **Facet** clock, from the source).
+Distinct from **Record-time**, which is Anam's own knowledge clock, and one letter away from it: the
+first is the world's account of when it wrote something down, the second is when Anam found out.
+Defaults to *Event-time* when a source has no separate documentation clock. See *Event-time*,
+*Record-time*.
 
 **Source** — A capture origin, named **lower-case hyphenated**: `health-db`, `bp-csv`. The identity that
 appears in provenance and cursors. See *Capture worker*.

@@ -52,12 +52,12 @@ it is built in the smallest steps that yield information.
 |---|---|---|
 | R0 ✅ | `facet`, `clock`, `config` | the domain values |
 | R1 ✅ | substrate spikes, thrice, then thrown away | DynamoDB does atomic conditional `TransactWriteItems` *and* a monotonic counter; SQLite enforces append-only and idempotency itself. Split by role (§8) |
-| R2 | `store` — idempotent `init` (table + seeded counter); the atomic `Append`; one facet round-tripped through the ledger; the operational schema, incl. the **bucket-span seam** | the key layout is real |
-| R3 | the gate — `resolve` + `commit`, atomic, idempotent, supersession, tombstone | **the error kernel.** Complete, or not at all |
-| R4 | `fold` + **`anam timeline`** | the inversion, visible. Plus the rebuild test (§7) as an automated check |
-| R5 | capture worker `health-db`, one `health.metric-group` definition | real payloads, real time semantics |
-| R6 | `changes_since` over `record_event` | record-time queries |
-| R7 | one projection + receipt | governance made real |
+| R2 ✅ | `store` — idempotent `init` (table + seeded counter); the atomic `Append`; one facet round-tripped through the ledger; the operational schema, incl. the **bucket-span seam** | the key layout is real |
+| R3 ✅ | the gate — `resolve` + `commit`, atomic, idempotent, supersession, tombstone | **the error kernel.** Complete, or not at all |
+| R4 ✅ | `fold` + **`anam timeline`** | the inversion, visible. Plus the rebuild test (§7) as an automated check |
+| R5 ✅ | capture worker `health-db`, one `health.metric-group` definition | real payloads, real time semantics |
+| R6 ✅ | `changes_since` over `record_event` | record-time queries |
+| R7 ✅ | one projection + receipt | governance made real |
 | R8 | mint / `checkpoint` per bucket-span → files | replay bounded, once measurable |
 | R9 | derived insight, admitted `proposed` | the agentic path, isolated |
 

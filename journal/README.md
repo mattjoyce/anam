@@ -27,6 +27,12 @@ Two kinds of note:
   - [[2026-07-10-step-one-domain-types]] — building `facet`/`clock`/`config`, and a trap in the stdlib.
   - [[2026-07-10-r2-the-store-and-five-corrections]] — R2 built; five corrections, five different finders.
   - [[2026-07-10-r3-the-gate-and-an-inspector]] — R3 complete; the gate's choreography live, plus `anam inspect`.
+  - [[2026-07-10-r4-the-fold-and-the-timeline]] — R4: the fold, the timeline, and the equality oracle.
+  - [[2026-07-10-r5-the-big-import]] — R5: the first real source, and the big import.
+  - [[2026-07-10-the-live-inspector]] — the inspector: capture→compose, drawn from the ledger.
+  - [[2026-07-10-r6-changes-since]] — R6: `changes_since`, and the derived tier earns its first reader.
+  - [[2026-07-11-bp-csv-arrives]] — the BP CSV arrives; identity isn't what the tests assumed. Plus safepath.
+  - [[2026-07-25-r7-projection-and-receipt]] — R7: the projection publishes, the receipt proves, and the retry loop disappears.
 - Decision notes
   - [[the-inversion]] · [[person-substrate-grain]] · [[mint-unit-whole-timeline]]
   - [[facet-types-dotted-namespaced]] · [[facet-definition-format]]
@@ -42,7 +48,7 @@ Two kinds of note:
   - [[tombstone-is-a-record-event]] · [[published-is-a-receipt-not-a-record-event]]
   - [[sqlite-is-the-operational-store]] · [[identity-first-keys-and-no-indexes]]
   - [[checkpoint-is-a-replay-floor]] · [[doctrine-aphorisms-outlive-their-reasoning]]
-  - [[identity-is-definition-owned]]
+  - [[identity-is-definition-owned]] · [[as-of-reads-fetch-by-version]]
 - Retracted
   - [[mint-unit-whole-timeline]] — superseded by [[span-is-the-mint-unit-not-the-read-filter]]
 - Reference notes

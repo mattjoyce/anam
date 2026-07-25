@@ -157,9 +157,19 @@ func TestInit_RefusesMismatchedSchema(t *testing.T) {
 
 // rawDynamo issues one DynamoDB Local wire call outside the SDK. Local does not
 // authenticate, so the Authorization header only needs the right shape.
+//
+// The budget is deliberately loose. DynamoDB Local is one process backed by one file,
+// shared by every package in a `-race -shuffle=on` run that is creating and dropping
+// its own table; a CreateTable that takes half a second alone can take many seconds
+// behind that queue. A tight budget here does not catch a slow server, it catches a
+// busy one — and reports it as a broken test. The deadline still exists, because a
+// hung call must fail rather than hang; it is just sized for contention rather than
+// for an idle machine.
+const rawDynamoBudget = 30 * time.Second
+
 func rawDynamo(t *testing.T, target, body string) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), rawDynamoBudget)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(body))

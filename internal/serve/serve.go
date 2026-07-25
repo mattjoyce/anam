@@ -15,6 +15,7 @@ package serve
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -177,6 +178,35 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 			r.DefinitionSetVersion, d.DefinitionSetVersion))
 	}
 	return r, out, nil
+}
+
+// Show returns a published receipt and the served value it names, read from the
+// artifact tier alone — no ledger, no fold, no re-derivation.
+//
+// That restraint is the point. Verify asks whether the ledger still honours a receipt;
+// Show asks what the artifact actually says, which is a question you must be able to
+// answer when the ledger is gone, unreachable, or exactly what you doubt. The bytes are
+// checked against their own content address on the way out, so a tampered artifact is
+// reported rather than displayed as though it were what was served.
+func Show(d Deps, receiptHash string) (receipt.Receipt, []fold.Entry, error) {
+	raw, err := d.Artifacts.Get(receipt.Kind, receiptHash)
+	if err != nil {
+		return receipt.Receipt{}, nil, err
+	}
+	r, err := receipt.Parse(raw)
+	if err != nil {
+		return receipt.Receipt{}, nil, err
+	}
+
+	served, err := d.Artifacts.Get(receipt.ServedKind, r.ServedHash)
+	if err != nil {
+		return r, nil, err
+	}
+	var entries []fold.Entry
+	if err := json.Unmarshal(served, &entries); err != nil {
+		return r, nil, fmt.Errorf("serve: parse served value %s: %w", r.ServedHash, err)
+	}
+	return r, entries, nil
 }
 
 // List returns the receipts in the store, newest serve first.

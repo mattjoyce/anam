@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"text/tabwriter"
 
@@ -82,7 +83,7 @@ func receiptCmd(cfgPath *string) *cobra.Command {
 		Use:   "receipt",
 		Short: "list and verify the receipts of past serves",
 	}
-	cmd.AddCommand(receiptListCmd(cfgPath), receiptVerifyCmd(cfgPath))
+	cmd.AddCommand(receiptListCmd(cfgPath), receiptShowCmd(cfgPath), receiptVerifyCmd(cfgPath))
 	return cmd
 }
 
@@ -123,6 +124,76 @@ func receiptListCmd(cfgPath *string) *cobra.Command {
 			return w.Flush()
 		},
 	}
+}
+
+func receiptShowCmd(cfgPath *string) *cobra.Command {
+	var asJSON bool
+
+	cmd := &cobra.Command{
+		Use:   "show <receipt-hash>",
+		Short: "render what a past serve actually published, from the artifact alone",
+		Long: `Show reads the receipt and the served value out of the artifact directory and
+prints them. It consults no ledger and re-derives nothing.
+
+That restraint is the point. ` + "`receipt verify`" + ` asks whether the ledger still honours
+a receipt; show asks what the artifact itself says — the question you have to be
+able to answer when the ledger is gone, unreachable, or exactly the thing you
+doubt. Both files are checked against their own content addresses on the way out,
+so a tampered artifact is refused rather than displayed as if it were genuine.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := loadConfig(*cfgPath, cmd)
+			if err != nil {
+				return err
+			}
+			store, err := artifact.New(cfg.ArtifactDir)
+			if err != nil {
+				return err
+			}
+
+			r, entries, err := serve.Show(serve.Deps{Artifacts: store}, args[0])
+			if err != nil {
+				return err
+			}
+
+			out := cmd.OutOrStdout()
+			if asJSON {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s v%d at W=%d, served %s\n",
+					r.Template, r.TemplateVersion, r.Watermark, r.ServedAt)
+				b, err := json.Marshal(entries)
+				if err != nil {
+					return fmt.Errorf("receipt show: marshal: %w", err)
+				}
+				_, err = fmt.Fprintf(out, "%s\n", b)
+				return err
+			}
+
+			_, _ = fmt.Fprintf(out, "%s v%d at W=%d, served %s\n", r.Template, r.TemplateVersion, r.Watermark, r.ServedAt)
+			_, _ = fmt.Fprintf(out, "  %d facets, span %s\n", len(r.FacetIDs), r.Span)
+			_, _ = fmt.Fprintf(out, "  served     %s  [intact]\n", r.ServedHash)
+			_, _ = fmt.Fprintf(out, "  definitions %s\n\n", r.DefinitionSetVersion)
+
+			w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
+			_, _ = fmt.Fprintln(w, "EVENT TIME\tTYPE\tSTATUS\tPAYLOAD")
+			for _, e := range entries {
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", e.EventTime, e.Type, e.Status, clipPayload(e.Payload))
+			}
+			return w.Flush()
+		},
+	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "emit the served entries as JSON, exactly as published")
+	return cmd
+}
+
+// clipPayload keeps a payload on one terminal line. The whole value is in the served
+// file; this is the viewer, and --json prints it untouched.
+func clipPayload(b []byte) string {
+	const max = 76
+	s := string(b)
+	if len(s) <= max {
+		return s
+	}
+	return s[:max-1] + "\u2026"
 }
 
 func receiptVerifyCmd(cfgPath *string) *cobra.Command {

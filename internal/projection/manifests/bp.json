@@ -1,0 +1,10 @@
+{
+  "name": "bp",
+  "version": 1,
+  "description": "Blood-pressure readings only — every reading Anam holds, at its reading time.",
+  "types": ["health.blood-pressure"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": ""
+}

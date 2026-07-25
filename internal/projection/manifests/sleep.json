@@ -1,0 +1,10 @@
+{
+  "name": "sleep",
+  "version": 1,
+  "description": "Sleep periods only — the stage breakdown, without the rest of the health record.",
+  "types": ["health.sleep"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": ""
+}

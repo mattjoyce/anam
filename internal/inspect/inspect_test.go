@@ -82,9 +82,19 @@ func seededServer(t *testing.T) (*httptest.Server, string, string) {
 
 func seedFacet(t *testing.T, sourceRef, ftype, payload string) facet.Facet {
 	t.Helper()
+	if _, err := facet.Canonicalize([]byte(payload)); err != nil {
+		t.Fatalf("canonicalize: %v", err)
+	}
+	return seedFacetNoT(sourceRef, ftype, payload)
+}
+
+// seedFacetNoT is the same fixture without a *testing.T, for use inside a sync.Once
+// where a t.Fatalf would report against whichever test arrived first. The payloads are
+// package constants, so a canonicalisation failure is a bug in this file, not data.
+func seedFacetNoT(sourceRef, ftype, payload string) facet.Facet {
 	canonical, err := facet.Canonicalize([]byte(payload))
 	if err != nil {
-		t.Fatalf("canonicalize: %v", err)
+		panic("inspect_test: fixture payload is not canonicalisable: " + err.Error())
 	}
 	et := time.Date(2026, 7, 5, 6, 30, 0, 0, time.UTC)
 	return facet.Facet{

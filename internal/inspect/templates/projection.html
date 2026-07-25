@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>anam — projections</title>
+{{template "style.html"}}
+<style>
+  form.controls { display: flex; gap: 1.25rem; align-items: flex-end; flex-wrap: wrap; margin-top: 1rem;
+                  padding: .9rem 1rem; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 6px; }
+  form.controls label { display: block; font-size: .8rem; opacity: .7; margin-bottom: .2rem; }
+  form.controls select, form.controls input { font: inherit; padding: .3rem .4rem; }
+  .tally { display: flex; gap: 1.5rem; margin-top: 1rem; }
+  .tally div { font-size: .85rem; }
+  .tally strong { display: block; font-size: 1.4rem; font-weight: 600; }
+  .stand-served { color: #1a7f37; }
+  .stand-excluded { opacity: .55; }
+  .stand-superseded { color: #7a5c00; }
+  tr.is-excluded td { opacity: .6; }
+  .hashes { font-size: .8rem; margin-top: 1rem; }
+  .hashes code { font-family: ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<header>
+  <h1>anam projections</h1>
+  <nav><a href="/">timeline</a> · <a href="/facets">facets</a> · <a href="/events">record-events</a> · <a href="/projection">projections</a></nav>
+</header>
+
+<p class="meta">
+  A projection <strong>prunes</strong> the canonical — it never reshapes a facet and never generates one,
+  and it filters on metadata alone. Switch the template to watch the verdict change on every facet;
+  wind <em>as-of</em> back to see what the projection stood on when Anam knew less.
+</p>
+
+<form class="controls" method="get" action="/projection">
+  <div>
+    <label for="p">projection</label>
+    <select name="p" id="p" onchange="this.form.submit()">
+      {{range .Names}}
+      <option value="{{.}}" {{if eq . $.Selected}}selected{{end}}>{{.}}</option>
+      {{end}}
+    </select>
+  </div>
+  <div>
+    <label for="asof">as-of (record-time, UTC)</label>
+    <input type="datetime-local" name="asof" id="asof" step="1" value="{{.AsOf}}">
+  </div>
+  <div><button type="submit">read</button></div>
+  {{if .AsOfSet}}<div><a href="/projection?p={{.Selected}}">back to now</a></div>{{end}}
+</form>
+
+<div class="tally">
+  <div><strong>{{.W}}</strong> watermark</div>
+  <div><strong class="stand-served">{{.NServed}}</strong> served</div>
+  <div><strong class="stand-excluded">{{.NExcluded}}</strong> excluded</div>
+  <div><strong class="stand-superseded">{{.NSuperseded}}</strong> superseded</div>
+</div>
+
+<p class="hashes">
+  canonical <code>{{.CanonicalHash}}</code><br>
+  {{if .Template}}served <code>{{.ServedHash}}</code> — the hash a receipt would carry for
+  <strong>{{.Template.Name}} v{{.Template.Version}}</strong>, span {{.Template.Span}}
+  {{else}}<span class="dim">no template selected — the canonical is the un-narrowed read, so every live facet stands served</span>{{end}}
+</p>
+
+{{if .Template}}
+<p class="meta dim">
+  allow-list: {{range $i, $t := .Template.Types}}{{if $i}}, {{end}}{{$t}}{{end}} ·
+  statuses: {{range $i, $s := .Template.Statuses}}{{if $i}}, {{end}}{{$s}}{{end}} ·
+  max classification: {{.Template.MaxClassification}}
+</p>
+{{end}}
+
+<table>
+  <thead>
+    <tr><th>event time</th><th>type</th><th>v</th><th>standing</th><th>why</th><th>facet</th></tr>
+  </thead>
+  <tbody>
+    {{range .Rows}}
+    <tr {{if ne .Standing "served"}}class="is-excluded"{{end}}>
+      <td class="mono">{{.EventTime}}</td>
+      <td>{{.Type}}</td>
+      <td>v{{.Version}}</td>
+      <td><span class="stand-{{.Standing}}">{{.Standing}}</span></td>
+      <td class="dim">{{.Why}}</td>
+      <td class="mono"><a href="/facet?id={{.ID}}">{{.SourceRef}}</a></td>
+    </tr>
+    {{else}}
+    <tr><td colspan="6" class="dim">nothing at this watermark — Anam knew nothing yet</td></tr>
+    {{end}}
+  </tbody>
+</table>
+</body>
+</html>

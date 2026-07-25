@@ -55,7 +55,19 @@ type Server struct {
 	mu     sync.Mutex
 	cached fold.Result
 	warm   bool
+
+	// asOfCache holds recent historical reads. The head cache above is keyed on a
+	// moving W; these are keyed on a watermark the operator chose, which does not
+	// move, so they can be kept until the ring wraps. Small on purpose: an as-of
+	// read is a deliberate act, not a page refresh.
+	asOf     map[ledger.Watermark]fold.Result
+	asOfRing []ledger.Watermark
 }
+
+// asOfCacheSize bounds the historical-read cache. Four is enough to flick between a
+// couple of instants without re-folding, and small enough that a person clicking
+// through a year of timestamps cannot grow the process without bound.
+const asOfCacheSize = 4
 
 // Handler returns the inspector's routes on a fresh mux.
 func Handler(l Ledger, timeout time.Duration) http.Handler {
@@ -65,6 +77,7 @@ func Handler(l Ledger, timeout time.Duration) http.Handler {
 	mux.HandleFunc("GET /facets", s.index)
 	mux.HandleFunc("GET /facet", s.facetPage)
 	mux.HandleFunc("GET /events", s.events)
+	mux.HandleFunc("GET /projection", s.projectionPage)
 	return mux
 }
 
@@ -91,6 +104,36 @@ func (s *Server) read(ctx context.Context) (fold.Result, error) {
 	s.mu.Lock()
 	s.cached, s.warm = res, true
 	s.mu.Unlock()
+	return res, nil
+}
+
+// readAt is read's as-of counterpart: the canonical at a watermark the caller chose.
+func (s *Server) readAt(ctx context.Context, w ledger.Watermark) (fold.Result, error) {
+	s.mu.Lock()
+	if res, ok := s.asOf[w]; ok {
+		s.mu.Unlock()
+		return res, nil
+	}
+	s.mu.Unlock()
+
+	res, err := fold.ReadAt(ctx, s.ledger, w)
+	if err != nil {
+		return fold.Result{}, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.asOf == nil {
+		s.asOf = map[ledger.Watermark]fold.Result{}
+	}
+	if _, seen := s.asOf[w]; !seen {
+		s.asOfRing = append(s.asOfRing, w)
+		for len(s.asOfRing) > asOfCacheSize {
+			delete(s.asOf, s.asOfRing[0])
+			s.asOfRing = s.asOfRing[1:]
+		}
+	}
+	s.asOf[w] = res
 	return res, nil
 }
 

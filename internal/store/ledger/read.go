@@ -52,6 +52,42 @@ func (l *Ledger) CurrentVersion(ctx context.Context, facetID string) (facet.Face
 	return fromFacetItem(it)
 }
 
+// Version returns one exact artifact version of one logical facet.
+//
+// CurrentVersion answers "the latest", which is the right question for the gate — it
+// compares content hashes against what is in force. It is the wrong question for a
+// read at a historical watermark, where the fold has already derived *which* version
+// was in force then, and the latest may be two supersessions further on.
+//
+// Because an artifact version is immutable once written, this lookup cannot be raced:
+// the answer to "give me v2 of this facet" is the same whether ingest is idle or busy.
+// That is what lets the as-of read run without a retry (see fold.ReadAt).
+func (l *Ledger) Version(ctx context.Context, facetID string, version int) (facet.Facet, error) {
+	if version < 1 {
+		return facet.Facet{}, fmt.Errorf("ledger: artifact version %d is not a version", version)
+	}
+	out, err := l.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(l.table),
+		Key: map[string]ddbtypes.AttributeValue{
+			"pk": &ddbtypes.AttributeValueMemberS{Value: l.pk},
+			"sk": &ddbtypes.AttributeValueMemberS{Value: facetSK(facetID, version)},
+		},
+		ConsistentRead: aws.Bool(true),
+	})
+	if err != nil {
+		return facet.Facet{}, fmt.Errorf("ledger: get %s v%d: %w", facetID, version, err)
+	}
+	if out.Item == nil {
+		return facet.Facet{}, fmt.Errorf("%w: %s v%d", ErrNotFound, facetID, version)
+	}
+
+	var it facetItem
+	if err := attributevalue.UnmarshalMap(out.Item, &it); err != nil {
+		return facet.Facet{}, fmt.Errorf("ledger: unmarshal facet item: %w", err)
+	}
+	return fromFacetItem(it)
+}
+
 // Replay returns the record-events in (sinceW, uptoW], in seq order — the range-scan
 // that every derived state is rebuilt from (§7). Pass the head watermark as uptoW for
 // "everything since"; pass a historical watermark for an as-of bound.

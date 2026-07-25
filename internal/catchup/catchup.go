@@ -29,17 +29,11 @@ import (
 // and wrong stops.
 var ErrIndexAhead = errors.New("catchup: replay cursor is ahead of the ledger head")
 
-// ErrOutpaced: ingest kept landing between the replay and the artifact reads on
-// every attempt. Nothing was written; re-run.
-var ErrOutpaced = errors.New("catchup: ledger advanced past the sync on every attempt")
-
-const syncAttempts = 3
-
 // Ledger is the read surface catch-up replays from.
 type Ledger interface {
 	Head(ctx context.Context) (ledger.Watermark, error)
 	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.RecordEvent, error)
-	CurrentVersion(ctx context.Context, facetID string) (facet.Facet, error)
+	Version(ctx context.Context, facetID string, version int) (facet.Facet, error)
 }
 
 // Ops is the derived tier catch-up writes to.
@@ -60,54 +54,50 @@ type Result struct {
 // crash-re-runnable: the rows and the cursor move in one transaction on the ops
 // side, so a re-run resumes from wherever the last complete batch ended.
 func Sync(ctx context.Context, l Ledger, o Ops) (Result, error) {
-	for attempt := 0; attempt < syncAttempts; attempt++ {
-		last, err := o.LastSeq(ctx)
-		if err != nil {
-			return Result{}, err
-		}
-		head, err := l.Head(ctx)
-		if err != nil {
-			return Result{}, err
-		}
-		switch {
-		case int64(head) == last:
-			return Result{From: last, To: last}, nil
-		case int64(head) < last:
-			return Result{}, fmt.Errorf("%w: cursor %d, head %d", ErrIndexAhead, last, head)
-		}
-
-		events, err := l.Replay(ctx, ledger.Watermark(last), head)
-		if err != nil {
-			return Result{}, err
-		}
-
-		facets, outpaced, err := advance(ctx, l, o, events)
-		if err != nil {
-			return Result{}, err
-		}
-		if outpaced {
-			continue
-		}
-
-		eventRows := make([]ops.EventRow, len(events))
-		for i, ev := range events {
-			eventRows[i] = ops.EventRow{
-				Seq: ev.Seq, RecordTime: clock.Format(ev.RecordTime),
-				Kind: ev.Kind, FacetID: ev.FacetID, ArtifactVersion: ev.ArtifactVersion,
-			}
-		}
-		if err := o.ApplyReplay(ctx, last, int64(head), eventRows, facets); err != nil {
-			return Result{}, err
-		}
-		return Result{From: last, To: int64(head)}, nil
+	last, err := o.LastSeq(ctx)
+	if err != nil {
+		return Result{}, err
 	}
-	return Result{}, fmt.Errorf("%w: %d attempts", ErrOutpaced, syncAttempts)
+	head, err := l.Head(ctx)
+	if err != nil {
+		return Result{}, err
+	}
+	switch {
+	case int64(head) == last:
+		return Result{From: last, To: last}, nil
+	case int64(head) < last:
+		return Result{}, fmt.Errorf("%w: cursor %d, head %d", ErrIndexAhead, last, head)
+	}
+
+	events, err := l.Replay(ctx, ledger.Watermark(last), head)
+	if err != nil {
+		return Result{}, err
+	}
+
+	facets, err := advance(ctx, l, o, events)
+	if err != nil {
+		return Result{}, err
+	}
+
+	eventRows := make([]ops.EventRow, len(events))
+	for i, ev := range events {
+		eventRows[i] = ops.EventRow{
+			Seq: ev.Seq, RecordTime: clock.Format(ev.RecordTime),
+			Kind: ev.Kind, FacetID: ev.FacetID, ArtifactVersion: ev.ArtifactVersion,
+		}
+	}
+	if err := o.ApplyReplay(ctx, last, int64(head), eventRows, facets); err != nil {
+		return Result{}, err
+	}
+	return Result{From: last, To: int64(head)}, nil
 }
 
 // advance replays the new events over the persisted states and returns the changed
-// facets' new index rows. outpaced reports an artifact read that saw a version the
-// events cannot have — ingest landed mid-sync; the caller re-runs from a fresh head.
-func advance(ctx context.Context, l Ledger, o Ops, events []facet.RecordEvent) (rows []ops.FacetRow, outpaced bool, err error) {
+// facets' new index rows, each read at the version the replay derived. Ingest landing
+// mid-sync is therefore invisible here: the artifact versions this replay names were
+// written before it started and never change. Anything the new events did not reach is
+// simply next run's work — the cursor moves with the rows, in one transaction.
+func advance(ctx context.Context, l Ledger, o Ops, events []facet.RecordEvent) (rows []ops.FacetRow, err error) {
 	var ids []string
 	seen := map[string]bool{}
 	for _, ev := range events {
@@ -119,13 +109,13 @@ func advance(ctx context.Context, l Ledger, o Ops, events []facet.RecordEvent) (
 
 	states, err := o.FacetStates(ctx, ids)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	for _, ev := range events {
 		cur, known := states[ev.FacetID]
 		next, err := fold.Apply(cur, known, ev)
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 		states[ev.FacetID] = next
 	}
@@ -133,16 +123,10 @@ func advance(ctx context.Context, l Ledger, o Ops, events []facet.RecordEvent) (
 	rows = make([]ops.FacetRow, 0, len(ids))
 	for _, id := range ids {
 		st := states[id]
-		f, err := l.CurrentVersion(ctx, id)
+		f, err := l.Version(ctx, id, st.Version)
 		if err != nil {
-			return nil, false, err
-		}
-		switch {
-		case f.ArtifactVersion > st.Version:
-			return nil, true, nil
-		case f.ArtifactVersion < st.Version:
-			return nil, false, fmt.Errorf("%w: facet %s replayed to v%d but the ledger holds v%d",
-				fold.ErrCorruptStream, id, st.Version, f.ArtifactVersion)
+			return nil, fmt.Errorf("%w: facet %s replayed to v%d: %v",
+				fold.ErrCorruptStream, id, st.Version, err)
 		}
 		rows = append(rows, ops.FacetRow{
 			FacetID: id, Type: f.Type,
@@ -150,5 +134,5 @@ func advance(ctx context.Context, l Ledger, o Ops, events []facet.RecordEvent) (
 			Version: st.Version, Status: st.Status, ContentHash: f.Descriptor.ContentHash,
 		})
 	}
-	return rows, false, nil
+	return rows, nil
 }

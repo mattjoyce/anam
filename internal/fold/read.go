@@ -2,7 +2,6 @@ package fold
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 
@@ -10,20 +9,13 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
-// ErrOutpaced is returned when the ledger kept advancing between the replay and the
-// artifact reads on every attempt. The read is simply re-run; nothing was written.
-var ErrOutpaced = errors.New("fold: ledger advanced past the read on every attempt")
-
-// readAttempts bounds the read-races-ingest retry. Reads are cheap and writes are
-// rare; three losses in a row means something is churning and the caller should know.
-const readAttempts = 3
-
-// Ledger is the read surface the fold needs — the ledger's two access paths plus the
-// head (interfaces at the point of use; *ledger.Ledger satisfies it).
+// Ledger is the read surface the fold needs — the ledger's replay path, its versioned
+// artifact lookup, and the head (interfaces at the point of use; *ledger.Ledger
+// satisfies it).
 type Ledger interface {
 	Head(ctx context.Context) (ledger.Watermark, error)
 	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.RecordEvent, error)
-	CurrentVersion(ctx context.Context, facetID string) (facet.Facet, error)
+	Version(ctx context.Context, facetID string, version int) (facet.Facet, error)
 }
 
 // Result is one consistent read of the whole person at a watermark.
@@ -35,7 +27,7 @@ type Result struct {
 	// what lets a caller distinguish "tombstoned" from "never admitted".
 	States map[string]State
 
-	// Live holds the live facets at their current artifact versions, in
+	// Live holds the live facets at the artifact versions in force at W, in
 	// (event-time, id) order — the whole-person timeline, un-narrowed.
 	Live []facet.Facet
 
@@ -43,62 +35,69 @@ type Result struct {
 	Value Value
 }
 
-// Read produces the canonical at the head watermark: head → replay → fold → fetch
-// each live artifact. The whole-person read is the default; narrowing is the
-// caller's lens over Live, never a different read (§4).
+// Read produces the canonical at the head watermark.
 //
-// The fetch races ingest: a supersession landing between the replay and a
-// CurrentVersion call returns an artifact version the folded events cannot have
-// seen. That mismatch is detected and the read re-runs from a fresh head — bounded,
-// like the gate's write retry. A version *behind* the fold is different: artifact
-// and event are written atomically, so an event without its artifact means the
-// ledger is corrupt, and the read stops rather than papers over it.
+// The whole-person read is the default; narrowing is the caller's lens over Live,
+// never a different read (§4).
 func Read(ctx context.Context, l Ledger) (Result, error) {
-	for attempt := 0; attempt < readAttempts; attempt++ {
-		head, err := l.Head(ctx)
-		if err != nil {
-			return Result{}, err
-		}
-		events, err := l.Replay(ctx, 0, head)
-		if err != nil {
-			return Result{}, err
-		}
-		states, err := Fold(events)
-		if err != nil {
-			return Result{}, err
-		}
-
-		live, outpaced, err := fetchLive(ctx, l, states)
-		if err != nil {
-			return Result{}, err
-		}
-		if outpaced {
-			continue
-		}
-
-		entries := make([]Entry, len(live))
-		for i, f := range live {
-			entries[i] = entryOf(f, states[f.ID])
-		}
-		value, err := NewValue(entries)
-		if err != nil {
-			return Result{}, err
-		}
-		return Result{W: head, States: states, Live: live, Value: value}, nil
+	head, err := l.Head(ctx)
+	if err != nil {
+		return Result{}, err
 	}
-	return Result{}, fmt.Errorf("%w: %d attempts", ErrOutpaced, readAttempts)
+	return ReadAt(ctx, l, head)
 }
 
-// fetchWorkers bounds the concurrent CurrentVersion reads. The whole-person read
-// is one fetch per live facet; serially that priced a 659-facet person at minutes.
-// The reads are independent and strongly consistent, so ordering is imposed
-// afterwards by sort, not by the fetch.
+// ReadAt produces the canonical as it stood at watermark w: replay → fold → fetch each
+// live facet at the version the fold derived. Pass the head watermark for the current
+// value, a historical one for the as-of value — same fold, different upper bound (§9).
+//
+// There is no retry here, and there used to be one. While the fetch asked the ledger
+// for each facet's *current* version, a supersession landing between the replay and
+// the fetch returned an artifact the folded events could not have seen, and the read
+// had to notice and start again. Asking instead for the version the fold derived
+// removes the race rather than handling it: an artifact version is immutable once
+// written, so the answer does not depend on when it is asked. The two questions —
+// which facets are live, and which version of each — were braided into one lookup;
+// separating them is what makes an as-of read possible at all, and the retry loop was
+// the cost of the braid.
+//
+// A missing artifact is still fatal. Artifact and record-event are written in one
+// transaction, so an event whose artifact is absent means the ledger is corrupt, and
+// the read stops rather than papering over it.
+func ReadAt(ctx context.Context, l Ledger, w ledger.Watermark) (Result, error) {
+	events, err := l.Replay(ctx, 0, w)
+	if err != nil {
+		return Result{}, err
+	}
+	states, err := Fold(events)
+	if err != nil {
+		return Result{}, err
+	}
+
+	live, err := fetchLive(ctx, l, states)
+	if err != nil {
+		return Result{}, err
+	}
+
+	entries := make([]Entry, len(live))
+	for i, f := range live {
+		entries[i] = entryOf(f, states[f.ID])
+	}
+	value, err := NewValue(entries)
+	if err != nil {
+		return Result{}, err
+	}
+	return Result{W: w, States: states, Live: live, Value: value}, nil
+}
+
+// fetchWorkers bounds the concurrent artifact reads. The whole-person read is one
+// fetch per live facet; serially that priced a 659-facet person at minutes. The reads
+// are independent and strongly consistent, so ordering is imposed afterwards by sort,
+// not by the fetch.
 const fetchWorkers = 16
 
-// fetchLive reads each live facet's current artifact and verifies it is the version
-// the fold derived. outpaced reports the benign race (ledger moved on); an artifact
-// behind its own events is returned as a corruption error instead.
-func fetchLive(ctx context.Context, l Ledger, states map[string]State) (live []facet.Facet, outpaced bool, err error) {
+// fetchLive reads each live facet at the exact version the fold derived.
+func fetchLive(ctx context.Context, l Ledger, states map[string]State) ([]facet.Facet, error) {
 	ids := make([]string, 0, len(states))
 	for id, st := range states {
 		if st.Live() {
@@ -107,9 +106,8 @@ func fetchLive(ctx context.Context, l Ledger, states map[string]State) (live []f
 	}
 
 	type fetched struct {
-		f        facet.Facet
-		outpaced bool
-		err      error
+		f   facet.Facet
+		err error
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel() // stops in-flight workers once a bad result lands
@@ -119,20 +117,13 @@ func fetchLive(ctx context.Context, l Ledger, states map[string]State) (live []f
 	for range fetchWorkers {
 		go func() {
 			for id := range work {
-				f, err := l.CurrentVersion(ctx, id)
-				r := fetched{f: f, err: err}
-				if err == nil {
-					st := states[id]
-					switch {
-					case f.ArtifactVersion > st.Version:
-						r.outpaced = true
-					case f.ArtifactVersion < st.Version:
-						r.err = fmt.Errorf("%w: facet %s folded to v%d but the ledger holds v%d",
-							ErrCorruptStream, id, st.Version, f.ArtifactVersion)
-					}
+				f, err := l.Version(ctx, id, states[id].Version)
+				if err != nil {
+					err = fmt.Errorf("%w: facet %s folded to v%d: %v",
+						ErrCorruptStream, id, states[id].Version, err)
 				}
 				select {
-				case results <- r:
+				case results <- fetched{f: f, err: err}:
 				case <-ctx.Done():
 					return
 				}
@@ -150,17 +141,13 @@ func fetchLive(ctx context.Context, l Ledger, states map[string]State) (live []f
 		}
 	}()
 
-	live = make([]facet.Facet, 0, len(ids))
+	live := make([]facet.Facet, 0, len(ids))
 	for range ids {
 		r := <-results
-		switch {
-		case r.err != nil:
-			return nil, false, r.err
-		case r.outpaced:
-			return nil, true, nil
-		default:
-			live = append(live, r.f)
+		if r.err != nil {
+			return nil, r.err
 		}
+		live = append(live, r.f)
 	}
 
 	sort.Slice(live, func(i, j int) bool {
@@ -169,5 +156,5 @@ func fetchLive(ctx context.Context, l Ledger, states map[string]State) (live []f
 		}
 		return live[i].ID < live[j].ID
 	})
-	return live, false, nil
+	return live, nil
 }

@@ -104,7 +104,7 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 		if st.Live() {
 			continue
 		}
-		f, err := s.ledger.CurrentVersion(ctx, id)
+		f, err := s.ledger.Version(ctx, id, st.Version)
 		if err != nil {
 			httpError(w, err)
 			return

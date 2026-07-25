@@ -35,6 +35,7 @@ type Ledger interface {
 	Head(ctx context.Context) (ledger.Watermark, error)
 	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.RecordEvent, error)
 	CurrentVersion(ctx context.Context, facetID string) (facet.Facet, error)
+	Version(ctx context.Context, facetID string, version int) (facet.Facet, error)
 }
 
 //go:embed templates/*.html
@@ -156,7 +157,11 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 		if st.Live() {
 			continue
 		}
-		f, err := s.ledger.CurrentVersion(ctx, id)
+		// At the version the fold derived, not the latest: a facet that was
+		// tombstoned and later re-captured is dead at v2 in this fold and live at
+		// v3 in the ledger, and rendering v3's content under v2's status would
+		// show a row that was never true.
+		f, err := s.ledger.Version(ctx, id, st.Version)
 		if err != nil {
 			httpError(w, err)
 			return

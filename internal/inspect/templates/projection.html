@@ -23,7 +23,7 @@
 <body>
 <header>
   <h1>anam projections</h1>
-  <nav><a href="/">timeline</a> · <a href="/facets">facets</a> · <a href="/events">record-events</a> · <a href="/projection">projections</a></nav>
+  <nav><a href="/">timeline</a> · <a href="/facets">facets</a> · <a href="/events">anam-events</a> · <a href="/projection">projections</a></nav>
 </header>
 
 <p class="meta">
@@ -42,7 +42,7 @@
     </select>
   </div>
   <div>
-    <label for="asof">as-of (record-time, UTC)</label>
+    <label for="asof">as-of (anam-time, UTC)</label>
     <input type="datetime-local" name="asof" id="asof" step="1" value="{{.AsOf}}">
   </div>
   <div><button type="submit">read</button></div>
@@ -73,12 +73,12 @@
 
 <table>
   <thead>
-    <tr><th>event time</th><th>type</th><th>v</th><th>standing</th><th>why</th><th>facet</th></tr>
+    <tr><th>fact time</th><th>type</th><th>v</th><th>standing</th><th>why</th><th>facet</th></tr>
   </thead>
   <tbody>
     {{range .Rows}}
     <tr {{if ne .Standing "served"}}class="is-excluded"{{end}}>
-      <td class="mono">{{.EventTime}}</td>
+      <td class="mono">{{.FactTime}}</td>
       <td>{{.Type}}</td>
       <td>v{{.Version}}</td>
       <td><span class="stand-{{.Standing}}">{{.Standing}}</span></td>

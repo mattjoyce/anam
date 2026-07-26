@@ -9,9 +9,9 @@ import (
 	"github.com/mattjoyce/anam/internal/fold"
 )
 
-// ev builds a record-event; the fold reads only Kind, FacetID and the two versions.
-func ev(kind facet.RecordEventKind, id string, version, prior int) facet.RecordEvent {
-	return facet.RecordEvent{Kind: kind, FacetID: id, ArtifactVersion: version, PriorArtifactVersion: prior}
+// ev builds an anam-event; the fold reads only Kind, FacetID and the two versions.
+func ev(kind facet.AnamEventKind, id string, version, prior int) facet.AnamEvent {
+	return facet.AnamEvent{Kind: kind, FacetID: id, ArtifactVersion: version, PriorArtifactVersion: prior}
 }
 
 func TestFold_DerivesEachStatus(t *testing.T) {
@@ -19,28 +19,28 @@ func TestFold_DerivesEachStatus(t *testing.T) {
 
 	cases := []struct {
 		name   string
-		events []facet.RecordEvent
+		events []facet.AnamEvent
 		want   fold.State
 	}{
-		{"admitted", []facet.RecordEvent{
+		{"admitted", []facet.AnamEvent{
 			ev(facet.EventAdmitted, "a", 1, 0),
 		}, fold.State{Version: 1, Status: facet.StatusAdmitted}},
 
 		// The load-bearing arm of the kind→status map: a superseding event lands the
 		// facet *admitted* at the higher version, never "superseded". The cast
 		// facet.Status(ev.Kind) would get exactly this case wrong.
-		{"superseded re-admits at the new version", []facet.RecordEvent{
+		{"superseded re-admits at the new version", []facet.AnamEvent{
 			ev(facet.EventAdmitted, "a", 1, 0),
 			ev(facet.EventSuperseded, "a", 2, 1),
 		}, fold.State{Version: 2, Status: facet.StatusAdmitted}},
 
-		{"tombstoned", []facet.RecordEvent{
+		{"tombstoned", []facet.AnamEvent{
 			ev(facet.EventAdmitted, "a", 1, 0),
 			ev(facet.EventTombstoned, "a", 1, 0),
 		}, fold.State{Version: 1, Status: facet.StatusTombstoned}},
 
 		// The R3 gate could append a second tombstone; the fold absorbs it.
-		{"double tombstone is idempotent", []facet.RecordEvent{
+		{"double tombstone is idempotent", []facet.AnamEvent{
 			ev(facet.EventAdmitted, "a", 1, 0),
 			ev(facet.EventTombstoned, "a", 1, 0),
 			ev(facet.EventTombstoned, "a", 1, 0),
@@ -48,18 +48,18 @@ func TestFold_DerivesEachStatus(t *testing.T) {
 
 		// A tombstoned facet is not gone from the source's point of view: a changed
 		// row re-read supersedes it, and the facet is live again at the new version.
-		{"supersession resurrects a tombstoned facet", []facet.RecordEvent{
+		{"supersession resurrects a tombstoned facet", []facet.AnamEvent{
 			ev(facet.EventAdmitted, "a", 1, 0),
 			ev(facet.EventTombstoned, "a", 1, 0),
 			ev(facet.EventSuperseded, "a", 2, 1),
 		}, fold.State{Version: 2, Status: facet.StatusAdmitted}},
 
-		{"endorsed", []facet.RecordEvent{
+		{"endorsed", []facet.AnamEvent{
 			ev(facet.EventAdmitted, "a", 1, 0),
 			ev(facet.EventEndorsed, "a", 1, 0),
 		}, fold.State{Version: 1, Status: facet.StatusEndorsed}},
 
-		{"rejected", []facet.RecordEvent{
+		{"rejected", []facet.AnamEvent{
 			ev(facet.EventAdmitted, "a", 1, 0),
 			ev(facet.EventRejected, "a", 1, 0),
 		}, fold.State{Version: 1, Status: facet.StatusRejected}},
@@ -102,34 +102,34 @@ func TestFold_RefusesCorruptStreams(t *testing.T) {
 
 	cases := []struct {
 		name    string
-		events  []facet.RecordEvent
+		events  []facet.AnamEvent
 		wantMsg string
 	}{
-		{"re-admission", []facet.RecordEvent{
+		{"re-admission", []facet.AnamEvent{
 			ev(facet.EventAdmitted, "a", 1, 0),
 			ev(facet.EventAdmitted, "a", 1, 0),
 		}, "already folded"},
-		{"first sight above v1", []facet.RecordEvent{
+		{"first sight above v1", []facet.AnamEvent{
 			ev(facet.EventAdmitted, "a", 2, 0),
 		}, "must be v1"},
-		{"supersede before admit", []facet.RecordEvent{
+		{"supersede before admit", []facet.AnamEvent{
 			ev(facet.EventSuperseded, "a", 2, 1),
 		}, "before it was admitted"},
-		{"supersede skipping a version", []facet.RecordEvent{
+		{"supersede skipping a version", []facet.AnamEvent{
 			ev(facet.EventAdmitted, "a", 1, 0),
 			ev(facet.EventSuperseded, "a", 3, 2),
 		}, "over folded state"},
-		{"tombstone before admit", []facet.RecordEvent{
+		{"tombstone before admit", []facet.AnamEvent{
 			ev(facet.EventTombstoned, "a", 1, 0),
 		}, "before it was admitted"},
-		{"tombstone of a displaced version", []facet.RecordEvent{
+		{"tombstone of a displaced version", []facet.AnamEvent{
 			ev(facet.EventAdmitted, "a", 1, 0),
 			ev(facet.EventSuperseded, "a", 2, 1),
 			ev(facet.EventTombstoned, "a", 1, 0),
 		}, "folded version"},
-		{"unknown kind", []facet.RecordEvent{
+		{"unknown kind", []facet.AnamEvent{
 			ev("published", "a", 1, 0),
-		}, "unknown record-event kind"},
+		}, "unknown anam-event kind"},
 	}
 
 	for _, tc := range cases {
@@ -149,7 +149,7 @@ func TestFold_RefusesCorruptStreams(t *testing.T) {
 func TestFold_FacetsFoldIndependently(t *testing.T) {
 	t.Parallel()
 
-	states, err := fold.Fold([]facet.RecordEvent{
+	states, err := fold.Fold([]facet.AnamEvent{
 		ev(facet.EventAdmitted, "a", 1, 0),
 		ev(facet.EventAdmitted, "b", 1, 0),
 		ev(facet.EventTombstoned, "a", 1, 0),

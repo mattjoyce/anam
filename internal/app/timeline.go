@@ -22,8 +22,8 @@ func timelineCmd(cfgPath *string) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "timeline",
-		Short: "the whole-person read: live facets in event-time order (the inversion)",
-		Long: `Timeline is Anam's default read: one person's live facts, whole, in event-time
+		Short: "the whole-person read: live facets in fact-time order (the inversion)",
+		Long: `Timeline is Anam's default read: one person's live facts, whole, in fact-time
 order. No span is required — narrowing with --from/--to or --type is a lens over
 the same read, never a different one.
 
@@ -36,8 +36,8 @@ Three lenses compose over that read:
   --projection  switch to a governed variant — the same read, pruned by a bundled
                 template. The served hash is the one a receipt would record, so
                 what you see here is what serve would publish.
-  --as-of       wind Anam's clock back to a record-time and read what it knew then.
-                Event-time (--from/--to) asks when things happened; record-time
+  --as-of       wind Anam's clock back to an anam-time and read what it knew then.
+                Fact-time (--from/--to) asks when things happened; anam-time
                 asks when Anam found out.
   --explain     show every facet with the verdict on it rather than only the ones
                 that survived — including the artifact versions since superseded.
@@ -76,17 +76,17 @@ Three lenses compose over that read:
 		},
 	}
 
-	cmd.Flags().StringVar(&from, "from", "", "narrow to event-times at or after this instant (2006-01-02 or RFC 3339)")
-	cmd.Flags().StringVar(&to, "to", "", "narrow to event-times at or before this instant; a bare date includes its whole day")
+	cmd.Flags().StringVar(&from, "from", "", "narrow to fact-times at or after this instant (2006-01-02 or RFC 3339)")
+	cmd.Flags().StringVar(&to, "to", "", "narrow to fact-times at or before this instant; a bare date includes its whole day")
 	cmd.Flags().StringVar(&typeFilter, "type", "", "narrow to one facet type (e.g. health.blood-pressure)")
 	cmd.Flags().StringVar(&projName, "projection", "", "read through a bundled projection instead of the canonical (see: anam serve)")
-	cmd.Flags().StringVar(&asOf, "as-of", "", "read what Anam knew at this record-time (2006-01-02 or RFC 3339)")
+	cmd.Flags().StringVar(&asOf, "as-of", "", "read what Anam knew at this anam-time (2006-01-02 or RFC 3339)")
 	cmd.Flags().BoolVar(&explain, "explain", false, "show every facet with its verdict, superseded versions included")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit the narrowed entries as JSON, in the canonical serialisation")
 	return cmd
 }
 
-// parseAsOf reads the --as-of record-time. A bare date means "as Anam knew it at the
+// parseAsOf reads the --as-of anam-time. A bare date means "as Anam knew it at the
 // end of that day", which is deliberately NOT --to's rule: --to feeds an exclusive
 // comparison and so rolls to the next midnight, while --as-of names one instant to read
 // at. Rolling it forward too would silently read a day further than was asked for.
@@ -116,7 +116,7 @@ type view struct {
 	asOfAt string
 }
 
-// readView performs the read the flags describe: at head or at a record-time, through
+// readView performs the read the flags describe: at head or at an anam-time, through
 // a projection or not.
 func readView(ctx context.Context, l fold.Ledger, asOfTime time.Time, projName string) (view, error) {
 	var v view
@@ -170,7 +170,7 @@ func (v view) header(shownCount int) string {
 	h += fmt.Sprintf("  shown=%d\n", shownCount)
 
 	if v.asOf {
-		h += fmt.Sprintf("as-of      %s (record-time)\n", v.asOfAt)
+		h += fmt.Sprintf("as-of      %s (anam-time)\n", v.asOfAt)
 	}
 	h += fmt.Sprintf("canonical  %s\n", v.res.Value.Hash())
 	if v.tmpl != nil {
@@ -201,15 +201,15 @@ func writeTimeline(cmd *cobra.Command, v view, b bounds, typeFilter string, asJS
 
 	_, _ = fmt.Fprint(cmd.OutOrStdout(), header)
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 2, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "EVENT TIME\tTYPE\tV\tSTATUS\tSOURCE REF\tID")
+	_, _ = fmt.Fprintln(w, "FACT TIME\tTYPE\tV\tSTATUS\tSOURCE REF\tID")
 	for _, e := range shown {
 		_, _ = fmt.Fprintf(w, "%s\t%s\tv%d\t%s\t%s\t%s\n",
-			e.EventTime, e.Type, v.res.States[e.FacetID].Version, e.Status, e.SourceRef, e.FacetID)
+			e.FactTime, e.Type, v.res.States[e.FacetID].Version, e.Status, e.SourceRef, e.FacetID)
 	}
 	return w.Flush()
 }
 
-// bounds is a derived span over event-time: an inclusive [from, to] the person
+// bounds is a derived span over fact-time: an inclusive [from, to] the person
 // names (ARCHITECTURE.md §4), held as clock.Layout strings so admission is the
 // same lexical comparison the entries were sorted by.
 type bounds struct {
@@ -218,10 +218,10 @@ type bounds struct {
 }
 
 func (b bounds) admits(e fold.Entry) bool {
-	if b.from != "" && e.EventTime < b.from {
+	if b.from != "" && e.FactTime < b.from {
 		return false
 	}
-	if b.toX != "" && e.EventTime >= b.toX {
+	if b.toX != "" && e.FactTime >= b.toX {
 		return false
 	}
 	return true

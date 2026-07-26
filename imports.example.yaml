@@ -9,3 +9,5 @@ imports:
     path: ~/admin/data/healthdata.db
   - source: bp-csv
     path: ~/exports/BloodPressure.csv
+  - source: withings
+    path: ~/exports/withings.db

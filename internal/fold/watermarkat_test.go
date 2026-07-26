@@ -10,11 +10,11 @@ import (
 )
 
 // WatermarkAt is the bridge between the two clocks: a person asks "what did this show
-// me on Tuesday?" in record-time, and every read below that line is in watermarks.
+// me on Tuesday?" in anam-time, and every read below that line is in watermarks.
 //
 // The ingests are separated in wall-clock time here so the boundaries are real rather
 // than an artefact of everything landing in the same instant.
-func TestWatermarkAt_TranslatesRecordTimeToWatermark(t *testing.T) {
+func TestWatermarkAt_TranslatesAnamTimeToWatermark(t *testing.T) {
 	t.Parallel()
 	g, l := newHarness(t)
 	ctx := context.Background()
@@ -62,7 +62,7 @@ func TestWatermarkAt_TranslatesRecordTimeToWatermark(t *testing.T) {
 	}
 }
 
-// The point of the translation: reading at a past record-time shows what Anam knew
+// The point of the translation: reading at a past anam-time shows what Anam knew
 // then, not what it knows now.
 func TestWatermarkAt_ComposesIntoAnAsOfRead(t *testing.T) {
 	t.Parallel()

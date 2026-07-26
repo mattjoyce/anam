@@ -11,9 +11,9 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
-// facetItem and recordItem are marshalling envelopes, quarantined to this package —
+// facetItem and anamEventItem are marshalling envelopes, quarantined to this package —
 // not domain types (ARCHITECTURE.md §8). The kind discriminator exists only at this
-// edge. Current status is absent by design: it is folded from record-events, and an
+// edge. Current status is absent by design: it is folded from anam-events, and an
 // artifact has nowhere to carry one.
 //
 // The payload is a Binary attribute, never a Map: this is where the metadata/payload
@@ -31,9 +31,7 @@ type facetItem struct {
 	ArtifactVersion   int     `dynamodbav:"artifact_version"`
 	DefinitionVersion int     `dynamodbav:"definition_version"`
 
-	EventTime    string `dynamodbav:"event_time"`
-	RecordedTime string `dynamodbav:"recorded_time"`
-	IngestedTime string `dynamodbav:"ingested_time"`
+	FactTime string `dynamodbav:"fact_time"`
 
 	BindingPersonID  string `dynamodbav:"binding_person_id"`
 	BindingAssurance string `dynamodbav:"binding_assurance"`
@@ -46,8 +44,6 @@ type facetItem struct {
 	ProvModel     string `dynamodbav:"prov_model,omitempty"`
 	ProvWatermark string `dynamodbav:"prov_watermark,omitempty"`
 
-	BirthStatus string `dynamodbav:"birth_status"`
-
 	SourceSchema  string `dynamodbav:"source_schema"`
 	SchemaVersion int    `dynamodbav:"schema_version"`
 	ContentHash   string `dynamodbav:"content_hash"`
@@ -57,14 +53,14 @@ type facetItem struct {
 	Payload []byte `dynamodbav:"payload"`
 }
 
-type recordItem struct {
+type anamEventItem struct {
 	PK   string `dynamodbav:"pk"`
 	SK   string `dynamodbav:"sk"`
 	Kind string `dynamodbav:"kind"`
 
 	EventKind            string `dynamodbav:"event_kind"`
 	FacetID              string `dynamodbav:"facet_id"`
-	RecordTime           string `dynamodbav:"record_time"`
+	AnamTime             string `dynamodbav:"anam_time"`
 	Seq                  int64  `dynamodbav:"seq"`
 	ArtifactVersion      int    `dynamodbav:"artifact_version"`
 	PriorArtifactVersion int    `dynamodbav:"prior_artifact_version,omitempty"`
@@ -89,9 +85,7 @@ func toFacetItem(pk string, f facet.Facet) facetItem {
 		ArtifactVersion:   f.ArtifactVersion,
 		DefinitionVersion: f.DefinitionVersion,
 
-		EventTime:    clock.Format(f.EventTime),
-		RecordedTime: clock.Format(f.RecordedTime),
-		IngestedTime: clock.Format(f.IngestedTime),
+		FactTime: clock.Format(f.FactTime),
 
 		BindingPersonID:  f.Binding.PersonID,
 		BindingAssurance: string(f.Binding.Assurance),
@@ -104,8 +98,6 @@ func toFacetItem(pk string, f facet.Facet) facetItem {
 		ProvModel:     model,
 		ProvWatermark: watermark,
 
-		BirthStatus: string(f.BirthStatus),
-
 		SourceSchema:  f.Descriptor.SourceSchema,
 		SchemaVersion: f.Descriptor.SchemaVersion,
 		ContentHash:   f.Descriptor.ContentHash,
@@ -117,15 +109,7 @@ func toFacetItem(pk string, f facet.Facet) facetItem {
 }
 
 func fromFacetItem(it facetItem) (facet.Facet, error) {
-	eventTime, err := parseTime("event_time", it.EventTime)
-	if err != nil {
-		return facet.Facet{}, err
-	}
-	recordedTime, err := parseTime("recorded_time", it.RecordedTime)
-	if err != nil {
-		return facet.Facet{}, err
-	}
-	ingestedTime, err := parseTime("ingested_time", it.IngestedTime)
+	factTime, err := parseTime("fact_time", it.FactTime)
 	if err != nil {
 		return facet.Facet{}, err
 	}
@@ -138,9 +122,7 @@ func fromFacetItem(it facetItem) (facet.Facet, error) {
 		ArtifactVersion:   it.ArtifactVersion,
 		DefinitionVersion: it.DefinitionVersion,
 
-		EventTime:    eventTime,
-		RecordedTime: recordedTime,
-		IngestedTime: ingestedTime,
+		FactTime: factTime,
 
 		Binding: facet.Binding{
 			PersonID:  it.BindingPersonID,
@@ -153,8 +135,6 @@ func fromFacetItem(it facetItem) (facet.Facet, error) {
 			SourceRef:  it.ProvSourceRef,
 			Derivation: derivationFromItem(it),
 		},
-
-		BirthStatus: facet.BirthStatus(it.BirthStatus),
 
 		Descriptor: facet.Descriptor{
 			SourceSchema:  it.SourceSchema,
@@ -170,30 +150,30 @@ func fromFacetItem(it facetItem) (facet.Facet, error) {
 	}, nil
 }
 
-func toRecordItem(pk string, ev facet.RecordEvent) recordItem {
-	return recordItem{
+func toAnamEventItem(pk string, ev facet.AnamEvent) anamEventItem {
+	return anamEventItem{
 		PK:   pk,
-		SK:   recSK(ev.Seq),
+		SK:   anamSK(ev.Seq),
 		Kind: "rec",
 
 		EventKind:            string(ev.Kind),
 		FacetID:              ev.FacetID,
-		RecordTime:           clock.Format(ev.RecordTime),
+		AnamTime:             clock.Format(ev.AnamTime),
 		Seq:                  ev.Seq,
 		ArtifactVersion:      ev.ArtifactVersion,
 		PriorArtifactVersion: ev.PriorArtifactVersion,
 	}
 }
 
-func fromRecordItem(it recordItem) (facet.RecordEvent, error) {
-	recordTime, err := parseTime("record_time", it.RecordTime)
+func fromAnamEventItem(it anamEventItem) (facet.AnamEvent, error) {
+	anamTime, err := parseTime("anam_time", it.AnamTime)
 	if err != nil {
-		return facet.RecordEvent{}, err
+		return facet.AnamEvent{}, err
 	}
-	return facet.RecordEvent{
-		Kind:                 facet.RecordEventKind(it.EventKind),
+	return facet.AnamEvent{
+		Kind:                 facet.AnamEventKind(it.EventKind),
 		FacetID:              it.FacetID,
-		RecordTime:           recordTime,
+		AnamTime:             anamTime,
 		Seq:                  it.Seq,
 		ArtifactVersion:      it.ArtifactVersion,
 		PriorArtifactVersion: it.PriorArtifactVersion,

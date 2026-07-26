@@ -111,7 +111,7 @@ func (t *Template) adoptFilters(types, statuses []string) error {
 }
 
 // checkWindow requires each bound to be a fixed-width clock.Layout instant, so the
-// comparison against an entry's event-time is the lexical one the canonical is already
+// comparison against an entry's fact-time is the lexical one the canonical is already
 // ordered by, and requires the window to be non-empty.
 func (t Template) checkWindow() error {
 	for label, v := range map[string]string{"from": t.From, "to": t.To} {

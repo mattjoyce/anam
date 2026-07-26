@@ -26,8 +26,7 @@ func validParams(t *testing.T) facet.NewParams {
 		Classification: facet.ClassificationNormal,
 		SourceSchema:   "bp-csv/reading", SchemaVersion: 1, MediaType: "application/json",
 		Confidence: 1,
-		EventTime:  et, RecordedTime: et, IngestedTime: et.Add(time.Hour),
-		BirthStatus: facet.BornAdmitted,
+		FactTime:   et,
 	}
 }
 
@@ -55,10 +54,11 @@ func TestNew_DerivesIdentityAndIntegrity(t *testing.T) {
 	}
 }
 
-func TestNew_DerivedFacetIsBornProposedWithItsDerivation(t *testing.T) {
+// A derived facet is marked by its Derivation and nothing else — the presence of the
+// provenance IS the claim, so there is no second field to disagree with it.
+func TestNew_DerivedFacetIsMarkedByItsDerivation(t *testing.T) {
 	t.Parallel()
 	p := validParams(t)
-	p.BirthStatus = facet.BornProposed
 	p.Derivation = &facet.Derivation{Method: "trend", Model: "hr-drift-1", Watermark: "42"}
 
 	f, err := facet.New(p)
@@ -86,16 +86,7 @@ func TestNew_RejectsIllegalParams(t *testing.T) {
 		"no media type":           func(p *facet.NewParams) { p.MediaType = "" },
 		"confidence zero":         func(p *facet.NewParams) { p.Confidence = 0 },
 		"confidence above one":    func(p *facet.NewParams) { p.Confidence = 1.1 },
-		"zero event time":         func(p *facet.NewParams) { p.EventTime = time.Time{} },
-		"zero recorded time":      func(p *facet.NewParams) { p.RecordedTime = time.Time{} },
-		"zero ingested time":      func(p *facet.NewParams) { p.IngestedTime = time.Time{} },
-		"bad birth status":        func(p *facet.NewParams) { p.BirthStatus = "superseded" },
-		"proposed without derivation": func(p *facet.NewParams) {
-			p.BirthStatus = facet.BornProposed
-		},
-		"admitted with derivation": func(p *facet.NewParams) {
-			p.Derivation = &facet.Derivation{Method: "trend"}
-		},
+		"zero fact time":          func(p *facet.NewParams) { p.FactTime = time.Time{} },
 	}
 
 	for name, mutate := range mutations {

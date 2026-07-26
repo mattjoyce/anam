@@ -12,7 +12,7 @@ and **inverts its one central decision** to serve a person rather than a hospita
   normal** mode; an Episode/Span (a trip, an illness, a training block) is an *optional* lens.
 
 Everything else in Arch carries over: the **Facet** held verbatim, an append-only **ledger**, two
-clocks (event-time / record-time), a resolve→commit **admission gate**, **mint**/checkpoint,
+clocks (fact-time / anam-time), a resolve→commit **admission gate**, **mint**/checkpoint,
 **fold-on-read**, prune-only **projections**, and **receipts**.
 
 ## Status
@@ -66,8 +66,8 @@ is provenance that evaporates with the shell history. Copy `imports.example.yaml
 
 ```sh
 ./anam timeline                                    # the canonical, whole
-./anam timeline --from 2025-05-01 --to 2026-07-01  # narrowed by event-time
-./anam changes --since 2026-07-10                  # what Anam learned since, by record-time
+./anam timeline --from 2025-05-01 --to 2026-07-01  # narrowed by fact-time
+./anam changes --since 2026-07-10                  # what Anam learned since, by anam-time
 ```
 
 **Publish and prove.** A projection prunes the canonical; a receipt proves what was served.

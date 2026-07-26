@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -24,10 +25,10 @@ func TestVersion_ReturnsTheExactArtifact(t *testing.T) {
 	}
 
 	v2 := testFacet(t, ref, `{"systolic": 121, "diastolic": 79}`, 2)
-	superseded := facet.RecordEvent{
+	superseded := facet.AnamEvent{
 		Kind:                 facet.EventSuperseded,
 		FacetID:              v2.ID,
-		RecordTime:           v2.IngestedTime,
+		AnamTime:             v2.FactTime.Add(3 * time.Hour),
 		Seq:                  2,
 		ArtifactVersion:      2,
 		PriorArtifactVersion: 1,

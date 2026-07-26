@@ -4,8 +4,8 @@
 //
 // Together with the append-only ledger this is Anam's error kernel. The gate owns
 // what the ledger deliberately refused: the retry loop. A writer that loses the
-// watermark race re-reads the head, re-stamps record time (so seq order and
-// record-time order agree by construction), and tries again, bounded.
+// watermark race re-reads the head, re-stamps anam time (so seq order and
+// anam-time order agree by construction), and tries again, bounded.
 package gate
 
 import (
@@ -51,9 +51,15 @@ var (
 type Ledger interface {
 	Head(ctx context.Context) (ledger.Watermark, error)
 	CurrentVersion(ctx context.Context, facetID string) (facet.Facet, error)
-	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.RecordEvent, error)
-	Admit(ctx context.Context, readW ledger.Watermark, f facet.Facet, ev facet.RecordEvent) error
-	Mark(ctx context.Context, readW ledger.Watermark, ev facet.RecordEvent) error
+	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.AnamEvent, error)
+	Admit(ctx context.Context, readW ledger.Watermark, f facet.Facet, ev facet.AnamEvent) error
+	Mark(ctx context.Context, readW ledger.Watermark, ev facet.AnamEvent) error
+
+	// The batch path. KnownFacets is a fast negative used to skip per-facet
+	// disposition queries; AdmitBatch writes a block of commits over a contiguous
+	// range of seqs.
+	KnownFacets(ctx context.Context, facetIDs []string) (map[string]bool, error)
+	AdmitBatch(ctx context.Context, readW ledger.Watermark, cs []ledger.Commit) error
 }
 
 // Definitions resolves a facet type to its contract.
@@ -79,7 +85,8 @@ func (s StaticScopes) Allowed(source string, t facet.Type) bool {
 	return false
 }
 
-// Clock is the gate's source of now (record and ingested time).
+// Clock is the gate's source of now — the anam-time stamped on every anam-event. It
+// is the gate's alone: no source supplies it, and a Facet has nowhere to hold it.
 type Clock interface {
 	Now() time.Time
 }

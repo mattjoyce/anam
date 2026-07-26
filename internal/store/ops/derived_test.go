@@ -9,14 +9,14 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
-func eventRow(seq int64, rt string, kind facet.RecordEventKind, id string, v int) ops.EventRow {
-	return ops.EventRow{Seq: seq, RecordTime: rt, Kind: kind, FacetID: id, ArtifactVersion: v}
+func eventRow(seq int64, rt string, kind facet.AnamEventKind, id string, v int) ops.EventRow {
+	return ops.EventRow{Seq: seq, AnamTime: rt, Kind: kind, FacetID: id, ArtifactVersion: v}
 }
 
 func facetRow(id string, v int, status facet.Status) ops.FacetRow {
 	return ops.FacetRow{
 		FacetID: id, Type: "health.blood-pressure",
-		EventTime: "2026-07-05T06:30:00.000000000Z", BucketID: "bucket:2026-W27",
+		FactTime: "2026-07-05T06:30:00.000000000Z", BucketID: "bucket:2026-W27",
 		Version: v, Status: status, ContentHash: "sha256:aaa",
 	}
 }
@@ -75,7 +75,7 @@ func TestApplyReplay_MovesRowsAndCursorTogether(t *testing.T) {
 	}
 }
 
-func TestChangesSince_BoundsAreRecordTime(t *testing.T) {
+func TestChangesSince_BoundsAreAnamTime(t *testing.T) {
 	t.Parallel()
 	d, _ := open(t)
 	ctx := context.Background()

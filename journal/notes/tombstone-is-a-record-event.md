@@ -21,7 +21,7 @@ carrying `tombstoned`"*. That is **Arch's** sentence (ADR 0030), and in Arch it 
 artifact stores its current status, so retraction must write a new version to carry the new status.
 
 Anam folded status out of the artifact at R0. `Facet` has no `Status` field; a reflection test fails the
-build if one appears; `BirthStatus` admits only `admitted` and `proposed`. **There is nowhere on an Anam
+build if one appears; a Facet has no status field at all. **There is nowhere on an Anam
 artifact to put `tombstoned`.** The doc and the type system contradicted each other for the project's
 entire life, and nothing noticed — because no code had yet needed to write a tombstone. R2's append
 primitive was the first thing that had to know which was true.

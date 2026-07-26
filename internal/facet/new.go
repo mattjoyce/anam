@@ -35,14 +35,11 @@ type NewParams struct {
 	// Confidence is (0, 1]; captured facts are 1.
 	Confidence float64
 
-	EventTime    time.Time
-	RecordedTime time.Time
-	IngestedTime time.Time
+	FactTime time.Time
 
-	// BirthStatus and Derivation travel together: a derived facet is born proposed and
-	// carries its derivation; a captured fact is born admitted and carries none (§11).
-	BirthStatus BirthStatus
-	Derivation  *Derivation
+	// Derivation is set only on a derived facet (§11), and its presence is what makes
+	// the facet derived — there is no second field saying so.
+	Derivation *Derivation
 }
 
 // New is the only way to build a Facet. It validates every field, derives identity
@@ -64,9 +61,7 @@ func New(p NewParams) (Facet, error) {
 		Classification:    p.Classification,
 		ArtifactVersion:   p.ArtifactVersion,
 		DefinitionVersion: p.DefinitionVersion,
-		EventTime:         p.EventTime,
-		RecordedTime:      p.RecordedTime,
-		IngestedTime:      p.IngestedTime,
+		FactTime:          p.FactTime,
 		Binding:           p.Binding,
 		Provenance: Provenance{
 			Source:     p.Envelope.Source,
@@ -74,7 +69,6 @@ func New(p NewParams) (Facet, error) {
 			SourceRef:  p.Envelope.SourceRef,
 			Derivation: p.Derivation,
 		},
-		BirthStatus: p.BirthStatus,
 		Descriptor: Descriptor{
 			SourceSchema:  p.SourceSchema,
 			SchemaVersion: p.SchemaVersion,
@@ -111,12 +105,8 @@ func (p NewParams) validate() error {
 		return fmt.Errorf("%w: media type is required", ErrInvalidFacet)
 	case p.Confidence <= 0 || p.Confidence > 1:
 		return fmt.Errorf("%w: confidence %v is outside (0, 1]", ErrInvalidFacet, p.Confidence)
-	case p.EventTime.IsZero(), p.RecordedTime.IsZero(), p.IngestedTime.IsZero():
-		return fmt.Errorf("%w: all three times are required", ErrInvalidFacet)
-	case !p.BirthStatus.Valid():
-		return fmt.Errorf("%w: birth status %q", ErrInvalidFacet, p.BirthStatus)
-	case (p.BirthStatus == BornProposed) != (p.Derivation != nil):
-		return fmt.Errorf("%w: derivation and birth status disagree — derived facets are born proposed and carry their derivation; captured facts are born admitted and carry none", ErrInvalidFacet)
+	case p.FactTime.IsZero():
+		return fmt.Errorf("%w: fact time is required", ErrInvalidFacet)
 	}
 	return nil
 }

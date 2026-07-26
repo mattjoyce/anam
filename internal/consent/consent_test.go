@@ -27,7 +27,7 @@ func TestOpen_AllowsEverything(t *testing.T) {
 				Type:           "health.blood-pressure",
 				Classification: c,
 				Status:         s,
-				EventTime:      "2026-01-24T06:36:00.000000000Z",
+				FactTime:       "2026-01-24T06:36:00.000000000Z",
 			}
 			got := consent.Open{}.Evaluate(req)
 			if !got.Allow {
@@ -46,7 +46,7 @@ func TestOpen_AllowsEverything(t *testing.T) {
 func TestRequest_CarriesNoPayload(t *testing.T) {
 	t.Parallel()
 
-	want := []string{"Type", "Classification", "Status", "EventTime"}
+	want := []string{"Type", "Classification", "Status", "FactTime"}
 	rt := reflect.TypeOf(consent.Request{})
 
 	var got []string

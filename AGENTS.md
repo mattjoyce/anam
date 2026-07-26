@@ -15,7 +15,7 @@ Every design review and code audit runs through **Hickey × Armstrong** (*struct
   apart? Is this *simple* (un-braided, objective) or merely *easy* (familiar)? Where does state
   actually live? Are we producing new **values** or overwriting a **place**?
   - Anam is **Datomic-shaped**: append-only accreting **immutable facts**, epochal time
-    (event-time / record-time), **current state derived as a fold**. Never overwrite a fact. Never
+    (fact-time / anam-time), **current state derived as a fold**. Never overwrite a fact. Never
     store a fact's current status as mutable place — derive it.
   - The **substrate is accidental**, not essential — the problem is a personal longitudinal record, not a
     store. Only `internal/store` may name DynamoDB, SQLite or `database/sql`; `scripts/check.sh` enforces
@@ -29,12 +29,12 @@ Every design review and code audit runs through **Hickey × Armstrong** (*struct
   - Anam's **error kernel** is the *append-only ledger + admission-gate invariants* (three pillars,
     idempotency, immutability). Everything else — capture workers, fold, projection, CLI — is
     **disposable and rebuildable from source** (Anam owns no facts).
-  - `commit` is **idempotent**; artifact, record-event and the watermark `W` are one atomic
+  - `commit` is **idempotent**; artifact, anam-event and the watermark `W` are one atomic
     `TransactWriteItems`, conditional on the idempotency marker. **There is no transaction across
     substrates** — SQLite catches up by replay, so a crash leaves it *behind*, never *wrong*. A worker may
     crash mid-batch and simply be re-run to known-good. No partial facet, ever.
   - **Append-only is not enforced by DynamoDB.** Our code must never issue an `UpdateItem` against a facet
-    or a record-event; a test guards it. This is a known cost of the substrate split.
+    or an anam-event; a test guards it. This is a known cost of the substrate split.
   - The **`Envelope` is the only ingress** (share-nothing). Every external call carries a `context`
     deadline and **fails fast** — never a hang.
 
@@ -117,7 +117,7 @@ go test -race -count=1 -shuffle=on -vet=all ./...
 | Source / operator identity | lower-case **hyphenated** | `health-db`, `bp-csv` |
 | CLI command | lower-case hyphenated | `ingest`, `def load` |
 | Config / payload / data key | **snake_case** | `db_path`, `ddb_endpoint`, `period_start` |
-| DynamoDB attribute / SQL column | snake_case | `event_time`, `content_hash` |
+| DynamoDB attribute / SQL column | snake_case | `fact_time`, `content_hash` |
 | Env var | UPPER_SNAKE | `ANAM_DDB_ENDPOINT` |
 | DynamoDB key value | lower-case, `#`-delimited | `person#matt`, `facet#…` |
 

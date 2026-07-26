@@ -99,7 +99,7 @@ func TestScan_ComposesGateCompliantEnvelopes(t *testing.T) {
 		if err := d.Check(doc); err != nil {
 			t.Errorf("%s: not compliant: %v", env.SourceRef, err)
 		}
-		if _, _, err := d.Times(doc); err != nil {
+		if _, err := d.FactTimeOf(doc); err != nil {
 			t.Errorf("%s: times: %v", env.SourceRef, err)
 		}
 		ref, err := d.SourceRef(env.Source, doc)

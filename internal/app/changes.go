@@ -18,9 +18,9 @@ func changesCmd(cfgPath *string) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "changes --since <instant>",
-		Short: "what Anam learned between two record-times",
-		Long: `Changes reads record-events by record-time (§9): what was admitted, superseded
-or tombstoned after a given instant — Anam's own clock, not the events' event-time.
+		Short: "what Anam learned between two anam-times",
+		Long: `Changes reads anam-events by anam-time (§9): what was admitted, superseded
+or tombstoned after a given instant — Anam's own clock, not the events' fact-time.
 
 The query runs over the operational store's derived index, which is first caught
 up to the ledger's head by replay, so the answer is as fresh as ingest.`,
@@ -70,14 +70,14 @@ up to the ledger's head by replay, so the answer is as fresh as ingest.`,
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "index at seq %d (caught up from %d)  ·  %d change(s) since %s\n",
 				sync.To, sync.From, len(changes), clock.Format(sinceT))
 			w := tabwriter.NewWriter(cmd.OutOrStdout(), 2, 0, 2, ' ', 0)
-			_, _ = fmt.Fprintln(w, "SEQ\tRECORD TIME\tKIND\tV\tFACET")
+			_, _ = fmt.Fprintln(w, "SEQ\tANAM TIME\tKIND\tV\tFACET")
 			for _, c := range changes {
-				_, _ = fmt.Fprintf(w, "%d\t%s\t%s\tv%d\t%s\n", c.Seq, c.RecordTime, c.Kind, c.ArtifactVersion, c.FacetID)
+				_, _ = fmt.Fprintf(w, "%d\t%s\t%s\tv%d\t%s\n", c.Seq, c.AnamTime, c.Kind, c.ArtifactVersion, c.FacetID)
 			}
 			return w.Flush()
 		},
 	}
-	cmd.Flags().StringVar(&since, "since", "", "report record-events after this instant (2006-01-02 or RFC 3339; required)")
+	cmd.Flags().StringVar(&since, "since", "", "report anam-events after this instant (2006-01-02 or RFC 3339; required)")
 	cmd.Flags().StringVar(&until, "until", "", "stop at this instant, inclusive; a bare date includes its whole day")
 	_ = cmd.MarkFlagRequired("since")
 	return cmd

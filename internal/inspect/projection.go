@@ -21,7 +21,7 @@ import (
 //
 //	projection   which governed variant — canonical, bp, sleep. Switching redraws the
 //	             verdict on every facet, so "prune, never reshape" is watchable.
-//	as-of        a record-time. Winding it back shows what the projection stood on
+//	as-of        an anam-time. Winding it back shows what the projection stood on
 //	             when Anam knew less: before the BP export arrived, `bp` serves nothing,
 //	             and the page says so rather than showing today's answer.
 //
@@ -29,7 +29,7 @@ import (
 // Apply uses, so the page cannot describe a filter the publisher does not apply.
 
 type projVerdictRow struct {
-	EventTime string
+	FactTime  string
 	Type      facet.Type
 	Version   int
 	Standing  string
@@ -113,7 +113,7 @@ func (s *Server) projectionPage(w http.ResponseWriter, r *http.Request) {
 // as a malformed request.
 var errBadAsOf = errors.New("bad as-of")
 
-// readForQuery reads at head, or at the watermark in force at an as-of record-time.
+// readForQuery reads at head, or at the watermark in force at an as-of anam-time.
 func (s *Server) readForQuery(ctx context.Context, asof string, data *projectionData) (fold.Result, error) {
 	if asof == "" {
 		return s.read(ctx)
@@ -159,8 +159,8 @@ func (d *projectionData) fill(ctx context.Context, l Ledger, res fold.Result) er
 	sort.Slice(d.Rows, func(i, j int) bool {
 		a, b := d.Rows[i], d.Rows[j]
 		switch {
-		case a.EventTime != b.EventTime:
-			return a.EventTime < b.EventTime
+		case a.FactTime != b.FactTime:
+			return a.FactTime < b.FactTime
 		case a.ID != b.ID:
 			return a.ID < b.ID
 		default:
@@ -196,7 +196,7 @@ func (d *projectionData) judgeLive(res fold.Result) error {
 				d.NServed++
 			}
 			d.Rows = append(d.Rows, projVerdictRow{
-				EventTime: x.Entry.EventTime, Type: x.Entry.Type,
+				FactTime: x.Entry.FactTime, Type: x.Entry.Type,
 				Version:  res.States[x.Entry.FacetID].Version,
 				Standing: standing, Why: why,
 				SourceRef: x.Entry.SourceRef, ID: x.Entry.FacetID,
@@ -207,7 +207,7 @@ func (d *projectionData) judgeLive(res fold.Result) error {
 		for _, e := range res.Value.Entries() {
 			d.NServed++
 			d.Rows = append(d.Rows, projVerdictRow{
-				EventTime: e.EventTime, Type: e.Type,
+				FactTime: e.FactTime, Type: e.Type,
 				Version: res.States[e.FacetID].Version, Standing: "served",
 				SourceRef: e.SourceRef, ID: e.FacetID,
 			})
@@ -219,7 +219,7 @@ func (d *projectionData) judgeLive(res fold.Result) error {
 
 func displacedRow(d fold.Displacement) projVerdictRow {
 	return projVerdictRow{
-		EventTime: clock.Format(d.Facet.EventTime),
+		FactTime:  clock.Format(d.Facet.FactTime),
 		Type:      d.Facet.Type,
 		Version:   d.Version,
 		Standing:  "superseded",

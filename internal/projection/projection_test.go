@@ -33,12 +33,11 @@ func canonical(t *testing.T) fold.Value {
 	return v
 }
 
-func entry(id string, typ facet.Type, eventTime string, st facet.Status, c facet.Classification) fold.Entry {
+func entry(id string, typ facet.Type, factTime string, st facet.Status, c facet.Classification) fold.Entry {
 	return fold.Entry{
 		FacetID:        id,
 		Type:           typ,
-		EventTime:      eventTime,
-		RecordedTime:   eventTime,
+		FactTime:       factTime,
 		Source:         "bp-csv",
 		SourceRef:      "bp-csv:" + id,
 		Status:         st,
@@ -174,9 +173,9 @@ func TestSpan_RendersTheWindow(t *testing.T) {
 
 	cases := []struct{ from, to, want string }{
 		{"", "", "whole-person"},
-		{"2026-01-01T00:00:00.000000000Z", "", "event-time[2026-01-01T00:00:00.000000000Z,+inf)"},
-		{"", "2026-02-01T00:00:00.000000000Z", "event-time[-inf,2026-02-01T00:00:00.000000000Z)"},
-		{"2026-01-01T00:00:00.000000000Z", "2026-02-01T00:00:00.000000000Z", "event-time[2026-01-01T00:00:00.000000000Z,2026-02-01T00:00:00.000000000Z)"},
+		{"2026-01-01T00:00:00.000000000Z", "", "fact-time[2026-01-01T00:00:00.000000000Z,+inf)"},
+		{"", "2026-02-01T00:00:00.000000000Z", "fact-time[-inf,2026-02-01T00:00:00.000000000Z)"},
+		{"2026-01-01T00:00:00.000000000Z", "2026-02-01T00:00:00.000000000Z", "fact-time[2026-01-01T00:00:00.000000000Z,2026-02-01T00:00:00.000000000Z)"},
 	}
 	for _, c := range cases {
 		tmpl := mustParse(t, template("x", []string{"health.sleep"}, []string{"admitted"}, "Normal", c.from, c.to))

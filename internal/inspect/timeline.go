@@ -14,7 +14,7 @@ import (
 
 // The landing page draws the capture→compose picture over the live ledger
 // (docs/assets/capture-compose-use.png): the capture band is the LEDGER surface —
-// every facet at its event-time, marked at its folded status, the dead ghosted —
+// every facet at its fact-time, marked at its folded status, the dead ghosted —
 // and the composed strip below it is the CANONICAL — the live-only value at W.
 // Two surfaces, two names (§7), one screen.
 
@@ -131,13 +131,13 @@ func parseWindow(fromQ, toQ string, all []facet.Facet) (from, to time.Time, zoom
 		from = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 		return from, from.AddDate(0, 0, 7), false, nil
 	}
-	min, max := all[0].EventTime, all[0].EventTime
+	min, max := all[0].FactTime, all[0].FactTime
 	for _, f := range all {
-		if f.EventTime.Before(min) {
-			min = f.EventTime
+		if f.FactTime.Before(min) {
+			min = f.FactTime
 		}
-		if f.EventTime.After(max) {
-			max = f.EventTime
+		if f.FactTime.After(max) {
+			max = f.FactTime
 		}
 	}
 	pad := max.Sub(min) / 50
@@ -189,8 +189,8 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 	}
 
 	sort.Slice(all, func(i, j int) bool {
-		if !all[i].EventTime.Equal(all[j].EventTime) {
-			return all[i].EventTime.Before(all[j].EventTime)
+		if !all[i].FactTime.Equal(all[j].FactTime) {
+			return all[i].FactTime.Before(all[j].FactTime)
 		}
 		return all[i].ID < all[j].ID
 	})
@@ -210,18 +210,18 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 
 	counts := map[facet.Type]int{}
 	// Types sharing a lane (slots cycle over four lanes) collide when their
-	// event-times coincide — the generic metric-group carries several groups per
+	// fact-times coincide — the generic metric-group carries several groups per
 	// day. Stacked marks step their stems up, as the diagram varies its heights,
 	// so every facet stays visible.
 	stacked := map[[2]int]int{}
 	for _, f := range all {
 		counts[f.Type]++
-		if f.EventTime.Before(from) || f.EventTime.After(to) {
+		if f.FactTime.Before(from) || f.FactTime.After(to) {
 			continue
 		}
 		st := res.States[f.ID]
 		slot := slots[f.Type]
-		px := x(f.EventTime)
+		px := x(f.FactTime)
 		stackKey := [2]int{slot % len(laneY), int(px)}
 		lift := float64(stacked[stackKey]) * (2*diamondR + 2)
 		stacked[stackKey]++
@@ -229,12 +229,12 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 			X: px, Y: laneY[slot%len(laneY)] - lift,
 			ID: f.ID, Slot: slot, Live: st.Live(),
 			Title: fmt.Sprintf("%s · %s · v%d %s · %s",
-				f.EventTime.UTC().Format("2006-01-02"), f.Type, f.ArtifactVersion, st.Status, f.Provenance.SourceRef),
+				f.FactTime.UTC().Format("2006-01-02"), f.Type, f.ArtifactVersion, st.Status, f.Provenance.SourceRef),
 		})
 		if st.Live() {
 			data.Strip = append(data.Strip, tlStripEntry{
 				ID: f.ID, Slot: slot,
-				Title: fmt.Sprintf("%s · %s", f.EventTime.UTC().Format("2006-01-02"), f.Type),
+				Title: fmt.Sprintf("%s · %s", f.FactTime.UTC().Format("2006-01-02"), f.Type),
 			})
 		}
 	}

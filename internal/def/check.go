@@ -66,8 +66,7 @@ func (d Definition) checkNoExtras(doc any) error {
 	for ptr := range d.Properties {
 		named[topToken(ptr)] = true
 	}
-	named[topToken(d.EventTime.Pointer)] = true
-	named[topToken(d.RecordedTime.Pointer)] = true
+	named[topToken(d.FactTime.Pointer)] = true
 	for _, ptr := range d.IdentityKey {
 		named[topToken(ptr)] = true
 	}
@@ -87,18 +86,11 @@ func topToken(pointer string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(rest, "~1", "/"), "~0", "~")
 }
 
-// Times extracts the two payload clocks (§5). The recorded time defaults to the
-// event time at Parse, so both always resolve or the payload is not compliant.
-func (d Definition) Times(doc any) (event, recorded time.Time, err error) {
-	event, err = d.timeAt(doc, d.EventTime)
-	if err != nil {
-		return time.Time{}, time.Time{}, err
-	}
-	recorded, err = d.timeAt(doc, d.RecordedTime)
-	if err != nil {
-		return time.Time{}, time.Time{}, err
-	}
-	return event, recorded, nil
+// FactTimeOf extracts the payload's own clock — when the fact was true in the world
+// (§5). It is the only time a Definition can read: Anam's clock is stamped by the gate
+// onto the AnamEvent, where a source has no say in it.
+func (d Definition) FactTimeOf(doc any) (time.Time, error) {
+	return d.timeAt(doc, d.FactTime)
 }
 
 func (d Definition) timeAt(doc any, tf TimeField) (time.Time, error) {

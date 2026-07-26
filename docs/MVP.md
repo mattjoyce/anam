@@ -33,7 +33,7 @@ depth before breadth.**
 
 **Mint comes late, and deliberately.** A checkpoint is a *cache of the fold*: it exists to bound replay,
 and at this scale there is no replay cost to bound. Building it before the fold would be solving an
-unmeasured performance problem. The *seam* (a record-time watermark) is present from the start; the
+unmeasured performance problem. The *seam* (an anam-time watermark) is present from the start; the
 machinery arrives once it earns its place.
 
 **`timeline` comes early, and deliberately.** The whole-person read is the one claim Anam exists to make
@@ -56,7 +56,7 @@ it is built in the smallest steps that yield information.
 | R3 ✅ | the gate — `resolve` + `commit`, atomic, idempotent, supersession, tombstone | **the error kernel.** Complete, or not at all |
 | R4 ✅ | `fold` + **`anam timeline`** | the inversion, visible. Plus the rebuild test (§7) as an automated check |
 | R5 ✅ | capture worker `health-db`, one `health.metric-group` definition | real payloads, real time semantics |
-| R6 ✅ | `changes_since` over `record_event` | record-time queries |
+| R6 ✅ | `changes_since` over `anam_event` | anam-time queries |
 | R7 ✅ | one projection + receipt, and the viewer that switches between them | governance made real — and *legible*: every facet can say why it is in or out, at any point in Anam's own clock |
 | R8 | mint / `checkpoint` per bucket-span → files | replay bounded, once measurable |
 | R9 | derived insight, admitted `proposed` | the agentic path, isolated |
@@ -70,11 +70,11 @@ then pure gate logic composed on top: three pillars, hash comparison, supersede-
 substrate semantics. The alternative, a `PutItem` at R2 replaced by a transaction at R3, builds the kernel
 twice and trusts the second one.
 
-Because a tombstone is a record-event with no artifact (§6a), the ledger's primitive is **two calls, not
+Because a tombstone is an anam-event with no artifact (§6a), the ledger's primitive is **two calls, not
 one with an optional facet**: admit an artifact with its event, or mark an existing facet with an event.
 An optional pointer would make `{no artifact, admitted}` representable.
 
-**Three substrates** (`ARCHITECTURE.md` §8): **DynamoDB** is the ledger (facet artifacts, record-events,
+**Three substrates** (`ARCHITECTURE.md` §8): **DynamoDB** is the ledger (facet artifacts, anam-events,
 the watermark `W` — all atomic in one `TransactWriteItems`); the **filesystem** holds checkpoint values
 and receipts, content-addressed; **SQLite** is the **operational store** — definitions, indexes, the span
 registry and per-span `V`/`Wᵥ`, cursors, bookmarks, GC state. Config is YAML; definitions are JSON.
@@ -101,10 +101,10 @@ fact, a substrate swap is a re-ingest, not a migration.
   checkpoint + replay-since*. The whole-person view **composes** buckets, never re-folds the person.
 - **`timeline`:** the whole-person read (the inversion) — default, no span required — with optional
   `--from/--to`, `--type`, and `--span` narrowing.
-- **`changes_since`** between two record-times.
+- **`changes_since`** between two anam-times.
 - **At least one prune-only projection** (e.g. `bp`, `sleep`), **materialised as a content-addressed
   file**, plus the **CLI timeline viewer** (the diagnostic harness — proves the model, not a shipped UI).
-  The viewer **switches projections** (`timeline --projection`) and can be wound back to a record-time
+  The viewer **switches projections** (`timeline --projection`) and can be wound back to an anam-time
   (`--as-of`); `--explain` shows every facet's verdict and the versions since displaced. The web
   inspector carries the same two controls at `/projection`.
 - **Receipts:** prove exactly what a projection served at a watermark.
@@ -137,11 +137,11 @@ fact, a substrate swap is a re-ingest, not a migration.
 
 | Source | Facet type(s) | Payload (verbatim) | Notes |
 |---|---|---|---|
-| `health-db` | `health.sleep`, `health.body-composition`, `health.heart-rate`, `health.metric-group` | a period's metric rows as JSON | grain = one group per period; `event_time = period_start`; `bp_*` excluded from `health.heart-rate` |
-| `bp-csv` | `health.blood-pressure` | one reading row as JSON | one facet per row; `event_time` from `Date (Excel)`; values kept as source strings |
+| `health-db` | `health.sleep`, `health.body-composition`, `health.heart-rate`, `health.metric-group` | a period's metric rows as JSON | grain = one group per period; `fact_time = period_start`; `bp_*` excluded from `health.heart-rate` |
+| `bp-csv` | `health.blood-pressure` | one reading row as JSON | one facet per row; `fact_time` from `Date (Excel)`; values kept as source strings |
 | *(agent)* | `health.insight` *(illustrative)* | the finding value | `proposed`; provenance carries method + the watermark it was computed from |
 
-Granularity is coarse on purpose; decompose only where real event-times or finer access control earn the
+Granularity is coarse on purpose; decompose only where real fact-times or finer access control earn the
 cut.
 
 ---
@@ -160,7 +160,7 @@ a harness for proving the model, not a shipped product.
 - A person opens **one** chronological whole-life timeline, each entry linked to its source evidence,
   and does **not** query the source DB/CSV directly.
 - **Re-ingesting** the same source produces **no duplicate facets** (idempotency); a **changed** source
-  row appears as a *superseding* artifact plus a `superseded` record-event, the original retained
+  row appears as a *superseding* artifact plus a `superseded` anam-event, the original retained
   (append-only).
 - **`changes_since`** correctly reports what was admitted after a given time.
 - A **checkpoint** is content-addressed: **stable** when nothing changed, and its hash **moves** after

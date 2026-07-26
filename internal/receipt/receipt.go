@@ -1,10 +1,10 @@
 // Package receipt records what Anam served, so that a serve can be proved rather than
 // remembered (ARCHITECTURE.md §9).
 //
-// A receipt is not a record-event. Serving a facet changes nothing Anam *knows* about
+// A receipt is not an anam-event. Serving a facet changes nothing Anam *knows* about
 // it, so the ledger says nothing about publication and the watermark does not move;
 // what Anam has *shown* is a separate fact, and this is where it lives
-// (journal: published-is-a-receipt-not-a-record-event). A facet's published time is
+// (journal: published-is-a-receipt-not-a-anam-event). A facet's published time is
 // the earliest ServedAt over the receipts naming it.
 //
 // It holds no payload — only hashes, identity and the coordinates needed to re-derive.

@@ -53,10 +53,10 @@ type Definition struct {
 	SchemaVersion  int
 	MediaType      string
 
-	// EventTime is required; RecordedTime defaults to it when the source has no
-	// separate documentation clock.
-	EventTime    TimeField
-	RecordedTime TimeField
+	// FactTime says where in the payload the fact's own clock lives — when it was true
+	// in the world. It is required, and it is the only clock a Definition declares:
+	// Anam's clock is Anam's to keep, not the source's to assert.
+	FactTime TimeField
 
 	// IdentityKey is the ordered set of pointers whose values say WHICH row this is —
 	// never what it contains (§6a). The gate composes source_ref from these.
@@ -88,8 +88,7 @@ type manifest struct {
 		SchemaVersion     int    `json:"schema_version"`
 		MediaType         string `json:"media_type"`
 		TimeSemantics     struct {
-			EventTime    TimeField  `json:"event_time"`
-			RecordedTime *TimeField `json:"recorded_time"`
+			FactTime TimeField `json:"fact_time"`
 		} `json:"time_semantics"`
 		IdentityKey         []string `json:"identity_key"`
 		MinBindingAssurance string   `json:"min_binding_assurance"`
@@ -122,7 +121,7 @@ func Parse(raw []byte) (Definition, error) {
 		SourceSchema:   m.Meta.SourceSchema,
 		SchemaVersion:  m.Meta.SchemaVersion,
 		MediaType:      m.Meta.MediaType,
-		EventTime:      m.Meta.TimeSemantics.EventTime,
+		FactTime:       m.Meta.TimeSemantics.FactTime,
 		IdentityKey:    m.Meta.IdentityKey,
 		MinAssurance:   facet.BindingAssurance(m.Meta.MinBindingAssurance),
 		Required:       m.Schema.Required,
@@ -134,11 +133,6 @@ func Parse(raw []byte) (Definition, error) {
 	}
 	if d.MediaType == "" {
 		d.MediaType = "application/json"
-	}
-	if m.Meta.TimeSemantics.RecordedTime != nil {
-		d.RecordedTime = *m.Meta.TimeSemantics.RecordedTime
-	} else {
-		d.RecordedTime = d.EventTime
 	}
 	if m.Meta.MinBindingAssurance == "" {
 		d.MinAssurance = facet.AssuranceMedium
@@ -182,14 +176,14 @@ func (d Definition) validate() error {
 		return fmt.Errorf("%w: validation_mode %q", ErrBadManifest, d.Mode)
 	case d.SourceSchema == "":
 		return fmt.Errorf("%w: source_schema is required", ErrBadManifest)
-	case d.EventTime.Pointer == "" || d.EventTime.Layout == "":
-		return fmt.Errorf("%w: time_semantics.event_time needs pointer and layout", ErrBadManifest)
+	case d.FactTime.Pointer == "" || d.FactTime.Layout == "":
+		return fmt.Errorf("%w: time_semantics.fact_time needs pointer and layout", ErrBadManifest)
 	case len(d.IdentityKey) == 0:
 		return fmt.Errorf("%w: identity_key must declare at least one pointer", ErrBadManifest)
 	case !d.MinAssurance.Valid():
 		return fmt.Errorf("%w: min_binding_assurance %q", ErrBadManifest, d.MinAssurance)
 	}
-	for _, p := range append(append([]string{d.EventTime.Pointer, d.RecordedTime.Pointer}, d.IdentityKey...), d.Required...) {
+	for _, p := range append(append([]string{d.FactTime.Pointer}, d.IdentityKey...), d.Required...) {
 		if err := checkPointerSyntax(p); err != nil {
 			return fmt.Errorf("%w: %v", ErrBadManifest, err)
 		}

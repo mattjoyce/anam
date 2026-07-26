@@ -33,7 +33,7 @@ import (
 
 // verdictRow is one artifact version and its standing.
 type verdictRow struct {
-	EventTime string
+	FactTime  string
 	Type      string
 	Version   int
 	Standing  string
@@ -53,7 +53,7 @@ func writeExplain(cmd *cobra.Command, ctx context.Context, l fold.Ledger, v view
 		if typeFilter != "" && r.Type != typeFilter {
 			continue
 		}
-		if !b.admits(fold.Entry{EventTime: r.EventTime}) {
+		if !b.admits(fold.Entry{FactTime: r.FactTime}) {
 			continue
 		}
 		shown = append(shown, r)
@@ -69,10 +69,10 @@ func writeExplain(cmd *cobra.Command, ctx context.Context, l fold.Ledger, v view
 	}
 
 	w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "EVENT TIME\tTYPE\tV\tSTANDING\tWHY\tSOURCE REF")
+	_, _ = fmt.Fprintln(w, "FACT TIME\tTYPE\tV\tSTANDING\tWHY\tSOURCE REF")
 	for _, r := range shown {
 		_, _ = fmt.Fprintf(w, "%s\t%s\tv%d\t%s\t%s\t%s\n",
-			r.EventTime, r.Type, r.Version, r.Standing, r.Reason, r.SourceRef)
+			r.FactTime, r.Type, r.Version, r.Standing, r.Reason, r.SourceRef)
 	}
 	return w.Flush()
 }
@@ -117,7 +117,7 @@ func explainRows(ctx context.Context, l fold.Ledger, v view) ([]verdictRow, map[
 		rows = append(rows, rowOfDisplacement(d))
 	}
 
-	// One order for every row, the canonical's own: event-time then id, with the
+	// One order for every row, the canonical's own: fact-time then id, with the
 	// version breaking ties so a facet's history reads oldest-first in place.
 	sortRows(rows)
 	return rows, counts, nil
@@ -125,7 +125,7 @@ func explainRows(ctx context.Context, l fold.Ledger, v view) ([]verdictRow, map[
 
 func rowOfEntry(e fold.Entry, version int, standing, reason string) verdictRow {
 	return verdictRow{
-		EventTime: e.EventTime,
+		FactTime:  e.FactTime,
 		Type:      string(e.Type),
 		Version:   version,
 		Standing:  standing,
@@ -140,7 +140,7 @@ func rowOfEntry(e fold.Entry, version int, standing, reason string) verdictRow {
 // and fold.Displaced's reason says which.
 func rowOfDisplacement(d fold.Displacement) verdictRow {
 	return verdictRow{
-		EventTime: clock.Format(d.Facet.EventTime),
+		FactTime:  clock.Format(d.Facet.FactTime),
 		Type:      string(d.Facet.Type),
 		Version:   d.Version,
 		Standing:  "superseded",
@@ -157,8 +157,8 @@ func sortRows(rows []verdictRow) {
 	sort.Slice(rows, func(i, j int) bool {
 		a, b := rows[i], rows[j]
 		switch {
-		case a.EventTime != b.EventTime:
-			return a.EventTime < b.EventTime
+		case a.FactTime != b.FactTime:
+			return a.FactTime < b.FactTime
 		case a.FacetID != b.FacetID:
 			return a.FacetID < b.FacetID
 		default:

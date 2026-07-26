@@ -33,7 +33,7 @@ import (
 // use; *ledger.Ledger satisfies it, and it is exactly fold.Ledger).
 type Ledger interface {
 	Head(ctx context.Context) (ledger.Watermark, error)
-	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.RecordEvent, error)
+	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.AnamEvent, error)
 	CurrentVersion(ctx context.Context, facetID string) (facet.Facet, error)
 	Version(ctx context.Context, facetID string, version int) (facet.Facet, error)
 }
@@ -165,13 +165,13 @@ func Serve(ctx context.Context, l Ledger, addr string, timeout time.Duration) er
 // facetRow is one line of the index: a logical facet at its current version, at
 // its folded status.
 type facetRow struct {
-	ID        string
-	Type      facet.Type
-	EventTime string
-	Bucket    string
-	Version   int
-	Status    facet.Status
-	Hash      string
+	ID       string
+	Type     facet.Type
+	FactTime string
+	Bucket   string
+	Version  int
+	Status   facet.Status
+	Hash     string
 }
 
 type indexData struct {
@@ -212,8 +212,8 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, rowOf(f, st.Status))
 	}
 	sort.Slice(rows, func(i, j int) bool {
-		if rows[i].EventTime != rows[j].EventTime {
-			return rows[i].EventTime < rows[j].EventTime
+		if rows[i].FactTime != rows[j].FactTime {
+			return rows[i].FactTime < rows[j].FactTime
 		}
 		return rows[i].ID < rows[j].ID
 	})
@@ -223,25 +223,41 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 
 func rowOf(f facet.Facet, st facet.Status) facetRow {
 	return facetRow{
-		ID:        f.ID,
-		Type:      f.Type,
-		EventTime: f.EventTime.Format(time.RFC3339),
-		Bucket:    span.Of(f.EventTime).ID(),
-		Version:   f.ArtifactVersion,
-		Status:    st,
-		Hash:      f.Descriptor.ContentHash,
+		ID:       f.ID,
+		Type:     f.Type,
+		FactTime: f.FactTime.Format(time.RFC3339),
+		Bucket:   span.Of(span.Default, f.FactTime).ID(),
+		Version:  f.ArtifactVersion,
+		Status:   st,
+		Hash:     f.Descriptor.ContentHash,
 	}
 }
 
+// anamTimeOf finds when Anam admitted this artifact version. A version always has an
+// admitting event — that is what put it in the ledger — but the page renders whatever
+// it is handed, so an absent one shows as unknown rather than as the zero instant.
+func anamTimeOf(events []facet.AnamEvent, version int) string {
+	for _, ev := range events {
+		if ev.ArtifactVersion == version && (ev.Kind == facet.EventAdmitted || ev.Kind == facet.EventSuperseded) {
+			return ev.AnamTime.Format(time.RFC3339)
+		}
+	}
+	return "unknown"
+}
+
 type facetData struct {
-	Facet     facet.Facet
-	Status    facet.Status
-	EventTime string
-	Recorded  string
-	Ingested  string
-	Bucket    string
-	Payload   string
-	Events    []facet.RecordEvent
+	Facet    facet.Facet
+	Status   facet.Status
+	FactTime string
+
+	// AnamTime is read off this artifact's own admitted event, not off the Facet: a
+	// Facet carries one clock, the world's. When Anam learned of it is the ledger's
+	// business, and the ledger is where the page has to go to ask.
+	AnamTime string
+
+	Bucket  string
+	Payload string
+	Events  []facet.AnamEvent
 }
 
 func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
@@ -269,7 +285,7 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err)
 		return
 	}
-	var mine []facet.RecordEvent
+	var mine []facet.AnamEvent
 	for _, ev := range events {
 		if ev.FacetID == id {
 			mine = append(mine, ev)
@@ -288,14 +304,13 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	render(w, "facet.html", facetData{
-		Facet:     f,
-		Status:    states[id].Status,
-		EventTime: f.EventTime.Format(time.RFC3339),
-		Recorded:  f.RecordedTime.Format(time.RFC3339),
-		Ingested:  f.IngestedTime.Format(time.RFC3339),
-		Bucket:    span.Of(f.EventTime).ID(),
-		Payload:   pretty.String(),
-		Events:    mine,
+		Facet:    f,
+		Status:   states[id].Status,
+		FactTime: f.FactTime.Format(time.RFC3339),
+		AnamTime: anamTimeOf(mine, f.ArtifactVersion),
+		Bucket:   span.Of(span.Default, f.FactTime).ID(),
+		Payload:  pretty.String(),
+		Events:   mine,
 	})
 }
 
@@ -305,8 +320,8 @@ type eventsData struct {
 }
 
 type eventRow struct {
-	facet.RecordEvent
-	RecordTimeText string
+	facet.AnamEvent
+	AnamTimeText string
 }
 
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
@@ -320,14 +335,14 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	}
 	rows := make([]eventRow, len(events))
 	for i, ev := range events {
-		rows[i] = eventRow{RecordEvent: ev, RecordTimeText: ev.RecordTime.Format(time.RFC3339)}
+		rows[i] = eventRow{AnamEvent: ev, AnamTimeText: ev.AnamTime.Format(time.RFC3339)}
 	}
 	render(w, "events.html", eventsData{W: head, Events: rows})
 }
 
-// headAndEvents reads the watermark and the full record-event stream — the inspector
+// headAndEvents reads the watermark and the full anam-event stream — the inspector
 // re-reads rather than caches, so what it shows is what the ledger holds right now.
-func (s *Server) headAndEvents(ctx context.Context) (ledger.Watermark, []facet.RecordEvent, error) {
+func (s *Server) headAndEvents(ctx context.Context) (ledger.Watermark, []facet.AnamEvent, error) {
 	head, err := s.ledger.Head(ctx)
 	if err != nil {
 		return 0, nil, err

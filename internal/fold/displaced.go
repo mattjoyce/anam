@@ -29,7 +29,7 @@ type Displacement struct {
 // Displaced lists every artifact version below each facet's current one, plus the
 // current version of any facet that is not live.
 //
-// It asks the record-event stream nothing extra: a facet folded to v3 has necessarily
+// It asks the anam-event stream nothing extra: a facet folded to v3 has necessarily
 // had v1 and v2 displaced, and the fold already derived that 3. Only the artifacts
 // themselves are fetched, which is what lets a caller show the reading that was
 // corrected rather than merely that something was.
@@ -61,8 +61,8 @@ func Displaced(ctx context.Context, l Ledger, res Result) ([]Displacement, error
 	sort.Slice(out, func(i, j int) bool {
 		a, b := out[i], out[j]
 		switch {
-		case !a.Facet.EventTime.Equal(b.Facet.EventTime):
-			return a.Facet.EventTime.Before(b.Facet.EventTime)
+		case !a.Facet.FactTime.Equal(b.Facet.FactTime):
+			return a.Facet.FactTime.Before(b.Facet.FactTime)
 		case a.Facet.ID != b.Facet.ID:
 			return a.Facet.ID < b.Facet.ID
 		default:

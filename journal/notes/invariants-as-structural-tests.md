@@ -29,7 +29,6 @@ The invariant is about the **type's shape**, so the guard must be about the type
 rt := reflect.TypeOf(facet.Facet{})
 for i := range rt.NumField() {
     name := rt.Field(i).Name
-    if name == "BirthStatus" { continue }   // the immutable state it was born in — permitted
     if strings.Contains(name, "Status") {
         t.Errorf("Facet has field %q: current status must be derived by the fold, never stored", name)
     }

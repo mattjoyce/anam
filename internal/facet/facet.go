@@ -4,9 +4,9 @@
 // Two invariants from the do-not-break list (§12) are structural here rather than
 // merely documented:
 //
-//   - A Facet carries no current status. Only the immutable BirthStatus it was born
-//     with is stored; current Status is derived by the fold over record-events (§9).
-//     There is no place to overwrite, so the ledger cannot drift from its events.
+//   - A Facet carries no status at all. Current Status is derived by the fold over
+//     anam-events (§9). There is no place to overwrite, so the ledger cannot drift
+//     from its events.
 //   - A Facet's payload is opaque bytes, never a parsed map (§3). Nothing downstream
 //     can normalise a source fragment into a canonical schema, because by the time it
 //     is a Facet the structure is gone.
@@ -65,30 +65,10 @@ func (c Classification) Valid() bool {
 	return false
 }
 
-// BirthStatus is the immutable state a Facet was born in. It is not the Facet's
-// current state and must never be used as such — see Status.
-type BirthStatus string
-
-// The states a Facet may be born in: captured world-facts are admitted; agent findings
-// are proposed (§11).
-const (
-	BornAdmitted BirthStatus = "admitted"
-	BornProposed BirthStatus = "proposed"
-)
-
-// Valid reports whether b is a known birth status.
-func (b BirthStatus) Valid() bool {
-	switch b {
-	case BornAdmitted, BornProposed:
-		return true
-	}
-	return false
-}
-
-// Status is a Facet's current state, derived by the fold from its record-events.
+// Status is a Facet's current state, derived by the fold from its anam-events.
 //
 // Status is deliberately not a field on Facet. Storing it would create a second source
-// of truth alongside the record-events, and a place to overwrite — the two things the
+// of truth alongside the anam-events, and a place to overwrite — the two things the
 // append-only ledger exists to prevent.
 type Status string
 
@@ -110,23 +90,23 @@ func (s Status) Valid() bool {
 	return false
 }
 
-// RecordEventKind names the way Anam's knowledge of a Facet changed.
-type RecordEventKind string
+// AnamEventKind names the way Anam's knowledge of a Facet changed.
+type AnamEventKind string
 
-// The record-event kinds — exactly five, one per derivable status. Publication is
+// The anam-event kinds — exactly five, one per derivable status. Publication is
 // deliberately not among them: serving a facet changes nothing Anam knows about it,
 // and a receipt already records what was shown (§9). Every kind can change the
-// live-set, which is what makes the watermark the record-event sequence itself.
+// live-set, which is what makes the watermark the anam-event sequence itself.
 const (
-	EventAdmitted   RecordEventKind = "admitted"
-	EventSuperseded RecordEventKind = "superseded"
-	EventTombstoned RecordEventKind = "tombstoned"
-	EventEndorsed   RecordEventKind = "endorsed"
-	EventRejected   RecordEventKind = "rejected"
+	EventAdmitted   AnamEventKind = "admitted"
+	EventSuperseded AnamEventKind = "superseded"
+	EventTombstoned AnamEventKind = "tombstoned"
+	EventEndorsed   AnamEventKind = "endorsed"
+	EventRejected   AnamEventKind = "rejected"
 )
 
-// Valid reports whether k is a known record-event kind.
-func (k RecordEventKind) Valid() bool {
+// Valid reports whether k is a known anam-event kind.
+func (k AnamEventKind) Valid() bool {
 	switch k {
 	case EventAdmitted, EventSuperseded, EventTombstoned, EventEndorsed, EventRejected:
 		return true
@@ -239,19 +219,13 @@ type Facet struct {
 	ArtifactVersion   int
 	DefinitionVersion int
 
-	// EventTime places the Facet on the timeline; RecordedTime is when a person or
-	// system documented it; IngestedTime is when Anam received it (§5).
-	EventTime    time.Time
-	RecordedTime time.Time
-	IngestedTime time.Time
+	// FactTime is when the fact was true in the world, read out of the payload by the
+	// type's Definition (§5). It is the Facet's only clock: Anam's own clock lives on
+	// the AnamEvents, which is where knowing-about belongs.
+	FactTime time.Time
 
 	Binding    Binding
 	Provenance Provenance
-
-	// BirthStatus is the state this artifact was born in, and is immutable. The
-	// Facet's current status is derived, not stored — there is deliberately no Status
-	// field here.
-	BirthStatus BirthStatus
 
 	Descriptor Descriptor
 
@@ -261,17 +235,17 @@ type Facet struct {
 	Payload Canonical
 }
 
-// RecordEvent asserts that Anam's knowledge of a Facet changed, at record-time (§5).
+// AnamEvent asserts that Anam's knowledge of a Facet changed, at anam-time (§5).
 //
-// The dependency runs one way: a RecordEvent references a Facet, and a Facet never
-// references a RecordEvent — the world does not know Anam exists. That asymmetry is
+// The dependency runs one way: an AnamEvent references a Facet, and a Facet never
+// references an AnamEvent — the world does not know Anam exists. That asymmetry is
 // what makes rebuild-from-source sound.
-type RecordEvent struct {
-	Kind       RecordEventKind
-	FacetID    string
-	RecordTime time.Time
+type AnamEvent struct {
+	Kind     AnamEventKind
+	FacetID  string
+	AnamTime time.Time
 
-	// Seq monotonically orders events sharing a record-time.
+	// Seq monotonically orders events sharing an anam-time.
 	Seq int64
 
 	// ArtifactVersion is the Facet version this event concerns.

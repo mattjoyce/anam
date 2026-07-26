@@ -32,7 +32,7 @@ var ErrIndexAhead = errors.New("catchup: replay cursor is ahead of the ledger he
 // Ledger is the read surface catch-up replays from.
 type Ledger interface {
 	Head(ctx context.Context) (ledger.Watermark, error)
-	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.RecordEvent, error)
+	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.AnamEvent, error)
 	Version(ctx context.Context, facetID string, version int) (facet.Facet, error)
 }
 
@@ -50,7 +50,7 @@ type Result struct {
 	From, To int64
 }
 
-// Sync replays record-events in (cursor, head] into the indexes. Idempotent and
+// Sync replays anam-events in (cursor, head] into the indexes. Idempotent and
 // crash-re-runnable: the rows and the cursor move in one transaction on the ops
 // side, so a re-run resumes from wherever the last complete batch ended.
 func Sync(ctx context.Context, l Ledger, o Ops) (Result, error) {
@@ -82,7 +82,7 @@ func Sync(ctx context.Context, l Ledger, o Ops) (Result, error) {
 	eventRows := make([]ops.EventRow, len(events))
 	for i, ev := range events {
 		eventRows[i] = ops.EventRow{
-			Seq: ev.Seq, RecordTime: clock.Format(ev.RecordTime),
+			Seq: ev.Seq, AnamTime: clock.Format(ev.AnamTime),
 			Kind: ev.Kind, FacetID: ev.FacetID, ArtifactVersion: ev.ArtifactVersion,
 		}
 	}
@@ -97,7 +97,7 @@ func Sync(ctx context.Context, l Ledger, o Ops) (Result, error) {
 // mid-sync is therefore invisible here: the artifact versions this replay names were
 // written before it started and never change. Anything the new events did not reach is
 // simply next run's work — the cursor moves with the rows, in one transaction.
-func advance(ctx context.Context, l Ledger, o Ops, events []facet.RecordEvent) (rows []ops.FacetRow, err error) {
+func advance(ctx context.Context, l Ledger, o Ops, events []facet.AnamEvent) (rows []ops.FacetRow, err error) {
 	var ids []string
 	seen := map[string]bool{}
 	for _, ev := range events {
@@ -130,7 +130,7 @@ func advance(ctx context.Context, l Ledger, o Ops, events []facet.RecordEvent) (
 		}
 		rows = append(rows, ops.FacetRow{
 			FacetID: id, Type: f.Type,
-			EventTime: clock.Format(f.EventTime), BucketID: span.Of(f.EventTime).ID(),
+			FactTime: clock.Format(f.FactTime), BucketID: span.Of(span.Default, f.FactTime).ID(),
 			Version: st.Version, Status: st.Status, ContentHash: f.Descriptor.ContentHash,
 		})
 	}

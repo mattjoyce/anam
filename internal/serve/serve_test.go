@@ -69,14 +69,14 @@ func TestRun_ServesAndPublishes(t *testing.T) {
 	}
 
 	// facet_ids is the served entries' ids, in served order — which is the canonical's
-	// (event-time, id) order, and therefore reproducible.
+	// (fact-time, id) order, and therefore reproducible.
 	if !reflect.DeepEqual(r.FacetIDs, servedIDs(t, stored)) {
 		t.Errorf("facet_ids %v is not the served value's own order %v", r.FacetIDs, servedIDs(t, stored))
 	}
 }
 
 // Serving is a read. Being shown is not something Anam learned about a fact, so no
-// record-event is appended and the watermark does not move (§9).
+// anam-event is appended and the watermark does not move (§9).
 func TestRun_LeavesTheLedgerUntouched(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
@@ -110,7 +110,7 @@ func TestRun_LeavesTheLedgerUntouched(t *testing.T) {
 		t.Fatalf("Replay: %v", err)
 	}
 	if len(eventsAfter) != len(eventsBefore) {
-		t.Errorf("serving appended %d record-events", len(eventsAfter)-len(eventsBefore))
+		t.Errorf("serving appended %d anam-events", len(eventsAfter)-len(eventsBefore))
 	}
 }
 

@@ -48,7 +48,7 @@ const bpManifest = `{
     "validation_mode": "lenient",
     "source_schema": "bp-csv/reading",
     "time_semantics": {
-      "event_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
+      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
     },
     "identity_key": ["/measured_at"]
   },
@@ -170,7 +170,7 @@ func TestCommit_AdmitNoopSupersedeRetract(t *testing.T) {
 		t.Errorf("current = v%d %s", current.ArtifactVersion, current.Payload.Bytes())
 	}
 
-	// Retract: one more record-event, no new artifact.
+	// Retract: one more anam-event, no new artifact.
 	res4, err := g.Retract(ctx, res.FacetID)
 	if err != nil {
 		t.Fatalf("Retract: %v", err)
@@ -194,11 +194,11 @@ func TestCommit_AdmitNoopSupersedeRetract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Replay: %v", err)
 	}
-	kinds := make([]facet.RecordEventKind, len(events))
+	kinds := make([]facet.AnamEventKind, len(events))
 	for i, ev := range events {
 		kinds[i] = ev.Kind
 	}
-	want := []facet.RecordEventKind{facet.EventAdmitted, facet.EventSuperseded, facet.EventTombstoned}
+	want := []facet.AnamEventKind{facet.EventAdmitted, facet.EventSuperseded, facet.EventTombstoned}
 	for i := range want {
 		if kinds[i] != want[i] {
 			t.Fatalf("event stream = %v, want %v", kinds, want)

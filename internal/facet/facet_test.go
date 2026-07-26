@@ -89,11 +89,6 @@ func TestEnumValid(t *testing.T) {
 		{"classification lower case", facet.Classification("normal"), false},
 		{"classification empty", facet.Classification(""), false},
 
-		{"birth admitted", facet.BornAdmitted, true},
-		{"birth proposed", facet.BornProposed, true},
-		{"birth superseded is not a birth", facet.BirthStatus("superseded"), false},
-		{"birth empty", facet.BirthStatus(""), false},
-
 		{"status admitted", facet.StatusAdmitted, true},
 		{"status superseded", facet.StatusSuperseded, true},
 		{"status tombstoned", facet.StatusTombstoned, true},
@@ -107,9 +102,9 @@ func TestEnumValid(t *testing.T) {
 		{"event tombstoned", facet.EventTombstoned, true},
 		{"event endorsed", facet.EventEndorsed, true},
 		{"event rejected", facet.EventRejected, true},
-		{"event published is not a record-event", facet.RecordEventKind("published"), false},
-		{"event unknown", facet.RecordEventKind("deleted"), false},
-		{"event empty", facet.RecordEventKind(""), false},
+		{"event published is not an anam-event", facet.AnamEventKind("published"), false},
+		{"event unknown", facet.AnamEventKind("deleted"), false},
+		{"event empty", facet.AnamEventKind(""), false},
 
 		{"payload verbatim", facet.PayloadVerbatim, true},
 		{"payload reference", facet.PayloadReference, true},
@@ -186,42 +181,40 @@ func TestEnvelopeValidate(t *testing.T) {
 }
 
 // TestFacetHasNoCurrentStatusField guards the invariant in ARCHITECTURE.md §12: a
-// Facet's current status is derived by the fold from record-events and is never stored
+// Facet's current status is derived by the fold from anam-events and is never stored
 // on the artifact. A field named Status here would be a second source of truth and a
 // place to overwrite, which is exactly what the append-only ledger forbids.
 //
-// BirthStatus is permitted: it is the immutable state the artifact was born in.
+// No field is exempt. BirthStatus used to be, until it was found to carry no
+// information a nil-check on Derivation did not already carry.
 func TestFacetHasNoCurrentStatusField(t *testing.T) {
 	t.Parallel()
 
 	rt := reflect.TypeOf(facet.Facet{})
 	for i := range rt.NumField() {
 		name := rt.Field(i).Name
-		if name == "BirthStatus" {
-			continue
-		}
 		if strings.Contains(name, "Status") {
 			t.Errorf("Facet has field %q: current status must be derived by the fold, never stored", name)
 		}
 	}
 }
 
-// TestRecordEventReferencesFacetNotTheReverse guards the one-directional dependency in
-// §5: a record-event references a Facet; a Facet never references a record-event,
+// TestAnamEventReferencesFacetNotTheReverse guards the one-directional dependency in
+// §5: an anam-event references a Facet; a Facet never references an anam-event,
 // because the world does not know Anam exists. Reversing it would break
 // rebuild-from-source.
-func TestRecordEventReferencesFacetNotTheReverse(t *testing.T) {
+func TestAnamEventReferencesFacetNotTheReverse(t *testing.T) {
 	t.Parallel()
 
-	if _, ok := reflect.TypeOf(facet.RecordEvent{}).FieldByName("FacetID"); !ok {
-		t.Error("RecordEvent must reference the Facet it concerns via FacetID")
+	if _, ok := reflect.TypeOf(facet.AnamEvent{}).FieldByName("FacetID"); !ok {
+		t.Error("AnamEvent must reference the Facet it concerns via FacetID")
 	}
 
 	rt := reflect.TypeOf(facet.Facet{})
 	for i := range rt.NumField() {
 		name := rt.Field(i).Name
-		if strings.Contains(name, "RecordEvent") || strings.Contains(name, "Seq") {
-			t.Errorf("Facet has field %q: a Facet must never reference a record-event", name)
+		if strings.Contains(name, "AnamEvent") || strings.Contains(name, "Seq") {
+			t.Errorf("Facet has field %q: a Facet must never reference an anam-event", name)
 		}
 	}
 }

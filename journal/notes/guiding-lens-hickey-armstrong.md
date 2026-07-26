@@ -34,7 +34,7 @@ Running the *Before — design review* pass on the draft produced binding rules:
 - **Quarantine the substrate (Hickey).** The stores are [[substrate-is-accidental|accidental
   complexity]]; only `internal/store` may name them. The single-table `item` is a marshalling envelope at
   the storage edge, not a domain type — the seven domain values stay un-braided in code.
-- **One truth per fact (Hickey, no PLOP).** The artifact stores only immutable `birth_status`; current
+- **One truth per fact (Hickey, no PLOP).** The artifact stores no status of any kind; current
   status/endorsement is always a fold output, never written back.
 - **Cursor is a cache, not truth (Hickey).** Derivable, safe to lose; ingest idempotency makes a lost
   cursor a re-scan.

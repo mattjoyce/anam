@@ -107,8 +107,8 @@ governing metadata* — deliberately **not** a normalised domain entity. Three p
 
 - **(a) Attributes about itself** — `id`; `type`; `confidence`; `classification`
   (`Normal`/`Confidential`/`Sensitive`); `artifact_version`; `definition_version`;
-  `event_time` / `recorded_time` / `ingested_time`; `binding` + a derived `binding_assurance`;
-  `provenance`; and `birth_status` — the **immutable** state it was born in (`admitted` or `proposed`).
+  `fact_time`; `binding` + a derived `binding_assurance`; and `provenance` — whose optional
+  `derivation` is the *only* mark distinguishing an Anam-authored finding from a captured fact (§11).
 - **(b) Payload descriptor** — the `source_schema` + `schema_version` (self-describing), a
   `content_hash`, the `payload_kind` (`verbatim` | `reference`), and `media_type`.
 - **(c) Payload** — *either* the **verbatim structured body** (the source fragment, held opaque) *or* a
@@ -124,7 +124,7 @@ Two rules make this safe:
    map (§8).
 
 > **Design note (Hickey).** The Facet is a *value* — an immutable fact. Its current *status* is not
-> stored on it; status is a **fold** over record-events (§6, §9). The artifact carries only the state
+> stored on it; status is a **fold** over anam-events (§6, §9). The artifact carries only the state
 > it was born in. One truth per fact; no place is ever overwritten.
 
 ### 3a. Facet and Facet Definition — two independent planes
@@ -136,7 +136,7 @@ Two rules make this safe:
   Old artifacts stay interpretable as definitions evolve.
 
 Granularity is a choice: start coarse (one Facet per source fragment) and decompose only where real
-event-times or finer access control earn the cut. Facet types are **dotted and namespaced** —
+fact-times or finer access control earn the cut. Facet types are **dotted and namespaced** —
 `health.sleep`, `health.body-composition`, `health.heart-rate`, `health.blood-pressure`,
 `health.metric-group` — so new sources slot in cleanly (`calendar.event`, `mail.thread`, `note.zettel`).
 
@@ -145,7 +145,7 @@ event-times or finer access control earn the cut. Facet types are **dotted and n
 ## 4. The person timeline — substrate and default access
 
 Storage is **partitioned by the person** (`person#<id>`): all their facets are co-located on one
-**timeline**, in **event-time** order. The person is the **substrate**.
+**timeline**, in **fact-time** order. The person is the **substrate**.
 
 **Access is the person timeline, read whole by default.** This is the inversion. Unlike Arch, there is
 no required span filter and no fail-closed on a whole-person read — a longitudinal record is the point.
@@ -158,7 +158,7 @@ Conflating these produced the whole-timeline mint that §1 retracts. Anam has **
 
 | Tier | What it is | Minted? |
 |---|---|---|
-| **Bucket span** | a calendar window over **event-time** (default: one month). Every facet is a member of exactly one, by arithmetic on its `event_time` — no lookup. Invisible to the reader; nobody asks for it. | **minted** — the unit of checkpointing (§7) |
+| **Bucket span** | a calendar window over **fact-time**, **one month** by default (`span.Default`; weekly is also implemented). Every facet is a member of exactly one, by arithmetic on its `fact_time` — no lookup. Invisible to the reader; nobody asks for it. | **minted** — the unit of checkpointing (§7) |
 | **Derived span** | an inclusive interval the person names — `[from, to]`, optionally narrowed to some facet types; a saved bookmark; or "everything" | **never minted.** Composed on demand from bucket values; materialised only when a receipt is served |
 
 A derived span is a **lens**, not a unit of consistency: composed on demand, never stored as one, never
@@ -176,79 +176,93 @@ rebuildable** — while owning, and taking responsibility for, the continuity.
 
 ## 5. Time — the two clocks
 
-| Time | Clock | Meaning |
-|---|---|---|
-| **Event time** | Facet | When the thing happened (the reading, the night's sleep) — timeline placement |
-| **Recorded time** | Facet | When a person or system documented it |
-| **Ingested time** | Anam | When Anam received it |
-| **Published time** | Anam | When it first appeared in a served account — the earliest `served_at` over the receipts naming it (§9). Not a record-event |
+There are exactly two, and where each one lives is the whole of the design:
 
-Four times sit on the table above and a fifth — **record-time**, on the Anam record-event — carries the
-ordering. Two of them do the work of every read, and telling them apart is the difference between asking
-about the world and asking about Anam.
+| Time | Lives on | Meaning |
+|---|---|---|
+| **Fact time** | the Facet | When it was true in the world — the reading, the night's sleep. Timeline placement |
+| **Anam time** | the anam-event | When Anam's knowledge changed — admitted, superseded, tombstoned, endorsed, rejected |
+
+Telling them apart is the difference between asking about the world and asking about Anam, and the
+split is structural rather than conventional. A **Facet carries one clock and it is the world's**; a
+source can assert when something was true and nothing else. An **anam-event carries one clock and it is
+Anam's**; nothing outside Anam can assert when Anam learned something. Neither can borrow the other's,
+because neither has a field for it.
+
+That is why there are two and not four. Earlier drafts also carried a *recorded time* ("when the source
+documented it") and an *ingested time* ("when Anam received it"). The first was a clock no source in the
+first slice actually provided — all five Definitions defaulted it to fact time, so it was a duplicate
+column across 893 rows. The second was the anam-time of the `admitted` event, copied onto the Facet, and
+so a second place for the same answer to disagree from. Both were deleted. Where the facet page once
+read `ingested_time` off the artifact, it now goes to the ledger and reads it off the event that
+admitted that version — one fact, one home.
+
+**Published time** is not a third clock. It is derived on demand: the earliest `served_at` over the
+receipts naming a facet (§9). Serving changes nothing Anam knows, so it is deliberately not an
+anam-event.
 
 ### 5a. Reading on two clocks
 
-**Event-time is not left in the payload.** The Definition's `time_semantics.event_time` JSON Pointer
+**Fact-time is not left in the payload.** The Definition's `time_semantics.fact_time` JSON Pointer
 extracts it at the gate and it becomes a first-class governed field on the Facet and on every canonical
 entry. That promotion is load-bearing: it is what lets the timeline be ordered and a window filtered
-without anything ever opening a payload. If event-time lived only inside the blob, every read would have
+without anything ever opening a payload. If fact-time lived only inside the blob, every read would have
 to parse every blob, and the metadata/payload separation of §3 would be a fiction.
 
 So a read may name either clock, or both:
 
 | Question | Clock | How it narrows | Resolution |
 |---|---|---|---|
-| What was true **in the world** up to January? | event-time | a **derived span** (`--from`/`--to`) | full — it comes from the source |
-| What did **Anam know** on 10 July? | record-time | an **as-of** (`--as-of`) | one point per record-event — but see §5b on span |
+| What was true **in the world** up to January? | fact-time | a **derived span** (`--from`/`--to`) | full — it comes from the source |
+| What did **Anam know** on 10 July? | anam-time | an **as-of** (`--as-of`) | one point per anam-event — but see §5b on span |
 | Both, composed | — | `--as-of T` then the span | bitemporal |
 
 They are different *kinds* of operation, which is why they compose rather than compete: an **as-of picks
 which version of the record you are reading** — one watermark, one fold — and a **span filters inside**
 that version. Naming both "as-of" would hide that.
 
-**`as-of` is unqualified and always means record-time.** It needs no prefix because there is only one;
-this matches Datomic's `as-of` and SQL:2011's `AS OF SYSTEM TIME`. A `record-as-of` spelling would also
-collide with **recorded time**, which is the *source's* account of when it documented something — a
-Facet clock, one letter away and a different thing entirely.
+**`as-of` is unqualified and always means anam-time.** It needs no prefix because as-of has only ever
+meant *what was available to know* — this is Datomic's `as-of` and SQL:2011's `AS OF SYSTEM TIME`. A
+fact-time point is a different question and must be spelled differently; anything one letter away from
+`--as-of` is a trap, not a name.
 
-### 5b. A bulk import compresses record-time, and nothing can uncompress it
+### 5b. A bulk import compresses anam-time, and nothing can uncompress it
 
-Record-time is **fine-grained** — every record-event gets its own instant and its own watermark, so the
-first slice's 893 facets have 893 distinct record-times. What a backfill compresses is not the
+Anam-time is **fine-grained** — every anam-event gets its own instant and its own watermark, so the
+first slice's 893 facets have 893 distinct anam-times. What a backfill compresses is not the
 resolution but the **span**:
 
 | | |
 |---|---|
-| event-time span | 2024-01 → 2026-07, ~30 months |
-| record-time span | one afternoon, 2026-07-10 |
+| fact-time span | 2024-01 → 2026-07, ~30 months |
+| anam-time span | one afternoon, 2026-07-10 |
 
 The two axes therefore bear no relation to each other, and an as-of *inside* the import returns
 whatever prefix of the backfill had landed by then — an artefact of the order the rows were read, not of
 history. **This is honest, not broken.** Anam did not exist in 2024, so "what did Anam know in 2024"
-correctly answers *nothing*, and manufacturing a record-time per fact would be inventing provenance Anam
+correctly answers *nothing*, and manufacturing an anam-time per fact would be inventing provenance Anam
 does not have.
 
 The consequence is a division of labour worth stating plainly:
 
-- **Record-time is an audit instrument.** What did this receipt stand on? Has the ledger moved under a
+- **Anam-time is an audit instrument.** What did this receipt stand on? Has the ledger moved under a
   published artifact? That is what `as-of`, `changes_since` and the watermark exist for, and their
   resolution is exactly right for it.
-- **Event-time is the history instrument.** It has full resolution because it comes from the source, and
+- **Fact-time is the history instrument.** It has full resolution because it comes from the source, and
   it is the axis the person actually experienced.
 
-Record-time gains real resolution only when ingest becomes incremental — worth knowing before minting
+Anam-time gains real resolution only when ingest becomes incremental — worth knowing before minting
 (§7), because checkpoints are cut against watermarks.
 
 > **Not yet built, and named so it is not assumed:** "the facts as of January" most often means *the
 > latest reading before January*, one per identity — a last-known-value read. A derived span gives every
 > reading up to January, which is a different answer. The canonical is already ordered by
-> `(event_time, facet_id)`, so the fold is cheap; it simply does not exist yet.
+> `(fact_time, facet_id)`, so the fold is cheap; it simply does not exist yet.
 
-A **Facet event** is the domain fact — immutable, carrying its own event-time, true independently of
-Anam; placed on the timeline at its **event-time**. An **Anam record-event** asserts that Anam's
+A **Facet event** is the domain fact — immutable, carrying its own fact-time, true independently of
+Anam; placed on the timeline at its **fact-time**. An **anam-event** asserts that Anam's
 *knowledge* changed — `admitted`, `superseded`, `tombstoned`, `endorsed`, `rejected` — and carries
-**record-time**. There are exactly these five.
+**anam-time**. There are exactly these five.
 
 > Publication is **not** among them. Serving a facet changes nothing Anam knows about it; it records what
 > Anam *showed*. That is what a **receipt** already is (§9), pinning the served bytes, the facet-id set,
@@ -259,9 +273,9 @@ Anam; placed on the timeline at its **event-time**. An **Anam record-event** ass
 > artifacts — authored, backed up, not rebuilt (§1). Lose the artifact directory and published-time is
 > gone. That is the trade, and it is worth it, because every remaining kind maps one-to-one onto a status.
 
-The dependency is **one-directional**: a record-event references a Facet; a Facet **never** references a
-record-event — the world does not know Anam exists. This one-way rule is what makes rebuild-from-source
-sound. `changes_since` is built from record-time (§9).
+The dependency is **one-directional**: an anam-event references a Facet; a Facet **never** references an
+anam-event — the world does not know Anam exists. This one-way rule is what makes rebuild-from-source
+sound. `changes_since` is built from anam-time (§9).
 
 ---
 
@@ -285,7 +299,7 @@ The gate is exposed as two calls:
 
 - **`resolve(envelope) → binding + assurance`** — enforces association.
 - **`commit(envelope, resolution) → admitted | rejected`** — enforces facet-compliance and token scope,
-  computes the content hash, and appends the artifact plus an `admitted` record-event.
+  computes the content hash, and appends the artifact plus an `admitted` anam-event.
 
 ### 6a. Idempotency and supersession (the crash-clean property)
 
@@ -298,18 +312,18 @@ The gate is exposed as two calls:
   facet** and orphan the original instead of superseding it — silently disabling the entire
   idempotency-and-supersession mechanism for that source. Identity decides *which fact*; `content_hash`
   decides *whether it changed*. Keep them unbraided.
-- `commit` writes the artifact, its `admitted` record-event, and the watermark bump `W` in **one atomic
+- `commit` writes the artifact, its `admitted` anam-event, and the watermark bump `W` in **one atomic
   transaction** (§8). Idempotency is enforced on `(source_ref, content_hash)`.
   - Same `source_ref` **and** same hash → **no-op** (safe re-ingest).
   - Same `source_ref`, **different** hash → the source row changed: write a **new artifact version** and
-    append a `superseded` record-event against the prior. Nothing is mutated; the old artifact stays.
-- **Retraction is a tombstone** — a `tombstoned` **record-event** against the current artifact version.
+    append a `superseded` anam-event against the prior. Nothing is mutated; the old artifact stays.
+- **Retraction is a tombstone** — a `tombstoned` **anam-event** against the current artifact version.
   Never a delete, and never a new artifact. It advances `W` like any other mutation (§7).
 
   > Arch writes a tombstone as a *status-bearing artifact version* (ADR 0030), and Anam inherited the
   > sentence. It cannot be true here: Anam folds status out of the artifact (§3, §12), so there is
-  > nowhere to put one — `birth_status` admits only `admitted` and `proposed`. The status transition
-  > *is* the whole event. Corrected once code had to write one.
+  > nowhere to put one — a Facet has no status field of any kind. The status transition *is* the whole
+  > event. Corrected once code had to write one.
 
 > **Design note (Armstrong).** Because `commit` is idempotent and atomic, a capture worker may **crash
 > mid-batch and simply be re-run to known-good**. There is no partial facet and no corruption. This — the
@@ -326,7 +340,7 @@ The **append-only ledger is Anam's record of what it knew** — its own log, nev
 world (the sources are). Everything admitted stays; supersession and tombstoning are status transitions,
 never deletes.
 
-> **Any state = nearest checkpoint + replay of the record-events since that checkpoint's watermark.**
+> **Any state = nearest checkpoint + replay of the anam-events since that checkpoint's watermark.**
 > (Arch ADR 0032.) A single indexed range-scan. The current canonical is the head case; a historical
 > as-of is the same scan with an upper bound.
 
@@ -346,23 +360,35 @@ surface is "the truth about the past" more than the other — they answer differ
 ### Mint = adaptive checkpointing, and its only job is to bound replay
 
 A **checkpoint** is an immutable, **content-addressed** value of the live-only fold over one span's
-members at a record-time **watermark**: `hash = sha256(canonical bytes)`.
+members at an anam-time **watermark**: `hash = sha256(canonical bytes)`.
 
 Minting exists **only to bound read-time replay depth** — *not* for freshness. The ledger is always
 current, so a read replays to the head and is **as fresh as ingest**. Freshness is a property of the
 read, paid by a range-scan; it is not bought by a periodic tick.
 
 - **Minting is per span, never whole-life** (ADR 0033). Anam's default mintable span is a **time bucket**
-  over **event-time** (default: one calendar month). Every facet is a member of exactly one bucket, so
-  the minted set is never empty and every facet sits inside a mintable scope.
-- **Anam buckets on event-time, where Arch buckets on record-time.** Anam can, and Arch cannot, because
+  over **fact-time**. **Width is a knob, not a constant** — `internal/span` implements monthly and
+  weekly, and `span.Default` is **monthly**. (Width bounds the cost of *making* a checkpoint; cadence
+  bounds the cost of *using* one. They are different knobs and were once wearing one word.) Bucket ids
+  are **self-describing** — `bucket:2026-07` monthly, `bucket:2026-W28` weekly — so ids already written
+  keep their meaning when the default changes. Every facet is a member of exactly one bucket, so the
+  minted set is never empty and every facet sits inside a mintable scope.
+- **Anam buckets on fact-time, where Arch buckets on anam-time.** Anam can, and Arch cannot, because
   `facet_id = uuidv5(source_ref)` and `source_ref` is a source row's **identity, not its contents** (§6a):
-  a superseding artifact is the same row re-read, so it carries the same `event_time` and lands in the
+  a superseding artifact is the same row re-read, so it carries the same `fact_time` and lands in the
   same bucket. **Every version of a logical facet lives in one bucket.** The lifelong view is therefore a
   *disjoint union* of bucket values needing no cross-bucket version resolution — and a checkpoint aligns
   with the time-bounded question a person actually asks.
-  - The cost: a backfilled facet (an old `event_time` ingested today) re-opens its sealed bucket and
-    re-mints it. One bucket, a few hundred facets. Garmin backfills routinely; this is cheap and correct.
+  - The cost: a backfilled facet (an old `fact_time` ingested today) re-opens its sealed bucket and
+    re-mints it. One bucket — but *how many facets* is a property of the corpus, not of the design, and
+    the "a few hundred" this once said was measured against 893 facets in total. Measured at the
+    current 6,181 facets: **31 monthly buckets, mean 199, worst 575, thinnest 7** — and it is the
+    *worst* bucket that prices a re-mint, never the mean. Garmin's `monitoring_*` and `stress` tables
+    would put ~73,000 in one month. A re-mint that is free at the first density is not free at the second, so
+    **either the width narrows as density rises, or re-mint becomes incremental**. Undecided, and it
+    must be decided before a dense source is ingested rather than discovered afterwards. Monthly is
+    chosen for the density this record has now — 31 buckets to stitch rather than 135 — and is expected
+    to be re-checked, not inherited.
 - **The lifelong / derived view composes, it never re-folds.** A Span the person names (`--from/--to`, a
   saved bookmark, "everything") is a **derived span**: computed on demand by stitching bucket values,
   materialised only when a receipt is served. It is never pulsed and never minted.
@@ -372,12 +398,12 @@ read, paid by a range-scan; it is not bought by a periodic tick.
 
 ### The watermark and the head
 
-`W` is the **stream watermark**: a monotonic counter advanced by *every* record-event that can change the
+`W` is the **stream watermark**: a monotonic counter advanced by *every* anam-event that can change the
 live-set — `admitted`, `superseded`, `tombstoned`, `endorsed`, `rejected`. A pure status transition
 advances `W` even though no facet is born; if it did not, a checkpoint could reuse a value that still
 lists a retracted facet.
 
-Because those five are *all* the record-events there are (§5), **`W` is the record-event sequence itself**:
+Because those five are *all* the anam-events there are (§5), **`W` is the anam-event sequence itself**:
 `W ≡ seq`. One counter, not two. Nothing takes a `seq` without moving the watermark, and nothing moves the
 watermark without taking a `seq`.
 
@@ -396,9 +422,9 @@ Anam stores in **three** places, because three different things want three diffe
 
 | Substrate | Holds | Nature |
 |---|---|---|
-| **DynamoDB** | facet artifacts (metadata + opaque payload), record-events, and the watermark `W` | the **ledger** — Anam's record of what it knew |
+| **DynamoDB** | facet artifacts (metadata + opaque payload), anam-events, and the watermark `W` | the **ledger** — Anam's record of what it knew |
 | **Filesystem** | checkpoint values (`VALUE#<hash>`) and served receipts | **published artifacts** — immutable, content-addressed |
-| **SQLite** | Facet Definitions, projection templates, token scopes, the facet and record-event indexes, the span registry and per-span `V`/`Wᵥ`, the checkpoint and receipt index, saved span bookmarks, sync cursors, GC state, the operational log | Anam's **operational store** |
+| **SQLite** | Facet Definitions, projection templates, token scopes, the facet and anam-event indexes, the span registry and per-span `V`/`Wᵥ`, the checkpoint and receipt index, saved span bookmarks, sync cursors, GC state, the operational log | Anam's **operational store** |
 
 Config is **YAML**; Facet Definitions are **JSON** (§3a).
 
@@ -413,7 +439,7 @@ rebuild has to know what it may drop:
 
 | Tier | Tables | Recovery |
 |---|---|---|
-| **Derived** | facet index, record-event index, checkpoint index, `span_head`, sync cursors | replay the ledger |
+| **Derived** | facet index, anam-event index, checkpoint index, `span_head`, sync cursors | replay the ledger |
 | **Provisioned** | Facet Definitions, projection templates, token scopes | the embedded assets and config — i.e. git |
 | **Authored** | saved span bookmarks, GC state, the operational log | nowhere. Back it up |
 
@@ -421,19 +447,19 @@ The tier belongs in the schema beside each table, because it is the only thing t
 whether dropping it is survivable.
 
 The **derived** tier must stay *provably* derived. The rebuild test (`MVP.md` §7) drops it and re-derives
-it from the ledger: if a facet payload, a record-event or `W` ever acquired a second home there, the test
+it from the ledger: if a facet payload, an anam-event or `W` ever acquired a second home there, the test
 would pass on data it never rebuilt, and "Anam owns no source fact" would stop being falsifiable.
 
 ### The ledger — datom-shaped, not a datom engine
 
 Following Arch ADR 0031: adopt the datom **shape**, do not build a datom **engine**. Facts are
-`[entity attribute value tx]` with `tx` = record-time; the store supplies sorted indexes, Anam supplies
+`[entity attribute value tx]` with `tx` = anam-time; the store supplies sorted indexes, Anam supplies
 the shape and a handful of fixed query forms.
 
 > **It is not EAVT, and calling it that invites a query Anam cannot answer.** EAVT implies you could ask
 > the ledger for the `systolic` attribute. You cannot: there is no such attribute, because the payload
 > is never decomposed into per-field triples. What *is* attribute-shaped and queryable is Anam's
-> **envelope** — type, event-time, classification, provenance, content-hash — which is exactly what
+> **envelope** — type, fact-time, classification, provenance, content-hash — which is exactly what
 > projections filter on. The payload beneath it is one opaque, content-addressed value, and a reader who
 > wants a field gets the whole reading back and reads it themselves.
 >
@@ -453,7 +479,7 @@ Grain is **hybrid at the verbatim line** (ADR 0031):
 pk = person#<id>
 sk:
   facet#<facet_id>#v<%06d>   facet artifacts, keyed by identity  (Query: begins_with)
-  rec#<%020d>                record-events, keyed by seq         (Query: BETWEEN — replay-since)
+  rec#<%020d>                anam-events, keyed by seq         (Query: BETWEEN — replay-since)
   seq                        the watermark W — a counter item, seeded at 0 by init
 ```
 
@@ -464,7 +490,7 @@ base-table range scans that must live in the same substrate as the conditional w
   `content_hash` `commit` compares against (§6a);
 - `BETWEEN("rec#…")` — replay since a watermark.
 
-Everything else a reader wants — the timeline in event-time order, a type filter, `changes_since` — is an
+Everything else a reader wants — the timeline in fact-time order, a type filter, `changes_since` — is an
 **index**, and indexes live in the operational store, rebuilt by replaying the ledger. A table with a
 partition key, a sort key and a conditional counter is *any* ordered key-value store; that is what "the
 substrate is accidental" has to mean if it means anything.
@@ -473,8 +499,8 @@ substrate is accidental" has to mean if it means anything.
 
 Both halves were learned the hard way, and both are verified against DynamoDB Local rather than assumed.
 
-- **`event_time` must not appear in an artifact's sort key.** It is a *value*, read out of the payload;
-  `facet_id` is *identity*. Key an artifact on its event-time and a corrected source row whose event-time
+- **`fact_time` must not appear in an artifact's sort key.** It is a *value*, read out of the payload;
+  `facet_id` is *identity*. Key an artifact on its fact-time and a corrected source row whose fact-time
   moved lands at a fresh sort key: the prior-version lookup misses it, `commit` concludes "never seen",
   and writes `v1` again. Two live artifacts, one `facet_id`, **supersession silently disabled** — the
   `source_ref` mistake (§6a) wearing a sort key. Identity-first makes it unrepresentable rather than
@@ -495,11 +521,11 @@ attribute, never a Map** — this is where metadata/payload separation (§3) is 
 > **Design note (Hickey).** The single-table `item` is a **marshalling envelope, quarantined to the store
 > package** — not a domain type. Each domain value owns its `toItem`/`fromItem`; the `kind` discriminator
 > exists only at the storage edge. Current status is absent from the artifact: it is folded from
-> record-events (§9).
+> anam-events (§9).
 
 ### `commit` is one transaction, and it is the error kernel
 
-The facet artifact, its `admitted` record-event, and the bump of `W` are written in a **single
+The facet artifact, its `admitted` anam-event, and the bump of `W` are written in a **single
 `TransactWriteItems`**: artifact and event each conditional on their sort key not already existing, and
 `W` conditional on still holding the value it was read at.
 
@@ -511,17 +537,17 @@ wrapped around it:
 | Cancelled item | What it means | Response |
 |---|---|---|
 | the artifact | this `(facet_id, version)` already exists | compare `content_hash`: **same** → idempotent no-op, we are seeing our own write; **different** → a lost update. Stop |
-| the record-event | that `seq` is taken *while `W` was not stale* | the counter is behind its own log. The ledger is corrupt. Stop |
-| the watermark | another writer advanced `W` | re-read, re-stamp `record_time`, retry |
+| the anam-event | that `seq` is taken *while `W` was not stale* | the counter is behind its own log. The ledger is corrupt. Stop |
+| the watermark | another writer advanced `W` | re-read, re-stamp `anam_time`, retry |
 
 `ReturnValuesOnConditionCheckFailure: ALL_OLD` returns the existing artifact alongside the cancellation, so
 the hash comparison costs no second read. This is what makes a dropped connection safe: the transaction
 committed, the client saw an error, and the retry lands on the first row and reads its own write back as a
 no-op.
 
-`record_time` is stamped **inside** the retry, after the successful `seq` read, so that `seq` order and
-`record_time` order agree by construction. A retry that reused its original timestamp could place an
-earlier `record_time` at a higher `seq`, and the ledger's order — the one thing §1 admits Anam owns —
+`anam_time` is stamped **inside** the retry, after the successful `seq` read, so that `seq` order and
+`anam_time` order agree by construction. A retry that reused its original timestamp could place an
+earlier `anam_time` at a higher `seq`, and the ledger's order — the one thing §1 admits Anam owns —
 would be ambiguous.
 
 The retry loop belongs to the **gate**, not the store. A capture worker may already crash mid-batch and be
@@ -531,7 +557,7 @@ component that must not fail buys nothing.
 > **Design note (Armstrong).** There is **no transaction across substrates**, so everything that must be
 > atomic lives in one: the artifact, the event, and the watermark. The operational store's **derived**
 > tier is never written in the same breath as the ledger; it catches up afterwards by replaying
-> record-events since its last-seen `seq`. That is safe precisely because the ledger is append-only and
+> anam-events since its last-seen `seq`. That is safe precisely because the ledger is append-only and
 > `commit` is idempotent — **a crash leaves the derived tier behind, never wrong, and behind is fixable by
 > replay.** Catch-up is not housekeeping: the fold reads its indexes, so it must assert `last_seq == W`
 > before folding, or a checkpoint can be computed from a lagging index and be wrong at its own watermark.
@@ -560,16 +586,16 @@ names the ledger's SDK, and `check.sh` enforces that too.
 Two surfaces (§7), and the reads that go to each.
 
 **The ledger** is append-only and complete: every facet ever admitted, at its **current status derived
-from record-events**, with provenance — including superseded and tombstoned facets. *What is admitted
+from anam-events**, with provenance — including superseded and tombstoned facets. *What is admitted
 stays; it is re-statused, never pruned by retraction.* Forensic reads, `as-of` reads, and rebuild go here.
 
-- **`changes_since`** reads record-events by record-time and reports what changed between two points.
+- **`changes_since`** reads anam-events by anam-time and reports what changed between two points.
 - The **raw / forensic** view of the timeline reads the ledger directly, tombstones visible.
 
 **The canonical** is the **live-only** fold at a watermark: every facet whose current status is live.
 Superseded and tombstoned facets are *excluded from the value* — they remain in the ledger, marked.
 
-- **Fold** reads the record-events for a span's members up to a watermark and derives each facet's
+- **Fold** reads the anam-events for a span's members up to a watermark and derives each facet's
   current status (`admitted` / `superseded` / `tombstoned` / `endorsed` / `rejected`), keeping the live
   ones. Liveness ⇔ the current artifact version's status is live.
 - The **normal serve path** is *nearest checkpoint + replay-since* (§7), so a read is as fresh as ingest.
@@ -599,7 +625,7 @@ template version, the definition-set version, the `served_at` time, and the span
 and linkage-version drop out — no consent gating, no identity graph.)
 
 Receipts are also where **publication** is recorded. A facet's published time (§5) is the earliest
-`served_at` over the receipts naming it; there is no `published` record-event, because being shown is not
+`served_at` over the receipts naming it; there is no `published` anam-event, because being shown is not
 something Anam learned about the fact.
 
 ---
@@ -625,7 +651,7 @@ Facet**: it re-enters through the **same admission gate**, admitted while still 
 provenance carrying the method/model and the canonical **watermark it was computed from**. It carries
 confidence and an endorsement status.
 
-**Admission is not endorsement.** Endorsement (`endorsed` / `rejected`) is itself a record-event and
+**Admission is not endorsement.** Endorsement (`endorsed` / `rejected`) is itself an anam-event and
 **never writes back** into source systems. Any real-world action a person takes on an insight re-enters
 Anam later as an ordinary source fact.
 
@@ -650,13 +676,13 @@ Anam later as an ordinary source fact.
   nothing (§8).
 - **Append-only**: facts are added and superseded by status events (tombstones) — **never modified,
   never deleted.** DynamoDB cannot enforce this; our code must not violate it, and a test guards it (§8).
-- **Current status is derived** by the fold from record-events — **never stored** on the artifact (no
-  place-oriented programming). A tombstone is therefore a **record-event, not an artifact version**: an
+- **Current status is derived** by the fold from anam-events — **never stored** on the artifact (no
+  place-oriented programming). A tombstone is therefore a **anam-event, not an artifact version**: an
   Anam artifact has nowhere to carry a status (§6a).
 - **`source_ref` is identity, `content_hash` is content.** The natural key never contains the row's
   values, or supersession silently becomes duplication (§6a).
 - **Sort keys are identity-first and fixed-width.** An artifact's key carries its `facet_id`, never its
-  `event_time`; every integer in a sort key is zero-padded. Otherwise supersession silently duplicates, or
+  `fact_time`; every integer in a sort key is zero-padded. Otherwise supersession silently duplicates, or
   lexical order stops being chronological (§8). The ledger carries **no secondary indexes**: an index is
   derived, and derived things live in the operational store.
 - **Canonical means the live-only value; the ledger means append-everything-marked.** One word, one
@@ -664,7 +690,7 @@ Anam later as an ordinary source fact.
 - **Metadata / payload separation**: the payload is verbatim, immutable, stored opaque, never parsed
   into a canonical schema.
 - **Three-pillar admission through the one gate**; **`commit` is idempotent and atomic** — artifact,
-  record-event and watermark in one transaction, in one substrate (crash-clean).
+  anam-event and watermark in one transaction, in one substrate (crash-clean).
 - Projections **prune, never reshape or generate**; a consumer selects, never defines.
 - Agent findings are derived Facets admitted as `proposed`; **endorsement never writes back**.
 - **The Envelope is the only ingress**; every external call is timed and fails fast.
@@ -690,5 +716,5 @@ one or two projections plus a CLI timeline viewer, manual mint, and receipts. Re
   them; they are simply not built yet.
 - **Last-known-value reads** (§5a) — "the facts as of January" usually means *the latest reading before
   January, one per identity*, and a derived span answers the different question "every reading up to
-  January". The canonical is already ordered by `(event_time, facet_id)`, so the fold is cheap; it is
+  January". The canonical is already ordered by `(fact_time, facet_id)`, so the fold is cheap; it is
   unbuilt, not hard. Named here so the span is not mistaken for it.

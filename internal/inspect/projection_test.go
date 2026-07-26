@@ -46,7 +46,7 @@ func projectionServer(t *testing.T) *httptest.Server {
 // that has been tombstoned. The real ledger has no corrections in it, so this is the
 // only place the superseded arm is exercised.
 //
-// Record-times are spread across two days so the as-of control has a boundary to land
+// Anam-times are spread across two days so the as-of control has a boundary to land
 // between. It returns an error rather than taking a *testing.T, because it runs inside
 // a sync.Once where a t.Fatalf would report against whichever test happened to be
 // first.
@@ -61,8 +61,8 @@ func seedProjectionServer() (*httptest.Server, error) {
 		return nil, fmt.Errorf("init: %w", err)
 	}
 
-	at := func(seq int64, day int) facet.RecordEvent {
-		return facet.RecordEvent{RecordTime: time.Date(2026, 7, day, 9, 0, 0, 0, time.UTC), Seq: seq}
+	at := func(seq int64, day int) facet.AnamEvent {
+		return facet.AnamEvent{AnamTime: time.Date(2026, 7, day, 9, 0, 0, 0, time.UTC), Seq: seq}
 	}
 
 	// seq 1 — a blood-pressure reading, admitted on the 10th.

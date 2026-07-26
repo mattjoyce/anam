@@ -8,11 +8,11 @@ import (
 	"github.com/mattjoyce/anam/internal/fold"
 )
 
-func entry(id, eventTime, hash string) fold.Entry {
+func entry(id, factTime, hash string) fold.Entry {
 	return fold.Entry{
 		FacetID: id, Type: "health.blood-pressure",
-		EventTime: eventTime, RecordedTime: eventTime,
-		Source: "bp-csv", SourceRef: "bp-csv:" + id,
+		FactTime: factTime,
+		Source:   "bp-csv", SourceRef: "bp-csv:" + id,
 		Status: facet.StatusAdmitted, ContentHash: hash,
 		Payload: json.RawMessage(`{"systolic":118}`),
 	}
@@ -39,7 +39,7 @@ func TestValue_OneSerialisation(t *testing.T) {
 	}
 
 	if v1.Entries()[0].FacetID != "b" {
-		t.Errorf("entries not in event-time order: %s first", v1.Entries()[0].FacetID)
+		t.Errorf("entries not in fact-time order: %s first", v1.Entries()[0].FacetID)
 	}
 
 	// A changed live set is a different value.
@@ -73,7 +73,7 @@ func TestValue_TiebreakOnFacetID(t *testing.T) {
 		t.Fatalf("NewValue: %v", err)
 	}
 	if v.Entries()[0].FacetID != "aa" {
-		t.Error("equal event-times must fall back to facet-id order, or the value is not a value")
+		t.Error("equal fact-times must fall back to facet-id order, or the value is not a value")
 	}
 }
 

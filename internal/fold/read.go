@@ -14,7 +14,7 @@ import (
 // satisfies it).
 type Ledger interface {
 	Head(ctx context.Context) (ledger.Watermark, error)
-	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.RecordEvent, error)
+	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.AnamEvent, error)
 	Version(ctx context.Context, facetID string, version int) (facet.Facet, error)
 }
 
@@ -28,7 +28,7 @@ type Result struct {
 	States map[string]State
 
 	// Live holds the live facets at the artifact versions in force at W, in
-	// (event-time, id) order — the whole-person timeline, un-narrowed.
+	// (fact-time, id) order — the whole-person timeline, un-narrowed.
 	Live []facet.Facet
 
 	// Value is the canonical built from Live: the live-only value at W.
@@ -61,7 +61,7 @@ func Read(ctx context.Context, l Ledger) (Result, error) {
 // separating them is what makes an as-of read possible at all, and the retry loop was
 // the cost of the braid.
 //
-// A missing artifact is still fatal. Artifact and record-event are written in one
+// A missing artifact is still fatal. Artifact and anam-event are written in one
 // transaction, so an event whose artifact is absent means the ledger is corrupt, and
 // the read stops rather than papering over it.
 func ReadAt(ctx context.Context, l Ledger, w ledger.Watermark) (Result, error) {
@@ -151,8 +151,8 @@ func fetchLive(ctx context.Context, l Ledger, states map[string]State) ([]facet.
 	}
 
 	sort.Slice(live, func(i, j int) bool {
-		if !live[i].EventTime.Equal(live[j].EventTime) {
-			return live[i].EventTime.Before(live[j].EventTime)
+		if !live[i].FactTime.Equal(live[j].FactTime) {
+			return live[i].FactTime.Before(live[j].FactTime)
 		}
 		return live[i].ID < live[j].ID
 	})

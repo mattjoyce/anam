@@ -2,8 +2,8 @@
 // control, and the single wire format for every timestamp Anam stores.
 //
 // Timestamps are formatted fixed-width, in UTC, at nanosecond precision, so that
-// lexical order equals chronological order (ARCHITECTURE.md §8). Event-time and
-// record-time are stored as text and range-queried with BETWEEN on that equivalence;
+// lexical order equals chronological order (ARCHITECTURE.md §8). Fact-time and
+// anam-time are stored as text and range-queried with BETWEEN on that equivalence;
 // nothing else guarantees it. (The rule outlived two substrate changes: any ordered
 // text timestamp needs it, whatever stores it.)
 //
@@ -21,7 +21,7 @@ import (
 //
 // time.RFC3339Nano must never be substituted here. It elides trailing zeros, so
 // "2026-01-24T06:30:00Z" sorts after "2026-01-24T06:30:00.5Z" ('Z' > '.'), inverting
-// the order of any two facets whose event-times differ only in sub-second precision.
+// the order of any two facets whose fact-times differ only in sub-second precision.
 const Layout = "2006-01-02T15:04:05.000000000Z07:00"
 
 // Width is the number of bytes Format always returns. Fixed width is what makes the

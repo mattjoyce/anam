@@ -14,6 +14,7 @@ import (
 
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
+	"github.com/mattjoyce/anam/internal/span"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
@@ -100,10 +101,9 @@ func seedFacetNoT(sourceRef, ftype, payload string) facet.Facet {
 	return facet.Facet{
 		ID: facet.NewID(sourceRef), Type: facet.Type(ftype), Confidence: 1,
 		Classification: facet.ClassificationNormal, ArtifactVersion: 1, DefinitionVersion: 1,
-		EventTime: et, RecordedTime: et, IngestedTime: et,
-		Binding:     facet.Binding{PersonID: person, Assurance: facet.AssuranceHigh},
-		Provenance:  facet.Provenance{Source: "test", Injector: "test", SourceRef: sourceRef},
-		BirthStatus: facet.BornAdmitted,
+		FactTime:   et,
+		Binding:    facet.Binding{PersonID: person, Assurance: facet.AssuranceHigh},
+		Provenance: facet.Provenance{Source: "test", Injector: "test", SourceRef: sourceRef},
 		Descriptor: facet.Descriptor{
 			SourceSchema: "test", SchemaVersion: 1, ContentHash: facet.ContentHash(canonical),
 			PayloadKind: facet.PayloadVerbatim, MediaType: "application/json",
@@ -112,9 +112,9 @@ func seedFacetNoT(sourceRef, ftype, payload string) facet.Facet {
 	}
 }
 
-func event(kind facet.RecordEventKind, f facet.Facet, seq int64) facet.RecordEvent {
-	return facet.RecordEvent{
-		Kind: kind, FacetID: f.ID, RecordTime: time.Date(2026, 7, 10, 9, 0, 0, int(seq), time.UTC),
+func event(kind facet.AnamEventKind, f facet.Facet, seq int64) facet.AnamEvent {
+	return facet.AnamEvent{
+		Kind: kind, FacetID: f.ID, AnamTime: time.Date(2026, 7, 10, 9, 0, 0, int(seq), time.UTC),
 		Seq: seq, ArtifactVersion: 1,
 	}
 }
@@ -173,7 +173,11 @@ func TestFacetList_ShowsFoldedStatus(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("GET /facets = %d", code)
 	}
-	for _, want := range []string{"W = 3", bpID, hrID, "tombstoned", "health.blood-pressure", "bucket:2026-W27"} {
+	// The bucket id is derived, not spelled out: the list must show whichever bucket
+	// the seeded fact-time falls in, so changing span.Default is a width change and
+	// not a test failure.
+	bucket := span.Of(span.Default, time.Date(2026, 7, 5, 6, 30, 0, 0, time.UTC)).ID()
+	for _, want := range []string{"W = 3", bpID, hrID, "tombstoned", "health.blood-pressure", bucket} {
 		if !strings.Contains(body, want) {
 			t.Errorf("facet list missing %q", want)
 		}

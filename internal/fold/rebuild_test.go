@@ -48,7 +48,7 @@ const bpManifest = `{
     "validation_mode": "lenient",
     "source_schema": "bp-csv/reading",
     "time_semantics": {
-      "event_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
+      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
     },
     "identity_key": ["/measured_at"]
   },
@@ -198,7 +198,7 @@ func TestRebuildFromSource_IdenticalCanonical(t *testing.T) {
 }
 
 // Read must hand back a value consistent with its own watermark: the live facets, at
-// the folded versions, in event-time order.
+// the folded versions, in fact-time order.
 func TestRead_WholePersonAtTheHead(t *testing.T) {
 	t.Parallel()
 	g, l := newHarness(t)
@@ -222,8 +222,8 @@ func TestRead_WholePersonAtTheHead(t *testing.T) {
 	if len(res.Live) != 2 {
 		t.Fatalf("live = %d facets, want 2", len(res.Live))
 	}
-	if !res.Live[0].EventTime.Before(res.Live[1].EventTime) {
-		t.Error("live facets are not in event-time order")
+	if !res.Live[0].FactTime.Before(res.Live[1].FactTime) {
+		t.Error("live facets are not in fact-time order")
 	}
 	if res.Live[1].ArtifactVersion != 2 {
 		t.Errorf("superseded facet served at v%d, want v2", res.Live[1].ArtifactVersion)
@@ -231,7 +231,7 @@ func TestRead_WholePersonAtTheHead(t *testing.T) {
 	if res.Value.Len() != 2 {
 		t.Errorf("value holds %d entries, want 2", res.Value.Len())
 	}
-	if res.Value.Entries()[0].EventTime > res.Value.Entries()[1].EventTime {
-		t.Error("value entries are not in event-time order")
+	if res.Value.Entries()[0].FactTime > res.Value.Entries()[1].FactTime {
+		t.Error("value entries are not in fact-time order")
 	}
 }

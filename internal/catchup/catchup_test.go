@@ -51,7 +51,7 @@ const bpManifest = `{
     "validation_mode": "lenient",
     "source_schema": "bp-csv/reading",
     "time_semantics": {
-      "event_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
+      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
     },
     "identity_key": ["/measured_at"]
   },
@@ -175,7 +175,7 @@ func TestSync_IncrementalAndIdempotent(t *testing.T) {
 	}
 }
 
-// changes_since is a record-time question answered from the index (§9).
+// changes_since is an anam-time question answered from the index (§9).
 func TestChangesSince_OverTheRealPair(t *testing.T) {
 	t.Parallel()
 	g, l, db := newHarness(t)

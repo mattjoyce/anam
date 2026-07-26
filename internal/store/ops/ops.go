@@ -9,7 +9,7 @@
 //   - provisioned — reloaded from embedded assets and config; i.e. from git.
 //   - authored    — comes back from a backup, or from nowhere.
 //
-// The derived tier must stay provably derived: if a facet payload, a record-event or
+// The derived tier must stay provably derived: if a facet payload, an anam-event or
 // the watermark ever acquired a second home here, the rebuild test would pass on data
 // it never rebuilt.
 package ops
@@ -27,7 +27,7 @@ import (
 
 // schemaVersion is bumped on any schema change. The prototype recreates rather than
 // migrates: everything derived replays, everything provisioned reloads.
-const schemaVersion = 2
+const schemaVersion = 4
 
 // ErrSchemaVersion is returned by Open for a database written by a different schema.
 var ErrSchemaVersion = errors.New("ops: schema version mismatch")
@@ -37,39 +37,39 @@ type DB struct {
 	db *sql.DB
 }
 
-// schema is executed idempotently by Open. Sort-ordered text columns (event_time,
-// record_time) hold fixed-width clock.Layout timestamps; bucket ids are span.Bucket
+// schema is executed idempotently by Open. Sort-ordered text columns (fact_time,
+// anam_time) hold fixed-width clock.Layout timestamps; bucket ids are span.Bucket
 // ids — both compare lexically in chronological order by construction.
 const schema = `
 -- tier: derived — the facet index: one row per logical facet, at its current version
 -- and folded status (current_version + status is exactly a persisted fold.State,
 -- which is what lets catch-up replay incrementally instead of from genesis).
--- The read paths that left the ledger live here: the timeline (event_time), the type
+-- The read paths that left the ledger live here: the timeline (fact_time), the type
 -- filter, and bucket membership (the bucket-span seam — bucket_id is arithmetic on
--- event_time, materialised for the joins the mint will need).
+-- fact_time, materialised for the joins the mint will need).
 CREATE TABLE IF NOT EXISTS facet_index (
   facet_id        TEXT PRIMARY KEY,
   type            TEXT NOT NULL,
-  event_time      TEXT NOT NULL,
+  fact_time      TEXT NOT NULL,
   bucket_id       TEXT NOT NULL,
   current_version INTEGER NOT NULL,
   status          TEXT NOT NULL,
   content_hash    TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS facet_index_by_time   ON facet_index (event_time);
-CREATE INDEX IF NOT EXISTS facet_index_by_type   ON facet_index (type, event_time);
+CREATE INDEX IF NOT EXISTS facet_index_by_time   ON facet_index (fact_time);
+CREATE INDEX IF NOT EXISTS facet_index_by_type   ON facet_index (type, fact_time);
 CREATE INDEX IF NOT EXISTS facet_index_by_bucket ON facet_index (bucket_id);
 
--- tier: derived — the record-event index: changes_since by record-time, and the
--- as-of translation (greatest seq with record_time <= T).
-CREATE TABLE IF NOT EXISTS record_event_index (
+-- tier: derived — the anam-event index: changes_since by anam-time, and the
+-- as-of translation (greatest seq with anam_time <= T).
+CREATE TABLE IF NOT EXISTS anam_event_index (
   seq              INTEGER PRIMARY KEY,
-  record_time      TEXT NOT NULL,
+  anam_time      TEXT NOT NULL,
   kind             TEXT NOT NULL,
   facet_id         TEXT NOT NULL,
   artifact_version INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS record_event_by_time ON record_event_index (record_time, seq);
+CREATE INDEX IF NOT EXISTS anam_event_by_time ON anam_event_index (anam_time, seq);
 
 -- tier: derived — the checkpoint index: every mint of every span, append-only.
 -- covers_w is the watermark the value actually folded; value_hash addresses the

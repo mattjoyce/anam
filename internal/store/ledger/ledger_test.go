@@ -78,7 +78,7 @@ func testFacet(t *testing.T, sourceRef, payload string, version int) facet.Facet
 	if err != nil {
 		t.Fatalf("canonicalize: %v", err)
 	}
-	eventTime := time.Date(2026, 7, 5, 6, 30, 0, 0, time.UTC)
+	factTime := time.Date(2026, 7, 5, 6, 30, 0, 0, time.UTC)
 	return facet.Facet{
 		ID:                facet.NewID(sourceRef),
 		Type:              facet.Type("health.blood-pressure"),
@@ -86,9 +86,7 @@ func testFacet(t *testing.T, sourceRef, payload string, version int) facet.Facet
 		Classification:    facet.ClassificationNormal,
 		ArtifactVersion:   version,
 		DefinitionVersion: 1,
-		EventTime:         eventTime,
-		RecordedTime:      eventTime,
-		IngestedTime:      time.Date(2026, 7, 10, 9, 0, 0, 0, time.UTC),
+		FactTime:          factTime,
 		Binding: facet.Binding{
 			PersonID:  person,
 			Assurance: facet.AssuranceHigh,
@@ -98,7 +96,6 @@ func testFacet(t *testing.T, sourceRef, payload string, version int) facet.Facet
 			Injector:  "bp-csv",
 			SourceRef: sourceRef,
 		},
-		BirthStatus: facet.BornAdmitted,
 		Descriptor: facet.Descriptor{
 			SourceSchema:  "bp-csv/reading",
 			SchemaVersion: 1,
@@ -110,11 +107,11 @@ func testFacet(t *testing.T, sourceRef, payload string, version int) facet.Facet
 	}
 }
 
-func admittedEvent(f facet.Facet, seq int64) facet.RecordEvent {
-	return facet.RecordEvent{
+func admittedEvent(f facet.Facet, seq int64) facet.AnamEvent {
+	return facet.AnamEvent{
 		Kind:            facet.EventAdmitted,
 		FacetID:         f.ID,
-		RecordTime:      time.Date(2026, 7, 10, 9, 0, 0, int(seq), time.UTC),
+		AnamTime:        time.Date(2026, 7, 10, 9, 0, 0, int(seq), time.UTC),
 		Seq:             seq,
 		ArtifactVersion: f.ArtifactVersion,
 	}
@@ -234,8 +231,8 @@ func TestAdmit_RoundTripsByteIdentical(t *testing.T) {
 	if got.Descriptor.ContentHash != f.Descriptor.ContentHash {
 		t.Errorf("content hash: got %s, want %s", got.Descriptor.ContentHash, f.Descriptor.ContentHash)
 	}
-	if !got.EventTime.Equal(f.EventTime) {
-		t.Errorf("event time: got %s, want %s", got.EventTime, f.EventTime)
+	if !got.FactTime.Equal(f.FactTime) {
+		t.Errorf("fact time: got %s, want %s", got.FactTime, f.FactTime)
 	}
 
 	w, err := l.Head(ctx)
@@ -320,7 +317,7 @@ func TestAdmit_StaleWatermarkLoses(t *testing.T) {
 	}
 }
 
-// A tombstone is a record-event and nothing else (§6a): Mark advances the watermark
+// A tombstone is an anam-event and nothing else (§6a): Mark advances the watermark
 // with no artifact written.
 func TestMark_TombstoneAdvancesWatermarkWithoutArtifact(t *testing.T) {
 	t.Parallel()
@@ -332,10 +329,10 @@ func TestMark_TombstoneAdvancesWatermarkWithoutArtifact(t *testing.T) {
 		t.Fatalf("Admit: %v", err)
 	}
 
-	tomb := facet.RecordEvent{
+	tomb := facet.AnamEvent{
 		Kind:            facet.EventTombstoned,
 		FacetID:         f.ID,
-		RecordTime:      time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC),
+		AnamTime:        time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC),
 		Seq:             2,
 		ArtifactVersion: 1,
 	}
@@ -411,7 +408,7 @@ func TestReplay_WindowAndOrder(t *testing.T) {
 }
 
 // The seq a caller stamps must follow the watermark it read; the ledger refuses the
-// pair rather than writing a record-event whose key disagrees with the counter.
+// pair rather than writing an anam-event whose key disagrees with the counter.
 func TestAdmit_SeqMustFollowWatermark(t *testing.T) {
 	t.Parallel()
 	l := newLedger(t)

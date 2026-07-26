@@ -24,7 +24,7 @@
 person_id: matt
 
 # --- the ledger: DynamoDB -----------------------------------------------------
-# Facets, record-events and the watermark W. `commit` writes all three in one
+# Facets, anam-events and the watermark W. `commit` writes all three in one
 # atomic TransactWriteItems. DynamoDB Local does not authenticate; the AWS
 # credentials are literally fake.
 ddb_endpoint: http://localhost:8000
@@ -36,7 +36,7 @@ ddb_region: us-east-1
 table_name: anam
 
 # --- operational store: SQLite ------------------------------------------------
-# Definitions, projection templates, token scopes, the facet and record-event
+# Definitions, projection templates, token scopes, the facet and anam-event
 # indexes, the span registry and per-span V/Wv, checkpoint and receipt index,
 # saved span bookmarks, sync cursors, GC state.
 # Not a cache: the derived tables replay back from the ledger, but definitions

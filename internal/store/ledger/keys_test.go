@@ -7,7 +7,7 @@ import (
 
 // Sort keys compare lexically, so lexical order must equal numeric order across every
 // digit-count boundary a counter will actually cross. Unpadded keys invert at each
-// power of ten: rec#10 < rec#9. This is the same defect family as the fixed-width
+// power of ten: anam#10 < anam#9. This is the same defect family as the fixed-width
 // timestamp rule in internal/clock, and it was verified live against DynamoDB Local
 // (an unpadded v1..v12 keyspace queried descending returns v9).
 func TestKeys_LexicalOrderIsNumericOrder(t *testing.T) {
@@ -17,8 +17,8 @@ func TestKeys_LexicalOrderIsNumericOrder(t *testing.T) {
 		{9, 10}, {99, 100}, {999, 1000}, {999999, 1000000},
 	}
 	for _, b := range boundaries {
-		if recSK(b.lo) >= recSK(b.hi) {
-			t.Errorf("recSK: %q must sort before %q", recSK(b.lo), recSK(b.hi))
+		if anamSK(b.lo) >= anamSK(b.hi) {
+			t.Errorf("anamSK: %q must sort before %q", anamSK(b.lo), anamSK(b.hi))
 		}
 	}
 	for _, b := range []struct{ lo, hi int }{{9, 10}, {99, 100}, {9999, 10000}} {

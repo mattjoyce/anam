@@ -1,19 +1,19 @@
 // Package span computes a Facet's bucket: the unit Anam checkpoints (ARCHITECTURE.md
 // §4, §7).
 //
-// A bucket is one ISO week of event-time. Every Facet is a member of exactly one, by
-// arithmetic on its event-time — there is no membership table and no lookup. Buckets
-// tile: they partition event-time with no overlaps and no gaps, which is what makes the
+// A bucket is a window of fact-time. Every Facet is a member of exactly one, by
+// arithmetic on its fact-time — there is no membership table and no lookup. Buckets
+// tile: they partition fact-time with no overlaps and no gaps, which is what makes the
 // whole-person view a plain union of bucket values rather than an interval-cover
 // problem.
 //
 // A bucket is invisible above this package. Nobody reads one, names one, or bookmarks
-// one. It exists only to bound how far a read must replay, and its width is a tuning
-// knob — it trades how many facets a checkpoint folds against how many values a long
-// read must stitch.
+// one. It exists only to bound how far a read must replay.
 //
 // Contrast the *derived* span (`[from, to]`, a saved bookmark, "everything"), which a
-// person names and Anam never mints.
+// person names and Anam never mints. And contrast **cadence** — how often a checkpoint
+// is taken, which is a different knob entirely: width bounds the cost of *making* one,
+// cadence the cost of *using* one.
 package span
 
 import (
@@ -27,64 +27,134 @@ import (
 // ErrInvalidID is returned by Parse for a malformed or non-existent bucket id.
 var ErrInvalidID = errors.New("invalid bucket id")
 
-// Width is a bucket's duration. Bounds are UTC, where a week is exactly seven days —
-// under a DST-observing zone it would not be.
-const Width = 7 * 24 * time.Hour
+// Width is how much fact-time one bucket covers.
+//
+// It is a tuning knob and nothing more: it trades how many facets a checkpoint folds
+// against how many values a long read must stitch. Narrow buckets make a re-mint cheap
+// and a lifelong read expensive; wide ones do the reverse. Neither choice changes what
+// a read returns.
+type Width string
 
-var idPattern = regexp.MustCompile(`^bucket:(\d{4})-W(\d{2})$`)
+// The widths. Monthly and Weekly are enough until a corpus argues for another.
+const (
+	Monthly Width = "monthly"
+	Weekly  Width = "weekly"
+)
 
-// Bucket is a half-open interval of event-time, [From, To), identified by its ISO
-// week. It is a value: two buckets with the same id are the same bucket.
+// Default is the width Anam buckets at unless an operator says otherwise.
+//
+// Monthly, because of the density this record actually has: ~6,200 facets across 31
+// months is ~200 to a bucket and 31 buckets to stitch, where weekly would be ~46 to a
+// bucket and 135 to stitch. Fatter buckets win while a re-mint stays cheap.
+//
+// That reasoning is a measurement, not a law, and it does not survive a dense source.
+// Garmin's `monitoring_*` and `stress` tables would put ~90,000 facets in a month —
+// at which point one backfilled row re-mints all of them, and either the width narrows
+// or re-mint becomes incremental (§7). Re-check this constant against the corpus before
+// trusting it.
+const Default = Monthly
+
+// Valid reports whether w is a known width.
+func (w Width) Valid() bool { return w == Monthly || w == Weekly }
+
+var (
+	weekPattern  = regexp.MustCompile(`^bucket:(\d{4})-W(\d{2})$`)
+	monthPattern = regexp.MustCompile(`^bucket:(\d{4})-(\d{2})$`)
+)
+
+// Bucket is a half-open interval of fact-time, [From, To). It is a value: two buckets
+// with the same id are the same bucket.
 type Bucket struct {
-	year int
-	week int
-	from time.Time
+	width Width
+	year  int
+	n     int // ISO week number, or calendar month
+	from  time.Time
 }
 
-// Of returns the bucket containing t. The instant is normalised to UTC first, so a
-// timestamp in any zone lands in the bucket its UTC instant belongs to.
-func Of(t time.Time) Bucket {
+// Of returns the bucket of width w containing t. The instant is normalised to UTC
+// first, so a timestamp in any zone lands in the bucket its UTC instant belongs to.
+//
+// The width is a parameter rather than a package default because it is an operator's
+// choice and belongs where it can be seen. An unknown width falls back to Default
+// rather than panicking: this is on the ingest path, and a typo in configuration must
+// not be able to halt capture.
+func Of(w Width, t time.Time) Bucket {
 	utc := t.UTC()
-	year, week := utc.ISOWeek()
-	return Bucket{year: year, week: week, from: mondayOf(utc)}
+	if w == Weekly {
+		year, week := utc.ISOWeek()
+		return Bucket{width: Weekly, year: year, n: week, from: mondayOf(utc)}
+	}
+	return Bucket{
+		width: Monthly, year: utc.Year(), n: int(utc.Month()),
+		from: time.Date(utc.Year(), utc.Month(), 1, 0, 0, 0, 0, time.UTC),
+	}
 }
 
-// Parse reads an id written by ID.
+// Parse reads an id written by ID, inferring the width from its shape.
+//
+// The id is self-describing on purpose. Bucket ids are stored — in the operational
+// index today, in checkpoint identities tomorrow — and they outlive the setting that
+// produced them. If Parse took the current width instead of reading it, changing
+// Default would silently re-interpret every id already written.
 func Parse(id string) (Bucket, error) {
-	m := idPattern.FindStringSubmatch(id)
-	if m == nil {
-		return Bucket{}, fmt.Errorf("%w: %q is not bucket:YYYY-Www", ErrInvalidID, id)
+	if m := weekPattern.FindStringSubmatch(id); m != nil {
+		// The pattern guarantees four and two digits, so neither Atoi can fail.
+		year, _ := strconv.Atoi(m[1])
+		week, _ := strconv.Atoi(m[2])
+		if week < 1 || week > weeksIn(year) {
+			return Bucket{}, fmt.Errorf("%w: %q — ISO year %d has %d weeks", ErrInvalidID, id, year, weeksIn(year))
+		}
+		// 4 January is always in ISO week 1, whatever weekday it falls on.
+		firstMonday := mondayOf(time.Date(year, time.January, 4, 0, 0, 0, 0, time.UTC))
+		return Bucket{width: Weekly, year: year, n: week,
+			from: firstMonday.AddDate(0, 0, 7*(week-1))}, nil
 	}
-
-	// The pattern guarantees four and two digits, so neither Atoi can fail.
-	year, _ := strconv.Atoi(m[1])
-	week, _ := strconv.Atoi(m[2])
-
-	if week < 1 || week > weeksIn(year) {
-		return Bucket{}, fmt.Errorf("%w: %q — ISO year %d has %d weeks", ErrInvalidID, id, year, weeksIn(year))
+	if m := monthPattern.FindStringSubmatch(id); m != nil {
+		year, _ := strconv.Atoi(m[1])
+		month, _ := strconv.Atoi(m[2])
+		if month < 1 || month > 12 {
+			return Bucket{}, fmt.Errorf("%w: %q — month %d is not 1..12", ErrInvalidID, id, month)
+		}
+		return Bucket{width: Monthly, year: year, n: month,
+			from: time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)}, nil
 	}
-
-	// 4 January is always in ISO week 1, whatever weekday it falls on.
-	firstMonday := mondayOf(time.Date(year, time.January, 4, 0, 0, 0, 0, time.UTC))
-	return Bucket{year: year, week: week, from: firstMonday.AddDate(0, 0, 7*(week-1))}, nil
+	return Bucket{}, fmt.Errorf("%w: %q is neither bucket:YYYY-MM nor bucket:YYYY-Www", ErrInvalidID, id)
 }
 
-// ID is the bucket's identity: "bucket:2026-W28".
+// ID is the bucket's identity: "bucket:2026-07" monthly, "bucket:2026-W28" weekly.
 //
-// The year is the **ISO week-year**, which is not the calendar year: 2026-12-31 and
-// 2027-01-01 are both in bucket:2026-W53. Building the id from the calendar year would
-// split one week across two ids, and the partition would stop partitioning.
+// For a weekly bucket the year is the **ISO week-year**, which is not the calendar
+// year: 2026-12-31 and 2027-01-01 are both in bucket:2026-W53. Building the id from the
+// calendar year would split one week across two ids, and the partition would stop
+// partitioning. A monthly bucket has no such trap — a calendar month never straddles
+// its own year.
 //
-// The week is zero-padded because ids are compared lexically wherever they are stored
-// or sorted. Unpadded, W7 sorts after W10.
-func (b Bucket) ID() string { return fmt.Sprintf("bucket:%04d-W%02d", b.year, b.week) }
+// The number is zero-padded because ids are compared lexically wherever they are stored
+// or sorted. Unpadded, 7 sorts after 10.
+func (b Bucket) ID() string {
+	if b.width == Weekly {
+		return fmt.Sprintf("bucket:%04d-W%02d", b.year, b.n)
+	}
+	return fmt.Sprintf("bucket:%04d-%02d", b.year, b.n)
+}
 
-// From is the first instant in the bucket: Monday, 00:00:00 UTC. Inclusive.
+// Width reports the bucket's width.
+func (b Bucket) Width() Width { return b.width }
+
+// From is the first instant in the bucket, 00:00:00 UTC. Inclusive.
 func (b Bucket) From() time.Time { return b.from }
 
-// To is the first instant after the bucket: the following Monday. Exclusive, so every
-// instant belongs to exactly one bucket.
-func (b Bucket) To() time.Time { return b.from.Add(Width) }
+// To is the first instant after the bucket. Exclusive, so every instant belongs to
+// exactly one bucket.
+//
+// A month is not a fixed duration, which is why this is arithmetic on the date rather
+// than an addition of some constant width. February and July are both one bucket.
+func (b Bucket) To() time.Time {
+	if b.width == Weekly {
+		return b.from.AddDate(0, 0, 7)
+	}
+	return b.from.AddDate(0, 1, 0)
+}
 
 // mondayOf returns midnight UTC on the Monday of t's ISO week.
 func mondayOf(t time.Time) time.Time {

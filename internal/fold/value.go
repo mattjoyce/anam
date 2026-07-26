@@ -17,8 +17,8 @@ import (
 // definition applied to it, so drop-the-table → init → re-ingest reproduces it
 // byte for byte. That is what makes the value's hash the equality oracle for
 // "Anam owns no fact" (MVP.md §7). Deliberately absent, because a rebuild
-// reassigns them: the artifact version (a superseded chain collapses to v1), the
-// ingested time, and every seq/watermark. The one exception is Status — endorsed
+// reassigns them: the artifact version (a superseded chain collapses to v1) and
+// every seq/watermark. The one exception is Status — endorsed
 // is Anam-authored — and it is carried anyway because projections gate on it;
 // endorsements come back from backup, not replay (§12).
 //
@@ -30,8 +30,7 @@ import (
 type Entry struct {
 	FacetID        string               `json:"facet_id"`
 	Type           facet.Type           `json:"type"`
-	EventTime      string               `json:"event_time"`
-	RecordedTime   string               `json:"recorded_time"`
+	FactTime       string               `json:"fact_time"`
 	Source         string               `json:"source"`
 	SourceRef      string               `json:"source_ref"`
 	Status         facet.Status         `json:"status"`
@@ -45,8 +44,7 @@ func entryOf(f facet.Facet, s State) Entry {
 	return Entry{
 		FacetID:        f.ID,
 		Type:           f.Type,
-		EventTime:      clock.Format(f.EventTime),
-		RecordedTime:   clock.Format(f.RecordedTime),
+		FactTime:       clock.Format(f.FactTime),
 		Source:         f.Provenance.Source,
 		SourceRef:      f.Provenance.SourceRef,
 		Status:         s.Status,
@@ -69,7 +67,7 @@ type Value struct {
 	hash    string
 }
 
-// NewValue builds the value from its entries, ordering them by (event_time,
+// NewValue builds the value from its entries, ordering them by (fact_time,
 // facet_id) — timeline order, with identity as the total-order tiebreak — and
 // pinning the serialisation. Both timestamps are fixed-width clock.Layout strings,
 // so the lexical sort is the chronological one.
@@ -77,8 +75,8 @@ func NewValue(entries []Entry) (Value, error) {
 	sorted := make([]Entry, len(entries))
 	copy(sorted, entries)
 	sort.Slice(sorted, func(i, j int) bool {
-		if sorted[i].EventTime != sorted[j].EventTime {
-			return sorted[i].EventTime < sorted[j].EventTime
+		if sorted[i].FactTime != sorted[j].FactTime {
+			return sorted[i].FactTime < sorted[j].FactTime
 		}
 		return sorted[i].FacetID < sorted[j].FacetID
 	})

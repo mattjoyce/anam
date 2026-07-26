@@ -120,11 +120,11 @@ func TestScan_ComposesGateCompliantEnvelopes(t *testing.T) {
 		if err := d.Check(doc); err != nil {
 			t.Errorf("%s: not compliant: %v", env.SourceRef, err)
 		}
-		event, _, err := d.Times(doc)
+		event, err := d.FactTimeOf(doc)
 		if err != nil {
 			t.Errorf("%s: times: %v", env.SourceRef, err)
 		} else if event.Year() != 2026 {
-			t.Errorf("%s: event time %s", env.SourceRef, event)
+			t.Errorf("%s: fact time %s", env.SourceRef, event)
 		}
 		ref, err := d.SourceRef(env.Source, doc)
 		if err != nil {

@@ -2,13 +2,13 @@
 // what Anam knew (ARCHITECTURE.md §7, §8).
 //
 // This is the error kernel's substrate. Admit and Mark write an artifact and/or a
-// record-event and the watermark bump in one TransactWriteItems, so a caller may
+// anam-event and the watermark bump in one TransactWriteItems, so a caller may
 // crash at any moment and re-run to known-good: the transaction either happened or it
 // did not, and re-running an attempt that happened reports ErrAlreadyWritten rather
 // than writing twice.
 //
 // The ledger carries no secondary indexes. It serves exactly two access paths — the
-// current version of one facet, and the record-events since a watermark — and both
+// current version of one facet, and the anam-events since a watermark — and both
 // are strongly-consistent base-table range scans. Everything else a reader wants (the
 // timeline, a type filter, changes_since) is an index, and indexes are derived, so
 // they live in the operational store and rebuild by replay.
@@ -30,8 +30,8 @@ import (
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-// Watermark is a position in the record-event stream. W is the seq of the most
-// recent record-event; genesis is 0 and rec#0 never exists.
+// Watermark is a position in the anam-event stream. W is the seq of the most
+// recent anam-event; genesis is 0 and anam#0 never exists.
 //
 // It is a distinct type, not a bare int64, so that a watermark and a checkpoint
 // version can never be swapped in a comparison without the compiler objecting — the
@@ -51,13 +51,13 @@ var (
 	ErrDivergentArtifact = errors.New("ledger: artifact version exists with different content")
 
 	// ErrStaleWatermark: another writer advanced W after it was read. Re-read the
-	// head, re-stamp record_time, and retry. The retry loop belongs to the caller —
+	// head, re-stamp anam_time, and retry. The retry loop belongs to the caller —
 	// the gate — never to this package.
 	ErrStaleWatermark = errors.New("ledger: watermark advanced since read")
 
-	// ErrCorrupt: the record-event's seq is taken while the watermark condition
+	// ErrCorrupt: the anam-event's seq is taken while the watermark condition
 	// passed — the counter is behind its own log. No write can be trusted; stop.
-	ErrCorrupt = errors.New("ledger: corrupt — counter is behind its own record-events")
+	ErrCorrupt = errors.New("ledger: corrupt — counter is behind its own anam-events")
 
 	// ErrSchemaMismatch: the table exists with a different key schema. A silently
 	// divergent table is a corrupt kernel; refuse to touch it.

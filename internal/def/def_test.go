@@ -17,7 +17,7 @@ const bpManifest = `{
     "validation_mode": "lenient",
     "source_schema": "bp-csv/reading",
     "time_semantics": {
-      "event_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
+      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
     },
     "identity_key": ["/measured_at"]
   },
@@ -59,9 +59,6 @@ func TestParse_DefaultsAndValidation(t *testing.T) {
 
 	if d.SchemaVersion != 1 || d.MediaType != "application/json" {
 		t.Errorf("defaults: schema v%d media %q", d.SchemaVersion, d.MediaType)
-	}
-	if d.RecordedTime != d.EventTime {
-		t.Error("recorded_time should default to event_time")
 	}
 	if !d.AdditionalProperties {
 		t.Error("lenient mode should allow additional fields")
@@ -138,7 +135,7 @@ func TestTimes_ExtractsAndNormalisesToUTC(t *testing.T) {
 	t.Parallel()
 	d := mustParse(t, bpManifest)
 
-	event, recorded, err := d.Times(mustDecode(t, strings.Replace(bpPayload,
+	event, err := d.FactTimeOf(mustDecode(t, strings.Replace(bpPayload,
 		"2026-01-24T06:30:00Z", "2026-01-24T16:30:00+10:00", 1)))
 	if err != nil {
 		t.Fatalf("Times: %v", err)
@@ -147,11 +144,7 @@ func TestTimes_ExtractsAndNormalisesToUTC(t *testing.T) {
 	if !event.Equal(want) || event.Location() != time.UTC {
 		t.Errorf("event = %v, want %v UTC", event, want)
 	}
-	if !recorded.Equal(event) {
-		t.Errorf("recorded should default to event: %v vs %v", recorded, event)
-	}
-
-	if _, _, err := d.Times(mustDecode(t, `{"measured_at": "24/01/2026", "systolic": 1, "diastolic": 1}`)); !errors.Is(err, def.ErrNotCompliant) {
+	if _, err := d.FactTimeOf(mustDecode(t, `{"measured_at": "24/01/2026", "systolic": 1, "diastolic": 1}`)); !errors.Is(err, def.ErrNotCompliant) {
 		t.Errorf("unparseable time = %v, want ErrNotCompliant", err)
 	}
 }

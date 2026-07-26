@@ -59,7 +59,7 @@ func TestParseInstant(t *testing.T) {
 func TestParseBounds_UpperIsInclusiveToTheOperator(t *testing.T) {
 	t.Parallel()
 
-	entry := func(s string) fold.Entry { return fold.Entry{EventTime: s} }
+	entry := func(s string) fold.Entry { return fold.Entry{FactTime: s} }
 
 	t.Run("a bare --to includes its whole day", func(t *testing.T) {
 		t.Parallel()
@@ -193,7 +193,7 @@ func TestParseAsOf(t *testing.T) {
 func TestViewHeader(t *testing.T) {
 	t.Parallel()
 
-	value, err := fold.NewValue([]fold.Entry{{FacetID: "f-1", EventTime: "2026-01-24T06:36:00.000000000Z"}})
+	value, err := fold.NewValue([]fold.Entry{{FacetID: "f-1", FactTime: "2026-01-24T06:36:00.000000000Z"}})
 	if err != nil {
 		t.Fatalf("NewValue: %v", err)
 	}
@@ -247,8 +247,8 @@ func TestViewHeader(t *testing.T) {
 		v := base
 		v.asOf, v.asOfAt = true, "2026-07-10T20:00:00.000000000Z"
 		h := v.header(1)
-		if !strings.Contains(h, "as-of      2026-07-10T20:00:00.000000000Z (record-time)") {
-			t.Errorf("as-of is not labelled as record-time:\n%s", h)
+		if !strings.Contains(h, "as-of      2026-07-10T20:00:00.000000000Z (anam-time)") {
+			t.Errorf("as-of is not labelled as anam-time:\n%s", h)
 		}
 	})
 }
@@ -260,10 +260,10 @@ func TestSortRows_ImposesTheCanonicalOrder(t *testing.T) {
 	t.Parallel()
 
 	rows := []verdictRow{
-		{EventTime: "2026-01-25T00:00:00.000000000Z", FacetID: "a", Version: 1},
-		{EventTime: "2026-01-24T00:00:00.000000000Z", FacetID: "b", Version: 2},
-		{EventTime: "2026-01-24T00:00:00.000000000Z", FacetID: "b", Version: 1},
-		{EventTime: "2026-01-24T00:00:00.000000000Z", FacetID: "a", Version: 1},
+		{FactTime: "2026-01-25T00:00:00.000000000Z", FacetID: "a", Version: 1},
+		{FactTime: "2026-01-24T00:00:00.000000000Z", FacetID: "b", Version: 2},
+		{FactTime: "2026-01-24T00:00:00.000000000Z", FacetID: "b", Version: 1},
+		{FactTime: "2026-01-24T00:00:00.000000000Z", FacetID: "a", Version: 1},
 	}
 	sortRows(rows)
 

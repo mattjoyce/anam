@@ -27,9 +27,9 @@ type Request struct {
 	Classification facet.Classification
 	Status         facet.Status
 
-	// EventTime is the fixed-width clock.Layout string the canonical carries, so a
+	// FactTime is the fixed-width clock.Layout string the canonical carries, so a
 	// context-of-use rule about recency has something to read.
-	EventTime string
+	FactTime string
 }
 
 // Decision is the gate's answer. Reason is free text explaining a denial; it is empty

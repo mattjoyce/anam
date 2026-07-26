@@ -25,7 +25,7 @@ type Config struct {
 	PersonID string `mapstructure:"person_id"`
 
 	// DDBEndpoint addresses DynamoDB Local, which holds the ledger: facets,
-	// record-events and the watermark (§8).
+	// anam-events and the watermark (§8).
 	DDBEndpoint string `mapstructure:"ddb_endpoint"`
 
 	// DDBRegion is nominal against DynamoDB Local, which does not authenticate, but the

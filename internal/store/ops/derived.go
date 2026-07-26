@@ -21,24 +21,24 @@ import (
 type FacetRow struct {
 	FacetID     string
 	Type        facet.Type
-	EventTime   string
+	FactTime    string
 	BucketID    string
 	Version     int
 	Status      facet.Status
 	ContentHash string
 }
 
-// EventRow is one record_event_index row.
+// EventRow is one anam_event_index row.
 type EventRow struct {
 	Seq             int64
-	RecordTime      string
-	Kind            facet.RecordEventKind
+	AnamTime        string
+	Kind            facet.AnamEventKind
 	FacetID         string
 	ArtifactVersion int
 }
 
 // LastSeq reports how far the derived tier has replayed the ledger: the seq of the
-// last record-event applied, 0 for a fresh database.
+// last anam-event applied, 0 for a fresh database.
 func (d *DB) LastSeq(ctx context.Context) (int64, error) {
 	var seq int64
 	err := d.db.QueryRowContext(ctx, `SELECT last_seq FROM replay_cursor WHERE id = 1`).Scan(&seq)
@@ -82,7 +82,7 @@ func (d *DB) FacetStates(ctx context.Context, ids []string) (map[string]fold.Sta
 	return states, nil
 }
 
-// ApplyReplay lands one catch-up batch: the new record-events, the changed facets
+// ApplyReplay lands one catch-up batch: the new anam-events, the changed facets
 // at their new states, and the cursor move to uptoSeq — one transaction, so the
 // derived tier is never half-applied. The cursor is moved conditionally from
 // fromSeq, so two racing catch-ups cannot interleave batches.
@@ -106,21 +106,21 @@ func (d *DB) ApplyReplay(ctx context.Context, fromSeq, uptoSeq int64, events []E
 
 	for _, ev := range events {
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO record_event_index (seq, record_time, kind, facet_id, artifact_version)
+			INSERT INTO anam_event_index (seq, anam_time, kind, facet_id, artifact_version)
 			VALUES (?, ?, ?, ?, ?)`,
-			ev.Seq, ev.RecordTime, string(ev.Kind), ev.FacetID, ev.ArtifactVersion); err != nil {
-			return fmt.Errorf("ops: index record-event %d: %w", ev.Seq, err)
+			ev.Seq, ev.AnamTime, string(ev.Kind), ev.FacetID, ev.ArtifactVersion); err != nil {
+			return fmt.Errorf("ops: index anam-event %d: %w", ev.Seq, err)
 		}
 	}
 	for _, f := range facets {
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO facet_index (facet_id, type, event_time, bucket_id, current_version, status, content_hash)
+			INSERT INTO facet_index (facet_id, type, fact_time, bucket_id, current_version, status, content_hash)
 			VALUES (?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT (facet_id) DO UPDATE SET
-			  type = excluded.type, event_time = excluded.event_time,
+			  type = excluded.type, fact_time = excluded.fact_time,
 			  bucket_id = excluded.bucket_id, current_version = excluded.current_version,
 			  status = excluded.status, content_hash = excluded.content_hash`,
-			f.FacetID, string(f.Type), f.EventTime, f.BucketID, f.Version, string(f.Status), f.ContentHash); err != nil {
+			f.FacetID, string(f.Type), f.FactTime, f.BucketID, f.Version, string(f.Status), f.ContentHash); err != nil {
 			return fmt.Errorf("ops: index facet %s: %w", f.FacetID, err)
 		}
 	}
@@ -131,18 +131,18 @@ func (d *DB) ApplyReplay(ctx context.Context, fromSeq, uptoSeq int64, events []E
 	return nil
 }
 
-// ChangesSince reports the record-events in (since, until] by record-time — what
+// ChangesSince reports the anam-events in (since, until] by anam-time — what
 // changed between two points (§9). Bounds are clock.Layout strings; pass "" as
-// until for "to the end". Results come back in (record_time, seq) order.
+// until for "to the end". Results come back in (anam_time, seq) order.
 func (d *DB) ChangesSince(ctx context.Context, since, until string) ([]EventRow, error) {
-	q := `SELECT seq, record_time, kind, facet_id, artifact_version
-	      FROM record_event_index WHERE record_time > ?`
+	q := `SELECT seq, anam_time, kind, facet_id, artifact_version
+	      FROM anam_event_index WHERE anam_time > ?`
 	args := []any{since}
 	if until != "" {
-		q += ` AND record_time <= ?`
+		q += ` AND anam_time <= ?`
 		args = append(args, until)
 	}
-	q += ` ORDER BY record_time, seq`
+	q += ` ORDER BY anam_time, seq`
 
 	rows, err := d.db.QueryContext(ctx, q, args...)
 	if err != nil {
@@ -154,10 +154,10 @@ func (d *DB) ChangesSince(ctx context.Context, since, until string) ([]EventRow,
 	for rows.Next() {
 		var ev EventRow
 		var kind string
-		if err := rows.Scan(&ev.Seq, &ev.RecordTime, &kind, &ev.FacetID, &ev.ArtifactVersion); err != nil {
+		if err := rows.Scan(&ev.Seq, &ev.AnamTime, &kind, &ev.FacetID, &ev.ArtifactVersion); err != nil {
 			return nil, fmt.Errorf("ops: scan change: %w", err)
 		}
-		ev.Kind = facet.RecordEventKind(kind)
+		ev.Kind = facet.AnamEventKind(kind)
 		out = append(out, ev)
 	}
 	if err := rows.Err(); err != nil {

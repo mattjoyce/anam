@@ -55,7 +55,7 @@ const bpManifest = `{
     "validation_mode": "lenient",
     "source_schema": "bp-csv/reading",
     "time_semantics": {
-      "event_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
+      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
     },
     "identity_key": ["/measured_at"]
   },
@@ -70,7 +70,7 @@ const sleepManifest = `{
     "validation_mode": "lenient",
     "source_schema": "health-db/sleep",
     "time_semantics": {
-      "event_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
+      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
     },
     "identity_key": ["/measured_at"]
   },

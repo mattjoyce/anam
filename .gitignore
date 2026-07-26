@@ -28,3 +28,6 @@ BloodPressure_*
 
 # The Algorithm working state (ISAs). The repo's record of *why* lives in journal/.
 /.algo/
+
+# graphify build products — derived, rebuildable, not part of the record
+graphify-out/

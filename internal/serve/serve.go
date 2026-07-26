@@ -246,7 +246,7 @@ func List(d Deps) ([]receipt.Receipt, []string, error) {
 }
 
 // idsOf lists a served value's facet ids in served order — the canonical's own
-// (event-time, id) order, which is what makes the list reproducible.
+// (fact-time, id) order, which is what makes the list reproducible.
 func idsOf(v fold.Value) []string {
 	ids := make([]string, 0, v.Len())
 	for _, e := range v.Entries() {

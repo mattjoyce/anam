@@ -33,7 +33,7 @@ one, and filters only on metadata. You select a template by name; you cannot def
 one. Run with no name to see what is available.
 
 Serving writes nothing to the ledger. Being shown is not something Anam learned
-about a fact, so no record-event is appended and the watermark does not move; the
+about a fact, so no anam-event is appended and the watermark does not move; the
 receipt is the record of the serve.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -174,9 +174,9 @@ so a tampered artifact is refused rather than displayed as if it were genuine.`,
 			_, _ = fmt.Fprintf(out, "  definitions %s\n\n", r.DefinitionSetVersion)
 
 			w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
-			_, _ = fmt.Fprintln(w, "EVENT TIME\tTYPE\tSTATUS\tPAYLOAD")
+			_, _ = fmt.Fprintln(w, "FACT TIME\tTYPE\tSTATUS\tPAYLOAD")
 			for _, e := range entries {
-				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", e.EventTime, e.Type, e.Status, clipPayload(e.Payload))
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", e.FactTime, e.Type, e.Status, clipPayload(e.Payload))
 			}
 			return w.Flush()
 		},

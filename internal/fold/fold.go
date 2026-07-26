@@ -1,9 +1,9 @@
-// Package fold derives current state from the record-event stream — the inversion
+// Package fold derives current state from the anam-event stream — the inversion
 // made executable (ARCHITECTURE.md §9). A Facet stores no current status; this
 // package is the only place one comes from, so the ledger can never drift from its
 // own events.
 //
-// Fold is pure: record-events in, per-facet states out. Read composes it with the
+// Fold is pure: anam-events in, per-facet states out. Read composes it with the
 // ledger's two access paths to produce the canonical — the live-only value at a
 // watermark (§7) — whose content hash is the equality oracle for the rebuild test
 // (MVP.md §7).
@@ -16,10 +16,10 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
-// ErrCorruptStream is returned when the record-event stream is not one the gate
+// ErrCorruptStream is returned when the anam-event stream is not one the gate
 // could have written. The stream is the error kernel's output; a hole in it is not
 // repaired here, it is reported and everything stops (AGENTS.md, Armstrong).
-var ErrCorruptStream = errors.New("fold: record-event stream is not one the gate could have written")
+var ErrCorruptStream = errors.New("fold: anam-event stream is not one the gate could have written")
 
 // State is one logical facet's folded position: the artifact version currently in
 // force, and the status that version holds.
@@ -38,10 +38,10 @@ func (s State) Live() bool {
 	return s.Status == facet.StatusAdmitted || s.Status == facet.StatusEndorsed
 }
 
-// Fold replays record-events, in seq order, into each logical facet's State.
+// Fold replays anam-events, in seq order, into each logical facet's State.
 // Events up to the head watermark yield current state; events up to a historical
 // watermark yield the as-of state — same fold, different upper bound.
-func Fold(events []facet.RecordEvent) (map[string]State, error) {
+func Fold(events []facet.AnamEvent) (map[string]State, error) {
 	states := make(map[string]State)
 	for _, ev := range events {
 		cur, known := states[ev.FacetID]
@@ -54,7 +54,7 @@ func Fold(events []facet.RecordEvent) (map[string]State, error) {
 	return states, nil
 }
 
-// Apply advances one facet's folded state by one record-event. It is exported so
+// Apply advances one facet's folded state by one anam-event. It is exported so
 // that an *incremental* consumer — the operational store's catch-up, which persists
 // each facet's State as its index row — replays new events through the same map
 // rather than growing a second, drifting one. known is false only when the facet
@@ -68,7 +68,7 @@ func Fold(events []facet.RecordEvent) (map[string]State, error) {
 // every corrected fact from the canonical. Spelling the arms out also means a sixth
 // event kind lands in the default arm and fails loudly instead of flowing through a
 // cast unexamined.
-func Apply(cur State, known bool, ev facet.RecordEvent) (State, error) {
+func Apply(cur State, known bool, ev facet.AnamEvent) (State, error) {
 	switch ev.Kind {
 	case facet.EventAdmitted:
 		// Only a first sight admits; every later capture of the row supersedes.
@@ -116,7 +116,7 @@ func Apply(cur State, known bool, ev facet.RecordEvent) (State, error) {
 		return State{Version: cur.Version, Status: facet.StatusRejected}, nil
 
 	default:
-		return State{}, fmt.Errorf("%w: unknown record-event kind %q on facet %s",
+		return State{}, fmt.Errorf("%w: unknown anam-event kind %q on facet %s",
 			ErrCorruptStream, ev.Kind, ev.FacetID)
 	}
 }
@@ -124,7 +124,7 @@ func Apply(cur State, known bool, ev facet.RecordEvent) (State, error) {
 // mustConcernCurrent checks that a pure status transition names the artifact version
 // actually in force — the gate stamps the current version into every Mark, so any
 // other version is a stream nothing wrote.
-func mustConcernCurrent(cur State, known bool, ev facet.RecordEvent) error {
+func mustConcernCurrent(cur State, known bool, ev facet.AnamEvent) error {
 	if !known {
 		return fmt.Errorf("%w: facet %s marked %s before it was admitted",
 			ErrCorruptStream, ev.FacetID, ev.Kind)

@@ -2,7 +2,7 @@
 // (ARCHITECTURE.md §9).
 //
 // A projection is a versioned template that **prunes**. It has four knobs, all of them
-// metadata: a facet-type allow-list, an event-time window, an endorsement-status
+// metadata: a facet-type allow-list, an fact-time window, an endorsement-status
 // filter, and a maximum classification. It never reshapes a facet, never generates
 // one, and never reads a payload — a facet is included or excluded whole.
 //
@@ -46,7 +46,7 @@ type Gate interface {
 // an empty Types or Statuses serves nothing. §9 says deny-by-default of the type
 // allow-list; the same reasoning is applied to statuses here, because a governance
 // template that can be *under*-specified into over-serving is the failure governance
-// exists to prevent. The event-time window is the exception: it only ever narrows, and
+// exists to prevent. The fact-time window is the exception: it only ever narrows, and
 // the canonical is already the ceiling, so unbounded is a safe default.
 type Template struct {
 	Name        string
@@ -66,7 +66,7 @@ type Template struct {
 	// template sets the ceiling. This is a comparison, not an assessment.
 	MaxClassification facet.Classification
 
-	// From and To bound event-time, inclusive and exclusive respectively, as
+	// From and To bound fact-time, inclusive and exclusive respectively, as
 	// fixed-width clock.Layout strings so the comparison is the lexical one the
 	// canonical is already ordered by. Empty means unbounded.
 	From string
@@ -78,7 +78,7 @@ type Template struct {
 }
 
 // Span describes the derived span a template serves, for the receipt to record (§9).
-// It is the template's event-time window rendered as one deterministic string, so a
+// It is the template's fact-time window rendered as one deterministic string, so a
 // receipt stays self-describing when read years later without the binary that made it.
 func (t Template) Span() string {
 	if t.From == "" && t.To == "" {
@@ -91,7 +91,7 @@ func (t Template) Span() string {
 	if to == "" {
 		to = "+inf"
 	}
-	return fmt.Sprintf("event-time[%s,%s)", from, to)
+	return fmt.Sprintf("fact-time[%s,%s)", from, to)
 }
 
 // Reason says why one entry is or is not served. It exists so that a projection can
@@ -107,8 +107,8 @@ const (
 	ReasonType           Reason = "type not in the allow-list"
 	ReasonStatus         Reason = "status not in the filter"
 	ReasonClassification Reason = "above the classification ceiling"
-	ReasonBeforeWindow   Reason = "event-time before the window"
-	ReasonAfterWindow    Reason = "event-time at or after the window"
+	ReasonBeforeWindow   Reason = "fact-time before the window"
+	ReasonAfterWindow    Reason = "fact-time at or after the window"
 	ReasonConsent        Reason = "denied by the consent gate"
 )
 
@@ -129,9 +129,9 @@ func (t Template) verdict(e fold.Entry) Reason {
 		return ReasonStatus
 	case classificationRank(e.Classification) > classificationRank(t.MaxClassification):
 		return ReasonClassification
-	case t.From != "" && e.EventTime < t.From:
+	case t.From != "" && e.FactTime < t.From:
 		return ReasonBeforeWindow
-	case t.To != "" && e.EventTime >= t.To:
+	case t.To != "" && e.FactTime >= t.To:
 		return ReasonAfterWindow
 	}
 	return ReasonServed
@@ -190,7 +190,7 @@ func Explain(v fold.Value, t Template, g Gate) ([]Verdict, error) {
 				Type:           e.Type,
 				Classification: e.Classification,
 				Status:         e.Status,
-				EventTime:      e.EventTime,
+				FactTime:       e.FactTime,
 			})
 			if !d.Allow {
 				x.Reason, x.Detail = ReasonConsent, d.Reason

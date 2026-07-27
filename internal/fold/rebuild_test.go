@@ -101,7 +101,7 @@ func (s source) ingest(t *testing.T, g *gate.Gate) map[string]gate.Result {
 		if err != nil {
 			t.Fatalf("Resolve %s: %v", measuredAt, err)
 		}
-		res, err := g.Commit(context.Background(), env, binding)
+		res, _, err := g.Commit(context.Background(), env, binding)
 		if err != nil {
 			t.Fatalf("Commit %s: %v", measuredAt, err)
 		}
@@ -156,7 +156,7 @@ func TestRebuildFromSource_IdenticalCanonical(t *testing.T) {
 
 	removed := results["2026-01-26T06:30:00Z"].FacetID
 	delete(src, "2026-01-26T06:30:00Z")
-	if _, err := g.Retract(ctx, removed); err != nil {
+	if _, _, err := g.Retract(ctx, removed); err != nil {
 		t.Fatalf("Retract: %v", err)
 	}
 	lived, err := fold.Read(ctx, l)

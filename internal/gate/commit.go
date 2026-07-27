@@ -12,88 +12,20 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
-// Commit enforces the remaining pillars and appends. Its outcome is decided by
+// Commit enforces the remaining pillars and appends one envelope, returning what
+// became of it and the watermark the ledger ended at. Its outcome is decided by
 // identity and content (§6a): an unknown source_ref admits, a known one with the same
 // hash is a no-op with no write, a known one with a different hash supersedes.
-func (g *Gate) Commit(ctx context.Context, env facet.Envelope, binding facet.Binding) (Result, error) {
-	d, doc, err := g.admitChecks(env, binding)
+//
+// It is CommitBatch of one, not a second implementation of it. It kept its own copy of
+// every pillar until the two were held identical only by a test comparing their
+// output; the batch path is what ingest runs, so this is the one that gives way.
+func (g *Gate) Commit(ctx context.Context, env facet.Envelope, binding facet.Binding) (Result, ledger.Watermark, error) {
+	results, w, err := g.CommitBatch(ctx, []facet.Envelope{env}, []facet.Binding{binding})
 	if err != nil {
-		return Result{}, err
+		return Result{}, 0, err
 	}
-
-	factTime, err := d.FactTimeOf(doc)
-	if err != nil {
-		return Result{}, err
-	}
-
-	// Identity is definition-owned: recompute the natural key and require the worker
-	// to agree, so a drifting worker cannot silently re-key its facets.
-	ref, err := d.SourceRef(env.Source, doc)
-	if err != nil {
-		return Result{}, err
-	}
-	if ref != env.SourceRef {
-		return Result{}, fmt.Errorf("%w: envelope says %q, identity_key composes %q",
-			ErrIdentityMismatch, env.SourceRef, ref)
-	}
-
-	canonical, err := facet.Canonicalize(env.Payload)
-	if err != nil {
-		return Result{}, err
-	}
-	hash := facet.ContentHash(canonical)
-	facetID := facet.NewID(ref)
-
-	for attempt := 0; attempt < g.maxRetries; attempt++ {
-		head, err := g.ledger.Head(ctx)
-		if err != nil {
-			return Result{}, err
-		}
-
-		version, kind, prior, noop, err := g.disposition(ctx, facetID, hash)
-		if err != nil {
-			return Result{}, err
-		}
-		if noop {
-			return Result{Outcome: OutcomeNoOp, FacetID: facetID, ArtifactVersion: version, W: head}, nil
-		}
-
-		// now is stamped inside the loop, after the head read, so that seq order and
-		// anam-time order agree by construction (§8).
-		now := g.clock.Now()
-		f, err := facet.New(facet.NewParams{
-			Envelope: env, Binding: binding, Payload: canonical,
-			ArtifactVersion: version, DefinitionVersion: d.Version,
-			Classification: d.Classification,
-			SourceSchema:   d.SourceSchema, SchemaVersion: d.SchemaVersion, MediaType: d.MediaType,
-			Confidence: 1,
-			FactTime:   factTime,
-		})
-		if err != nil {
-			return Result{}, err
-		}
-		ev := facet.AnamEvent{
-			Kind: kind, FacetID: facetID, AnamTime: now,
-			Seq: int64(head) + 1, ArtifactVersion: version, PriorArtifactVersion: prior,
-		}
-
-		switch err := g.ledger.Admit(ctx, head, f, ev); {
-		case err == nil:
-			outcome := OutcomeAdmitted
-			if kind == facet.EventSuperseded {
-				outcome = OutcomeSuperseded
-			}
-			return Result{Outcome: outcome, FacetID: facetID, ArtifactVersion: version, W: head + 1}, nil
-		case errors.Is(err, ledger.ErrAlreadyWritten):
-			// A crashed earlier attempt succeeded; we are reading our own write.
-			return Result{Outcome: OutcomeNoOp, FacetID: facetID, ArtifactVersion: version, W: head}, nil
-		case errors.Is(err, ledger.ErrStaleWatermark):
-			continue
-		default:
-			return Result{}, err
-		}
-	}
-	return Result{}, fmt.Errorf("%w: after %d attempts", ErrContention, g.maxRetries)
+	return results[0], w, nil
 }
 
 // prepared is one envelope past every pillar that needs no ledger read, held so a
@@ -108,35 +40,35 @@ type prepared struct {
 	factTime  time.Time
 }
 
-// CommitBatch admits many envelopes in one transaction, over one contiguous block of
-// seqs. It is Commit's semantics at Commit's guarantees — same pillars, same
-// identity recomputation, same idempotency — differing only in how many facets share
-// a round trip.
+// CommitBatch admits envelopes in one transaction, over one contiguous block of seqs.
+// It is the admission path — Commit is this with a slice of one.
 //
-// The win is not fewer writes but fewer waits. Commit costs three sequential round
-// trips per facet (head, disposition, transact); a batch of N costs three for the
-// whole block, because the head is read once, the dispositions collapse into one
-// negative probe, and the writes are one transaction.
+// The win is not fewer writes but fewer waits. One envelope costs three sequential
+// round trips (head, disposition, transact); a block of N costs three for the whole
+// block, because the head is read once, the dispositions collapse into one negative
+// probe, and the writes are one transaction.
 //
-// Results are returned positionally, one per input envelope. A validation failure in
-// any envelope fails the call and writes nothing: a batch that silently dropped a bad
-// row would make "the import ran" mean less than it does now.
-func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings []facet.Binding) ([]Result, error) {
+// Results are returned positionally, one per input envelope, alongside the watermark
+// the ledger ended at — one number for the call, because one transaction leaves the
+// ledger in one place. A validation failure in any envelope fails the call and writes
+// nothing: a batch that silently dropped a bad row would make "the import ran" mean
+// less than it does now.
+func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings []facet.Binding) ([]Result, ledger.Watermark, error) {
 	if len(envs) != len(bindings) {
-		return nil, fmt.Errorf("gate: %d envelopes but %d bindings", len(envs), len(bindings))
+		return nil, 0, fmt.Errorf("gate: %d envelopes but %d bindings", len(envs), len(bindings))
 	}
 	if len(envs) == 0 {
-		return nil, nil
+		return nil, 0, nil
 	}
 	if len(envs) > ledger.MaxBatch {
-		return nil, fmt.Errorf("gate: batch of %d exceeds %d", len(envs), ledger.MaxBatch)
+		return nil, 0, fmt.Errorf("gate: batch of %d exceeds %d", len(envs), ledger.MaxBatch)
 	}
 
 	ps := make([]prepared, len(envs))
 	for i, env := range envs {
 		p, err := g.prepare(env, bindings[i])
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", env.SourceRef, err)
+			return nil, 0, fmt.Errorf("%s: %w", env.SourceRef, err)
 		}
 		ps[i] = p
 	}
@@ -145,7 +77,7 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 	seen := make(map[string]int, len(ps))
 	for i, p := range ps {
 		if first, dup := seen[p.facetID]; dup {
-			return nil, fmt.Errorf("gate: envelopes %d (%s) and %d (%s) are the same facet %s — a batch cannot hold both",
+			return nil, 0, fmt.Errorf("gate: envelopes %d (%s) and %d (%s) are the same facet %s — a batch cannot hold both",
 				first, ps[first].env.SourceRef, i, p.env.SourceRef, p.facetID)
 		}
 		seen[p.facetID] = i
@@ -160,12 +92,12 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 	for attempt := 0; attempt < g.maxRetries; attempt++ {
 		head, err := g.ledger.Head(ctx)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 
 		dispositions, err := g.batchDisposition(ctx, ps, pending)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 
 		// now is stamped after the head read, so seq order and anam-time order agree
@@ -177,16 +109,13 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 		for _, i := range pending {
 			d := dispositions[i]
 			if d.noop {
-				// No W here: it is stamped on every result at the end, from the
-				// watermark the transaction actually left behind. Taking it from the
-				// head read a moment ago would date this entry to before the write.
 				results[i] = Result{Outcome: OutcomeNoOp, FacetID: ps[i].facetID,
 					ArtifactVersion: d.version}
 				continue
 			}
 			f, err := g.build(ps[i], d.version)
 			if err != nil {
-				return nil, fmt.Errorf("%s: %w", ps[i].env.SourceRef, err)
+				return nil, 0, fmt.Errorf("%s: %w", ps[i].env.SourceRef, err)
 			}
 			commits = append(commits, ledger.Commit{
 				Facet: f,
@@ -201,7 +130,7 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 		if len(commits) == 0 {
 			// Everything resolved to a no-op. A cancelled transaction writes nothing,
 			// so this call moved the watermark nowhere and head is where it ended.
-			return stampW(results, head), nil
+			return results, head, nil
 		}
 
 		err = g.ledger.AdmitBatch(ctx, head, commits)
@@ -216,7 +145,7 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 				results[i] = Result{Outcome: outcome, FacetID: ps[i].facetID,
 					ArtifactVersion: commits[n].Facet.ArtifactVersion}
 			}
-			return stampW(results, head+ledger.Watermark(len(commits))), nil
+			return results, head + ledger.Watermark(len(commits)), nil
 
 		case errors.Is(err, ledger.ErrStaleWatermark):
 			continue
@@ -224,7 +153,7 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 		case errors.As(err, &conflict):
 			if len(conflict.Divergent) > 0 {
 				i := writing[conflict.Divergent[0]]
-				return nil, fmt.Errorf("%s: %w", ps[i].env.SourceRef, conflict.Reasons[conflict.Divergent[0]])
+				return nil, 0, fmt.Errorf("%s: %w", ps[i].env.SourceRef, conflict.Reasons[conflict.Divergent[0]])
 			}
 			// Every conflict is a write that already succeeded — an earlier attempt
 			// that crashed after committing. Record them and retry the remainder.
@@ -242,30 +171,15 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 				}
 			}
 			if len(next) == len(pending) {
-				return nil, fmt.Errorf("gate: batch conflict resolved nothing: %w", err)
+				return nil, 0, fmt.Errorf("gate: batch conflict resolved nothing: %w", err)
 			}
 			pending = next
 
 		default:
-			return nil, err
+			return nil, 0, err
 		}
 	}
-	return nil, fmt.Errorf("%w: after %d attempts", ErrContention, g.maxRetries)
-}
-
-// stampW gives every result the watermark the call ended at, and is the only place a
-// batch's results get one.
-//
-// W is the ledger's, not an envelope's. Assigned per entry it disagreed with itself: a
-// no-op is decided before the transaction, so it carried the head read before the
-// write while its written siblings carried the head after — and a caller reading the
-// last result of a batch whose last envelope happened to be unchanged was told a
-// watermark the write had already moved past.
-func stampW(results []Result, w ledger.Watermark) []Result {
-	for i := range results {
-		results[i].W = w
-	}
-	return results
+	return nil, 0, fmt.Errorf("%w: after %d attempts", ErrContention, g.maxRetries)
 }
 
 // prepare runs every pillar that needs no ledger read and derives identity and
@@ -332,15 +246,18 @@ func (g *Gate) batchDisposition(ctx context.Context, ps []prepared, pending []in
 			out[i] = disposition{version: 1, kind: facet.EventAdmitted}
 			continue
 		}
-		version, kind, prior, noop, err := g.disposition(ctx, ps[i].facetID, ps[i].hash)
+		d, err := g.disposition(ctx, ps[i].facetID, ps[i].hash)
 		if err != nil {
 			return nil, err
 		}
-		out[i] = disposition{version: version, kind: kind, prior: prior, noop: noop}
+		out[i] = d
 	}
 	return out, nil
 }
 
+// disposition is what a commit turns out to be: first sight, a re-ingest, or a change
+// — and at which version. It is one value, so the function that decides it returns it
+// rather than a tuple a caller has to reassemble into this.
 type disposition struct {
 	version int
 	kind    facet.AnamEventKind
@@ -380,18 +297,23 @@ func (g *Gate) admitChecks(env facet.Envelope, binding facet.Binding) (def.Defin
 	return d, doc, nil
 }
 
-// disposition decides what this commit is: first sight, a re-ingest, or a change.
-func (g *Gate) disposition(ctx context.Context, facetID, hash string) (version int, kind facet.AnamEventKind, prior int, noop bool, err error) {
+// disposition decides what this commit is by asking the ledger for the facet's
+// current version.
+func (g *Gate) disposition(ctx context.Context, facetID, hash string) (disposition, error) {
 	current, err := g.ledger.CurrentVersion(ctx, facetID)
 	switch {
 	case errors.Is(err, ledger.ErrNotFound):
-		return 1, facet.EventAdmitted, 0, false, nil
+		return disposition{version: 1, kind: facet.EventAdmitted}, nil
 	case err != nil:
-		return 0, "", 0, false, err
+		return disposition{}, err
 	case current.Descriptor.ContentHash == hash:
-		return current.ArtifactVersion, "", 0, true, nil
+		return disposition{version: current.ArtifactVersion, noop: true}, nil
 	default:
-		return current.ArtifactVersion + 1, facet.EventSuperseded, current.ArtifactVersion, false, nil
+		return disposition{
+			version: current.ArtifactVersion + 1,
+			kind:    facet.EventSuperseded,
+			prior:   current.ArtifactVersion,
+		}, nil
 	}
 }
 
@@ -403,29 +325,29 @@ func (g *Gate) disposition(ctx context.Context, facetID, hash string) (version i
 // retry loop, against the same head the write is conditioned on, so a raced second
 // tombstone is caught on the re-read rather than appended. (Streams written by the
 // R3 gate may hold a double tombstone; the fold absorbs those.)
-func (g *Gate) Retract(ctx context.Context, facetID string) (Result, error) {
+func (g *Gate) Retract(ctx context.Context, facetID string) (Result, ledger.Watermark, error) {
 	current, err := g.ledger.CurrentVersion(ctx, facetID)
 	if err != nil {
-		return Result{}, err
+		return Result{}, 0, err
 	}
 
 	for attempt := 0; attempt < g.maxRetries; attempt++ {
 		head, err := g.ledger.Head(ctx)
 		if err != nil {
-			return Result{}, err
+			return Result{}, 0, err
 		}
 
 		events, err := g.ledger.Replay(ctx, 0, head)
 		if err != nil {
-			return Result{}, err
+			return Result{}, 0, err
 		}
 		states, err := fold.Fold(events)
 		if err != nil {
-			return Result{}, err
+			return Result{}, 0, err
 		}
 		if st := states[facetID]; st.Status == facet.StatusTombstoned {
 			return Result{Outcome: OutcomeNoOp, FacetID: facetID,
-				ArtifactVersion: st.Version, W: head}, nil
+				ArtifactVersion: st.Version}, head, nil
 		}
 
 		ev := facet.AnamEvent{
@@ -435,14 +357,14 @@ func (g *Gate) Retract(ctx context.Context, facetID string) (Result, error) {
 		switch err := g.ledger.Mark(ctx, head, ev); {
 		case err == nil:
 			return Result{Outcome: OutcomeTombstoned, FacetID: facetID,
-				ArtifactVersion: current.ArtifactVersion, W: head + 1}, nil
+				ArtifactVersion: current.ArtifactVersion}, head + 1, nil
 		case errors.Is(err, ledger.ErrStaleWatermark):
 			continue
 		default:
-			return Result{}, err
+			return Result{}, 0, err
 		}
 	}
-	return Result{}, fmt.Errorf("%w: after %d attempts", ErrContention, g.maxRetries)
+	return Result{}, 0, fmt.Errorf("%w: after %d attempts", ErrContention, g.maxRetries)
 }
 
 // assuranceRank orders the assurance levels: review < medium < high.

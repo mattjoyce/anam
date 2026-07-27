@@ -33,39 +33,37 @@ func testFacetWithHash(hash string) *facet.Facet {
 	return &facet.Facet{ID: "f-1", ArtifactVersion: 1, Descriptor: facet.Descriptor{ContentHash: hash}}
 }
 
-func TestMapCancellation_Arms(t *testing.T) {
+// The batch mapper's arms, over a one-commit transaction — the shape Admit now writes.
+// Positions are named through the layout the builder uses, not spelled out here, so a
+// reordering breaks both sides at once instead of silently re-labelling an arm.
+func TestMapBatchCancellation_Arms(t *testing.T) {
 	t.Parallel()
 	l := &Ledger{}
 	ccf := "ConditionalCheckFailed"
+	cs := []Commit{{Facet: *testFacetWithHash("sha256:aaa")}}
 
 	tests := []struct {
-		name        string
-		err         error
-		artifactPos int
-		want        error
+		name string
+		err  error
+		want error
 	}{
-		{"stale: rec and counter both failed, artifact passed",
-			canceled("", ccf, ccf), admitArtifactPos, ErrStaleWatermark},
-		{"stale via Mark: counter failed",
-			canceled("", ccf), markArtifactPos, ErrStaleWatermark},
-		{"corrupt: rec failed while counter passed",
-			canceled("", ccf, ""), admitArtifactPos, ErrCorrupt},
-		{"corrupt via Mark: rec failed while counter passed",
-			canceled(ccf, ""), markArtifactPos, ErrCorrupt},
+		{"stale: the event and the counter both failed, the artifact passed",
+			canceled("", ccf, ccf), ErrStaleWatermark},
+		{"corrupt: an event seq is taken while the counter held",
+			canceled("", ccf, ""), ErrCorrupt},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := l.mapCancellation(tc.err, testFacetWithHash("sha256:aaa"), tc.artifactPos)
-			if !errors.Is(got, tc.want) {
-				t.Errorf("mapCancellation = %v, want %v", got, tc.want)
+			if got := l.mapBatchCancellation(tc.err, cs); !errors.Is(got, tc.want) {
+				t.Errorf("mapBatchCancellation = %v, want %v", got, tc.want)
 			}
 		})
 	}
 
 	t.Run("a non-transaction error passes through wrapped", func(t *testing.T) {
 		t.Parallel()
-		got := l.mapCancellation(errors.New("network sadness"), nil, markArtifactPos)
+		got := l.mapBatchCancellation(errors.New("network sadness"), cs)
 		if errors.Is(got, ErrStaleWatermark) || errors.Is(got, ErrCorrupt) || errors.Is(got, ErrAlreadyWritten) {
 			t.Errorf("plain error mis-typed: %v", got)
 		}
@@ -73,10 +71,45 @@ func TestMapCancellation_Arms(t *testing.T) {
 
 	t.Run("cancellation without any failed condition is surfaced, not swallowed", func(t *testing.T) {
 		t.Parallel()
-		if got := l.mapCancellation(canceled("", "", ""), nil, admitArtifactPos); got == nil {
+		if got := l.mapBatchCancellation(canceled("", "", ""), cs); got == nil {
 			t.Error("want an error, got nil")
 		}
 	})
+}
+
+// Mark writes [event, counter] and has no artifact, so it has its own two arms.
+func TestMapMarkCancellation_Arms(t *testing.T) {
+	t.Parallel()
+	ccf := "ConditionalCheckFailed"
+
+	if got := mapMarkCancellation(canceled("", ccf)); !errors.Is(got, ErrStaleWatermark) {
+		t.Errorf("counter failed = %v, want ErrStaleWatermark", got)
+	}
+	if got := mapMarkCancellation(canceled(ccf, "")); !errors.Is(got, ErrCorrupt) {
+		t.Errorf("event seq taken under a held counter = %v, want ErrCorrupt", got)
+	}
+}
+
+// The builder and the mapper share one definition of where things sit. This is that
+// definition stated once more, so a change to it is a decision rather than a slip.
+func TestBatchLayout_IsWhatTheMapperReadsBack(t *testing.T) {
+	t.Parallel()
+
+	for n := 1; n <= 3; n++ {
+		if got := batchCounterPos(n); got != 2*n {
+			t.Errorf("counter for %d commits at %d, want %d", n, got, 2*n)
+		}
+	}
+	for i := 0; i < 3; i++ {
+		pos := batchArtifactPos(i)
+		gotI, artifact := batchCommitAt(pos)
+		if gotI != i || !artifact {
+			t.Errorf("artifact position %d reads back as (%d, artifact=%v), want (%d, true)", pos, gotI, artifact, i)
+		}
+		if gotI, artifact := batchCommitAt(pos + 1); gotI != i || artifact {
+			t.Errorf("event position %d reads back as (%d, artifact=%v), want (%d, false)", pos+1, gotI, artifact, i)
+		}
+	}
 }
 
 func TestDiverged_Arms(t *testing.T) {

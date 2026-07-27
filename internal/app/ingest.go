@@ -189,7 +189,7 @@ func loadImports(explicit string, cmd *cobra.Command) ([]config.Import, error) {
 // AGENTS.md). *gate.Gate satisfies it.
 type admitter interface {
 	Resolve(env facet.Envelope) (facet.Binding, error)
-	CommitBatch(ctx context.Context, envs []facet.Envelope, bindings []facet.Binding) ([]gate.Result, error)
+	CommitBatch(ctx context.Context, envs []facet.Envelope, bindings []facet.Binding) ([]gate.Result, ledger.Watermark, error)
 }
 
 // progress is what an ingest is known to have done: the outcomes counted so far and
@@ -259,15 +259,15 @@ func admitAll(ctx context.Context, g admitter, envs []facet.Envelope, timeout ti
 		// single commit: it is one round trip's latency times three, not per facet,
 		// but the transaction itself is larger.
 		callCtx, cancel := context.WithTimeout(ctx, timeout)
-		results, err := g.CommitBatch(callCtx, chunk, bindings)
+		results, w, err := g.CommitBatch(callCtx, chunk, bindings)
 		cancel()
 		if err != nil {
 			return prog, fmt.Errorf("commit batch at %d: %w", start, err)
 		}
 		for _, res := range results {
 			prog.tally[res.Outcome]++
-			prog.w = res.W
 		}
+		prog.w = w
 		prog.done += len(results)
 	}
 	return prog, nil

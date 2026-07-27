@@ -45,13 +45,15 @@ func envelopes(n int) []facet.Envelope {
 	return envs
 }
 
-// The claim batching has to earn: it is a throughput change, not a semantic one.
-// The same envelopes through Commit one at a time and through CommitBatch must
+// The claim batching has to earn: it is a throughput change, not a semantic one. The
+// same envelopes twelve times as a block of one, and once as a block of twelve, must
 // produce the same canonical — same entries, same order, same hash.
 //
-// The hash is the oracle because it covers everything a consumer can see. What it
-// deliberately excludes is the bookkeeping batching *does* change: seq assignment
-// and anam-time. Those differ, and must.
+// Commit is now CommitBatch of one, so this no longer guards two implementations
+// against each other; it guards one implementation against its own block size, which
+// is the property that was actually at stake. The hash is the oracle because it covers
+// everything a consumer can see. What it deliberately excludes is the bookkeeping
+// block size *does* change: seq assignment and anam-time. Those differ, and must.
 func TestCommitBatch_ProducesTheSameCanonicalAsCommit(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -63,13 +65,13 @@ func TestCommitBatch_ProducesTheSameCanonicalAsCommit(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Resolve: %v", err)
 		}
-		if _, err := gSingle.Commit(ctx, env, b); err != nil {
+		if _, _, err := gSingle.Commit(ctx, env, b); err != nil {
 			t.Fatalf("Commit %s: %v", env.SourceRef, err)
 		}
 	}
 
 	gBatch, lBatch := newGate(t)
-	if _, err := gBatch.CommitBatch(ctx, envs, resolveAll(t, gBatch, envs)); err != nil {
+	if _, _, err := gBatch.CommitBatch(ctx, envs, resolveAll(t, gBatch, envs)); err != nil {
 		t.Fatalf("CommitBatch: %v", err)
 	}
 
@@ -103,7 +105,7 @@ func TestCommitBatch_IsIdempotent(t *testing.T) {
 	g, l := newGate(t)
 	envs := envelopes(8)
 
-	if _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs)); err != nil {
+	if _, _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs)); err != nil {
 		t.Fatalf("first CommitBatch: %v", err)
 	}
 	head, err := l.Head(ctx)
@@ -111,7 +113,7 @@ func TestCommitBatch_IsIdempotent(t *testing.T) {
 		t.Fatalf("Head: %v", err)
 	}
 
-	results, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs))
+	results, _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs))
 	if err != nil {
 		t.Fatalf("second CommitBatch: %v", err)
 	}
@@ -134,14 +136,14 @@ func TestCommitBatch_SupersedesAlongsideNoOps(t *testing.T) {
 	g, _ := newGate(t)
 	envs := envelopes(4)
 
-	if _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs)); err != nil {
+	if _, _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs)); err != nil {
 		t.Fatalf("first CommitBatch: %v", err)
 	}
 
 	corrected := envelopes(4)
 	corrected[2] = bpEnvelopeAt(2, 999)
 
-	results, err := g.CommitBatch(ctx, corrected, resolveAll(t, g, corrected))
+	results, _, err := g.CommitBatch(ctx, corrected, resolveAll(t, g, corrected))
 	if err != nil {
 		t.Fatalf("second CommitBatch: %v", err)
 	}
@@ -159,30 +161,35 @@ func TestCommitBatch_SupersedesAlongsideNoOps(t *testing.T) {
 	}
 }
 
-// One transaction leaves the ledger in one place, so every result of one call must
-// report that place — the no-ops included.
+// The watermark a call reports must be where the ledger actually ended.
 //
-// The shape that caught this: change the *first* envelope and leave the rest, so the
-// last result is a no-op. A no-op is decided before the transaction, and when it took
-// its W from the head read there, it reported a watermark the write had already moved
-// past. An ingest tally reads the last result, so the run printed a stale W.
-func TestCommitBatch_EveryResultReportsTheWatermarkTheCallEndedAt(t *testing.T) {
+// This is the shape that caught the bug W used to have: change the *first* envelope
+// and leave the rest, so the last result is a no-op. When each result carried its own
+// W, the no-ops held the head read before the transaction while their written siblings
+// held the one after — and an ingest tally, which reads the last result, printed a
+// watermark the write had already moved past. There is one W now, so the disagreement
+// has nowhere to live; this pins the value that replaced it.
+func TestCommitBatch_ReportsTheWatermarkTheLedgerEndedAt(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	g, l := newGate(t)
 	envs := envelopes(3)
 
-	if _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs)); err != nil {
+	if _, _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs)); err != nil {
 		t.Fatalf("first CommitBatch: %v", err)
 	}
 
 	corrected := envelopes(3)
 	corrected[0] = bpEnvelopeAt(0, 999)
 
-	results, err := g.CommitBatch(ctx, corrected, resolveAll(t, g, corrected))
+	results, w, err := g.CommitBatch(ctx, corrected, resolveAll(t, g, corrected))
 	if err != nil {
 		t.Fatalf("second CommitBatch: %v", err)
 	}
+	if results[len(results)-1].Outcome != gate.OutcomeNoOp {
+		t.Fatalf("the last result is %s; this test needs it to be a no-op", results[len(results)-1].Outcome)
+	}
+
 	head, err := l.Head(ctx)
 	if err != nil {
 		t.Fatalf("Head: %v", err)
@@ -190,14 +197,12 @@ func TestCommitBatch_EveryResultReportsTheWatermarkTheCallEndedAt(t *testing.T) 
 	if head != 4 {
 		t.Fatalf("head = %d, want 4 (three admissions, one supersession)", head)
 	}
-	for i, res := range results {
-		if res.W != head {
-			t.Errorf("result %d (%s) reports W=%d, the ledger is at %d", i, res.Outcome, res.W, head)
-		}
+	if w != head {
+		t.Errorf("CommitBatch reported W=%d, the ledger is at %d", w, head)
 	}
 }
 
-// A batch that writes nothing must report the watermark it found, not one it moved:
+// A batch that writes nothing reports the watermark it found, not one it moved:
 // the all-no-op re-ingest, where the caller's W must stay put.
 func TestCommitBatch_AllNoOpsReportTheUnmovedWatermark(t *testing.T) {
 	t.Parallel()
@@ -205,7 +210,7 @@ func TestCommitBatch_AllNoOpsReportTheUnmovedWatermark(t *testing.T) {
 	g, l := newGate(t)
 	envs := envelopes(3)
 
-	if _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs)); err != nil {
+	if _, _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs)); err != nil {
 		t.Fatalf("first CommitBatch: %v", err)
 	}
 	head, err := l.Head(ctx)
@@ -213,7 +218,7 @@ func TestCommitBatch_AllNoOpsReportTheUnmovedWatermark(t *testing.T) {
 		t.Fatalf("Head: %v", err)
 	}
 
-	results, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs))
+	results, w, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs))
 	if err != nil {
 		t.Fatalf("second CommitBatch: %v", err)
 	}
@@ -221,9 +226,9 @@ func TestCommitBatch_AllNoOpsReportTheUnmovedWatermark(t *testing.T) {
 		if res.Outcome != gate.OutcomeNoOp {
 			t.Errorf("result %d = %s, want no-op", i, res.Outcome)
 		}
-		if res.W != head {
-			t.Errorf("result %d reports W=%d after writing nothing, want %d", i, res.W, head)
-		}
+	}
+	if w != head {
+		t.Errorf("a batch that wrote nothing reported W=%d, want %d", w, head)
 	}
 }
 
@@ -237,7 +242,7 @@ func TestCommitBatch_RefusesTwoEnvelopesForOneFacet(t *testing.T) {
 	g, _ := newGate(t)
 
 	envs := []facet.Envelope{bpEnvelopeAt(1, 118), bpEnvelopeAt(2, 120), bpEnvelopeAt(1, 130)}
-	_, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs))
+	_, _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs))
 	if err == nil {
 		t.Fatal("a batch holding one facet twice was accepted")
 	}
@@ -258,7 +263,7 @@ func TestCommitBatch_WritesNothingWhenAnEnvelopeIsBad(t *testing.T) {
 	bad.SourceRef = "bp-csv:not-what-identity-composes"
 	envs[1] = bad
 
-	if _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs)); err == nil {
+	if _, _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs)); err == nil {
 		t.Fatal("a batch with a mis-keyed envelope was accepted")
 	}
 	if head, err := l.Head(ctx); err != nil || head != 0 {
@@ -274,7 +279,7 @@ func TestCommitBatch_RefusesOversizedBatches(t *testing.T) {
 	g, _ := newGate(t)
 
 	envs := envelopes(ledger.MaxBatch + 1)
-	if _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs)); err == nil {
+	if _, _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs)); err == nil {
 		t.Errorf("a batch of %d was accepted (MaxBatch is %d)", len(envs), ledger.MaxBatch)
 	}
 }

@@ -38,24 +38,22 @@ func (f *fakeAdmitter) Resolve(env facet.Envelope) (facet.Binding, error) {
 	return facet.Binding{PersonID: "matt", Assurance: facet.AssuranceHigh}, nil
 }
 
-func (f *fakeAdmitter) CommitBatch(_ context.Context, envs []facet.Envelope, _ []facet.Binding) ([]gate.Result, error) {
+func (f *fakeAdmitter) CommitBatch(_ context.Context, envs []facet.Envelope, _ []facet.Binding) ([]gate.Result, ledger.Watermark, error) {
 	block := f.blocks
 	f.blocks++
 	if block == f.failBlock {
-		return nil, errors.New("commit refused")
+		return nil, 0, errors.New("commit refused")
 	}
 
-	// Every result of one call carries the watermark that call ended at — the real
-	// gate's contract, mirrored here so the fake cannot pass a test the gate fails.
+	// One watermark for the call, as the real gate returns — not one per result.
 	f.w += ledger.Watermark(len(envs))
 	out := make([]gate.Result, len(envs))
 	for i, env := range envs {
 		out[i] = gate.Result{
-			Outcome: gate.OutcomeAdmitted, FacetID: env.SourceRef,
-			ArtifactVersion: 1, W: f.w,
+			Outcome: gate.OutcomeAdmitted, FacetID: env.SourceRef, ArtifactVersion: 1,
 		}
 	}
-	return out, nil
+	return out, f.w, nil
 }
 
 func testEnvelopes(n int) []facet.Envelope {

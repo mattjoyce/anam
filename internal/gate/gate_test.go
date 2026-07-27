@@ -132,31 +132,31 @@ func TestCommit_AdmitNoopSupersedeRetract(t *testing.T) {
 	}
 
 	// First sight: admitted at v1, W moves to 1.
-	res, err := g.Commit(ctx, env, binding)
+	res, w, err := g.Commit(ctx, env, binding)
 	if err != nil {
 		t.Fatalf("Commit: %v", err)
 	}
-	if res.Outcome != gate.OutcomeAdmitted || res.ArtifactVersion != 1 || res.W != 1 {
-		t.Fatalf("first commit = %+v, want admitted v1 W=1", res)
+	if res.Outcome != gate.OutcomeAdmitted || res.ArtifactVersion != 1 || w != 1 {
+		t.Fatalf("first commit = %+v at W=%d, want admitted v1 W=1", res, w)
 	}
 
 	// Same row, same bytes: a no-op, and the watermark must not move.
-	res2, err := g.Commit(ctx, env, binding)
+	res2, w2, err := g.Commit(ctx, env, binding)
 	if err != nil {
 		t.Fatalf("re-Commit: %v", err)
 	}
-	if res2.Outcome != gate.OutcomeNoOp || res2.W != 1 {
-		t.Fatalf("re-ingest = %+v, want no-op with W still 1", res2)
+	if res2.Outcome != gate.OutcomeNoOp || w2 != 1 {
+		t.Fatalf("re-ingest = %+v at W=%d, want no-op with W still 1", res2, w2)
 	}
 
 	// Same row, corrected value: supersedes at v2; the old artifact stays.
 	corrected := bpEnvelope(strings.Replace(bpPayload, "118", "121", 1))
-	res3, err := g.Commit(ctx, corrected, binding)
+	res3, w3, err := g.Commit(ctx, corrected, binding)
 	if err != nil {
 		t.Fatalf("corrected Commit: %v", err)
 	}
-	if res3.Outcome != gate.OutcomeSuperseded || res3.ArtifactVersion != 2 || res3.W != 2 {
-		t.Fatalf("corrected commit = %+v, want superseded v2 W=2", res3)
+	if res3.Outcome != gate.OutcomeSuperseded || res3.ArtifactVersion != 2 || w3 != 2 {
+		t.Fatalf("corrected commit = %+v at W=%d, want superseded v2 W=2", res3, w3)
 	}
 	if res3.FacetID != res.FacetID {
 		t.Fatalf("supersession changed identity: %s vs %s", res3.FacetID, res.FacetID)
@@ -171,22 +171,22 @@ func TestCommit_AdmitNoopSupersedeRetract(t *testing.T) {
 	}
 
 	// Retract: one more anam-event, no new artifact.
-	res4, err := g.Retract(ctx, res.FacetID)
+	res4, w4, err := g.Retract(ctx, res.FacetID)
 	if err != nil {
 		t.Fatalf("Retract: %v", err)
 	}
-	if res4.Outcome != gate.OutcomeTombstoned || res4.W != 3 {
-		t.Fatalf("retract = %+v, want tombstoned W=3", res4)
+	if res4.Outcome != gate.OutcomeTombstoned || w4 != 3 {
+		t.Fatalf("retract = %+v at W=%d, want tombstoned W=3", res4, w4)
 	}
 
 	// Retracting again is a no-op — the fold shows the facet already tombstoned, so
 	// no second tombstone is appended and the watermark stays put (the R3 gap, closed).
-	res5, err := g.Retract(ctx, res.FacetID)
+	res5, w5, err := g.Retract(ctx, res.FacetID)
 	if err != nil {
 		t.Fatalf("re-Retract: %v", err)
 	}
-	if res5.Outcome != gate.OutcomeNoOp || res5.W != 3 {
-		t.Fatalf("re-retract = %+v, want no-op with W still 3", res5)
+	if res5.Outcome != gate.OutcomeNoOp || w5 != 3 {
+		t.Fatalf("re-retract = %+v at W=%d, want no-op with W still 3", res5, w5)
 	}
 
 	// The stream tells the whole story in order.
@@ -219,7 +219,7 @@ func TestCommit_TypedRejections(t *testing.T) {
 		t.Parallel()
 		env := bpEnvelope(bpPayload)
 		env.Source = "rogue"
-		if _, err := g.Commit(ctx, env, binding); !errors.Is(err, gate.ErrNotAuthorized) {
+		if _, _, err := g.Commit(ctx, env, binding); !errors.Is(err, gate.ErrNotAuthorized) {
 			t.Errorf("got %v, want ErrNotAuthorized", err)
 		}
 	})
@@ -234,14 +234,14 @@ func TestCommit_TypedRejections(t *testing.T) {
 		g2 := gate.New(nil, reg, gate.StaticScopes{"bp-csv": {"health.sleep"}}, clock.Real{}, person)
 		env := bpEnvelope(bpPayload)
 		env.Type = "health.sleep"
-		if _, err := g2.Commit(ctx, env, binding); !errors.Is(err, gate.ErrNoDefinition) {
+		if _, _, err := g2.Commit(ctx, env, binding); !errors.Is(err, gate.ErrNoDefinition) {
 			t.Errorf("got %v, want ErrNoDefinition", err)
 		}
 	})
 	t.Run("non-compliant payload", func(t *testing.T) {
 		t.Parallel()
 		env := bpEnvelope(`{"measured_at": "2026-01-24T06:30:00Z", "systolic": 118}`)
-		if _, err := g.Commit(ctx, env, binding); !errors.Is(err, def.ErrNotCompliant) {
+		if _, _, err := g.Commit(ctx, env, binding); !errors.Is(err, def.ErrNotCompliant) {
 			t.Errorf("got %v, want ErrNotCompliant (missing diastolic)", err)
 		}
 	})
@@ -249,27 +249,27 @@ func TestCommit_TypedRejections(t *testing.T) {
 		t.Parallel()
 		env := bpEnvelope(bpPayload)
 		env.SourceRef = "bp-csv:some-other-key"
-		if _, err := g.Commit(ctx, env, binding); !errors.Is(err, gate.ErrIdentityMismatch) {
+		if _, _, err := g.Commit(ctx, env, binding); !errors.Is(err, gate.ErrIdentityMismatch) {
 			t.Errorf("got %v, want ErrIdentityMismatch", err)
 		}
 	})
 	t.Run("malformed payload", func(t *testing.T) {
 		t.Parallel()
 		env := bpEnvelope(`{"measured_at": `)
-		if _, err := g.Commit(ctx, env, binding); err == nil {
+		if _, _, err := g.Commit(ctx, env, binding); err == nil {
 			t.Error("malformed payload committed")
 		}
 	})
 	t.Run("assurance below floor", func(t *testing.T) {
 		t.Parallel()
 		low := facet.Binding{PersonID: person, Assurance: facet.AssuranceReview}
-		if _, err := g.Commit(ctx, bpEnvelope(bpPayload), low); !errors.Is(err, gate.ErrAssuranceBelowFloor) {
+		if _, _, err := g.Commit(ctx, bpEnvelope(bpPayload), low); !errors.Is(err, gate.ErrAssuranceBelowFloor) {
 			t.Errorf("got %v, want ErrAssuranceBelowFloor (review < medium default)", err)
 		}
 	})
 	t.Run("retract unknown facet", func(t *testing.T) {
 		t.Parallel()
-		if _, err := g.Retract(ctx, "0000-not-a-facet"); !errors.Is(err, ledger.ErrNotFound) {
+		if _, _, err := g.Retract(ctx, "0000-not-a-facet"); !errors.Is(err, ledger.ErrNotFound) {
 			t.Errorf("got %v, want ErrNotFound", err)
 		}
 	})
@@ -284,10 +284,10 @@ func TestCommit_CrashRerunIsANoOp(t *testing.T) {
 	env := bpEnvelope(bpPayload)
 	binding, _ := g.Resolve(env)
 
-	if _, err := g.Commit(ctx, env, binding); err != nil {
+	if _, _, err := g.Commit(ctx, env, binding); err != nil {
 		t.Fatalf("Commit: %v", err)
 	}
-	res, err := g.Commit(ctx, env, binding)
+	res, _, err := g.Commit(ctx, env, binding)
 	if err != nil {
 		t.Fatalf("re-run: %v", err)
 	}
@@ -327,7 +327,7 @@ func TestCommit_ConcurrentWritersBothLand(t *testing.T) {
 				errc <- err
 				return
 			}
-			_, err = g.Commit(ctx, env, binding)
+			_, _, err = g.Commit(ctx, env, binding)
 			errc <- err
 		}(payloads[i], refs[i])
 	}

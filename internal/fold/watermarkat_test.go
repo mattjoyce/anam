@@ -191,7 +191,7 @@ func TestDisplaced_IncludesTheDeadCurrentVersion(t *testing.T) {
 	for _, r := range results {
 		id = r.FacetID
 	}
-	if _, err := g.Retract(ctx, id); err != nil {
+	if _, _, err := g.Retract(ctx, id); err != nil {
 		t.Fatalf("Retract: %v", err)
 	}
 

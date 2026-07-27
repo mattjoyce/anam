@@ -156,7 +156,7 @@ func (h *harness) admit(t *testing.T, source string, typ facet.Type, measuredAt,
 	if err != nil {
 		t.Fatalf("Resolve %s: %v", measuredAt, err)
 	}
-	if _, err := h.gate.Commit(context.Background(), env, binding); err != nil {
+	if _, _, err := h.gate.Commit(context.Background(), env, binding); err != nil {
 		t.Fatalf("Commit %s: %v", measuredAt, err)
 	}
 }

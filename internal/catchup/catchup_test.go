@@ -115,7 +115,7 @@ func commit(t *testing.T, g *gate.Gate, measuredAt, reading string) gate.Result 
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
-	res, err := g.Commit(context.Background(), env, binding)
+	res, _, err := g.Commit(context.Background(), env, binding)
 	if err != nil {
 		t.Fatalf("Commit: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestSync_IncrementalAndIdempotent(t *testing.T) {
 	// More history: a correction and a retraction. The next sync replays only
 	// (2, 4] and must land the same states the full fold derives.
 	commit(t, g, "2026-01-24T06:30:00Z", `"systolic": 124, "diastolic": 80`)
-	if _, err := g.Retract(ctx, resA.FacetID); err != nil {
+	if _, _, err := g.Retract(ctx, resA.FacetID); err != nil {
 		t.Fatalf("Retract: %v", err)
 	}
 	sync3, err := catchup.Sync(ctx, l, db, testBuckets(t))

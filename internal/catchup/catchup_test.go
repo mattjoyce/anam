@@ -236,3 +236,75 @@ func TestSync_RefusesACursorAheadOfTheLedger(t *testing.T) {
 		t.Fatalf("Sync with cursor 99 over head 1 = %v, want ErrIndexAhead", err)
 	}
 }
+
+// A batch commit is one change in Anam's knowledge, so its events share one anam-time.
+// That makes anam_time non-unique — up to MaxBatch events on one instant — and
+// changes_since is a half-open window on exactly that column.
+//
+// So the window's edges have to be right about ties, and a batch has to come back
+// whole. A caller that took the last anam_time it saw as its next `since` would
+// otherwise step over the rest of that instant's batch and call it "no changes".
+func TestChangesSince_ReturnsABatchsSharedInstantWhole(t *testing.T) {
+	t.Parallel()
+	g, l, db := newHarness(t)
+	ctx := context.Background()
+
+	const n = 5
+	envs := make([]facet.Envelope, n)
+	bindings := make([]facet.Binding, n)
+	for i := range envs {
+		at := time.Date(2026, 5, 1, 6, i, 0, 0, time.UTC).Format(time.RFC3339)
+		envs[i] = facet.Envelope{
+			Type: "health.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
+			SourceRef: "bp-csv:" + at,
+			Payload:   []byte(`{"measured_at": "` + at + `", "systolic": 118, "diastolic": 76}`),
+		}
+		b, err := g.Resolve(envs[i])
+		if err != nil {
+			t.Fatalf("Resolve: %v", err)
+		}
+		bindings[i] = b
+	}
+
+	before := clock.Format(time.Now().UTC().Add(-time.Minute))
+	if _, _, err := g.CommitBatch(ctx, envs, bindings); err != nil {
+		t.Fatalf("CommitBatch: %v", err)
+	}
+	if _, err := catchup.Sync(ctx, l, db, testBuckets(t)); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	changes, err := db.ChangesSince(ctx, before, "")
+	if err != nil {
+		t.Fatalf("ChangesSince: %v", err)
+	}
+	if len(changes) != n {
+		t.Fatalf("changes = %d, want %d — the batch came back in pieces", len(changes), n)
+	}
+
+	// The premise: they really do share one instant, and seq is what orders them.
+	instant := changes[0].AnamTime
+	for i, c := range changes {
+		if c.AnamTime != instant {
+			t.Errorf("change %d is at %s, want the batch's shared %s", i, c.AnamTime, instant)
+		}
+		if c.Seq != int64(i)+1 {
+			t.Errorf("change %d has seq %d — the tie is not broken by seq", i, c.Seq)
+		}
+	}
+
+	// `since` is exclusive: asking from the batch's own instant excludes all of it,
+	// rather than some of it.
+	if after, err := db.ChangesSince(ctx, instant, ""); err != nil {
+		t.Fatalf("ChangesSince at the instant: %v", err)
+	} else if len(after) != 0 {
+		t.Errorf("since the batch's own instant = %d changes, want 0 (the bound is exclusive)", len(after))
+	}
+
+	// `until` is inclusive, and takes the instant whole for the same reason.
+	if upto, err := db.ChangesSince(ctx, before, instant); err != nil {
+		t.Fatalf("ChangesSince up to the instant: %v", err)
+	} else if len(upto) != n {
+		t.Errorf("up to the batch's instant = %d changes, want %d (the bound is inclusive)", len(upto), n)
+	}
+}

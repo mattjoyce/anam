@@ -419,3 +419,58 @@ func TestAdmit_SeqMustFollowWatermark(t *testing.T) {
 		t.Fatal("Admit with seq 7 against W=0 succeeded, want refusal")
 	}
 }
+
+// KnownFacets is a fast *negative*, and the gate leans its whole first-sight decision
+// on it: "unknown" is what admits a first artifact at v1. So every way a facet could
+// stop looking present is a way to make the gate write a duplicate over an existing
+// one — and the probe asks for v1 specifically, which is what makes those ways
+// non-obvious.
+//
+// Two of them look plausible enough to pin here. Retraction: a tombstone is an
+// anam-event, not a delete, so the artifact stays and the facet must still probe as
+// known. Supersession: the current version moves to v2, v3, … but v1 is never rewritten
+// or removed, so the probe still finds it.
+//
+// The structural half of this — that no code in the package can delete an item at all —
+// is TestAppendOnly_NoMutatingCallsInCode. This is the behavioural half.
+func TestKnownFacets_SurvivesRetractionAndSupersession(t *testing.T) {
+	t.Parallel()
+	l := newLedger(t)
+	ctx := context.Background()
+
+	tombstoned := testFacet(t, "bp-csv:2026-04-01T06:30:00", `{"systolic": 118}`, 1)
+	if err := l.Admit(ctx, 0, tombstoned, admittedEvent(tombstoned, 1)); err != nil {
+		t.Fatalf("Admit the facet to be retracted: %v", err)
+	}
+	if err := l.Mark(ctx, 1, facet.AnamEvent{
+		Kind: facet.EventTombstoned, FacetID: tombstoned.ID,
+		AnamTime:        time.Date(2026, 7, 10, 10, 0, 0, 0, time.UTC),
+		Seq:             2,
+		ArtifactVersion: 1,
+	}); err != nil {
+		t.Fatalf("Mark tombstone: %v", err)
+	}
+
+	superseded := testFacet(t, "bp-csv:2026-04-02T06:30:00", `{"systolic": 121}`, 1)
+	if err := l.Admit(ctx, 2, superseded, admittedEvent(superseded, 3)); err != nil {
+		t.Fatalf("Admit v1: %v", err)
+	}
+	v2 := testFacet(t, "bp-csv:2026-04-02T06:30:00", `{"systolic": 124}`, 2)
+	if err := l.Admit(ctx, 3, v2, admittedEvent(v2, 4)); err != nil {
+		t.Fatalf("Admit v2: %v", err)
+	}
+
+	known, err := l.KnownFacets(ctx, []string{tombstoned.ID, superseded.ID, "0000-never-admitted"})
+	if err != nil {
+		t.Fatalf("KnownFacets: %v", err)
+	}
+	if !known[tombstoned.ID] {
+		t.Error("a tombstoned facet probed as unknown — the gate would admit a second v1 over it")
+	}
+	if !known[superseded.ID] {
+		t.Error("a superseded facet probed as unknown — v1 is still there, and the probe asks for v1")
+	}
+	if known["0000-never-admitted"] {
+		t.Error("a facet that was never admitted probed as known — the fast negative is not fast, it is wrong")
+	}
+}

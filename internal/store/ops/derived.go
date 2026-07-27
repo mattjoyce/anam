@@ -134,6 +134,18 @@ func (d *DB) ApplyReplay(ctx context.Context, fromSeq, uptoSeq int64, events []E
 // ChangesSince reports the anam-events in (since, until] by anam-time — what
 // changed between two points (§9). Bounds are clock.Layout strings; pass "" as
 // until for "to the end". Results come back in (anam_time, seq) order.
+//
+// Anam-time is not unique, and deliberately so: a batch commit is one change in Anam's
+// knowledge, so all its events share one instant. Up to MaxBatch of them can therefore
+// sit on a single anam_time, which is why the ordering is (anam_time, seq) — the tie is
+// broken by the clock that is total.
+//
+// That also makes the absence of a LIMIT here load-bearing rather than incidental. The
+// bounds are a half-open window on a non-unique column, so a caller paging on the last
+// anam_time it saw would step over the rest of that instant's batch. Returning the
+// whole window is what keeps the cursor sound; adding a row limit would mean carrying
+// seq in the cursor too.
+
 func (d *DB) ChangesSince(ctx context.Context, since, until string) ([]EventRow, error) {
 	q := `SELECT seq, anam_time, kind, facet_id, artifact_version
 	      FROM anam_event_index WHERE anam_time > ?`

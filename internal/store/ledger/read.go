@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -66,7 +67,23 @@ func (l *Ledger) KnownFacets(ctx context.Context, facetIDs []string) (map[string
 
 	// UnprocessedKeys is DynamoDB throttling, not an error: the unread keys come
 	// back to be asked for again. Treating them as absent would admit a duplicate.
-	for len(keys) > 0 {
+	//
+	// So the re-ask is required — but it is a retry, and a retry needs a bound and a
+	// pause. Without them, sustained throttling is a hot loop against the thing already
+	// asking to be left alone, and the only thing that ends it is the caller's deadline
+	// firing somewhere else. Give up instead, saying so: a probe that cannot complete
+	// must fail, because its "unknown" is what admits a first artifact.
+	for attempt := 0; len(keys) > 0; attempt++ {
+		if attempt == maxProbeAttempts {
+			return nil, fmt.Errorf("%w: %d ids still unread after %d attempts",
+				ErrThrottled, len(keys), maxProbeAttempts)
+		}
+		if attempt > 0 {
+			if err := pause(ctx, probeBackoff(attempt)); err != nil {
+				return nil, err
+			}
+		}
+
 		out, err := l.client.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
 			RequestItems: map[string]ddbtypes.KeysAndAttributes{
 				l.table: {
@@ -89,6 +106,38 @@ func (l *Ledger) KnownFacets(ctx context.Context, facetIDs []string) (map[string
 		keys = out.UnprocessedKeys[l.table].Keys
 	}
 	return known, nil
+}
+
+// ErrThrottled is returned when a probe still has unread keys after every attempt.
+var ErrThrottled = errors.New("ledger: probe gave up under throttling")
+
+// maxProbeAttempts bounds the re-ask. Six attempts span roughly 1.6s of backoff, which
+// is longer than a healthy table ever needs and short enough to surface as a failure
+// rather than as a call that never returns.
+const maxProbeAttempts = 6
+
+// probeBackoff is the pause before attempt n (n >= 1): 50ms doubling to 800ms. No
+// jitter, because this is a single-writer backfill — there is no thundering herd to
+// spread, only one caller being asked to slow down.
+func probeBackoff(attempt int) time.Duration {
+	d := 50 * time.Millisecond << (attempt - 1)
+	if d > 800*time.Millisecond {
+		d = 800 * time.Millisecond
+	}
+	return d
+}
+
+// pause waits d, or returns early if the caller's deadline fires first. A sleep that
+// ignored the context would outlive the request it belongs to.
+func pause(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("ledger: probe backoff: %w", ctx.Err())
+	case <-t.C:
+		return nil
+	}
 }
 
 // CurrentVersion returns the highest artifact version of one logical facet.

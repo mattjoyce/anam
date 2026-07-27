@@ -561,6 +561,17 @@ no-op.
 earlier `anam_time` at a higher `seq`, and the ledger's order — the one thing §1 admits Anam owns —
 would be ambiguous.
 
+**The two clocks are not symmetric, and the asymmetry is deliberate.** `seq` is total: every anam-event
+gets its own, unique and gapless. `anam_time` is not: a batch commit is *one* change in Anam's knowledge,
+so all its events share one instant — up to `MaxBatch` of them. "Agree by construction" above therefore
+means non-decreasing, not strictly increasing, and anything ordering by anam-time must break the tie with
+`seq` (`anam_event_by_time` is indexed `(anam_time, seq)` for exactly that).
+
+The consequence worth naming: `changes_since` is a half-open window on a **non-unique** column, so it
+returns its whole window and takes no row limit. A caller paging on the last `anam_time` it saw would
+step over the rest of that instant's batch and be told nothing changed. A row limit here would mean
+carrying `seq` in the cursor too — the absence of one is load-bearing, not incidental.
+
 The retry loop belongs to the **gate**, not the store. A capture worker may already crash mid-batch and be
 re-run to known-good, so the recovery is free; putting a loop, a bound and a give-up path inside the one
 component that must not fail buys nothing.

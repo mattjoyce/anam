@@ -158,7 +158,7 @@ Conflating these produced the whole-timeline mint that §1 retracts. Anam has **
 
 | Tier | What it is | Minted? |
 |---|---|---|
-| **Bucket span** | a calendar window over **fact-time**, **one month** by default (`span.Default`; weekly is also implemented). Every facet is a member of exactly one, by arithmetic on its `fact_time` — no lookup. Invisible to the reader; nobody asks for it. | **minted** — the unit of checkpointing (§7) |
+| **Bucket span** | a calendar window over **fact-time**, **one month** by default (`bucket_width` in config, `span.Default`; weekly is also implemented). Every facet is a member of exactly one, by arithmetic on its `fact_time` — no lookup. Invisible to the reader; nobody asks for it. | **minted** — the unit of checkpointing (§7) |
 | **Derived span** | an inclusive interval the person names — `[from, to]`, optionally narrowed to some facet types; a saved bookmark; or "everything" | **never minted.** Composed on demand from bucket values; materialised only when a receipt is served |
 
 A derived span is a **lens**, not a unit of consistency: composed on demand, never stored as one, never
@@ -368,11 +368,22 @@ read, paid by a range-scan; it is not bought by a periodic tick.
 
 - **Minting is per span, never whole-life** (ADR 0033). Anam's default mintable span is a **time bucket**
   over **fact-time**. **Width is a knob, not a constant** — `internal/span` implements monthly and
-  weekly, and `span.Default` is **monthly**. (Width bounds the cost of *making* a checkpoint; cadence
-  bounds the cost of *using* one. They are different knobs and were once wearing one word.) Bucket ids
-  are **self-describing** — `bucket:2026-07` monthly, `bucket:2026-W28` weekly — so ids already written
-  keep their meaning when the default changes. Every facet is a member of exactly one bucket, so the
-  minted set is never empty and every facet sits inside a mintable scope.
+  weekly, and the operator turns it with **`bucket_width`** in config; `span.Default` is **monthly**.
+  (Width bounds the cost of *making* a checkpoint; cadence bounds the cost of *using* one. They are
+  different knobs and were once wearing one word.) Bucket ids are **self-describing** — `bucket:2026-07`
+  monthly, `bucket:2026-W28` weekly — so ids already written keep their meaning when the default changes.
+  Every facet is a member of exactly one bucket, so the minted set is never empty and every facet sits
+  inside a mintable scope.
+- **The width is checked once and then carried, never re-decided.** `span.New` is the only constructor of
+  a `span.Buckets`, and it is where an unknown width is refused; `Buckets.Of` is arithmetic with nothing
+  to fall back to. A width that defaulted quietly would be the worst kind of wrong — the ids it wrote
+  would be well-formed, plausible, and afterwards indistinguishable from correct ones. So a typo dies at
+  **config load**, not on the ingest path.
+- **Changing the width is a rebuild, not a migration.** `facet_index.bucket_id` is persisted and catch-up
+  only rewrites the rows new events touch, so the width is a property of the *built index*, not of the
+  run. The operational store pins it beside `schema_version` and **refuses a database built at another
+  width**; the remedy is the same one a schema bump gets — delete `tracking.db` and re-run `init`. The
+  derived tier replays, so that costs time, never a fact.
 - **Anam buckets on fact-time, where Arch buckets on anam-time.** Anam can, and Arch cannot, because
   `facet_id = uuidv5(source_ref)` and `source_ref` is a source row's **identity, not its contents** (§6a):
   a superseding artifact is the same row re-read, so it carries the same `fact_time` and lands in the

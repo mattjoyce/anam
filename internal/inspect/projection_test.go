@@ -110,7 +110,7 @@ func seedProjectionServer() (*httptest.Server, error) {
 
 	// A generous per-request budget: the page is several ledger round-trips, and the
 	// whole suite shares one DynamoDB Local. Latency is not what these tests are about.
-	return httptest.NewServer(inspect.Handler(l, 90*time.Second)), nil
+	return httptest.NewServer(inspect.Handler(l, 90*time.Second, defaultBuckets)), nil
 }
 
 // The canonical view is the un-narrowed read: every live facet stands served, and the

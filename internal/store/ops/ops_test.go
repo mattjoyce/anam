@@ -7,15 +7,31 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/span"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
 // A real SQLite file per test (AGENTS.md): t.TempDir gives each its own.
 
+// buckets is the bucketing these tests open at; the width-mismatch test is the one
+// that opens at another.
+func buckets(t *testing.T, w ...span.Width) span.Buckets {
+	t.Helper()
+	width := span.Default
+	if len(w) == 1 {
+		width = w[0]
+	}
+	b, err := span.New(width)
+	if err != nil {
+		t.Fatalf("span.New(%q): %v", width, err)
+	}
+	return b
+}
+
 func open(t *testing.T) (*ops.DB, string) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "anam.db")
-	d, err := ops.Open(context.Background(), path)
+	d, err := ops.Open(context.Background(), path, buckets(t))
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
@@ -31,7 +47,7 @@ func TestOpen_IsIdempotent(t *testing.T) {
 	}
 
 	// Re-opening an existing database must apply the schema as a no-op.
-	d2, err := ops.Open(context.Background(), path)
+	d2, err := ops.Open(context.Background(), path, buckets(t))
 	if err != nil {
 		t.Fatalf("second Open: %v", err)
 	}
@@ -41,7 +57,7 @@ func TestOpen_IsIdempotent(t *testing.T) {
 func TestOpen_CreatesParentDirectories(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "deep", "nested", "anam.db")
-	d, err := ops.Open(context.Background(), path)
+	d, err := ops.Open(context.Background(), path, buckets(t))
 	if err != nil {
 		t.Fatalf("Open with missing parents: %v", err)
 	}
@@ -55,7 +71,7 @@ func TestOpen_FailsFastOnAnUncreatableDir(t *testing.T) {
 	if err := os.WriteFile(obstruction, []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ops.Open(context.Background(), filepath.Join(obstruction, "anam.db")); err == nil {
+	if _, err := ops.Open(context.Background(), filepath.Join(obstruction, "anam.db"), buckets(t)); err == nil {
 		t.Fatal("Open under a file-as-directory succeeded, want error")
 	}
 }
@@ -72,10 +88,33 @@ func TestOpen_RefusesForeignSchemaVersion(t *testing.T) {
 		t.Fatalf("Close: %v", err)
 	}
 
-	_, err := ops.Open(context.Background(), path)
+	_, err := ops.Open(context.Background(), path, buckets(t))
 	if !errors.Is(err, ops.ErrSchemaVersion) {
 		t.Fatalf("Open on v999 database = %v, want ErrSchemaVersion", err)
 	}
+}
+
+// bucket_id is persisted and catch-up only rewrites the rows new events touch, so
+// re-opening at another width would accrete two kinds of well-formed id in one index
+// with nothing to tell them apart. Refuse instead: the derived tier replays.
+func TestOpen_RefusesAnIndexBuiltAtAnotherBucketWidth(t *testing.T) {
+	t.Parallel()
+	d, path := open(t)
+	if err := d.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	_, err := ops.Open(context.Background(), path, buckets(t, span.Weekly))
+	if !errors.Is(err, ops.ErrBucketWidth) {
+		t.Fatalf("Open of a monthly index at weekly = %v, want ErrBucketWidth", err)
+	}
+
+	// The same width still opens: the pin refuses a change, not a re-open.
+	again, err := ops.Open(context.Background(), path, buckets(t))
+	if err != nil {
+		t.Fatalf("re-Open at the pinned width: %v", err)
+	}
+	_ = again.Close()
 }
 
 // The head of a span is its latest checkpoint — a view over the log, so it cannot
@@ -148,7 +187,7 @@ func TestLostFile_ReopensEmptyAndUsable(t *testing.T) {
 		t.Fatalf("remove: %v", err)
 	}
 
-	d2, err := ops.Open(context.Background(), path)
+	d2, err := ops.Open(context.Background(), path, buckets(t))
 	if err != nil {
 		t.Fatalf("re-Open after loss: %v", err)
 	}

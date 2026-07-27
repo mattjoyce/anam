@@ -46,7 +46,9 @@ and *transaction time*; Anam's are fact-time and anam-time. See *As-of*, *Fact-t
 by default (`span.Default`; weekly is also implemented, and the id says which). Every Facet is a member
 of exactly one, by arithmetic on its fact-time. Invisible to the reader. The unit of checkpointing.
 Width is a tuning knob — it trades facets-per-mint against values-per-read — and is not a semantic
-choice. See *Span*, *Checkpoint*.
+choice; the operator sets it with `bucket_width` in config. It is stamped into every bucket id the
+facet index holds, so changing it is a rebuild of the derived tier rather than a setting that takes
+effect quietly. See *Span*, *Checkpoint*.
 
 **Canonical** — The **live-only** fold at a watermark: every Facet whose current status is live.
 Superseded and tombstoned Facets are **excluded from the value** (they remain in the *Ledger*, marked).

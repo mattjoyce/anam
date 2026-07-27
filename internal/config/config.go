@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/mattjoyce/anam/internal/safepath"
+	"github.com/mattjoyce/anam/internal/span"
 )
 
 // ErrInvalid is returned when the resolved configuration is unusable.
@@ -46,6 +47,12 @@ type Config struct {
 	// Timeout bounds every call to a store. Anam fails fast on an unreachable endpoint
 	// rather than hanging (§8).
 	Timeout time.Duration `mapstructure:"timeout"`
+
+	// BucketWidth is how much fact-time one checkpoint bucket covers (§4, §7). It is a
+	// tuning knob and changes nothing a read returns — but it is stamped into every
+	// bucket id the operational index persists, so the ops store pins it and refuses a
+	// database that was built at a different width.
+	BucketWidth span.Width `mapstructure:"bucket_width"`
 }
 
 // Load resolves configuration, reading the YAML file at path when it is non-empty.
@@ -76,6 +83,7 @@ func Load(path string) (Config, error) {
 	v.SetDefault("db_path", DefaultDBPath())
 	v.SetDefault("artifact_dir", DefaultArtifactDir())
 	v.SetDefault("timeout", 5*time.Second)
+	v.SetDefault("bucket_width", string(span.Default))
 
 	if path != "" {
 		v.SetConfigFile(path)
@@ -129,8 +137,17 @@ func (c Config) Validate() error {
 	case c.Timeout <= 0:
 		return fmt.Errorf("%w: timeout must be positive, got %s", ErrInvalid, c.Timeout)
 	}
+	// A typo'd width dies here, at startup, where it costs a re-run — not on the ingest
+	// path, where falling back would write months of plausible, wrongly-named buckets.
+	if _, err := span.New(c.BucketWidth); err != nil {
+		return fmt.Errorf("%w: bucket_width: %v", ErrInvalid, err)
+	}
 	return nil
 }
+
+// Buckets is the bucketing this configuration selects. Validate has already rejected
+// an unknown width, so a config that loaded yields one here.
+func (c Config) Buckets() (span.Buckets, error) { return span.New(c.BucketWidth) }
 
 // DefaultDBPath is the tracking database: <data dir>/anam/tracking.db.
 func DefaultDBPath() string { return dataPath("tracking.db") }

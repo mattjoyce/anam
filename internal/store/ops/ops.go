@@ -23,14 +23,24 @@ import (
 	"path/filepath"
 
 	_ "modernc.org/sqlite" // registers the pure-Go "sqlite" driver
+
+	"github.com/mattjoyce/anam/internal/span"
 )
 
 // schemaVersion is bumped on any schema change. The prototype recreates rather than
 // migrates: everything derived replays, everything provisioned reloads.
-const schemaVersion = 4
+//
+// 4 -> 5 adds no table. It bumps because meta now carries a pinned bucket_width, and a
+// database written before that pin has none — so opening one would record whatever
+// width the config happened to say and accept an index built at another. The bump
+// makes the pre-pin database refuse, which is the same answer by a route that works.
+const schemaVersion = 5
 
 // ErrSchemaVersion is returned by Open for a database written by a different schema.
 var ErrSchemaVersion = errors.New("ops: schema version mismatch")
+
+// ErrBucketWidth is returned by Open for an index built at a different bucket width.
+var ErrBucketWidth = errors.New("ops: bucket width mismatch")
 
 // DB is a handle on the operational store.
 type DB struct {
@@ -133,8 +143,14 @@ CREATE TABLE IF NOT EXISTS meta (
 
 // Open opens (creating if absent) the operational store at path and idempotently
 // applies the schema. Parent directories are created. A database written by a
-// different schema version is refused, not migrated silently.
-func Open(ctx context.Context, path string) (*DB, error) {
+// different schema version, or built at a different bucket width, is refused rather
+// than migrated silently.
+//
+// buckets is pinned rather than merely used because facet_index.bucket_id is
+// persisted, and catch-up only rewrites the rows new events touch. Opening the same
+// database at another width would therefore leave old ids and new ids side by side,
+// each well-formed, with nothing to say which is which.
+func Open(ctx context.Context, path string, buckets span.Buckets) (*DB, error) {
 	if dir := filepath.Dir(path); dir != "." {
 		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return nil, fmt.Errorf("ops: create data dir: %w", err)
@@ -154,32 +170,57 @@ func Open(ctx context.Context, path string) (*DB, error) {
 		_ = db.Close()
 		return nil, err
 	}
+	if err := pinBucketWidth(ctx, db, buckets.Width()); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	return &DB{db: db}, nil
 }
 
 // pinSchemaVersion records the version on first open and refuses a mismatch after.
 func pinSchemaVersion(ctx context.Context, db *sql.DB) error {
-	res, err := db.ExecContext(ctx,
-		`INSERT INTO meta (key, value) VALUES ('schema_version', ?) ON CONFLICT (key) DO NOTHING`,
-		fmt.Sprintf("%d", schemaVersion))
-	if err != nil {
+	stored, fresh, err := pin(ctx, db, "schema_version", fmt.Sprintf("%d", schemaVersion))
+	switch {
+	case err != nil:
 		return fmt.Errorf("ops: pin schema version: %w", err)
+	case fresh || stored == fmt.Sprintf("%d", schemaVersion):
+		return nil
+	}
+	return fmt.Errorf("%w: database holds %s, this build writes %d — delete the file and re-run init; the derived tier replays and the provisioned tier reloads",
+		ErrSchemaVersion, stored, schemaVersion)
+}
+
+// pinBucketWidth records the width the index was built at and refuses a mismatch
+// after. Same remedy as a schema change, and for the same reason: the derived tier is
+// rebuildable, so re-deriving it is cheaper than reasoning about a half-converted one.
+func pinBucketWidth(ctx context.Context, db *sql.DB, w span.Width) error {
+	stored, fresh, err := pin(ctx, db, "bucket_width", string(w))
+	switch {
+	case err != nil:
+		return fmt.Errorf("ops: pin bucket width: %w", err)
+	case fresh || stored == string(w):
+		return nil
+	}
+	return fmt.Errorf("%w: index was built %s, config says %s — delete the file and re-run init; the derived tier replays at the new width",
+		ErrBucketWidth, stored, w)
+}
+
+// pin writes key on first open and reports what is stored thereafter. fresh is true
+// when this call is the one that wrote it.
+func pin(ctx context.Context, db *sql.DB, key, value string) (stored string, fresh bool, err error) {
+	res, err := db.ExecContext(ctx,
+		`INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO NOTHING`, key, value)
+	if err != nil {
+		return "", false, err
 	}
 	if n, _ := res.RowsAffected(); n == 1 {
-		return nil // fresh database, version pinned
+		return value, true, nil
 	}
-
-	var stored string
-	err = db.QueryRowContext(ctx,
-		`SELECT value FROM meta WHERE key = 'schema_version'`).Scan(&stored)
-	if err != nil {
-		return fmt.Errorf("ops: read schema version: %w", err)
+	if err := db.QueryRowContext(ctx,
+		`SELECT value FROM meta WHERE key = ?`, key).Scan(&stored); err != nil {
+		return "", false, err
 	}
-	if stored != fmt.Sprintf("%d", schemaVersion) {
-		return fmt.Errorf("%w: database holds %s, this build writes %d — delete the file and re-run init; the derived tier replays and the provisioned tier reloads",
-			ErrSchemaVersion, stored, schemaVersion)
-	}
-	return nil
+	return stored, false, nil
 }
 
 // Close releases the handle.

@@ -4,10 +4,12 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/config"
+	"github.com/mattjoyce/anam/internal/span"
 )
 
 // TestLoadWithoutPersonIDFails guards the partition key. person_id has no default:
@@ -41,6 +43,7 @@ func TestLoadDefaults(t *testing.T) {
 		DBPath:      "/data/anam/tracking.db",
 		ArtifactDir: "/data/anam/artifacts",
 		Timeout:     5 * time.Second,
+		BucketWidth: span.Default,
 	}
 	if got != want {
 		t.Errorf("Load() = %+v, want %+v", got, want)
@@ -87,6 +90,7 @@ table_name: anam-test
 db_path: /srv/anam/tracking.db
 artifact_dir: /srv/anam/artifacts
 timeout: 12s
+bucket_width: weekly
 `)
 
 	got, err := config.Load(path)
@@ -102,6 +106,7 @@ timeout: 12s
 		DBPath:      "/srv/anam/tracking.db",
 		ArtifactDir: "/srv/anam/artifacts",
 		Timeout:     12 * time.Second,
+		BucketWidth: span.Weekly,
 	}
 	if got != want {
 		t.Errorf("Load() = %+v, want %+v", got, want)
@@ -218,6 +223,7 @@ func TestValidate(t *testing.T) {
 		DBPath:      "/srv/tracking.db",
 		ArtifactDir: "/srv/artifacts",
 		Timeout:     5 * time.Second,
+		BucketWidth: span.Default,
 	}
 
 	tests := []struct {
@@ -234,6 +240,9 @@ func TestValidate(t *testing.T) {
 		{"missing artifact_dir", func(c *config.Config) { c.ArtifactDir = "" }, true},
 		{"zero timeout", func(c *config.Config) { c.Timeout = 0 }, true},
 		{"negative timeout", func(c *config.Config) { c.Timeout = -time.Second }, true},
+		{"weekly bucket_width", func(c *config.Config) { c.BucketWidth = span.Weekly }, false},
+		{"unknown bucket_width", func(c *config.Config) { c.BucketWidth = "fortnightly" }, true},
+		{"empty bucket_width", func(c *config.Config) { c.BucketWidth = "" }, true},
 	}
 
 	for _, tt := range tests {
@@ -268,4 +277,19 @@ func writeConfig(t *testing.T, body string) string {
 		t.Fatalf("write config: %v", err)
 	}
 	return path
+}
+
+// A typo'd width must die at startup, where it costs a re-run. Absorbed on the ingest
+// path instead, it would write months of real-looking bucket ids under a width nobody
+// chose — and nothing downstream could tell them from correct ones.
+func TestLoadRejectsAnUnknownBucketWidth(t *testing.T) {
+	path := writeConfig(t, "person_id: matt\nbucket_width: fortnightly\n")
+
+	_, err := config.Load(path)
+	if !errors.Is(err, config.ErrInvalid) {
+		t.Fatalf("Load() with bucket_width: fortnightly = %v, want it to wrap ErrInvalid", err)
+	}
+	if !strings.Contains(err.Error(), "bucket_width") {
+		t.Errorf("error does not name the key: %v", err)
+	}
 }

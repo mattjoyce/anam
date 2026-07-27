@@ -159,6 +159,74 @@ func TestCommitBatch_SupersedesAlongsideNoOps(t *testing.T) {
 	}
 }
 
+// One transaction leaves the ledger in one place, so every result of one call must
+// report that place — the no-ops included.
+//
+// The shape that caught this: change the *first* envelope and leave the rest, so the
+// last result is a no-op. A no-op is decided before the transaction, and when it took
+// its W from the head read there, it reported a watermark the write had already moved
+// past. An ingest tally reads the last result, so the run printed a stale W.
+func TestCommitBatch_EveryResultReportsTheWatermarkTheCallEndedAt(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	g, l := newGate(t)
+	envs := envelopes(3)
+
+	if _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs)); err != nil {
+		t.Fatalf("first CommitBatch: %v", err)
+	}
+
+	corrected := envelopes(3)
+	corrected[0] = bpEnvelopeAt(0, 999)
+
+	results, err := g.CommitBatch(ctx, corrected, resolveAll(t, g, corrected))
+	if err != nil {
+		t.Fatalf("second CommitBatch: %v", err)
+	}
+	head, err := l.Head(ctx)
+	if err != nil {
+		t.Fatalf("Head: %v", err)
+	}
+	if head != 4 {
+		t.Fatalf("head = %d, want 4 (three admissions, one supersession)", head)
+	}
+	for i, res := range results {
+		if res.W != head {
+			t.Errorf("result %d (%s) reports W=%d, the ledger is at %d", i, res.Outcome, res.W, head)
+		}
+	}
+}
+
+// A batch that writes nothing must report the watermark it found, not one it moved:
+// the all-no-op re-ingest, where the caller's W must stay put.
+func TestCommitBatch_AllNoOpsReportTheUnmovedWatermark(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	g, l := newGate(t)
+	envs := envelopes(3)
+
+	if _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs)); err != nil {
+		t.Fatalf("first CommitBatch: %v", err)
+	}
+	head, err := l.Head(ctx)
+	if err != nil {
+		t.Fatalf("Head: %v", err)
+	}
+
+	results, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs))
+	if err != nil {
+		t.Fatalf("second CommitBatch: %v", err)
+	}
+	for i, res := range results {
+		if res.Outcome != gate.OutcomeNoOp {
+			t.Errorf("result %d = %s, want no-op", i, res.Outcome)
+		}
+		if res.W != head {
+			t.Errorf("result %d reports W=%d after writing nothing, want %d", i, res.W, head)
+		}
+	}
+}
+
 // One transaction cannot write a key twice, and two envelopes for one facet in a
 // single batch is nearly always a duplicated source row. Refuse it by name rather
 // than letting DynamoDB reject the transaction with an error that identifies

@@ -67,10 +67,14 @@ func inspectCmd(cfgPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			buckets, err := cfg.Buckets()
+			if err != nil {
+				return err
+			}
 
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "inspecting table %q (person %s) at %s\nhttp://%s/\n",
 				cfg.TableName, cfg.PersonID, cfg.DDBEndpoint, listen)
-			return inspect.Serve(cmd.Context(), l, listen, cfg.Timeout)
+			return inspect.Serve(cmd.Context(), l, listen, cfg.Timeout, buckets)
 		},
 	}
 	// Loopback by default: the inspector is a local diagnostic tool, not a service.

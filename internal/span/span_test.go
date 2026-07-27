@@ -1,6 +1,7 @@
 package span_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -24,7 +25,7 @@ func TestDefault_IsMonthly(t *testing.T) {
 	if span.Default != span.Monthly {
 		t.Errorf("Default = %q, want %q", span.Default, span.Monthly)
 	}
-	if got, want := span.Of(span.Default, mustParse(t, "2026-07-11T05:54:00Z")).ID(), "bucket:2026-07"; got != want {
+	if got, want := bucketing(t, span.Default).Of(mustParse(t, "2026-07-11T05:54:00Z")).ID(), "bucket:2026-07"; got != want {
 		t.Errorf("Of(Default).ID() = %q, want %q", got, want)
 	}
 }
@@ -45,7 +46,7 @@ func TestMonthly_BoundsAreHalfOpenAndVariableLength(t *testing.T) {
 		{"2026-12-31T23:59:59Z", "2026-12-01T00:00:00Z", "2027-01-01T00:00:00Z", 31},
 	}
 	for _, tc := range cases {
-		b := span.Of(span.Monthly, mustParse(t, tc.instant))
+		b := bucketing(t, span.Monthly).Of(mustParse(t, tc.instant))
 		if got := b.From().Format(time.RFC3339); got != tc.from {
 			t.Errorf("Of(%s).From() = %s, want %s", tc.instant, got, tc.from)
 		}
@@ -56,10 +57,10 @@ func TestMonthly_BoundsAreHalfOpenAndVariableLength(t *testing.T) {
 			t.Errorf("Of(%s) is %d days, want %d", tc.instant, got, tc.days)
 		}
 		// Half-open: From is inside, To is the next bucket.
-		if span.Of(span.Monthly, b.From()).ID() != b.ID() {
+		if bucketing(t, span.Monthly).Of(b.From()).ID() != b.ID() {
 			t.Errorf("From() %s is not in its own bucket %s", b.From(), b.ID())
 		}
-		if span.Of(span.Monthly, b.To()).ID() == b.ID() {
+		if bucketing(t, span.Monthly).Of(b.To()).ID() == b.ID() {
 			t.Errorf("To() %s must be exclusive, but lands in %s", b.To(), b.ID())
 		}
 		if b.From().Location() != time.UTC || b.To().Location() != time.UTC {
@@ -77,7 +78,7 @@ func TestMonthly_YearNeverStraddles(t *testing.T) {
 		{"2026-12-31T23:59:59Z", "bucket:2026-12"},
 		{"2027-01-01T00:00:00Z", "bucket:2027-01"},
 	} {
-		if got := span.Of(span.Monthly, mustParse(t, tc.instant)).ID(); got != tc.want {
+		if got := bucketing(t, span.Monthly).Of(mustParse(t, tc.instant)).ID(); got != tc.want {
 			t.Errorf("Of(%s).ID() = %q, want %q", tc.instant, got, tc.want)
 		}
 	}
@@ -102,7 +103,7 @@ func TestWeekly_ISOWeekYearIsNotTheCalendarYear(t *testing.T) {
 		{"2027-01-04T00:00:00Z", "bucket:2027-W01"}, // Monday, the next week
 	}
 	for _, tc := range tests {
-		if got := span.Of(span.Weekly, mustParse(t, tc.instant)).ID(); got != tc.want {
+		if got := bucketing(t, span.Weekly).Of(mustParse(t, tc.instant)).ID(); got != tc.want {
 			t.Errorf("Of(Weekly, %s).ID() = %q, want %q", tc.instant, got, tc.want)
 		}
 	}
@@ -111,7 +112,7 @@ func TestWeekly_ISOWeekYearIsNotTheCalendarYear(t *testing.T) {
 func TestWeekly_BoundsAreHalfOpenAndSevenDaysWide(t *testing.T) {
 	t.Parallel()
 
-	b := span.Of(span.Weekly, mustParse(t, "2026-07-05T14:30:00Z")) // a Sunday
+	b := bucketing(t, span.Weekly).Of(mustParse(t, "2026-07-05T14:30:00Z")) // a Sunday
 
 	if got, want := b.From().Format(time.RFC3339), "2026-06-29T00:00:00Z"; got != want {
 		t.Errorf("From() = %s, want %s (the Monday)", got, want)
@@ -119,10 +120,10 @@ func TestWeekly_BoundsAreHalfOpenAndSevenDaysWide(t *testing.T) {
 	if got, want := b.To().Sub(b.From()), 7*24*time.Hour; got != want {
 		t.Errorf("width = %s, want %s", got, want)
 	}
-	if span.Of(span.Weekly, b.From()).ID() != b.ID() {
+	if bucketing(t, span.Weekly).Of(b.From()).ID() != b.ID() {
 		t.Errorf("From() %s is not in its own bucket %s", b.From(), b.ID())
 	}
-	if span.Of(span.Weekly, b.To()).ID() == b.ID() {
+	if bucketing(t, span.Weekly).Of(b.To()).ID() == b.ID() {
 		t.Errorf("To() %s must be exclusive, but lands in %s", b.To(), b.ID())
 	}
 	if b.From().Location() != time.UTC || b.To().Location() != time.UTC {
@@ -136,16 +137,16 @@ func TestID_LexicalOrderIsChronological(t *testing.T) {
 	t.Parallel()
 
 	for _, w := range []span.Width{span.Monthly, span.Weekly} {
-		early := span.Of(w, mustParse(t, "2026-02-16T00:00:00Z"))
-		late := span.Of(w, mustParse(t, "2026-11-09T00:00:00Z"))
+		early := bucketing(t, w).Of(mustParse(t, "2026-02-16T00:00:00Z"))
+		late := bucketing(t, w).Of(mustParse(t, "2026-11-09T00:00:00Z"))
 		if early.ID() >= late.ID() {
 			t.Errorf("%s: lexical order broken: %q should sort before %q", w, early.ID(), late.ID())
 		}
 	}
-	if got, want := span.Of(span.Monthly, mustParse(t, "2026-02-16T00:00:00Z")).ID(), "bucket:2026-02"; got != want {
+	if got, want := bucketing(t, span.Monthly).Of(mustParse(t, "2026-02-16T00:00:00Z")).ID(), "bucket:2026-02"; got != want {
 		t.Errorf("month not zero-padded: got %q, want %q", got, want)
 	}
-	if got, want := span.Of(span.Weekly, mustParse(t, "2026-02-16T00:00:00Z")).ID(), "bucket:2026-W08"; got != want {
+	if got, want := bucketing(t, span.Weekly).Of(mustParse(t, "2026-02-16T00:00:00Z")).ID(), "bucket:2026-W08"; got != want {
 		t.Errorf("week not zero-padded: got %q, want %q", got, want)
 	}
 }
@@ -157,10 +158,10 @@ func TestOf_NormalisesToUTC(t *testing.T) {
 	// 2027-01-01T09:00:00+10:00 is 2026-12-31T23:00:00Z — the previous month, and
 	// (for weekly) still 2026-W53.
 	zoned := time.Date(2027, 1, 1, 9, 0, 0, 0, time.FixedZone("AEST", 10*3600))
-	if got, want := span.Of(span.Monthly, zoned).ID(), "bucket:2026-12"; got != want {
+	if got, want := bucketing(t, span.Monthly).Of(zoned).ID(), "bucket:2026-12"; got != want {
 		t.Errorf("Of(Monthly, %s).ID() = %q, want %q", zoned, got, want)
 	}
-	if got, want := span.Of(span.Weekly, zoned).ID(), "bucket:2026-W53"; got != want {
+	if got, want := bucketing(t, span.Weekly).Of(zoned).ID(), "bucket:2026-W53"; got != want {
 		t.Errorf("Of(Weekly, %s).ID() = %q, want %q", zoned, got, want)
 	}
 }
@@ -201,7 +202,7 @@ func TestParse_RoundTrips(t *testing.T) {
 			"2027-01-01T00:00:00Z",
 			"2024-02-29T12:00:00Z", // leap day
 		} {
-			want := span.Of(w, mustParse(t, instant))
+			want := bucketing(t, w).Of(mustParse(t, instant))
 			got, err := span.Parse(want.ID())
 			if err != nil {
 				t.Fatalf("Parse(%q): %v", want.ID(), err)
@@ -240,14 +241,14 @@ func TestParse_Rejects(t *testing.T) {
 	}
 }
 
-// An unknown width must not halt capture: this is on the ingest path, and a typo in
-// configuration is not a reason to stop recording facts.
-func TestOf_UnknownWidthFallsBackToDefault(t *testing.T) {
+// An unknown width is refused where it is named, not absorbed where it is used.
+// Falling back would put a typo's facets in real-looking buckets under the wrong
+// width — durable, plausible, and indistinguishable afterwards from correct ones.
+func TestNew_RefusesAnUnknownWidth(t *testing.T) {
 	t.Parallel()
 
-	at := mustParse(t, "2026-07-11T05:54:00Z")
-	if got, want := span.Of("fortnightly", at).ID(), span.Of(span.Default, at).ID(); got != want {
-		t.Errorf("Of(unknown).ID() = %q, want the default %q", got, want)
+	if _, err := span.New("fortnightly"); !errors.Is(err, span.ErrInvalidWidth) {
+		t.Errorf("New(\"fortnightly\") = %v, want ErrInvalidWidth", err)
 	}
 	if span.Width("fortnightly").Valid() {
 		t.Error("an unknown width reported itself valid")
@@ -256,5 +257,35 @@ func TestOf_UnknownWidthFallsBackToDefault(t *testing.T) {
 		if !w.Valid() {
 			t.Errorf("%q reported itself invalid", w)
 		}
+		if _, err := span.New(w); err != nil {
+			t.Errorf("New(%q) = %v, want a bucketing", w, err)
+		}
 	}
+}
+
+// The zero Buckets is not a bucketing, and must not quietly behave like the default
+// one. Its id is the one shape Parse refuses, so a Buckets that skipped New announces
+// itself rather than writing plausible rows.
+func TestZeroBuckets_ProducesAnIDParseRejects(t *testing.T) {
+	t.Parallel()
+
+	var b span.Buckets
+	id := b.Of(mustParse(t, "2026-07-11T05:54:00Z")).ID()
+	if id == bucketing(t, span.Default).Of(mustParse(t, "2026-07-11T05:54:00Z")).ID() {
+		t.Fatalf("the zero Buckets produced the default's id %q", id)
+	}
+	if _, err := span.Parse(id); !errors.Is(err, span.ErrInvalidID) {
+		t.Errorf("Parse(%q) = %v, want ErrInvalidID", id, err)
+	}
+}
+
+// bucketing is New with the error asserted away — every test here uses a width it
+// knows is valid, and the ones checking that New rejects call it directly.
+func bucketing(t *testing.T, w span.Width) span.Buckets {
+	t.Helper()
+	b, err := span.New(w)
+	if err != nil {
+		t.Fatalf("span.New(%q): %v", w, err)
+	}
+	return b
 }

@@ -129,7 +129,11 @@ type Result struct {
 	Outcome         Outcome
 	FacetID         string
 	ArtifactVersion int
-	W               ledger.Watermark
+
+	// W is the watermark the call ended at. It is the ledger's, not this envelope's:
+	// every result of one CommitBatch carries the same W whatever each envelope's own
+	// outcome was, because one transaction leaves the ledger in one place.
+	W ledger.Watermark
 }
 
 // Resolve is the gate's first call: the associated pillar (§6). Binding never

@@ -27,6 +27,9 @@ import (
 // ErrInvalidID is returned by Parse for a malformed or non-existent bucket id.
 var ErrInvalidID = errors.New("invalid bucket id")
 
+// ErrInvalidWidth is returned by New for a width that is not one of the declared ones.
+var ErrInvalidWidth = errors.New("invalid bucket width")
+
 // Width is how much fact-time one bucket covers.
 //
 // It is a tuning knob and nothing more: it trades how many facets a checkpoint folds
@@ -71,23 +74,49 @@ type Bucket struct {
 	from  time.Time
 }
 
-// Of returns the bucket of width w containing t. The instant is normalised to UTC
-// first, so a timestamp in any zone lands in the bucket its UTC instant belongs to.
+// Buckets tiles fact-time at one width. It is the bucketing an operator selected,
+// held as a value: construct it once from configuration and pass it to whatever needs
+// to place a facet.
 //
-// The width is a parameter rather than a package default because it is an operator's
-// choice and belongs where it can be seen. An unknown width falls back to Default
-// rather than panicking: this is on the ingest path, and a typo in configuration must
-// not be able to halt capture.
-func Of(w Width, t time.Time) Bucket {
+// The width is checked once, in New, and the value carries the proof — so Of is total
+// and has nothing to fall back to. That is the whole reason this is a type rather than
+// a width handed to a package-level function. A bucket id is durable, self-describing,
+// and plausible: a width that quietly defaulted would write real-looking ids that
+// nothing downstream can tell from right ones.
+//
+// The zero Buckets is not a bucketing. New is the only constructor, and an id built
+// from a zero value is one Parse refuses rather than one it misreads.
+type Buckets struct{ width Width }
+
+// New returns the bucketing of width w. It is the one place an unknown width is
+// rejected; every Of afterwards is arithmetic.
+func New(w Width) (Buckets, error) {
+	if !w.Valid() {
+		return Buckets{}, fmt.Errorf("%w: %q is neither %s nor %s", ErrInvalidWidth, w, Monthly, Weekly)
+	}
+	return Buckets{width: w}, nil
+}
+
+// Width reports the width this bucketing tiles at.
+func (b Buckets) Width() Width { return b.width }
+
+// Of returns the bucket containing t. The instant is normalised to UTC first, so a
+// timestamp in any zone lands in the bucket its UTC instant belongs to.
+func (b Buckets) Of(t time.Time) Bucket {
 	utc := t.UTC()
-	if w == Weekly {
+	switch b.width {
+	case Weekly:
 		year, week := utc.ISOWeek()
 		return Bucket{width: Weekly, year: year, n: week, from: mondayOf(utc)}
+	case Monthly:
+		return Bucket{
+			width: Monthly, year: utc.Year(), n: int(utc.Month()),
+			from: time.Date(utc.Year(), utc.Month(), 1, 0, 0, 0, 0, time.UTC),
+		}
 	}
-	return Bucket{
-		width: Monthly, year: utc.Year(), n: int(utc.Month()),
-		from: time.Date(utc.Year(), utc.Month(), 1, 0, 0, 0, 0, time.UTC),
-	}
+	// Unreachable through New. Returning the zero bucket rather than guessing a width
+	// keeps the failure loud: its id is "bucket:0000-00", which Parse rejects.
+	return Bucket{}
 }
 
 // Parse reads an id written by ID, inferring the width from its shape.

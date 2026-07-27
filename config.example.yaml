@@ -52,3 +52,18 @@ artifact_dir: ~/.local/share/anam/artifacts
 # Bounds every call to a store. Anam fails fast on an unreachable endpoint rather
 # than hanging.
 timeout: 5s
+
+# --- bucketing ----------------------------------------------------------------
+# How much fact-time one checkpoint bucket covers: `monthly` or `weekly`.
+#
+# A tuning knob, and only that — it changes nothing a read returns. It trades how
+# many facets a checkpoint folds against how many values a long read stitches:
+# narrow buckets make a re-mint cheap and a lifelong read expensive, wide ones the
+# reverse. Monthly suits this record's density (~200 facets a bucket, 31 buckets);
+# a dense source like Garmin's monitoring tables would argue for weekly.
+#
+# It is also stamped into every bucket id the facet index persists, so changing it
+# is a rebuild: the operational store refuses a database built at another width,
+# and the fix is to delete tracking.db and re-run `anam init`. The derived tier
+# replays from the ledger, so that costs time, not facts.
+bucket_width: monthly

@@ -49,7 +49,11 @@ up to the ledger's head by replay, so the answer is as fresh as ingest.`,
 			if err != nil {
 				return err
 			}
-			db, err := ops.Open(cmd.Context(), cfg.DBPath)
+			buckets, err := cfg.Buckets()
+			if err != nil {
+				return err
+			}
+			db, err := ops.Open(cmd.Context(), cfg.DBPath, buckets)
 			if err != nil {
 				return err
 			}
@@ -57,7 +61,7 @@ up to the ledger's head by replay, so the answer is as fresh as ingest.`,
 
 			ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
 			defer cancel()
-			sync, err := catchup.Sync(ctx, l, db)
+			sync, err := catchup.Sync(ctx, l, db, buckets)
 			if err != nil {
 				return err
 			}

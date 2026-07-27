@@ -18,6 +18,15 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
+// defaultBuckets is the bucketing the inspector renders at here. The bucket ids the
+// pages show are derived from it rather than spelled out, so a change of default width
+// is a width change and not a test failure.
+//
+// The error is discarded because span.Default is a declared width: New can only refuse
+// it if the constants contradict each other, and then the zero Buckets it returns
+// yields "bucket:0000-00" and every assertion below fails by name.
+var defaultBuckets, _ = span.New(span.Default)
+
 // The inspector is exercised over a real seeded ledger (AGENTS.md: real components),
 // through its Handler so no port is bound. Skips cleanly when DynamoDB Local is away.
 
@@ -76,7 +85,7 @@ func seededServer(t *testing.T) (*httptest.Server, string, string) {
 	// A generous request timeout: the suite runs whole packages of integration
 	// tests against one DynamoDB Local, whose table creates/drops (the fold's
 	// rebuild test) serialise everything else. Latency is not under test here.
-	srv := httptest.NewServer(inspect.Handler(l, 30*time.Second))
+	srv := httptest.NewServer(inspect.Handler(l, 30*time.Second, defaultBuckets))
 	t.Cleanup(srv.Close)
 	return srv, bp.ID, hr.ID
 }
@@ -151,7 +160,7 @@ func TestServe_ShutsDownOnContextCancel(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = l.Drop(context.Background()) })
 
-	go func() { done <- inspect.Serve(ctx, l, "127.0.0.1:0", time.Second) }()
+	go func() { done <- inspect.Serve(ctx, l, "127.0.0.1:0", time.Second, defaultBuckets) }()
 	time.Sleep(200 * time.Millisecond) // let ListenAndServe bind
 	cancel()
 
@@ -176,7 +185,7 @@ func TestFacetList_ShowsFoldedStatus(t *testing.T) {
 	// The bucket id is derived, not spelled out: the list must show whichever bucket
 	// the seeded fact-time falls in, so changing span.Default is a width change and
 	// not a test failure.
-	bucket := span.Of(span.Default, time.Date(2026, 7, 5, 6, 30, 0, 0, time.UTC)).ID()
+	bucket := defaultBuckets.Of(time.Date(2026, 7, 5, 6, 30, 0, 0, time.UTC)).ID()
 	for _, want := range []string{"W = 3", bpID, hrID, "tombstoned", "health.blood-pressure", bucket} {
 		if !strings.Contains(body, want) {
 			t.Errorf("facet list missing %q", want)

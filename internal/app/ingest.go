@@ -49,7 +49,11 @@ func initCmd(cfgPath *string) *cobra.Command {
 			if err := l.Init(ctx); err != nil {
 				return err
 			}
-			db, err := ops.Open(ctx, cfg.DBPath)
+			buckets, err := cfg.Buckets()
+			if err != nil {
+				return err
+			}
+			db, err := ops.Open(ctx, cfg.DBPath, buckets)
 			if err != nil {
 				return err
 			}
@@ -117,14 +121,14 @@ with the shell history; a declared import is reviewable and repeatable.`,
 				if err != nil {
 					return err
 				}
-				tally, w, err := admitAll(cmd.Context(), g, envs, cfg.Timeout, batch)
+				// The report is printed on both paths, and before the error: the writes
+				// that landed are in the ledger whatever the exit code says, and an
+				// operator deciding whether to re-run needs to know there were any.
+				prog, err := admitAll(cmd.Context(), g, envs, cfg.Timeout, batch)
+				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n", imp.Source, prog.report(len(envs)))
 				if err != nil {
 					return err
 				}
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(),
-					"%s: %d envelopes → admitted=%d superseded=%d no-op=%d  W=%d\n",
-					imp.Source, len(envs),
-					tally[gate.OutcomeAdmitted], tally[gate.OutcomeSuperseded], tally[gate.OutcomeNoOp], w)
 			}
 			return nil
 		},
@@ -180,19 +184,63 @@ func loadImports(explicit string, cmd *cobra.Command) ([]config.Import, error) {
 	return config.LoadImports(path)
 }
 
+// admitter is the commit surface admitAll needs, and nothing more: resolve a binding,
+// then commit a block of envelopes under it (interfaces at the point of use,
+// AGENTS.md). *gate.Gate satisfies it.
+type admitter interface {
+	Resolve(env facet.Envelope) (facet.Binding, error)
+	CommitBatch(ctx context.Context, envs []facet.Envelope, bindings []facet.Binding) ([]gate.Result, error)
+}
+
+// progress is what an ingest is known to have done: the outcomes counted so far and
+// the watermark the last completed block left behind.
+//
+// It exists because the interesting case is the failed one. A block that committed is
+// in the ledger whether or not a later block fails, so "how far did it get" is an
+// answer the operator is owed on the error path — and held in loop-local variables it
+// was exactly what the error path stepped over.
+type progress struct {
+	tally map[gate.Outcome]int
+	w     ledger.Watermark
+
+	// done is how many envelopes have an outcome. It is also what says whether w
+	// means anything: zero blocks completed leaves w at the zero watermark, which is
+	// a real value meaning "empty ledger" and must not be reported as one.
+	done int
+}
+
+// report renders progress against the number of envelopes offered, naming itself
+// partial when it is.
+func (p progress) report(offered int) string {
+	if p.done == 0 {
+		return fmt.Sprintf("%d envelopes → nothing committed", offered)
+	}
+	s := fmt.Sprintf("%d envelopes → admitted=%d superseded=%d no-op=%d  W=%d",
+		offered, p.tally[gate.OutcomeAdmitted], p.tally[gate.OutcomeSuperseded],
+		p.tally[gate.OutcomeNoOp], p.w)
+	if p.done < offered {
+		s += fmt.Sprintf("  (stopped after %d of %d — commit is idempotent, so re-run)", p.done, offered)
+	}
+	return s
+}
+
 // admitAll drives every envelope through resolve → commit in blocks of `batch`,
 // each block under its own deadline. It stops at the first error: commit is
 // idempotent, so a failed ingest is re-run rather than resumed.
+//
+// It returns what it managed alongside the error rather than instead of it. Re-running
+// is always safe, but "safe to re-run" is not "nothing happened": dying at block 2 and
+// dying at block 100 want different responses from the operator, and only the count
+// tells them apart.
 //
 // The block size is throughput, not semantics. A block of 1 is exactly the old
 // one-transaction-per-facet path; larger blocks amortise the three sequential round
 // trips a commit costs over many facets, at the price of retrying more work when a
 // watermark goes stale. For a single-writer backfill nothing contends and the price
 // is never paid.
-func admitAll(ctx context.Context, g *gate.Gate, envs []facet.Envelope, timeout time.Duration, batch int,
-) (map[gate.Outcome]int, ledger.Watermark, error) {
-	tally := map[gate.Outcome]int{}
-	var w ledger.Watermark
+func admitAll(ctx context.Context, g admitter, envs []facet.Envelope, timeout time.Duration, batch int,
+) (progress, error) {
+	prog := progress{tally: map[gate.Outcome]int{}}
 
 	for start := 0; start < len(envs); start += batch {
 		end := min(start+batch, len(envs))
@@ -202,7 +250,7 @@ func admitAll(ctx context.Context, g *gate.Gate, envs []facet.Envelope, timeout 
 		for i, env := range chunk {
 			b, err := g.Resolve(env)
 			if err != nil {
-				return nil, 0, fmt.Errorf("resolve %s: %w", env.SourceRef, err)
+				return prog, fmt.Errorf("resolve %s: %w", env.SourceRef, err)
 			}
 			bindings[i] = b
 		}
@@ -214,12 +262,13 @@ func admitAll(ctx context.Context, g *gate.Gate, envs []facet.Envelope, timeout 
 		results, err := g.CommitBatch(callCtx, chunk, bindings)
 		cancel()
 		if err != nil {
-			return nil, 0, fmt.Errorf("commit batch at %d: %w", start, err)
+			return prog, fmt.Errorf("commit batch at %d: %w", start, err)
 		}
 		for _, res := range results {
-			tally[res.Outcome]++
-			w = res.W
+			prog.tally[res.Outcome]++
+			prog.w = res.W
 		}
+		prog.done += len(results)
 	}
-	return tally, w, nil
+	return prog, nil
 }

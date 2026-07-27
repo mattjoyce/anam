@@ -177,8 +177,11 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 		for _, i := range pending {
 			d := dispositions[i]
 			if d.noop {
+				// No W here: it is stamped on every result at the end, from the
+				// watermark the transaction actually left behind. Taking it from the
+				// head read a moment ago would date this entry to before the write.
 				results[i] = Result{Outcome: OutcomeNoOp, FacetID: ps[i].facetID,
-					ArtifactVersion: d.version, W: head}
+					ArtifactVersion: d.version}
 				continue
 			}
 			f, err := g.build(ps[i], d.version)
@@ -196,23 +199,24 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 			writing = append(writing, i)
 		}
 		if len(commits) == 0 {
-			return results, nil
+			// Everything resolved to a no-op. A cancelled transaction writes nothing,
+			// so this call moved the watermark nowhere and head is where it ended.
+			return stampW(results, head), nil
 		}
 
 		err = g.ledger.AdmitBatch(ctx, head, commits)
 		var conflict *ledger.BatchConflict
 		switch {
 		case err == nil:
-			w := head + ledger.Watermark(len(commits))
 			for n, i := range writing {
 				outcome := OutcomeAdmitted
 				if commits[n].Event.Kind == facet.EventSuperseded {
 					outcome = OutcomeSuperseded
 				}
 				results[i] = Result{Outcome: outcome, FacetID: ps[i].facetID,
-					ArtifactVersion: commits[n].Facet.ArtifactVersion, W: w}
+					ArtifactVersion: commits[n].Facet.ArtifactVersion}
 			}
-			return results, nil
+			return stampW(results, head+ledger.Watermark(len(commits))), nil
 
 		case errors.Is(err, ledger.ErrStaleWatermark):
 			continue
@@ -229,7 +233,7 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 				i := writing[n]
 				done[i] = true
 				results[i] = Result{Outcome: OutcomeNoOp, FacetID: ps[i].facetID,
-					ArtifactVersion: commits[n].Facet.ArtifactVersion, W: head}
+					ArtifactVersion: commits[n].Facet.ArtifactVersion}
 			}
 			next := pending[:0:0]
 			for _, i := range pending {
@@ -247,6 +251,21 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 		}
 	}
 	return nil, fmt.Errorf("%w: after %d attempts", ErrContention, g.maxRetries)
+}
+
+// stampW gives every result the watermark the call ended at, and is the only place a
+// batch's results get one.
+//
+// W is the ledger's, not an envelope's. Assigned per entry it disagreed with itself: a
+// no-op is decided before the transaction, so it carried the head read before the
+// write while its written siblings carried the head after — and a caller reading the
+// last result of a batch whose last envelope happened to be unchanged was told a
+// watermark the write had already moved past.
+func stampW(results []Result, w ledger.Watermark) []Result {
+	for i := range results {
+		results[i].W = w
+	}
+	return results
 }
 
 // prepare runs every pillar that needs no ledger read and derives identity and

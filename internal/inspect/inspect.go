@@ -48,6 +48,10 @@ type Server struct {
 	ledger  Ledger
 	timeout time.Duration
 
+	// buckets is the operator's bucketing, so the id shown beside a facet is the one
+	// the operational index holds for it rather than whatever this package assumed.
+	buckets span.Buckets
+
 	// The fold cache, keyed by watermark: a whole-person read is one replay plus
 	// one fetch per live facet, too dear to repeat per page view. Every request
 	// still reads the head (one cheap call), so a moved W is never served stale —
@@ -70,8 +74,8 @@ type Server struct {
 const asOfCacheSize = 4
 
 // Handler returns the inspector's routes on a fresh mux.
-func Handler(l Ledger, timeout time.Duration) http.Handler {
-	s := &Server{ledger: l, timeout: timeout}
+func Handler(l Ledger, timeout time.Duration, buckets span.Buckets) http.Handler {
+	s := &Server{ledger: l, timeout: timeout, buckets: buckets}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.timeline)
 	mux.HandleFunc("GET /facets", s.index)
@@ -138,10 +142,10 @@ func (s *Server) readAt(ctx context.Context, w ledger.Watermark) (fold.Result, e
 }
 
 // Serve runs the inspector at addr until ctx is cancelled.
-func Serve(ctx context.Context, l Ledger, addr string, timeout time.Duration) error {
+func Serve(ctx context.Context, l Ledger, addr string, timeout time.Duration, buckets span.Buckets) error {
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           Handler(l, timeout),
+		Handler:           Handler(l, timeout, buckets),
 		ReadHeaderTimeout: 5 * time.Second,
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}
@@ -194,7 +198,7 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	// deliberately absent from the cached canonical.
 	rows := make([]facetRow, 0, len(res.States))
 	for _, f := range res.Live {
-		rows = append(rows, rowOf(f, res.States[f.ID].Status))
+		rows = append(rows, s.rowOf(f, res.States[f.ID].Status))
 	}
 	for id, st := range res.States {
 		if st.Live() {
@@ -209,7 +213,7 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 			httpError(w, err)
 			return
 		}
-		rows = append(rows, rowOf(f, st.Status))
+		rows = append(rows, s.rowOf(f, st.Status))
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		if rows[i].FactTime != rows[j].FactTime {
@@ -221,12 +225,12 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	render(w, "index.html", indexData{W: res.W, Facets: rows})
 }
 
-func rowOf(f facet.Facet, st facet.Status) facetRow {
+func (s *Server) rowOf(f facet.Facet, st facet.Status) facetRow {
 	return facetRow{
 		ID:       f.ID,
 		Type:     f.Type,
 		FactTime: f.FactTime.Format(time.RFC3339),
-		Bucket:   span.Of(span.Default, f.FactTime).ID(),
+		Bucket:   s.buckets.Of(f.FactTime).ID(),
 		Version:  f.ArtifactVersion,
 		Status:   st,
 		Hash:     f.Descriptor.ContentHash,
@@ -308,7 +312,7 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 		Status:   states[id].Status,
 		FactTime: f.FactTime.Format(time.RFC3339),
 		AnamTime: anamTimeOf(mine, f.ArtifactVersion),
-		Bucket:   span.Of(span.Default, f.FactTime).ID(),
+		Bucket:   s.buckets.Of(f.FactTime).ID(),
 		Payload:  pretty.String(),
 		Events:   mine,
 	})

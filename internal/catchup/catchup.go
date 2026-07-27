@@ -53,7 +53,7 @@ type Result struct {
 // Sync replays anam-events in (cursor, head] into the indexes. Idempotent and
 // crash-re-runnable: the rows and the cursor move in one transaction on the ops
 // side, so a re-run resumes from wherever the last complete batch ended.
-func Sync(ctx context.Context, l Ledger, o Ops) (Result, error) {
+func Sync(ctx context.Context, l Ledger, o Ops, buckets span.Buckets) (Result, error) {
 	last, err := o.LastSeq(ctx)
 	if err != nil {
 		return Result{}, err
@@ -74,7 +74,7 @@ func Sync(ctx context.Context, l Ledger, o Ops) (Result, error) {
 		return Result{}, err
 	}
 
-	facets, err := advance(ctx, l, o, events)
+	facets, err := advance(ctx, l, o, events, buckets)
 	if err != nil {
 		return Result{}, err
 	}
@@ -97,7 +97,7 @@ func Sync(ctx context.Context, l Ledger, o Ops) (Result, error) {
 // mid-sync is therefore invisible here: the artifact versions this replay names were
 // written before it started and never change. Anything the new events did not reach is
 // simply next run's work — the cursor moves with the rows, in one transaction.
-func advance(ctx context.Context, l Ledger, o Ops, events []facet.AnamEvent) (rows []ops.FacetRow, err error) {
+func advance(ctx context.Context, l Ledger, o Ops, events []facet.AnamEvent, buckets span.Buckets) (rows []ops.FacetRow, err error) {
 	var ids []string
 	seen := map[string]bool{}
 	for _, ev := range events {
@@ -130,7 +130,7 @@ func advance(ctx context.Context, l Ledger, o Ops, events []facet.AnamEvent) (ro
 		}
 		rows = append(rows, ops.FacetRow{
 			FacetID: id, Type: f.Type,
-			FactTime: clock.Format(f.FactTime), BucketID: span.Of(span.Default, f.FactTime).ID(),
+			FactTime: clock.Format(f.FactTime), BucketID: buckets.Of(f.FactTime).ID(),
 			Version: st.Version, Status: st.Status, ContentHash: f.Descriptor.ContentHash,
 		})
 	}

@@ -17,9 +17,21 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/gate"
+	"github.com/mattjoyce/anam/internal/span"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
+
+// testBuckets is the bucketing catch-up stamps onto facet_index rows here. It is the
+// default width, which is also what ops.Open pins the test database at.
+func testBuckets(t *testing.T) span.Buckets {
+	t.Helper()
+	b, err := span.New(span.Default)
+	if err != nil {
+		t.Fatalf("span.New(%q): %v", span.Default, err)
+	}
+	return b
+}
 
 // Catch-up is tested over the real pair it bridges: the real ledger (skipping
 // cleanly when DynamoDB Local is away) and a real SQLite file per test.
@@ -74,7 +86,7 @@ func newHarness(t *testing.T) (*gate.Gate, *ledger.Ledger, *ops.DB) {
 	}
 	t.Cleanup(func() { _ = l.Drop(context.Background()) })
 
-	db, err := ops.Open(ctx, filepath.Join(t.TempDir(), "tracking.db"))
+	db, err := ops.Open(ctx, filepath.Join(t.TempDir(), "tracking.db"), testBuckets(t))
 	if err != nil {
 		t.Fatalf("ops.Open: %v", err)
 	}
@@ -121,7 +133,7 @@ func TestSync_IncrementalAndIdempotent(t *testing.T) {
 	resA := commit(t, g, "2026-01-24T06:30:00Z", `"systolic": 118, "diastolic": 76`)
 	commit(t, g, "2026-01-25T06:30:00Z", `"systolic": 121, "diastolic": 79`)
 
-	sync, err := catchup.Sync(ctx, l, db)
+	sync, err := catchup.Sync(ctx, l, db, testBuckets(t))
 	if err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
@@ -130,7 +142,7 @@ func TestSync_IncrementalAndIdempotent(t *testing.T) {
 	}
 
 	// Current already: a re-run is a no-op.
-	sync2, err := catchup.Sync(ctx, l, db)
+	sync2, err := catchup.Sync(ctx, l, db, testBuckets(t))
 	if err != nil {
 		t.Fatalf("re-Sync: %v", err)
 	}
@@ -144,7 +156,7 @@ func TestSync_IncrementalAndIdempotent(t *testing.T) {
 	if _, err := g.Retract(ctx, resA.FacetID); err != nil {
 		t.Fatalf("Retract: %v", err)
 	}
-	sync3, err := catchup.Sync(ctx, l, db)
+	sync3, err := catchup.Sync(ctx, l, db, testBuckets(t))
 	if err != nil {
 		t.Fatalf("incremental Sync: %v", err)
 	}
@@ -184,7 +196,7 @@ func TestChangesSince_OverTheRealPair(t *testing.T) {
 	before := clock.Format(time.Now().UTC().Add(-time.Minute))
 	commit(t, g, "2026-02-01T06:30:00Z", `"systolic": 119, "diastolic": 77`)
 	commit(t, g, "2026-02-02T06:30:00Z", `"systolic": 117, "diastolic": 74`)
-	if _, err := catchup.Sync(ctx, l, db); err != nil {
+	if _, err := catchup.Sync(ctx, l, db, testBuckets(t)); err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
 
@@ -219,7 +231,7 @@ func TestSync_RefusesACursorAheadOfTheLedger(t *testing.T) {
 		t.Fatalf("force cursor: %v", err)
 	}
 
-	_, err := catchup.Sync(ctx, l, db)
+	_, err := catchup.Sync(ctx, l, db, testBuckets(t))
 	if err == nil || !strings.Contains(err.Error(), "ahead") {
 		t.Fatalf("Sync with cursor 99 over head 1 = %v, want ErrIndexAhead", err)
 	}

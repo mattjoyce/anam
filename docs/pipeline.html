@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Health data pipeline</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --surface: #ffffff; --ink: #1d1f23; --muted: #5d636e; --line: #d9d6cf;
+    --accent: #1f6f5c; --accent-soft: #e3f1ed; --warn: #9a5b00; --warn-soft: #fbf0dc;
+    --source: #eef1f6; --store: #f4efe3; --work: #e3f1ed; --anam: #ece6f5;
+    --code-bg: #f1efe9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14161a; --surface: #1b1e24; --ink: #e8e6e1; --muted: #a0a6b2; --line: #343944;
+      --accent: #6cc7b0; --accent-soft: #1d3330; --warn: #e6b566; --warn-soft: #33290f;
+      --source: #232a36; --store: #2e2a20; --work: #1d3330; --anam: #2b2438;
+      --code-bg: #23272f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161a; --surface: #1b1e24; --ink: #e8e6e1; --muted: #a0a6b2; --line: #343944;
+    --accent: #6cc7b0; --accent-soft: #1d3330; --warn: #e6b566; --warn-soft: #33290f;
+    --source: #232a36; --store: #2e2a20; --work: #1d3330; --anam: #2b2438;
+    --code-bg: #23272f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.01em; }
+  h2 { font-size: 1.3rem; margin: 48px 0 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+  h3 { font-size: 1.02rem; margin: 24px 0 6px; }
+  p { margin: 0 0 14px; }
+  .lede { color: var(--muted); font-size: 1.08rem; max-width: 62ch; }
+  .meta { color: var(--muted); font-size: 0.88rem; margin-bottom: 28px; }
+  code, pre { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.88em; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  pre { background: var(--code-bg); padding: 14px 16px; border-radius: 8px; overflow-x: auto; line-height: 1.5; }
+  pre code { background: none; padding: 0; }
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  .scroll svg { display: block; min-width: 860px; width: 100%; height: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin: 0 0 16px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 600; color: var(--muted); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .note { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 0 0 16px; }
+  .gap { border-left: 3px solid var(--warn); background: var(--warn-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 0 0 16px; }
+  .steps { counter-reset: step; list-style: none; padding: 0; margin: 0; }
+  .steps li { counter-increment: step; position: relative; padding: 0 0 18px 46px; }
+  .steps li::before {
+    content: counter(step); position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent); color: var(--bg); font-weight: 700; font-size: 0.9rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .steps strong { display: block; }
+  ul { padding-left: 20px; margin: 0 0 14px; }
+  li { margin-bottom: 6px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.85rem; color: var(--muted); margin: 10px 2px 0; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; border: 1px solid var(--line); }
+  .l-source::before { background: var(--source); } .l-work::before { background: var(--work); }
+  .l-store::before { background: var(--store); } .l-anam::before { background: var(--anam); }
+  svg text { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--ink); }
+  svg .sub { fill: var(--muted); font-size: 11px; }
+  svg .ttl { font-size: 13px; font-weight: 600; }
+  svg .lbl { fill: var(--muted); font-size: 10.5px; }
+  svg .box { stroke: var(--line); stroke-width: 1; }
+  svg .arrow { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+  svg .head { fill: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Health data pipeline</h1>
+<p class="lede">How a heartbeat on the watch and a step on the scale become facets in Anam, which machine does each part, and how to tell when a part has stopped.</p>
+<p class="meta">State as of 29 September 2026. Every stage below was checked on that date.</p>
+
+<div class="scroll">
+<svg viewBox="0 0 916 372" role="img" aria-label="Pipeline from Garmin and Withings through collectors and the ETL into Anam">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path class="head" d="M0,0 L10,5 L0,10 z"/>
+    </marker>
+  </defs>
+
+  <!-- column headings -->
+  <text class="lbl" x="73" y="16" text-anchor="middle">SOURCE</text>
+  <text class="lbl" x="227" y="16" text-anchor="middle">COLLECTOR</text>
+  <text class="lbl" x="381" y="16" text-anchor="middle">RAW STORE</text>
+  <text class="lbl" x="535" y="16" text-anchor="middle">ETL</text>
+  <text class="lbl" x="689" y="16" text-anchor="middle">SUMMARIES</text>
+  <text class="lbl" x="843" y="16" text-anchor="middle">ANAM</text>
+
+  <!-- Garmin row -->
+  <rect class="box" x="8" y="30" width="130" height="70" rx="8" fill="var(--source)"/>
+  <text class="ttl" x="73" y="60" text-anchor="middle">Garmin Connect</text>
+  <text class="sub" x="73" y="78" text-anchor="middle">watch, via phone</text>
+
+  <rect class="box" x="162" y="30" width="130" height="70" rx="8" fill="var(--work)"/>
+  <text class="ttl" x="227" y="56" text-anchor="middle">garmindb</text>
+  <text class="sub" x="227" y="72" text-anchor="middle">container on unraid</text>
+  <text class="sub" x="227" y="87" text-anchor="middle">own cron, 4 a day</text>
+
+  <rect class="box" x="316" y="30" width="130" height="70" rx="8" fill="var(--store)"/>
+  <text class="ttl" x="381" y="56" text-anchor="middle" style="font-size:11.5px">garmin_summary.db</text>
+  <text class="sub" x="381" y="72" text-anchor="middle">one row per day</text>
+  <text class="sub" x="381" y="87" text-anchor="middle">with min and max</text>
+
+  <!-- Withings row -->
+  <rect class="box" x="8" y="150" width="130" height="70" rx="8" fill="var(--source)"/>
+  <text class="ttl" x="73" y="180" text-anchor="middle">Withings cloud</text>
+  <text class="sub" x="73" y="198" text-anchor="middle">scale, cuff</text>
+
+  <rect class="box" x="162" y="150" width="130" height="70" rx="8" fill="var(--work)"/>
+  <text class="ttl" x="227" y="176" text-anchor="middle">withings plugin</text>
+  <text class="sub" x="227" y="192" text-anchor="middle">ductile on unraid</text>
+  <text class="sub" x="227" y="207" text-anchor="middle">polls every 6 hours</text>
+
+  <rect class="box" x="316" y="150" width="130" height="70" rx="8" fill="var(--store)"/>
+  <text class="ttl" x="381" y="176" text-anchor="middle">withings.db</text>
+  <text class="sub" x="381" y="192" text-anchor="middle">one row per</text>
+  <text class="sub" x="381" y="207" text-anchor="middle">measurement</text>
+
+  <!-- BP row -->
+  <rect class="box" x="8" y="282" width="130" height="70" rx="8" fill="var(--source)"/>
+  <text class="ttl" x="73" y="312" text-anchor="middle">Blood pressure</text>
+  <text class="sub" x="73" y="330" text-anchor="middle">CSV export, by hand</text>
+
+  <!-- ETL and summaries -->
+  <rect class="box" x="470" y="90" width="130" height="70" rx="8" fill="var(--work)"/>
+  <text class="ttl" x="535" y="116" text-anchor="middle">Health ETL</text>
+  <text class="sub" x="535" y="132" text-anchor="middle">run by ductile</text>
+  <text class="sub" x="535" y="147" text-anchor="middle">on unraid, per event</text>
+
+  <rect class="box" x="624" y="90" width="130" height="70" rx="8" fill="var(--store)"/>
+  <text class="ttl" x="689" y="116" text-anchor="middle">healthdata.db</text>
+  <text class="sub" x="689" y="132" text-anchor="middle">day, week, month,</text>
+  <text class="sub" x="689" y="147" text-anchor="middle">year per metric</text>
+
+  <!-- Anam -->
+  <rect class="box" x="778" y="30" width="130" height="322" rx="8" fill="var(--anam)"/>
+  <text class="ttl" x="843" y="56" text-anchor="middle">anam ingest</text>
+  <text class="sub" x="843" y="72" text-anchor="middle">ThinkPad, by hand</text>
+  <text class="sub" x="843" y="129" text-anchor="middle">health-db worker</text>
+  <text class="sub" x="843" y="244" text-anchor="middle">withings worker</text>
+  <text class="sub" x="843" y="321" text-anchor="middle">bp-csv worker</text>
+  <text class="sub" x="843" y="344" text-anchor="middle">gate, then ledger.db</text>
+
+  <!-- arrows -->
+  <path class="arrow" marker-end="url(#a)" d="M138,65 L160,65"/>
+  <path class="arrow" marker-end="url(#a)" d="M292,65 L314,65"/>
+  <path class="arrow" marker-end="url(#a)" d="M138,185 L160,185"/>
+  <path class="arrow" marker-end="url(#a)" d="M292,185 L314,185"/>
+  <path class="arrow" marker-end="url(#a)" d="M446,72 L468,108"/>
+  <path class="arrow" marker-end="url(#a)" d="M446,172 L468,142"/>
+  <path class="arrow" marker-end="url(#a)" d="M600,125 L622,125"/>
+  <path class="arrow" marker-end="url(#a)" d="M754,125 L776,125"/>
+  <path class="arrow" marker-end="url(#a)" d="M446,205 L458,205 L458,240 L776,240"/>
+  <path class="arrow" marker-end="url(#a)" d="M138,317 L776,317"/>
+
+  <text class="lbl" x="610" y="234">every measurement, read directly</text>
+  <text class="lbl" x="458" y="311" text-anchor="middle">every reading, read directly</text>
+</svg>
+</div>
+<div class="legend">
+  <span class="l-source">where the data starts</span>
+  <span class="l-work">a process that runs</span>
+  <span class="l-store">a SQLite file</span>
+  <span class="l-anam">Anam</span>
+</div>
+
+<h2>The five stages</h2>
+
+<ol class="steps">
+  <li><strong>Collect from Garmin</strong>
+    The <code>garmindb</code> container on unraid runs its own cron. It downloads from Garmin Connect, imports, then analyses. The analyse step writes <code>garmin_summary.db</code>, which holds one row per day with Garmin's own min and max. Nothing in ductile runs this container.</li>
+  <li><strong>Collect from Withings</strong>
+    The <code>withings</code> plugin in the unraid ductile gateway polls every six hours and writes <code>withings.db</code>. It raises one event per new weigh-in.</li>
+  <li><strong>Notice that something changed</strong>
+    The <code>garmin</code> plugin checks the modification time of <code>garmin.db</code> every 30 minutes. When it moves, the plugin raises <code>health.new_data</code> with the days that changed. Withings needs no watcher, because its plugin raises <code>withings.measurement_recorded</code> itself.</li>
+  <li><strong>Summarise</strong>
+    Either event starts the health ETL. Ductile runs it as a one-shot container from the <code>ductile-healthdata</code> image. It reads both raw stores and writes day, week, month and year rows to <code>healthdata.db</code>.</li>
+  <li><strong>Ingest into Anam</strong>
+    <code>anam ingest</code> on the ThinkPad reads <code>healthdata.db</code> over the Projects share. It also reads <code>withings.db</code> and the blood pressure export directly. Every row passes the gate and lands in <code>ledger.db</code>.</li>
+</ol>
+
+<div class="gap"><strong>Stage five is by hand.</strong> Nothing schedules <code>anam ingest</code>. Stages one to four keep <code>healthdata.db</code> current on their own. Anam only catches up when someone runs the command.</div>
+
+<h2>Where each part lives</h2>
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Part</th><th>Machine</th><th>Runs</th><th>Writes</th></tr></thead>
+  <tbody>
+    <tr><td><code>garmindb</code> container</td><td>unraid</td><td>00:02, 06:02, 12:02, 18:02 UTC</td><td><code>healthdata/garmin/DBs/</code></td></tr>
+    <tr><td><code>withings</code> plugin</td><td>unraid, in ductile</td><td>every 6 hours</td><td><code>healthdata/withings/withings.db</code></td></tr>
+    <tr><td><code>garmin</code> plugin</td><td>unraid, in ductile</td><td>every 30 minutes</td><td>an event, no file</td></tr>
+    <tr><td>Health ETL</td><td>unraid, one-shot container</td><td>on each event</td><td><code>healthdata/healthdata.db</code></td></tr>
+    <tr><td><code>anam ingest</code></td><td>ThinkPad</td><td>by hand</td><td><code>~/.local/share/anam/ledger.db</code></td></tr>
+  </tbody>
+</table>
+</div>
+<p>All unraid paths are under the Projects share. On unraid that is <code>/mnt/user/Projects</code>. On the ThinkPad it is mounted at <code>/mnt/Projects</code>.</p>
+
+<h2>What a day looks like</h2>
+<p>The ETL writes one row per metric per period. Each row has a value, and a min and a max where Garmin supplies them. Anam groups the rows for one period into six facets, one per metric group. This is 27 September 2026.</p>
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Metric</th><th>Group</th><th class="num">Value</th><th class="num">Min</th><th class="num">Max</th></tr></thead>
+  <tbody>
+    <tr><td>Heart rate, bpm</td><td>heart</td><td class="num">78.2</td><td class="num">58</td><td class="num">127</td></tr>
+    <tr><td>Resting heart rate, bpm</td><td>heart</td><td class="num">60</td><td class="num">60</td><td class="num">60</td></tr>
+    <tr><td>Respiration, per minute</td><td>breath</td><td class="num">14</td><td class="num">12</td><td class="num">25</td></tr>
+    <tr><td>Body battery</td><td>stress</td><td class="num">none</td><td class="num">5</td><td class="num">62</td></tr>
+    <tr><td>Sleep, minutes</td><td>sleep</td><td class="num">371</td><td class="num">371</td><td class="num">371</td></tr>
+    <tr><td>Steps</td><td>activity</td><td class="num">2088</td><td class="num">none</td><td class="num">none</td></tr>
+    <tr><td>Weight, kg</td><td>body</td><td class="num">88.65</td><td class="num">88.65</td><td class="num">88.65</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Body battery has a range and no single value, because Garmin reports it that way. Steps are a count, so they have no range. A day's sleep has one night in it, so its min and max equal its value. For a month they differ.</p>
+
+<h2>What reaches Anam</h2>
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Source</th><th>Grain in Anam</th><th class="num">Facets</th><th>Covers</th></tr></thead>
+  <tbody>
+    <tr><td>Withings</td><td>every measurement</td><td class="num">5,481</td><td>Jan 2024 to 27 Sept 2026</td></tr>
+    <tr><td>Garmin and Withings summaries</td><td>day, week, month, year</td><td class="num">5,419</td><td>Jan 2024 to 27 Sept 2026</td></tr>
+    <tr><td>Blood pressure export</td><td>every reading</td><td class="num">234</td><td>May 2025 to 11 July 2026</td></tr>
+    <tr><td><strong>Total</strong></td><td></td><td class="num"><strong>11,134</strong></td><td></td></tr>
+  </tbody>
+</table>
+</div>
+<h3>What does not</h3>
+<ul>
+  <li><strong>Garmin samples.</strong> About 2.7 million minute-level rows for heart rate, stress, respiration and blood oxygen. Daily summaries were chosen instead.</li>
+  <li><strong>Garmin activities.</strong> 198 activities and their track records. No worker reads them.</li>
+  <li><strong>Garmin weeks after 2024.</strong> GarminDB counts weeks in seven-day blocks from 1 January. The ETL looks them up by Monday, so they match only in a year that starts on a Monday.</li>
+  <li><strong>Nights with no recording.</strong> GarminDB writes zero minutes when the watch recorded no sleep. The ETL writes no sleep row for that period, so Anam does not claim a sleepless night.</li>
+</ul>
+
+<h2>How to tell a stage has stopped</h2>
+<p>Every stage can stop without any error. The process stays up and the gateway stays healthy. The only reliable sign is that its output stops moving. Check the newest date each stage holds.</p>
+<pre><code># 1. Garmin collected: newest day in GarminDB
+sqlite3 "file:/mnt/Projects/healthdata/garmin/DBs/garmin_summary.db?mode=ro" \
+  "SELECT MAX(day) FROM days_summary"
+
+# 2. Withings collected: newest measurement
+sqlite3 "file:/mnt/Projects/healthdata/withings/withings.db?mode=ro" \
+  "SELECT MAX(date) FROM measurements"
+
+# 3 and 4. ETL ran: newest summarised day, and when each source last ran
+sqlite3 "file:/mnt/Projects/healthdata/healthdata.db?mode=ro" \
+  "SELECT MAX(period_start) FROM summaries WHERE period_type='day';
+   SELECT source, last_sync FROM sync_status"
+
+# 5. Anam ingested: newest fact-time per type
+sqlite3 "file:$HOME/.local/share/anam/ledger.db?mode=ro" \
+  "SELECT type, MAX(fact_time) FROM facet GROUP BY type"</code></pre>
+<p>A healthy pipeline has the first three within a day of each other. The ETL's run history is in the unraid gateway:</p>
+<pre><code>/mnt/Projects/unraid_admin/unraid_cmd.sh \
+  'docker exec ductile /app/ductile job logs --plugin health_data_summary --limit 5 \
+   --config /app/config/config.yaml'</code></pre>
+
+<h2>To bring Anam up to date</h2>
+<pre><code>cd ~/Projects/anam
+ANAM_PERSON_ID=matt ./anam ingest</code></pre>
+<p>An ingest is safe to repeat. Rows that have not changed are skipped. A row whose summary moved is written as a new version, and the old one is kept.</p>
+
+<h2>Why it had stopped</h2>
+<p>On 28 September 2026 Anam's Garmin data ended at 16 July. The ETL had been moved twice and neither move was finished.</p>
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Generation</th><th>Where</th><th>What happened</th></tr></thead>
+  <tbody>
+    <tr><td>Senechal</td><td>unraid, hourly cron</td><td>Kept running on Garmin files that stopped changing on 22 March. Switched off 29 September.</td></tr>
+    <tr><td>ThinkPad gateway</td><td>ThinkPad</td><td>The working stopgap from March. Its ETL step was dropped in July when the gateway moved to the privileged setup.</td></tr>
+    <tr><td>Unraid gateway</td><td>unraid</td><td>Registered in April and never ran. It had no trigger for either source, and its image was not on the server. Live since 29 September.</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="note">Nothing alerted at any point. A pipeline that nothing triggers leaves an empty job log, and an empty log reads the same as a quiet day.</div>
+
+<h2>Still open</h2>
+<ul>
+  <li><strong>Anam ingest is by hand.</strong> A schedule, or a trigger from the ETL's completion event, would close the last gap.</li>
+  <li><strong>No staleness alert.</strong> Nothing compares the newest summarised day with the newest Garmin day.</li>
+  <li><strong>A real Withings weigh-in has not yet passed through the new trigger.</strong> A synthetic event did.</li>
+  <li><strong>Day boundaries are UTC.</strong> Garmin's day is a local calendar day. Anam reads its start as midnight UTC, about ten hours early for Sydney.</li>
+</ul>
+
+</main>
+</body>
+</html>

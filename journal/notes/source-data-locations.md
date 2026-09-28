@@ -57,3 +57,16 @@ group (88 rows each, back to 2024-01-01) — but only as *period summaries*, not
 without the comment field. The MVP wants one facet per reading, placed at its reading time. Summarised BP
 is a different fact at a different grain, which is precisely why `bp_*` is excluded from
 `health.heart-rate` and given its own source.
+
+## 2026-09-29: the table above is reversed
+
+The health ETL now runs on unraid, and the copy it writes is the real one.
+
+| Path | Contents |
+|---|---|
+| `/mnt/Projects/healthdata/healthdata.db` | **the real one**, written by the unraid ductile gateway after every Garmin sync and Withings weigh-in. Daily rows back to 2024 |
+| `/home/matt/admin/data/healthdata.db` | stale. Nothing has written it since a hand refresh on 2026-09-28 |
+
+`~/.config/anam/imports.yaml` points at the unraid copy. The blood pressure export did
+arrive, on 11 July, and is declared there too. How the whole chain fits together is in
+`docs/pipeline.html`.

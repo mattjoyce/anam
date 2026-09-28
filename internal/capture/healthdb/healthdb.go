@@ -58,8 +58,9 @@ type payload struct {
 	Metrics     map[string]metric `json:"metrics"`
 }
 
-// metric carries one row's aggregates. Nulls stay null (a single-sample period
-// has no min/max), exactly as the source holds them.
+// metric carries one row's aggregates. Nulls stay null, exactly as the source holds
+// them. A count such as steps has no min or max. A range such as body battery has no
+// avg.
 type metric struct {
 	Unit    string   `json:"unit"`
 	Avg     *float64 `json:"avg"`

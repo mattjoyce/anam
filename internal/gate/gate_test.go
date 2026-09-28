@@ -3,13 +3,9 @@ package gate_test
 import (
 	"context"
 	"errors"
-	"net/http"
-	"os"
+	"path/filepath"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/google/uuid"
 
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/def"
@@ -19,26 +15,9 @@ import (
 )
 
 // The gate is the error kernel's logic; it is tested over the real ledger
-// (AGENTS.md), one unique table per test, skipping cleanly when the endpoint is away.
+// (AGENTS.md), one ledger file per test.
 
-const (
-	endpoint = "http://192.168.20.4:8000"
-	region   = "us-east-1"
-	person   = "matt"
-)
-
-var reachable bool
-
-func TestMain(m *testing.M) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if resp, err := http.DefaultClient.Do(req); err == nil {
-		_ = resp.Body.Close()
-		reachable = true
-	}
-	os.Exit(m.Run())
-}
+const person = "matt"
 
 const bpManifest = `{
   "meta": {
@@ -55,22 +34,16 @@ const bpManifest = `{
   "schema": {"required": ["/systolic", "/diastolic"]}
 }`
 
-// newGate wires a Gate over a fresh real ledger table.
+// newGate wires a Gate over a fresh real ledger.
 func newGate(t *testing.T) (*gate.Gate, *ledger.Ledger) {
 	t.Helper()
-	if !reachable {
-		t.Skipf("DynamoDB Local unreachable at %s", endpoint)
-	}
 	ctx := context.Background()
 
-	l, err := ledger.New(ctx, endpoint, region, "anam_test_"+uuid.NewString(), person)
+	l, err := ledger.Create(ctx, filepath.Join(t.TempDir(), "ledger.db"), person)
 	if err != nil {
-		t.Fatalf("ledger.New: %v", err)
+		t.Fatalf("ledger.Create: %v", err)
 	}
-	if err := l.Init(ctx); err != nil {
-		t.Fatalf("Init: %v", err)
-	}
-	t.Cleanup(func() { _ = l.Drop(context.Background()) })
+	t.Cleanup(func() { _ = l.Close() })
 
 	d, err := def.Parse([]byte(bpManifest))
 	if err != nil {

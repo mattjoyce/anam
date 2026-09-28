@@ -3,40 +3,35 @@ package ledger
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
-	"sort"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	sqlite3 "modernc.org/sqlite/lib"
 
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
-// Admit appends a facet artifact together with its anam-event, and Mark appends a
-// anam-event alone (a tombstone, an endorsement — status transitions that carry no
-// new artifact). They are two calls rather than one with an optional artifact so that
+// Admit appends a facet artifact together with its anam-event, and Mark appends an
+// anam-event alone (a tombstone, an endorsement: status transitions that carry no
+// new artifact). They are two calls, not one with an optional artifact, so that
 // {no artifact, admitted} is unrepresentable (MVP.md §2).
 //
 // Both take the watermark the caller read. The event's Seq must be readW+1: the
 // caller owns the seq because the caller stamps AnamTime, and the two must be
-// assigned together — inside the caller's retry — so that seq order and anam-time
+// assigned together, inside the caller's retry, so that seq order and anam-time
 // order agree by construction (§8).
 //
 // Neither retries. On ErrStaleWatermark the caller re-reads the head, re-stamps, and
 // tries again; the loop, its bound and its give-up belong to the gate, outside the
 // kernel.
 
-// Admit writes f, its anam-event, and the watermark bump in one transaction.
+// Admit writes f and its anam-event in one transaction.
 //
-// It is AdmitBatch of one, not a second implementation of it. A single admission and a
-// block of them differ only in how many pairs share the counter condition, and two
-// code paths asserting that would be two paths that could drift.
-//
-// The one thing it does on its own is unwrap: a batch reports conflicts positionally,
-// through *BatchConflict, and with a single commit there is exactly one position — so
-// callers keep the sentinel they can test against.
+// It is AdmitBatch of one, not a second implementation of it. The one thing it does on
+// its own is unwrap: a batch reports conflicts by position, through *BatchConflict,
+// and with a single commit there is exactly one position, so callers keep the sentinel
+// they can test against.
 func (l *Ledger) Admit(ctx context.Context, readW Watermark, f facet.Facet, ev facet.AnamEvent) error {
 	err := l.AdmitBatch(ctx, readW, []Commit{{Facet: f, Event: ev}})
 
@@ -50,144 +45,125 @@ func (l *Ledger) Admit(ctx context.Context, readW Watermark, f facet.Facet, ev f
 	return ErrAlreadyWritten
 }
 
-// Mark writes an anam-event and the watermark bump in one transaction.
+// Mark writes an anam-event in one transaction.
 func (l *Ledger) Mark(ctx context.Context, readW Watermark, ev facet.AnamEvent) error {
 	if err := checkSeq(readW, ev); err != nil {
 		return err
 	}
-	ri, err := marshalItem(toAnamEventItem(l.pk, ev))
-	if err != nil {
-		return err
-	}
-
-	items := []ddbtypes.TransactWriteItem{
-		{Put: &ddbtypes.Put{
-			TableName:           aws.String(l.table),
-			Item:                ri,
-			ConditionExpression: aws.String("attribute_not_exists(sk)"),
-		}},
-		l.bumpCounter(readW),
-	}
-
-	_, err = l.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items})
-	if err != nil {
-		return mapMarkCancellation(err)
-	}
-	return nil
+	return l.write(ctx, readW, func(tx *sql.Tx) error {
+		return refused("anam-event", insertEvent(ctx, tx, ev))
+	})
 }
 
 // Commit pairs one artifact with the anam-event that admits it. It exists so that
-// AdmitBatch cannot be handed an artifact without its event, or the reverse — the
-// same reason Admit and Mark are two calls rather than one (MVP.md §2).
+// AdmitBatch cannot be handed an artifact without its event, or the reverse.
 type Commit struct {
 	Facet facet.Facet
 	Event facet.AnamEvent
 }
 
-// MaxBatch is the largest number of facets one AdmitBatch may carry.
-//
-// TransactWriteItems accepts 100 items. Each facet costs two — its artifact and its
-// anam-event — and the watermark bump costs one, so 49 facets is 99 items and 50
-// would be 101. The cap is DynamoDB's, not a tuning choice.
-const MaxBatch = 49
-
-// AdmitBatch appends many artifacts, their anam-events, and one watermark bump in a
-// single transaction, allocating a contiguous block of seqs.
+// AdmitBatch appends many artifacts and their anam-events in a single transaction,
+// over a contiguous block of seqs.
 //
 // This does not weaken `W ≡ seq` (§8). Every anam-event still receives its own
-// unique, monotonic, gapless seq — readW+1 through readW+len(cs) — and the counter
-// lands on the last of them. What changes is only how many events one counter
-// condition covers: the invariant is "every event has its own seq", never "one
-// event per bump".
+// unique, monotonic, gapless seq, readW+1 through readW+len(cs), and the head lands
+// on the last of them.
 //
-// What it does trade is contention tolerance for round trips. A stale watermark
-// costs the whole batch rather than one facet, which is the right trade for a
-// backfill (one writer, no contention) and the wrong one under many writers. The
-// caller chooses the size; a batch of one is exactly Admit.
+// The ledger sets no limit on the size of a batch. How many events may share one
+// transaction, and so one anam-time, is the gate's policy (gate.MaxBatch).
 func (l *Ledger) AdmitBatch(ctx context.Context, readW Watermark, cs []Commit) error {
 	if err := checkBatch(readW, cs); err != nil {
 		return err
 	}
-
-	items := make([]ddbtypes.TransactWriteItem, 0, batchCounterPos(len(cs))+1)
-	for i, c := range cs {
-		fi, err := marshalItem(toFacetItem(l.pk, c.Facet))
+	return l.write(ctx, readW, func(tx *sql.Tx) error {
+		conflict, err := conflicts(ctx, tx, cs)
 		if err != nil {
 			return err
 		}
-		ri, err := marshalItem(toAnamEventItem(l.pk, c.Event))
-		if err != nil {
-			return err
+		if conflict != nil {
+			return conflict
 		}
-		// The layout this transaction's cancellation will be read back through, checked
-		// as it is built rather than assumed at the far end. Writer and reader now share
-		// one definition; this is what keeps them sharing it.
-		if len(items) != batchArtifactPos(i) {
-			return fmt.Errorf("%w: commit %d would land at item %d, layout says %d",
-				ErrCorrupt, i, len(items), batchArtifactPos(i))
+		for _, c := range cs {
+			if err := refused("artifact", insertFacet(ctx, tx, c.Facet)); err != nil {
+				return err
+			}
+			if err := refused("anam-event", insertEvent(ctx, tx, c.Event)); err != nil {
+				return err
+			}
 		}
-		items = append(items,
-			ddbtypes.TransactWriteItem{Put: &ddbtypes.Put{
-				TableName:           aws.String(l.table),
-				Item:                fi,
-				ConditionExpression: aws.String("attribute_not_exists(sk)"),
-				// The mechanism, not an optimisation: the cancellation carries the
-				// existing artifact back, so the divergence check needs no second read.
-				ReturnValuesOnConditionCheckFailure: ddbtypes.ReturnValuesOnConditionCheckFailureAllOld,
-			}},
-			ddbtypes.TransactWriteItem{Put: &ddbtypes.Put{
-				TableName:           aws.String(l.table),
-				Item:                ri,
-				ConditionExpression: aws.String("attribute_not_exists(sk)"),
-			}},
-		)
-	}
-	// The counter goes last, which is what puts it at batchCounterPos(len(cs)): each
-	// iteration above proved it added exactly two items.
-	items = append(items, l.bumpCounterTo(readW, readW+Watermark(len(cs))))
+		return nil
+	})
+}
 
-	_, err := l.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items})
+// write runs fn inside one transaction that holds the file's write lock from its
+// first statement, after checking that the head is still the watermark the caller
+// read. Anything but a nil from fn rolls the whole transaction back, so a refused
+// batch writes nothing.
+//
+// The stale check comes first on purpose. A writer that read an old head may also be
+// re-presenting artifacts that landed since, and "re-read and try again" is the answer
+// that lets the caller sort those out against the head as it now is.
+func (l *Ledger) write(ctx context.Context, readW Watermark, fn func(*sql.Tx) error) error {
+	tx, err := l.db.BeginTx(ctx, nil)
 	if err != nil {
-		return l.mapBatchCancellation(err, cs)
+		return classify("begin write", err)
+	}
+	defer func() { _ = tx.Rollback() }() // no-op after Commit
+
+	h, err := head(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if h != readW {
+		return fmt.Errorf("%w: caller read %d, head is %d", ErrStaleWatermark, readW, h)
+	}
+	if err := fn(tx); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return classify("commit write", err)
 	}
 	return nil
 }
 
-// The transaction's item layout: two items per commit — artifact then anam-event — and
-// one counter bump last. The position is the meaning (§8), so it is defined once and
-// used by both the builder above and the mapper below. Held as two copies, a
-// reordering either side made alone would not fail: it would quietly read a lost
-// update as corruption, or the reverse.
-func batchArtifactPos(i int) int { return 2 * i }
-func batchCounterPos(n int) int  { return 2 * n }
-
-// batchCommitAt is the inverse: which commit a cancelled position belongs to, and
-// whether it is that commit's artifact or its anam-event.
-func batchCommitAt(pos int) (i int, artifact bool) { return pos / 2, pos%2 == 0 }
-
-// checkBatch rejects a batch the ledger cannot write soundly: the wrong size, seqs
-// that do not form the contiguous block following readW, or two commits for the same
-// artifact. The last one matters because DynamoDB rejects a transaction touching one
-// key twice, and the error it returns says nothing about which facet.
-func checkBatch(readW Watermark, cs []Commit) error {
-	switch {
-	case len(cs) == 0:
-		return fmt.Errorf("ledger: empty batch")
-	case len(cs) > MaxBatch:
-		return fmt.Errorf("ledger: batch of %d exceeds MaxBatch %d", len(cs), MaxBatch)
+// refused maps an insert's error. The checks that ran before the insert (the head, the
+// seq block, the existing artifacts) cover everything the schema's constraints
+// enforce, and they ran under the same write lock. A constraint failure here therefore
+// means the checks and the database disagree, which is ErrCorrupt and not a conflict
+// the caller can retry.
+func refused(what string, err error) error {
+	if err == nil {
+		return nil
 	}
-	seen := make(map[string]int, len(cs))
+	if code, ok := primaryCode(err); ok && code == sqlite3.SQLITE_CONSTRAINT {
+		return fmt.Errorf("%w: %s: %v", ErrCorrupt, what, err)
+	}
+	return classify("insert "+what, err)
+}
+
+// checkBatch rejects a batch the ledger cannot write soundly: an empty one, seqs that
+// do not form the contiguous block following readW, or two commits for the same
+// artifact.
+func checkBatch(readW Watermark, cs []Commit) error {
+	if len(cs) == 0 {
+		return fmt.Errorf("ledger: empty batch")
+	}
+	type key struct {
+		id      string
+		version int
+	}
+	seen := make(map[key]int, len(cs))
 	for i, c := range cs {
 		if want := int64(readW) + int64(i) + 1; c.Event.Seq != want {
 			return fmt.Errorf("ledger: batch item %d has seq %d, want %d (block follows watermark %d)",
 				i, c.Event.Seq, want, readW)
 		}
-		sk := facetSK(c.Facet.ID, c.Facet.ArtifactVersion)
-		if first, dup := seen[sk]; dup {
-			return fmt.Errorf("ledger: batch items %d and %d are both %s — one transaction cannot write a key twice",
-				first, i, sk)
+		k := key{c.Facet.ID, c.Facet.ArtifactVersion}
+		if first, dup := seen[k]; dup {
+			return fmt.Errorf("ledger: batch items %d and %d are both %s v%d; one transaction cannot write an artifact twice",
+				first, i, k.id, k.version)
 		}
-		seen[sk] = i
+		seen[k] = i
 	}
 	return nil
 }
@@ -199,82 +175,12 @@ func checkSeq(readW Watermark, ev facet.AnamEvent) error {
 	return nil
 }
 
-// bumpCounter advances the watermark by one iff it still holds the value the caller
-// read.
-func (l *Ledger) bumpCounter(readW Watermark) ddbtypes.TransactWriteItem {
-	return l.bumpCounterTo(readW, readW+1)
-}
-
-// bumpCounterTo advances the watermark to next iff it still holds readW.
-func (l *Ledger) bumpCounterTo(readW, next Watermark) ddbtypes.TransactWriteItem {
-	return ddbtypes.TransactWriteItem{Update: &ddbtypes.Update{
-		TableName: aws.String(l.table),
-		Key: map[string]ddbtypes.AttributeValue{
-			"pk": &ddbtypes.AttributeValueMemberS{Value: l.pk},
-			"sk": &ddbtypes.AttributeValueMemberS{Value: seqSK},
-		},
-		UpdateExpression:         aws.String("SET #n = :next"),
-		ConditionExpression:      aws.String("#n = :read"),
-		ExpressionAttributeNames: map[string]string{"#n": "n"},
-		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
-			":next": &ddbtypes.AttributeValueMemberN{Value: fmt.Sprintf("%d", int64(next))},
-			":read": &ddbtypes.AttributeValueMemberN{Value: fmt.Sprintf("%d", int64(readW))},
-		},
-	}}
-}
-
-// mapMarkCancellation turns Mark's cancellation into the typed outcome its caller acts
-// on. Mark writes [anam-event, counter] — no artifact — so it has only two arms:
+// BatchConflict reports which commits in a batch name an artifact that already
+// exists. Nothing was written, so the caller may drop the already-written entries and
+// retry the remainder.
 //
-//   - the counter's condition failed → another writer advanced W — ErrStaleWatermark,
-//     re-read and retry (in the caller).
-//   - the anam-event's condition failed while the counter's passed → the counter is
-//     behind its own log — ErrCorrupt, stop. Nothing sound can be written.
-//
-// The counter is checked first, not because it comes first, but because a stale writer
-// fails both conditions at once: its seq is taken AND the counter moved. That pair is
-// the ordinary race, so ErrCorrupt is only the impossible remainder — a taken seq under
-// a counter that had not moved.
-func mapMarkCancellation(err error) error {
-	failed, mapErr := failedConditions(err)
-	if mapErr != nil {
-		return mapErr
-	}
-	if _, stale := failed[markCounterPos]; stale {
-		return ErrStaleWatermark
-	}
-	return fmt.Errorf("%w: an anam-event seq is taken while the watermark condition passed", ErrCorrupt)
-}
-
-// markCounterPos is where the counter sits in Mark's two-item transaction.
-const markCounterPos = 1
-
-// failedConditions pulls the positions whose condition failed out of a cancellation,
-// or explains why this error is not one.
-func failedConditions(err error) (map[int]ddbtypes.CancellationReason, error) {
-	var tce *ddbtypes.TransactionCanceledException
-	if !errors.As(err, &tce) {
-		return nil, fmt.Errorf("ledger: transact write: %w", err)
-	}
-	failed := map[int]ddbtypes.CancellationReason{}
-	for pos, r := range tce.CancellationReasons {
-		if aws.ToString(r.Code) == "ConditionalCheckFailed" {
-			failed[pos] = r
-		}
-	}
-	if len(failed) == 0 {
-		return nil, fmt.Errorf("ledger: transaction cancelled without a failed condition: %w", err)
-	}
-	return failed, nil
-}
-
-// BatchConflict reports which commits in a batch failed their artifact condition.
-// Nothing was written — a cancelled transaction writes nothing — so the caller may
-// drop the already-written entries and retry the remainder.
-//
-// The two lists are the same distinction diverged() draws for a single Admit, kept
-// apart because a batch can hit both at once: AlreadyWritten is a benign re-run of a
-// write that succeeded, Divergent is a lost update and must stop.
+// The two lists are kept apart because a batch can hit both at once: AlreadyWritten is
+// a benign re-run of a write that succeeded, Divergent is a lost update and must stop.
 type BatchConflict struct {
 	AlreadyWritten []int
 	Divergent      []int
@@ -282,77 +188,65 @@ type BatchConflict struct {
 }
 
 func (e *BatchConflict) Error() string {
-	return fmt.Sprintf("ledger: batch cancelled — %d already written, %d divergent",
+	return fmt.Sprintf("ledger: batch refused, %d already written and %d divergent",
 		len(e.AlreadyWritten), len(e.Divergent))
 }
 
-// mapBatchCancellation turns a cancelled batch into the typed outcome the caller acts
-// on, reading positions back through the same layout AdmitBatch wrote them at.
+// conflicts looks up every artifact the batch is about to write and reports the ones
+// that exist, in batch order. It returns nil when none do.
 //
-// Three situations, exactly as for one admission:
-//
-//   - an artifact's condition failed → that (facet_id, version) exists. Same content
-//     hash: the previous attempt succeeded — ErrAlreadyWritten, treat as success.
-//     Different hash: a lost update — ErrDivergentArtifact, stop.
-//   - the counter's condition failed → another writer advanced W — ErrStaleWatermark,
-//     re-read and retry (in the caller).
-//   - an anam-event's condition failed while the counter's passed → the counter is
-//     behind its own log — ErrCorrupt, stop.
-//
-// The counter is checked first, not because of where it sits, but because a stale
-// writer fails its counter condition and some of its artifact conditions at once, and
-// the counter is the arm that says "re-read and try again".
-//
-// This mapping is the idempotency: collapse the arms into one "conflict" and the
-// caller either retries a write that already succeeded or rejects a benign re-run.
-func (l *Ledger) mapBatchCancellation(err error, cs []Commit) error {
-	failed, mapErr := failedConditions(err)
-	if mapErr != nil {
-		return mapErr
+// This classifies; it does not enforce. The schema would refuse the overwrite anyway.
+// What the schema cannot say is whether the existing row is our own earlier write or
+// somebody else's different bytes, and that distinction is the idempotency: collapse
+// the two and the caller either retries a write that already succeeded or accepts a
+// lost update.
+func conflicts(ctx context.Context, tx *sql.Tx, cs []Commit) (*BatchConflict, error) {
+	stmt, err := tx.PrepareContext(ctx,
+		`SELECT content_hash, payload FROM facet WHERE facet_id = ? AND artifact_version = ?`)
+	if err != nil {
+		return nil, classify("prepare conflict lookup", err)
 	}
-	if _, stale := failed[batchCounterPos(len(cs))]; stale {
-		return ErrStaleWatermark
-	}
+	defer func() { _ = stmt.Close() }()
 
-	conflict := &BatchConflict{Reasons: map[int]error{}}
-	for pos, r := range failed {
-		i, artifact := batchCommitAt(pos)
-		if !artifact {
-			return fmt.Errorf("%w: an anam-event seq is taken while the watermark condition passed", ErrCorrupt)
+	var conflict *BatchConflict
+	for i, c := range cs {
+		var (
+			hash    string
+			payload []byte
+		)
+		err := stmt.QueryRowContext(ctx, c.Facet.ID, c.Facet.ArtifactVersion).Scan(&hash, &payload)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
 		}
-		switch e := diverged(&cs[i].Facet, r); {
-		case errors.Is(e, ErrAlreadyWritten):
-			conflict.AlreadyWritten = append(conflict.AlreadyWritten, i)
-		default:
+		if err != nil {
+			return nil, classify("look up "+c.Facet.ID, err)
+		}
+
+		if conflict == nil {
+			conflict = &BatchConflict{Reasons: map[int]error{}}
+		}
+		if reason := diverged(c.Facet, hash, payload); reason != nil {
 			conflict.Divergent = append(conflict.Divergent, i)
-			conflict.Reasons[i] = e
+			conflict.Reasons[i] = reason
+			continue
 		}
+		conflict.AlreadyWritten = append(conflict.AlreadyWritten, i)
 	}
-	sort.Ints(conflict.AlreadyWritten)
-	sort.Ints(conflict.Divergent)
-	return conflict
+	return conflict, nil
 }
 
-// diverged decides ErrAlreadyWritten vs ErrDivergentArtifact by comparing the
-// existing item the cancellation carried back against the attempted write.
-func diverged(f *facet.Facet, r ddbtypes.CancellationReason) error {
-	if f == nil {
-		return fmt.Errorf("%w: no artifact in this transaction yet its position failed", ErrCorrupt)
-	}
-	existing, ok := r.Item["content_hash"].(*ddbtypes.AttributeValueMemberS)
-	if !ok {
-		return fmt.Errorf("%w: existing item returned no content_hash to compare", ErrDivergentArtifact)
-	}
-	if existing.Value != f.Descriptor.ContentHash {
+// diverged compares an existing artifact against the attempted write. It returns nil
+// when they are the same bytes, and ErrDivergentArtifact when they are not.
+func diverged(f facet.Facet, existingHash string, existingPayload []byte) error {
+	if existingHash != f.Descriptor.ContentHash {
 		return fmt.Errorf("%w: facet %s v%d holds %s, attempted %s",
-			ErrDivergentArtifact, f.ID, f.ArtifactVersion, existing.Value, f.Descriptor.ContentHash)
+			ErrDivergentArtifact, f.ID, f.ArtifactVersion, existingHash, f.Descriptor.ContentHash)
 	}
-	// Same identity, same bytes: we are looking at our own successful earlier write.
-	// Belt and braces: the payloads must agree too, or the hash lied.
-	if p, ok := r.Item["payload"].(*ddbtypes.AttributeValueMemberB); ok {
-		if !bytes.Equal(p.Value, f.Payload.Bytes()) {
-			return fmt.Errorf("%w: content hash matches but payload bytes differ", ErrDivergentArtifact)
-		}
+	// Same identity, same hash: we are looking at our own successful earlier write.
+	// The payloads must agree too, or the hash lied.
+	if !bytes.Equal(existingPayload, f.Payload.Bytes()) {
+		return fmt.Errorf("%w: facet %s v%d: content hash matches but payload bytes differ",
+			ErrDivergentArtifact, f.ID, f.ArtifactVersion)
 	}
-	return ErrAlreadyWritten
+	return nil
 }

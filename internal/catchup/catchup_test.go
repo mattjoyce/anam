@@ -2,14 +2,11 @@ package catchup_test
 
 import (
 	"context"
-	"net/http"
-	"os"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
 
 	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/clock"
@@ -33,27 +30,10 @@ func testBuckets(t *testing.T) span.Buckets {
 	return b
 }
 
-// Catch-up is tested over the real pair it bridges: the real ledger (skipping
-// cleanly when DynamoDB Local is away) and a real SQLite file per test.
+// Catch-up is tested over the real pair it bridges: a real ledger file and a real
+// operational store file, both in the test's own temp directory.
 
-const (
-	endpoint = "http://192.168.20.4:8000"
-	region   = "us-east-1"
-	person   = "matt"
-)
-
-var reachable bool
-
-func TestMain(m *testing.M) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if resp, err := http.DefaultClient.Do(req); err == nil {
-		_ = resp.Body.Close()
-		reachable = true
-	}
-	os.Exit(m.Run())
-}
+const person = "matt"
 
 const bpManifest = `{
   "meta": {
@@ -72,19 +52,13 @@ const bpManifest = `{
 
 func newHarness(t *testing.T) (*gate.Gate, *ledger.Ledger, *ops.DB) {
 	t.Helper()
-	if !reachable {
-		t.Skipf("DynamoDB Local unreachable at %s", endpoint)
-	}
 	ctx := context.Background()
 
-	l, err := ledger.New(ctx, endpoint, region, "anam_test_"+uuid.NewString(), person)
+	l, err := ledger.Create(ctx, filepath.Join(t.TempDir(), "ledger.db"), person)
 	if err != nil {
-		t.Fatalf("ledger.New: %v", err)
+		t.Fatalf("ledger.Create: %v", err)
 	}
-	if err := l.Init(ctx); err != nil {
-		t.Fatalf("Init: %v", err)
-	}
-	t.Cleanup(func() { _ = l.Drop(context.Background()) })
+	t.Cleanup(func() { _ = l.Close() })
 
 	db, err := ops.Open(ctx, filepath.Join(t.TempDir(), "tracking.db"), testBuckets(t))
 	if err != nil {
@@ -234,6 +208,35 @@ func TestSync_RefusesACursorAheadOfTheLedger(t *testing.T) {
 	_, err := catchup.Sync(ctx, l, db, testBuckets(t))
 	if err == nil || !strings.Contains(err.Error(), "ahead") {
 		t.Fatalf("Sync with cursor 99 over head 1 = %v, want ErrIndexAhead", err)
+	}
+}
+
+// A rebuilt ledger holding the same facts reaches the same head, so the cursor alone
+// reads the old index as current. Every anam-time in that index would be the old
+// ledger's. The ledger pin is what refuses it.
+func TestSync_RefusesAReplacedLedger(t *testing.T) {
+	t.Parallel()
+	g, l, db := newHarness(t)
+	ctx := context.Background()
+
+	commit(t, g, "2026-04-01T06:30:00Z", `"systolic": 120, "diastolic": 78`)
+	commit(t, g, "2026-04-02T06:30:00Z", `"systolic": 122, "diastolic": 80`)
+	if _, err := catchup.Sync(ctx, l, db, testBuckets(t)); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	if err := l.Drop(ctx); err != nil {
+		t.Fatalf("Drop: %v", err)
+	}
+	if err := l.Init(ctx); err != nil {
+		t.Fatalf("re-Init: %v", err)
+	}
+	commit(t, g, "2026-04-01T06:30:00Z", `"systolic": 120, "diastolic": 78`)
+	commit(t, g, "2026-04-02T06:30:00Z", `"systolic": 122, "diastolic": 80`)
+
+	_, err := catchup.Sync(ctx, l, db, testBuckets(t))
+	if !errors.Is(err, ops.ErrLedgerChanged) {
+		t.Fatalf("Sync against a rebuilt ledger = %v, want ErrLedgerChanged", err)
 	}
 }
 

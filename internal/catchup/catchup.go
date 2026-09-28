@@ -1,8 +1,8 @@
 // Package catchup brings the operational store's derived tier up to the ledger's
 // head by replay (ARCHITECTURE.md §8). It is the seam the substrate split created:
-// there is no transaction across DynamoDB and SQLite, so the indexes are never
-// written in the same breath as the ledger — they catch up afterwards, and a crash
-// leaves them behind, never wrong.
+// the ledger and the operational store are two files, and no transaction spans two
+// files. So the indexes are never written in the same breath as the ledger. They catch
+// up afterwards, and a crash leaves them behind, never wrong.
 //
 // The replay is incremental. A facet_index row persists exactly a fold.State
 // (current version + folded status), so new events advance the persisted states
@@ -25,12 +25,14 @@ import (
 
 // ErrIndexAhead: the replay cursor exceeds the ledger's head. The derived tier
 // claims to have seen events the ledger does not hold — that is not "behind"
-// (fixable by replay); it is wrong, likely a cursor pointed at the wrong table,
-// and wrong stops.
+// (fixable by replay); it is wrong, and wrong stops. The ledger pin catches a
+// replaced ledger before the cursor is read, so reaching this means the ledger itself
+// lost events.
 var ErrIndexAhead = errors.New("catchup: replay cursor is ahead of the ledger head")
 
 // Ledger is the read surface catch-up replays from.
 type Ledger interface {
+	ID(ctx context.Context) (string, error)
 	Head(ctx context.Context) (ledger.Watermark, error)
 	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.AnamEvent, error)
 	Version(ctx context.Context, facetID string, version int) (facet.Facet, error)
@@ -38,6 +40,7 @@ type Ledger interface {
 
 // Ops is the derived tier catch-up writes to.
 type Ops interface {
+	PinLedger(ctx context.Context, ledgerID string) error
 	LastSeq(ctx context.Context) (int64, error)
 	FacetStates(ctx context.Context, ids []string) (map[string]fold.State, error)
 	ApplyReplay(ctx context.Context, fromSeq, uptoSeq int64, events []ops.EventRow, facets []ops.FacetRow) error
@@ -54,6 +57,16 @@ type Result struct {
 // crash-re-runnable: the rows and the cursor move in one transaction on the ops
 // side, so a re-run resumes from wherever the last complete batch ended.
 func Sync(ctx context.Context, l Ledger, o Ops, buckets span.Buckets) (Result, error) {
+	// Which ledger, before how far. A cursor means nothing until it is known to count
+	// this ledger's events.
+	id, err := l.ID(ctx)
+	if err != nil {
+		return Result{}, err
+	}
+	if err := o.PinLedger(ctx, id); err != nil {
+		return Result{}, err
+	}
+
 	last, err := o.LastSeq(ctx)
 	if err != nil {
 		return Result{}, err

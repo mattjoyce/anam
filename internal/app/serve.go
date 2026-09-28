@@ -15,7 +15,6 @@ import (
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/serve"
 	"github.com/mattjoyce/anam/internal/store/artifact"
-	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
 func serveCmd(cfgPath *string) *cobra.Command {
@@ -49,10 +48,11 @@ receipt is the record of the serve.`,
 			if err != nil {
 				return err
 			}
-			deps, err := serveDeps(cmd.Context(), cfg, templates)
+			deps, closeLedger, err := serveDeps(cmd.Context(), cfg, templates)
 			if err != nil {
 				return err
 			}
+			defer closeLedger()
 
 			ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
 			defer cancel()
@@ -97,16 +97,14 @@ func receiptListCmd(cfgPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			templates, err := projection.Bundled()
-			if err != nil {
-				return err
-			}
-			deps, err := serveDeps(cmd.Context(), cfg, templates)
+			// Listing reads the artifact directory and nothing else, so it still
+			// answers when there is no ledger to open.
+			store, err := artifact.New(cfg.ArtifactDir)
 			if err != nil {
 				return err
 			}
 
-			receipts, hashes, err := serve.List(deps)
+			receipts, hashes, err := serve.List(serve.Deps{Artifacts: store})
 			if err != nil {
 				return err
 			}
@@ -219,10 +217,11 @@ corrupted ledger under an untouched file. Both must hold for the serve to be pro
 			if err != nil {
 				return err
 			}
-			deps, err := serveDeps(cmd.Context(), cfg, templates)
+			deps, closeLedger, err := serveDeps(cmd.Context(), cfg, templates)
 			if err != nil {
 				return err
 			}
+			defer closeLedger()
 
 			ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
 			defer cancel()
@@ -291,18 +290,21 @@ func joinStatuses(t projection.Template) string {
 // serveDeps assembles the serve path's dependencies from config. The consent gate is
 // the pass-through one (§10) — it is wired in on the real path rather than reserved
 // for later, because a gate threaded through afterwards is a gate a caller can forget.
-func serveDeps(ctx context.Context, cfg config.Config, templates *projection.Registry) (serve.Deps, error) {
-	l, err := ledger.New(ctx, cfg.DDBEndpoint, cfg.DDBRegion, cfg.TableName, cfg.PersonID)
-	if err != nil {
-		return serve.Deps{}, err
-	}
+//
+// The ledger is opened read-only: serving writes nothing to it. The returned func
+// closes it.
+func serveDeps(ctx context.Context, cfg config.Config, templates *projection.Registry) (serve.Deps, func(), error) {
 	store, err := artifact.New(cfg.ArtifactDir)
 	if err != nil {
-		return serve.Deps{}, err
+		return serve.Deps{}, nil, err
 	}
 	defSet, err := def.SetVersion()
 	if err != nil {
-		return serve.Deps{}, err
+		return serve.Deps{}, nil, err
+	}
+	l, err := openLedgerReadOnly(ctx, cfg)
+	if err != nil {
+		return serve.Deps{}, nil, err
 	}
 	return serve.Deps{
 		Ledger:               l,
@@ -311,5 +313,5 @@ func serveDeps(ctx context.Context, cfg config.Config, templates *projection.Reg
 		Gate:                 consent.Open{},
 		Clock:                clock.Real{},
 		DefinitionSetVersion: defSet,
-	}, nil
+	}, func() { _ = l.Close() }, nil
 }

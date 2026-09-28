@@ -4,61 +4,44 @@ import (
 	"context"
 	"fmt"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
 
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
-// The projection tests share one seeded ledger, built once for the package.
-//
-// AGENTS.md's rule is a unique table per test *run*, so nothing is shared across
-// packages or between runs; within this package the four tests are strictly read-only
-// over the same fixture, so a table each buys no isolation and costs four CreateTables
-// against a DynamoDB Local that every other package is also hammering. That cost is not
-// theoretical: four tables here is what pushed the package past the suite's timeout.
-var (
-	projOnce sync.Once
-	projSrv  *httptest.Server
-	projErr  error
-)
-
+// projectionServer serves the inspector over a freshly seeded ledger in the test's own
+// temp directory.
 func projectionServer(t *testing.T) *httptest.Server {
 	t.Helper()
-	if !reachable {
-		t.Skipf("DynamoDB Local unreachable at %s", endpoint)
+	l, err := seedProjectionLedger(filepath.Join(t.TempDir(), "ledger.db"))
+	if err != nil {
+		t.Fatalf("seed projection fixture: %v", err)
 	}
-	projOnce.Do(func() { projSrv, projErr = seedProjectionServer() })
-	if projErr != nil {
-		t.Fatalf("seed projection fixture: %v", projErr)
-	}
-	return projSrv
+	t.Cleanup(func() { _ = l.Close() })
+
+	srv := httptest.NewServer(inspect.Handler(l, 30*time.Second, defaultBuckets))
+	t.Cleanup(srv.Close)
+	return srv
 }
 
-// seedProjectionServer builds the fixture: a facet the bp template serves, a live one
+// seedProjectionLedger builds the fixture: a facet the bp template serves, a live one
 // it excludes by type, one that has been corrected (so a version is displaced), and one
 // that has been tombstoned. The real ledger has no corrections in it, so this is the
 // only place the superseded arm is exercised.
 //
 // Anam-times are spread across two days so the as-of control has a boundary to land
-// between. It returns an error rather than taking a *testing.T, because it runs inside
-// a sync.Once where a t.Fatalf would report against whichever test happened to be
-// first.
-func seedProjectionServer() (*httptest.Server, error) {
+// between.
+func seedProjectionLedger(path string) (*ledger.Ledger, error) {
 	ctx := context.Background()
 
-	l, err := ledger.New(ctx, endpoint, region, "anam_test_"+uuid.NewString(), person)
+	l, err := ledger.Create(ctx, path, person)
 	if err != nil {
-		return nil, fmt.Errorf("ledger.New: %w", err)
-	}
-	if err := l.Init(ctx); err != nil {
-		return nil, fmt.Errorf("init: %w", err)
+		return nil, fmt.Errorf("ledger.Create: %w", err)
 	}
 
 	at := func(seq int64, day int) facet.AnamEvent {
@@ -108,9 +91,7 @@ func seedProjectionServer() (*httptest.Server, error) {
 		return nil, fmt.Errorf("admit sleep: %w", err)
 	}
 
-	// A generous per-request budget: the page is several ledger round-trips, and the
-	// whole suite shares one DynamoDB Local. Latency is not what these tests are about.
-	return httptest.NewServer(inspect.Handler(l, 90*time.Second, defaultBuckets)), nil
+	return l, nil
 }
 
 // The canonical view is the un-narrowed read: every live facet stands served, and the

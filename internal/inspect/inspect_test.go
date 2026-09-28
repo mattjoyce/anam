@@ -5,12 +5,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
 
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
@@ -28,44 +26,21 @@ import (
 var defaultBuckets, _ = span.New(span.Default)
 
 // The inspector is exercised over a real seeded ledger (AGENTS.md: real components),
-// through its Handler so no port is bound. Skips cleanly when DynamoDB Local is away.
+// through its Handler so no port is bound.
 
-const (
-	endpoint = "http://192.168.20.4:8000"
-	region   = "us-east-1"
-	person   = "test-person"
-)
-
-var reachable bool
-
-func TestMain(m *testing.M) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if resp, err := http.DefaultClient.Do(req); err == nil {
-		_ = resp.Body.Close()
-		reachable = true
-	}
-	os.Exit(m.Run())
-}
+const person = "test-person"
 
 // seededServer builds a ledger holding two facets — one healthy, one tombstoned —
 // and returns an httptest server over the inspector plus the two facet ids.
 func seededServer(t *testing.T) (*httptest.Server, string, string) {
 	t.Helper()
-	if !reachable {
-		t.Skipf("DynamoDB Local unreachable at %s", endpoint)
-	}
 	ctx := context.Background()
 
-	l, err := ledger.New(ctx, endpoint, region, "anam_test_"+uuid.NewString(), person)
+	l, err := ledger.Create(ctx, filepath.Join(t.TempDir(), "ledger.db"), person)
 	if err != nil {
-		t.Fatalf("New: %v", err)
+		t.Fatalf("ledger.Create: %v", err)
 	}
-	if err := l.Init(ctx); err != nil {
-		t.Fatalf("Init: %v", err)
-	}
-	t.Cleanup(func() { _ = l.Drop(context.Background()) })
+	t.Cleanup(func() { _ = l.Close() })
 
 	bp := seedFacet(t, "bp-csv:2026-01-24T06:30:00", "health.blood-pressure",
 		`{"systolic": 118, "diastolic": 76, "comment": "No filodipine"}`)
@@ -82,9 +57,7 @@ func seededServer(t *testing.T) (*httptest.Server, string, string) {
 		t.Fatalf("Mark tombstone: %v", err)
 	}
 
-	// A generous request timeout: the suite runs whole packages of integration
-	// tests against one DynamoDB Local, whose table creates/drops (the fold's
-	// rebuild test) serialise everything else. Latency is not under test here.
+	// A generous request timeout: latency is not under test here.
 	srv := httptest.NewServer(inspect.Handler(l, 30*time.Second, defaultBuckets))
 	t.Cleanup(srv.Close)
 	return srv, bp.ID, hr.ID
@@ -145,20 +118,14 @@ func get(t *testing.T, url string) (int, string) {
 // Serve must exit cleanly when its context is cancelled — the CLI's Ctrl-C path.
 func TestServe_ShutsDownOnContextCancel(t *testing.T) {
 	t.Parallel()
-	if !reachable {
-		t.Skipf("DynamoDB Local unreachable at %s", endpoint)
-	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 
-	l, err := ledger.New(ctx, endpoint, region, "anam_test_"+uuid.NewString(), person)
+	l, err := ledger.Create(ctx, filepath.Join(t.TempDir(), "ledger.db"), person)
 	if err != nil {
-		t.Fatalf("New: %v", err)
+		t.Fatalf("ledger.Create: %v", err)
 	}
-	if err := l.Init(ctx); err != nil {
-		t.Fatalf("Init: %v", err)
-	}
-	t.Cleanup(func() { _ = l.Drop(context.Background()) })
+	t.Cleanup(func() { _ = l.Close() })
 
 	go func() { done <- inspect.Serve(ctx, l, "127.0.0.1:0", time.Second, defaultBuckets) }()
 	time.Sleep(200 * time.Millisecond) // let ListenAndServe bind

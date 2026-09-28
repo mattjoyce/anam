@@ -37,8 +37,8 @@ var (
 	// drifting worker would silently re-key its facets.
 	ErrIdentityMismatch = errors.New("gate: envelope source_ref disagrees with the definition's identity_key")
 
-	// ErrPayloadTooLarge: the ledger's item ceiling, met here as policy rather than
-	// discovered as a substrate rejection.
+	// ErrPayloadTooLarge: the payload exceeds the gate's size policy. The ledger itself
+	// would hold it; the bound is a choice about what one facet may be.
 	ErrPayloadTooLarge = errors.New("gate: payload exceeds the configured maximum")
 
 	// ErrContention: the bounded retry gave up. The worker may simply re-run;
@@ -56,7 +56,7 @@ type Ledger interface {
 	Mark(ctx context.Context, readW ledger.Watermark, ev facet.AnamEvent) error
 
 	// The batch path. KnownFacets is a fast negative used to skip per-facet
-	// disposition queries; AdmitBatch writes a block of commits over a contiguous
+	// disposition lookups; AdmitBatch writes a block of commits over a contiguous
 	// range of seqs.
 	KnownFacets(ctx context.Context, facetIDs []string) (map[string]bool, error)
 	AdmitBatch(ctx context.Context, readW ledger.Watermark, cs []ledger.Commit) error
@@ -103,8 +103,18 @@ type Gate struct {
 	maxRetries      int
 }
 
-// New builds a Gate. maxPayloadBytes guards DynamoDB's 400 KB item ceiling with
-// headroom for the envelope's metadata; maxRetries bounds the watermark race.
+// MaxBatch is the most envelopes one CommitBatch may carry.
+//
+// It is policy, and it lives here because the ledger has no limit of its own. A batch
+// is one transaction, so its events share one anam-time and a stale watermark costs
+// the whole block. The number is inherited: 49 was the most the ledger's previous
+// substrate could write in one transaction. It is kept so that the move to SQLite
+// changes where facts are stored and not which events share an instant. It can now be
+// raised; doing so coarsens the anam-time resolution of an import.
+const MaxBatch = 49
+
+// New builds a Gate. maxPayloadBytes is the size policy for one payload; maxRetries
+// bounds the watermark race.
 func New(l Ledger, defs Definitions, scopes TokenScopes, clock Clock, personID string) *Gate {
 	return &Gate{
 		ledger: l, defs: defs, scopes: scopes, clock: clock, personID: personID,

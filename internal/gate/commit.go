@@ -43,10 +43,9 @@ type prepared struct {
 // CommitBatch admits envelopes in one transaction, over one contiguous block of seqs.
 // It is the admission path — Commit is this with a slice of one.
 //
-// The win is not fewer writes but fewer waits. One envelope costs three sequential
-// round trips (head, disposition, transact); a block of N costs three for the whole
-// block, because the head is read once, the dispositions collapse into one negative
-// probe, and the writes are one transaction.
+// The win is fewer commits. Every transaction ends in a sync to disk, so one envelope
+// per transaction pays that sync per facet and a block of N pays it once. The head is
+// read once for the block and the dispositions collapse into one negative probe.
 //
 // Results are returned positionally, one per input envelope, alongside the watermark
 // the ledger ended at — one number for the call, because one transaction leaves the
@@ -60,8 +59,8 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 	if len(envs) == 0 {
 		return nil, 0, nil
 	}
-	if len(envs) > ledger.MaxBatch {
-		return nil, 0, fmt.Errorf("gate: batch of %d exceeds %d", len(envs), ledger.MaxBatch)
+	if len(envs) > MaxBatch {
+		return nil, 0, fmt.Errorf("gate: batch of %d exceeds %d", len(envs), MaxBatch)
 	}
 
 	ps := make([]prepared, len(envs))
@@ -128,8 +127,8 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 			writing = append(writing, i)
 		}
 		if len(commits) == 0 {
-			// Everything resolved to a no-op. A cancelled transaction writes nothing,
-			// so this call moved the watermark nowhere and head is where it ended.
+			// Everything resolved to a no-op, so nothing was written. This call moved
+			// the watermark nowhere and head is where it ended.
 			return results, head, nil
 		}
 

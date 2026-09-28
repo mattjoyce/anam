@@ -33,7 +33,7 @@ var mvpScopes = gate.StaticScopes{
 func initCmd(cfgPath *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "init",
-		Short: "idempotently create the ledger table, seed its watermark, and create the operational schema",
+		Short: "idempotently create the ledger file and the operational store",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := loadConfig(*cfgPath, cmd)
 			if err != nil {
@@ -42,13 +42,11 @@ func initCmd(cfgPath *string) *cobra.Command {
 			ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
 			defer cancel()
 
-			l, err := ledger.New(ctx, cfg.DDBEndpoint, cfg.DDBRegion, cfg.TableName, cfg.PersonID)
+			l, err := ledger.Create(ctx, cfg.LedgerPath, cfg.PersonID)
 			if err != nil {
 				return err
 			}
-			if err := l.Init(ctx); err != nil {
-				return err
-			}
+			defer func() { _ = l.Close() }()
 			buckets, err := cfg.Buckets()
 			if err != nil {
 				return err
@@ -60,16 +58,24 @@ func initCmd(cfgPath *string) *cobra.Command {
 			defer func() { _ = db.Close() }()
 
 			_, err = fmt.Fprintf(cmd.OutOrStdout(),
-				"ledger table %q ready (person %s); operational store %s ready\n",
-				cfg.TableName, cfg.PersonID, cfg.DBPath)
+				"ledger %s ready (person %s); operational store %s ready\n",
+				cfg.LedgerPath, cfg.PersonID, cfg.DBPath)
 			return err
 		},
 	}
 }
 
+// openLedgerForWrite opens an existing ledger for writing. It creates nothing: ingest
+// against a path with no ledger fails and names `anam init`.
+func openLedgerForWrite(ctx context.Context, cfg config.Config) (*ledger.Ledger, error) {
+	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+	defer cancel()
+	return ledger.Open(ctx, cfg.LedgerPath, cfg.PersonID)
+}
+
 func ingestCmd(cfgPath *string) *cobra.Command {
 	var importsPath string
-	batch := ledger.MaxBatch
+	batch := gate.MaxBatch
 
 	cmd := &cobra.Command{
 		Use:   "ingest [source]",
@@ -88,8 +94,8 @@ declarations for that source. A path typed ad hoc is provenance that evaporates
 with the shell history; a declared import is reviewable and repeatable.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if batch < 1 || batch > ledger.MaxBatch {
-				return fmt.Errorf("--batch %d is outside 1..%d", batch, ledger.MaxBatch)
+			if batch < 1 || batch > gate.MaxBatch {
+				return fmt.Errorf("--batch %d is outside 1..%d", batch, gate.MaxBatch)
 			}
 			cfg, err := loadConfig(*cfgPath, cmd)
 			if err != nil {
@@ -110,10 +116,11 @@ with the shell history; a declared import is reviewable and repeatable.`,
 			if err != nil {
 				return err
 			}
-			l, err := ledger.New(cmd.Context(), cfg.DDBEndpoint, cfg.DDBRegion, cfg.TableName, cfg.PersonID)
+			l, err := openLedgerForWrite(cmd.Context(), cfg)
 			if err != nil {
 				return err
 			}
+			defer func() { _ = l.Close() }()
 			g := gate.New(l, reg, mvpScopes, clock.Real{}, cfg.PersonID)
 
 			for _, imp := range imports {
@@ -135,8 +142,8 @@ with the shell history; a declared import is reviewable and repeatable.`,
 	}
 	cmd.Flags().StringVar(&importsPath, "imports", "",
 		"imports file (default: $ANAM_IMPORTS, then <user config dir>/anam/imports.yaml)")
-	cmd.Flags().IntVar(&batch, "batch", ledger.MaxBatch,
-		"facets per transaction; 1 restores one-commit-per-facet (max "+strconv.Itoa(ledger.MaxBatch)+")")
+	cmd.Flags().IntVar(&batch, "batch", gate.MaxBatch,
+		"facets per transaction; 1 is one commit per facet (max "+strconv.Itoa(gate.MaxBatch)+")")
 	return cmd
 }
 

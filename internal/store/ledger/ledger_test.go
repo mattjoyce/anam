@@ -3,67 +3,32 @@ package ledger_test
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"strings"
+	"path/filepath"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
 
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
-// The tests run against real DynamoDB Local (AGENTS.md: real components over mocks),
-// on a unique table per run so parallel packages and -shuffle=on cannot share state.
-// TestMain probes the endpoint and skips the package cleanly when it is unreachable.
+// The tests run against a real SQLite file (AGENTS.md: real components over mocks),
+// one file per test in the test's own temp directory, so parallel packages and
+// -shuffle=on cannot share state. Nothing here needs a network, so nothing skips.
 
-const (
-	endpoint = "http://192.168.20.4:8000"
-	region   = "us-east-1"
-	person   = "test-person"
-)
+const person = "test-person"
 
-var reachable bool
-
-func TestMain(m *testing.M) {
-	flag.Parse()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if resp, err := http.DefaultClient.Do(req); err == nil {
-		_ = resp.Body.Close() // probe only; the body is not read
-		reachable = true      // DynamoDB Local answers 400 to a bare GET; alive is alive
-	}
-	os.Exit(m.Run())
-}
-
-// newLedger creates an initialised Ledger on a fresh uniquely-named table and
-// registers its teardown.
+// newLedger creates an initialised Ledger in a fresh file and registers its close.
 func newLedger(t *testing.T) *ledger.Ledger {
 	t.Helper()
-	if !reachable {
-		t.Skipf("DynamoDB Local unreachable at %s — start it (unraid) to run ledger tests", endpoint)
-	}
 
-	table := "anam_test_" + uuid.NewString()
-	ctx := context.Background()
-
-	l, err := ledger.New(ctx, endpoint, region, table, person)
+	l, err := ledger.Create(context.Background(), filepath.Join(t.TempDir(), "ledger.db"), person)
 	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
-	if err := l.Init(ctx); err != nil {
-		t.Fatalf("Init: %v", err)
+		t.Fatalf("Create: %v", err)
 	}
 	t.Cleanup(func() {
-		if err := l.Drop(context.Background()); err != nil {
-			t.Errorf("drop table %s: %v", table, err)
+		if err := l.Close(); err != nil {
+			t.Errorf("close ledger: %v", err)
 		}
 	})
 	return l
@@ -117,79 +82,7 @@ func admittedEvent(f facet.Facet, seq int64) facet.AnamEvent {
 	}
 }
 
-// On a -sharedDb endpoint, tables from earlier schemas survive indefinitely. Init on
-// a table whose key schema differs must refuse loudly, not treat "already exists" as
-// "already correct" — a silently divergent table is a corrupt kernel.
-func TestInit_RefusesMismatchedSchema(t *testing.T) {
-	t.Parallel()
-	if !reachable {
-		t.Skipf("DynamoDB Local unreachable at %s", endpoint)
-	}
-	ctx := context.Background()
-	table := "anam_test_" + uuid.NewString()
-
-	// Create a pk-only table straight through the wire API, bypassing the package.
-	createBody := fmt.Sprintf(`{
-		"TableName": %q,
-		"BillingMode": "PAY_PER_REQUEST",
-		"AttributeDefinitions": [{"AttributeName": "pk", "AttributeType": "S"}],
-		"KeySchema": [{"AttributeName": "pk", "KeyType": "HASH"}]
-	}`, table)
-	rawDynamo(t, "CreateTable", createBody)
-
-	l, err := ledger.New(ctx, endpoint, region, table, person)
-	if err != nil {
-		t.Fatalf("New: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := l.Drop(context.Background()); err != nil {
-			t.Errorf("drop table %s: %v", table, err)
-		}
-	})
-
-	if err := l.Init(ctx); !errors.Is(err, ledger.ErrSchemaMismatch) {
-		t.Fatalf("Init on a pk-only table = %v, want ErrSchemaMismatch", err)
-	}
-}
-
-// rawDynamo issues one DynamoDB Local wire call outside the SDK. Local does not
-// authenticate, so the Authorization header only needs the right shape.
-//
-// The budget is deliberately loose. DynamoDB Local is one process backed by one file,
-// shared by every package in a `-race -shuffle=on` run that is creating and dropping
-// its own table; a CreateTable that takes half a second alone can take many seconds
-// behind that queue. A tight budget here does not catch a slow server, it catches a
-// busy one — and reports it as a broken test. The deadline still exists, because a
-// hung call must fail rather than hang; it is just sized for contention rather than
-// for an idle machine.
-const rawDynamoBudget = 30 * time.Second
-
-func rawDynamo(t *testing.T, target, body string) {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), rawDynamoBudget)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(body))
-	if err != nil {
-		t.Fatal(err)
-	}
-	req.Header.Set("Content-Type", "application/x-amz-json-1.0")
-	req.Header.Set("X-Amz-Target", "DynamoDB_20120810."+target)
-	req.Header.Set("Authorization",
-		"AWS4-HMAC-SHA256 Credential=fake/20260710/us-east-1/dynamodb/aws4_request, SignedHeaders=content-type;x-amz-target, Signature=fake")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("raw %s: %v", target, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		t.Fatalf("raw %s: HTTP %d: %s", target, resp.StatusCode, b)
-	}
-}
-
-func TestInit_IsIdempotentAndSeedsTheCounter(t *testing.T) {
+func TestInit_IsIdempotentAndStartsAtGenesis(t *testing.T) {
 	t.Parallel()
 	l := newLedger(t)
 	ctx := context.Background()
@@ -431,8 +324,8 @@ func TestAdmit_SeqMustFollowWatermark(t *testing.T) {
 // known. Supersession: the current version moves to v2, v3, … but v1 is never rewritten
 // or removed, so the probe still finds it.
 //
-// The structural half of this — that no code in the package can delete an item at all —
-// is TestAppendOnly_NoMutatingCallsInCode. This is the behavioural half.
+// That no writer at all can delete or rewrite a row is TestAppendOnly_*. This is the
+// behavioural half: the ledger's own operations leave v1 where the probe looks.
 func TestKnownFacets_SurvivesRetractionAndSupersession(t *testing.T) {
 	t.Parallel()
 	l := newLedger(t)

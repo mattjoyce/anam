@@ -9,31 +9,32 @@
 # The user config dir is $XDG_CONFIG_HOME if set, otherwise ~/.config.
 #
 # Every key can be overridden by an ANAM_-prefixed environment variable
-# (ANAM_DDB_ENDPOINT, ANAM_PERSON_ID, ...). An unrecognised key is an error, not a
-# shrug: a silently-ignored `ddb_endpont` would leave Anam talking to the default
-# endpoint while you believed it was talking to yours.
+# (ANAM_LEDGER_PATH, ANAM_PERSON_ID, ...). An unrecognised key is an error, not a
+# shrug: a silently-ignored `ledger_pth` would leave Anam writing to the default
+# ledger while you believed it was writing to yours.
 #
 # Anam stores in three places (ARCHITECTURE.md §8): the ledger is the record;
-# files hold published artifacts; SQLite is the operational store. Each of the
-# operational store's tables records where it comes back from — the derived tier
-# by replaying the ledger, the rest from git or from a backup.
+# files hold published artifacts; the operational store holds what Anam derives
+# and authors. Each of the operational store's tables records where it comes back
+# from — the derived tier by replaying the ledger, the rest from git or from a
+# backup.
 
-# The storage substrate. Every facet is partitioned under person#<person_id>.
-# Required, and deliberately without a default: a wrong partition key must fail
-# loudly rather than write your facts somewhere nobody chose.
+# Whose timeline this is. Pinned into the ledger by `anam init`; a ledger pinned
+# to another person is refused. Required, and deliberately without a default.
 person_id: matt
 
-# --- the ledger: DynamoDB -----------------------------------------------------
-# Facets, anam-events and the watermark W. `commit` writes all three in one
-# atomic TransactWriteItems. DynamoDB Local does not authenticate; the AWS
-# credentials are literally fake.
-ddb_endpoint: http://localhost:8000
-
-# Nominal against DynamoDB Local, which ignores it, but the AWS SDK insists.
-ddb_region: us-east-1
-
-# The single table holding every ledger item kind.
-table_name: anam
+# --- the ledger: SQLite, in a file of its own ----------------------------------
+# Facet artifacts and anam-events. `commit` writes both in one transaction.
+# Append-only is enforced by triggers in the file. Commands that only read open
+# it read-only.
+#
+# This file is the record. Payloads could be re-ingested from their sources; the
+# anam-times could not. Back it up with
+#   sqlite3 ledger.db ".backup /path/to/copy.db"
+# A plain file copy can miss recent commits still in ledger.db-wal.
+# Must not be the same file as db_path.
+# Defaults to $XDG_DATA_HOME/anam/ledger.db, else ~/.local/share/anam/.
+ledger_path: ~/.local/share/anam/ledger.db
 
 # --- operational store: SQLite ------------------------------------------------
 # Definitions, projection templates, token scopes, the facet and anam-event
@@ -49,8 +50,7 @@ db_path: ~/.local/share/anam/tracking.db
 # authored, not rebuildable — back them up.
 artifact_dir: ~/.local/share/anam/artifacts
 
-# Bounds every call to a store. Anam fails fast on an unreachable endpoint rather
-# than hanging.
+# Bounds every call to a store. Anam fails fast rather than hanging.
 timeout: 5s
 
 # --- bucketing ----------------------------------------------------------------
@@ -64,6 +64,6 @@ timeout: 5s
 #
 # It is also stamped into every bucket id the facet index persists, so changing it
 # is a rebuild: the operational store refuses a database built at another width,
-# and the fix is to delete tracking.db and re-run `anam init`. The derived tier
-# replays from the ledger, so that costs time, not facts.
+# and the fix is to delete tracking.db (never ledger.db) and re-run `anam init`.
+# The derived tier replays from the ledger, so that costs time, not facts.
 bucket_width: monthly

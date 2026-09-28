@@ -9,7 +9,6 @@ import (
 
 	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/clock"
-	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
@@ -45,10 +44,11 @@ up to the ledger's head by replay, so the answer is as fresh as ingest.`,
 			if err != nil {
 				return err
 			}
-			l, err := ledger.New(cmd.Context(), cfg.DDBEndpoint, cfg.DDBRegion, cfg.TableName, cfg.PersonID)
+			l, err := openLedgerReadOnly(cmd.Context(), cfg)
 			if err != nil {
 				return err
 			}
+			defer func() { _ = l.Close() }()
 			buckets, err := cfg.Buckets()
 			if err != nil {
 				return err

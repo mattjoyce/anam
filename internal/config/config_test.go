@@ -12,8 +12,8 @@ import (
 	"github.com/mattjoyce/anam/internal/span"
 )
 
-// TestLoadWithoutPersonIDFails guards the partition key. person_id has no default:
-// defaulting it would let Anam write facets into a partition nobody chose.
+// TestLoadWithoutPersonIDFails guards the person pin. person_id has no default:
+// defaulting it would pin a ledger to a person nobody chose.
 func TestLoadWithoutPersonIDFails(t *testing.T) {
 	t.Setenv("ANAM_PERSON_ID", "") // hermetic: ignore the developer's own environment
 
@@ -37,9 +37,7 @@ func TestLoadDefaults(t *testing.T) {
 
 	want := config.Config{
 		PersonID:    "matt",
-		DDBEndpoint: "http://localhost:8000",
-		DDBRegion:   "us-east-1",
-		TableName:   "anam",
+		LedgerPath:  "/data/anam/ledger.db",
 		DBPath:      "/data/anam/tracking.db",
 		ArtifactDir: "/data/anam/artifacts",
 		Timeout:     5 * time.Second,
@@ -52,6 +50,9 @@ func TestLoadDefaults(t *testing.T) {
 
 func TestDefaultDataPaths(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", "/data")
+	if got, want := config.DefaultLedgerPath(), "/data/anam/ledger.db"; got != want {
+		t.Errorf("DefaultLedgerPath() = %q, want %q (XDG_DATA_HOME honoured)", got, want)
+	}
 	if got, want := config.DefaultDBPath(), "/data/anam/tracking.db"; got != want {
 		t.Errorf("DefaultDBPath() = %q, want %q (XDG_DATA_HOME honoured)", got, want)
 	}
@@ -84,9 +85,7 @@ func TestPersonIDComesFromEnvWithoutADefault(t *testing.T) {
 func TestLoadFromFile(t *testing.T) {
 	path := writeConfig(t, `
 person_id: matt
-ddb_endpoint: http://192.168.20.4:8000
-ddb_region: ap-southeast-2
-table_name: anam-test
+ledger_path: /srv/anam/ledger.db
 db_path: /srv/anam/tracking.db
 artifact_dir: /srv/anam/artifacts
 timeout: 12s
@@ -100,9 +99,7 @@ bucket_width: weekly
 
 	want := config.Config{
 		PersonID:    "matt",
-		DDBEndpoint: "http://192.168.20.4:8000",
-		DDBRegion:   "ap-southeast-2",
-		TableName:   "anam-test",
+		LedgerPath:  "/srv/anam/ledger.db",
 		DBPath:      "/srv/anam/tracking.db",
 		ArtifactDir: "/srv/anam/artifacts",
 		Timeout:     12 * time.Second,
@@ -115,14 +112,14 @@ bucket_width: weekly
 
 func TestLoadFileLeavesUnsetKeysAtDefaults(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", "/data")
-	path := writeConfig(t, "person_id: matt\ntable_name: anam-partial\n")
+	path := writeConfig(t, "person_id: matt\nledger_path: /srv/partial/ledger.db\n")
 
 	got, err := config.Load(path)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if got.TableName != "anam-partial" {
-		t.Errorf("TableName = %q, want %q", got.TableName, "anam-partial")
+	if got.LedgerPath != "/srv/partial/ledger.db" {
+		t.Errorf("LedgerPath = %q, want %q", got.LedgerPath, "/srv/partial/ledger.db")
 	}
 	if got.DBPath != "/data/anam/tracking.db" {
 		t.Errorf("DBPath = %q, want the default", got.DBPath)
@@ -136,9 +133,9 @@ func TestLoadFileLeavesUnsetKeysAtDefaults(t *testing.T) {
 }
 
 func TestEnvOverridesFileAndDefaults(t *testing.T) {
-	path := writeConfig(t, "person_id: from-file\nddb_endpoint: http://from-file:8000\n")
+	path := writeConfig(t, "person_id: from-file\nledger_path: /from-file/ledger.db\n")
 
-	t.Setenv("ANAM_DDB_ENDPOINT", "http://from-env:8000")
+	t.Setenv("ANAM_LEDGER_PATH", "/from-env/ledger.db")
 	t.Setenv("ANAM_TIMEOUT", "30s")
 
 	got, err := config.Load(path)
@@ -146,8 +143,8 @@ func TestEnvOverridesFileAndDefaults(t *testing.T) {
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	if got.DDBEndpoint != "http://from-env:8000" {
-		t.Errorf("DDBEndpoint = %q, want the environment to override the file", got.DDBEndpoint)
+	if got.LedgerPath != "/from-env/ledger.db" {
+		t.Errorf("LedgerPath = %q, want the environment to override the file", got.LedgerPath)
 	}
 	if got.Timeout != 30*time.Second {
 		t.Errorf("Timeout = %s, want the environment to override the default", got.Timeout)
@@ -158,16 +155,19 @@ func TestEnvOverridesFileAndDefaults(t *testing.T) {
 }
 
 // TestLoadRejectsUnknownKey is the fail-fast guard: a mistyped key must not be
-// silently ignored, leaving Anam talking to the default endpoint while the operator
-// believes it is talking to theirs.
+// silently ignored, leaving Anam writing to the default ledger while the operator
+// believes it is writing to theirs. The retired DynamoDB keys are refused by the same
+// rule, so a config written for the old ledger fails at startup and names the key.
 func TestLoadRejectsUnknownKey(t *testing.T) {
 	tests := []struct {
 		name string
 		body string
 	}{
-		{"typo'd key", "ddb_endpont: http://x:8000\n"},
+		{"typo'd key", "ledger_pth: /x/ledger.db\n"},
 		{"key from a future version", "seal_point: true\n"},
-		{"camelCase instead of snake_case", "tableName: anam\n"},
+		{"camelCase instead of snake_case", "ledgerPath: /x/ledger.db\n"},
+		{"retired DynamoDB endpoint", "ddb_endpoint: http://x:8000\n"},
+		{"retired DynamoDB table", "table_name: anam\n"},
 	}
 
 	for _, tt := range tests {
@@ -217,9 +217,7 @@ func TestValidate(t *testing.T) {
 
 	valid := config.Config{
 		PersonID:    "matt",
-		DDBEndpoint: "http://localhost:8000",
-		DDBRegion:   "us-east-1",
-		TableName:   "anam",
+		LedgerPath:  "/srv/ledger.db",
 		DBPath:      "/srv/tracking.db",
 		ArtifactDir: "/srv/artifacts",
 		Timeout:     5 * time.Second,
@@ -233,9 +231,8 @@ func TestValidate(t *testing.T) {
 	}{
 		{"valid", func(*config.Config) {}, false},
 		{"missing person_id", func(c *config.Config) { c.PersonID = "" }, true},
-		{"missing ddb_endpoint", func(c *config.Config) { c.DDBEndpoint = "" }, true},
-		{"missing ddb_region", func(c *config.Config) { c.DDBRegion = "" }, true},
-		{"missing table_name", func(c *config.Config) { c.TableName = "" }, true},
+		{"missing ledger_path", func(c *config.Config) { c.LedgerPath = "" }, true},
+		{"ledger and tracking in one file", func(c *config.Config) { c.LedgerPath = c.DBPath }, true},
 		{"missing db_path", func(c *config.Config) { c.DBPath = "" }, true},
 		{"missing artifact_dir", func(c *config.Config) { c.ArtifactDir = "" }, true},
 		{"zero timeout", func(c *config.Config) { c.Timeout = 0 }, true},

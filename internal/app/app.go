@@ -63,23 +63,32 @@ func inspectCmd(cfgPath *string) *cobra.Command {
 				return err
 			}
 
-			l, err := ledger.New(cmd.Context(), cfg.DDBEndpoint, cfg.DDBRegion, cfg.TableName, cfg.PersonID)
+			l, err := openLedgerReadOnly(cmd.Context(), cfg)
 			if err != nil {
 				return err
 			}
+			defer func() { _ = l.Close() }()
 			buckets, err := cfg.Buckets()
 			if err != nil {
 				return err
 			}
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "inspecting table %q (person %s) at %s\nhttp://%s/\n",
-				cfg.TableName, cfg.PersonID, cfg.DDBEndpoint, listen)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "inspecting ledger %s (person %s), read-only\nhttp://%s/\n",
+				cfg.LedgerPath, cfg.PersonID, listen)
 			return inspect.Serve(cmd.Context(), l, listen, cfg.Timeout, buckets)
 		},
 	}
 	// Loopback by default: the inspector is a local diagnostic tool, not a service.
 	cmd.Flags().StringVar(&listen, "listen", "127.0.0.1:8787", "address to serve on")
 	return cmd
+}
+
+// openLedgerReadOnly opens the ledger the way every reading command does: on a handle
+// SQLite will not accept a write from. Only init and ingest open it for writing.
+func openLedgerReadOnly(ctx context.Context, cfg config.Config) (*ledger.Ledger, error) {
+	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+	defer cancel()
+	return ledger.OpenReadOnly(ctx, cfg.LedgerPath, cfg.PersonID)
 }
 
 // loadConfig resolves and loads configuration, reporting where it came from —

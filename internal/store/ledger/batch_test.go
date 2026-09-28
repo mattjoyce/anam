@@ -92,8 +92,8 @@ func TestAdmitBatch_WritesEveryArtifact(t *testing.T) {
 	}
 }
 
-// checkBatch is the kernel refusing to write something unsound. Each of these would
-// otherwise fail deep inside DynamoDB with an error that names no facet.
+// checkBatch is the kernel refusing to write something unsound, before a transaction
+// is opened and with an error that names the item.
 func TestAdmitBatch_RefusesAnUnsoundBatch(t *testing.T) {
 	t.Parallel()
 	l := newLedger(t)
@@ -102,12 +102,6 @@ func TestAdmitBatch_RefusesAnUnsoundBatch(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		if err := l.AdmitBatch(ctx, 0, nil); err == nil {
 			t.Error("an empty batch was accepted")
-		}
-	})
-
-	t.Run("over MaxBatch", func(t *testing.T) {
-		if err := l.AdmitBatch(ctx, 0, batchOf(t, 0, ledger.MaxBatch+1, "d")); err == nil {
-			t.Errorf("a batch of %d was accepted", ledger.MaxBatch+1)
 		}
 	})
 
@@ -256,8 +250,7 @@ func TestKnownFacets_IsATrustworthyNegative(t *testing.T) {
 	if _, err := l.KnownFacets(ctx, nil); err != nil {
 		t.Errorf("KnownFacets(nil) = %v, want no error", err)
 	}
-	// A repeated id must not make the request illegal — BatchGetItem rejects a
-	// duplicated key, so the dedup has to happen here.
+	// A repeated id is answered once and must not make the probe fail.
 	if got, err := l.KnownFacets(ctx, []string{cs[0].Facet.ID, cs[0].Facet.ID}); err != nil {
 		t.Errorf("KnownFacets with a repeated id: %v", err)
 	} else if !got[cs[0].Facet.ID] {

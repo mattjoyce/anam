@@ -3,13 +3,10 @@ package serve_test
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
 
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/consent"
@@ -23,27 +20,10 @@ import (
 )
 
 // Serve is tested end to end over the real ledger and the real artifact tier
-// (AGENTS.md: real components over mocks): a unique table and a temp directory per
-// test, skipping cleanly when the endpoint is away.
+// (AGENTS.md: real components over mocks): a ledger file and an artifact directory
+// per test, both under the test's temp directory.
 
-const (
-	endpoint = "http://192.168.20.4:8000"
-	region   = "us-east-1"
-	person   = "matt"
-)
-
-var reachable bool
-
-func TestMain(m *testing.M) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if resp, err := http.DefaultClient.Do(req); err == nil {
-		_ = resp.Body.Close()
-		reachable = true
-	}
-	os.Exit(m.Run())
-}
+const person = "matt"
 
 // Two definitions, so a projection has something to prune away. The bundled bp and
 // sleep templates are the ones under test, so the types must be theirs.
@@ -87,19 +67,13 @@ type harness struct {
 
 func newHarness(t *testing.T) *harness {
 	t.Helper()
-	if !reachable {
-		t.Skipf("DynamoDB Local unreachable at %s", endpoint)
-	}
 	ctx := context.Background()
 
-	l, err := ledger.New(ctx, endpoint, region, "anam_test_"+uuid.NewString(), person)
+	l, err := ledger.Create(ctx, filepath.Join(t.TempDir(), "ledger.db"), person)
 	if err != nil {
-		t.Fatalf("ledger.New: %v", err)
+		t.Fatalf("ledger.Create: %v", err)
 	}
-	if err := l.Init(ctx); err != nil {
-		t.Fatalf("Init: %v", err)
-	}
-	t.Cleanup(func() { _ = l.Drop(context.Background()) })
+	t.Cleanup(func() { _ = l.Close() })
 
 	bp, err := def.Parse([]byte(bpManifest))
 	if err != nil {

@@ -3,12 +3,8 @@ package fold_test
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"os"
+	"path/filepath"
 	"testing"
-	"time"
-
-	"github.com/google/uuid"
 
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/def"
@@ -19,26 +15,9 @@ import (
 )
 
 // The fold's integration tests run over the real ledger and the real gate
-// (AGENTS.md): one unique table per test, skipping cleanly when the endpoint is away.
+// (AGENTS.md): one ledger file per test.
 
-const (
-	endpoint = "http://192.168.20.4:8000"
-	region   = "us-east-1"
-	person   = "matt"
-)
-
-var reachable bool
-
-func TestMain(m *testing.M) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if resp, err := http.DefaultClient.Do(req); err == nil {
-		_ = resp.Body.Close()
-		reachable = true
-	}
-	os.Exit(m.Run())
-}
+const person = "matt"
 
 const bpManifest = `{
   "meta": {
@@ -57,19 +36,13 @@ const bpManifest = `{
 
 func newHarness(t *testing.T) (*gate.Gate, *ledger.Ledger) {
 	t.Helper()
-	if !reachable {
-		t.Skipf("DynamoDB Local unreachable at %s", endpoint)
-	}
 	ctx := context.Background()
 
-	l, err := ledger.New(ctx, endpoint, region, "anam_test_"+uuid.NewString(), person)
+	l, err := ledger.Create(ctx, filepath.Join(t.TempDir(), "ledger.db"), person)
 	if err != nil {
-		t.Fatalf("ledger.New: %v", err)
+		t.Fatalf("ledger.Create: %v", err)
 	}
-	if err := l.Init(ctx); err != nil {
-		t.Fatalf("Init: %v", err)
-	}
-	t.Cleanup(func() { _ = l.Drop(context.Background()) })
+	t.Cleanup(func() { _ = l.Close() })
 
 	d, err := def.Parse([]byte(bpManifest))
 	if err != nil {
@@ -111,7 +84,7 @@ func (s source) ingest(t *testing.T, g *gate.Gate) map[string]gate.Result {
 }
 
 // The executable specification of "Anam owns no fact" (MVP.md §7): live a history —
-// admissions, a correction, a retraction — then drop the table, init, re-ingest what
+// admissions, a correction, a retraction — then drop the ledger, init, re-ingest what
 // the source now holds, and the canonical fold is byte-identical. The value's hash is
 // the equality oracle; the watermark is allowed to differ, because the ledger's
 // bookkeeping is Anam-authored and the value deliberately excludes it.
@@ -173,7 +146,7 @@ func TestRebuildFromSource_IdenticalCanonical(t *testing.T) {
 		t.Fatalf("retracted facet folded to %+v, want tombstoned", st)
 	}
 
-	// Switch Anam off and lose nothing: drop the table, init, re-ingest.
+	// Switch Anam off and lose nothing: drop the ledger, init, re-ingest.
 	if err := l.Drop(ctx); err != nil {
 		t.Fatalf("Drop: %v", err)
 	}

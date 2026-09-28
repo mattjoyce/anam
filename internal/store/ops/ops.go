@@ -34,13 +34,21 @@ import (
 // database written before that pin has none — so opening one would record whatever
 // width the config happened to say and accept an index built at another. The bump
 // makes the pre-pin database refuse, which is the same answer by a route that works.
-const schemaVersion = 5
+//
+// 5 -> 6 is the same move for the ledger pin. A database written before it names no
+// ledger, so the first catch-up would pin whichever ledger it met and read an index
+// derived from another as an index of that one.
+const schemaVersion = 6
 
 // ErrSchemaVersion is returned by Open for a database written by a different schema.
 var ErrSchemaVersion = errors.New("ops: schema version mismatch")
 
 // ErrBucketWidth is returned by Open for an index built at a different bucket width.
 var ErrBucketWidth = errors.New("ops: bucket width mismatch")
+
+// ErrLedgerChanged is returned by PinLedger when the derived tier was built from a
+// different ledger than the one it is being asked to follow.
+var ErrLedgerChanged = errors.New("ops: derived tier belongs to a different ledger")
 
 // DB is a handle on the operational store.
 type DB struct {
@@ -203,6 +211,28 @@ func pinBucketWidth(ctx context.Context, db *sql.DB, w span.Width) error {
 	}
 	return fmt.Errorf("%w: index was built %s, config says %s — delete the file and re-run init; the derived tier replays at the new width",
 		ErrBucketWidth, stored, w)
+}
+
+// PinLedger records which ledger the derived tier is derived from, on first use, and
+// refuses any other afterwards.
+//
+// The replay cursor is only a number. Against a rebuilt or replaced ledger it can
+// compare as "behind" or even "current" while every row beside it describes events
+// the new ledger never held. The ledger's id is what tells the two apart. The remedy
+// is the derived tier's usual one: it rebuilds by replay.
+func (d *DB) PinLedger(ctx context.Context, ledgerID string) error {
+	if ledgerID == "" {
+		return fmt.Errorf("ops: pin ledger: empty ledger id")
+	}
+	stored, fresh, err := pin(ctx, d.db, "ledger_id", ledgerID)
+	switch {
+	case err != nil:
+		return fmt.Errorf("ops: pin ledger: %w", err)
+	case fresh || stored == ledgerID:
+		return nil
+	}
+	return fmt.Errorf("%w: index was derived from ledger %s, this is ledger %s. Delete the tracking file and re-run init; the derived tier replays from this ledger",
+		ErrLedgerChanged, stored, ledgerID)
 }
 
 // pin writes key on first open and reports what is stored thereafter. fresh is true

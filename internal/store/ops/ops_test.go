@@ -201,3 +201,24 @@ func TestLostFile_ReopensEmptyAndUsable(t *testing.T) {
 		t.Errorf("fresh database holds %d facet rows, want 0", n)
 	}
 }
+
+// The derived tier names the ledger it was derived from. The cursor is only a number,
+// and a number cannot tell this ledger's events from another's.
+func TestPinLedger_RefusesADifferentLedger(t *testing.T) {
+	t.Parallel()
+	d, _ := open(t)
+	ctx := context.Background()
+
+	if err := d.PinLedger(ctx, "ledger-a"); err != nil {
+		t.Fatalf("first pin: %v", err)
+	}
+	if err := d.PinLedger(ctx, "ledger-a"); err != nil {
+		t.Errorf("re-pinning the same ledger = %v, want nil", err)
+	}
+	if err := d.PinLedger(ctx, "ledger-b"); !errors.Is(err, ops.ErrLedgerChanged) {
+		t.Errorf("pinning another ledger = %v, want ErrLedgerChanged", err)
+	}
+	if err := d.PinLedger(ctx, ""); err == nil {
+		t.Error("an empty ledger id was pinned")
+	}
+}

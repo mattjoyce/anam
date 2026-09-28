@@ -9,7 +9,6 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/gate"
-	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
 // bpEnvelopeAt builds a distinct reading — identity_key is /measured_at, so the
@@ -233,9 +232,8 @@ func TestCommitBatch_AllNoOpsReportTheUnmovedWatermark(t *testing.T) {
 }
 
 // One transaction cannot write a key twice, and two envelopes for one facet in a
-// single batch is nearly always a duplicated source row. Refuse it by name rather
-// than letting DynamoDB reject the transaction with an error that identifies
-// nothing.
+// single batch is nearly always a duplicated source row. Refuse it by name, before
+// the ledger is asked to write anything.
 func TestCommitBatch_RefusesTwoEnvelopesForOneFacet(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -271,15 +269,15 @@ func TestCommitBatch_WritesNothingWhenAnEnvelopeIsBad(t *testing.T) {
 	}
 }
 
-// The size bound is DynamoDB's transaction limit, and exceeding it must be a clear
-// refusal rather than a cancelled transaction deep in the kernel.
+// The size bound is the gate's policy, and exceeding it must be a clear refusal
+// before anything is written.
 func TestCommitBatch_RefusesOversizedBatches(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	g, _ := newGate(t)
 
-	envs := envelopes(ledger.MaxBatch + 1)
+	envs := envelopes(gate.MaxBatch + 1)
 	if _, _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs)); err == nil {
-		t.Errorf("a batch of %d was accepted (MaxBatch is %d)", len(envs), ledger.MaxBatch)
+		t.Errorf("a batch of %d was accepted (MaxBatch is %d)", len(envs), gate.MaxBatch)
 	}
 }

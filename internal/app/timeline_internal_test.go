@@ -12,7 +12,7 @@ import (
 
 // The CLI's date handling is the part a person touches most and the part with the most
 // room for an off-by-one, so the pure functions are pinned here. No ledger is involved:
-// these are string-and-time functions, and testing them against a real DynamoDB would
+// these are string-and-time functions, and testing them against a real ledger would
 // be slower and prove less.
 
 func TestParseInstant(t *testing.T) {

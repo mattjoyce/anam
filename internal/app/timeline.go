@@ -13,7 +13,6 @@ import (
 	"github.com/mattjoyce/anam/internal/consent"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/projection"
-	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
 func timelineCmd(cfgPath *string) *cobra.Command {
@@ -57,10 +56,11 @@ Three lenses compose over that read:
 			if err != nil {
 				return err
 			}
-			l, err := ledger.New(cmd.Context(), cfg.DDBEndpoint, cfg.DDBRegion, cfg.TableName, cfg.PersonID)
+			l, err := openLedgerReadOnly(cmd.Context(), cfg)
 			if err != nil {
 				return err
 			}
+			defer func() { _ = l.Close() }()
 
 			ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
 			defer cancel()

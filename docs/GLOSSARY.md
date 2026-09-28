@@ -160,8 +160,8 @@ from**: the *derived* tier from replaying the *Ledger*, the *provisioned* tier f
 config, the *authored* tier from a backup and nowhere else. Only the derived tier is disposable, and it
 must stay provably derived (`ARCHITECTURE.md` §8). See *Ledger*, *Sync cursor*.
 
-**Person** — The storage **substrate**: all facets partitioned onto one **timeline** under
-`person#<id>`. In Anam there is exactly one person and **no identity graph, no merge**. See *Timeline*.
+**Person** — The storage **substrate**: all facets partitioned onto one **timeline**, in a ledger
+file pinned to that person's id. In Anam there is exactly one person and **no identity graph, no merge**. See *Timeline*.
 
 **Projection** *(variant)* — A versioned template that **prunes** the *Canonical* for a purpose: metadata
 filters only (type allow-list, datetime, endorsement status, max classification); whole-Facet
@@ -184,7 +184,7 @@ never as an anam-event. See *Projection*, *Anam-event*.
 
 **Anam-event** — An assertion that Anam's *knowledge* changed. There are exactly five kinds —
 `admitted` / `superseded` / `tombstoned` / `endorsed` / `rejected` — each carrying **anam-time** and a
-monotonic `seq`. Every kind can change the live-set, so `W ≡ seq` (one counter). Append-only.
+monotonic, gapless `seq`. Every kind can change the live-set, so `W ≡ seq` (one number). Append-only.
 `changes_since` is built from these. A Facet never references an anam-event.
 **Publication is not one of them**: serving a facet changes nothing Anam knows, and a *Receipt* already
 records what was shown. See *Anam-time*, *Watermark*, *Receipt*.
@@ -239,6 +239,7 @@ status-bearing artifact version). It advances the watermark like any mutation. T
 *Canonical*, *Status*.
 
 **Watermark** — An anam-time marker pinning "what was known" at a point — the basis for checkpoints and
-receipts. `W` is the **stream watermark**, a monotonic counter advanced by *every* anam-event that can
-change the live-set (including a pure status transition). `Wᵥ` is the watermark the last checkpoint
+receipts. `W` is the **stream watermark**: the `seq` of the newest anam-event, advanced by *every*
+anam-event that can change the live-set (including a pure status transition). It is read from the
+events, not stored beside them. `Wᵥ` is the watermark the last checkpoint
 actually folded; `W > Wᵥ` is the whole re-mint test. See *Checkpoint*, *Receipt*.

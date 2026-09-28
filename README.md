@@ -20,7 +20,7 @@ clocks (fact-time / anam-time), a resolve→commit **admission gate**, **mint**/
 Prototype. First slice proves the vertical path end-to-end against real data:
 
 ```
-capture (health-db / bp-csv) → ingest (gate) → append-only ledger (DynamoDB)
+capture (health-db / bp-csv) → ingest (gate) → append-only ledger (SQLite)
     → mint → canonical fold → projection + CLI viewer → receipt
 ```
 
@@ -45,11 +45,13 @@ Extensible to "all sorts of facets" later — `calendar.event`, `mail.thread`, `
 ```sh
 make build
 
-# person_id has no default on purpose: it is the ledger's partition key, so a
-# defaulted one would quietly write facts into a partition nobody chose.
+# person_id has no default on purpose: it is pinned into the ledger at init, so a
+# defaulted one would name a person nobody chose for the life of the file.
 export ANAM_PERSON_ID=matt
-export ANAM_DDB_ENDPOINT=http://192.168.20.4:8000   # the ledger (creds are static fakes, in-code)
 
+# The ledger and the operational store are two SQLite files. Both default to
+# ~/.local/share/anam/ (ledger.db and tracking.db); override with
+# ANAM_LEDGER_PATH and ANAM_DB_PATH.
 ./anam init
 ```
 

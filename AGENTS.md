@@ -18,23 +18,24 @@ Every design review and code audit runs through **Hickey × Armstrong** (*struct
     (fact-time / anam-time), **current state derived as a fold**. Never overwrite a fact. Never
     store a fact's current status as mutable place — derive it.
   - The **substrate is accidental**, not essential — the problem is a personal longitudinal record, not a
-    store. Only `internal/store` may name DynamoDB, SQLite or `database/sql`; `scripts/check.sh` enforces
+    store. Only `internal/store` may name SQLite or `database/sql`; `scripts/check.sh` enforces
     it. One carve-out: `internal/capture` may read a **source** in its native format (a source that is a
-    SQLite file needs `database/sql` to be read) — that is the source's substrate, not Anam's, and the
-    ledger's SDK stays out of capture. The ledger is the record; files hold published artifacts; SQLite is the **operational store**,
-    authoritative for what Anam authors. Each of its tables says where it comes back from (§8) — the
-    *derived* tier by replaying the ledger, and that tier must stay provably derived.
+    SQLite file needs `database/sql` to be read) — that is the source's substrate, not Anam's, and
+    capture never imports `internal/store`. The ledger is the record, in a SQLite file of its own; files
+    hold published artifacts; a second SQLite file is the **operational store**, authoritative for what
+    Anam authors. Each of its tables says where it comes back from (§8) — the *derived* tier by replaying
+    the ledger, and that tier must stay provably derived.
 - **Armstrong (runtime).** For each component, name its failure and its recovery. What is the **error
   kernel** — the small trusted core that must not corrupt? What crashes, and what restarts it clean?
   - Anam's **error kernel** is the *append-only ledger + admission-gate invariants* (three pillars,
     idempotency, immutability). Everything else — capture workers, fold, projection, CLI — is
     **disposable and rebuildable from source** (Anam owns no facts).
-  - `commit` is **idempotent**; artifact, anam-event and the watermark `W` are one atomic
-    `TransactWriteItems`, conditional on the idempotency marker. **There is no transaction across
-    substrates** — SQLite catches up by replay, so a crash leaves it *behind*, never *wrong*. A worker may
+  - `commit` is **idempotent**; the artifact and its anam-event are one SQLite transaction, and the
+    watermark `W` is the newest event's `seq`. **There is no transaction across the two files** — the
+    operational store catches up by replay, so a crash leaves it *behind*, never *wrong*. A worker may
     crash mid-batch and simply be re-run to known-good. No partial facet, ever.
-  - **Append-only is not enforced by DynamoDB.** Our code must never issue an `UpdateItem` against a facet
-    or an anam-event; a test guards it. This is a known cost of the substrate split.
+  - **Append-only is enforced by the ledger's triggers**, for every writer. Commands that only read the
+    ledger open it read-only. Never add a code path that drops or disables a ledger trigger.
   - The **`Envelope` is the only ingress** (share-nothing). Every external call carries a `context`
     deadline and **fails fast** — never a hang.
 
@@ -78,9 +79,9 @@ Use these defaults unless a task clearly requires otherwise.
 
 **Tests**
 - **Prefer real components over mocks.** Mock only truly uncontrollable externals.
-- Use **real DynamoDB Local** (checked in `TestMain`; skip with a clear message if unreachable) and a
-  **real SQLite** file. A **unique table and a temp file per test run** — never shared: parallel packages
-  and `-shuffle=on` make shared state flaky. Test behaviour, not internals. Tests beside code. No flaky
+- Use a **real ledger file** and a **real operational store file**, each under the test's own
+  `t.TempDir()` — never shared: parallel packages and `-shuffle=on` make shared state flaky. No test
+  needs a network, so no test skips. Test behaviour, not internals. Tests beside code. No flaky
   tests. Table-driven for multiple meaningful cases. Target >80% coverage.
 
 **Embedded assets**
@@ -116,10 +117,9 @@ go test -race -count=1 -shuffle=on -vet=all ./...
 | **Facet type** | lower-case **dotted**, namespaced | `health.blood-pressure`, `calendar.event` |
 | Source / operator identity | lower-case **hyphenated** | `health-db`, `bp-csv` |
 | CLI command | lower-case hyphenated | `ingest`, `def load` |
-| Config / payload / data key | **snake_case** | `db_path`, `ddb_endpoint`, `period_start` |
-| DynamoDB attribute / SQL column | snake_case | `fact_time`, `content_hash` |
-| Env var | UPPER_SNAKE | `ANAM_DDB_ENDPOINT` |
-| DynamoDB key value | lower-case, `#`-delimited | `person#matt`, `facet#…` |
+| Config / payload / data key | **snake_case** | `db_path`, `ledger_path`, `period_start` |
+| SQL column | snake_case | `fact_time`, `content_hash` |
+| Env var | UPPER_SNAKE | `ANAM_LEDGER_PATH` |
 
 Facet types are **dotted and namespaced** on purpose — the namespace earns its keep as sources
 multiply (`health.*`, `calendar.*`, `mail.*`, `note.*`). This deviates from Arch's snake_case facet

@@ -144,8 +144,8 @@ fact-times or finer access control earn the cut. Facet types are **dotted and na
 
 ## 4. The person timeline — substrate and default access
 
-Storage is **partitioned by the person** (`person#<id>`): all their facets are co-located on one
-**timeline**, in **fact-time** order. The person is the **substrate**.
+Storage is **partitioned by the person**: a ledger file is pinned to one `person_id`, and all their
+facets are co-located on one **timeline**, in **fact-time** order. The person is the **substrate**.
 
 **Access is the person timeline, read whole by default.** This is the inversion. Unlike Arch, there is
 no required span filter and no fail-closed on a whole-person read — a longitudinal record is the point.
@@ -409,14 +409,15 @@ read, paid by a range-scan; it is not bought by a periodic tick.
 
 ### The watermark and the head
 
-`W` is the **stream watermark**: a monotonic counter advanced by *every* anam-event that can change the
-live-set — `admitted`, `superseded`, `tombstoned`, `endorsed`, `rejected`. A pure status transition
+`W` is the **stream watermark**: the `seq` of the newest anam-event, advanced by *every* anam-event that
+can change the live-set — `admitted`, `superseded`, `tombstoned`, `endorsed`, `rejected`. A pure status transition
 advances `W` even though no facet is born; if it did not, a checkpoint could reuse a value that still
 lists a retracted facet.
 
 Because those five are *all* the anam-events there are (§5), **`W` is the anam-event sequence itself**:
-`W ≡ seq`. One counter, not two. Nothing takes a `seq` without moving the watermark, and nothing moves the
-watermark without taking a `seq`.
+`W ≡ seq`. One number, held once: the ledger stores no counter, and `W` is read as the highest `seq`
+(§8). Nothing takes a `seq` without moving the watermark, and nothing moves the watermark without taking a
+`seq`.
 
 Per minted span, Anam tracks `Wᵥ` — the watermark the last checkpoint actually folded — and `V`, the
 checkpoint version. Whether a span needs re-minting is then one comparison, `W > Wᵥ`.
@@ -433,9 +434,9 @@ Anam stores in **three** places, because three different things want three diffe
 
 | Substrate | Holds | Nature |
 |---|---|---|
-| **DynamoDB** | facet artifacts (metadata + opaque payload), anam-events, and the watermark `W` | the **ledger** — Anam's record of what it knew |
+| **SQLite, the ledger file** | facet artifacts (metadata + opaque payload) and anam-events | the **ledger** — Anam's record of what it knew |
 | **Filesystem** | checkpoint values (`VALUE#<hash>`) and served receipts | **published artifacts** — immutable, content-addressed |
-| **SQLite** | Facet Definitions, projection templates, token scopes, the facet and anam-event indexes, the span registry and per-span `V`/`Wᵥ`, the checkpoint and receipt index, saved span bookmarks, sync cursors, GC state, the operational log | Anam's **operational store** |
+| **SQLite, the tracking file** | Facet Definitions, projection templates, token scopes, the facet and anam-event indexes, the span registry and per-span `V`/`Wᵥ`, the checkpoint and receipt index, saved span bookmarks, sync cursors, GC state, the operational log | Anam's **operational store** |
 
 Config is **YAML**; Facet Definitions are **JSON** (§3a).
 
@@ -487,74 +488,89 @@ Grain is **hybrid at the verbatim line** (ADR 0031):
   provenance actually pay.
 
 ```text
-pk = person#<id>
-sk:
-  facet#<facet_id>#v<%06d>   facet artifacts, keyed by identity  (Query: begins_with)
-  rec#<%020d>                anam-events, keyed by seq         (Query: BETWEEN — replay-since)
-  seq                        the watermark W — a counter item, seeded at 0 by init
+ledger.db
+  facet        PRIMARY KEY (facet_id, artifact_version)   one row per artifact version
+  anam_event   PRIMARY KEY (seq)                          one row per anam-event
+  ledger_meta  PRIMARY KEY (key)                          schema_version, person_id, ledger_id
 ```
 
-**No secondary indexes.** The ledger serves exactly two access paths, and both are strongly-consistent
-base-table range scans that must live in the same substrate as the conditional write:
+There is no watermark row. `W` is `MAX(seq)`, and a trigger lets an anam-event take only the `seq` after
+the newest one, so the sequence is gapless and the highest `seq` is the count of everything Anam learned.
 
-- `begins_with("facet#<facet_id>#")`, descending, limit 1 — the current artifact version, whose
-  `content_hash` `commit` compares against (§6a);
-- `BETWEEN("rec#…")` — replay since a watermark.
+**The ledger carries no secondary indexes.** It serves two access paths, both on a primary key:
+
+- one facet's versions, highest first: the current artifact version, whose `content_hash` `commit`
+  compares against (§6a);
+- the anam-events in a `seq` range: replay since a watermark.
 
 Everything else a reader wants — the timeline in fact-time order, a type filter, `changes_since` — is an
-**index**, and indexes live in the operational store, rebuilt by replaying the ledger. A table with a
-partition key, a sort key and a conditional counter is *any* ordered key-value store; that is what "the
+**index**, and indexes live in the operational store, rebuilt by replaying the ledger. The ledger asks its
+store for ordered keys and one atomic multi-row write, which any ordered store can give; that is what "the
 substrate is accidental" has to mean if it means anything.
 
-### Keys are identity-first, and every integer in them is zero-padded
+**The ledger is its own file, apart from the operational store.** Three things follow from the file being
+the unit SQLite deletes, locks and opens read-only by:
 
-Both halves were learned the hard way, and both are verified against DynamoDB Local rather than assumed.
+- the operational store's repair is to delete its file and replay. That repair cannot reach a fact;
+- a command that only reads the ledger opens it read-only, and SQLite refuses any write on that handle.
+  `init` and `ingest` are the only commands that open it for writing;
+- deleting the operational file and replaying proves the derived tier is derived, because nothing of the
+  ledger could have been inside it.
 
-- **`fact_time` must not appear in an artifact's sort key.** It is a *value*, read out of the payload;
+The ledger's `person_id` is pinned in `ledger_meta` at `init`, and a ledger pinned to another person is
+refused on every open. The operational store in turn pins the `ledger_id` it was derived from: a rebuilt
+ledger gets a new id, so a tracking file left over from an earlier ledger is refused instead of being read
+as an index of the new one.
+
+**Backing the ledger up is not a plain file copy while anything has it open.** The ledger runs in WAL
+mode, so recent commits can sit in `ledger.db-wal` until a checkpoint folds them in. Copy with
+`sqlite3 ledger.db ".backup <dest>"`, or copy `ledger.db` together with its `-wal` file with no writer
+running.
+
+### Keys are identity-first, and integers are typed
+
+- **`fact_time` must not appear in an artifact's key.** It is a *value*, read out of the payload;
   `facet_id` is *identity*. Key an artifact on its fact-time and a corrected source row whose fact-time
-  moved lands at a fresh sort key: the prior-version lookup misses it, `commit` concludes "never seen",
+  moved lands at a fresh key: the prior-version lookup misses it, `commit` concludes "never seen",
   and writes `v1` again. Two live artifacts, one `facet_id`, **supersession silently disabled** — the
-  `source_ref` mistake (§6a) wearing a sort key. Identity-first makes it unrepresentable rather than
-  guarded.
-- **Sort keys compare lexically, so integers are fixed-width.** Unpadded, `rec#10 < rec#9` and `v10 < v9`:
-  replay returns the wrong window, and the prior-version lookup reads the *ninth* artifact as current from
-  the tenth onward, comparing against a stale hash. Spiked: `facet#RAW#v1..v12` queried descending returns
-  `v9`; padded, `v000012`. This is the fixed-width timestamp rule (§5) again, in a different key — and it
-  is live today in the `mint-cli` reference implementation's `AllSnapshots`.
+  `source_ref` mistake (§6a) wearing a key. Identity-first makes it unrepresentable.
+- **`artifact_version` and `seq` are INTEGER columns**, so they order numerically. A key built as text
+  orders lexically, where `v10 < v9` and the prior-version lookup reads the *ninth* artifact as current
+  from the tenth onward. That defect is live in the `mint-cli` reference implementation's `AllSnapshots`.
+  Typed columns remove it; zero-padding only guarded it.
 
-Times are formatted **fixed-width UTC RFC3339Nano** for the same reason (§5). The **payload is a Binary
-attribute, never a Map** — this is where metadata/payload separation (§3) is enforced.
+Times are still text, so they are formatted **fixed-width UTC RFC3339Nano** and compare lexically in
+chronological order (§5). The **payload is a BLOB, never a JSON column** — this is where
+metadata/payload separation (§3) is enforced.
 
 **Facet Definitions are not in the ledger.** A Definition is not something Anam *knew*; it is how Anam
 *interprets* — governance, not record. It lives in the operational store, provisioned from embedded JSON
 (every version, so an artifact's `definition_version` still resolves). The error kernel is smaller for it.
 
-> **Design note (Hickey).** The single-table `item` is a **marshalling envelope, quarantined to the store
-> package** — not a domain type. Each domain value owns its `toItem`/`fromItem`; the `kind` discriminator
-> exists only at the storage edge. Current status is absent from the artifact: it is folded from
-> anam-events (§9).
+> **Design note (Hickey).** The row mapping is **quarantined to the store package**. A row is not a
+> domain type. Current status has no column: it is folded from anam-events (§9).
 
 ### `commit` is one transaction, and it is the error kernel
 
-The facet artifact, its `admitted` anam-event, and the bump of `W` are written in a **single
-`TransactWriteItems`**: artifact and event each conditional on their sort key not already existing, and
-`W` conditional on still holding the value it was read at.
+The facet artifact and its `admitted` anam-event are written in **one SQLite transaction** that holds
+the file's write lock from its first statement. Inside it the ledger checks, in this order:
 
-`TransactionCanceledException` reports its reasons **positionally**, and the three positions mean three
-different things. Collapsing them into one "conflict" would make `commit` either retry a write that
-already succeeded or reject a benign re-ingest — so this mapping *is* the idempotency, not error handling
-wrapped around it:
-
-| Cancelled item | What it means | Response |
+| Check | What it means | Response |
 |---|---|---|
-| the artifact | this `(facet_id, version)` already exists | compare `content_hash`: **same** → idempotent no-op, we are seeing our own write; **different** → a lost update. Stop |
-| the anam-event | that `seq` is taken *while `W` was not stale* | the counter is behind its own log. The ledger is corrupt. Stop |
-| the watermark | another writer advanced `W` | re-read, re-stamp `anam_time`, retry |
+| the head is not the watermark the caller read | another writer advanced `W` | `ErrStaleWatermark`: re-read, re-stamp `anam_time`, retry |
+| this `(facet_id, version)` already exists | compare `content_hash` and payload bytes: **same** → we are seeing our own write; **different** → a lost update | `ErrAlreadyWritten`: idempotent no-op. `ErrDivergentArtifact`: stop |
+| the database refuses an insert the checks passed | the checks and the constraints disagree | `ErrCorrupt`: stop |
 
-`ReturnValuesOnConditionCheckFailure: ALL_OLD` returns the existing artifact alongside the cancellation, so
-the hash comparison costs no second read. This is what makes a dropped connection safe: the transaction
-committed, the client saw an error, and the retry lands on the first row and reads its own write back as a
+Collapsing the first two into one "conflict" would make `commit` either retry a write that already
+succeeded or reject a benign re-ingest — so this mapping *is* the idempotency, not error handling wrapped
+around it. The stale check comes first because a writer holding an old head may also be re-presenting
+artifacts that landed since, and "re-read and try again" is the answer that lets it sort those out.
+
+Any refusal rolls the whole transaction back, so a refused batch writes nothing. This is what makes a
+crash safe: the transaction committed or it did not, and a re-run reads its own earlier write back as a
 no-op.
+
+A writer that cannot get the write lock within the busy timeout gets `ErrBusy` and has written nothing.
 
 `anam_time` is stamped **inside** the retry, after the successful `seq` read, so that `seq` order and
 `anam_time` order agree by construction. A retry that reused its original timestamp could place an
@@ -563,7 +579,8 @@ would be ambiguous.
 
 **The two clocks are not symmetric, and the asymmetry is deliberate.** `seq` is total: every anam-event
 gets its own, unique and gapless. `anam_time` is not: a batch commit is *one* change in Anam's knowledge,
-so all its events share one instant — up to `MaxBatch` of them. "Agree by construction" above therefore
+so all its events share one instant — up to `gate.MaxBatch` of them. The ledger sets no limit of its
+own; the batch size is the gate's policy. "Agree by construction" above therefore
 means non-decreasing, not strictly increasing, and anything ordering by anam-time must break the tie with
 `seq` (`anam_event_by_time` is indexed `(anam_time, seq)` for exactly that).
 
@@ -576,30 +593,32 @@ The retry loop belongs to the **gate**, not the store. A capture worker may alre
 re-run to known-good, so the recovery is free; putting a loop, a bound and a give-up path inside the one
 component that must not fail buys nothing.
 
-> **Design note (Armstrong).** There is **no transaction across substrates**, so everything that must be
-> atomic lives in one: the artifact, the event, and the watermark. The operational store's **derived**
-> tier is never written in the same breath as the ledger; it catches up afterwards by replaying
-> anam-events since its last-seen `seq`. That is safe precisely because the ledger is append-only and
-> `commit` is idempotent — **a crash leaves the derived tier behind, never wrong, and behind is fixable by
-> replay.** Catch-up is not housekeeping: the fold reads its indexes, so it must assert `last_seq == W`
-> before folding, or a checkpoint can be computed from a lagging index and be wrong at its own watermark.
+> **Design note (Armstrong).** There is **no transaction across two files**, so everything that must be
+> atomic lives in one: the artifact and the event. The operational store's **derived** tier is never
+> written in the same breath as the ledger; it catches up afterwards by replaying anam-events since its
+> last-seen `seq`. That is safe precisely because the ledger is append-only and `commit` is idempotent —
+> **a crash leaves the derived tier behind, never wrong, and behind is fixable by replay.** Catch-up is
+> not housekeeping: the fold reads its indexes, so it must assert `last_seq == W` before folding, or a
+> checkpoint can be computed from a lagging index and be wrong at its own watermark.
 >
-> The price of this substrate, paid knowingly: DynamoDB cannot refuse an `UpdateItem`, so **append-only
-> drops from an invariant the substrate enforces to one our code must not violate.** It falls back to a
-> test. SQLite would have held it with a trigger. This is the single largest cost of the split, and it
-> lands on Anam's deepest promise.
+> **Append-only is enforced by the database.** Triggers on every ledger table refuse `UPDATE` and
+> `DELETE`, and refuse an `INSERT` over an existing key. Without that last one, `INSERT OR REPLACE`
+> would overwrite a row without firing the delete trigger. They bind every writer, a `sqlite3` shell included. A trigger is
+> not a security boundary: whoever holds the file can drop it. The threat it answers is a refactor or a
+> hurried session, not an adversary.
 
-Every store method takes a `context` with a deadline and **fails fast** on an unreachable endpoint —
-never a hang. `ConditionalCheckFailed` and `TransactionCanceledException` surface as a typed conflict.
+Every store method takes a `context` with a deadline and **fails fast** — never a hang. A missing
+ledger file is `ErrNotInitialised` on open; nothing is created by reading or ingesting.
 
-**The substrate is accidental, not essential.** Only `internal/store` may name DynamoDB, SQLite, or
-`database/sql`; `scripts/check.sh` enforces it. Because Anam owns no source fact, **changing substrate is
-a re-ingest, not a migration** — as this document has already demonstrated once.
+**The substrate is accidental, not essential.** Only `internal/store` may name SQLite or
+`database/sql`; `scripts/check.sh` enforces it. Because Anam owns no source fact, a change of
+substrate can be a re-ingest: the payloads come back from their sources. The anam-times do not. A
+re-ingest stamps new ones, so a ledger whose history of learning matters is moved by copying its rows.
 
 The one carve-out: `internal/capture` may read a **source** in its native format — a source that happens
 to be a SQLite file needs `database/sql` to be read at all. That is the *source's* substrate, not Anam's:
 a capture worker sits outside the gate, is disposable, and speaks whatever its source speaks. It never
-names the ledger's SDK, and `check.sh` enforces that too.
+imports `internal/store`, and `check.sh` enforces that too.
 
 ---
 
@@ -697,7 +716,7 @@ Anam later as an ordinary source fact.
   Its **derived** tier must stay provably rebuildable by replaying the ledger, or the rebuild test proves
   nothing (§8).
 - **Append-only**: facts are added and superseded by status events (tombstones) — **never modified,
-  never deleted.** DynamoDB cannot enforce this; our code must not violate it, and a test guards it (§8).
+  never deleted.** The ledger's triggers refuse both, for every writer (§8).
 - **Current status is derived** by the fold from anam-events — **never stored** on the artifact (no
   place-oriented programming). A tombstone is therefore a **anam-event, not an artifact version**: an
   Anam artifact has nowhere to carry a status (§6a).

@@ -22,7 +22,7 @@ Everything in scope serves that sentence. Everything out of scope waits until it
 One thin end-to-end path must work before anything is widened:
 
 ```text
-ingest gate (resolve → commit, three pillars) → append-only ledger (DynamoDB)
+ingest gate (resolve → commit, three pillars) → append-only ledger (SQLite)
        → canonical fold → CLI timeline viewer          ← the thesis, made observable
        → capture (health-db, then bp-csv) → changes_since
        → one projection + receipt → mint (adaptive checkpoint, per bucket-span)
@@ -63,23 +63,26 @@ it is built in the smallest steps that yield information.
 
 `bp-csv` attaches at R5 whenever the export is available; it gates nothing.
 
-**The atomic write is R2's, not R3's.** `commit`'s single `TransactWriteItems` *is* the error kernel, and
+R1 and R2 record what was built at the time, on DynamoDB. The ledger has since moved to a SQLite file of
+its own (journal, 2026-09-28), behind the same interface.
+
+**The atomic write is R2's, not R3's.** `commit`'s single transaction *is* the error kernel, and
 "depth-first below the gate" forbids stubbing it. So R2 ships the ledger's `Append` complete — the
-transaction, the seeded counter, the three typed cancellation outcomes (`ARCHITECTURE.md` §8) — and R3 is
-then pure gate logic composed on top: three pillars, hash comparison, supersede-or-no-op. R3 adds no
-substrate semantics. The alternative, a `PutItem` at R2 replaced by a transaction at R3, builds the kernel
-twice and trusts the second one.
+transaction and its typed outcomes (`ARCHITECTURE.md` §8) — and R3 is then pure gate logic composed on
+top: three pillars, hash comparison, supersede-or-no-op. R3 adds no substrate semantics. The alternative,
+a plain write at R2 replaced by a transaction at R3, builds the kernel twice and trusts the second one.
 
 Because a tombstone is an anam-event with no artifact (§6a), the ledger's primitive is **two calls, not
 one with an optional facet**: admit an artifact with its event, or mark an existing facet with an event.
 An optional pointer would make `{no artifact, admitted}` representable.
 
-**Three substrates** (`ARCHITECTURE.md` §8): **DynamoDB** is the ledger (facet artifacts, anam-events,
-the watermark `W` — all atomic in one `TransactWriteItems`); the **filesystem** holds checkpoint values
-and receipts, content-addressed; **SQLite** is the **operational store** — definitions, indexes, the span
-registry and per-span `V`/`Wᵥ`, cursors, bookmarks, GC state. Config is YAML; definitions are JSON.
+**Three substrates** (`ARCHITECTURE.md` §8): a **SQLite file** is the ledger (facet artifacts and
+anam-events, atomic in one transaction; the watermark `W` is the newest event's `seq`); the
+**filesystem** holds checkpoint values and receipts, content-addressed; a **second SQLite file** is the
+**operational store** — definitions, indexes, the span registry and per-span `V`/`Wᵥ`, cursors,
+bookmarks, GC state. Config is YAML; definitions are JSON.
 
-There is no transaction across substrates, so everything that must be atomic lives in one. Only
+There is no transaction across two files, so everything that must be atomic lives in one. Only
 `internal/store` may name any of them, and `scripts/check.sh` enforces that — because Anam owns no source
 fact, a substrate swap is a re-ingest, not a migration.
 
@@ -110,9 +113,9 @@ fact, a substrate swap is a re-ingest, not a migration.
 - **Receipts:** prove exactly what a projection served at a watermark.
 - **One derived-facet path:** an **insight** admitted as `proposed`, visible on the timeline, no
   write-back.
-- **`init`** idempotently creates the ledger table, **seeds its watermark counter at 0**, and creates the
-  operational schema. There are **no append-only triggers**: DynamoDB cannot refuse an `UpdateItem`, so
-  append-only is enforced by a test, not by the substrate (`ARCHITECTURE.md` §8). **`version`** reports
+- **`init`** idempotently creates the ledger file, pins its person, and creates the operational
+  schema. **Append-only triggers** on every ledger table refuse `UPDATE`, `DELETE` and any overwriting
+  `INSERT`, so append-only is enforced by the database (`ARCHITECTURE.md` §8). **`version`** reports
   the ldflags build.
 - **Read-only** throughout — Anam never writes back to a source.
 

@@ -46,3 +46,9 @@ Two more facts pinned by spike: `init` must **seed the counter at 0** (a conditi
 missing item fails rather than creating it — otherwise every first commit fails forever), and
 `TransactionCanceledException` is **positional**, with `ReturnValuesOnConditionCheckFailure: ALL_OLD`
 carrying the existing artifact back for the idempotency hash-compare.
+
+## 2026-09-28: the keys are typed
+
+On SQLite ([[ledger-is-a-sqlite-file-of-its-own]]) the key is `(facet_id, artifact_version)` and `seq`,
+with both integers stored as INTEGER. Identity-first is unchanged. Fixed-width padding is gone, because
+typed integers order numerically. The counter and its seeding are gone too: the watermark is `MAX(seq)`.

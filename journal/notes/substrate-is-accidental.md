@@ -82,3 +82,10 @@ record-events since its last-seen `seq`, which is safe precisely because the led
 Because Anam owns no source fact, **a substrate swap is a re-ingest, not a migration.** The cost of being
 wrong is a rebuild, in any direction. When reversal is that cheap, the argument for choosing the simplest
 arrangement — and for changing your mind the moment the facts change — is overwhelming.
+
+## 2026-09-28: a fourth arrangement
+
+The ledger left DynamoDB for a SQLite file of its own ([[ledger-is-a-sqlite-file-of-its-own]]). The
+three roles above still hold. Two of them are now SQLite files, kept apart, and the cost named above is
+gone: the database refuses an overwrite again. "A substrate swap is a re-ingest" needs one qualifier the
+move exposed. Payloads come back from their sources. Anam-times do not.

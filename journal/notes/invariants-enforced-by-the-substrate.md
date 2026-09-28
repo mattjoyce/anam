@@ -83,3 +83,10 @@ that is all it needs to be.
 Rung 4 also has a cost worth naming: the invariant now lives in two languages, and the schema must be
 read to understand the domain. That is a real tax on comprehension, paid once, in exchange for a promise
 that cannot quietly lapse.
+
+## 2026-09-28: the rung was climbed again
+
+The ledger is a SQLite file again ([[ledger-is-a-sqlite-file-of-its-own]]), and append-only is back at
+rung 4, with gapless `seq` and version order beside it. One detail the first SQLite design did not have:
+`INSERT OR REPLACE` bypasses a delete trigger unless `recursive_triggers` is on for that connection, so
+the insert itself is guarded.

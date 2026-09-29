@@ -1,0 +1,136 @@
+package app
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/mattjoyce/anam/internal/store/ledger"
+)
+
+// Three readings in the blood pressure export's own format.
+const bpFixture = "Date (Excel),\tDate,\tSystolic,\tDiastolic,\tPulse,\tIrregular heartbeat,\tMissed medication,\tDizzy / Light-headed,\tWeight [kg],\tTemperature [Celsius],\tBlood Glucose [mg/dL],\tOxygen Saturation [%],\tLocation,\tPosture,\tComment,\tTags,\t\r\n" +
+	"2026-1-24 06:36:00,\t 24 January 2026 6:36,\t 114.0,\t 80.0,\t 70.0,\t ,\t ,\t ,\t 96.3,\t ,\t ,\t ,\t \"Left Arm\",\t \"Seated\",\t ,\t ,\t \r\n" +
+	"2026-2-10 05:04:00,\t 10 February 2026 5:04,\t 102.0,\t 72.0,\t 68.0,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t \r\n" +
+	"2026-2-11 05:10:00,\t 11 February 2026 5:10,\t 101.0,\t 72.0,\t 66.0,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t \r\n"
+
+// ingestFixture is a real ledger, a real config and a readable blood pressure export,
+// all under the test's own directory.
+type ingestFixture struct {
+	dir, cfgPath, ledgerPath, bpPath string
+}
+
+func newIngestFixture(t *testing.T) ingestFixture {
+	t.Helper()
+	dir := t.TempDir()
+	f := ingestFixture{
+		dir:        dir,
+		cfgPath:    filepath.Join(dir, "config.yaml"),
+		ledgerPath: filepath.Join(dir, "ledger.db"),
+		bpPath:     filepath.Join(dir, "bp.csv"),
+	}
+	cfg := fmt.Sprintf("person_id: matt\nledger_path: %s\ndb_path: %s\nartifact_dir: %s\n",
+		f.ledgerPath, filepath.Join(dir, "tracking.db"), filepath.Join(dir, "artifacts"))
+	if err := os.WriteFile(f.cfgPath, []byte(cfg), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(f.bpPath, []byte(bpFixture), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	l, err := ledger.Create(context.Background(), f.ledgerPath, "matt")
+	if err != nil {
+		t.Fatalf("create ledger: %v", err)
+	}
+	if err := l.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+// ingest runs the command against the fixture with the given declarations and returns
+// its output, the ledger's head afterwards, and the command's error.
+func (f ingestFixture) ingest(t *testing.T, imports string) (string, ledger.Watermark, error) {
+	t.Helper()
+	importsPath := filepath.Join(f.dir, "imports.yaml")
+	if err := os.WriteFile(importsPath, []byte(imports), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := ingestCmd(&f.cfgPath)
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"--imports", importsPath})
+	cmd.SilenceUsage = true
+	runErr := cmd.ExecuteContext(context.Background())
+
+	l, err := ledger.OpenReadOnly(context.Background(), f.ledgerPath, "matt")
+	if err != nil {
+		t.Fatalf("reopen ledger: %v", err)
+	}
+	defer func() { _ = l.Close() }()
+	w, err := l.Head(context.Background())
+	if err != nil {
+		t.Fatalf("head: %v", err)
+	}
+	return out.String(), w, runErr
+}
+
+// A scheduled ingest reads two of its three sources over a network share. When the
+// share is unmounted those paths do not resolve, and the run must stop before it
+// writes: a ledger that holds one source's new rows and not the others' is a state no
+// complete run produces.
+func TestIngest_AnUnreadableSourceStopsTheRunBeforeAnythingIsAdmitted(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		imports     func(f ingestFixture) string
+		wantErr     string
+		wantWritten bool
+	}{
+		{
+			name: "every source readable",
+			imports: func(f ingestFixture) string {
+				return fmt.Sprintf("imports:\n  - source: bp-csv\n    path: %s\n", f.bpPath)
+			},
+			wantWritten: true,
+		},
+		{
+			name: "a later source is missing",
+			imports: func(f ingestFixture) string {
+				return fmt.Sprintf("imports:\n  - source: bp-csv\n    path: %s\n"+
+					"  - source: health-db\n    path: %s\n",
+					f.bpPath, filepath.Join(f.dir, "unmounted", "healthdata.db"))
+			},
+			wantErr: "health-db",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := newIngestFixture(t)
+			out, w, err := f.ingest(t, tt.imports(f))
+
+			if tt.wantErr == "" && err != nil {
+				t.Fatalf("ingest: %v\n%s", err, out)
+			}
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("ingest succeeded, want an error naming %q\n%s", tt.wantErr, out)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("error %q does not name %q", err, tt.wantErr)
+				}
+			}
+			if written := w > 0; written != tt.wantWritten {
+				t.Errorf("ledger head is %d, want written=%v\n%s", w, tt.wantWritten, out)
+			}
+		})
+	}
+}

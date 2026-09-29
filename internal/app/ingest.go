@@ -91,7 +91,10 @@ func ingestCmd(cfgPath *string) *cobra.Command {
 
 With no argument every declared import runs, in order; with a source name, the
 declarations for that source. A path typed ad hoc is provenance that evaporates
-with the shell history; a declared import is reviewable and repeatable.`,
+with the shell history; a declared import is reviewable and repeatable.
+
+Every import is read before any is admitted. A source that cannot be read stops
+the run with nothing written.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if batch < 1 || batch > gate.MaxBatch {
@@ -112,32 +115,7 @@ with the shell history; a declared import is reviewable and repeatable.`,
 				}
 			}
 
-			reg, err := def.Bundled()
-			if err != nil {
-				return err
-			}
-			l, err := openLedgerForWrite(cmd.Context(), cfg)
-			if err != nil {
-				return err
-			}
-			defer func() { _ = l.Close() }()
-			g := gate.New(l, reg, mvpScopes, clock.Real{}, cfg.PersonID)
-
-			for _, imp := range imports {
-				envs, err := scanImport(cmd.Context(), imp, cfg)
-				if err != nil {
-					return err
-				}
-				// The report is printed on both paths, and before the error: the writes
-				// that landed are in the ledger whatever the exit code says, and an
-				// operator deciding whether to re-run needs to know there were any.
-				prog, err := admitAll(cmd.Context(), g, envs, cfg.Timeout, batch)
-				_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n", imp.Source, prog.report(len(envs)))
-				if err != nil {
-					return err
-				}
-			}
-			return nil
+			return runIngest(cmd, cfg, imports, batch)
 		},
 	}
 	cmd.Flags().StringVar(&importsPath, "imports", "",
@@ -145,6 +123,62 @@ with the shell history; a declared import is reviewable and repeatable.`,
 	cmd.Flags().IntVar(&batch, "batch", gate.MaxBatch,
 		"facets per transaction; 1 is one commit per facet (max "+strconv.Itoa(gate.MaxBatch)+")")
 	return cmd
+}
+
+// scanned is one declared import's envelopes, held until every import has been read.
+type scanned struct {
+	source string
+	envs   []facet.Envelope
+}
+
+// runIngest reads every import, then admits them in declared order.
+//
+// The ledger is opened only after the last scan succeeds. A source that cannot be
+// read, such as a file on a share that is not mounted, ends the run with the ledger
+// never opened for writing.
+func runIngest(cmd *cobra.Command, cfg config.Config, imports []config.Import, batch int) error {
+	reg, err := def.Bundled()
+	if err != nil {
+		return err
+	}
+	all, err := scanAll(cmd.Context(), imports, cfg)
+	if err != nil {
+		return err
+	}
+
+	l, err := openLedgerForWrite(cmd.Context(), cfg)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = l.Close() }()
+	g := gate.New(l, reg, mvpScopes, clock.Real{}, cfg.PersonID)
+
+	for _, sc := range all {
+		// The report is printed on both paths, and before the error: the writes
+		// that landed are in the ledger whatever the exit code says, and an
+		// operator deciding whether to re-run needs to know there were any.
+		prog, err := admitAll(cmd.Context(), g, sc.envs, cfg.Timeout, batch)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n", sc.source, prog.report(len(sc.envs)))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// scanAll reads every declared import before any of them is admitted, and stops at the
+// first that cannot be read. Its error names the declared source and says nothing was
+// admitted, because the reader of a failed scheduled run needs both.
+func scanAll(ctx context.Context, imports []config.Import, cfg config.Config) ([]scanned, error) {
+	all := make([]scanned, 0, len(imports))
+	for _, imp := range imports {
+		envs, err := scanImport(ctx, imp, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("import %s could not be read, nothing admitted: %w", imp.Source, err)
+		}
+		all = append(all, scanned{source: imp.Source, envs: envs})
+	}
+	return all, nil
 }
 
 // scanImport dispatches one declared import to its capture worker.

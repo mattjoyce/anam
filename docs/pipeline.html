@@ -79,7 +79,7 @@
 
 <h1>Health data pipeline</h1>
 <p class="lede">How a heartbeat on the watch and a step on the scale become facets in Anam, which machine does each part, and how to tell when a part has stopped.</p>
-<p class="meta">State as of 29 September 2026. Every stage below was checked on that date.</p>
+<p class="meta">State as of 30 September 2026. Stages one to four were checked on 29 September, and stage five on 30 September.</p>
 
 <div class="scroll">
 <svg viewBox="0 0 916 372" role="img" aria-label="Pipeline from Garmin and Withings through collectors and the ETL into Anam">
@@ -146,7 +146,7 @@
   <!-- Anam -->
   <rect class="box" x="778" y="30" width="130" height="322" rx="8" fill="var(--anam)"/>
   <text class="ttl" x="843" y="56" text-anchor="middle">anam ingest</text>
-  <text class="sub" x="843" y="72" text-anchor="middle">ThinkPad, by hand</text>
+  <text class="sub" x="843" y="72" text-anchor="middle">ThinkPad, every hour</text>
   <text class="sub" x="843" y="129" text-anchor="middle">health-db worker</text>
   <text class="sub" x="843" y="244" text-anchor="middle">withings worker</text>
   <text class="sub" x="843" y="321" text-anchor="middle">bp-csv worker</text>
@@ -187,10 +187,10 @@
   <li><strong>Summarise</strong>
     Either event starts the health ETL. Ductile runs it as a one-shot container from the <code>ductile-healthdata</code> image. It reads both raw stores and writes day, week, month and year rows to <code>healthdata.db</code>.</li>
   <li><strong>Ingest into Anam</strong>
-    <code>anam ingest</code> on the ThinkPad reads <code>healthdata.db</code> over the Projects share. It also reads <code>withings.db</code> and the blood pressure export directly. Every row passes the gate and lands in <code>ledger.db</code>.</li>
+    The ThinkPad ductile gateway runs <code>anam ingest</code> every hour. It reads <code>healthdata.db</code> over the Projects share. It also reads <code>withings.db</code> and the blood pressure export directly. Every row passes the gate and lands in <code>ledger.db</code>.</li>
 </ol>
 
-<div class="gap"><strong>Stage five is by hand.</strong> Nothing schedules <code>anam ingest</code>. Stages one to four keep <code>healthdata.db</code> current on their own. Anam only catches up when someone runs the command.</div>
+<div class="note"><strong>Stage five runs on a clock, not on an event.</strong> The ingest takes about two seconds and an unchanged row is a no-op, so an hourly run costs nothing when there is no news. New data reaches Anam within an hour of the ETL writing it.</div>
 
 <h2>Where each part lives</h2>
 <div class="tablewrap">
@@ -201,7 +201,7 @@
     <tr><td><code>withings</code> plugin</td><td>unraid, in ductile</td><td>every 6 hours</td><td><code>healthdata/withings/withings.db</code></td></tr>
     <tr><td><code>garmin</code> plugin</td><td>unraid, in ductile</td><td>every 30 minutes</td><td>an event, no file</td></tr>
     <tr><td>Health ETL</td><td>unraid, one-shot container</td><td>on each event</td><td><code>healthdata/healthdata.db</code></td></tr>
-    <tr><td><code>anam ingest</code></td><td>ThinkPad</td><td>by hand</td><td><code>~/.local/share/anam/ledger.db</code></td></tr>
+    <tr><td><code>anam ingest</code></td><td>ThinkPad, in ductile</td><td>every hour</td><td><code>~/.local/share/anam/ledger.db</code></td></tr>
   </tbody>
 </table>
 </div>
@@ -268,10 +268,29 @@ sqlite3 "file:$HOME/.local/share/anam/ledger.db?mode=ro" \
   'docker exec ductile /app/ductile job logs --plugin health_data_summary --limit 5 \
    --config /app/config/config.yaml'</code></pre>
 
-<h2>To bring Anam up to date</h2>
+<h2>How Anam stays up to date</h2>
+<p>The ThinkPad gateway has a scheduled job, <code>anam_ingest</code>, declared in <code>/etc/ductile/anam.plugins.yaml</code>. It runs the installed binary as matt.</p>
+<pre><code>/usr/bin/timeout -k 10 300 /home/matt/go/bin/anam ingest</code></pre>
+<div class="tablewrap">
+<table>
+  <thead><tr><th>What happened</th><th>What you see in Discord</th></tr></thead>
+  <tbody>
+    <tr><td>New or revised rows were admitted</td><td>A message from Anam with the count per source</td></tr>
+    <tr><td>Nothing was new</td><td>Nothing</td></tr>
+    <tr><td>The run failed</td><td>A message from Ductile Ops naming <code>anam_ingest</code> and the error</td></tr>
+  </tbody>
+</table>
+</div>
+<p>An ingest reads every source before it admits anything. If the Projects share is not mounted, the run fails at the first source it cannot read and the ledger is not opened for writing.</p>
+<p>The job runs the binary in <code>~/go/bin</code>, not the one in the repository. After a change to Anam, install it:</p>
 <pre><code>cd ~/Projects/anam
-ANAM_PERSON_ID=matt ./anam ingest</code></pre>
+make install</code></pre>
+<p>To run an ingest by hand:</p>
+<pre><code>ANAM_PERSON_ID=matt ~/go/bin/anam ingest</code></pre>
 <p>An ingest is safe to repeat. Rows that have not changed are skipped. A row whose summary moved is written as a new version, and the old one is kept.</p>
+<p>Its run history is in the ThinkPad gateway:</p>
+<pre><code>sudo -u ductile ductile job logs --plugin anam_ingest --limit 5 \
+  --config /etc/ductile/config.yaml</code></pre>
 
 <h2>Why it had stopped</h2>
 <p>On 28 September 2026 Anam's Garmin data ended at 16 July. The ETL had been moved twice and neither move was finished.</p>
@@ -289,7 +308,7 @@ ANAM_PERSON_ID=matt ./anam ingest</code></pre>
 
 <h2>Still open</h2>
 <ul>
-  <li><strong>Anam ingest is by hand.</strong> A schedule, or a trigger from the ETL's completion event, would close the last gap.</li>
+  <li><strong>A gateway job can stall without failing.</strong> On 27 September the ThinkPad gateway could not record that a job had finished, because its state database was locked. The job stayed marked as running and the scheduler skipped it 6,840 times over three days. That is not a failure, so nothing is sent. A restart clears it. The staleness alert below is what would catch it.</li>
   <li><strong>No staleness alert.</strong> Nothing compares the newest summarised day with the newest Garmin day.</li>
   <li><strong>A real Withings weigh-in has not yet passed through the new trigger.</strong> A synthetic event did.</li>
   <li><strong>Day boundaries are UTC.</strong> Garmin's day is a local calendar day. Anam reads its start as midnight UTC, about ten hours early for Sydney.</li>

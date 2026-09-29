@@ -33,6 +33,7 @@ Two kinds of note:
   - [[2026-07-10-r6-changes-since]] — R6: `changes_since`, and the derived tier earns its first reader.
   - [[2026-07-11-bp-csv-arrives]] — the BP CSV arrives; identity isn't what the tests assumed. Plus safepath.
   - [[2026-09-29-the-health-pipeline-runs-end-to-end]] — three ETLs and none of them live; the fix was on unraid, not in Anam. Daily min and max, back to 2024.
+  - [[2026-09-30-ingest-runs-on-a-clock]] — hourly, in the ThinkPad gateway. The gateway had never announced a failure, and a job in it had been stalled for three days.
   - [[2026-09-28-the-ledger-moves-to-sqlite]] — the ledger leaves DynamoDB for a SQLite file of its own; append-only is held by the database again.
   - [[2026-07-25-r7-projection-and-receipt]] — R7: the projection publishes, the receipt proves, the retry loop disappears; plus the viewer that switches between projections and winds the clock back.
 - Decision notes

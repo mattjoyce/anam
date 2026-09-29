@@ -77,3 +77,18 @@ func TestResolveImports_ExplicitMustExist(t *testing.T) {
 		t.Errorf("ResolveImports(explicit) = %q %q %v", got, origin, err)
 	}
 }
+
+// A scheduled ingest names its imports by environment, and its log is read by someone
+// working out why it failed. The origin must name the variable that was used.
+func TestResolveImports_EnvIsLabelledWithItsOwnVariable(t *testing.T) {
+	path := writeImports(t, "imports:\n  - source: bp-csv\n    path: /x\n")
+	t.Setenv(config.EnvImports, path)
+
+	got, origin, err := config.ResolveImports("")
+	if err != nil || got != path {
+		t.Fatalf("ResolveImports() = %q %v, want %q", got, err, path)
+	}
+	if origin != "env:ANAM_IMPORTS" {
+		t.Errorf("origin = %q, want env:ANAM_IMPORTS", origin)
+	}
+}

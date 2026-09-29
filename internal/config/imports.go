@@ -21,6 +21,11 @@ import (
 // EnvImports names the environment variable that overrides imports discovery.
 const EnvImports = "ANAM_IMPORTS"
 
+// OriginImportsEnv marks an imports file named by $ANAM_IMPORTS. It is not OriginEnv,
+// which names $ANAM_CONFIG: a label that names the wrong variable sends its reader to
+// the wrong place.
+const OriginImportsEnv Origin = "env:" + EnvImports
+
 // ErrInvalidImports is returned for an imports file that cannot be used.
 var ErrInvalidImports = errors.New("invalid imports file")
 
@@ -64,7 +69,7 @@ func ResolveImports(explicit string) (string, Origin, error) {
 		if err != nil {
 			return "", "", fmt.Errorf("%s: %w", EnvImports, err)
 		}
-		return path, OriginEnv, nil
+		return path, OriginImportsEnv, nil
 	}
 
 	dir, err := os.UserConfigDir()

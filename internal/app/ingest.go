@@ -153,6 +153,7 @@ func runIngest(cmd *cobra.Command, cfg config.Config, imports []config.Import, b
 	defer func() { _ = l.Close() }()
 	g := gate.New(l, reg, mvpScopes, clock.Real{}, cfg.PersonID)
 
+	changed := 0
 	for _, sc := range all {
 		// The report is printed on both paths, and before the error: the writes
 		// that landed are in the ledger whatever the exit code says, and an
@@ -162,8 +163,23 @@ func runIngest(cmd *cobra.Command, cfg config.Config, imports []config.Import, b
 		if err != nil {
 			return err
 		}
+		changed += prog.tally[gate.OutcomeAdmitted] + prog.tally[gate.OutcomeSuperseded]
 	}
-	return nil
+	_, err = fmt.Fprintln(cmd.OutOrStdout(), verdict(changed))
+	return err
+}
+
+// nothingNew is the last line of a complete run that wrote nothing. It is a fixed
+// string because a scheduler matches on it to stay quiet about such a run.
+const nothingNew = "ledger unchanged: nothing new in any source"
+
+// verdict is the last line of a complete run: whether the ledger moved, in one line
+// that reads the same to a person and to a string match.
+func verdict(changed int) string {
+	if changed == 0 {
+		return nothingNew
+	}
+	return fmt.Sprintf("ledger changed: %d facets admitted or superseded", changed)
 }
 
 // scanAll reads every declared import before any of them is admitted, and stops at the

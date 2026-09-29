@@ -92,6 +92,7 @@ func TestIngest_AnUnreadableSourceStopsTheRunBeforeAnythingIsAdmitted(t *testing
 		imports     func(f ingestFixture) string
 		wantErr     string
 		wantWritten bool
+		wantOut     string
 	}{
 		{
 			name: "every source readable",
@@ -99,6 +100,7 @@ func TestIngest_AnUnreadableSourceStopsTheRunBeforeAnythingIsAdmitted(t *testing
 				return fmt.Sprintf("imports:\n  - source: bp-csv\n    path: %s\n", f.bpPath)
 			},
 			wantWritten: true,
+			wantOut:     "ledger changed: 3 facets admitted or superseded",
 		},
 		{
 			name: "a later source is missing",
@@ -131,6 +133,34 @@ func TestIngest_AnUnreadableSourceStopsTheRunBeforeAnythingIsAdmitted(t *testing
 			if written := w > 0; written != tt.wantWritten {
 				t.Errorf("ledger head is %d, want written=%v\n%s", w, tt.wantWritten, out)
 			}
+			if !strings.Contains(out, tt.wantOut) {
+				t.Errorf("output does not say %q\n%s", tt.wantOut, out)
+			}
 		})
+	}
+}
+
+// A scheduled run is quiet when nothing moved, so the line that says so is one a
+// scheduler can match. The second of two identical runs must print it, and must leave
+// the ledger where the first run did.
+func TestIngest_ARepeatedRunSaysTheLedgerIsUnchanged(t *testing.T) {
+	t.Parallel()
+	f := newIngestFixture(t)
+	imports := fmt.Sprintf("imports:\n  - source: bp-csv\n    path: %s\n", f.bpPath)
+
+	_, first, err := f.ingest(t, imports)
+	if err != nil {
+		t.Fatalf("first ingest: %v", err)
+	}
+	out, second, err := f.ingest(t, imports)
+	if err != nil {
+		t.Fatalf("second ingest: %v\n%s", err, out)
+	}
+
+	if second != first {
+		t.Errorf("ledger head moved from %d to %d on a repeat run", first, second)
+	}
+	if !strings.Contains(out, nothingNew) {
+		t.Errorf("output does not say %q\n%s", nothingNew, out)
 	}
 }

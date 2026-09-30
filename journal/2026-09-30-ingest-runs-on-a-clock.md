@@ -71,9 +71,14 @@ cleared both.
 | Normal run, new data | By hand, same binary and environment | 20 admitted, 15 superseded |
 | Share not mounted | Temporary job, empty scratch ledger, a path that does not exist | Failed, 0 facets written, Discord message sent |
 
-Not verified: a scheduled run that finds new data and announces it. The pipeline is
-registered and its condition is the inverse of the quiet case, which did hold. The
-next Garmin sync will show it.
+The remaining case held the same day. The 11:06 run took in 7 new and 17 revised
+summaries from the ETL's morning write, plus new Withings measurements, and Discord
+got the message. The 12:07 run announced four more revisions. The runs between were
+quiet. Eleven runs in eleven hours, none skipped.
+
+Later that evening every scheduled plugin on the ThinkPad gateway was opted in to
+failure notices, except `youtube_transcript`, which fails daily on rate limits and is a
+pipeline step in any case.
 
 ## Open
 

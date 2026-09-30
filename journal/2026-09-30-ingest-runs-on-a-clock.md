@@ -80,10 +80,25 @@ Later that evening every scheduled plugin on the ThinkPad gateway was opted in t
 failure notices, except `youtube_transcript`, which fails daily on rate limits and is a
 pipeline step in any case.
 
+## The staleness check, same evening
+
+`scripts/pipeline-staleness.sh` reads the newest date at each of five points, from
+GarminDB to the ledger, and compares neighbours. It has three exits and each is
+visible in its own way: fresh is quiet, stale emits an event that a pipeline posts
+with the reasons, and unreadable fails the job so the failure hook posts it. The
+gateway runs it daily as `health_staleness`, and at every boot. Tested against
+fixtures for a stalled ETL, a stalled collector, and a share that is not there.
+
+One thing the second restart of the evening taught. `ductile job logs` lists
+completed jobs. A job that is running now is in `job_queue`, and only that table says
+whether a restart will interrupt something. Two touchstone polls were interrupted and
+recovered at boot, which is what the design promises, but the check I ran beforehand
+had not looked in the right place.
+
 ## Open
 
-- **The stall is not a failure, so nothing announces it.** The staleness alert is
-  the guard, and it is not built.
+- **The stall is caught a day late.** The staleness check runs daily, so a job that
+  stalls after a run is reported at the next one.
 - **The scheduled job runs `~/go/bin/anam`.** A change to Anam reaches it only after
   `make install`.
 - **The failure text starts with two lines of provenance.** The cause comes third.

@@ -247,6 +247,9 @@
 
 <h2>How to tell a stage has stopped</h2>
 <p>Every stage can stop without any error. The process stays up and the gateway stays healthy. The only reliable sign is that its output stops moving. Check the newest date each stage holds.</p>
+<p>Since 30 September the ThinkPad gateway does this once a day, as job <code>health_staleness</code>, by running <code>scripts/pipeline-staleness.sh</code> from the Anam repository. It compares each stage with the one before it. When a stage is more than two days behind, a message from Anam names it. When a stage cannot be read, the job fails and Ductile Ops says so. When all is well, nothing is sent. To run it by hand:</p>
+<pre><code>~/Projects/anam/scripts/pipeline-staleness.sh</code></pre>
+<p>The queries it runs:</p>
 <pre><code># 1. Garmin collected: newest day in GarminDB
 sqlite3 "file:/mnt/Projects/healthdata/garmin/DBs/garmin_summary.db?mode=ro" \
   "SELECT MAX(day) FROM days_summary"
@@ -308,8 +311,7 @@ make install</code></pre>
 
 <h2>Still open</h2>
 <ul>
-  <li><strong>A gateway job can stall without failing.</strong> On 27 September the ThinkPad gateway could not record that a job had finished, because its state database was locked. The job stayed marked as running and the scheduler skipped it 6,840 times over three days. That is not a failure, so nothing is sent. A restart clears it. The staleness alert below is what would catch it.</li>
-  <li><strong>No staleness alert.</strong> Nothing compares the newest summarised day with the newest Garmin day.</li>
+  <li><strong>A gateway job can stall without failing.</strong> On 27 September the ThinkPad gateway could not record that a job had finished, because its state database was locked. The job stayed marked as running and the scheduler skipped it 6,840 times over three days. That is not a failure, so nothing is sent. A restart clears it. The daily staleness check is what catches it, a day late.</li>
   <li><strong>A real Withings weigh-in has not yet passed through the new trigger.</strong> A synthetic event did.</li>
   <li><strong>Day boundaries are UTC.</strong> Garmin's day is a local calendar day. Anam reads its start as midnight UTC, about ten hours early for Sydney.</li>
 </ul>

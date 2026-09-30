@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Is the health pipeline moving? (docs/pipeline.html, "How to tell a stage has stopped")
+#
+# Every stage can stop without an error: the process stays up and the gateway stays
+# healthy. The only reliable sign is that a stage's output stops moving. This reads
+# the newest date each stage holds and compares neighbours.
+#
+# Exit 0  every stage is within MAX_LAG_DAYS of the one before it (FRESH)
+# Exit 1  a stage has fallen behind (STALE); the reasons are on stdout
+# Exit 2  a stage could not be read; the check itself failed
+#
+# The ThinkPad ductile gateway runs this daily as job `health_staleness` and posts
+# stdout to Discord on exit 1. Paths can be overridden for a test.
+set -uo pipefail
+
+MAX_LAG_DAYS="${MAX_LAG_DAYS:-2}"
+GARMIN_DB="${GARMIN_DB:-/mnt/Projects/healthdata/garmin/DBs/garmin_summary.db}"
+WITHINGS_DB="${WITHINGS_DB:-/mnt/Projects/healthdata/withings/withings.db}"
+HEALTH_DB="${HEALTH_DB:-/mnt/Projects/healthdata/healthdata.db}"
+LEDGER_DB="${LEDGER_DB:-$HOME/.local/share/anam/ledger.db}"
+TODAY="${TODAY:-$(date +%F)}"
+
+# newest <label> <db> <sql>: prints the first 10 characters of the scalar (a date),
+# or exits 2 naming the stage that could not be read on stderr, which is what the
+# gateway reports as the job's error. Read-only, and bounded so a share whose server
+# has gone cannot hold the check forever.
+newest() {
+  local label=$1 db=$2 sql=$3 out
+  if [ ! -r "$db" ]; then
+    echo "CHECK FAILED: $label: cannot read $db" >&2
+    exit 2
+  fi
+  if ! out=$(timeout 30 sqlite3 -batch "file:${db}?mode=ro" "$sql" 2>&1); then
+    echo "CHECK FAILED: $label: $out" >&2
+    exit 2
+  fi
+  if [ -z "$out" ]; then
+    echo "CHECK FAILED: $label: no rows" >&2
+    exit 2
+  fi
+  printf '%s' "${out:0:10}"
+}
+
+# days_between <earlier> <later>: whole days from one calendar date to another.
+days_between() {
+  echo $(( ( $(date -d "$2" +%s) - $(date -d "$1" +%s) ) / 86400 ))
+}
+
+garmin=$(newest "Garmin collected" "$GARMIN_DB" "SELECT MAX(day) FROM days_summary") || exit $?
+withings=$(newest "Withings collected" "$WITHINGS_DB" "SELECT MAX(date) FROM measurements") || exit $?
+etl=$(newest "ETL summarised" "$HEALTH_DB" "SELECT MAX(period_start) FROM summaries WHERE period_type='day'") || exit $?
+anam_day=$(newest "Anam ingested (daily)" "$LEDGER_DB" "SELECT MAX(fact_time) FROM facet WHERE type='health.metric-group'") || exit $?
+anam_meas=$(newest "Anam ingested (Withings)" "$LEDGER_DB" "SELECT MAX(fact_time) FROM facet WHERE type='health.measurement'") || exit $?
+
+printf 'Garmin collected      %s\nWithings collected    %s\nETL summarised        %s\nAnam, daily rows      %s\nAnam, Withings rows   %s\n' \
+  "$garmin" "$withings" "$etl" "$anam_day" "$anam_meas"
+
+stale=0
+# lag <what> <earlier> <later>: reports when <later> is more than MAX_LAG_DAYS behind
+# <earlier>. Withings is not compared with today: a scale is stepped on when it is.
+lag() {
+  local what=$1 earlier=$2 later=$3 d
+  d=$(days_between "$later" "$earlier")
+  if [ "$d" -gt "$MAX_LAG_DAYS" ]; then
+    echo "STALE: $what is $d days behind"
+    stale=1
+  fi
+}
+lag "Garmin collection (against today)" "$TODAY" "$garmin"
+lag "ETL summary (against Garmin)" "$garmin" "$etl"
+lag "Anam ingest of daily rows (against the ETL)" "$etl" "$anam_day"
+lag "Anam ingest of Withings rows (against Withings)" "$withings" "$anam_meas"
+
+if [ "$stale" -eq 0 ]; then
+  echo "FRESH: every stage is within $MAX_LAG_DAYS days of the one before it"
+fi
+exit "$stale"

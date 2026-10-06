@@ -399,13 +399,15 @@ read, paid by a range-scan; it is not bought by a periodic tick.
     **either the width narrows as density rises, or re-mint becomes incremental**. Undecided, and it
     must be decided before a dense source is ingested rather than discovered afterwards. Monthly is
     chosen for the density this record has now — 31 buckets to stitch rather than 135 — and is expected
-    to be re-checked, not inherited.
+    to be re-checked, not inherited. Measured again at 11,246 live facets (2026-10-06, the first
+    mint): **34 monthly buckets, mean 330, worst 744, thinnest 19**; a dry run of every bucket took
+    0.8 s wall.
 - **The lifelong / derived view composes, it never re-folds.** A Span the person names (`--from/--to`, a
   saved bookmark, "everything") is a **derived span**: computed on demand by stitching bucket values,
   materialised only when a receipt is served. It is never pulsed and never minted.
 - **Cadence is adaptive** — time-OR-size-OR-rate, whichever trips first. A quiet bucket mints nothing.
-  The first slice mints on a **manual trigger** (`anam checkpoint`); the adaptive trigger is deferred, the
-  seam is not.
+  The first slice mints on a **manual trigger** (`anam checkpoint`, R8, `internal/mint`); the adaptive
+  trigger is deferred, the seam is not.
 
 ### The watermark and the head
 
@@ -419,8 +421,16 @@ Because those five are *all* the anam-events there are (§5), **`W` is the anam-
 (§8). Nothing takes a `seq` without moving the watermark, and nothing moves the watermark without taking a
 `seq`.
 
-Per minted span, Anam tracks `Wᵥ` — the watermark the last checkpoint actually folded — and `V`, the
-checkpoint version. Whether a span needs re-minting is then one comparison, `W > Wᵥ`.
+Per minted span, Anam records `Wᵥ` — the watermark the last checkpoint actually folded (`covers_w`) —
+and `V`, the checkpoint version, one row per mint in the `checkpoint` log; the head of a span is a view
+over the log, never a second copy. **Whether a span needs re-minting is decided by its value, not by
+bookkeeping about it**: the mint builds the bucket's value at `W` and compares its hash with the head
+checkpoint's. Equal means nothing a reader could see has changed, and nothing is written. `W > Wᵥ` is
+only *sufficient* — `W` is global, so on that test alone every ingest would re-mint every bucket — and it
+is kept as the cheap pre-filter an incremental mint would put in front of the fold. The hash is also what
+makes the moved-fact-time case (above) need no second index: a facet that left one bucket for another
+moves both hashes, and both buckets re-mint. A bucket that has emptied is found through its head and
+re-mints as the empty value, or a composed read would still list the facets that left.
 
 **Receipts** prove exactly what was served at a watermark (§9). Unserved interstitial checkpoints are
 garbage-collectable once a later checkpoint subsumes them and no receipt pins them; they were only ever

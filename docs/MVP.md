@@ -58,7 +58,7 @@ it is built in the smallest steps that yield information.
 | R5 ✅ | capture worker `health-db`, one `health.metric-group` definition | real payloads, real time semantics |
 | R6 ✅ | `changes_since` over `anam_event` | anam-time queries |
 | R7 ✅ | one projection + receipt, and the viewer that switches between them | governance made real — and *legible*: every facet can say why it is in or out, at any point in Anam's own clock |
-| R8 | mint / `checkpoint` per bucket-span → files | replay bounded, once measurable |
+| R8 ✅ | mint / `checkpoint` per bucket-span → files | replay bounded, once measurable |
 | R9 | derived insight, admitted `proposed` | the agentic path, isolated |
 
 `bp-csv` attaches at R5 whenever the export is available; it gates nothing.

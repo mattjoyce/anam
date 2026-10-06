@@ -82,6 +82,14 @@ is provenance that evaporates with the shell history. Copy `imports.example.yaml
 ./anam receipt verify <hash>       # re-derive it from the ledger, and re-hash the file
 ```
 
+**Mint.** A checkpoint is a cache of the fold, one value per monthly bucket, there to bound replay.
+
+```sh
+./anam checkpoint --dry-run         # which buckets would mint, and to what hash
+./anam checkpoint                   # mint every bucket whose value moved; unchanged ones are left alone
+./anam checkpoint list              # every checkpoint ever minted, by bucket and version
+```
+
 **Look at a projection before publishing it**, and ask why a facet is in or out:
 
 ```sh

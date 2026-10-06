@@ -37,6 +37,9 @@ type NewParams struct {
 
 	FactTime time.Time
 
+	// Series is the Definition's series stamp, or "" for a type without one.
+	Series string
+
 	// Derivation is set only on a derived facet (§11), and its presence is what makes
 	// the facet derived — there is no second field saying so.
 	Derivation *Derivation
@@ -62,6 +65,7 @@ func New(p NewParams) (Facet, error) {
 		ArtifactVersion:   p.ArtifactVersion,
 		DefinitionVersion: p.DefinitionVersion,
 		FactTime:          p.FactTime,
+		Series:            p.Series,
 		Binding:           p.Binding,
 		Provenance: Provenance{
 			Source:     p.Envelope.Source,

@@ -119,6 +119,20 @@ does not stay buried in the payload, and that promotion is load-bearing: it is w
 ordered and a span filtered without anything ever parsing a payload. Narrowed with `--from`/`--to`, which
 is a *derived span* and **not** an as-of. Contrast *Anam-time*; see *Bitemporal*, *Span*.
 
+**Series** — Which facets are repeated statements about one thing over time, so that a *Snapshot*
+can keep the latest per thing. Neither identity (every change is its own row) nor type (`med.started`
+and `med.stopped` are one regimen). A Definition declares a series **family** (`med.regimen`, named like
+a type), the ordered key pointers that name one series within it (the drug and the course), and
+whether the type **closes** the series (`med.stopped`). The gate composes `<family>:<values>` and
+stamps it on the Facet as metadata, beside *fact-time* and *classification*, so no read opens a
+payload to group. Every type in a family declares the same key; the registry refuses one keyed two ways.
+
+**Snapshot** — The last-known-value read: for a fact-time `D`, the latest facet in each *Series* at or
+before `D`, with a series whose latest is a closing type dropped and facets without a series left
+alone. A pure function of the value it is taken over, so the same answer from the canonical, from an
+*as-of* read (bitemporal), or from the composed prefix of hard checkpoints up to `D`'s bucket. The
+result is a value; serving it through a projection makes it a *Checkpoint, soft* a receipt can pin.
+
 **Facet** — Anam's atomic unit: a captured source fragment **held verbatim** plus its governing
 metadata (attributes, a payload descriptor, an opaque payload). **Not** a normalised entity. See *Facet
 Definition*.

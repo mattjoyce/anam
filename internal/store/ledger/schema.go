@@ -1,11 +1,19 @@
 package ledger
 
-// schemaVersion is pinned in ledger_meta on first Init and compared on every open.
+// schemaVersion is the version this build writes. A fresh ledger pins it in
+// ledger_meta; an older ledger reaches it by migration (migrate.go), and every open
+// compares the file's effective version against it.
 //
-// Bump it whenever a stored object is renamed or reshaped. Every object below is
-// created IF NOT EXISTS, so without the pin a renamed table would be created empty
-// beside the populated one and the open would report success.
-const schemaVersion = 1
+// Bump it whenever a stored object is renamed or reshaped, and add the step to
+// migrations. Every object below is created IF NOT EXISTS, so without the pin a
+// renamed table would be created empty beside the populated one and the open would
+// report success.
+//
+// History:
+//
+//	1  the three tables and their triggers
+//	2  facet.series, the Definition's series stamp (SELF-LOG.md §2)
+const schemaVersion = 2
 
 // The ledger's schema. Three tables, and every one of them is append-only.
 //
@@ -44,6 +52,7 @@ CREATE TABLE IF NOT EXISTS facet (
   classification     TEXT    NOT NULL,
   definition_version INTEGER NOT NULL,
   fact_time          TEXT    NOT NULL,
+  series             TEXT    NOT NULL DEFAULT '',
   binding_person_id  TEXT    NOT NULL,
   binding_assurance  TEXT    NOT NULL,
   binding_span_hint  TEXT    NOT NULL DEFAULT '',
@@ -111,9 +120,12 @@ DROP TABLE IF EXISTS anam_event;
 DROP TABLE IF EXISTS ledger_meta;
 `
 
-// The ledger_meta keys.
+// The ledger_meta keys. schema_version is the version the file was created at and
+// never changes, because ledger_meta is write-once; each migration applied since adds
+// a schema_migration:<n> key, and the effective version is the highest of them all.
 const (
-	metaSchemaVersion = "schema_version"
-	metaPersonID      = "person_id"
-	metaLedgerID      = "ledger_id"
+	metaSchemaVersion   = "schema_version"
+	metaPersonID        = "person_id"
+	metaLedgerID        = "ledger_id"
+	metaMigrationPrefix = "schema_migration:"
 )

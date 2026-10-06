@@ -28,10 +28,18 @@ each immutable, each a row in the source. The kind of change goes in the **facet
 metadata and no read opens a payload: `med.started`, `med.dose-changed`, `med.stopped`.
 
 **The series key says which facts are the same thing over time.** Identity is too fine (every change
-has its own id) and type is too coarse. A Definition declares the pointers that name the series, the
-drug and the course, and the gate stamps the series into metadata at capture, as it stamps
-classification today. A Definition also declares which type **closes** a series (`med.stopped`), so
-"a stop ends the regimen" is data in the Definition, not a rule in the read.
+has its own id) and type is too coarse. A Definition declares a series **family** and the pointers
+that name one series within it, the drug and the course, and the gate stamps `<family>:<values>` into
+metadata at capture, as it stamps classification today. A Definition also declares whether its type
+**closes** a series (`med.stopped`), so "a stop ends the regimen" is data in the Definition, not a rule
+in the read. Built 2026-10-07 (card 15; the design pass is `journal/notes/series-key.md`):
+
+```json
+"series": {"name": "med.regimen", "key": ["/drug", "/course"], "closes": false}
+```
+
+Every type in a family declares the same key, and the registry refuses a family keyed two ways at load.
+`fold.Snapshot` is the read; the registry answers which types close.
 
 **The snapshot read.** For a date D: take every facet with fact-time at or before D, group by series,
 keep the latest in each, drop the series whose latest is a closing type. What remains is what was true
@@ -142,7 +150,8 @@ by status from world facts. Do that on demand, not by default.
 
 ## 9. Open questions
 
-- Whether a series key is one declaration or two (group and course). Medications need the course.
+- ~~Whether a series key is one declaration or two (group and course).~~ One declaration, with a
+  family name and an ordered key; the course is a key element, so a restart is a new series (2026-10-07).
 - Whether `travel.arrived` closes a trip only when the destination is home, which reads a payload,
   or whether the trip is closed by a distinct `travel.returned` type. Prefer the type.
 - Where the self-log file lives and how it reaches the ThinkPad gateway's hourly ingest.

@@ -70,6 +70,11 @@ func (d Definition) checkNoExtras(doc any) error {
 	for _, ptr := range d.IdentityKey {
 		named[topToken(ptr)] = true
 	}
+	if d.Series != nil {
+		for _, ptr := range d.Series.Key {
+			named[topToken(ptr)] = true
+		}
+	}
 	for k := range obj {
 		if !named[k] {
 			return fmt.Errorf("%w: unexpected field %q (strict mode)", ErrNotCompliant, k)
@@ -113,19 +118,36 @@ func (d Definition) timeAt(doc any, tf TimeField) (time.Time, error) {
 // identity, never content (§6a): "<source>:<v1>[:<v2>...]" over the identity
 // pointers' values, in declared order.
 func (d Definition) SourceRef(source string, doc any) (string, error) {
-	parts := make([]string, 0, len(d.IdentityKey)+1)
-	parts = append(parts, source)
-	for _, ptr := range d.IdentityKey {
+	return compose("identity", source, d.IdentityKey, doc)
+}
+
+// SeriesOf composes the series stamp from the Definition's series key:
+// "<name>:<v1>[:<v2>...]" over the key pointers' values, in declared order. It is ""
+// for a type without a series, and an error when a key pointer does not resolve: a
+// row that cannot say which series it belongs to is not compliant.
+func (d Definition) SeriesOf(doc any) (string, error) {
+	if d.Series == nil {
+		return "", nil
+	}
+	return compose("series", d.Series.Name, d.Series.Key, doc)
+}
+
+// compose joins a prefix and the scalar values at the pointers with ':'. Both the
+// source_ref and the series stamp are this shape, so they are built by one function.
+func compose(what, prefix string, pointers []string, doc any) (string, error) {
+	parts := make([]string, 0, len(pointers)+1)
+	parts = append(parts, prefix)
+	for _, ptr := range pointers {
 		v, err := resolve(doc, ptr)
 		if err != nil {
-			return "", fmt.Errorf("%w: identity %s: %v", ErrNotCompliant, ptr, err)
+			return "", fmt.Errorf("%w: %s %s: %v", ErrNotCompliant, what, ptr, err)
 		}
 		s, err := scalarString(v)
 		if err != nil {
-			return "", fmt.Errorf("%w: identity %s: %v", ErrNotCompliant, ptr, err)
+			return "", fmt.Errorf("%w: %s %s: %v", ErrNotCompliant, what, ptr, err)
 		}
 		if s == "" {
-			return "", fmt.Errorf("%w: identity %s is empty", ErrNotCompliant, ptr)
+			return "", fmt.Errorf("%w: %s %s is empty", ErrNotCompliant, what, ptr)
 		}
 		parts = append(parts, s)
 	}

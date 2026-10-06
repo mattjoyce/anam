@@ -43,6 +43,23 @@ type TimeField struct {
 	Layout  string `json:"layout"`
 }
 
+// Series says which facets of this type are repeated statements about one thing
+// over time, so that a snapshot read can keep the latest per thing (SELF-LOG.md §2).
+// Identity is too fine for that (every change is its own row) and type is too coarse
+// (`med.started` and `med.stopped` are one regimen).
+//
+// Name is the family the series belongs to, dotted and namespaced like a facet type;
+// every type that takes part in one family declares the same Name and the same Key,
+// and the registry refuses a family declared two ways. Key is the ordered pointers
+// whose values name one series within the family, composed by the gate as
+// "<name>:<v1>[:<v2>...]" and stamped onto the facet as metadata, beside
+// classification. Closes says a facet of this type ends the series it belongs to.
+type Series struct {
+	Name   string   `json:"name"`
+	Key    []string `json:"key"`
+	Closes bool     `json:"closes"`
+}
+
 // Definition is the parsed, validated contract for one facet type at one version.
 type Definition struct {
 	Type           facet.Type
@@ -64,6 +81,9 @@ type Definition struct {
 
 	// MinAssurance is the association floor: review < medium < high.
 	MinAssurance facet.BindingAssurance
+
+	// Series is nil for a type whose facets stand alone. See Series.
+	Series *Series
 
 	// The schema half.
 	Required             []string
@@ -92,6 +112,7 @@ type manifest struct {
 		} `json:"time_semantics"`
 		IdentityKey         []string `json:"identity_key"`
 		MinBindingAssurance string   `json:"min_binding_assurance"`
+		Series              *Series  `json:"series"`
 	} `json:"meta"`
 	Schema struct {
 		Required   []string `json:"required"`
@@ -124,6 +145,7 @@ func Parse(raw []byte) (Definition, error) {
 		FactTime:       m.Meta.TimeSemantics.FactTime,
 		IdentityKey:    m.Meta.IdentityKey,
 		MinAssurance:   facet.BindingAssurance(m.Meta.MinBindingAssurance),
+		Series:         m.Meta.Series,
 		Required:       m.Schema.Required,
 	}
 
@@ -191,6 +213,25 @@ func (d Definition) validate() error {
 	for p := range d.Properties {
 		if err := checkPointerSyntax(p); err != nil {
 			return fmt.Errorf("%w: %v", ErrBadManifest, err)
+		}
+	}
+	return d.validateSeries()
+}
+
+func (d Definition) validateSeries() error {
+	s := d.Series
+	if s == nil {
+		return nil
+	}
+	if !facet.Type(s.Name).Valid() {
+		return fmt.Errorf("%w: series.name %q is not a valid namespaced name", ErrBadManifest, s.Name)
+	}
+	if len(s.Key) == 0 {
+		return fmt.Errorf("%w: series.key must declare at least one pointer", ErrBadManifest)
+	}
+	for _, p := range s.Key {
+		if err := checkPointerSyntax(p); err != nil {
+			return fmt.Errorf("%w: series.key: %v", ErrBadManifest, err)
 		}
 	}
 	return nil

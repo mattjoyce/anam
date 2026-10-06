@@ -107,7 +107,8 @@ governing metadata* — deliberately **not** a normalised domain entity. Three p
 
 - **(a) Attributes about itself** — `id`; `type`; `confidence`; `classification`
   (`Normal`/`Confidential`/`Sensitive`); `artifact_version`; `definition_version`;
-  `fact_time`; `binding` + a derived `binding_assurance`; and `provenance` — whose optional
+  `fact_time`; `series` (the Definition's series stamp, empty for a facet that stands alone;
+  §5a); `binding` + a derived `binding_assurance`; and `provenance` — whose optional
   `derivation` is the *only* mark distinguishing an Anam-authored finding from a captured fact (§11).
 - **(b) Payload descriptor** — the `source_schema` + `schema_version` (self-describing), a
   `content_hash`, the `payload_kind` (`verbatim` | `reference`), and `media_type`.
@@ -254,10 +255,17 @@ The consequence is a division of labour worth stating plainly:
 Anam-time gains real resolution only when ingest becomes incremental — worth knowing before minting
 (§7), because checkpoints are cut against watermarks.
 
-> **Not yet built, and named so it is not assumed:** "the facts as of January" most often means *the
-> latest reading before January*, one per identity — a last-known-value read. A derived span gives every
-> reading up to January, which is a different answer. The canonical is already ordered by
-> `(fact_time, facet_id)`, so the fold is cheap; it simply does not exist yet.
+> **The last-known-value read is the snapshot** (`fold.Snapshot`, built 2026-10-07; `SELF-LOG.md` §2).
+> "The facts as of January" most often means *the latest statement before January about each thing*,
+> and "each thing" is neither an identity (every change is its own row) nor a type (`med.started` and
+> `med.stopped` are one regimen). It is the **series**: a Definition declares a series family, the key
+> pointers that name one series within it, and whether its type **closes** the series. The gate composes
+> `<family>:<values>` and stamps it on the facet as metadata, beside `fact_time`, so the snapshot groups
+> on it without opening a payload. The snapshot at `D` keeps the latest entry per series at or before
+> `D`, drops a series whose latest is a closing type, and leaves entries without a series alone. It is
+> a function of the value it is given: over the canonical, over an as-of read (bitemporal), or over the
+> composed prefix of hard checkpoints up to `D`'s bucket, which yields the same value (§7). A derived span
+> still gives every reading up to January, which is a different answer.
 
 A **Facet event** is the domain fact — immutable, carrying its own fact-time, true independently of
 Anam; placed on the timeline at its **fact-time**. An **anam-event** asserts that Anam's
@@ -501,7 +509,7 @@ Grain is **hybrid at the verbatim line** (ADR 0031):
 ledger.db
   facet        PRIMARY KEY (facet_id, artifact_version)   one row per artifact version
   anam_event   PRIMARY KEY (seq)                          one row per anam-event
-  ledger_meta  PRIMARY KEY (key)                          schema_version, person_id, ledger_id
+  ledger_meta  PRIMARY KEY (key)                          schema_version, person_id, ledger_id, schema_migration:<n>
 ```
 
 There is no watermark row. `W` is `MAX(seq)`, and a trigger lets an anam-event take only the `seq` after
@@ -528,7 +536,12 @@ the unit SQLite deletes, locks and opens read-only by:
   ledger could have been inside it.
 
 The ledger's `person_id` is pinned in `ledger_meta` at `init`, and a ledger pinned to another person is
-refused on every open. The operational store in turn pins the `ledger_id` it was derived from: a rebuilt
+refused on every open. `ledger_meta` is write-once like every other ledger row, so the schema version is
+not a pin that moves: `schema_version` is the version the file was **created** at, each migration applied
+since adds a `schema_migration:<n>` row beside it, and the file's effective version is the highest of
+them. A migration only ever adds (a column with a default, an index), never rewrites a row, and runs as
+one transaction with its record, so a crash leaves the file at the version before it. `anam init` is the
+one place a ledger's schema moves; every other opener refuses a file behind or ahead of its build. The operational store in turn pins the `ledger_id` it was derived from: a rebuilt
 ledger gets a new id, so a tracking file left over from an earlier ledger is refused instead of being read
 as an index of the new one.
 
@@ -765,7 +778,6 @@ one or two projections plus a CLI timeline viewer, manual mint, and receipts. Re
   precisely because Anam owns no facts and can re-ingest.
 - **Extensibility to non-health facets** (`calendar.*`, `mail.*`, `note.*`) — the model already admits
   them; they are simply not built yet.
-- **Last-known-value reads** (§5a) — "the facts as of January" usually means *the latest reading before
-  January, one per identity*, and a derived span answers the different question "every reading up to
-  January". The canonical is already ordered by `(fact_time, facet_id)`, so the fold is cheap; it is
-  unbuilt, not hard. Named here so the span is not mistaken for it.
+- **Last-known-value reads** (§5a) — built as the snapshot over the series stamp (2026-10-07). Not yet
+  exposed on `timeline` or as a snapshot projection template; and a Definition that changes its series
+  key reaches only facets admitted after the change, because admission is idempotent on content.

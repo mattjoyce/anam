@@ -224,6 +224,11 @@ type Facet struct {
 	// the AnamEvents, which is where knowing-about belongs.
 	FactTime time.Time
 
+	// Series names the thing this facet is one statement about over time, composed by
+	// the type's Definition at admission ("<family>:<key values>") so that a snapshot
+	// read can group without opening a payload. Empty for a facet that stands alone.
+	Series string
+
 	Binding    Binding
 	Provenance Provenance
 

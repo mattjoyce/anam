@@ -20,13 +20,13 @@ import (
 // facetColumns is the one column list the insert and every select share, so the
 // writer and the scanner cannot disagree about order.
 const facetColumns = `facet_id, artifact_version, type, confidence, classification,
-	definition_version, fact_time,
+	definition_version, fact_time, series,
 	binding_person_id, binding_assurance, binding_span_hint,
 	prov_source, prov_injector, prov_source_ref, prov_method, prov_model, prov_watermark,
 	source_schema, schema_version, content_hash, payload_kind, media_type, payload`
 
 const insertFacetSQL = `INSERT INTO facet (` + facetColumns + `)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 const eventColumns = `seq, kind, facet_id, anam_time, artifact_version, prior_artifact_version`
 
@@ -52,7 +52,7 @@ func insertFacet(ctx context.Context, x execer, f facet.Facet) error {
 	}
 	_, err := x.ExecContext(ctx, insertFacetSQL,
 		f.ID, f.ArtifactVersion, string(f.Type), f.Confidence, string(f.Classification),
-		f.DefinitionVersion, clock.Format(f.FactTime),
+		f.DefinitionVersion, clock.Format(f.FactTime), f.Series,
 		f.Binding.PersonID, string(f.Binding.Assurance), f.Binding.SpanHint,
 		f.Provenance.Source, f.Provenance.Injector, f.Provenance.SourceRef, method, model, watermark,
 		f.Descriptor.SourceSchema, f.Descriptor.SchemaVersion, f.Descriptor.ContentHash,
@@ -84,7 +84,7 @@ func scanFacet(s scanner) (facet.Facet, error) {
 	)
 	err := s.Scan(
 		&f.ID, &f.ArtifactVersion, &typ, &f.Confidence, &class,
-		&f.DefinitionVersion, &factTime,
+		&f.DefinitionVersion, &factTime, &f.Series,
 		&f.Binding.PersonID, &assurance, &f.Binding.SpanHint,
 		&f.Provenance.Source, &f.Provenance.Injector, &f.Provenance.SourceRef, &method, &model, &watermark,
 		&f.Descriptor.SourceSchema, &f.Descriptor.SchemaVersion, &f.Descriptor.ContentHash,

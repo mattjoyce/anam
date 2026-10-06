@@ -27,10 +27,16 @@ import (
 // it; and the answer is the Definition's, applied at capture, so re-ingest reproduces
 // it. A projection reads these fields and never Payload — filtering is on metadata
 // only, and a facet is included or excluded whole.
+//
+// Series is the Definition's stamp, applied at capture like Classification, and it
+// is what the snapshot read groups on. It is omitted when empty so that an entry
+// without a series serialises exactly as it did before the field existed: the
+// checkpoint hashes of a record with no series types do not move.
 type Entry struct {
 	FacetID        string               `json:"facet_id"`
 	Type           facet.Type           `json:"type"`
 	FactTime       string               `json:"fact_time"`
+	Series         string               `json:"series,omitempty"`
 	Source         string               `json:"source"`
 	SourceRef      string               `json:"source_ref"`
 	Status         facet.Status         `json:"status"`
@@ -45,6 +51,7 @@ func entryOf(f facet.Facet, s State) Entry {
 		FacetID:        f.ID,
 		Type:           f.Type,
 		FactTime:       clock.Format(f.FactTime),
+		Series:         f.Series,
 		Source:         f.Provenance.Source,
 		SourceRef:      f.Provenance.SourceRef,
 		Status:         s.Status,

@@ -185,27 +185,39 @@ func dsn(path, mode string) string {
 }
 
 // Init idempotently prepares the ledger: it applies the schema and pins the schema
-// version, the person, and a fresh ledger id.
+// version, the person, and a fresh ledger id. A ledger written by an earlier schema
+// is migrated forward here, step by step (migrate.go); this is the one place a
+// ledger's schema moves, and it only ever adds.
 //
 // A file that already holds tables but no ledger_meta is somebody else's database,
 // most plausibly the operational store reached through a mistyped path. Init refuses
 // it with ErrSchemaMismatch and creates nothing in it.
 func (l *Ledger) Init(ctx context.Context) error {
+	from, err := l.initPins(ctx)
+	if err != nil {
+		return err
+	}
+	return l.migrate(ctx, from)
+}
+
+// initPins applies the base schema and the pins in one transaction and returns the
+// file's effective schema version as it stood after them.
+func (l *Ledger) initPins(ctx context.Context) (int, error) {
 	tx, err := l.db.BeginTx(ctx, nil)
 	if err != nil {
-		return classify("begin init", err)
+		return 0, classify("begin init", err)
 	}
 	defer func() { _ = tx.Rollback() }() // no-op after Commit
 
 	foreign, err := holdsForeignTables(ctx, tx)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if foreign {
-		return fmt.Errorf("%w: %s holds tables but is not a ledger", ErrSchemaMismatch, l.path)
+		return 0, fmt.Errorf("%w: %s holds tables but is not a ledger", ErrSchemaMismatch, l.path)
 	}
 	if _, err := tx.ExecContext(ctx, schema); err != nil {
-		return classify("apply schema", err)
+		return 0, classify("apply schema", err)
 	}
 
 	for _, p := range []struct{ key, want string }{
@@ -215,16 +227,24 @@ func (l *Ledger) Init(ctx context.Context) error {
 	} {
 		stored, err := pin(ctx, tx, p.key, p.want)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		if err := checkPin(p.key, stored, p.want); err != nil {
-			return err
+			return 0, err
 		}
 	}
-	if err := tx.Commit(); err != nil {
-		return classify("commit init", err)
+	pins, err := readPins(ctx, tx)
+	if err != nil {
+		return 0, err
 	}
-	return nil
+	have, err := effectiveVersion(pins)
+	if err != nil {
+		return 0, fmt.Errorf("%w: %s: %v", ErrSchemaMismatch, l.path, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, classify("commit init", err)
+	}
+	return have, nil
 }
 
 // holdsForeignTables reports whether the file has tables of its own but no
@@ -259,45 +279,28 @@ func pin(ctx context.Context, tx *sql.Tx, key, value string) (string, error) {
 }
 
 // checkPin compares a stored pin against what this build and this config expect. The
-// ledger id is generated, so whatever is stored is right.
+// ledger id is generated, so whatever is stored is right, and the schema version is
+// judged by effectiveVersion, after the migration records are counted.
 func checkPin(key, stored, want string) error {
-	switch {
-	case key == metaLedgerID || stored == want:
-		return nil
-	case key == metaPersonID:
+	if key == metaPersonID && stored != want {
 		return fmt.Errorf("%w: ledger is pinned to %q, config says %q", ErrPersonMismatch, stored, want)
-	default:
-		return fmt.Errorf("%w: ledger holds schema %s, this build writes %s. Migrate it or start a new ledger at another path. Do not delete it, it is the record",
-			ErrSchemaMismatch, stored, want)
 	}
+	return nil
 }
 
 // verify checks an opened file is an initialised ledger for this person and this
 // schema. It writes nothing, so it runs on a read-only handle too.
 func (l *Ledger) verify(ctx context.Context) error {
-	rows, err := l.db.QueryContext(ctx, `SELECT key, value FROM ledger_meta`)
+	pins, err := readPins(ctx, l.db)
 	if err != nil {
 		if isNoSuchTable(err) {
 			return fmt.Errorf("%w: %s is not a ledger", ErrNotInitialised, l.path)
 		}
 		return classify("read pins", err)
 	}
-	defer func() { _ = rows.Close() }()
-
-	pins := map[string]string{}
-	for rows.Next() {
-		var k, v string
-		if err := rows.Scan(&k, &v); err != nil {
-			return classify("scan pin", err)
-		}
-		pins[k] = v
-	}
-	if err := rows.Err(); err != nil {
-		return classify("read pins", err)
-	}
 
 	for _, p := range []struct{ key, want string }{
-		{metaSchemaVersion, strconv.Itoa(schemaVersion)},
+		{metaSchemaVersion, ""},
 		{metaPersonID, l.person},
 		{metaLedgerID, ""},
 	} {
@@ -309,7 +312,11 @@ func (l *Ledger) verify(ctx context.Context) error {
 			return err
 		}
 	}
-	return nil
+	have, err := effectiveVersion(pins)
+	if err != nil {
+		return fmt.Errorf("%w: %s: %v", ErrSchemaMismatch, l.path, err)
+	}
+	return checkVersion(have)
 }
 
 // ID returns the ledger's identity: a UUID generated when the ledger was initialised.

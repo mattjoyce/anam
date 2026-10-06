@@ -38,6 +38,7 @@ type prepared struct {
 	hash      string
 	facetID   string
 	factTime  time.Time
+	series    string
 }
 
 // CommitBatch admits envelopes in one transaction, over one contiguous block of seqs.
@@ -196,6 +197,10 @@ func (g *Gate) prepare(env facet.Envelope, binding facet.Binding) (prepared, err
 	if err != nil {
 		return prepared{}, err
 	}
+	series, err := d.SeriesOf(doc)
+	if err != nil {
+		return prepared{}, err
+	}
 	if ref != env.SourceRef {
 		return prepared{}, fmt.Errorf("%w: envelope says %q, identity_key composes %q",
 			ErrIdentityMismatch, env.SourceRef, ref)
@@ -207,6 +212,7 @@ func (g *Gate) prepare(env facet.Envelope, binding facet.Binding) (prepared, err
 	return prepared{
 		env: env, binding: binding, def: d, canonical: canonical,
 		hash: facet.ContentHash(canonical), facetID: facet.NewID(ref), factTime: factTime,
+		series: series,
 	}, nil
 }
 
@@ -220,6 +226,7 @@ func (g *Gate) build(p prepared, version int) (facet.Facet, error) {
 		MediaType:  p.def.MediaType,
 		Confidence: 1,
 		FactTime:   p.factTime,
+		Series:     p.series,
 	})
 }
 

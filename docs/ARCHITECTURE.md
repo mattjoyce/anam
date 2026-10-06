@@ -113,8 +113,12 @@ governing metadata* — deliberately **not** a normalised domain entity. Three p
 - **(b) Payload descriptor** — the `source_schema` + `schema_version` (self-describing), a
   `content_hash`, the `payload_kind` (`verbatim` | `reference`), and `media_type`.
 - **(c) Payload** — *either* the **verbatim structured body** (the source fragment, held opaque) *or* a
-  **native reference** to a binary in its source. The descriptor says which. (Anam's first slice is all
-  `verbatim`; references are reserved.)
+  **native reference** to a binary in its source. The descriptor says which. A reference is JSON like
+  any other payload (`path`, `sha256`, `media_type`, `bytes`, `date`), so the descriptor describes the
+  payload it holds — `application/json`, kind `reference`, hash over the reference — and the reference
+  describes what it points at. One integrity invariant for both kinds. The first reference type is
+  `doc.reference`, from the `documents` folder source (built 2026-10-07;
+  `journal/notes/reference-payloads.md`).
 
 Two rules make this safe:
 
@@ -773,7 +777,9 @@ one or two projections plus a CLI timeline viewer, manual mint, and receipts. Re
 
 **Deferred, not forgotten:**
 
-- **Binary / native-reference facets** — reserved; no binary source in the first slice.
+- **Binary / native-reference facets** — `doc.reference` is built over a folder source (2026-10-07).
+  Anam never serves the bytes; the inspector shows the path and hash. Retraction when a file is
+  removed is card 17; EXIF is not read, a sidecar carries the date.
 - **Adaptive mint cadence (time-OR-size-OR-rate)** — manual `checkpoint` only; the bucket-span seam and
   the `W`/`Wᵥ` machinery exist from R2, the trigger does not.
 - **Sealed projections / a seal point** — receipts suffice for now.

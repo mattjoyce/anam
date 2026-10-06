@@ -104,6 +104,8 @@ it until now. Rules:
   file is a new facet and the old one is tombstoned, which is honest.
 - **Fact-time comes from outside the bytes**: EXIF, the document's own date, or the self-log row
   that points at it. If fact-time lived only inside the image, every read would open every image.
+  Built as a sidecar, `<file>.meta.yaml` with `date: YYYY-MM-DD`, beside the file; a file without
+  one is refused and the message names the sidecar to write (`INBOX.md`).
 
 **Extracted data is a second facet, derived.** OCR or a model reading a blood test is fallible, so
 what it produces re-enters through the same gate as a derived facet (§11): admitted `proposed`, its
@@ -138,7 +140,8 @@ by status from world facts. Do that on demand, not by default.
    `snapshot`), `timeline --at`. The inspector's projection page shows the same verdicts.
 4. ✅ **Life events** as self-log types: donation, illness, hangover, travel, gym (card 27, 2026-10-07;
    illness and travel are series, closed by `illness.ended` and `travel.returned`).
-5. **Reference payload kind** and a folder source (card 24).
+5. ✅ **Reference payload kind** and a folder source (card 24, 2026-10-07): `doc.reference`, the
+   `documents` worker over a folder with `<file>.meta.yaml` sidecars carrying the date.
 6. **Lab results** from text files first, then images via a `proposed` extractor (card 25).
 7. ✅ **Compliance estimates** (card 26, 2026-10-07): `med.compliance-estimate`, the estimate bounded
    to (0, 1] at the gate; `internal/regimen.Expected` is the soft schedule, and a test holds that the

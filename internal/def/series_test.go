@@ -145,3 +145,15 @@ func TestRegistry_RefusesAFamilyKeyedTwoWays(t *testing.T) {
 		t.Error("Closes: only med.stopped closes")
 	}
 }
+
+func TestParse_PayloadKind(t *testing.T) {
+	t.Parallel()
+	ref := strings.Replace(medStartedManifest, `"validation_mode": "lenient",`, `"validation_mode": "lenient", "payload_kind": "reference",`, 1)
+	if d := mustParse(t, ref); d.PayloadKind != "reference" {
+		t.Errorf("payload_kind = %q", d.PayloadKind)
+	}
+	bad := strings.Replace(medStartedManifest, `"validation_mode": "lenient",`, `"validation_mode": "lenient", "payload_kind": "pointer",`, 1)
+	if _, err := def.Parse([]byte(bad)); !errors.Is(err, def.ErrBadManifest) {
+		t.Errorf("payload_kind pointer = %v, want ErrBadManifest", err)
+	}
+}

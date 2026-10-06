@@ -70,6 +70,11 @@ type Definition struct {
 	SchemaVersion  int
 	MediaType      string
 
+	// PayloadKind says whether facets of this type hold their source fragment or a
+	// native reference to a binary that stays in its source (§3b). Verbatim unless
+	// the manifest says reference.
+	PayloadKind facet.PayloadKind
+
 	// FactTime says where in the payload the fact's own clock lives — when it was true
 	// in the world. It is required, and it is the only clock a Definition declares:
 	// Anam's clock is Anam's to keep, not the source's to assert.
@@ -107,6 +112,7 @@ type manifest struct {
 		SourceSchema      string `json:"source_schema"`
 		SchemaVersion     int    `json:"schema_version"`
 		MediaType         string `json:"media_type"`
+		PayloadKind       string `json:"payload_kind"`
 		TimeSemantics     struct {
 			FactTime TimeField `json:"fact_time"`
 		} `json:"time_semantics"`
@@ -142,6 +148,7 @@ func Parse(raw []byte) (Definition, error) {
 		SourceSchema:   m.Meta.SourceSchema,
 		SchemaVersion:  m.Meta.SchemaVersion,
 		MediaType:      m.Meta.MediaType,
+		PayloadKind:    facet.PayloadKind(m.Meta.PayloadKind),
 		FactTime:       m.Meta.TimeSemantics.FactTime,
 		IdentityKey:    m.Meta.IdentityKey,
 		MinAssurance:   facet.BindingAssurance(m.Meta.MinBindingAssurance),
@@ -155,6 +162,9 @@ func Parse(raw []byte) (Definition, error) {
 	}
 	if d.MediaType == "" {
 		d.MediaType = "application/json"
+	}
+	if d.PayloadKind == "" {
+		d.PayloadKind = facet.PayloadVerbatim
 	}
 	if m.Meta.MinBindingAssurance == "" {
 		d.MinAssurance = facet.AssuranceMedium
@@ -198,6 +208,8 @@ func (d Definition) validate() error {
 		return fmt.Errorf("%w: validation_mode %q", ErrBadManifest, d.Mode)
 	case d.SourceSchema == "":
 		return fmt.Errorf("%w: source_schema is required", ErrBadManifest)
+	case !d.PayloadKind.Valid():
+		return fmt.Errorf("%w: payload_kind %q", ErrBadManifest, d.PayloadKind)
 	case d.FactTime.Pointer == "" || d.FactTime.Layout == "":
 		return fmt.Errorf("%w: time_semantics.fact_time needs pointer and layout", ErrBadManifest)
 	case len(d.IdentityKey) == 0:

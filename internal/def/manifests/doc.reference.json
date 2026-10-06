@@ -1,0 +1,21 @@
+{
+  "meta": {
+    "facet_type": "doc.reference",
+    "definition_version": 1,
+    "classification": "Sensitive",
+    "validation_mode": "lenient",
+    "source_schema": "documents/reference",
+    "payload_kind": "reference",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02"}
+    },
+    "identity_key": ["/path"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "required": ["/path", "/sha256", "/media_type", "/bytes", "/date"],
+    "properties": {
+      "/sha256": {"pattern": "^[0-9a-f]{64}$"}
+    }
+  }
+}

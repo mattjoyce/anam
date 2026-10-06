@@ -114,3 +114,24 @@ func TestBundled_LifeEventTypes(t *testing.T) {
 		}
 	}
 }
+
+// doc.reference is the first reference-kind type: the descriptor says the payload is
+// a pointer, and the Definition requires what the pointer must say.
+func TestBundled_DocReferenceIsAReference(t *testing.T) {
+	t.Parallel()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatalf("Bundled: %v", err)
+	}
+	d, ok := reg.Lookup("doc.reference")
+	if !ok {
+		t.Fatal("no bundled definition for doc.reference")
+	}
+	if d.PayloadKind != facet.PayloadReference || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/path" {
+		t.Errorf("doc.reference = kind %s identity %v", d.PayloadKind, d.IdentityKey)
+	}
+	bp, _ := reg.Lookup("health.blood-pressure")
+	if bp.PayloadKind != facet.PayloadVerbatim {
+		t.Errorf("a type that says nothing is verbatim, got %s", bp.PayloadKind)
+	}
+}

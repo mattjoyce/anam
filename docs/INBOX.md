@@ -67,6 +67,29 @@ was I on"; `anam serve meds` publishes the current regimen with a receipt.
     course: 1
 ```
 
+## Documents as facts of their own
+
+A processed document can also be a facet: `doc.reference`, whose payload is the path, the sha256,
+the media type and size, and the date from a sidecar. The bytes stay in the folder. Declare the
+folder once in `imports.yaml`:
+
+```yaml
+  - source: documents
+    path: /mnt/Projects/anam/private/processed
+```
+
+and give every file a sidecar beside it, `<file>.meta.yaml`:
+
+```yaml
+date: 2026-01-30          # the document's own date, not the day it was scanned
+title: Lipid studies      # anything else worth saying stays in the payload too
+```
+
+A file with no sidecar refuses the whole scan, and the hourly ingest with it, so add the sidecars
+before the import. Identity is the relative path, so a renamed file is a new facet and the old one
+stands (retraction is card 17); changed bytes supersede. `.meta.yaml` files, dot-files and
+dot-folders are skipped.
+
 ## Extractors
 
 **ACL pathology PDFs** (Australian Clinical Labs, PDFsharp e-results) are deterministic:

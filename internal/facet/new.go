@@ -25,12 +25,13 @@ type NewParams struct {
 	ArtifactVersion   int
 	DefinitionVersion int
 
-	// Classification, SourceSchema, SchemaVersion and MediaType come from the type's
-	// Facet Definition.
+	// Classification, SourceSchema, SchemaVersion, MediaType and PayloadKind come
+	// from the type's Facet Definition. An empty PayloadKind is verbatim.
 	Classification Classification
 	SourceSchema   string
 	SchemaVersion  int
 	MediaType      string
+	PayloadKind    PayloadKind
 
 	// Confidence is (0, 1]; captured facts are 1.
 	Confidence float64
@@ -50,9 +51,13 @@ type NewParams struct {
 // (§6a: identity says which fact, the hash says whether it changed — New guarantees
 // neither can be asserted independently of what they describe).
 //
-// The first slice is entirely verbatim, so New always sets PayloadKind accordingly;
-// native references are reserved (§13) and will earn a parameter when they earn code.
+// A reference facet is built the same way: its payload is the native reference,
+// JSON like any other, and the hash is over that. The descriptor's kind says the
+// payload is a pointer; the pointer says what it points at (§3b).
 func New(p NewParams) (Facet, error) {
+	if p.PayloadKind == "" {
+		p.PayloadKind = PayloadVerbatim
+	}
 	if err := p.validate(); err != nil {
 		return Facet{}, err
 	}
@@ -77,7 +82,7 @@ func New(p NewParams) (Facet, error) {
 			SourceSchema:  p.SourceSchema,
 			SchemaVersion: p.SchemaVersion,
 			ContentHash:   ContentHash(p.Payload),
-			PayloadKind:   PayloadVerbatim,
+			PayloadKind:   p.PayloadKind,
 			MediaType:     p.MediaType,
 		},
 		Payload: p.Payload,
@@ -107,6 +112,8 @@ func (p NewParams) validate() error {
 		return fmt.Errorf("%w: schema version %d", ErrInvalidFacet, p.SchemaVersion)
 	case p.MediaType == "":
 		return fmt.Errorf("%w: media type is required", ErrInvalidFacet)
+	case !p.PayloadKind.Valid():
+		return fmt.Errorf("%w: payload kind %q", ErrInvalidFacet, p.PayloadKind)
 	case p.Confidence <= 0 || p.Confidence > 1:
 		return fmt.Errorf("%w: confidence %v is outside (0, 1]", ErrInvalidFacet, p.Confidence)
 	case p.FactTime.IsZero():

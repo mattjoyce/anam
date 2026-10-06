@@ -223,7 +223,7 @@ func (g *Gate) build(p prepared, version int) (facet.Facet, error) {
 		ArtifactVersion: version, DefinitionVersion: p.def.Version,
 		Classification: p.def.Classification,
 		SourceSchema:   p.def.SourceSchema, SchemaVersion: p.def.SchemaVersion,
-		MediaType:  p.def.MediaType,
+		MediaType: p.def.MediaType, PayloadKind: p.def.PayloadKind,
 		Confidence: 1,
 		FactTime:   p.factTime,
 		Series:     p.series,

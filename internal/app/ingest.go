@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mattjoyce/anam/internal/capture/bpcsv"
+	"github.com/mattjoyce/anam/internal/capture/documents"
 	"github.com/mattjoyce/anam/internal/capture/healthdb"
 	"github.com/mattjoyce/anam/internal/capture/records"
 	"github.com/mattjoyce/anam/internal/capture/withings"
@@ -41,6 +42,9 @@ var mvpScopes = gate.StaticScopes{
 		"travel.departed", "travel.arrived", "travel.returned",
 		"visit.clinic", "gym.visit", bpcsv.Type,
 	},
+	// documents is a folder of files whose bytes stay there: each becomes a
+	// doc.reference whose payload is the path, the hash and the sidecar's date.
+	documents.Source: {documents.Type},
 }
 
 func initCmd(cfgPath *string) *cobra.Command {
@@ -225,9 +229,11 @@ func scanImport(ctx context.Context, imp config.Import, cfg config.Config) ([]fa
 		return withings.Scan(scanCtx, imp.Path, cfg.PersonID)
 	case records.Source:
 		return records.Scan(imp.Path, cfg.PersonID)
+	case documents.Source:
+		return documents.Scan(imp.Path, cfg.PersonID)
 	default:
-		return nil, fmt.Errorf("import names unknown source %q (have: %s, %s, %s, %s)",
-			imp.Source, healthdb.Source, bpcsv.Source, withings.Source, records.Source)
+		return nil, fmt.Errorf("import names unknown source %q (have: %s, %s, %s, %s, %s)",
+			imp.Source, healthdb.Source, bpcsv.Source, withings.Source, records.Source, documents.Source)
 	}
 }
 

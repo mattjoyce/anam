@@ -31,3 +31,6 @@ BloodPressure_*
 
 # graphify build products — derived, rebuildable, not part of the record
 graphify-out/
+
+# Personal source documents kept beside the repo for inspection. Never committed.
+/private/

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"time"
 
@@ -84,6 +85,36 @@ type timelineData struct {
 	Strip      []tlStripEntry
 	StripCount int
 	Zoomed     bool
+
+	// Nav is the window moved: the same read at another from/to, each a link, so
+	// every gesture is a round trip and the band stays honest to the fold at W.
+	Nav tlNav
+}
+
+// tlNav holds the four moves a window can make, as URLs.
+type tlNav struct {
+	Left, Right, In, Out string
+}
+
+// navLinks derives the four moves from the window: pan by a quarter of its width,
+// zoom in to half and out to double, both centred. The window stays in the URL, so
+// a view is a link.
+func navLinks(from, to time.Time) tlNav {
+	width := to.Sub(from)
+	quarter := width / 4
+	centre := from.Add(width / 2)
+	link := func(f, t time.Time) string {
+		q := url.Values{}
+		q.Set("from", f.UTC().Format(time.RFC3339))
+		q.Set("to", t.UTC().Format(time.RFC3339))
+		return "/?" + q.Encode()
+	}
+	return tlNav{
+		Left:  link(from.Add(-quarter), to.Add(-quarter)),
+		Right: link(from.Add(quarter), to.Add(quarter)),
+		In:    link(centre.Add(-width/4), centre.Add(width/4)),
+		Out:   link(centre.Add(-width), centre.Add(width)),
+	}
 }
 
 func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
@@ -202,6 +233,7 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 		PlotLeft: bandLeft, PlotRight: bandW - bandRight,
 		WindowFromMS: from.UnixMilli(), WindowToMS: to.UnixMilli(),
 		Zoomed: zoomed,
+		Nav:    navLinks(from, to),
 	}
 	if zoomed {
 		data.From = from.UTC().Format(time.RFC3339)

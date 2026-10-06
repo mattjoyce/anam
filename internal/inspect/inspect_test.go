@@ -256,3 +256,24 @@ func TestEvents_ListsTheStreamInSeqOrder(t *testing.T) {
 		t.Error("events not in seq order")
 	}
 }
+
+// The window moves by links the server derives: pan by a quarter of the width,
+// zoom in to half and out to double, both centred, each a from/to in the URL
+// (card 20).
+func TestTimeline_NavLinksMoveTheWindow(t *testing.T) {
+	t.Parallel()
+	srv, _, _ := seededServer(t)
+	_, body := get(t, srv.URL+"/?from=2026-01-01&to=2026-01-31")
+
+	// The window is [Jan 1, Feb 1): 31 days. A quarter is 7d18h.
+	for name, want := range map[string]string{
+		"pan right": "from=2026-01-08T18%3A00%3A00Z&amp;to=2026-02-08T18%3A00%3A00Z",
+		"pan left":  "from=2025-12-24T06%3A00%3A00Z&amp;to=2026-01-24T06%3A00%3A00Z",
+		"zoom in":   "from=2026-01-08T18%3A00%3A00Z&amp;to=2026-01-24T06%3A00%3A00Z",
+		"zoom out":  "from=2025-12-16T12%3A00%3A00Z&amp;to=2026-02-16T12%3A00%3A00Z",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("%s: no link with %s", name, want)
+		}
+	}
+}

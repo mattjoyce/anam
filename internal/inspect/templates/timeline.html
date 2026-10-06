@@ -54,6 +54,8 @@
   .controls { display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; margin-top: .6rem; font-size: .9rem; }
   .controls input { font: inherit; padding: .15rem .35rem; width: 13.5rem; }
   .hint { font-size: .8rem; }
+  .nav a { display: inline-block; min-width: 1.6em; text-align: center; padding: .1rem .3rem; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 6px; text-decoration: none; margin-right: .15rem; }
+  .nav a:hover { border-color: var(--s0); }
 </style>
 </head>
 <body class="viz">
@@ -91,8 +93,14 @@
     <label>from <input name="from" id="from" value="{{.From}}" placeholder="2026-03-07 or RFC 3339"></label>
     <label>to <input name="to" id="to" value="{{.To}}" placeholder="2026-06-06 or RFC 3339"></label>
     <button type="submit">compose</button>
+    <span class="nav">
+      <a href="{{.Nav.Left}}" id="nav-left" title="pan left (←)">◀</a>
+      <a href="{{.Nav.Out}}" id="nav-out" title="zoom out (−)">−</a>
+      <a href="{{.Nav.In}}" id="nav-in" title="zoom in (+)">+</a>
+      <a href="{{.Nav.Right}}" id="nav-right" title="pan right (→)">▶</a>
+    </span>
     {{if .Zoomed}}<a href="/">whole person</a>{{end}}
-    <span class="dim hint">or drag a span on the band</span>
+    <span class="dim hint">drag a span on the band · arrows pan, + − zoom · wheel zooms at the cursor</span>
   </form>
 </div>
 
@@ -143,6 +151,28 @@
       x0 = null;
       sel.setAttribute('visibility', 'hidden');
     });
+
+    // Every move is a round trip: the window is the request and the server draws
+    // the points, so the band stays honest to the fold at W. Arrows pan, + and −
+    // zoom about the centre (the server's links); the wheel zooms about the
+    // cursor's fact-time, one navigation per gesture.
+    const go = id => { const a = document.getElementById(id); if (a) location.href = a.href; };
+    document.addEventListener('keydown', e => {
+      if (e.target.tagName === 'INPUT') return;
+      const k = { ArrowLeft: 'nav-left', ArrowRight: 'nav-right', '+': 'nav-in', '=': 'nav-in', '-': 'nav-out' }[e.key];
+      if (k) { e.preventDefault(); go(k); }
+    });
+    let wheeled = false;
+    band.addEventListener('wheel', e => {
+      e.preventDefault();
+      if (wheeled) return;
+      wheeled = true;
+      const at = toTime(toX(e)).getTime();
+      const factor = e.deltaY < 0 ? 0.5 : 2;
+      const f = at - (at - from) * factor, t = at + (to - at) * factor;
+      location.href = '/?from=' + encodeURIComponent(new Date(f).toISOString()) +
+        '&to=' + encodeURIComponent(new Date(t).toISOString());
+    }, { passive: false });
   })();
 </script>
 </body>

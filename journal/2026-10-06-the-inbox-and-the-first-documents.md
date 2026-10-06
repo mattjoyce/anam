@@ -58,3 +58,17 @@ record now runs from January 2023. Twelve buckets re-minted.
 
 Card 28: the zip of scans, 26 image pages from 2013 to 2024, the oldest pathology there is. Then
 the antihypertensive's name, which nothing in the mailbox gives.
+
+## Later the same night: the scans, Fitbit and Strong
+
+Matt kept dropping. The zip of scans turned out to be the oldest pathology there is, 26 image pages
+from 2013 to 2024, read page by page at 90 dpi and re-rendered at 160 where a digit was in doubt.
+Then a Fitbit weight log (1,597 weights, 2015 to 2024) and the Strong app's workout export (409
+workouts, 4,818 sets, 2020 to 2026), each given a small deterministic extractor. 2,160 more facets
+at W=13736; the record now runs from August 2013 and holds six pathology draws.
+
+Three things learned on the scans. Lab ids must name the lab that did the work, because ACL absorbed
+Healthscope and quotes its old lab numbers as history. A row that only a later report prints is
+emitted from that report under the original draw's number, with a note saying so. And a text
+extraction can be wrong where the scan is right: the 2024 ECG date was 10/03 in the text and 10/09
+on paper, so the record was corrected and names the page that settled it.

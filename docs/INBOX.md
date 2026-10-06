@@ -66,13 +66,27 @@ analyte per draw and one `lab.panel` for the report's draw (`acl:<lab>/panel/<sl
 - **Ids.** `acl:<lab_number>/<analyte-slug>`; a non-blood specimen prefixes the slug
   (`urine-albumin`), so urine and serum albumin do not collide.
 
+**Fitbit weight logs** (Google Takeout `Weight Logs.xlsx`): `scripts/extract-fitbit-weight.py`,
+stdlib only, one `health.weight` per log, id `fitbit:<ISO minute>` with an ordinal when two logs
+share a minute. **Strong workouts** (the app's CSV, semicolon-separated): `scripts/extract-strong-csv.py`,
+one `gym.visit` per workout keyed by its start time (the export's "Workout #" is renumbered per export),
+every set kept verbatim under `sets`.
+
+**Lab ids name the lab that did the work.** `acl:<lab_number>/<analyte>` for Australian Clinical Labs,
+`healthscope:<lab_number>/<analyte>` for Healthscope Pathology. ACL absorbed Healthscope in 2015 and
+its later reports quote Healthscope draws as history columns under the old lab numbers; the prefix
+keeps a draw's identity with the lab that collected it, whichever report prints it.
+
 **Everything else is read.** Interleaved text (a PDF's text with columns scrambled), scanned
 images, notes compiled from email: Claude reads the document and writes the records file by hand,
 with `extracted.method` saying so. Matt's review of the YAML is the endorsement; the architecture's
 `proposed` status (§11, R9) is not built, so the method field is the honest mark. A better reading
 later supersedes under the same ids.
 
-Scanned PDFs: `pdftoppm -r 100 -f N -l N -png` one page at a time, then read the image.
+Scanned PDFs: `pdftoppm -r 90 -png` the whole file, read each page image; re-render at 160 dpi
+when a digit is in doubt. A history row that only a later report prints (a lab that dropped a row from
+its own report, or a draw whose report is lost) is emitted from that later report, with a
+`source_note` saying so, under the original draw's lab number.
 
 ## Processing a drop
 
@@ -100,3 +114,7 @@ Scanned PDFs: `pdftoppm -r 100 -f N -l N -png` one page at a time, then read the
   the record says where.
 - The live diary readings from Sep–Oct 2024 were not in the bp-csv export (which starts May 2025),
   so the diary PDF added a year of blood pressure, not duplicates. Check the ledger before assuming.
+- A scanned text extraction can be wrong where the scan is right: blood_test1.txt read the ECG date as
+  10/03/2024, the scanned original says 10/09/2024. The hand-read record was corrected and the record
+  says which page settled it.
+- Two children's results were in the 2016 scan. Other people's facts are not admitted to this record.

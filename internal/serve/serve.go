@@ -55,6 +55,10 @@ type Deps struct {
 	Gate      projection.Gate
 	Clock     Clock
 
+	// Series is the Definitions' word on which types close a series, which a
+	// snapshot-shaped template needs and a log-shaped one never consults.
+	Series projection.Series
+
 	// DefinitionSetVersion is the receipt's provenance field, passed in rather than
 	// read here so that this package needs no opinion about definitions.
 	DefinitionSetVersion string
@@ -87,7 +91,7 @@ func Run(ctx context.Context, d Deps, name string, dryRun bool) (Served, error) 
 	if err != nil {
 		return Served{}, err
 	}
-	value, err := projection.Apply(res.Value, t, d.Gate)
+	value, err := projection.Apply(res.Value, t, d.Gate, d.Series)
 	if err != nil {
 		return Served{}, err
 	}
@@ -159,7 +163,7 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 	if err != nil {
 		return r, receipt.Result{}, err
 	}
-	value, err := projection.Apply(res.Value, t, d.Gate)
+	value, err := projection.Apply(res.Value, t, d.Gate, d.Series)
 	if err != nil {
 		return r, receipt.Result{}, err
 	}
@@ -173,9 +177,13 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 
 	out := receipt.Compare(r, value.Hash(), idsOf(value), stored, artifact.Digest)
 	if r.DefinitionSetVersion != d.DefinitionSetVersion {
+		note := "definitions govern capture, not the fold, so this does not affect reproduction"
+		if t.Shape == projection.ShapeSnapshot {
+			note = "a snapshot shape reads which types close a series from the definitions, so if reproduction failed, look here first"
+		}
 		out.Notes = append(out.Notes, fmt.Sprintf(
-			"definition set has moved (receipt %s, this build %s) — definitions govern capture, not the fold, so this does not affect reproduction",
-			r.DefinitionSetVersion, d.DefinitionSetVersion))
+			"definition set has moved (receipt %s, this build %s) — %s",
+			r.DefinitionSetVersion, d.DefinitionSetVersion, note))
 	}
 	return r, out, nil
 }

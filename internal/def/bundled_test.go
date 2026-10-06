@@ -44,3 +44,28 @@ func TestBundled_HoldsTheHealthDBTypes(t *testing.T) {
 		}
 	}
 }
+
+// The regimen types share one series family with one key, and only the stop closes.
+func TestBundled_MedTypesShareTheRegimenSeries(t *testing.T) {
+	t.Parallel()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatalf("Bundled: %v", err)
+	}
+	for _, typ := range []facet.Type{"med.started", "med.dose-changed", "med.stopped"} {
+		d, ok := reg.Lookup(typ)
+		if !ok {
+			t.Errorf("no bundled definition for %s", typ)
+			continue
+		}
+		if d.Series == nil || d.Series.Name != "med.regimen" || len(d.Series.Key) != 2 {
+			t.Errorf("%s series = %+v, want med.regimen over [/drug /course]", typ, d.Series)
+		}
+		if d.Classification != facet.ClassificationSensitive || d.Mode != def.ModeLenient {
+			t.Errorf("%s = %s %s, want Sensitive lenient", typ, d.Classification, d.Mode)
+		}
+	}
+	if !reg.Closes("med.stopped") || reg.Closes("med.started") || reg.Closes("med.dose-changed") {
+		t.Error("only med.stopped closes the regimen")
+	}
+}

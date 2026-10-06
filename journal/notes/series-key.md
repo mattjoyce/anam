@@ -66,8 +66,19 @@ resolve is non-compliant, like a missing identity. The batch fails whole, as it 
 **The snapshot is pure.** A function from a value and a fact-time to a value, with the registry
 supplying which types close. It has no state and nothing to restart.
 
+## Card 23, same day
+
+The snapshot became a projection **shape** (`"shape": "snapshot"`, defaulting to `log`), because a
+consumer selects a projection and never defines one (journal: two-clocks). The relation is decided
+once, in `fold.Fates`, and both `fold.Snapshot` and the projection's explain are built on it, so the
+reason a facet is not served ("displaced by", "closed by") comes from the same procedure that served
+the rest. The closing rule reaches the projection as a parameter at the point of use, like the consent
+gate, and a snapshot template without it is refused rather than served wrong. `timeline --at` is the
+person's own view of the same read; `serve meds` is the published one with a receipt.
+
 ## Deferred
 
 - A series stamp in `facet_index` for the inspector (card 21).
 - Re-stamping existing facets after a Definition changes its key.
-- `--at` on `timeline` and the snapshot projection template (card 23).
+- A fact-time `at` on the inspector's projection page; the page shows the shape's verdicts but
+  only at the head of fact-time.

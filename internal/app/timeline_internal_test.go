@@ -277,3 +277,43 @@ func TestSortRows_ImposesTheCanonicalOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestParseBoundsAt(t *testing.T) {
+	t.Parallel()
+
+	// A bare date includes its whole day, like --to, and leaves the bounds alone.
+	b, at, err := parseBoundsAt("2026-01-01", "", "2026-06-15", false)
+	if err != nil {
+		t.Fatalf("parseBoundsAt: %v", err)
+	}
+	if at != "2026-06-15T23:59:59.999999999Z" || b.toX != "" || b.from != "2026-01-01T00:00:00.000000000Z" {
+		t.Errorf("at=%q from=%q toX=%q", at, b.from, b.toX)
+	}
+
+	// An instant is taken as given.
+	_, at, err = parseBoundsAt("", "", "2026-06-15T12:00:00Z", false)
+	if err != nil || at != "2026-06-15T12:00:00.000000000Z" {
+		t.Errorf("instant: at=%q err=%v", at, err)
+	}
+
+	// Two upper bounds, --explain, a bad instant, and an --at before --from are refused.
+	for name, c := range map[string]struct {
+		from, to, at string
+		explain      bool
+	}{
+		"at and to":      {"", "2026-07-01", "2026-06-15", false},
+		"at and explain": {"", "", "2026-06-15", true},
+		"bad at":         {"", "", "June", false},
+		"at before from": {"2026-07-01", "", "2026-06-15", false},
+	} {
+		if _, _, err := parseBoundsAt(c.from, c.to, c.at, c.explain); err == nil {
+			t.Errorf("%s: no error", name)
+		}
+	}
+
+	// No --at: plain bounds, no snapshot.
+	_, at, err = parseBoundsAt("", "2026-07-01", "", true)
+	if err != nil || at != "" {
+		t.Errorf("no at: at=%q err=%v", at, err)
+	}
+}

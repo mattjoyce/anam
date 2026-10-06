@@ -132,7 +132,7 @@ func TestBundled_ParsesBpAndSleep(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Bundled: %v", err)
 	}
-	if got, want := r.Names(), []string{"bp", "sleep"}; !reflect.DeepEqual(got, want) {
+	if got, want := r.Names(), []string{"bp", "meds", "sleep"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("bundled names = %v, want %v", got, want)
 	}
 	for _, tmpl := range r.All() {
@@ -197,7 +197,7 @@ func TestApply_TypeAllowListDeniesByDefault(t *testing.T) {
 	}
 
 	tmpl := mustParse(t, template("empty", nil, []string{"admitted", "endorsed"}, "Sensitive", "", ""))
-	served, err := projection.Apply(v, tmpl, consent.Open{})
+	served, err := projection.Apply(v, tmpl, consent.Open{}, nil)
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestApply_StatusAllowListDeniesByDefault(t *testing.T) {
 
 	v := canonical(t)
 	tmpl := mustParse(t, template("nostatus", []string{"health.blood-pressure"}, nil, "Sensitive", "", ""))
-	served, err := projection.Apply(v, tmpl, consent.Open{})
+	served, err := projection.Apply(v, tmpl, consent.Open{}, nil)
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -277,7 +277,7 @@ func TestApply_Knobs(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			served, err := projection.Apply(v, mustParse(t, c.tmpl), consent.Open{})
+			served, err := projection.Apply(v, mustParse(t, c.tmpl), consent.Open{}, nil)
 			if err != nil {
 				t.Fatalf("Apply: %v", err)
 			}
@@ -326,7 +326,7 @@ func TestApply_PropertyPruneOnly(t *testing.T) {
 			for _, cl := range classes {
 				for _, win := range windows {
 					tmpl := mustParse(t, template("p", ty, st, cl, win[0], win[1]))
-					served, err := projection.Apply(v, tmpl, consent.Open{})
+					served, err := projection.Apply(v, tmpl, consent.Open{}, nil)
 					if err != nil {
 						t.Fatalf("Apply(%v/%v/%s/%v): %v", ty, st, cl, win, err)
 					}
@@ -368,7 +368,7 @@ func TestApply_WideOpenReproducesTheCanonicalHash(t *testing.T) {
 		[]string{"admitted", "endorsed", "tombstoned", "rejected", "superseded"},
 		"Sensitive", "", ""))
 
-	served, err := projection.Apply(v, tmpl, consent.Open{})
+	served, err := projection.Apply(v, tmpl, consent.Open{}, nil)
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
@@ -401,7 +401,7 @@ func TestApply_ConsentGateCanExclude(t *testing.T) {
 		[]string{"health.blood-pressure", "health.sleep"},
 		[]string{"admitted", "endorsed", "tombstoned"}, "Sensitive", "", ""))
 
-	open, err := projection.Apply(v, tmpl, consent.Open{})
+	open, err := projection.Apply(v, tmpl, consent.Open{}, nil)
 	if err != nil {
 		t.Fatalf("Apply(open): %v", err)
 	}
@@ -409,7 +409,7 @@ func TestApply_ConsentGateCanExclude(t *testing.T) {
 		t.Fatal("the open gate served nothing; the denial below would pass vacuously")
 	}
 
-	denied, err := projection.Apply(v, tmpl, denyType{typ: "health.blood-pressure"})
+	denied, err := projection.Apply(v, tmpl, denyType{typ: "health.blood-pressure"}, nil)
 	if err != nil {
 		t.Fatalf("Apply(deny): %v", err)
 	}
@@ -423,7 +423,7 @@ func TestApply_RequiresAGate(t *testing.T) {
 	t.Parallel()
 
 	tmpl := mustParse(t, template("t", []string{"health.sleep"}, []string{"admitted"}, "Normal", "", ""))
-	if _, err := projection.Apply(canonical(t), tmpl, nil); err == nil {
+	if _, err := projection.Apply(canonical(t), tmpl, nil, nil); err == nil {
 		t.Error("Apply with no consent gate was accepted")
 	}
 }

@@ -11,12 +11,13 @@ import (
 
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/consent"
+	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/projection"
 )
 
 func timelineCmd(cfgPath *string) *cobra.Command {
-	var from, to, typeFilter, projName, asOf string
+	var from, to, at, typeFilter, projName, asOf string
 	var asJSON, explain bool
 
 	cmd := &cobra.Command{
@@ -30,7 +31,7 @@ The canonical hash printed in the header identifies the whole-person value at th
 watermark W, regardless of any narrowing: stable when nothing changed, moved by
 any ingest that changed the live set, identical after a rebuild from source.
 
-Three lenses compose over that read:
+Four lenses compose over that read:
 
   --projection  switch to a governed variant — the same read, pruned by a bundled
                 template. The served hash is the one a receipt would record, so
@@ -38,12 +39,16 @@ Three lenses compose over that read:
   --as-of       wind Anam's clock back to an anam-time and read what it knew then.
                 Fact-time (--from/--to) asks when things happened; anam-time
                 asks when Anam found out.
+  --at          the snapshot: what was true at a fact-time. One facet per series,
+                the latest at or before then, a closed series gone, facts without
+                a series left alone. --as-of then --at is the bitemporal answer:
+                what Anam believed on T was true at D.
   --explain     show every facet with the verdict on it rather than only the ones
                 that survived — including the artifact versions since superseded.
                 This is the same decision procedure the projection applies, not a
                 second account of it.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			bounds, err := parseBounds(from, to)
+			bounds, atBound, err := parseBoundsAt(from, to, at, explain)
 			if err != nil {
 				return err
 			}
@@ -65,7 +70,7 @@ Three lenses compose over that read:
 			ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
 			defer cancel()
 
-			view, err := readView(ctx, l, asOfTime, projName)
+			view, err := readView(ctx, l, asOfTime, projName, atBound)
 			if err != nil {
 				return err
 			}
@@ -81,6 +86,7 @@ Three lenses compose over that read:
 	cmd.Flags().StringVar(&typeFilter, "type", "", "narrow to one facet type (e.g. health.blood-pressure)")
 	cmd.Flags().StringVar(&projName, "projection", "", "read through a bundled projection instead of the canonical (see: anam serve)")
 	cmd.Flags().StringVar(&asOf, "as-of", "", "read what Anam knew at this anam-time (2006-01-02 or RFC 3339)")
+	cmd.Flags().StringVar(&at, "at", "", "the snapshot at this fact-time: latest per series at or before it (2006-01-02 or RFC 3339); excludes --to")
 	cmd.Flags().BoolVar(&explain, "explain", false, "show every facet with its verdict, superseded versions included")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit the narrowed entries as JSON, in the canonical serialisation")
 	return cmd
@@ -104,22 +110,34 @@ func parseAsOf(asOf string) (time.Time, error) {
 	return t, nil
 }
 
-// view is one read of the person, optionally wound back and optionally pruned.
+// view is one read of the person, optionally wound back, optionally pruned, and
+// optionally taken as a snapshot.
 type view struct {
 	res fold.Result
 
 	// tmpl and served are set only when a projection was named. shown is whichever
-	// value the caller should render — the canonical, or the served variant.
+	// value the caller should render — the canonical, the served variant, or the
+	// snapshot of either.
 	tmpl   *projection.Template
 	shown  fold.Value
 	asOf   bool
 	asOfAt string
+
+	// at is the snapshot's fact-time bound when --at was given, else "".
+	at string
+
+	// defs is the bundled Definition set: which types close a series.
+	defs *def.Registry
 }
 
 // readView performs the read the flags describe: at head or at an anam-time, through
-// a projection or not.
-func readView(ctx context.Context, l fold.Ledger, asOfTime time.Time, projName string) (view, error) {
-	var v view
+// a projection or not, as a log or as the snapshot at a fact-time.
+func readView(ctx context.Context, l fold.Ledger, asOfTime time.Time, projName, at string) (view, error) {
+	defs, err := def.Bundled()
+	if err != nil {
+		return view{}, err
+	}
+	v := view{defs: defs, at: at}
 
 	res, err := readAtOrHead(ctx, l, asOfTime, &v)
 	if err != nil {
@@ -127,22 +145,32 @@ func readView(ctx context.Context, l fold.Ledger, asOfTime time.Time, projName s
 	}
 	v.res, v.shown = res, res.Value
 
-	if projName == "" {
-		return v, nil
+	if projName != "" {
+		templates, err := projection.Bundled()
+		if err != nil {
+			return view{}, err
+		}
+		t, err := templates.Lookup(projName)
+		if err != nil {
+			return view{}, err
+		}
+		served, err := projection.Apply(res.Value, t, consent.Open{}, defs)
+		if err != nil {
+			return view{}, err
+		}
+		v.tmpl, v.shown = &t, served
 	}
-	templates, err := projection.Bundled()
-	if err != nil {
-		return view{}, err
+
+	if at != "" {
+		// The snapshot is taken over whatever the lenses above produced: the
+		// canonical, or the served variant. Over a served snapshot shape it is the
+		// same value again, which is the right answer, not a double count.
+		snap, err := fold.Snapshot(v.shown, at, defs.Closes)
+		if err != nil {
+			return view{}, err
+		}
+		v.shown = snap
 	}
-	t, err := templates.Lookup(projName)
-	if err != nil {
-		return view{}, err
-	}
-	served, err := projection.Apply(res.Value, t, consent.Open{})
-	if err != nil {
-		return view{}, err
-	}
-	v.tmpl, v.shown = &t, served
 	return v, nil
 }
 
@@ -171,6 +199,9 @@ func (v view) header(shownCount int) string {
 
 	if v.asOf {
 		h += fmt.Sprintf("as-of      %s (anam-time)\n", v.asOfAt)
+	}
+	if v.at != "" {
+		h += fmt.Sprintf("at         %s (fact-time, snapshot: latest per series)  %s\n", v.at, v.shown.Hash())
 	}
 	h += fmt.Sprintf("canonical  %s\n", v.res.Value.Hash())
 	if v.tmpl != nil {
@@ -225,6 +256,36 @@ func (b bounds) admits(e fold.Entry) bool {
 		return false
 	}
 	return true
+}
+
+// parseBoundsAt reads the fact-time flags. --at is a bound like --to (a bare date
+// includes its whole day) and also asks for the snapshot shape, so the two exclude
+// each other: one upper bound, and it says which read it wants.
+func parseBoundsAt(from, to, at string, explain bool) (bounds, string, error) {
+	if at != "" && to != "" {
+		return bounds{}, "", fmt.Errorf("--at and --to both bound fact-time: give one")
+	}
+	if at != "" && explain {
+		return bounds{}, "", fmt.Errorf("--explain shows the log's verdicts; to explain a snapshot, name a snapshot-shaped projection (e.g. --projection meds --explain)")
+	}
+	b, err := parseBounds(from, to)
+	if err != nil {
+		return bounds{}, "", err
+	}
+	if at == "" {
+		return b, "", nil
+	}
+	t, dateOnly, err := parseInstant(at)
+	if err != nil {
+		return bounds{}, "", fmt.Errorf("--at: %w", err)
+	}
+	if dateOnly {
+		t = t.AddDate(0, 0, 1).Add(-time.Nanosecond)
+	}
+	if b.from != "" && clock.Format(t) < b.from {
+		return bounds{}, "", fmt.Errorf("--at %s is before --from", at)
+	}
+	return b, clock.Format(t), nil
 }
 
 func parseBounds(from, to string) (bounds, error) {

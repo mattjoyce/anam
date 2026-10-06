@@ -668,9 +668,14 @@ Superseded and tombstoned facets are *excluded from the value* — they remain i
 
 From the canonical, Anam publishes governed **projections** (variants): **versioned templates that
 prune — never reshape, never generate.** The only knobs are **metadata filters**: a facet-type allow-list
-(deny-by-default), a datetime filter, an endorsement-status filter, and a maximum classification.
-Filtering is on **metadata only, never the payload**; a projection includes or excludes **whole Facets**.
-A consumer **selects** a projection; it never defines one.
+(deny-by-default), a datetime filter, an endorsement-status filter, a maximum classification, and a
+**shape**, `log` or `snapshot` (§5a; built 2026-10-07). The shape is the one knob whose verdict depends
+on other entries: a snapshot keeps the latest per series within the window and drops a closed series,
+and its explanation says *displaced by* or *closed by* which facet. It runs after the other four, over
+what they admitted, so the window's `to` is the snapshot's "at". Filtering is on **metadata only, never
+the payload**; a projection includes or excludes **whole Facets**. A consumer **selects** a projection;
+it never defines one — which is why shape is a template knob and not a read-time flag. (`timeline --at`
+is the person's own un-published view of the same read; `serve meds` is the published one.)
 
 > *Tombstone visibility* is no longer a projection knob. It was one only while "canonical" named the
 > append-everything surface. A projection over the canonical sees live facets by construction; a reader

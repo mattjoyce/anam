@@ -131,9 +131,11 @@ by status from world facts. Do that on demand, not by default.
 
 ## 7. Build order
 
-1. **Series key and closing type** in the Definition, stamped at capture (card 15).
-2. **The self-log source**: format, row identity, capture worker (card 22).
-3. **Medication types and the snapshot read**, with a snapshot projection and `--at` (card 23).
+1. ✅ **Series key and closing type** in the Definition, stamped at capture (card 15, 2026-10-07).
+2. ✅ **The self-log source**: format, row identity, capture worker (card 22, 2026-10-06).
+3. ✅ **Medication types and the snapshot read**, with a snapshot projection and `--at` (card 23,
+   2026-10-07): `med.started` / `med.dose-changed` / `med.stopped`, the `meds` template (shape
+   `snapshot`), `timeline --at`. The inspector's projection page shows the same verdicts.
 4. **Life events** as self-log types: donation, illness, hangover, travel, gym (card 27).
 5. **Reference payload kind** and a folder source (card 24).
 6. **Lab results** from text files first, then images via a `proposed` extractor (card 25).

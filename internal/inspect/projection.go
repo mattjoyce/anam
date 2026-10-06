@@ -10,6 +10,7 @@ import (
 
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/consent"
+	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/projection"
@@ -52,6 +53,10 @@ type projectionData struct {
 
 	Template *projection.Template
 
+	// series is the Definitions' word on which types close a series, for a
+	// snapshot-shaped template.
+	series projection.Series
+
 	Rows        []projVerdictRow
 	NServed     int
 	NExcluded   int
@@ -67,8 +72,14 @@ func (s *Server) projectionPage(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err)
 		return
 	}
+	defs, err := def.Bundled()
+	if err != nil {
+		httpError(w, err)
+		return
+	}
 
 	data := projectionData{
+		series:   defs,
 		Names:    append([]string{"canonical"}, templates.Names()...),
 		Selected: r.URL.Query().Get("p"),
 	}
@@ -174,11 +185,11 @@ func (d *projectionData) fill(ctx context.Context, l Ledger, res fold.Result) er
 // no template is selected — the canonical is the un-narrowed read.
 func (d *projectionData) judgeLive(res fold.Result) error {
 	if d.Template != nil {
-		verdicts, err := projection.Explain(res.Value, *d.Template, consent.Open{})
+		verdicts, err := projection.Explain(res.Value, *d.Template, consent.Open{}, d.series)
 		if err != nil {
 			return err
 		}
-		served, err := projection.Apply(res.Value, *d.Template, consent.Open{})
+		served, err := projection.Apply(res.Value, *d.Template, consent.Open{}, d.series)
 		if err != nil {
 			return err
 		}

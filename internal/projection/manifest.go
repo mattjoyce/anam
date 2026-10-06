@@ -31,6 +31,7 @@ type manifest struct {
 	MaxClassification *string   `json:"max_classification"`
 	From              string    `json:"from"`
 	To                string    `json:"to"`
+	Shape             string    `json:"shape"`
 }
 
 // Parse reads and validates one template manifest. A manifest is config, and config is
@@ -46,6 +47,12 @@ func Parse(raw []byte) (Template, error) {
 	if err := m.requireEveryKnob(); err != nil {
 		return Template{}, err
 	}
+	// Shape is the one knob with a safe default. A template that says nothing serves
+	// the log, which is exactly what every template served before the knob existed;
+	// a snapshot only ever narrows that, so absent cannot over-serve.
+	if m.Shape == "" {
+		m.Shape = string(ShapeLog)
+	}
 
 	t := Template{
 		Name:              *m.Name,
@@ -54,6 +61,7 @@ func Parse(raw []byte) (Template, error) {
 		MaxClassification: facet.Classification(*m.MaxClassification),
 		From:              m.From,
 		To:                m.To,
+		Shape:             Shape(m.Shape),
 		typeSet:           map[facet.Type]bool{},
 		statusSet:         map[facet.Status]bool{},
 	}
@@ -81,6 +89,8 @@ func (m manifest) requireEveryKnob() error {
 		return fmt.Errorf("%w: %s: statuses is required", ErrBadTemplate, *m.Name)
 	case m.MaxClassification == nil:
 		return fmt.Errorf("%w: %s: max_classification is required", ErrBadTemplate, *m.Name)
+	case m.Shape != "" && !Shape(m.Shape).Valid():
+		return fmt.Errorf("%w: %s: shape %q is not log or snapshot", ErrBadTemplate, *m.Name, m.Shape)
 	}
 	return nil
 }

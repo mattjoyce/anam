@@ -144,3 +144,41 @@ func (h *harness) composePrefix(t *testing.T, upto string) fold.Value {
 	}
 	return composed
 }
+
+// The bitemporal case (SELF-LOG.md §8): the snapshot at D as Anam knew it before the
+// stop row arrived. --as-of picks the canonical, --at picks the point within it.
+func TestSnapshot_AsOfBeforeTheStopArrived(t *testing.T) {
+	h := newHarness(t)
+	reg := medRegistry(t)
+	h.useRegistry(t, reg, map[string][]facet.Type{
+		"self-log": {"med.started", "med.dose-changed", "med.stopped"},
+	})
+	ctx := context.Background()
+
+	h.med(t, "med.started", "m1", "2026-03-01", "ramipril", 1)
+	h.med(t, "med.dose-changed", "m2", "2026-05-10", "ramipril", 1)
+	beforeStop, err := h.l.Head(ctx)
+	if err != nil {
+		t.Fatalf("Head: %v", err)
+	}
+	h.med(t, "med.stopped", "m3", "2026-08-01", "ramipril", 1)
+
+	const at = "2026-09-01T00:00:00.000000000Z"
+	now, err := fold.Read(ctx, h.l)
+	if err != nil {
+		t.Fatalf("fold.Read: %v", err)
+	}
+	then, err := fold.ReadAt(ctx, h.l, beforeStop)
+	if err != nil {
+		t.Fatalf("fold.ReadAt: %v", err)
+	}
+	snapNow, _ := fold.Snapshot(now.Value, at, reg.Closes)
+	snapThen, _ := fold.Snapshot(then.Value, at, reg.Closes)
+
+	if snapNow.Len() != 0 {
+		t.Errorf("at September, knowing of the stop: %d entries, want none", snapNow.Len())
+	}
+	if snapThen.Len() != 1 || snapThen.Entries()[0].SourceRef != "self-log:m2" {
+		t.Errorf("at September, before the stop was known: %v, want the dose change", snapThen.Entries())
+	}
+}

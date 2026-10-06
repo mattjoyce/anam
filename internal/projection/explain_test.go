@@ -33,11 +33,11 @@ func TestExplain_AgreesWithApplyOverEveryTemplate(t *testing.T) {
 				for _, win := range windows {
 					tmpl := mustParse(t, template("p", ty, st, cl, win[0], win[1]))
 
-					served, err := projection.Apply(v, tmpl, consent.Open{})
+					served, err := projection.Apply(v, tmpl, consent.Open{}, nil)
 					if err != nil {
 						t.Fatalf("Apply: %v", err)
 					}
-					verdicts, err := projection.Explain(v, tmpl, consent.Open{})
+					verdicts, err := projection.Explain(v, tmpl, consent.Open{}, nil)
 					if err != nil {
 						t.Fatalf("Explain: %v", err)
 					}
@@ -101,7 +101,7 @@ func TestExplain_NamesTheKnobThatExcluded(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			verdicts, err := projection.Explain(v, mustParse(t, c.tmpl), consent.Open{})
+			verdicts, err := projection.Explain(v, mustParse(t, c.tmpl), consent.Open{}, nil)
 			if err != nil {
 				t.Fatalf("Explain: %v", err)
 			}
@@ -128,7 +128,7 @@ func TestExplain_ConsentDenialIsItsOwnReason(t *testing.T) {
 		[]string{"health.blood-pressure", "health.sleep"},
 		[]string{"admitted", "endorsed", "tombstoned"}, "Sensitive", "", ""))
 
-	verdicts, err := projection.Explain(canonical(t), tmpl, denyType{typ: "health.blood-pressure"})
+	verdicts, err := projection.Explain(canonical(t), tmpl, denyType{typ: "health.blood-pressure"}, nil)
 	if err != nil {
 		t.Fatalf("Explain: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestExplain_GateIsNotConsultedAboutAlreadyExcluded(t *testing.T) {
 	tmpl := mustParse(t, template("t", []string{"health.sleep"},
 		[]string{"admitted", "endorsed", "tombstoned"}, "Sensitive", "", ""))
 
-	verdicts, err := projection.Explain(canonical(t), tmpl, denyType{typ: "health.blood-pressure"})
+	verdicts, err := projection.Explain(canonical(t), tmpl, denyType{typ: "health.blood-pressure"}, nil)
 	if err != nil {
 		t.Fatalf("Explain: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestExplain_MultipleFailuresAttributeToTheFirstKnob(t *testing.T) {
 	tmpl := mustParse(t, template("t", []string{"health.sleep"}, []string{"admitted"},
 		"Normal", "2026-03-01T00:00:00.000000000Z", ""))
 
-	verdicts, err := projection.Explain(canonical(t), tmpl, consent.Open{})
+	verdicts, err := projection.Explain(canonical(t), tmpl, consent.Open{}, nil)
 	if err != nil {
 		t.Fatalf("Explain: %v", err)
 	}
@@ -201,7 +201,7 @@ func TestExplain_RequiresAGate(t *testing.T) {
 	t.Parallel()
 
 	tmpl := mustParse(t, template("t", []string{"health.sleep"}, []string{"admitted"}, "Normal", "", ""))
-	if _, err := projection.Explain(canonical(t), tmpl, nil); err == nil {
+	if _, err := projection.Explain(canonical(t), tmpl, nil, nil); err == nil {
 		t.Error("Explain with no consent gate was accepted")
 	}
 }

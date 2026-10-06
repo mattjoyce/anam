@@ -302,6 +302,10 @@ func serveDeps(ctx context.Context, cfg config.Config, templates *projection.Reg
 	if err != nil {
 		return serve.Deps{}, nil, err
 	}
+	defs, err := def.Bundled()
+	if err != nil {
+		return serve.Deps{}, nil, err
+	}
 	l, err := openLedgerReadOnly(ctx, cfg)
 	if err != nil {
 		return serve.Deps{}, nil, err
@@ -313,5 +317,6 @@ func serveDeps(ctx context.Context, cfg config.Config, templates *projection.Reg
 		Gate:                 consent.Open{},
 		Clock:                clock.Real{},
 		DefinitionSetVersion: defSet,
+		Series:               defs,
 	}, func() { _ = l.Close() }, nil
 }

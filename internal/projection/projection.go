@@ -1,10 +1,15 @@
 // Package projection publishes governed variants of the canonical
 // (ARCHITECTURE.md §9).
 //
-// A projection is a versioned template that **prunes**. It has four knobs, all of them
-// metadata: a facet-type allow-list, an fact-time window, an endorsement-status
-// filter, and a maximum classification. It never reshapes a facet, never generates
-// one, and never reads a payload — a facet is included or excluded whole.
+// A projection is a versioned template that **prunes**. It has five knobs, all of them
+// metadata: a facet-type allow-list, a fact-time window, an endorsement-status
+// filter, a maximum classification, and a shape. It never reshapes a facet, never
+// generates one, and never reads a payload — a facet is included or excluded whole.
+//
+// The shape is the one knob whose verdict depends on other entries. A log serves
+// every surviving facet; a snapshot serves the latest per series, the last-known
+// value at the window's end (SELF-LOG.md §2). Shape lives in the template and not in
+// a read-time flag, because a consumer selects a projection and never defines one.
 //
 // Two things here are structural rather than conventional, because a rule that lives
 // only in a doc comment is a rule the next change can break silently:
@@ -40,6 +45,24 @@ type Gate interface {
 	Evaluate(consent.Request) consent.Decision
 }
 
+// Series is the Definitions' word a snapshot shape needs: which types close a
+// series. *def.Registry satisfies it. A log-shaped template never consults it.
+type Series interface {
+	Closes(facet.Type) bool
+}
+
+// Shape says what a projection returns: every surviving facet, or one per series.
+type Shape string
+
+// The shapes.
+const (
+	ShapeLog      Shape = "log"
+	ShapeSnapshot Shape = "snapshot"
+)
+
+// Valid reports whether s is a known shape.
+func (s Shape) Valid() bool { return s == ShapeLog || s == ShapeSnapshot }
+
 // Template is one versioned projection: a name, a version, and four metadata filters.
 //
 // Every filter is required in the manifest, and the two list filters deny by default —
@@ -71,6 +94,11 @@ type Template struct {
 	// canonical is already ordered by. Empty means unbounded.
 	From string
 	To   string
+
+	// Shape is log or snapshot. A snapshot with no To is the last-known value now;
+	// with one, the last-known value at or before then — the coordinate was already
+	// there (journal: two-clocks).
+	Shape Shape
 
 	// typeSet and statusSet are the allow-lists as sets, built once at parse.
 	typeSet   map[facet.Type]bool
@@ -110,6 +138,8 @@ const (
 	ReasonBeforeWindow   Reason = "fact-time before the window"
 	ReasonAfterWindow    Reason = "fact-time at or after the window"
 	ReasonConsent        Reason = "denied by the consent gate"
+	ReasonDisplaced      Reason = "a later statement in the series exists"
+	ReasonClosed         Reason = "the series is closed"
 )
 
 // Served reports whether this verdict includes the entry.
@@ -144,8 +174,8 @@ func (t Template) verdict(e fold.Entry) Reason {
 // deliberate — consent is asked about what a consumer would otherwise see, not about
 // every fact Anam holds, so a future policy's audit trail is about a real disclosure
 // rather than about the whole ledger.
-func Apply(v fold.Value, t Template, g Gate) (fold.Value, error) {
-	verdicts, err := Explain(v, t, g)
+func Apply(v fold.Value, t Template, g Gate, s Series) (fold.Value, error) {
+	verdicts, err := Explain(v, t, g, s)
 	if err != nil {
 		return fold.Value{}, err
 	}
@@ -174,9 +204,12 @@ type Verdict struct {
 // This is the function Apply is built from, not a companion to it. A projection that
 // could not say why it excluded something would be governance by assertion; one whose
 // explanation came from separately-written code would be governance by coincidence.
-func Explain(v fold.Value, t Template, g Gate) ([]Verdict, error) {
+func Explain(v fold.Value, t Template, g Gate, s Series) ([]Verdict, error) {
 	if g == nil {
 		return nil, fmt.Errorf("projection: %s: a consent gate is required (§10)", t.Name)
+	}
+	if t.Shape == ShapeSnapshot && s == nil {
+		return nil, fmt.Errorf("projection: %s: a snapshot shape needs the Definitions' series rules", t.Name)
 	}
 
 	out := make([]Verdict, 0, v.Len())
@@ -198,7 +231,34 @@ func Explain(v fold.Value, t Template, g Gate) ([]Verdict, error) {
 		}
 		out = append(out, x)
 	}
+	if t.Shape == ShapeSnapshot {
+		snapshot(out, s)
+	}
 	return out, nil
+}
+
+// snapshot demotes the served verdicts the last-known-value relation excludes. It
+// runs after the four per-entry knobs and the gate, over what they admitted, so the
+// window's To is the snapshot's "at" and the type allow-list bounds which series are
+// in play. The relation itself is fold.Fates: one decision procedure, shared with
+// the value-shaped read, so this explanation cannot disagree with that result.
+func snapshot(verdicts []Verdict, s Series) {
+	var served []fold.Entry
+	var at []int
+	for i, x := range verdicts {
+		if x.Reason.Served() {
+			served = append(served, x.Entry)
+			at = append(at, i)
+		}
+	}
+	for j, f := range fold.Fates(served, s.Closes) {
+		switch {
+		case f.Displaced:
+			verdicts[at[j]].Reason, verdicts[at[j]].Detail = ReasonDisplaced, "by "+f.By
+		case f.Closed:
+			verdicts[at[j]].Reason, verdicts[at[j]].Detail = ReasonClosed, "by "+f.By
+		}
+	}
 }
 
 // classificationRank orders the levels by restriction, so a ceiling comparison is an

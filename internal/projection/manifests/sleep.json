@@ -6,5 +6,6 @@
   "statuses": ["admitted", "endorsed"],
   "max_classification": "Sensitive",
   "from": "",
-  "to": ""
+  "to": "",
+  "shape": "log"
 }

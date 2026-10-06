@@ -86,7 +86,7 @@ func explainRows(ctx context.Context, l fold.Ledger, v view) ([]verdictRow, map[
 	// every live facet stands served — the canonical is the un-narrowed read.
 	var rows []verdictRow
 	if v.tmpl != nil {
-		verdicts, err := projection.Explain(v.res.Value, *v.tmpl, consent.Open{})
+		verdicts, err := projection.Explain(v.res.Value, *v.tmpl, consent.Open{}, v.defs)
 		if err != nil {
 			return nil, nil, err
 		}

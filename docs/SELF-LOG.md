@@ -140,7 +140,9 @@ by status from world facts. Do that on demand, not by default.
    illness and travel are series, closed by `illness.ended` and `travel.returned`).
 5. **Reference payload kind** and a folder source (card 24).
 6. **Lab results** from text files first, then images via a `proposed` extractor (card 25).
-7. **Compliance estimates** (card 26).
+7. ✅ **Compliance estimates** (card 26, 2026-10-07): `med.compliance-estimate`, the estimate bounded
+   to (0, 1] at the gate; `internal/regimen.Expected` is the soft schedule, and a test holds that the
+   watermark does not move when it is computed.
 
 ## 8. Tests that define done
 

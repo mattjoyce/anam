@@ -41,7 +41,8 @@ records:
 - A re-run is a no-op; an edited record supersedes; a deleted record retracts nothing (card 17).
 
 Types today: `lab.result`, `lab.panel`, `condition.noted`, `donation.blood`, `health.weight`,
-`med.missed-dose`, `med.started`, `med.dose-changed`, `med.stopped`, `illness.started`, `illness.ended`,
+`med.missed-dose`, `med.started`, `med.dose-changed`, `med.stopped`, `med.compliance-estimate`,
+`illness.started`, `illness.ended`,
 `illness.hangover`, `travel.departed`, `travel.arrived`, `travel.returned`, `visit.clinic`, `gym.visit`,
 and `health.blood-pressure` for diary readings. Each is a manifest in `internal/def/manifests/`,
 lenient, Sensitive (visits, gym and travel Confidential). Illness rows carry an `episode` and travel

@@ -36,7 +36,7 @@ var mvpScopes = gate.StaticScopes{
 	// diary record's id is exactly that composition.
 	records.Source: {
 		"lab.result", "lab.panel", "condition.noted", "donation.blood", "health.weight",
-		"med.missed-dose", "med.started", "med.dose-changed", "med.stopped",
+		"med.missed-dose", "med.started", "med.dose-changed", "med.stopped", "med.compliance-estimate",
 		"illness.started", "illness.ended", "illness.hangover",
 		"travel.departed", "travel.arrived", "travel.returned",
 		"visit.clinic", "gym.visit", bpcsv.Type,

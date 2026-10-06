@@ -63,8 +63,9 @@ A plain file you edit, one row per event, read by a capture worker like any othe
 - **Validation is lenient** for every self-log type, so a row can carry as much or as little as you
   know. "Went to the gym" is a row. "Went to the gym, 45 minutes, legs" is the same row with more.
 - **Classification** is Sensitive for everything medical; travel and gym can be Confidential.
-- Format is open (YAML list, or CSV with a `kind` column). Decide in card 22. One file, every kind,
-  because the person is the partition and the source is the person.
+- Format: **records files**, one YAML per source document, read by `internal/capture/records`
+  (decided and built 2026-10-06; `INBOX.md` is the runbook). A hand-kept log is one records file
+  whose document is the log itself.
 
 ## 4. The types
 

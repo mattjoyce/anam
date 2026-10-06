@@ -38,6 +38,7 @@ Two kinds of note:
   - [[2026-07-25-r7-projection-and-receipt]] — R7: the projection publishes, the receipt proves, the retry loop disappears; plus the viewer that switches between projections and winds the clock back.
   - [[2026-10-06-r8-the-mint]] — R8: `anam checkpoint` mints one value per bucket; dirtiness is the value's hash, not a watermark, so no second index.
   - [[2026-10-06-what-meds-was-i-on]] — the self-log, documents as references, and the snapshot read; an interval is a series of point facts, and probable doses are not stored.
+  - [[2026-10-06-the-inbox-and-the-first-documents]] — the records worker, the ACL parser, the runbook; 194 facts from the first documents, and the record now starts in 2023.
 - Decision notes
   - [[the-inversion]] · [[person-substrate-grain]] · [[mint-unit-whole-timeline]]
   - [[facet-types-dotted-namespaced]] · [[facet-definition-format]]

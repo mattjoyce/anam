@@ -70,3 +70,13 @@ The health ETL now runs on unraid, and the copy it writes is the real one.
 `~/.config/anam/imports.yaml` points at the unraid copy. The blood pressure export did
 arrive, on 11 July, and is declared there too. How the whole chain fits together is in
 `docs/pipeline.html`.
+
+## Documents — `/mnt/Projects/anam-sources/`
+
+Added 2026-10-06. The unraid `Projects` share is mounted on the ThinkPad at `/mnt/Projects` and is
+visible from Windows as `\\192.168.20.4\Projects`, so it is the drop point for documents: PDFs,
+scans, exported text. The ThinkPad cannot write inside `/mnt/Projects/healthdata` (the unraid ETL
+owns it) but can at the share root, hence a sibling folder. `labs/` holds pathology reports; the
+first, `blood_test1.txt`, is a PDF's extracted text. This folder is a **source** in the §5 sense of
+`docs/SELF-LOG.md`: the bytes stay here, Anam holds references. `/mnt/Projects/anam` is a stale
+August copy of the repo, not an instance; nothing runs on unraid but the ETL.

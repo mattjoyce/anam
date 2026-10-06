@@ -69,3 +69,48 @@ func TestBundled_MedTypesShareTheRegimenSeries(t *testing.T) {
 		t.Error("only med.stopped closes the regimen")
 	}
 }
+
+// The life-event types (SELF-LOG.md §4): illness and travel are series, closed by
+// their own ending type; hangover, donation and gym stand alone. Medical ones are
+// Sensitive, travel and gym Confidential.
+func TestBundled_LifeEventTypes(t *testing.T) {
+	t.Parallel()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatalf("Bundled: %v", err)
+	}
+	cases := []struct {
+		typ    facet.Type
+		class  facet.Classification
+		series string
+		closes bool
+	}{
+		{"illness.started", facet.ClassificationSensitive, "illness.episode", false},
+		{"illness.ended", facet.ClassificationSensitive, "illness.episode", true},
+		{"illness.hangover", facet.ClassificationSensitive, "", false},
+		{"travel.departed", facet.ClassificationConfidential, "travel.trip", false},
+		{"travel.arrived", facet.ClassificationConfidential, "travel.trip", false},
+		{"travel.returned", facet.ClassificationConfidential, "travel.trip", true},
+		{"donation.blood", facet.ClassificationSensitive, "", false},
+		{"gym.visit", facet.ClassificationConfidential, "", false},
+	}
+	for _, c := range cases {
+		d, ok := reg.Lookup(c.typ)
+		if !ok {
+			t.Errorf("no bundled definition for %s", c.typ)
+			continue
+		}
+		if d.Classification != c.class || d.Mode != def.ModeLenient {
+			t.Errorf("%s = %s %s, want %s lenient", c.typ, d.Classification, d.Mode, c.class)
+		}
+		switch {
+		case c.series == "" && d.Series != nil:
+			t.Errorf("%s declares a series %q, want none", c.typ, d.Series.Name)
+		case c.series != "" && (d.Series == nil || d.Series.Name != c.series):
+			t.Errorf("%s series = %+v, want %s", c.typ, d.Series, c.series)
+		}
+		if reg.Closes(c.typ) != c.closes {
+			t.Errorf("%s closes = %t, want %t", c.typ, reg.Closes(c.typ), c.closes)
+		}
+	}
+}

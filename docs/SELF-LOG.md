@@ -84,8 +84,8 @@ A plain file you edit, one row per event, read by a capture worker like any othe
 | `lab` | `lab.result` | point per analyte, fact-time = draw date | analyte |
 | `doc` | `doc.reference` | the reference facet for a file or image (§5) | none |
 | `donation` | `donation.blood` | point | none |
-| `illness` | `illness.started`, `illness.ended`, `illness.hangover` | series for an illness; hangover is a point | illness episode; `illness.ended` closes |
-| `travel` | `travel.departed`, `travel.arrived` | series per trip | trip; `travel.arrived` home closes |
+| `illness` | `illness.started`, `illness.ended`, `illness.hangover` | series for an illness; hangover is a point | `illness.episode` keyed by `/episode`; `illness.ended` closes |
+| `travel` | `travel.departed`, `travel.arrived`, `travel.returned` | series per trip; arrived is a leg within it | `travel.trip` keyed by `/trip`; `travel.returned` closes |
 | `gym` | `gym.visit` | point, generic or detailed | none |
 
 Hangover is a point fact under `illness` because that is what it is; one row, one day. Detailed gym
@@ -136,7 +136,8 @@ by status from world facts. Do that on demand, not by default.
 3. ✅ **Medication types and the snapshot read**, with a snapshot projection and `--at` (card 23,
    2026-10-07): `med.started` / `med.dose-changed` / `med.stopped`, the `meds` template (shape
    `snapshot`), `timeline --at`. The inspector's projection page shows the same verdicts.
-4. **Life events** as self-log types: donation, illness, hangover, travel, gym (card 27).
+4. ✅ **Life events** as self-log types: donation, illness, hangover, travel, gym (card 27, 2026-10-07;
+   illness and travel are series, closed by `illness.ended` and `travel.returned`).
 5. **Reference payload kind** and a folder source (card 24).
 6. **Lab results** from text files first, then images via a `proposed` extractor (card 25).
 7. **Compliance estimates** (card 26).
@@ -154,6 +155,7 @@ by status from world facts. Do that on demand, not by default.
 
 - ~~Whether a series key is one declaration or two (group and course).~~ One declaration, with a
   family name and an ordered key; the course is a key element, so a restart is a new series (2026-10-07).
-- Whether `travel.arrived` closes a trip only when the destination is home, which reads a payload,
-  or whether the trip is closed by a distinct `travel.returned` type. Prefer the type.
+- ~~Whether `travel.arrived` closes a trip only when the destination is home, which reads a payload,
+  or whether the trip is closed by a distinct `travel.returned` type.~~ The type: `travel.returned`
+  closes, `travel.arrived` is a leg within the trip (2026-10-07).
 - Where the self-log file lives and how it reaches the ThinkPad gateway's hourly ingest.

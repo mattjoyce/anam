@@ -41,9 +41,12 @@ records:
 - A re-run is a no-op; an edited record supersedes; a deleted record retracts nothing (card 17).
 
 Types today: `lab.result`, `lab.panel`, `condition.noted`, `donation.blood`, `health.weight`,
-`med.missed-dose`, `med.started`, `med.dose-changed`, `med.stopped`, `visit.clinic`, `gym.visit`, and
-`health.blood-pressure` for diary readings. Each is a manifest in `internal/def/manifests/`, lenient,
-Sensitive (visits and gym Confidential).
+`med.missed-dose`, `med.started`, `med.dose-changed`, `med.stopped`, `illness.started`, `illness.ended`,
+`illness.hangover`, `travel.departed`, `travel.arrived`, `travel.returned`, `visit.clinic`, `gym.visit`,
+and `health.blood-pressure` for diary readings. Each is a manifest in `internal/def/manifests/`,
+lenient, Sensitive (visits, gym and travel Confidential). Illness rows carry an `episode` and travel
+rows a `trip`; those are the series keys, so `illness.ended` and `travel.returned` close what
+`illness.started` and `travel.departed` opened, and `anam timeline --at` shows what was open on a day.
 
 The three `med.*` regimen types are a **series** (`docs/SELF-LOG.md` §2): every row carries `drug` and
 `course`, and a restart after a stop is a new course number. `anam timeline --at <date>` answers "what

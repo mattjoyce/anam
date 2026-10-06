@@ -1,0 +1,17 @@
+{
+  "meta": {
+    "facet_type": "illness.hangover",
+    "definition_version": 1,
+    "classification": "Sensitive",
+    "validation_mode": "lenient",
+    "source_schema": "records/illness.hangover",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02"}
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "required": ["/id", "/date"]
+  }
+}

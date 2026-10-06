@@ -37,6 +37,7 @@ Two kinds of note:
   - [[2026-09-28-the-ledger-moves-to-sqlite]] — the ledger leaves DynamoDB for a SQLite file of its own; append-only is held by the database again.
   - [[2026-07-25-r7-projection-and-receipt]] — R7: the projection publishes, the receipt proves, the retry loop disappears; plus the viewer that switches between projections and winds the clock back.
   - [[2026-10-06-r8-the-mint]] — R8: `anam checkpoint` mints one value per bucket; dirtiness is the value's hash, not a watermark, so no second index.
+  - [[2026-10-06-what-meds-was-i-on]] — the self-log, documents as references, and the snapshot read; an interval is a series of point facts, and probable doses are not stored.
 - Decision notes
   - [[the-inversion]] · [[person-substrate-grain]] · [[mint-unit-whole-timeline]]
   - [[facet-types-dotted-namespaced]] · [[facet-definition-format]]

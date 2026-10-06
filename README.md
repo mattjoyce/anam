@@ -38,6 +38,7 @@ Extensible to "all sorts of facets" later — `calendar.event`, `mail.thread`, `
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the model, contracts, and mechanics.
 - [`docs/GLOSSARY.md`](docs/GLOSSARY.md) — the shared language.
 - [`docs/MVP.md`](docs/MVP.md) — the first slice: scope and success criteria.
+- [`docs/SELF-LOG.md`](docs/SELF-LOG.md) — the next sources: the self-log, documents as references, and the snapshot read.
 - [`AGENTS.md`](AGENTS.md) — engineering standards and the guiding design lens.
 
 ## Quick start

@@ -205,7 +205,8 @@ nothing Anam knows — so it lives in the published-artifact tier and is lost wi
 *Anam-event*.
 
 **Receipt** — Proof of exactly what a projection served at a watermark: `served_hash`, the facet-id set,
-watermark, template version, definition-set version, `served_at`, and optional span. A Facet's
+watermark, template version, definition-set version, `served_at`, optional span, and since 2026-10-07
+the `ledger_id` the watermark counts in (a verify against another ledger says so instead of failing). A Facet's
 *published time* is the earliest `served_at` over the receipts naming it — publication is recorded here,
 never as an anam-event. See *Projection*, *Anam-event*.
 

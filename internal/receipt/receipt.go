@@ -44,6 +44,11 @@ const ServedKind = "served"
 //     fold), and a mismatch is worth reporting, never a failed reproduction.
 //   - Span and ServedAt make the receipt self-describing without the binary that
 //     wrote it.
+//   - LedgerID names the ledger the watermark counts in. A watermark means nothing
+//     against another ledger: after a rebuild the same number lands somewhere else,
+//     and a verify there must say "other ledger", never "failed reproduction".
+//     Receipts served before 2026-10-07 have none, and they parse; the verify notes
+//     it. It is last, so their bytes are unchanged.
 type Receipt struct {
 	ServedHash           string   `json:"served_hash"`
 	FacetIDs             []string `json:"facet_ids"`
@@ -53,6 +58,7 @@ type Receipt struct {
 	DefinitionSetVersion string   `json:"definition_set_version"`
 	ServedAt             string   `json:"served_at"`
 	Span                 string   `json:"span"`
+	LedgerID             string   `json:"ledger_id,omitempty"`
 }
 
 // Bytes is the receipt's one serialisation, and the bytes its own content address is

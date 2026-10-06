@@ -694,8 +694,11 @@ the fold.
 
 Projections are **materialised as files**, content-addressed. **Receipts** make a served projection
 reproducible: `served_hash = sha256(served bytes)` plus the exact facet-id set, the watermark, the
-template version, the definition-set version, the `served_at` time, and the span. (Arch's consent-version
-and linkage-version drop out — no consent gating, no identity graph.)
+template version, the definition-set version, the `served_at` time, the span, and the `ledger_id` the
+watermark counts in (since 2026-10-07; a watermark means nothing against another ledger, so `receipt
+verify` on a rebuilt ledger reports *other ledger*, never a failed reproduction, and a receipt from
+before the field is verified with a note). (Arch's consent-version and linkage-version drop out — no
+consent gating, no identity graph.)
 
 Receipts are also where **publication** is recorded. A facet's published time (§5) is the earliest
 `served_at` over the receipts naming it; there is no `published` anam-event, because being shown is not

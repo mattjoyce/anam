@@ -169,7 +169,8 @@ so a tampered artifact is refused rather than displayed as if it were genuine.`,
 			_, _ = fmt.Fprintf(out, "%s v%d at W=%d, served %s\n", r.Template, r.TemplateVersion, r.Watermark, r.ServedAt)
 			_, _ = fmt.Fprintf(out, "  %d facets, span %s\n", len(r.FacetIDs), r.Span)
 			_, _ = fmt.Fprintf(out, "  served     %s  [intact]\n", r.ServedHash)
-			_, _ = fmt.Fprintf(out, "  definitions %s\n\n", r.DefinitionSetVersion)
+			_, _ = fmt.Fprintf(out, "  definitions %s\n", r.DefinitionSetVersion)
+			_, _ = fmt.Fprintf(out, "  ledger     %s\n\n", ledgerOrUnnamed(r.LedgerID))
 
 			w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
 			_, _ = fmt.Fprintln(w, "FACT TIME\tTYPE\tSTATUS\tPAYLOAD")
@@ -232,8 +233,8 @@ corrupted ledger under an untouched file. Both must hold for the serve to be pro
 
 			w := cmd.OutOrStdout()
 			_, _ = fmt.Fprintf(w, "receipt %s\n", args[0])
-			_, _ = fmt.Fprintf(w, "  served %s v%d at W=%d on %s — %d facets, span %s\n\n",
-				r.Template, r.TemplateVersion, r.Watermark, r.ServedAt, len(r.FacetIDs), r.Span)
+			_, _ = fmt.Fprintf(w, "  served %s v%d at W=%d on %s — %d facets, span %s, ledger %s\n\n",
+				r.Template, r.TemplateVersion, r.Watermark, r.ServedAt, len(r.FacetIDs), r.Span, ledgerOrUnnamed(r.LedgerID))
 			_, _ = fmt.Fprint(w, res.Summary())
 			if !res.OK() {
 				return fmt.Errorf("receipt %s did not verify", args[0])
@@ -285,6 +286,14 @@ func joinStatuses(t projection.Template) string {
 		return "(none)"
 	}
 	return out
+}
+
+// ledgerOrUnnamed renders a receipt's ledger id, or says a receipt predates them.
+func ledgerOrUnnamed(id string) string {
+	if id == "" {
+		return "(unnamed: served before ledger ids were recorded)"
+	}
+	return id
 }
 
 // serveDeps assembles the serve path's dependencies from config. The consent gate is

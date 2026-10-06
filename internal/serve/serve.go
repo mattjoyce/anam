@@ -34,6 +34,19 @@ import (
 // the ledger for a change in the code.
 var ErrTemplateMoved = errors.New("serve: template version has moved since this receipt")
 
+// ErrOtherLedger is returned when a receipt names a ledger other than the one open.
+// Its watermark counts in that ledger, so re-deriving here would prove nothing
+// either way, and reporting "not reproduced" would blame this ledger for being a
+// different one.
+var ErrOtherLedger = errors.New("serve: receipt was served from another ledger")
+
+// Ledger is the read surface a serve needs: the fold's, plus the ledger's identity
+// for the receipt. *ledger.Ledger satisfies it.
+type Ledger interface {
+	fold.Ledger
+	ID(ctx context.Context) (string, error)
+}
+
 // Store is the published-artifact tier this package writes to and reads back.
 type Store interface {
 	Put(kind string, b []byte) (string, error)
@@ -49,7 +62,7 @@ type Clock interface{ Now() time.Time }
 // parameters because both calls need the same seven, and a caller assembling them
 // twice is a caller that can assemble them differently.
 type Deps struct {
-	Ledger    fold.Ledger
+	Ledger    Ledger
 	Templates *projection.Registry
 	Artifacts Store
 	Gate      projection.Gate
@@ -87,6 +100,10 @@ func Run(ctx context.Context, d Deps, name string, dryRun bool) (Served, error) 
 		return Served{}, err
 	}
 
+	ledgerID, err := d.Ledger.ID(ctx)
+	if err != nil {
+		return Served{}, err
+	}
 	res, err := fold.Read(ctx, d.Ledger)
 	if err != nil {
 		return Served{}, err
@@ -97,6 +114,7 @@ func Run(ctx context.Context, d Deps, name string, dryRun bool) (Served, error) 
 	}
 
 	r := receipt.Receipt{
+		LedgerID:             ledgerID,
 		ServedHash:           value.Hash(),
 		FacetIDs:             idsOf(value),
 		Watermark:            int64(res.W),
@@ -159,6 +177,20 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 			ErrTemplateMoved, t.Name, t.Version, r.TemplateVersion)
 	}
 
+	ledgerID, err := d.Ledger.ID(ctx)
+	if err != nil {
+		return r, receipt.Result{}, err
+	}
+	var notes []string
+	switch r.LedgerID {
+	case ledgerID:
+	case "":
+		notes = append(notes, "receipt names no ledger (served before ledger ids were recorded); its watermark is taken to be this ledger's")
+	default:
+		return r, receipt.Result{}, fmt.Errorf("%w: receipt names %s, this is %s; its watermark %d counts there, not here",
+			ErrOtherLedger, r.LedgerID, ledgerID, r.Watermark)
+	}
+
 	res, err := fold.ReadAt(ctx, d.Ledger, ledger.Watermark(r.Watermark))
 	if err != nil {
 		return r, receipt.Result{}, err
@@ -176,6 +208,7 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 	}
 
 	out := receipt.Compare(r, value.Hash(), idsOf(value), stored, artifact.Digest)
+	out.Notes = append(out.Notes, notes...)
 	if r.DefinitionSetVersion != d.DefinitionSetVersion {
 		note := "definitions govern capture, not the fold, so this does not affect reproduction"
 		if t.Shape == projection.ShapeSnapshot {

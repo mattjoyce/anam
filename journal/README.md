@@ -55,6 +55,7 @@ Two kinds of note:
   - [[identity-is-definition-owned]] · [[as-of-reads-fetch-by-version]]
   - [[one-decision-procedure-per-decision]]
   - [[ledger-is-a-sqlite-file-of-its-own]]
+  - [[hard-and-soft-checkpoints]]
 - Retracted
   - [[mint-unit-whole-timeline]] — superseded by [[span-is-the-mint-unit-not-the-read-filter]]
 - Reference notes

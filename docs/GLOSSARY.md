@@ -60,7 +60,20 @@ ingest gate. In the MVP: `health-db` and `bp-csv`. **Out of the kernel.** See *S
 
 **Checkpoint** — An immutable, content-addressed value of the canonical (live-only) fold over **one
 minted span's** members at an anam-time *watermark*. Produced by the mint solely to bound replay depth.
-Never whole-life. See *Mint*, *Watermark*, *Bucket span*.
+Never whole-life. Comes in two provenances, *hard* and *soft*, below; only a hard one is a replay
+floor. See *Mint*, *Watermark*, *Bucket span*.
+
+**Checkpoint, hard** — A checkpoint that has been given a place: a row in the checkpoint log
+(`span_id`, `v`, `covers_w`, `value_hash`) and a file under its hash in the artifact tier. Minted,
+citable, a replay floor. The mint promotes a soft checkpoint to a hard one. See *Checkpoint, soft*.
+
+**Checkpoint, soft** — A bucket's live-only value at a watermark, computed on demand and **ephemeral**:
+the same type and hash a hard checkpoint would have, with no row and no file. Shown, compared, dropped;
+never kept between requests, or it becomes a stale place. Soft equals hard by hash means the bucket is
+*sealed*; soft differs means the bucket is *behind* (still a correct floor, costing replay); no hard
+means *never minted*. A soft checkpoint bounds no replay and is not what the doctrine means by
+"checkpoint". Distinct from a *Derived span*, which composes either kind over a range the person
+names. See *Checkpoint, hard*, *Mint*, *Span*.
 
 **Classification** — A governance level on the Facet Definition and each Facet:
 `Normal` / `Confidential` / `Sensitive`. Present and carried; **gating on it is deferred** (§10). See

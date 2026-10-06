@@ -670,6 +670,13 @@ Superseded and tombstoned facets are *excluded from the value* — they remain i
 - The **whole-person timeline** — Anam's default read — is a **derived span composed** from bucket
   checkpoints plus the open bucket's replay. It never re-folds the person.
 
+**Retraction is a command, never a side effect of ingest** (`anam retract <source>`, 2026-10-07). Ingest
+admits and supersedes; a row's absence from one scan and a source's absence look alike from inside an
+envelope, so no ingest tombstones. The command reports the live facets a source no longer holds, as a
+set comparison, and tombstones them through the gate only with `--yes`. A scan that fails writes
+nothing; a scan that holds nothing is refused; and a run may not retract more than a fraction of a
+source (`--max-fraction`, a tenth by default) unless the operator raises it.
+
 From the canonical, Anam publishes governed **projections** (variants): **versioned templates that
 prune — never reshape, never generate.** The only knobs are **metadata filters**: a facet-type allow-list
 (deny-by-default), a datetime filter, an endorsement-status filter, a maximum classification, and a
@@ -781,8 +788,8 @@ one or two projections plus a CLI timeline viewer, manual mint, and receipts. Re
 **Deferred, not forgotten:**
 
 - **Binary / native-reference facets** — `doc.reference` is built over a folder source (2026-10-07).
-  Anam never serves the bytes; the inspector shows the path and hash. Retraction when a file is
-  removed is card 17; EXIF is not read, a sidecar carries the date.
+  Anam never serves the bytes; the inspector shows the path and hash. A removed file is retracted
+  by `anam retract`, deliberately; EXIF is not read, a sidecar carries the date.
 - **Adaptive mint cadence (time-OR-size-OR-rate)** — manual `checkpoint` only; the bucket-span seam and
   the `W`/`Wᵥ` machinery exist from R2, the trigger does not.
 - **Sealed projections / a seal point** — receipts suffice for now.

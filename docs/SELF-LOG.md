@@ -64,8 +64,9 @@ A plain file you edit, one row per event, read by a capture worker like any othe
 
 - **Identity is a row id you assign**, stable for the row's life, never its content and never its
   line number. `source_ref = self-log:<row_id>`. Editing a row's fields supersedes the facet;
-  deleting a row does not tombstone it (card 17, retraction, is still open), so a wrong row is
-  corrected, not removed.
+  deleting a row does not tombstone it by itself: `anam retract <source>` reports the rows the
+  source has dropped and tombstones them only with `--yes` (card 17, 2026-10-07), so a wrong row is
+  corrected in place, and a row that should never have been is retracted on purpose.
 - **Fact-time is the row's date**, the day the thing happened, as you record it. A row added late is
   a backfill and re-opens its bucket, which is the system working.
 - **Validation is lenient** for every self-log type, so a row can carry as much or as little as you

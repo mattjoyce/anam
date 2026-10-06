@@ -38,7 +38,9 @@ records:
   whose Definition composes `date_excel:reading`; a diary record's id is exactly that.
 - One id in two files in one scan is refused. That is the guard against re-admitting a draw from
   a later report's history column when the draw has a report of its own.
-- A re-run is a no-op; an edited record supersedes; a deleted record retracts nothing (card 17).
+- A re-run is a no-op; an edited record supersedes; a deleted record retracts nothing until you ask:
+  `anam retract records` lists what the folder no longer holds, and `--yes` tombstones it. An empty or
+  unreadable folder is refused, and more than a tenth of the source in one run needs `--max-fraction`.
 
 Types today: `lab.result`, `lab.panel`, `condition.noted`, `donation.blood`, `health.weight`,
 `med.missed-dose`, `med.started`, `med.dose-changed`, `med.stopped`, `med.compliance-estimate`,
@@ -87,7 +89,7 @@ title: Lipid studies      # anything else worth saying stays in the payload too
 
 A file with no sidecar refuses the whole scan, and the hourly ingest with it, so add the sidecars
 before the import. Identity is the relative path, so a renamed file is a new facet and the old one
-stands (retraction is card 17); changed bytes supersede. `.meta.yaml` files, dot-files and
+stands until `anam retract documents --yes`; changed bytes supersede. `.meta.yaml` files, dot-files and
 dot-folders are skipped.
 
 ## Extractors

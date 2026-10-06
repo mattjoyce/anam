@@ -1,0 +1,17 @@
+{
+  "meta": {
+    "facet_type": "lab.result",
+    "definition_version": 1,
+    "classification": "Sensitive",
+    "validation_mode": "lenient",
+    "source_schema": "records/lab.result",
+    "time_semantics": {
+      "fact_time": {"pointer": "/collected", "layout": "2006-01-02 15:04"}
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "required": ["/id", "/collected", "/analyte", "/value", "/lab_number"]
+  }
+}

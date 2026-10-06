@@ -1,0 +1,17 @@
+{
+  "meta": {
+    "facet_type": "gym.visit",
+    "definition_version": 1,
+    "classification": "Confidential",
+    "validation_mode": "lenient",
+    "source_schema": "records/gym.visit",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02 15:04"}
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "required": ["/id", "/date"]
+  }
+}

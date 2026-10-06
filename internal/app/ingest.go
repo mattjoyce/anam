@@ -10,6 +10,7 @@ import (
 
 	"github.com/mattjoyce/anam/internal/capture/bpcsv"
 	"github.com/mattjoyce/anam/internal/capture/healthdb"
+	"github.com/mattjoyce/anam/internal/capture/records"
 	"github.com/mattjoyce/anam/internal/capture/withings"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
@@ -28,6 +29,15 @@ var mvpScopes = gate.StaticScopes{
 	},
 	bpcsv.Source:    {bpcsv.Type},
 	withings.Source: {withings.Type},
+	// records carries what is written down about the person: lab reports, the
+	// self-log, notes made from email. Each type has a Definition whose identity is
+	// the record's own id (docs/SELF-LOG.md). The one exception is blood pressure,
+	// whose Definition composes identity from the reading's time and ordinal, so a
+	// diary record's id is exactly that composition.
+	records.Source: {
+		"lab.result", "lab.panel", "condition.noted", "donation.blood", "health.weight",
+		"med.missed-dose", "visit.clinic", "gym.visit", bpcsv.Type,
+	},
 }
 
 func initCmd(cfgPath *string) *cobra.Command {
@@ -210,9 +220,11 @@ func scanImport(ctx context.Context, imp config.Import, cfg config.Config) ([]fa
 		scanCtx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 		defer cancel()
 		return withings.Scan(scanCtx, imp.Path, cfg.PersonID)
+	case records.Source:
+		return records.Scan(imp.Path, cfg.PersonID)
 	default:
-		return nil, fmt.Errorf("import names unknown source %q (have: %s, %s, %s)",
-			imp.Source, healthdb.Source, bpcsv.Source, withings.Source)
+		return nil, fmt.Errorf("import names unknown source %q (have: %s, %s, %s, %s)",
+			imp.Source, healthdb.Source, bpcsv.Source, withings.Source, records.Source)
 	}
 }
 

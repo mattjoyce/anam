@@ -15,13 +15,22 @@ var ErrNotCompliant = errors.New("def: payload not compliant")
 // Verbatim checks nothing here (identity and time are enforced by their own calls);
 // lenient enforces required/pattern/enum and ignores unknown fields; strict also
 // rejects top-level fields the schema does not name.
+//
+// Required means filled: a field that is present but null or an empty string is not
+// there in any sense a reader cares about, and a measurement the source left blank
+// must not be admitted as if it were taken. An empty container is not empty for this
+// purpose; a list the source wrote as `[]` is what the source said.
 func (d Definition) Check(doc any) error {
 	if d.Mode == ModeVerbatim {
 		return nil
 	}
 
 	for _, ptr := range d.Required {
-		if _, err := resolve(doc, ptr); err != nil {
+		v, err := resolve(doc, ptr)
+		if err != nil {
+			return fmt.Errorf("%w: required %s: %v", ErrNotCompliant, ptr, err)
+		}
+		if err := filled(v); err != nil {
 			return fmt.Errorf("%w: required %s: %v", ErrNotCompliant, ptr, err)
 		}
 	}
@@ -152,6 +161,19 @@ func compose(what, prefix string, pointers []string, doc any) (string, error) {
 		parts = append(parts, s)
 	}
 	return strings.Join(parts, ":"), nil
+}
+
+// filled rejects null and the empty string.
+func filled(v any) error {
+	switch t := v.(type) {
+	case nil:
+		return fmt.Errorf("is null")
+	case string:
+		if t == "" {
+			return fmt.Errorf("is empty")
+		}
+	}
+	return nil
 }
 
 func contains(list []string, s string) bool {

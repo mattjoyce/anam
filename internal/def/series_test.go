@@ -157,3 +157,30 @@ func TestParse_PayloadKind(t *testing.T) {
 		t.Errorf("payload_kind pointer = %v, want ErrBadManifest", err)
 	}
 }
+
+// Required means filled: present but null or empty is refused in lenient and strict
+// modes, and an empty list is a value the source wrote, not a gap.
+func TestCheck_RequiredMeansFilled(t *testing.T) {
+	t.Parallel()
+	for _, mode := range []string{"lenient", "strict"} {
+		m := strings.Replace(bpManifest, `"validation_mode": "lenient"`, `"validation_mode": "`+mode+`"`, 1)
+		d := mustParse(t, m)
+		cases := map[string]bool{
+			`{"measured_at": "2026-01-24T06:30:00Z", "systolic": 118, "diastolic": 76}`:   true,
+			`{"measured_at": "2026-01-24T06:30:00Z", "systolic": null, "diastolic": 76}`:  false,
+			`{"measured_at": "2026-01-24T06:30:00Z", "systolic": "", "diastolic": 76}`:    false,
+			`{"measured_at": "2026-01-24T06:30:00Z", "systolic": 0, "diastolic": 76}`:     true,
+			`{"measured_at": "2026-01-24T06:30:00Z", "systolic": [], "diastolic": 76}`:    true,
+			`{"measured_at": "2026-01-24T06:30:00Z", "systolic": false, "diastolic": 76}`: true,
+		}
+		for payload, want := range cases {
+			err := d.Check(mustDecode(t, payload))
+			if got := err == nil; got != want {
+				t.Errorf("%s: Check(%s) = %v, want admitted=%t", mode, payload, err, want)
+			}
+			if err != nil && !errors.Is(err, def.ErrNotCompliant) {
+				t.Errorf("%s: %v is not ErrNotCompliant", mode, err)
+			}
+		}
+	}
+}

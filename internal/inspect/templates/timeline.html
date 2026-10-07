@@ -6,56 +6,72 @@
 {{template "style.html"}}
 <style>
   .viz {
-    /* validated palette (dataviz): slots in fixed order — 0 body-composition,
-       1 heart-rate, 2 sleep, 3 metric-group; 4..7 reserved for future types. */
-    --s0: #2a78d6; --s1: #e34948; --s2: #4a3aa7; --s3: #eda100;
-    --s4: #1baf7a; --s5: #e87ba4; --s6: #008300; --s7: #eb6834;
-    --ink-muted: #898781; --gridline: #e1e0d9; --axis: #c3c2b7;
-    --ring: rgba(11,11,11,0.35);
+    /* validated palette (dataviz reference instance), one hue per family, fixed
+       in marks.go: h0 blue body · h1 orange docs & travel · h2 aqua labs ·
+       h3 yellow activity · h4 magenta meds · h5 green clinical · h6 violet sleep
+       · h7 red heart. Rows and shapes carry identity too, so no family is told
+       apart by colour alone. */
+    --h0: #2a78d6; --h1: #eb6834; --h2: #1baf7a; --h3: #eda100;
+    --h4: #e87ba4; --h5: #008300; --h6: #4a3aa7; --h7: #e34948;
+    --hx: #898781;
+    --ink-muted: #898781; --gridline: #e1e0d9; --axis: #c3c2b7; --row: rgba(11,11,11,0.025);
+    --ring: rgba(252,252,251,0.9);
     --select: rgba(42,120,214,0.12);
   }
   @media (prefers-color-scheme: dark) {
     .viz {
-      --s0: #3987e5; --s1: #e66767; --s2: #9085e9; --s3: #c98500;
-      --s4: #199e70; --s5: #d55181; --s6: #008300; --s7: #d95926;
-      --gridline: #2c2c2a; --axis: #383835;
-      --ring: rgba(255,255,255,0.4);
+      --h0: #3987e5; --h1: #d95926; --h2: #199e70; --h3: #c98500;
+      --h4: #d55181; --h5: #008300; --h6: #9085e9; --h7: #e66767;
+      --gridline: #2c2c2a; --axis: #383835; --row: rgba(255,255,255,0.03);
+      --ring: rgba(26,26,25,0.9);
       --select: rgba(57,135,229,0.18);
     }
   }
   .band { width: 100%; height: auto; display: block; touch-action: none; cursor: crosshair; }
-  .band .stem { stroke: var(--axis); stroke-width: 1; }
-  .band .dead .stem { stroke-dasharray: 3 3; }
-  .band .dead path { opacity: .35; }
+  .band .rowbg { fill: var(--row); }
+  .band .rowlabel { font-weight: 600; }
   .band .pt path { stroke: var(--ring); stroke-width: 1; }
-  .band .pt:hover path { stroke-width: 2.5; }
-  .band .baseline { stroke: var(--axis); stroke-width: 2; }
+  .band .pt:hover path { stroke: currentColor; stroke-width: 1.5; }
+  .band .dead path { opacity: .3; }
+  .band .baseline { stroke: var(--axis); stroke-width: 1; }
   .band .tick { stroke: var(--gridline); }
   .band text { fill: var(--ink-muted); font: 11px system-ui, sans-serif; }
-  .band .sel { fill: var(--select); stroke: var(--s0); stroke-dasharray: 5 4; }
-  /* fill styles SVG marks; background-color styles the HTML swatches and strip
-     diamonds — each element listens to the one that applies to it. */
-  .c0 { fill: var(--s0); background-color: var(--s0); }
-  .c1 { fill: var(--s1); background-color: var(--s1); }
-  .c2 { fill: var(--s2); background-color: var(--s2); }
-  .c3 { fill: var(--s3); background-color: var(--s3); }
-  .c4 { fill: var(--s4); background-color: var(--s4); }
-  .c5 { fill: var(--s5); background-color: var(--s5); }
-  .c6 { fill: var(--s6); background-color: var(--s6); }
-  .c7 { fill: var(--s7); background-color: var(--s7); }
-  svg .c0, svg .c1, svg .c2, svg .c3, svg .c4, svg .c5, svg .c6, svg .c7 { background-color: transparent; }
-  .legend { display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; margin: .4rem 0 0; font-size: .85rem; }
-  .legend .sw { display: inline-block; width: 10px; height: 10px; transform: rotate(45deg); margin-right: .45rem; box-shadow: 0 0 0 1px var(--ring); }
+  .band .sel { fill: var(--select); stroke: var(--h0); stroke-dasharray: 5 4; }
+  /* fill styles SVG marks; background-color styles the strip squares. */
+  .h0 { fill: var(--h0); background-color: var(--h0); }
+  .h1 { fill: var(--h1); background-color: var(--h1); }
+  .h2 { fill: var(--h2); background-color: var(--h2); }
+  .h3 { fill: var(--h3); background-color: var(--h3); }
+  .h4 { fill: var(--h4); background-color: var(--h4); }
+  .h5 { fill: var(--h5); background-color: var(--h5); }
+  .h6 { fill: var(--h6); background-color: var(--h6); }
+  .h7 { fill: var(--h7); background-color: var(--h7); }
+  .hx { fill: var(--hx); background-color: var(--hx); }
+  /* a reading is hollow: its family's hue as the outline */
+  .band .pt path.hollow, .sw .hollow { fill: none; stroke-width: 1.6; }
+  svg path.hollow.h0 { stroke: var(--h0); } svg path.hollow.h1 { stroke: var(--h1); } svg path.hollow.h2 { stroke: var(--h2); }
+  svg path.hollow.h3 { stroke: var(--h3); } svg path.hollow.h4 { stroke: var(--h4); } svg path.hollow.h5 { stroke: var(--h5); }
+  svg path.hollow.h6 { stroke: var(--h6); } svg path.hollow.h7 { stroke: var(--h7); } svg path.hollow.hx { stroke: var(--hx); }
+  .band .pt:hover path.hollow { stroke-width: 2.6; }
+  svg .h0, svg .h1, svg .h2, svg .h3, svg .h4, svg .h5, svg .h6, svg .h7, svg .hx { background-color: transparent; }
+  .legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .5rem 1.2rem; margin: .6rem 0 0; font-size: .85rem; }
+  .fam { margin: 0; padding: 0; border: 0; }
+  .fam legend { font-weight: 600; padding: 0; }
+  .fam label { display: flex; align-items: center; gap: .35rem; cursor: pointer; }
+  .fam label.off { opacity: .5; }
+  .sw { width: 16px; height: 16px; flex: none; }
+  .presets a { margin-right: .6rem; }
   .surface { border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 10px; padding: .8rem 1rem; margin-top: 1rem; }
   .surface h2 { margin: 0 0 .35rem; }
-  .strip { display: flex; flex-wrap: wrap; gap: 7px; padding: .5rem .2rem .2rem; }
-  .strip a { display: inline-block; width: 11px; height: 11px; transform: rotate(45deg); box-shadow: 0 0 0 1px var(--ring); }
-  .strip a:hover { outline: 2px solid var(--s0); }
-  .controls { display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; margin-top: .6rem; font-size: .9rem; }
-  .controls input { font: inherit; padding: .15rem .35rem; width: 13.5rem; }
+  .strip { display: flex; flex-wrap: wrap; gap: 3px; padding: .5rem .2rem .2rem; max-height: 12rem; overflow-y: auto; }
+  .strip a { display: inline-block; width: 8px; height: 8px; border-radius: 2px; }
+  .strip a:hover { outline: 2px solid var(--h0); }
+  .controls { margin-top: .6rem; font-size: .9rem; }
+  .controls .row { display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
+  .controls input[type=text], .controls input:not([type]) { font: inherit; padding: .15rem .35rem; width: 13.5rem; }
   .hint { font-size: .8rem; }
   .nav a { display: inline-block; min-width: 1.6em; text-align: center; padding: .1rem .3rem; border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 6px; text-decoration: none; margin-right: .15rem; }
-  .nav a:hover { border-color: var(--s0); }
+  .nav a:hover { border-color: var(--h0); }
 </style>
 </head>
 <body class="viz">
@@ -72,42 +88,53 @@
 
   <svg class="band" viewBox="0 0 {{.BandW}} {{.BandH}}" id="band"
        data-left="{{.PlotLeft}}" data-right="{{.PlotRight}}">
+    {{range .Rows}}{{if .Stripe}}<rect class="rowbg" x="0" y="{{.Top}}" width="{{$.BandW}}" height="{{.Height}}"/>{{end}}
+    <text class="rowlabel" x="8" y="{{.Y}}" dy="4">{{.Label}}</text>{{end}}
     {{range .Ticks}}<line class="tick" x1="{{.X}}" y1="20" x2="{{.X}}" y2="{{$.Baseline}}"/>
     <text x="{{.X}}" y="{{$.Baseline}}" dy="16" text-anchor="middle">{{.Label}}</text>{{end}}
     <line class="baseline" x1="{{.PlotLeft}}" y1="{{.Baseline}}" x2="{{.PlotRight}}" y2="{{.Baseline}}"/>
-    {{range .Points}}
-    <g class="pt{{if not .Live}} dead{{end}}">
-      <line class="stem" x1="{{.X}}" y1="{{.Y}}" x2="{{.X}}" y2="{{$.Baseline}}"/>
-      <a href="/facet?id={{.ID}}"><path class="c{{.Slot}}" d="M {{.X}} {{.Y}} m 0 -6 l 6 6 l -6 6 l -6 -6 z"><title>{{.Title}}</title></path></a>
-    </g>
+    {{range .Points}}<a class="pt{{if not .Live}} dead{{end}}" href="/facet?id={{.ID}}"><path class="{{.Hue}}" d="{{.Path}}"><title>{{.Title}}</title></path></a>
     {{end}}
     <rect class="sel" id="sel" x="0" y="20" width="0" height="{{.Baseline}}" visibility="hidden" pointer-events="none"/>
   </svg>
-
-  <div class="legend">
-    {{range .Legend}}<span><span class="sw c{{.Slot}}"></span>{{.Type}} <span class="dim">({{.Count}})</span></span>
-    {{end}}<span><span class="sw" style="opacity:.35;background-color:var(--ink-muted)"></span><span class="dim">tombstoned / rejected</span></span>
-  </div>
+  <p class="dim hint">{{.Shown}} mark{{if ne .Shown 1}}s{{end}} in this window{{if .Filtered}}, filtered by type{{end}} · filled circles are periodic measures, hollow marks are readings, filled shapes are things that happened · faded marks are tombstoned or rejected</p>
 
   <form class="controls" method="get" action="/">
-    <label>from <input name="from" id="from" value="{{.From}}" placeholder="2026-03-07 or RFC 3339"></label>
-    <label>to <input name="to" id="to" value="{{.To}}" placeholder="2026-06-06 or RFC 3339"></label>
-    <button type="submit">compose</button>
-    <span class="nav">
-      <a href="{{.Nav.Left}}" id="nav-left" title="pan left (←)">◀</a>
-      <a href="{{.Nav.Out}}" id="nav-out" title="zoom out (−)">−</a>
-      <a href="{{.Nav.In}}" id="nav-in" title="zoom in (+)">+</a>
-      <a href="{{.Nav.Right}}" id="nav-right" title="pan right (→)">▶</a>
-    </span>
-    {{if .Zoomed}}<a href="/">whole person</a>{{end}}
-    <span class="dim hint">drag a span on the band · arrows pan, + − zoom · wheel zooms at the cursor</span>
+    <div class="row">
+      <label>from <input name="from" id="from" value="{{.From}}" placeholder="2026-03-07 or RFC 3339"></label>
+      <label>to <input name="to" id="to" value="{{.To}}" placeholder="2026-06-06 or RFC 3339"></label>
+      <button type="submit">compose</button>
+      <span class="nav">
+        <a href="{{.Nav.Left}}" id="nav-left" title="pan left (←)">◀</a>
+        <a href="{{.Nav.Out}}" id="nav-out" title="zoom out (−)">−</a>
+        <a href="{{.Nav.In}}" id="nav-in" title="zoom in (+)">+</a>
+        <a href="{{.Nav.Right}}" id="nav-right" title="pan right (→)">▶</a>
+      </span>
+      {{if .Zoomed}}<a href="/">whole person</a>{{end}}
+      <span class="dim hint">drag a span on the band · arrows pan, + − zoom · wheel zooms at the cursor</span>
+    </div>
+    <div class="row presets">
+      <strong>show</strong>
+      <a href="{{.Nav.AllTypes}}" id="show-all">all types</a>
+      <a href="{{.Nav.EventsOnly}}" id="show-events">events only</a>
+      <span class="dim hint">or tick types below</span>
+    </div>
+    <div class="legend">
+      {{range $g := .Legend}}<fieldset class="fam">
+        <legend><label><input type="checkbox" class="fam-toggle"> <svg class="sw" viewBox="0 0 16 16"><circle class="{{.Hue}}" cx="8" cy="8.5" r="5"/></svg>{{.Label}}</label></legend>
+        {{range .Entries}}<label{{if not .Checked}} class="off"{{end}}><input type="checkbox" name="type" value="{{.Type}}"{{if .Checked}} checked{{end}}>
+          <svg class="sw" viewBox="0 0 16 16"><path class="{{.Class}}" d="{{.Swatch}}"/></svg>{{.Type}} <span class="dim">({{.Count}})</span></label>
+        {{end}}
+      </fieldset>
+      {{end}}
+    </div>
   </form>
 </div>
 
 <div class="surface">
   <h2>compose — the canonical <span class="dim hint">(the live-only value at W{{if .Zoomed}}, narrowed to the span — a lens, not a different read{{end}})</span></h2>
   <div class="strip">
-    {{range .Strip}}<a class="c{{.Slot}}" href="/facet?id={{.ID}}" title="{{.Title}}"></a>
+    {{range .Strip}}<a class="{{.Hue}}" href="/facet?id={{.ID}}" title="{{.Title}}"></a>
     {{else}}<span class="dim">no live facets in this span</span>{{end}}
   </div>
   <p class="dim hint">{{.StripCount}} live facet{{if ne .StripCount 1}}s{{end}} composed{{if .Zoomed}} from the span{{end}}, in fact-time order</p>
@@ -170,9 +197,25 @@
       const at = toTime(toX(e)).getTime();
       const factor = e.deltaY < 0 ? 0.5 : 2;
       const f = at - (at - from) * factor, t = at + (to - at) * factor;
-      location.href = '/?from=' + encodeURIComponent(new Date(f).toISOString()) +
-        '&to=' + encodeURIComponent(new Date(t).toISOString());
+      const q = new URLSearchParams(location.search);
+      q.set('from', new Date(f).toISOString());
+      q.set('to', new Date(t).toISOString());
+      location.href = '/?' + q.toString();
     }, { passive: false });
+
+    // A family's box ticks or clears every type in its row, then recomposes.
+    document.querySelectorAll('.fam-toggle').forEach(box => {
+      const group = box.closest('.fam');
+      const types = [...group.querySelectorAll('input[name=type]')];
+      box.checked = types.every(t => t.checked);
+      box.indeterminate = !box.checked && types.some(t => t.checked);
+      box.addEventListener('change', () => {
+        types.forEach(t => { t.checked = box.checked; });
+        document.querySelector('.controls').submit();
+      });
+    });
+    document.querySelectorAll('input[name=type]').forEach(t =>
+      t.addEventListener('change', () => document.querySelector('.controls').submit()));
   })();
 </script>
 </body>

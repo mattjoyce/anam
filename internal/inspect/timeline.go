@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
 	"sort"
 	"time"
 
@@ -19,34 +18,29 @@ import (
 // and the composed strip below it is the CANONICAL — the live-only value at W.
 // Two surfaces, two names (§7), one screen.
 
-// Band geometry, in viewBox units. Stems rise from the baseline to lane heights
-// staggered per type slot, echoing the diagram and keeping same-day facets of
-// different types out of each other's way.
+// Band geometry, in viewBox units. Each family is a row (marks.go); the plot
+// starts right of the row labels.
 const (
 	bandW     = 1200.0
-	bandH     = 240.0
-	bandLeft  = 24.0
+	bandLeft  = 104.0
 	bandRight = 24.0
-	baseline  = 196.0
-	diamondR  = 6.0
+	rowTop    = 30.0
+	rowH      = 30.0
+	axisH     = 28.0
 )
 
-// laneY maps a type's slot to its stem height: four lanes, cycled.
-var laneY = []float64{64, 100, 136, 168}
-
-// slotOrder pins the four MVP types to categorical slots in fixed order
-// (dataviz: hues are assigned, never cycled). Types beyond these are slotted
-// deterministically after, in name order, by the caller.
-var slotOrder = []facet.Type{
-	"health.body-composition", "health.heart-rate", "health.sleep", "health.metric-group",
+type tlRow struct {
+	Family, Label, Hue string
+	Types              []facet.Type
+	Y, Top, Height     float64
+	Stripe             bool // every other row is shaded, for the eye to follow
 }
 
 type tlPoint struct {
-	X, Y  float64
-	ID    string
-	Slot  int
-	Live  bool
-	Title string
+	Path, Hue string
+	ID        string
+	Live      bool
+	Title     string
 }
 
 type tlTick struct {
@@ -55,14 +49,21 @@ type tlTick struct {
 }
 
 type tlLegendEntry struct {
-	Type  facet.Type
-	Slot  int
-	Count int
+	Type    facet.Type
+	Swatch  string // the type's mark, centred in a 16×16 box
+	Class   string // the mark's CSS class: hue, and hollow for a reading
+	Count   int
+	Checked bool
+}
+
+type tlLegendGroup struct {
+	Family, Label, Hue string
+	Entries            []tlLegendEntry
 }
 
 type tlStripEntry struct {
 	ID    string
-	Slot  int
+	Hue   string
 	Title string
 }
 
@@ -78,43 +79,30 @@ type timelineData struct {
 
 	BandW, BandH, Baseline, PlotLeft, PlotRight float64
 
+	Rows   []tlRow
 	Points []tlPoint
 	Ticks  []tlTick
-	Legend []tlLegendEntry
+	Legend []tlLegendGroup
 
 	Strip      []tlStripEntry
 	StripCount int
 	Zoomed     bool
 
+	// Filtered is true when the type filter hides something. Shown counts the
+	// marks drawn in the window.
+	Filtered bool
+	Shown    int
+
 	// Nav is the window moved: the same read at another from/to, each a link, so
 	// every gesture is a round trip and the band stays honest to the fold at W.
+	// The type filter rides along on every link.
 	Nav tlNav
 }
 
-// tlNav holds the four moves a window can make, as URLs.
+// tlNav holds the moves a window can make, and the filter presets, as URLs.
 type tlNav struct {
 	Left, Right, In, Out string
-}
-
-// navLinks derives the four moves from the window: pan by a quarter of its width,
-// zoom in to half and out to double, both centred. The window stays in the URL, so
-// a view is a link.
-func navLinks(from, to time.Time) tlNav {
-	width := to.Sub(from)
-	quarter := width / 4
-	centre := from.Add(width / 2)
-	link := func(f, t time.Time) string {
-		q := url.Values{}
-		q.Set("from", f.UTC().Format(time.RFC3339))
-		q.Set("to", t.UTC().Format(time.RFC3339))
-		return "/?" + q.Encode()
-	}
-	return tlNav{
-		Left:  link(from.Add(-quarter), to.Add(-quarter)),
-		Right: link(from.Add(quarter), to.Add(quarter)),
-		In:    link(centre.Add(-width/4), centre.Add(width/4)),
-		Out:   link(centre.Add(-width), centre.Add(width)),
-	}
+	AllTypes, EventsOnly string
 }
 
 func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
@@ -149,7 +137,7 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := buildTimeline(res, all, from, to, zoomed)
+	data := buildTimeline(res, all, from, to, zoomed, r.URL.Query()["type"])
 	render(w, "timeline.html", data)
 }
 
@@ -212,8 +200,7 @@ func parseInstant(s string) (t time.Time, dateOnly bool, err error) {
 	return t, false, nil
 }
 
-func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoomed bool) timelineData {
-	slots := slotFor(all)
+func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoomed bool, typeQ []string) timelineData {
 	x := func(t time.Time) float64 {
 		frac := float64(t.Sub(from)) / float64(to.Sub(from))
 		return bandLeft + frac*(bandW-bandLeft-bandRight)
@@ -226,81 +213,104 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 		return all[i].ID < all[j].ID
 	})
 
+	counts := map[facet.Type]int{}
+	var types []facet.Type
+	for _, f := range all {
+		if counts[f.Type] == 0 {
+			types = append(types, f.Type)
+		}
+		counts[f.Type]++
+	}
+	show, selected := typeFilter(typeQ, types)
+
+	// Rows come from every type in the ledger, not the filtered few, so a filter
+	// hides marks without moving the rows that are left.
+	rows, yOf := layoutRows(types)
+	baseline := rowTop + float64(len(rows))*rowH
+
 	data := timelineData{
 		W: res.W, Hash: res.Value.Hash(),
 		Total: len(res.States), Live: len(res.Live),
-		BandW: bandW, BandH: bandH, Baseline: baseline,
+		BandW: bandW, BandH: baseline + axisH, Baseline: baseline,
 		PlotLeft: bandLeft, PlotRight: bandW - bandRight,
 		WindowFromMS: from.UnixMilli(), WindowToMS: to.UnixMilli(),
-		Zoomed: zoomed,
-		Nav:    navLinks(from, to),
+		Zoomed: zoomed, Rows: rows,
+		Filtered: selected != nil,
+		Nav:      navLinks(from, to, selected),
 	}
 	if zoomed {
 		data.From = from.UTC().Format(time.RFC3339)
 		data.To = to.UTC().Format(time.RFC3339)
 	}
+	var events []facet.Type
+	for _, t := range types {
+		if isEvent(t) {
+			events = append(events, t)
+		}
+	}
+	sort.Slice(events, func(i, j int) bool { return events[i] < events[j] })
+	data.Nav.AllTypes = windowLink(from, to, zoomed, nil)
+	data.Nav.EventsOnly = windowLink(from, to, zoomed, events)
 
-	counts := map[facet.Type]int{}
-	// Types sharing a lane (slots cycle over four lanes) collide when their
-	// fact-times coincide — the generic metric-group carries several groups per
-	// day. Stacked marks step their stems up, as the diagram varies its heights,
-	// so every facet stays visible.
-	stacked := map[[2]int]int{}
 	for _, f := range all {
-		counts[f.Type]++
-		if f.FactTime.Before(from) || f.FactTime.After(to) {
+		if !show[f.Type] || f.FactTime.Before(from) || f.FactTime.After(to) {
 			continue
 		}
 		st := res.States[f.ID]
-		slot := slots[f.Type]
-		px := x(f.FactTime)
-		stackKey := [2]int{slot % len(laneY), int(px)}
-		lift := float64(stacked[stackKey]) * (2*diamondR + 2)
-		stacked[stackKey]++
+		style := styleOf(f.Type)
+		hue := hueClass(style.Family)
+		mark := markClass(f.Type)
+		when := f.FactTime.UTC().Format("2006-01-02 15:04Z")
 		data.Points = append(data.Points, tlPoint{
-			X: px, Y: laneY[slot%len(laneY)] - lift,
-			ID: f.ID, Slot: slot, Live: st.Live(),
+			Path: markPath(style.Shape, x(f.FactTime), yOf[f.Type]),
+			Hue:  mark, ID: f.ID, Live: st.Live(),
 			Title: fmt.Sprintf("%s · %s · v%d %s · %s",
-				f.FactTime.UTC().Format("2006-01-02"), f.Type, f.ArtifactVersion, st.Status, f.Provenance.SourceRef),
+				when, f.Type, f.ArtifactVersion, st.Status, f.Provenance.SourceRef),
 		})
 		if st.Live() {
 			data.Strip = append(data.Strip, tlStripEntry{
-				ID: f.ID, Slot: slot,
-				Title: fmt.Sprintf("%s · %s", f.FactTime.UTC().Format("2006-01-02"), f.Type),
+				ID: f.ID, Hue: hue, Title: when + " · " + string(f.Type),
 			})
 		}
 	}
+	data.Shown = len(data.Points)
 	data.StripCount = len(data.Strip)
 
-	for typ, slot := range slots {
-		data.Legend = append(data.Legend, tlLegendEntry{Type: typ, Slot: slot, Count: counts[typ]})
+	for _, row := range rows {
+		g := tlLegendGroup{Family: row.Family, Label: row.Label, Hue: row.Hue}
+		for _, t := range row.Types {
+			g.Entries = append(g.Entries, tlLegendEntry{
+				Type: t, Swatch: markPath(styleOf(t).Shape, 8, 8.5), Class: markClass(t),
+				Count: counts[t], Checked: show[t],
+			})
+		}
+		data.Legend = append(data.Legend, g)
 	}
-	sort.Slice(data.Legend, func(i, j int) bool { return data.Legend[i].Slot < data.Legend[j].Slot })
 
 	data.Ticks = monthTicks(from, to, x)
 	return data
 }
 
-// slotFor assigns each type its categorical slot: the four known types in fixed
-// order, anything else deterministically after, by name.
-func slotFor(all []facet.Facet) map[facet.Type]int {
-	slots := map[facet.Type]int{}
-	for i, t := range slotOrder {
-		slots[t] = i
-	}
-	var extra []facet.Type
-	seen := map[facet.Type]bool{}
-	for _, f := range all {
-		if _, known := slots[f.Type]; !known && !seen[f.Type] {
-			seen[f.Type] = true
-			extra = append(extra, f.Type)
+// layoutRows places each family's row and each type's sub-lane within it. Types
+// in a row sit a few units apart, so a day's body-composition and weight do not
+// land on the same spot.
+func layoutRows(types []facet.Type) ([]tlRow, map[facet.Type]float64) {
+	rows := rowsFor(types)
+	yOf := map[facet.Type]float64{}
+	for i := range rows {
+		rows[i].Top, rows[i].Height = rowTop+float64(i)*rowH, rowH
+		rows[i].Y = rows[i].Top + rowH/2
+		rows[i].Stripe = i%2 == 0
+		n := len(rows[i].Types)
+		step := 0.0
+		if n > 1 {
+			step = min(7, 18/float64(n-1))
+		}
+		for j, t := range rows[i].Types {
+			yOf[t] = rows[i].Y + (float64(j)-float64(n-1)/2)*step
 		}
 	}
-	sort.Slice(extra, func(i, j int) bool { return extra[i] < extra[j] })
-	for i, t := range extra {
-		slots[t] = len(slotOrder) + i
-	}
-	return slots
+	return rows, yOf
 }
 
 // monthTicks lays out at most ~8 month-boundary ticks across the window.

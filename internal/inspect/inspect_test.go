@@ -277,3 +277,32 @@ func TestTimeline_NavLinksMoveTheWindow(t *testing.T) {
 		}
 	}
 }
+
+// The type filter is a lens like the span: naming one type draws only its marks,
+// on the band and in the strip, and every move keeps the filter (card 34).
+func TestTimeline_TypeFilterNarrowsBandAndStripAndRidesTheLinks(t *testing.T) {
+	t.Parallel()
+	srv, bpID, hrID := seededServer(t)
+
+	code, body := get(t, srv.URL+"/?type=health.heart-rate")
+	if code != http.StatusOK {
+		t.Fatalf("GET /?type = %d", code)
+	}
+	if strings.Contains(body, "/facet?id="+bpID) {
+		t.Error("blood pressure facet drawn under a heart-rate filter")
+	}
+	if !strings.Contains(body, "/facet?id="+hrID) {
+		t.Error("heart-rate facet missing under its own filter")
+	}
+	if !strings.Contains(body, "type=health.heart-rate") || !strings.Contains(body, "filtered by type") {
+		t.Error("nav links or caption lost the filter")
+	}
+
+	// Unfiltered, both types are in the legend with a checkbox each.
+	_, all := get(t, srv.URL+"/")
+	for _, want := range []string{`value="health.blood-pressure" checked`, `value="health.heart-rate" checked`} {
+		if !strings.Contains(all, want) {
+			t.Errorf("legend missing %s", want)
+		}
+	}
+}

@@ -35,23 +35,51 @@ snapshot describes the recorded regimen; it does not establish adherence.
 ## 2. Boundaries and ownership
 
 ```text
-Conversation / CLI / inspector
-              |
-       MCP or other adapter
-              |
-       Application operations
-        /         |          \
-  record reads  source authoring  operator operations
-       |           |                  |
- fold + projection records source -> capture -> gate -> ledger
-       |
- published value + receipt
+Conversation -> MCP adapter --+
+CLI -------------------------+--> Anam service API (Docker on Unraid)
+Inspector -------------------+              |
+                              Application operations
+                               /         |         \
+                         reads       authoring    operations
+                           |             |             |
+                    fold/projection   records -> capture -> gate
+                           |                               |
+                    value + receipt                     ledger
 ```
 
-The application API is transport-independent, initially a Go API. Operation names below identify
-contracts, not mandatory package names or HTTP routes. No HTTP service or separate public Go module
-is needed to establish these contracts. Define small interfaces at consumers, grouped by concern;
-do not build a single store/service interface containing every operation.
+**Target deployment, agreed 2026-10-07:** Anam runs as a service in Docker on Unraid, exposing a
+comprehensive application API. SQLite remains the database substrate, on safe host-local storage.
+The service owns the ledger, operational store, artifacts, and managed source-writing operations.
+CLI, inspector, MCP, and scheduled ingestion use the service API in normal operation; they do not
+independently open its database files. A separately controlled offline maintenance mode may access
+them only with the service stopped.
+
+The domain operations remain transport-independent Go code inside the service. Operation names below
+identify contracts, not mandatory package names or HTTP routes. A versioned network API exposes these
+contracts to clients; its concrete routes and authentication scheme remain implementation design work.
+Define small interfaces at consumers, grouped by concern; do not build a single store/service interface
+containing every operation. The MCP adapter is a client of this API and needs no database volume mount.
+
+### Storage and process ownership
+
+- Bind persistent host-local storage into the container for both SQLite files and their WAL/shared
+  memory companions. Never place the live databases on an SMB-mounted path or in the disposable
+  container layer. Select and verify the actual Unraid disk/pool path during deployment.
+- A local array-disk path can retain configured array parity protection; a redundant pool is another
+  placement option. Local filesystem access and parity protection are separate choices. Keep live
+  database directories stationary while the service runs; do not move them between storage tiers.
+- One service instance owns the stores. Serialize application writes through bounded scheduling,
+  permit bounded concurrent reads, and retain SQLite transactions, busy handling, and gate invariants.
+  No database transaction spans a conversation, model call, or wait for client input.
+- Distinguish SQLite WAL checkpoint maintenance from Anam's semantic bucket checkpoints. The service
+  coordinates both, plus backup and derived-store repair. Do not copy a live database file alone as
+  a backup; use a database-consistent backup procedure. Parity does not replace backups.
+- Docker supervises the service with an explicit restart policy, readiness checks, and graceful
+  shutdown. Shutdown stops accepting work and drains or cancels bounded work; durable submissions
+  reconcile after restart. A service outage returns unavailable, never a fallback to direct DB access.
+
+This target replaces the earlier suggestion that each interface could host the domain packages and
+open the stores itself. It changes deployment ownership, not Anam's immutable record model.
 
 - **Core:** temporal selection, series resolution, projection verdicts, canonical serialization,
   receipt creation, admission, and immutable ledger invariants.
@@ -424,8 +452,11 @@ and interpretation into Anam. No `log(text)` endpoint that silently guesses type
 
 The official [Go MCP SDK](https://github.com/modelcontextprotocol/go-sdk) supplies typed tool
 registration, structured results, transports, and in-memory client/server testing. Keep SDK types in
-the adapter. Start with local stdio, protocol traffic alone on stdout and diagnostics on stderr.
-Remote transport and authentication follow a concrete client/deployment requirement. Tool annotations
+the adapter. A local stdio adapter can call the Unraid service API; stdout then carries protocol traffic
+alone and diagnostics use stderr. A remotely hosted MCP adapter is another client deployment option.
+The MCP transport choice does not change store ownership. Service authentication, caller scopes, and
+protected network transport are required deployment contracts; exact mechanisms remain to be selected.
+Tool annotations
 describe effects accurately but do not enforce permissions. See the [SDK research note](../journal/notes/mcp-go-sdk.md).
 
 Treat facet payloads and source documents as evidence, including any text that looks like instructions.
@@ -454,6 +485,9 @@ the client can distinguish a user assertion, a device observation, an extraction
    statement. Unsupported proposed admission returns an explicit capability limitation.
 10. **Recovery:** rebuilding derived indexes preserves authored submissions and historical receipts;
     restarting the MCP process loses no admitted fact or durable pending assertion.
+11. **Service ownership:** CLI, inspector, MCP, and scheduled ingest work without database mounts.
+    Concurrent ingest and conversational writes are bounded and recoverable. Restarting the service
+    reconciles pending submissions; an outage never causes a client to open shared database files.
 
 Exercise these through a real SDK client/server pair and real temporary ledger, operational, source,
 and artifact files. Core query tests compare checkpoint-derived answers to full folds. Adapter tests
@@ -467,6 +501,7 @@ substantial reuse, but not an existing application API with all contracts above.
 
 | Stage | Deliverable | Prerequisites owned outside the MCP adapter |
 |---|---|---|
+| 0 | Anam service in Docker on Unraid, SQLite on verified local persistent storage | Single store owner, versioned service API, authentication, bounded work scheduling, lifecycle and backup procedures; CLI/scheduler routed through the service |
 | 1 | Discovery and timeline conversations with exact evidence | Callable core query/publication seam, ledger-bound receipts, durable query metadata, stable paging, sufficient authorized projections |
 | 2 | Log supported user assertions and check their outcomes | Managed records writer, durable submission identity, precision rules, admission reconciliation and concurrency with scheduled ingest |
 | 3 | Snapshot conversations and corrections | Series/closure semantics, snapshot projection and receipt support; source revision protocol for corrections |
@@ -498,6 +533,8 @@ that shortcut. The source writer is a substantive new responsibility and must be
 
 **Armstrong, runtime:** the ledger/gate remains the error kernel. The MCP process can die at any request
 boundary and be restarted by its local client (or by a service supervisor if deployed remotely).
+The Anam service is independently supervised by Docker and is the sole normal store owner; losing
+it makes API operations unavailable until restart, while durable work remains recoverable.
 Read failure produces an error or an unreferenced published value, never a fabricated partial answer.
 Source writes recover through durable submission identity and reconciliation; operational indexes
 recover through replay. Corruption and divergent identity stop the affected operation rather than

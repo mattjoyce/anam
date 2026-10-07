@@ -21,8 +21,38 @@ import (
 // The rows are drawn from the shape the real export has: two measurement groups
 // sharing one timestamp (a repeated blood-pressure reading), a REAL that would
 // lose its ".0" if the driver were allowed to re-utter it, and a created_at that
-// must not reach the payload.
+// must not reach the payload. Their groups are as the account holds them: the
+// blood pressure entered by hand (attrib 2, no device, no timezone), the weight
+// from the scale but ambiguous (attrib 1), and a scale reading with no group row.
 func fixture(t *testing.T) string {
+	t.Helper()
+	path := measurementsOnly(t)
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("open fixture: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	stmts := `
+	CREATE TABLE measure_groups (
+	    withings_id INTEGER PRIMARY KEY,
+	    attrib INTEGER, category INTEGER, deviceid TEXT, model TEXT, modelid INTEGER,
+	    timezone TEXT, created INTEGER, modified INTEGER);
+
+	INSERT INTO measure_groups VALUES
+	  (6314440651, 2, 1, NULL, NULL, NULL, NULL, 1724355780, 1724355780),
+	  (6314440652, 2, 1, NULL, NULL, NULL, NULL, 1724355780, 1724355780),
+	  (5204716098, 1, 1, 'da158fc939db68c8', 'Body Smart', 16, 'Australia/Sydney', 1706304979, 1788579025);
+	INSERT INTO measurements (withings_id, date, type, value, unit, created_at) VALUES
+	  (7974153600,'2026-07-11 13:47:37', 1, 88.164, -3, '2026-07-11 19:33:04');`
+	if _, err := db.Exec(stmts); err != nil {
+		t.Fatalf("seed groups: %v", err)
+	}
+	return path
+}
+
+// measurementsOnly is a source from before the plugin stored measure groups.
+func measurementsOnly(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "withings.db")
 	db, err := sql.Open("sqlite", path)
@@ -69,8 +99,8 @@ func TestScan_ComposesGateCompliantEnvelopes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
-	if len(envs) != 5 {
-		t.Fatalf("Scan composed %d envelopes, want 5 (one per measurement)", len(envs))
+	if len(envs) != 6 {
+		t.Fatalf("Scan composed %d envelopes, want 6 (one per measurement)", len(envs))
 	}
 
 	for _, env := range envs {
@@ -198,5 +228,76 @@ func TestScan_IsDeterministic(t *testing.T) {
 		if a[i].SourceRef != b[i].SourceRef || !bytes.Equal(a[i].Payload, b[i].Payload) {
 			t.Errorf("scan %d not deterministic: %s", i, a[i].SourceRef)
 		}
+	}
+}
+
+// Withings' own attribution decides the binding. A reading the scale could not place
+// asserts no one, so the gate binds it at medium. A reading typed in by hand is the
+// account holder's own entry and keeps the assertion: manual is how it was taken,
+// not whose it is. A row with no group row is as it was before attribution existed.
+func TestScan_AttributionDecidesTheAssertion(t *testing.T) {
+	t.Parallel()
+
+	envs, err := withings.Scan(context.Background(), fixture(t), "matt")
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	want := map[string]string{
+		facet.SourceRef("withings", "5204716098", "1"):  "",     // attrib 1, ambiguous
+		facet.SourceRef("withings", "6314440651", "9"):  "matt", // attrib 2, entered by hand
+		facet.SourceRef("withings", "6314440652", "10"): "matt",
+		facet.SourceRef("withings", "7974153600", "1"):  "matt", // no group row
+	}
+	for _, env := range envs {
+		if w, ok := want[env.SourceRef]; ok && env.AssertedPerson != w {
+			t.Errorf("%s: asserted %q, want %q", env.SourceRef, env.AssertedPerson, w)
+		}
+	}
+}
+
+// The group's fields reach the payload as the source wrote them, and a NULL is an
+// absent field: the hand-entered reading has no device and no timezone, and must not
+// be given an empty or invented one.
+func TestScan_CarriesTheGroupAsWritten(t *testing.T) {
+	t.Parallel()
+
+	envs, err := withings.Scan(context.Background(), fixture(t), "matt")
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	byRef := map[string][]byte{}
+	for _, env := range envs {
+		byRef[env.SourceRef] = env.Payload
+	}
+	scale := byRef[facet.SourceRef("withings", "5204716098", "1")]
+	for _, want := range []string{`"attrib":"1"`, `"model":"Body Smart"`, `"deviceid":"da158fc939db68c8"`,
+		`"timezone":"Australia/Sydney"`} {
+		if !bytes.Contains(scale, []byte(want)) {
+			t.Errorf("scale payload lacks %s:\n%s", want, scale)
+		}
+	}
+	manual := byRef[facet.SourceRef("withings", "6314440651", "9")]
+	if !bytes.Contains(manual, []byte(`"attrib":"2"`)) {
+		t.Errorf("manual payload lacks its attrib:\n%s", manual)
+	}
+	for _, absent := range []string{"model", "deviceid", "timezone", "null"} {
+		if bytes.Contains(manual, []byte(absent)) {
+			t.Errorf("manual payload carries %s:\n%s", absent, manual)
+		}
+	}
+	for _, absent := range []string{"modified", "1788579025", "category"} {
+		if bytes.Contains(scale, []byte(absent)) {
+			t.Errorf("scale payload carries Withings' bookkeeping %s:\n%s", absent, scale)
+		}
+	}
+}
+
+// A source without measure_groups cannot say who stood on the scale. Scan refuses
+// rather than bind every reading high on attribution it cannot see.
+func TestScan_RefusesASourceWithoutGroups(t *testing.T) {
+	t.Parallel()
+
+	if _, err := withings.Scan(context.Background(), measurementsOnly(t), "matt"); err == nil {
+		t.Fatal("Scan accepted a source with no measure_groups")
 	}
 }

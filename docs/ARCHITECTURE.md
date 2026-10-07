@@ -319,7 +319,11 @@ The gate is exposed as two calls:
   row always maps to the same logical facet.
 - **`source_ref` is a source row's identity, never its contents.** It composes from the Definition's
   declared `identity_key` — the fields that say *which* row this is — and nothing else:
-  `bp-csv:2026-01-24T06:30:00`, not `bp-csv:2026-01-24T06:30:00:118/76/61`. Braiding the values into the
+  `bp-csv:20:2026-01-24T06:30:00`, not `bp-csv:…:118/76/61`. The composition is one function,
+  `facet.SourceRef`: the source name, then each identity value **length-prefixed** (`<bytes>:<value>`),
+  so that two different tuples can never compose one string however many colons the values carry (a
+  timestamp does; a lab's id prefix does). The gate composes it from the Definition and every capture
+  worker composes it the same way, through the same function. Braiding the values into the
   natural key would give a corrected reading a *different* `facet_id`, so it would enter as a **new
   facet** and orphan the original instead of superseding it — silently disabling the entire
   idempotency-and-supersession mechanism for that source. Identity decides *which fact*; `content_hash`
@@ -553,6 +557,15 @@ as an index of the new one.
 mode, so recent commits can sit in `ledger.db-wal` until a checkpoint folds them in. Copy with
 `sqlite3 ledger.db ".backup <dest>"`, or copy `ledger.db` together with its `-wal` file with no writer
 running.
+
+**The ledger's directory is the record, and the backup unit.** Beside `ledger.db` sit the published
+artifacts (`artifacts/`) and the **default library** (`documents/`): the primary source documents the
+facts were extracted from, each admitted as a `doc.reference` by its library-relative path and hash.
+A library is a folder root whose rows are files; the default one needs no declaration because its
+place is derived from the ledger's, and a named one is a `documents` import with its own root. The root
+is a *place* and never enters a fact: the facet carries the relative path and the sha256, so a library
+that moves is a config change and a document that changes supersedes. The inspector serves the default
+library's bytes itself (`/document?path=`), confined to the root.
 
 ### Keys are identity-first, and integers are typed
 

@@ -43,7 +43,7 @@ const bpManifest = `{
     "validation_mode": "lenient",
     "source_schema": "bp-csv/reading",
     "time_semantics": {
-      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
+      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
     },
     "identity_key": ["/measured_at"]
   },
@@ -82,7 +82,7 @@ func commit(t *testing.T, g *gate.Gate, measuredAt, reading string) gate.Result 
 	t.Helper()
 	env := facet.Envelope{
 		Type: "health.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
-		SourceRef: "bp-csv:" + measuredAt,
+		SourceRef: facet.SourceRef("bp-csv", measuredAt),
 		Payload:   []byte(`{"measured_at": "` + measuredAt + `", ` + reading + `}`),
 	}
 	binding, err := g.Resolve(env)
@@ -259,7 +259,7 @@ func TestChangesSince_ReturnsABatchsSharedInstantWhole(t *testing.T) {
 		at := time.Date(2026, 5, 1, 6, i, 0, 0, time.UTC).Format(time.RFC3339)
 		envs[i] = facet.Envelope{
 			Type: "health.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
-			SourceRef: "bp-csv:" + at,
+			SourceRef: facet.SourceRef("bp-csv", at),
 			Payload:   []byte(`{"measured_at": "` + at + `", "systolic": 118, "diastolic": 76}`),
 		}
 		b, err := g.Resolve(envs[i])

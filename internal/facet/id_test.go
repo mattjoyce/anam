@@ -62,3 +62,34 @@ func TestNewIDIsAUUIDv5(t *testing.T) {
 		t.Errorf("NewID() UUID variant = %v, want RFC4122", got)
 	}
 }
+
+// The card-11 property: two different identity tuples never compose one source ref,
+// however many colons the values carry. Before the length prefix, ("a:b", "c") and
+// ("a", "b:c") were both "s:a:b:c".
+func TestSourceRef_DistinctTuplesNeverCollide(t *testing.T) {
+	t.Parallel()
+
+	tuples := [][]string{
+		{"a:b", "c"}, {"a", "b:c"}, {"a:b:c"}, {"a", "b", "c"},
+		{"2025-5-29 05:41:00", "1"}, {"2025-5-29 05:41:00:1"},
+		{"", "x"}, {"x", ""}, {"x"},
+	}
+	seen := map[string][]string{}
+	for _, tu := range tuples {
+		ref := facet.SourceRef("s", tu...)
+		if prev, dup := seen[ref]; dup {
+			t.Errorf("%v and %v both compose %q", prev, tu, ref)
+		}
+		seen[ref] = tu
+	}
+	if got, want := facet.SourceRef("records", "mhr:med/ramipril/1/started"), "records:26:mhr:med/ramipril/1/started"; got != want {
+		t.Errorf("SourceRef = %q, want %q", got, want)
+	}
+	if got, want := facet.Stamp("med.regimen", "ramipril", "1"), "med.regimen:8:ramipril:1:1"; got != want {
+		t.Errorf("Stamp = %q, want %q", got, want)
+	}
+	// Byte length, not rune count: the prefix must let a reader skip exactly the value.
+	if got, want := facet.SourceRef("s", "é"), "s:2:é"; got != want {
+		t.Errorf("SourceRef over a multibyte value = %q, want %q", got, want)
+	}
+}

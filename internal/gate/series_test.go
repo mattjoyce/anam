@@ -20,7 +20,7 @@ const medStartedManifest = `{
     "classification": "Sensitive",
     "validation_mode": "lenient",
     "source_schema": "records/med.started",
-    "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02"}},
+    "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "UTC"}},
     "identity_key": ["/id"],
     "series": {"name": "med.regimen", "key": ["/drug", "/course"]}
   },
@@ -49,7 +49,7 @@ func newMedGate(t *testing.T) (*gate.Gate, *ledger.Ledger) {
 func medEnvelope(payload string) facet.Envelope {
 	return facet.Envelope{
 		Type: "med.started", Source: "self-log", Injector: "self-log",
-		SourceRef: "self-log:m1", Payload: []byte(payload),
+		SourceRef: facet.SourceRef("self-log", "m1"), Payload: []byte(payload),
 	}
 }
 
@@ -73,7 +73,7 @@ func TestCommit_StampsTheSeries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CurrentVersion: %v", err)
 	}
-	if want := "med.regimen:ramipril:1"; f.Series != want {
+	if want := facet.Stamp("med.regimen", "ramipril", "1"); f.Series != want {
 		t.Errorf("stamped series = %q, want %q", f.Series, want)
 	}
 }

@@ -6,14 +6,23 @@ is `SELF-LOG.md`; this is the runbook. Written 2026-10-06, the night the first d
 ## The folders
 
 ```
-/mnt/Projects/anam/private/            Windows: \\192.168.20.4\Projects\anam\private\
+/mnt/Projects/anam/private/            Windows: \\192.168.20.4\Projects\anam\private\   — the INBOX
 ├── <documents>                        dropped here; pending until processed
 ├── records/                           the SOURCE Anam ingests: one YAML per document
-├── processed/                         documents whose facts are in the ledger
 └── README-processing.md               status, for Matt, kept current by whoever processes
+
+~/.local/share/anam/                   the ThinkPad: the RECORD, and the backup unit
+├── ledger.db                          the ledger
+├── tracking.db                        the operational store
+├── artifacts/                         checkpoints and receipts
+└── documents/                         the DEFAULT LIBRARY: every processed primary document,
+    ├── <document>                     each with a sidecar, each a doc.reference facet
+    └── <document>.meta.yaml           `date:` the document's own date
 ```
 
-The clone of this repo on the share ignores `private/`. Nothing in it is ever committed.
+The clone of this repo on the share ignores `private/`. Nothing in it is ever committed. The library
+is the primary source: a records file is an extraction from a document that is in the library, under
+the path its `document.name` names, with the hash its `document.sha256` records.
 
 ## Records: the one shape every document becomes
 
@@ -33,9 +42,10 @@ records:
   **never enter the payload**: one measurement quoted by two reports is one fact, and the document
   would make the two fight. Which document said what is a grep over `records/`.
 - Scalars reach the payload as typed: `20240916` is text, `2026-01-30 08:53` is text, `5.7` is a number.
-- Source is `records`, so `source_ref` is `records:<id>` and the gate recomposes it from the
-  Definition's identity_key. Every records type has `identity_key: ["/id"]`, except blood pressure,
-  whose Definition composes `date_excel:reading`; a diary record's id is exactly that.
+- Source is `records`, and the worker composes `source_ref` from the type's Definition exactly as
+  the gate does (`facet.SourceRef`: the source, then each identity value length-prefixed). Every
+  records type has `identity_key: ["/id"]`, so the ref is `records:<len>:<id>`; blood pressure is keyed
+  on `date_excel` and `reading`, and a diary record's `id` is then just another field.
 - One id in two files in one scan is refused. That is the guard against re-admitting a draw from
   a later report's history column when the draw has a report of its own.
 - A re-run is a no-op; an edited record supersedes; a deleted record retracts nothing until you ask:
@@ -71,26 +81,25 @@ was I on"; `anam serve meds` publishes the current regimen with a receipt.
 
 ## Documents as facts of their own
 
-A processed document can also be a facet: `doc.reference`, whose payload is the path, the sha256,
-the media type and size, and the date from a sidecar. The bytes stay in the folder. Declare the
-folder once in `imports.yaml`:
-
-```yaml
-  - source: documents
-    path: /mnt/Projects/anam/private/processed
-```
-
-and give every file a sidecar beside it, `<file>.meta.yaml`:
+Every processed document is a facet: `doc.reference`, whose payload is the library-relative path, the
+sha256, the media type and size, and the date from a sidecar. The bytes stay in the **default
+library**, `documents/` beside the ledger, which needs no declaration: `anam ingest` and `anam retract`
+add it as the `documents` source whenever the folder exists. Every file in it has a sidecar beside it,
+`<file>.meta.yaml`:
 
 ```yaml
 date: 2026-01-30          # the document's own date, not the day it was scanned
 title: Lipid studies      # anything else worth saying stays in the payload too
 ```
 
-A file with no sidecar refuses the whole scan, and the hourly ingest with it, so add the sidecars
-before the import. Identity is the relative path, so a renamed file is a new facet and the old one
+A file with no sidecar refuses the whole scan, and the hourly ingest with it, so write the sidecar
+before the file goes in. Identity is the relative path, so a renamed file is a new facet and the old one
 stands until `anam retract documents --yes`; changed bytes supersede. `.meta.yaml` files, dot-files and
-dot-folders are skipped.
+dot-folders are skipped. The inspector links a reference facet to its bytes (`/document?path=…`),
+served from the library and confined to it.
+
+A second library is a declared `documents` import with its own root; a declared one replaces the
+default rather than adding to it. The root is config and never enters a fact.
 
 ## Extractors
 
@@ -138,17 +147,19 @@ its own report, or a draw whose report is lost) is emitted from that later repor
 
 ## Processing a drop
 
-1. `sha256sum` the file. If a records file with that sha exists, the document is a duplicate: move
-   it to `processed/` and stop.
-2. ACL PDF: run the extractor into `records/`. Anything else: read it, write the records file.
+1. `sha256sum` the file. If a records file with that sha exists, the document is a duplicate: delete
+   the drop and stop (the library already holds it).
+2. ACL PDF: run the extractor into `records/`. Anything else: read it, write the records file. Its
+   `document.name` is the path the document will have in the library.
 3. Validate before touching the live ledger: build, `anam init` against a scratch ledger via
    `ANAM_LEDGER_PATH`, `ANAM_DB_PATH`, `ANAM_ARTIFACT_DIR`, `anam ingest --imports <scratch>`. The
    gate is the validator; a records file that fails here fails identically live.
-4. `ANAM_PERSON_ID=matt ~/go/bin/anam ingest records` (back up `ledger.db` and `tracking.db` beside
-   the data first, by convention `*.pre-<event>-<date>`). The hourly gateway ingest also picks up
-   `records/`, since it is a declared import in `~/.config/anam/imports.yaml`.
-5. `anam checkpoint` re-mints the buckets the new facts touched.
-6. Move the document to `processed/`; update `README-processing.md`.
+4. Move the document into the library, `~/.local/share/anam/documents/`, and write its sidecar.
+5. `ANAM_PERSON_ID=matt ~/go/bin/anam ingest` (back up `ledger.db` and `tracking.db` beside the data
+   first, by convention `*.pre-<event>-<date>`). The records and the document go in together; the
+   hourly gateway ingest reads both, `records/` as a declared import and the library implicitly.
+6. `anam checkpoint` re-mints the buckets the new facts touched.
+7. Update `README-processing.md` on the share.
 
 ## What the first night taught
 

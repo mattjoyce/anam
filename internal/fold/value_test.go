@@ -12,7 +12,7 @@ func entry(id, factTime, hash string) fold.Entry {
 	return fold.Entry{
 		FacetID: id, Type: "health.blood-pressure",
 		FactTime: factTime,
-		Source:   "bp-csv", SourceRef: "bp-csv:" + id,
+		Source:   "bp-csv", SourceRef: facet.SourceRef("bp-csv", id),
 		Status: facet.StatusAdmitted, ContentHash: hash,
 		Payload: json.RawMessage(`{"systolic":118}`),
 	}

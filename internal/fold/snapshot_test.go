@@ -11,7 +11,7 @@ import (
 func medEntry(id, typ, factTime, series string) fold.Entry {
 	return fold.Entry{
 		FacetID: id, Type: facet.Type(typ), FactTime: factTime, Series: series,
-		Source: "self-log", SourceRef: "self-log:" + id,
+		Source: "self-log", SourceRef: facet.SourceRef("self-log", id),
 		Status: facet.StatusAdmitted, ContentHash: "sha256:" + id,
 		Payload: json.RawMessage(`{}`),
 	}

@@ -13,7 +13,11 @@ package ledger
 //
 //	1  the three tables and their triggers
 //	2  facet.series, the Definition's series stamp (SELF-LOG.md §2)
-const schemaVersion = 2
+//	3  no DDL: the identity encoding (facet.SourceRef, length-prefixed values) and
+//	   the fact-time zone changed what a facet's id and fact_time are. A schema 2
+//	   file holds rows keyed by the old rules and cannot be carried forward; it is
+//	   refused with the remedy, a new ledger from the same sources.
+const schemaVersion = 3
 
 // The ledger's schema. Three tables, and every one of them is append-only.
 //

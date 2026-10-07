@@ -6,7 +6,7 @@
     "validation_mode": "lenient",
     "source_schema": "bp-csv/reading",
     "time_semantics": {
-      "fact_time": {"pointer": "/date_excel", "layout": "2006-1-2 15:04:05"}
+      "fact_time": {"pointer": "/date_excel", "layout": "2006-1-2 15:04:05", "zone": "Australia/Sydney"}
     },
     "identity_key": ["/date_excel", "/reading"],
     "min_binding_assurance": "medium"

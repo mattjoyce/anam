@@ -40,6 +40,8 @@ func TestLoadDefaults(t *testing.T) {
 		LedgerPath:  "/data/anam/ledger.db",
 		DBPath:      "/data/anam/tracking.db",
 		ArtifactDir: "/data/anam/artifacts",
+		LibraryDir:  "/data/anam/documents",
+		Zone:        "Local",
 		Timeout:     5 * time.Second,
 		BucketWidth: span.Default,
 	}
@@ -102,6 +104,8 @@ bucket_width: weekly
 		LedgerPath:  "/srv/anam/ledger.db",
 		DBPath:      "/srv/anam/tracking.db",
 		ArtifactDir: "/srv/anam/artifacts",
+		LibraryDir:  "/srv/anam/documents",
+		Zone:        "Local",
 		Timeout:     12 * time.Second,
 		BucketWidth: span.Weekly,
 	}
@@ -220,6 +224,8 @@ func TestValidate(t *testing.T) {
 		LedgerPath:  "/srv/ledger.db",
 		DBPath:      "/srv/tracking.db",
 		ArtifactDir: "/srv/artifacts",
+		LibraryDir:  "/srv/documents",
+		Zone:        "Australia/Sydney",
 		Timeout:     5 * time.Second,
 		BucketWidth: span.Default,
 	}
@@ -235,6 +241,9 @@ func TestValidate(t *testing.T) {
 		{"ledger and tracking in one file", func(c *config.Config) { c.LedgerPath = c.DBPath }, true},
 		{"missing db_path", func(c *config.Config) { c.DBPath = "" }, true},
 		{"missing artifact_dir", func(c *config.Config) { c.ArtifactDir = "" }, true},
+		{"missing library_dir", func(c *config.Config) { c.LibraryDir = "" }, true},
+		{"unknown zone", func(c *config.Config) { c.Zone = "Mars/Olympus" }, true},
+		{"utc zone", func(c *config.Config) { c.Zone = "UTC" }, false},
 		{"zero timeout", func(c *config.Config) { c.Timeout = 0 }, true},
 		{"negative timeout", func(c *config.Config) { c.Timeout = -time.Second }, true},
 		{"weekly bucket_width", func(c *config.Config) { c.BucketWidth = span.Weekly }, false},

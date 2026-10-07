@@ -17,7 +17,7 @@ func medManifest(typ string, closes bool) string {
   "meta": {
     "facet_type": %q, "definition_version": 1, "classification": "Sensitive",
     "validation_mode": "lenient", "source_schema": "records/%s",
-    "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02"}},
+    "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "UTC"}},
     "identity_key": ["/id"],
     "series": {"name": "med.regimen", "key": ["/drug", "/course"], "closes": %t}
   },
@@ -55,7 +55,7 @@ func medHarness(t *testing.T) *harness {
 func (h *harness) med(t *testing.T, typ facet.Type, id, date, drug string, course int) {
 	t.Helper()
 	env := facet.Envelope{
-		Type: typ, Source: "self-log", Injector: "self-log", SourceRef: "self-log:" + id,
+		Type: typ, Source: "self-log", Injector: "self-log", SourceRef: facet.SourceRef("self-log", id),
 		Payload: []byte(fmt.Sprintf(`{"id": %q, "date": %q, "drug": %q, "course": %d}`, id, date, drug, course)),
 	}
 	binding, err := h.gate.Resolve(env)

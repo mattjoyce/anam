@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/facet"
+
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
@@ -151,7 +153,7 @@ func TestReadAt_GenesisIsEmpty(t *testing.T) {
 func facetIDFor(t *testing.T, res fold.Result, measuredAt string) string {
 	t.Helper()
 	for _, e := range res.Value.Entries() {
-		if e.SourceRef == "bp-csv:"+measuredAt {
+		if e.SourceRef == facet.SourceRef("bp-csv", measuredAt) {
 			return e.FacetID
 		}
 	}

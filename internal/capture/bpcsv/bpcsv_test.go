@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/facet"
+
 	"github.com/mattjoyce/anam/internal/capture/bpcsv"
 	"github.com/mattjoyce/anam/internal/def"
 )
@@ -53,8 +55,8 @@ func TestScan_CollidingTimestampsStayDistinct(t *testing.T) {
 	if len(rows) != 3 {
 		t.Fatalf("Scan composed %d envelopes, want 3", len(rows))
 	}
-	if rows[1].SourceRef != "bp-csv:2026-2-10 05:04:00:1" ||
-		rows[2].SourceRef != "bp-csv:2026-2-10 05:04:00:2" {
+	if rows[1].SourceRef != facet.SourceRef("bp-csv", "2026-2-10 05:04:00", "1") ||
+		rows[2].SourceRef != facet.SourceRef("bp-csv", "2026-2-10 05:04:00", "2") {
 		t.Errorf("colliding readings keyed %q and %q — must differ by ordinal",
 			rows[1].SourceRef, rows[2].SourceRef)
 	}

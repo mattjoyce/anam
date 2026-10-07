@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/mattjoyce/anam/internal/facet"
 )
 
 // ErrNotCompliant is returned when a payload fails its Definition — the gate's
@@ -116,7 +118,10 @@ func (d Definition) timeAt(doc any, tf TimeField) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, fmt.Errorf("%w: time %s: %v", ErrNotCompliant, tf.Pointer, err)
 	}
-	t, err := time.Parse(tf.Layout, s)
+	// The source's clock is read in the Definition's zone. A layout that carries its
+	// own offset keeps it; a zoneless one, which is what every local export writes,
+	// lands at the instant the person lived it rather than ten hours away.
+	t, err := time.ParseInLocation(tf.Layout, s, d.loc)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("%w: time %s value %q does not parse as %q", ErrNotCompliant, tf.Pointer, s, tf.Layout)
 	}
@@ -124,14 +129,14 @@ func (d Definition) timeAt(doc any, tf TimeField) (time.Time, error) {
 }
 
 // SourceRef composes the row's natural key from the Definition's identity_key —
-// identity, never content (§6a): "<source>:<v1>[:<v2>...]" over the identity
-// pointers' values, in declared order.
+// identity, never content (§6a): facet.SourceRef over the identity pointers' values,
+// in declared order.
 func (d Definition) SourceRef(source string, doc any) (string, error) {
 	return compose("identity", source, d.IdentityKey, doc)
 }
 
-// SeriesOf composes the series stamp from the Definition's series key:
-// "<name>:<v1>[:<v2>...]" over the key pointers' values, in declared order. It is ""
+// SeriesOf composes the series stamp from the Definition's series key: facet.Stamp
+// over the key pointers' values, in declared order. It is ""
 // for a type without a series, and an error when a key pointer does not resolve: a
 // row that cannot say which series it belongs to is not compliant.
 func (d Definition) SeriesOf(doc any) (string, error) {
@@ -141,11 +146,11 @@ func (d Definition) SeriesOf(doc any) (string, error) {
 	return compose("series", d.Series.Name, d.Series.Key, doc)
 }
 
-// compose joins a prefix and the scalar values at the pointers with ':'. Both the
-// source_ref and the series stamp are this shape, so they are built by one function.
+// compose resolves the scalar values at the pointers and stamps them after the
+// prefix (facet.Stamp). Both the source_ref and the series stamp are this shape, so
+// they are built by one function.
 func compose(what, prefix string, pointers []string, doc any) (string, error) {
-	parts := make([]string, 0, len(pointers)+1)
-	parts = append(parts, prefix)
+	parts := make([]string, 0, len(pointers))
 	for _, ptr := range pointers {
 		v, err := resolve(doc, ptr)
 		if err != nil {
@@ -160,7 +165,7 @@ func compose(what, prefix string, pointers []string, doc any) (string, error) {
 		}
 		parts = append(parts, s)
 	}
-	return strings.Join(parts, ":"), nil
+	return facet.Stamp(prefix, parts...), nil
 }
 
 // filled rejects null and the empty string.

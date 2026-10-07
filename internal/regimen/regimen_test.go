@@ -71,7 +71,7 @@ func TestExpected_LeavesTheLedgerUntouched(t *testing.T) {
 
 	env := facet.Envelope{
 		Type: "med.compliance-estimate", Source: "records", Injector: "records",
-		SourceRef: "records:self-log:est/ramipril/1/2026-02",
+		SourceRef: facet.SourceRef("records", "self-log:est/ramipril/1/2026-02"),
 		Payload: []byte(`{"id": "self-log:est/ramipril/1/2026-02", "date": "2026-02-03",
 			"drug": "ramipril", "course": 1, "period_start": "2026-01-01", "period_end": "2026-01-31",
 			"estimate": 0.95}`),

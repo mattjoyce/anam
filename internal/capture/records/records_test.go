@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/def"
+	"github.com/mattjoyce/anam/internal/facet"
+
 	"github.com/mattjoyce/anam/internal/capture/records"
 )
 
@@ -51,7 +54,7 @@ func TestScan_DirectoryToEnvelopes(t *testing.T) {
 	write(t, dir, "lipids.yaml", labFile)
 	write(t, dir, "README.txt", "not a records file")
 
-	envs, err := records.Scan(dir, "matt")
+	envs, err := records.Scan(dir, "matt", bundled(t))
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
@@ -62,7 +65,7 @@ func TestScan_DirectoryToEnvelopes(t *testing.T) {
 	if e.Source != "records" || e.Injector != "records" || e.Type != "lab.result" {
 		t.Errorf("envelope identity wrong: %+v", e)
 	}
-	if e.SourceRef != "records:acl:39986323/total-chol" {
+	if e.SourceRef != facet.SourceRef("records", "acl:39986323/total-chol") {
 		t.Errorf("source_ref %q", e.SourceRef)
 	}
 	var payload map[string]any
@@ -91,7 +94,7 @@ func TestScan_RefusesBadFiles(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
 			write(t, dir, "f.yaml", body)
-			_, err := records.Scan(dir, "matt")
+			_, err := records.Scan(dir, "matt", bundled(t))
 			if !errors.Is(err, records.ErrBadRecords) {
 				t.Fatalf("err = %v, want ErrBadRecords", err)
 			}
@@ -110,7 +113,7 @@ func TestScan_ScalarsAsWritten(t *testing.T) {
     value_num: 5.7
     flagged: true
 `)
-	envs, err := records.Scan(dir, "matt")
+	envs, err := records.Scan(dir, "matt", bundled(t))
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
@@ -121,7 +124,17 @@ func TestScan_ScalarsAsWritten(t *testing.T) {
 	if p["collected"] != "2024-09-10 07:46" || p["id"] != "20240916" || p["value_num"] != 5.7 || p["flagged"] != true {
 		t.Fatalf("payload %v", p)
 	}
-	if envs[0].SourceRef != "records:20240916" {
+	if envs[0].SourceRef != facet.SourceRef("records", "20240916") {
 		t.Fatalf("source_ref %q", envs[0].SourceRef)
 	}
+}
+
+// bundled is the real Definition set: identity composes as the gate composes it.
+func bundled(t *testing.T) *def.Registry {
+	t.Helper()
+	defs, err := def.Bundled()
+	if err != nil {
+		t.Fatalf("def.Bundled: %v", err)
+	}
+	return defs
 }

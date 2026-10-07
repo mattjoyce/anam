@@ -17,7 +17,7 @@ func bpEnvelopeAt(minute, systolic int) facet.Envelope {
 	at := fmt.Sprintf("2026-01-24T06:%02d:00Z", minute)
 	return facet.Envelope{
 		Type: "health.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
-		SourceRef: "bp-csv:" + at,
+		SourceRef: facet.SourceRef("bp-csv", at),
 		Payload: []byte(fmt.Sprintf(
 			`{"measured_at": %q, "systolic": %d, "diastolic": 76}`, at, systolic)),
 	}

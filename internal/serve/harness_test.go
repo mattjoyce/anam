@@ -35,7 +35,7 @@ const bpManifest = `{
     "validation_mode": "lenient",
     "source_schema": "bp-csv/reading",
     "time_semantics": {
-      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
+      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
     },
     "identity_key": ["/measured_at"]
   },
@@ -50,7 +50,7 @@ const sleepManifest = `{
     "validation_mode": "lenient",
     "source_schema": "health-db/sleep",
     "time_semantics": {
-      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
+      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
     },
     "identity_key": ["/measured_at"]
   },
@@ -123,7 +123,7 @@ func (h *harness) admit(t *testing.T, source string, typ facet.Type, measuredAt,
 	t.Helper()
 	env := facet.Envelope{
 		Type: typ, Source: source, Injector: source,
-		SourceRef: source + ":" + measuredAt,
+		SourceRef: facet.SourceRef(source, measuredAt),
 		Payload:   []byte(fmt.Sprintf(`{"measured_at": %q, %s}`, measuredAt, body)),
 	}
 	binding, err := h.gate.Resolve(env)

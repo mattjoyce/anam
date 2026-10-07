@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
@@ -125,6 +126,7 @@ the run with nothing written.`,
 			if err != nil {
 				return err
 			}
+			imports = withLibrary(imports, cfg)
 			if len(args) == 1 {
 				imports = filterImports(imports, args[0])
 				if len(imports) == 0 {
@@ -156,6 +158,9 @@ type scanned struct {
 func runIngest(cmd *cobra.Command, cfg config.Config, imports []config.Import, batch int) error {
 	reg, err := def.Bundled()
 	if err != nil {
+		return err
+	}
+	if err := guardDefinitions(cmd.Context(), cfg, reg); err != nil {
 		return err
 	}
 	all, err := scanAll(cmd.Context(), imports, cfg)
@@ -203,9 +208,13 @@ func verdict(changed int) string {
 // first that cannot be read. Its error names the declared source and says nothing was
 // admitted, because the reader of a failed scheduled run needs both.
 func scanAll(ctx context.Context, imports []config.Import, cfg config.Config) ([]scanned, error) {
+	defs, err := def.Bundled()
+	if err != nil {
+		return nil, err
+	}
 	all := make([]scanned, 0, len(imports))
 	for _, imp := range imports {
-		envs, err := scanImport(ctx, imp, cfg)
+		envs, err := scanImport(ctx, imp, cfg, defs)
 		if err != nil {
 			return nil, fmt.Errorf("import %s could not be read, nothing admitted: %w", imp.Source, err)
 		}
@@ -215,7 +224,7 @@ func scanAll(ctx context.Context, imports []config.Import, cfg config.Config) ([
 }
 
 // scanImport dispatches one declared import to its capture worker.
-func scanImport(ctx context.Context, imp config.Import, cfg config.Config) ([]facet.Envelope, error) {
+func scanImport(ctx context.Context, imp config.Import, cfg config.Config, defs *def.Registry) ([]facet.Envelope, error) {
 	switch imp.Source {
 	case healthdb.Source:
 		scanCtx, cancel := context.WithTimeout(ctx, cfg.Timeout)
@@ -228,13 +237,68 @@ func scanImport(ctx context.Context, imp config.Import, cfg config.Config) ([]fa
 		defer cancel()
 		return withings.Scan(scanCtx, imp.Path, cfg.PersonID)
 	case records.Source:
-		return records.Scan(imp.Path, cfg.PersonID)
+		return records.Scan(imp.Path, cfg.PersonID, defs)
 	case documents.Source:
 		return documents.Scan(imp.Path, cfg.PersonID)
 	default:
 		return nil, fmt.Errorf("import names unknown source %q (have: %s, %s, %s, %s, %s)",
 			imp.Source, healthdb.Source, bpcsv.Source, withings.Source, records.Source, documents.Source)
 	}
+}
+
+// withLibrary adds the default library as a documents import when nothing declared
+// one and the folder exists. The library needs no declaration because its place is
+// derived from the ledger's; a declared documents import names another folder and
+// wins. A library that is not there yet is empty, which is a state, not a fault.
+func withLibrary(imports []config.Import, cfg config.Config) []config.Import {
+	for _, imp := range imports {
+		if imp.Source == documents.Source {
+			return imports
+		}
+	}
+	if info, err := os.Stat(cfg.LibraryDir); err != nil || !info.IsDir() {
+		return imports
+	}
+	return append(imports, config.Import{Source: documents.Source, Path: cfg.LibraryDir})
+}
+
+// guardDefinitions checks the bundled Definitions against the ones the operational
+// store last saw (def.Guard) and stores the current set. It runs before any source is
+// read: a Definition that would re-key or re-place the ledger's facets must stop the
+// run before the gate exists, and the message is the remedy.
+func guardDefinitions(ctx context.Context, cfg config.Config, reg *def.Registry) error {
+	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+	defer cancel()
+	buckets, err := cfg.Buckets()
+	if err != nil {
+		return err
+	}
+	db, err := ops.Open(ctx, cfg.DBPath, buckets)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = db.Close() }()
+
+	rows, err := db.Definitions(ctx)
+	if err != nil {
+		return err
+	}
+	stored := make([]def.Stored, len(rows))
+	for i, r := range rows {
+		stored[i] = def.Stored{Type: facet.Type(r.Type), Version: r.Version, Body: []byte(r.Body)}
+	}
+	if err := def.Guard(stored, reg); err != nil {
+		return err
+	}
+	current, err := def.Manifests()
+	if err != nil {
+		return err
+	}
+	put := make([]ops.DefinitionRow, len(current))
+	for i, m := range current {
+		put[i] = ops.DefinitionRow{Type: string(m.Type), Version: m.Version, Body: string(m.Body)}
+	}
+	return db.PutDefinitions(ctx, put)
 }
 
 func filterImports(imports []config.Import, source string) []config.Import {

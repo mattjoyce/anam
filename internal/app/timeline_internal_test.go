@@ -34,7 +34,7 @@ func TestParseInstant(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.in, func(t *testing.T) {
 			t.Parallel()
-			got, dateOnly, err := parseInstant(c.in)
+			got, dateOnly, err := parseInstant(c.in, time.UTC)
 			if c.wantErr {
 				if err == nil {
 					t.Fatalf("parseInstant(%q) was accepted", c.in)
@@ -63,7 +63,7 @@ func TestParseBounds_UpperIsInclusiveToTheOperator(t *testing.T) {
 
 	t.Run("a bare --to includes its whole day", func(t *testing.T) {
 		t.Parallel()
-		b, err := parseBounds("", "2026-01-24")
+		b, err := parseBounds("", "2026-01-24", time.UTC)
 		if err != nil {
 			t.Fatalf("parseBounds: %v", err)
 		}
@@ -82,7 +82,7 @@ func TestParseBounds_UpperIsInclusiveToTheOperator(t *testing.T) {
 
 	t.Run("an instant --to includes itself", func(t *testing.T) {
 		t.Parallel()
-		b, err := parseBounds("", "2026-01-24T06:36:00Z")
+		b, err := parseBounds("", "2026-01-24T06:36:00Z", time.UTC)
 		if err != nil {
 			t.Fatalf("parseBounds: %v", err)
 		}
@@ -96,7 +96,7 @@ func TestParseBounds_UpperIsInclusiveToTheOperator(t *testing.T) {
 
 	t.Run("--from is inclusive", func(t *testing.T) {
 		t.Parallel()
-		b, err := parseBounds("2026-01-24T06:36:00Z", "")
+		b, err := parseBounds("2026-01-24T06:36:00Z", "", time.UTC)
 		if err != nil {
 			t.Fatalf("parseBounds: %v", err)
 		}
@@ -110,7 +110,7 @@ func TestParseBounds_UpperIsInclusiveToTheOperator(t *testing.T) {
 
 	t.Run("unbounded admits everything", func(t *testing.T) {
 		t.Parallel()
-		b, err := parseBounds("", "")
+		b, err := parseBounds("", "", time.UTC)
 		if err != nil {
 			t.Fatalf("parseBounds: %v", err)
 		}
@@ -122,11 +122,11 @@ func TestParseBounds_UpperIsInclusiveToTheOperator(t *testing.T) {
 	})
 
 	for _, bad := range []string{"last tuesday", "2026-1-24"} {
-		if _, err := parseBounds(bad, ""); err == nil {
-			t.Errorf("parseBounds(--from %q) was accepted", bad)
+		if _, err := parseBounds(bad, "", time.UTC); err == nil {
+			t.Errorf("parseBounds(--from %q, time.UTC) was accepted", bad)
 		}
-		if _, err := parseBounds("", bad); err == nil {
-			t.Errorf("parseBounds(--to %q) was accepted", bad)
+		if _, err := parseBounds("", bad, time.UTC); err == nil {
+			t.Errorf("parseBounds(--to %q, time.UTC) was accepted", bad)
 		}
 	}
 }
@@ -140,7 +140,7 @@ func TestParseAsOf(t *testing.T) {
 
 	t.Run("a bare date lands on the end of that day", func(t *testing.T) {
 		t.Parallel()
-		got, err := parseAsOf("2026-07-10")
+		got, err := parseAsOf("2026-07-10", time.UTC)
 		if err != nil {
 			t.Fatalf("parseAsOf: %v", err)
 		}
@@ -155,7 +155,7 @@ func TestParseAsOf(t *testing.T) {
 
 	t.Run("an instant is taken as given", func(t *testing.T) {
 		t.Parallel()
-		got, err := parseAsOf("2026-07-10T20:00:00Z")
+		got, err := parseAsOf("2026-07-10T20:00:00Z", time.UTC)
 		if err != nil {
 			t.Fatalf("parseAsOf: %v", err)
 		}
@@ -166,7 +166,7 @@ func TestParseAsOf(t *testing.T) {
 
 	t.Run("empty means no as-of, not the zero instant as a bound", func(t *testing.T) {
 		t.Parallel()
-		got, err := parseAsOf("")
+		got, err := parseAsOf("", time.UTC)
 		if err != nil {
 			t.Fatalf("parseAsOf(\"\"): %v", err)
 		}
@@ -177,7 +177,7 @@ func TestParseAsOf(t *testing.T) {
 
 	t.Run("unparseable is refused, naming the flag", func(t *testing.T) {
 		t.Parallel()
-		_, err := parseAsOf("last tuesday")
+		_, err := parseAsOf("last tuesday", time.UTC)
 		if err == nil {
 			t.Fatal("parseAsOf(\"last tuesday\") was accepted")
 		}
@@ -282,7 +282,7 @@ func TestParseBoundsAt(t *testing.T) {
 	t.Parallel()
 
 	// A bare date includes its whole day, like --to, and leaves the bounds alone.
-	b, at, err := parseBoundsAt("2026-01-01", "", "2026-06-15", false)
+	b, at, err := parseBoundsAt("2026-01-01", "", "2026-06-15", false, time.UTC)
 	if err != nil {
 		t.Fatalf("parseBoundsAt: %v", err)
 	}
@@ -291,7 +291,7 @@ func TestParseBoundsAt(t *testing.T) {
 	}
 
 	// An instant is taken as given.
-	_, at, err = parseBoundsAt("", "", "2026-06-15T12:00:00Z", false)
+	_, at, err = parseBoundsAt("", "", "2026-06-15T12:00:00Z", false, time.UTC)
 	if err != nil || at != "2026-06-15T12:00:00.000000000Z" {
 		t.Errorf("instant: at=%q err=%v", at, err)
 	}
@@ -306,13 +306,13 @@ func TestParseBoundsAt(t *testing.T) {
 		"bad at":         {"", "", "June", false},
 		"at before from": {"2026-07-01", "", "2026-06-15", false},
 	} {
-		if _, _, err := parseBoundsAt(c.from, c.to, c.at, c.explain); err == nil {
+		if _, _, err := parseBoundsAt(c.from, c.to, c.at, c.explain, time.UTC); err == nil {
 			t.Errorf("%s: no error", name)
 		}
 	}
 
 	// No --at: plain bounds, no snapshot.
-	_, at, err = parseBoundsAt("", "2026-07-01", "", true)
+	_, at, err = parseBoundsAt("", "2026-07-01", "", true, time.UTC)
 	if err != nil || at != "" {
 		t.Errorf("no at: at=%q err=%v", at, err)
 	}

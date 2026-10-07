@@ -75,7 +75,7 @@ func inspectCmd(cfgPath *string) *cobra.Command {
 
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "inspecting ledger %s (person %s), read-only\nhttp://%s/\n",
 				cfg.LedgerPath, cfg.PersonID, listen)
-			return inspect.Serve(cmd.Context(), l, listen, cfg.Timeout, buckets)
+			return inspect.Serve(cmd.Context(), l, listen, cfg.Timeout, buckets, cfg.LibraryDir)
 		},
 	}
 	// Loopback by default: the inspector is a local diagnostic tool, not a service.

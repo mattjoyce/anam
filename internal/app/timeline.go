@@ -48,19 +48,23 @@ Four lenses compose over that read:
                 This is the same decision procedure the projection applies, not a
                 second account of it.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			bounds, atBound, err := parseBoundsAt(from, to, at, explain)
-			if err != nil {
-				return err
-			}
-			asOfTime, err := parseAsOf(asOf)
-			if err != nil {
-				return err
-			}
-
 			cfg, err := loadConfig(*cfgPath, cmd)
 			if err != nil {
 				return err
 			}
+			loc, err := cfg.Location()
+			if err != nil {
+				return err
+			}
+			bounds, atBound, err := parseBoundsAt(from, to, at, explain, loc)
+			if err != nil {
+				return err
+			}
+			asOfTime, err := parseAsOf(asOf, loc)
+			if err != nil {
+				return err
+			}
+
 			l, err := openLedgerReadOnly(cmd.Context(), cfg)
 			if err != nil {
 				return err
@@ -74,6 +78,7 @@ Four lenses compose over that read:
 			if err != nil {
 				return err
 			}
+			view.loc = loc
 			if explain {
 				return writeExplain(cmd, ctx, l, view, bounds, typeFilter)
 			}
@@ -96,11 +101,11 @@ Four lenses compose over that read:
 // end of that day", which is deliberately NOT --to's rule: --to feeds an exclusive
 // comparison and so rolls to the next midnight, while --as-of names one instant to read
 // at. Rolling it forward too would silently read a day further than was asked for.
-func parseAsOf(asOf string) (time.Time, error) {
+func parseAsOf(asOf string, loc *time.Location) (time.Time, error) {
 	if asOf == "" {
 		return time.Time{}, nil
 	}
-	t, dateOnly, err := parseInstant(asOf)
+	t, dateOnly, err := parseInstant(asOf, loc)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("--as-of: %w", err)
 	}
@@ -128,6 +133,23 @@ type view struct {
 
 	// defs is the bundled Definition set: which types close a series.
 	defs *def.Registry
+
+	// loc is the reader's zone, for showing fact-times where the reader stands.
+	loc *time.Location
+}
+
+// show renders a stored fact-time in the reader's zone, at the wire format's full
+// precision so nothing is rounded away. The stored string is what Anam holds; this
+// is only where the reader is standing when they look at it.
+func (v view) show(stored string) string {
+	if v.loc == nil {
+		return stored
+	}
+	t, err := clock.Parse(stored)
+	if err != nil {
+		return stored
+	}
+	return t.In(v.loc).Format(clock.Layout)
 }
 
 // readView performs the read the flags describe: at head or at an anam-time, through
@@ -235,7 +257,7 @@ func writeTimeline(cmd *cobra.Command, v view, b bounds, typeFilter string, asJS
 	_, _ = fmt.Fprintln(w, "FACT TIME\tTYPE\tV\tSTATUS\tSOURCE REF\tID")
 	for _, e := range shown {
 		_, _ = fmt.Fprintf(w, "%s\t%s\tv%d\t%s\t%s\t%s\n",
-			e.FactTime, e.Type, v.res.States[e.FacetID].Version, e.Status, e.SourceRef, e.FacetID)
+			v.show(e.FactTime), e.Type, v.res.States[e.FacetID].Version, e.Status, e.SourceRef, e.FacetID)
 	}
 	return w.Flush()
 }
@@ -261,21 +283,21 @@ func (b bounds) admits(e fold.Entry) bool {
 // parseBoundsAt reads the fact-time flags. --at is a bound like --to (a bare date
 // includes its whole day) and also asks for the snapshot shape, so the two exclude
 // each other: one upper bound, and it says which read it wants.
-func parseBoundsAt(from, to, at string, explain bool) (bounds, string, error) {
+func parseBoundsAt(from, to, at string, explain bool, loc *time.Location) (bounds, string, error) {
 	if at != "" && to != "" {
 		return bounds{}, "", fmt.Errorf("--at and --to both bound fact-time: give one")
 	}
 	if at != "" && explain {
 		return bounds{}, "", fmt.Errorf("--explain shows the log's verdicts; to explain a snapshot, name a snapshot-shaped projection (e.g. --projection meds --explain)")
 	}
-	b, err := parseBounds(from, to)
+	b, err := parseBounds(from, to, loc)
 	if err != nil {
 		return bounds{}, "", err
 	}
 	if at == "" {
 		return b, "", nil
 	}
-	t, dateOnly, err := parseInstant(at)
+	t, dateOnly, err := parseInstant(at, loc)
 	if err != nil {
 		return bounds{}, "", fmt.Errorf("--at: %w", err)
 	}
@@ -288,17 +310,17 @@ func parseBoundsAt(from, to, at string, explain bool) (bounds, string, error) {
 	return b, clock.Format(t), nil
 }
 
-func parseBounds(from, to string) (bounds, error) {
+func parseBounds(from, to string, loc *time.Location) (bounds, error) {
 	var b bounds
 	if from != "" {
-		t, _, err := parseInstant(from)
+		t, _, err := parseInstant(from, loc)
 		if err != nil {
 			return bounds{}, fmt.Errorf("--from: %w", err)
 		}
 		b.from = clock.Format(t)
 	}
 	if to != "" {
-		t, dateOnly, err := parseInstant(to)
+		t, dateOnly, err := parseInstant(to, loc)
 		if err != nil {
 			return bounds{}, fmt.Errorf("--to: %w", err)
 		}
@@ -315,9 +337,14 @@ func parseBounds(from, to string) (bounds, error) {
 	return b, nil
 }
 
-// parseInstant reads a bound as a bare UTC date or an RFC 3339 instant.
-func parseInstant(s string) (t time.Time, dateOnly bool, err error) {
-	if t, err := time.ParseInLocation("2006-01-02", s, time.UTC); err == nil {
+// parseInstant reads a bound as a bare date in the reader's zone or an RFC 3339
+// instant. A bare date is a day where the person stands, so "2025-12-23" is that day
+// in loc, not the UTC day that overlaps it.
+func parseInstant(s string, loc *time.Location) (t time.Time, dateOnly bool, err error) {
+	if loc == nil {
+		loc = time.UTC
+	}
+	if t, err := time.ParseInLocation("2006-01-02", s, loc); err == nil {
 		return t, true, nil
 	}
 	t, err = time.Parse(time.RFC3339, s)

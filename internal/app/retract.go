@@ -58,7 +58,7 @@ one run; raise it deliberately when the source really has shrunk that far.`,
 			if err != nil {
 				return err
 			}
-			imports = filterImports(imports, source)
+			imports = filterImports(withLibrary(imports, cfg), source)
 			if len(imports) == 0 {
 				return fmt.Errorf("no import declares source %q", source)
 			}

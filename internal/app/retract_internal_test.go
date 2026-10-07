@@ -25,7 +25,11 @@ records:
 
 func heldBy(t *testing.T, dir string) map[string]bool {
 	t.Helper()
-	envs, err := records.Scan(dir, "matt")
+	defs, err := def.Bundled()
+	if err != nil {
+		t.Fatalf("def.Bundled: %v", err)
+	}
+	envs, err := records.Scan(dir, "matt", defs)
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
@@ -54,7 +58,7 @@ func TestRetract_PlansOnlyWhatTheSourceDropped(t *testing.T) {
 		t.Fatalf("def.Bundled: %v", err)
 	}
 	g := gate.New(l, defs, mvpScopes, clock.Real{}, "matt")
-	envs, err := records.Scan(dir, "matt")
+	envs, err := records.Scan(dir, "matt", defs)
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
@@ -79,7 +83,7 @@ func TestRetract_PlansOnlyWhatTheSourceDropped(t *testing.T) {
 	writeDoc(t, filepath.Join(dir, "diary.yaml"), strings.Replace(threeWeights,
 		`  - {type: health.weight, id: w2, date: "2026-01-02 07:00", kg: 80.2}`+"\n", "", 1))
 	absent, total = planRetraction(res.Live, records.Source, heldBy(t, dir))
-	if len(absent) != 1 || absent[0].Provenance.SourceRef != "records:w2" || total != 3 {
+	if len(absent) != 1 || absent[0].Provenance.SourceRef != facet.SourceRef("records", "w2") || total != 3 {
 		t.Fatalf("plan after deleting w2 = %v of %d", absent, total)
 	}
 	if err := guardRetraction(len(absent), total, 2, 0.5); err != nil {

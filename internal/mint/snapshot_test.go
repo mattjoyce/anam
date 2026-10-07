@@ -34,7 +34,7 @@ func medManifest(typ string, closes bool) string {
     "classification": "Sensitive",
     "validation_mode": "lenient",
     "source_schema": "records/%s",
-    "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02"}},
+    "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "UTC"}},
     "identity_key": ["/id"],
     "series": {"name": "med.regimen", "key": ["/drug", "/course"], "closes": %t}
   },
@@ -63,7 +63,7 @@ func medRegistry(t *testing.T) *def.Registry {
 
 func (h *harness) med(t *testing.T, typ facet.Type, id, date, drug string, course int) string {
 	t.Helper()
-	return h.admit(t, "self-log", typ, "self-log:"+id,
+	return h.admit(t, "self-log", typ, facet.SourceRef("self-log", id),
 		fmt.Sprintf(`{"id": %q, "date": %q, "drug": %q, "course": %d}`, id, date, drug, course))
 }
 
@@ -95,10 +95,10 @@ func TestSnapshot_FromComposedCheckpointsEqualsTheFold(t *testing.T) {
 		bucket string   // the prefix of hard checkpoints up to D's bucket
 		want   []string // source refs, in value order
 	}{
-		{"2026-04-15T00:00:00.000000000Z", "bucket:2026-04", []string{"self-log:m1", "scale:w-1"}},
-		{"2026-06-15T00:00:00.000000000Z", "bucket:2026-06", []string{"scale:w-1", "self-log:m2"}},
-		{"2026-09-01T00:00:00.000000000Z", "bucket:2026-09", []string{"scale:w-1"}},
-		{"2026-11-01T00:00:00.000000000Z", "bucket:2026-11", []string{"scale:w-1", "self-log:m4"}},
+		{"2026-04-15T00:00:00.000000000Z", "bucket:2026-04", []string{facet.SourceRef("self-log", "m1"), facet.SourceRef("scale", "w-1")}},
+		{"2026-06-15T00:00:00.000000000Z", "bucket:2026-06", []string{facet.SourceRef("scale", "w-1"), facet.SourceRef("self-log", "m2")}},
+		{"2026-09-01T00:00:00.000000000Z", "bucket:2026-09", []string{facet.SourceRef("scale", "w-1")}},
+		{"2026-11-01T00:00:00.000000000Z", "bucket:2026-11", []string{facet.SourceRef("scale", "w-1"), facet.SourceRef("self-log", "m4")}},
 	}
 	for _, c := range cases {
 		t.Run(c.at[:10], func(t *testing.T) {
@@ -178,7 +178,7 @@ func TestSnapshot_AsOfBeforeTheStopArrived(t *testing.T) {
 	if snapNow.Len() != 0 {
 		t.Errorf("at September, knowing of the stop: %d entries, want none", snapNow.Len())
 	}
-	if snapThen.Len() != 1 || snapThen.Entries()[0].SourceRef != "self-log:m2" {
+	if snapThen.Len() != 1 || snapThen.Entries()[0].SourceRef != facet.SourceRef("self-log", "m2") {
 		t.Errorf("at September, before the stop was known: %v, want the dose change", snapThen.Entries())
 	}
 }

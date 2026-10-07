@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -73,73 +74,41 @@ func TestOpen_RefusesAnUnmigratedLedger(t *testing.T) {
 	}
 }
 
-// Create (init) carries a v1 ledger forward: the rows it held are still there and
-// read back with no series, the id it was created with is kept, and the migration is
-// recorded beside the original pin rather than over it.
-func TestCreate_MigratesAnOldLedgerInPlace(t *testing.T) {
+// Create (init) cannot carry a v1 or v2 ledger forward: schema 3 changed what the
+// rows mean (how ids compose, where fact-time lands), not their shape. The refusal
+// names the remedy, a new ledger from the sources, and leaves the file exactly as it
+// was: no step of the path is applied when a later step cannot be.
+func TestCreate_RefusesToCarryAnOldLedgerForward(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	path := buildV1(t)
 
 	l, err := ledger.Create(ctx, path, person)
-	if err != nil {
-		t.Fatalf("Create on a v1 ledger: %v", err)
+	closeIfOpen(l)
+	if !errors.Is(err, ledger.ErrSchemaMismatch) {
+		t.Fatalf("Create on a v1 ledger = %v, want ErrSchemaMismatch", err)
 	}
-	defer func() { _ = l.Close() }()
-
-	id, err := l.ID(ctx)
-	if err != nil || id != "v1-ledger" {
-		t.Errorf("ID after migration = %q, %v; want the original", id, err)
+	for _, want := range []string{"anam init", "anam ingest", "stays the record"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("refusal %q does not say %q", err, want)
+		}
 	}
-	f, err := l.Version(ctx, "f1", 1)
-	if err != nil {
-		t.Fatalf("Version(f1): %v", err)
-	}
-	if f.Series != "" || f.Provenance.SourceRef != "bp-csv:1" {
-		t.Errorf("migrated row read back as series=%q ref=%q", f.Series, f.Provenance.SourceRef)
-	}
-	head, err := l.Head(ctx)
-	if err != nil || head != 1 {
-		t.Errorf("Head = %d, %v; want 1", head, err)
-	}
-
-	// The migration is idempotent: a second init changes nothing and refuses nothing.
-	again, err := ledger.Create(ctx, path, person)
-	if err != nil {
-		t.Fatalf("second Create: %v", err)
-	}
-	_ = again.Close()
 
 	var created, migrated string
 	db := rawDB(t, path)
 	if err := db.QueryRowContext(ctx, `SELECT value FROM ledger_meta WHERE key = 'schema_version'`).Scan(&created); err != nil || created != "1" {
 		t.Errorf("created-at pin = %q, %v; want it untouched at 1", created, err)
 	}
-	if err := db.QueryRowContext(ctx, `SELECT value FROM ledger_meta WHERE key = 'schema_migration:2'`).Scan(&migrated); err != nil || migrated == "" {
-		t.Errorf("migration record = %q, %v; want one", migrated, err)
+	err = db.QueryRowContext(ctx, `SELECT value FROM ledger_meta WHERE key = 'schema_migration:2'`).Scan(&migrated)
+	if err == nil {
+		t.Errorf("migration to 2 was applied (%q) on a path that cannot reach 3", migrated)
 	}
-
-	// A new facet written after the migration carries its series through the column.
-	r, err := ledger.OpenReadOnly(ctx, path, person)
-	if err != nil {
-		t.Fatalf("OpenReadOnly after migration: %v", err)
-	}
-	defer func() { _ = r.Close() }()
-	stamped := testFacet(t, "self-log:m1", `{"drug": "ramipril"}`, 1)
-	stamped.Series = "med.regimen:ramipril:1"
-	if err := l.Admit(ctx, 1, stamped, admittedEvent(stamped, 2)); err != nil {
-		t.Fatalf("Admit after migration: %v", err)
-	}
-	got, err := r.Version(ctx, stamped.ID, 1)
-	if err != nil {
-		t.Fatalf("Version(stamped): %v", err)
-	}
-	if got.Series != stamped.Series {
-		t.Errorf("series round trip = %q, want %q", got.Series, stamped.Series)
+	var n int
+	if err := db.QueryRowContext(ctx, `SELECT count(*) FROM facet`).Scan(&n); err != nil || n != 1 {
+		t.Errorf("facet rows after refusal = %d, %v; want the 1 the file held", n, err)
 	}
 }
 
-// A ledger from a later build than this one is refused, not "migrated" downward.
 func TestOpen_RefusesALedgerAheadOfThisBuild(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

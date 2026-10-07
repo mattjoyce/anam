@@ -19,7 +19,7 @@
 // and carrying the document into the payload would make the two reports fight over it.
 // The records file stays on disk, so which document said what is a grep away.
 //
-// Identity is definition-owned (§6a). The envelope's source_ref is "records:<id>", and
+// Identity is definition-owned (§6a). The envelope's source_ref is composed from the type's Definition, and
 // the gate recomposes it from the type's identity_key, so a record whose id is not what
 // its definition composes is refused rather than admitted under the wrong identity.
 package records
@@ -35,6 +35,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/safepath"
 )
@@ -55,11 +56,21 @@ type file struct {
 	Records   []yaml.Node `yaml:"records"`
 }
 
+// Identities is the one thing this worker needs from the Definitions: how a record
+// of each type says which row it is. The gate composes the source ref from the
+// Definition's identity_key, and the worker must compose the same string, so it asks
+// the same contract rather than guessing (interfaces at the point of use;
+// *def.Registry satisfies it).
+type Identities interface {
+	Lookup(t facet.Type) (def.Definition, bool)
+}
+
 // Scan reads every records file under path (a directory, or one file) and returns
 // their envelopes in file-name, then record, order. The whole set is read before any
-// envelope is returned, and a duplicate id across the set is an error: two records
-// claiming one identity in one scan is a mistake in the files, not a supersession.
-func Scan(path, assertedPerson string) ([]facet.Envelope, error) {
+// envelope is returned, and a duplicate identity across the set is an error: two
+// records claiming one identity in one scan is a mistake in the files, not a
+// supersession.
+func Scan(path, assertedPerson string, defs Identities) ([]facet.Envelope, error) {
 	paths, err := recordFiles(path)
 	if err != nil {
 		return nil, err
@@ -68,14 +79,14 @@ func Scan(path, assertedPerson string) ([]facet.Envelope, error) {
 	var out []facet.Envelope
 	seen := map[string]string{}
 	for _, p := range paths {
-		envs, err := scanFile(p, assertedPerson)
+		envs, err := scanFile(p, assertedPerson, defs)
 		if err != nil {
 			return nil, err
 		}
 		for _, env := range envs {
 			if prev, dup := seen[env.SourceRef]; dup {
-				return nil, fmt.Errorf("%w: %s and %s both declare id %q",
-					ErrBadRecords, prev, p, strings.TrimPrefix(env.SourceRef, Source+":"))
+				return nil, fmt.Errorf("%w: %s and %s both declare the row %s",
+					ErrBadRecords, prev, p, env.SourceRef)
 			}
 			seen[env.SourceRef] = p
 		}
@@ -116,7 +127,7 @@ func recordFiles(path string) ([]string, error) {
 	return paths, nil
 }
 
-func scanFile(path, assertedPerson string) ([]facet.Envelope, error) {
+func scanFile(path, assertedPerson string, defs Identities) ([]facet.Envelope, error) {
 	f, err := safepath.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("records: %w", err)
@@ -139,7 +150,7 @@ func scanFile(path, assertedPerson string) ([]facet.Envelope, error) {
 		if !ok {
 			return nil, fmt.Errorf("%w: %s record %d: not a mapping", ErrBadRecords, path, i+1)
 		}
-		env, err := envelope(rec, assertedPerson)
+		env, err := envelope(rec, assertedPerson, defs)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %s record %d: %v", ErrBadRecords, path, i+1, err)
 		}
@@ -149,11 +160,18 @@ func scanFile(path, assertedPerson string) ([]facet.Envelope, error) {
 }
 
 // envelope turns one record into an envelope. `type` leaves the payload — it is the
-// envelope's, not the fact's — and `id` stays in it, because identity_key points at it.
-func envelope(rec map[string]any, assertedPerson string) (facet.Envelope, error) {
+// envelope's, not the fact's — and `id` stays in it, because most identity_keys point
+// at it. The source ref is composed from the type's Definition, whatever its
+// identity_key names: for a type keyed on `id` that is the id; for blood pressure it
+// is the reading's time and ordinal, and the record's `id` is just another field.
+func envelope(rec map[string]any, assertedPerson string, defs Identities) (facet.Envelope, error) {
 	typ, _ := rec["type"].(string)
 	if !facet.Type(typ).Valid() {
 		return facet.Envelope{}, fmt.Errorf("type %q is not a namespaced facet type", typ)
+	}
+	d, ok := defs.Lookup(facet.Type(typ))
+	if !ok {
+		return facet.Envelope{}, fmt.Errorf("type %q has no definition", typ)
 	}
 	id, err := scalar(rec["id"])
 	if err != nil || id == "" {
@@ -176,9 +194,13 @@ func envelope(rec map[string]any, assertedPerson string) (facet.Envelope, error)
 	if err != nil {
 		return facet.Envelope{}, err
 	}
+	ref, err := d.SourceRef(Source, payload)
+	if err != nil {
+		return facet.Envelope{}, err
+	}
 	return facet.Envelope{
 		Type: facet.Type(typ), Source: Source, Injector: Source,
-		SourceRef: Source + ":" + id, Payload: b, AssertedPerson: assertedPerson,
+		SourceRef: ref, Payload: b, AssertedPerson: assertedPerson,
 	}, nil
 }
 

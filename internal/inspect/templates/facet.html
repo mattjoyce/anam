@@ -27,7 +27,8 @@
   <tr><th>payload</th><td>{{.Facet.Descriptor.PayloadKind}} · {{.Facet.Descriptor.MediaType}} · schema {{.Facet.Descriptor.SourceSchema}} v{{.Facet.Descriptor.SchemaVersion}}</td></tr>
 </table>
 
-<h2>payload <span class="dim">{{if eq (print .Facet.Descriptor.PayloadKind) "reference"}}(a reference: the bytes stay in the source, at this path and hash){{else}}(verbatim, canonical bytes){{end}}</span></h2>
+<h2>payload <span class="dim">{{if eq (print .Facet.Descriptor.PayloadKind) "reference"}}(a reference: the bytes stay in the library, at this path and hash){{else}}(verbatim, canonical bytes){{end}}</span></h2>
+{{if .DocumentURL}}<p><a href="{{.DocumentURL}}">open the document</a> <span class="dim">served from the default library, bytes as they are</span></p>{{end}}
 <pre>{{.Payload}}</pre>
 
 <h2>anam-events for this facet</h2>

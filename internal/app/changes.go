@@ -24,13 +24,21 @@ or tombstoned after a given instant — Anam's own clock, not the events' fact-t
 The query runs over the operational store's derived index, which is first caught
 up to the ledger's head by replay, so the answer is as fresh as ingest.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			sinceT, _, err := parseInstant(since)
+			cfg, err := loadConfig(*cfgPath, cmd)
+			if err != nil {
+				return err
+			}
+			loc, err := cfg.Location()
+			if err != nil {
+				return err
+			}
+			sinceT, _, err := parseInstant(since, loc)
 			if err != nil {
 				return fmt.Errorf("--since: %w", err)
 			}
 			untilS := ""
 			if until != "" {
-				t, dateOnly, err := parseInstant(until)
+				t, dateOnly, err := parseInstant(until, loc)
 				if err != nil {
 					return fmt.Errorf("--until: %w", err)
 				}
@@ -40,10 +48,6 @@ up to the ledger's head by replay, so the answer is as fresh as ingest.`,
 				untilS = clock.Format(t)
 			}
 
-			cfg, err := loadConfig(*cfgPath, cmd)
-			if err != nil {
-				return err
-			}
 			l, err := openLedgerReadOnly(cmd.Context(), cfg)
 			if err != nil {
 				return err

@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/facet"
+
 	"github.com/mattjoyce/anam/internal/def"
 )
 
@@ -15,7 +17,7 @@ const medStartedManifest = `{
     "classification": "Sensitive",
     "validation_mode": "lenient",
     "source_schema": "records/med.started",
-    "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02"}},
+    "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "UTC"}},
     "identity_key": ["/id"],
     "series": {"name": "med.regimen", "key": ["/drug", "/course"]}
   },
@@ -29,7 +31,7 @@ const medStoppedManifest = `{
     "classification": "Sensitive",
     "validation_mode": "lenient",
     "source_schema": "records/med.stopped",
-    "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02"}},
+    "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "UTC"}},
     "identity_key": ["/id"],
     "series": {"name": "med.regimen", "key": ["/drug", "/course"], "closes": true}
   },
@@ -53,7 +55,7 @@ func TestSeries_ParsesAndComposesTheStamp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SeriesOf: %v", err)
 	}
-	if want := "med.regimen:ramipril:1"; got != want {
+	if want := facet.Stamp("med.regimen", "ramipril", "1"); got != want {
 		t.Errorf("SeriesOf = %q, want %q", got, want)
 	}
 

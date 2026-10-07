@@ -128,7 +128,7 @@ func describe(dir, path, assertedPerson string) (facet.Envelope, error) {
 	}
 	return facet.Envelope{
 		Type: Type, Source: Source, Injector: Source,
-		SourceRef: Source + ":" + rel, Payload: b, AssertedPerson: assertedPerson,
+		SourceRef: facet.SourceRef(Source, rel), Payload: b, AssertedPerson: assertedPerson,
 	}, nil
 }
 

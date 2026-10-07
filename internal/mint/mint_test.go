@@ -35,7 +35,7 @@ const bpManifest = `{
     "validation_mode": "lenient",
     "source_schema": "bp-csv/reading",
     "time_semantics": {
-      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
+      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
     },
     "identity_key": ["/measured_at"]
   },
@@ -53,7 +53,7 @@ const weightManifest = `{
     "validation_mode": "lenient",
     "source_schema": "scale/measure",
     "time_semantics": {
-      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
+      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
     },
     "identity_key": ["/id"]
   },
@@ -142,13 +142,13 @@ func (h *harness) admit(t *testing.T, source string, typ facet.Type, ref, payloa
 
 func (h *harness) bp(t *testing.T, measuredAt string, systolic int) string {
 	t.Helper()
-	return h.admit(t, "bp-csv", "health.blood-pressure", "bp-csv:"+measuredAt,
+	return h.admit(t, "bp-csv", "health.blood-pressure", facet.SourceRef("bp-csv", measuredAt),
 		fmt.Sprintf(`{"measured_at": %q, "systolic": %d}`, measuredAt, systolic))
 }
 
 func (h *harness) weight(t *testing.T, id, measuredAt string, kg float64) string {
 	t.Helper()
-	return h.admit(t, "scale", "health.weight", "scale:"+id,
+	return h.admit(t, "scale", "health.weight", facet.SourceRef("scale", id),
 		fmt.Sprintf(`{"id": %q, "measured_at": %q, "kg": %g}`, id, measuredAt, kg))
 }
 
@@ -361,7 +361,7 @@ func TestCompose_MatchesTheFoldOverARange(t *testing.T) {
 func TestRun_EmptiedBucketMintsTheEmptyValue(t *testing.T) {
 	h := newHarness(t)
 	h.seed(t)
-	sep := facet.NewID("bp-csv:2026-09-03T06:30:00Z")
+	sep := facet.NewID(facet.SourceRef("bp-csv", "2026-09-03T06:30:00Z"))
 	h.run(t, false)
 
 	if _, _, err := h.gate.Retract(context.Background(), sep); err != nil {

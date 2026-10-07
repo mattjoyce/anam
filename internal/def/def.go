@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/mattjoyce/anam/internal/facet"
 )
@@ -37,10 +38,15 @@ const (
 	ModeVerbatim ValidationMode = "verbatim"
 )
 
-// TimeField names where a clock lives in the payload and how to parse it.
+// TimeField names where a clock lives in the payload, how to parse it, and the zone
+// a zoneless value is read in. Zone is an IANA name ("Australia/Sydney", "UTC") and
+// is required: a source's export writes the clock on the wall where the person stood,
+// and reading it as UTC puts every fact hours from where it happened. A layout that
+// carries its own offset is unaffected by the zone.
 type TimeField struct {
 	Pointer string `json:"pointer"`
 	Layout  string `json:"layout"`
+	Zone    string `json:"zone"`
 }
 
 // Series says which facets of this type are repeated statements about one thing
@@ -94,6 +100,9 @@ type Definition struct {
 	Required             []string
 	Properties           map[string]PropRule
 	AdditionalProperties bool
+
+	// loc is FactTime.Zone loaded, once, at Parse.
+	loc *time.Location
 }
 
 // PropRule is the per-pointer constraint vocabulary: pattern and enum, nothing more.
@@ -193,6 +202,11 @@ func Parse(raw []byte) (Definition, error) {
 	if err := d.validate(); err != nil {
 		return Definition{}, err
 	}
+	loc, err := time.LoadLocation(d.FactTime.Zone)
+	if err != nil {
+		return Definition{}, fmt.Errorf("%w: time_semantics.fact_time zone %q: %v", ErrBadManifest, d.FactTime.Zone, err)
+	}
+	d.loc = loc
 	return d, nil
 }
 
@@ -210,8 +224,8 @@ func (d Definition) validate() error {
 		return fmt.Errorf("%w: source_schema is required", ErrBadManifest)
 	case !d.PayloadKind.Valid():
 		return fmt.Errorf("%w: payload_kind %q", ErrBadManifest, d.PayloadKind)
-	case d.FactTime.Pointer == "" || d.FactTime.Layout == "":
-		return fmt.Errorf("%w: time_semantics.fact_time needs pointer and layout", ErrBadManifest)
+	case d.FactTime.Pointer == "" || d.FactTime.Layout == "" || d.FactTime.Zone == "":
+		return fmt.Errorf("%w: time_semantics.fact_time needs pointer, layout and zone", ErrBadManifest)
 	case len(d.IdentityKey) == 0:
 		return fmt.Errorf("%w: identity_key must declare at least one pointer", ErrBadManifest)
 	case !d.MinAssurance.Valid():

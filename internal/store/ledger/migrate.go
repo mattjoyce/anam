@@ -22,10 +22,20 @@ import (
 type migration struct {
 	to  int
 	ddl string
+
+	// rebuild, when set, says this step cannot carry a file forward: what changed is
+	// not the shape of the rows but what the rows mean, and only a new ledger from
+	// the sources holds the new meaning. The text is the remedy, shown to the
+	// operator.
+	rebuild string
 }
 
 var migrations = []migration{
 	{to: 2, ddl: `ALTER TABLE facet ADD COLUMN series TEXT NOT NULL DEFAULT ''`},
+	{to: 3, rebuild: "schema 3 changed how a facet's id is composed from its source row and the zone " +
+		"its fact-time is read in; the rows in a schema 2 file were keyed and placed by the old rules. " +
+		"Move this file aside (it stays the record of what Anam knew until now), run `anam init` at " +
+		"the same path, and `anam ingest`: every source still holds its rows"},
 }
 
 // effectiveVersion derives the file's schema version from its pins: the created-at
@@ -67,6 +77,14 @@ func checkVersion(have int) error {
 func (l *Ledger) migrate(ctx context.Context, from int) error {
 	if from > schemaVersion {
 		return checkVersion(from)
+	}
+	// A step that cannot be applied refuses the whole path before any step runs, so a
+	// refused file is exactly as it was: not half-way to a version it can never reach.
+	for _, m := range migrations {
+		if m.to > from && m.rebuild != "" {
+			return fmt.Errorf("%w: ledger %s holds schema %d and cannot migrate to %d: %s",
+				ErrSchemaMismatch, l.path, from, m.to, m.rebuild)
+		}
 	}
 	for _, m := range migrations {
 		if m.to <= from {

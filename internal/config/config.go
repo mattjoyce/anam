@@ -39,6 +39,19 @@ type Config struct {
 	// published artifacts, immutable, backed up rather than rebuilt (§8).
 	ArtifactDir string `mapstructure:"artifact_dir"`
 
+	// LibraryDir is the default library: the folder of primary source documents the
+	// facts were extracted from, each admitted as a doc.reference by its
+	// library-relative path and hash. It defaults to `documents` beside the ledger,
+	// so the ledger's directory is the whole record and the backup unit. A folder
+	// that does not exist is an empty library, not an error.
+	LibraryDir string `mapstructure:"library_dir"`
+
+	// Zone is the reader's zone: the one a bare date on the command line is taken in
+	// and fact-times are shown in. It is not a fact-time rule — each Definition
+	// carries the zone its source's clock is read in — it is where the person reading
+	// is standing. Defaults to Local.
+	Zone string `mapstructure:"zone"`
+
 	// Timeout bounds every call to a store. Anam fails fast rather than hanging (§8).
 	Timeout time.Duration `mapstructure:"timeout"`
 
@@ -76,6 +89,8 @@ func Load(path string) (Config, error) {
 	v.SetDefault("artifact_dir", DefaultArtifactDir())
 	v.SetDefault("timeout", 5*time.Second)
 	v.SetDefault("bucket_width", string(span.Default))
+	v.SetDefault("library_dir", "")
+	v.SetDefault("zone", "Local")
 
 	if path != "" {
 		v.SetConfigFile(path)
@@ -98,8 +113,12 @@ func Load(path string) (Config, error) {
 	// Filesystem paths are expanded once, here, so every consumer sees the same
 	// absolute path the operator meant — a "~/" that reached SQLite verbatim would
 	// quietly create a directory literally named "~".
+	if c.LibraryDir == "" {
+		c.LibraryDir = filepath.Join(filepath.Dir(c.LedgerPath), "documents")
+	}
 	for name, p := range map[string]*string{
 		"ledger_path": &c.LedgerPath, "db_path": &c.DBPath, "artifact_dir": &c.ArtifactDir,
+		"library_dir": &c.LibraryDir,
 	} {
 		expanded, err := safepath.Expand(*p)
 		if err != nil {
@@ -130,6 +149,8 @@ func (c Config) Validate() error {
 			ErrInvalid, c.LedgerPath)
 	case c.ArtifactDir == "":
 		return fmt.Errorf("%w: artifact_dir is required", ErrInvalid)
+	case c.LibraryDir == "":
+		return fmt.Errorf("%w: library_dir is required", ErrInvalid)
 	case c.Timeout <= 0:
 		return fmt.Errorf("%w: timeout must be positive, got %s", ErrInvalid, c.Timeout)
 	}
@@ -138,8 +159,14 @@ func (c Config) Validate() error {
 	if _, err := span.New(c.BucketWidth); err != nil {
 		return fmt.Errorf("%w: bucket_width: %v", ErrInvalid, err)
 	}
+	if _, err := time.LoadLocation(c.Zone); err != nil {
+		return fmt.Errorf("%w: zone %q: %v", ErrInvalid, c.Zone, err)
+	}
 	return nil
 }
+
+// Location is the reader's zone, loaded. Validate has already accepted the name.
+func (c Config) Location() (*time.Location, error) { return time.LoadLocation(c.Zone) }
 
 // Buckets is the bucketing this configuration selects. Validate has already rejected
 // an unknown width, so a config that loaded yields one here.

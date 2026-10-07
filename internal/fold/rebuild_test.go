@@ -27,7 +27,7 @@ const bpManifest = `{
     "validation_mode": "lenient",
     "source_schema": "bp-csv/reading",
     "time_semantics": {
-      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
+      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
     },
     "identity_key": ["/measured_at"]
   },
@@ -67,7 +67,7 @@ func (s source) ingest(t *testing.T, g *gate.Gate) map[string]gate.Result {
 	for measuredAt, reading := range s {
 		env := facet.Envelope{
 			Type: "health.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
-			SourceRef: "bp-csv:" + measuredAt,
+			SourceRef: facet.SourceRef("bp-csv", measuredAt),
 			Payload:   []byte(fmt.Sprintf(`{"measured_at": %q, %s}`, measuredAt, reading)),
 		}
 		binding, err := g.Resolve(env)

@@ -61,7 +61,7 @@ func testEnvelopes(n int) []facet.Envelope {
 	for i := range envs {
 		envs[i] = facet.Envelope{
 			Type: "health.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
-			SourceRef: fmt.Sprintf("bp-csv:%02d", i),
+			SourceRef: facet.SourceRef("bp-csv", fmt.Sprintf("%02d", i)),
 			Payload:   []byte(`{"systolic": 118, "diastolic": 76}`),
 		}
 	}
@@ -126,12 +126,12 @@ func TestAdmitAll_SaysNothingCommittedRatherThanReportingWZero(t *testing.T) {
 func TestAdmitAll_ResolveFailureKeepsTheBlocksBehindIt(t *testing.T) {
 	t.Parallel()
 
-	f := &fakeAdmitter{failBlock: -1, failResolve: "bp-csv:04"}
+	f := &fakeAdmitter{failBlock: -1, failResolve: facet.SourceRef("bp-csv", "04")}
 	prog, err := admitAll(context.Background(), f, testEnvelopes(6), time.Second, 2)
 	if err == nil {
 		t.Fatal("admitAll returned nil error though an envelope would not resolve")
 	}
-	if !strings.Contains(err.Error(), "bp-csv:04") {
+	if !strings.Contains(err.Error(), facet.SourceRef("bp-csv", "04")) {
 		t.Errorf("error does not name the envelope: %v", err)
 	}
 

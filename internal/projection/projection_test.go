@@ -39,7 +39,7 @@ func entry(id string, typ facet.Type, factTime string, st facet.Status, c facet.
 		Type:           typ,
 		FactTime:       factTime,
 		Source:         "bp-csv",
-		SourceRef:      "bp-csv:" + id,
+		SourceRef:      facet.SourceRef("bp-csv", id),
 		Status:         st,
 		Classification: c,
 		ContentHash:    "sha256:" + strings.Repeat("0", 64),

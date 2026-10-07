@@ -7,7 +7,7 @@
     "source_schema": "documents/reference",
     "payload_kind": "reference",
     "time_semantics": {
-      "fact_time": {"pointer": "/date", "layout": "2006-01-02"}
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}
     },
     "identity_key": ["/path"],
     "min_binding_assurance": "medium"

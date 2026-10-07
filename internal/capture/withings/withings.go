@@ -101,7 +101,7 @@ func Scan(ctx context.Context, dbPath, assertedPerson string) ([]facet.Envelope,
 			Injector: Source,
 			// The gate recomputes this from the definition's identity_key and
 			// rejects a mismatch — the worker must compose the same string.
-			SourceRef:      Source + ":" + p.WithingsID + ":" + p.Type,
+			SourceRef:      facet.SourceRef(Source, p.WithingsID, p.Type),
 			Payload:        raw,
 			AssertedPerson: assertedPerson,
 		})

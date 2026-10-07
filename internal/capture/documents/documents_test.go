@@ -53,7 +53,7 @@ func TestScan_DescribesEachFileFromItsSidecar(t *testing.T) {
 
 	pdf := payloadOf(t, envs[0])
 	sum := sha256.Sum256([]byte("%PDF-1.4 not really"))
-	if envs[0].SourceRef != "documents:2026-01-30_lipids.pdf" || envs[0].Type != documents.Type {
+	if envs[0].SourceRef != facet.SourceRef("documents", "2026-01-30_lipids.pdf") || envs[0].Type != documents.Type {
 		t.Errorf("first envelope = %s %s", envs[0].Type, envs[0].SourceRef)
 	}
 	if pdf["path"] != "2026-01-30_lipids.pdf" || pdf["sha256"] != hex.EncodeToString(sum[:]) ||
@@ -62,7 +62,7 @@ func TestScan_DescribesEachFileFromItsSidecar(t *testing.T) {
 		t.Errorf("pdf payload = %v", pdf)
 	}
 	jpg := payloadOf(t, envs[1])
-	if envs[1].SourceRef != "documents:scans/bp.jpg" || jpg["media_type"] != "image/jpeg" || jpg["date"] != "2024-09-16" {
+	if envs[1].SourceRef != facet.SourceRef("documents", "scans/bp.jpg") || jpg["media_type"] != "image/jpeg" || jpg["date"] != "2024-09-16" {
 		t.Errorf("jpg = %s %v", envs[1].SourceRef, jpg)
 	}
 }

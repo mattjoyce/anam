@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/facet"
+
 	"github.com/mattjoyce/anam/internal/def"
 )
 
@@ -17,7 +19,7 @@ const bpManifest = `{
     "validation_mode": "lenient",
     "source_schema": "bp-csv/reading",
     "time_semantics": {
-      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
+      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
     },
     "identity_key": ["/measured_at"]
   },
@@ -77,7 +79,7 @@ func TestParse_RejectsBadManifests(t *testing.T) {
 			return strings.Replace(m, `"enum": ["sitting", "standing", "lying"]`, `"pattern": "["`, 1)
 		},
 		"no event layout": func(m string) string {
-			return strings.Replace(m, `"layout": "2006-01-02T15:04:05Z07:00"`, `"layout": ""`, 1)
+			return strings.Replace(m, `"layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"`, `"layout": "", "zone": "UTC"`, 1)
 		},
 	}
 	for name, corrupt := range breakages {
@@ -149,6 +151,38 @@ func TestTimes_ExtractsAndNormalisesToUTC(t *testing.T) {
 	}
 }
 
+// Card 12: a zoneless clock is read in the Definition's zone, on both sides of a
+// daylight-saving change, and a clock that carries its own offset ignores the zone.
+func TestTimes_ZonelessClockIsReadInTheDefinitionsZone(t *testing.T) {
+	t.Parallel()
+	sydney := strings.Replace(strings.Replace(bpManifest,
+		`"zone": "UTC"`, `"zone": "Australia/Sydney"`, 1),
+		`"layout": "2006-01-02T15:04:05Z07:00"`, `"layout": "2006-01-02 15:04"`, 1)
+	d := mustParse(t, sydney)
+
+	cases := []struct{ in, want string }{
+		{"2024-08-16 07:46", "2024-08-15T21:46:00Z"}, // AEST, +10
+		{"2024-10-16 07:46", "2024-10-15T20:46:00Z"}, // AEDT, +11, after the first Sunday of October
+		{"2026-04-05 01:30", "2026-04-04T14:30:00Z"}, // the morning the clocks go back
+	}
+	for _, c := range cases {
+		got, err := d.FactTimeOf(mustDecode(t, `{"measured_at": "`+c.in+`", "systolic": 1, "diastolic": 1}`))
+		if err != nil {
+			t.Fatalf("FactTimeOf(%s): %v", c.in, err)
+		}
+		if got.Format(time.RFC3339) != c.want || got.Location() != time.UTC {
+			t.Errorf("FactTimeOf(%s) = %s, want %s", c.in, got.Format(time.RFC3339), c.want)
+		}
+	}
+
+	if _, err := def.Parse([]byte(strings.Replace(bpManifest, `"zone": "UTC"`, `"zone": "Mars/Olympus"`, 1))); !errors.Is(err, def.ErrBadManifest) {
+		t.Errorf("unknown zone = %v, want ErrBadManifest", err)
+	}
+	if _, err := def.Parse([]byte(strings.Replace(bpManifest, `, "zone": "UTC"`, ``, 1))); !errors.Is(err, def.ErrBadManifest) {
+		t.Errorf("missing zone = %v, want ErrBadManifest", err)
+	}
+}
+
 // The natural key is identity, never content (§6a): composed from identity_key
 // pointers only, so a corrected value yields the SAME source ref.
 func TestSourceRef_IsIdentityNotContent(t *testing.T) {
@@ -159,7 +193,7 @@ func TestSourceRef_IsIdentityNotContent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SourceRef: %v", err)
 	}
-	if want := "bp-csv:2026-01-24T06:30:00Z"; ref != want {
+	if want := facet.SourceRef("bp-csv", "2026-01-24T06:30:00Z"); ref != want {
 		t.Errorf("SourceRef = %q, want %q", ref, want)
 	}
 

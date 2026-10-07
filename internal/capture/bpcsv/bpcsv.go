@@ -92,7 +92,7 @@ func Scan(path, assertedPerson string) ([]facet.Envelope, error) {
 			Type:           Type,
 			Source:         Source,
 			Injector:       Source,
-			SourceRef:      Source + ":" + ts + ":" + reading,
+			SourceRef:      facet.SourceRef(Source, ts, reading),
 			Payload:        payload,
 			AssertedPerson: assertedPerson,
 		})

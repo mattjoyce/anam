@@ -6,7 +6,7 @@
     "validation_mode": "lenient",
     "source_schema": "records/med.stopped",
     "time_semantics": {
-      "fact_time": {"pointer": "/date", "layout": "2006-01-02"}
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}
     },
     "identity_key": ["/id"],
     "min_binding_assurance": "medium",

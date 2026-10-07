@@ -2,10 +2,11 @@ package app
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mattjoyce/anam/internal/facet"
 
 	"github.com/mattjoyce/anam/internal/capture/records"
 	"github.com/mattjoyce/anam/internal/clock"
@@ -73,7 +74,7 @@ func TestRecords_AdmitThroughTheGate(t *testing.T) {
 	dir := t.TempDir()
 	write(t, dir, "lipids.yaml", labFile)
 	admit := func() map[gate.Outcome]int {
-		envs, err := records.Scan(dir, "matt")
+		envs, err := records.Scan(dir, "matt", defs)
 		if err != nil {
 			t.Fatalf("Scan: %v", err)
 		}
@@ -103,7 +104,9 @@ func TestRecords_AdmitThroughTheGate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fold.Read: %v", err)
 	}
-	if res.Value.Len() != 2 || res.Live[0].FactTime.Format("2006-01-02 15:04") != "2024-09-10 07:46" {
+	// lab.result reads its clock in Australia/Sydney (AEST, +10 in September), so the
+	// 07:46 collection lands at 21:46 UTC the evening before.
+	if res.Value.Len() != 2 || res.Live[0].FactTime.UTC().Format("2006-01-02 15:04") != "2024-09-09 21:46" {
 		t.Fatalf("canonical: %d facets, first at %s", res.Value.Len(), res.Live[0].FactTime)
 	}
 
@@ -114,8 +117,9 @@ func TestRecords_AdmitThroughTheGate(t *testing.T) {
 	}
 }
 
-// A blood-pressure record matches the bp-csv Definition when its id is the identity
-// composition that definition makes: date_excel then reading.
+// A blood-pressure record's identity is what its Definition composes, date_excel then
+// reading, whatever its id says: the worker asks the Definition, as the gate does, so
+// the two never disagree and the record's id is just another field.
 func TestRecords_BloodPressureIdentityComposes(t *testing.T) {
 	ctx := context.Background()
 	l, err := ledger.Create(ctx, filepath.Join(t.TempDir(), "ledger.db"), "matt")
@@ -145,16 +149,17 @@ func TestRecords_BloodPressureIdentityComposes(t *testing.T) {
     systolic: 142
     diastolic: 88
 `)
-	envs, err := records.Scan(dir, "matt")
+	envs, err := records.Scan(dir, "matt", defs)
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
-	b, _ := g.Resolve(envs[0])
-	if _, _, err := g.Commit(ctx, envs[0], b); err != nil {
-		t.Fatalf("composed id refused: %v", err)
+	if want := facet.SourceRef("records", "2024-09-16 06:14:00", "1"); envs[0].SourceRef != want {
+		t.Fatalf("composed ref = %q, want %q", envs[0].SourceRef, want)
 	}
-	b, _ = g.Resolve(envs[1])
-	if _, _, err := g.Commit(ctx, envs[1], b); !errors.Is(err, gate.ErrIdentityMismatch) {
-		t.Fatalf("free-form id on a composed identity: err = %v, want ErrIdentityMismatch", err)
+	for i, env := range envs {
+		b, _ := g.Resolve(env)
+		if _, _, err := g.Commit(ctx, env, b); err != nil {
+			t.Fatalf("record %d refused: %v", i, err)
+		}
 	}
 }

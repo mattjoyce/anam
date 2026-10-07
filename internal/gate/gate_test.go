@@ -27,7 +27,7 @@ const bpManifest = `{
     "validation_mode": "lenient",
     "source_schema": "bp-csv/reading",
     "time_semantics": {
-      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00"}
+      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
     },
     "identity_key": ["/measured_at"]
   },
@@ -60,7 +60,7 @@ func newGate(t *testing.T) (*gate.Gate, *ledger.Ledger) {
 func bpEnvelope(payload string) facet.Envelope {
 	return facet.Envelope{
 		Type: "health.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
-		SourceRef: "bp-csv:2026-01-24T06:30:00Z",
+		SourceRef: facet.SourceRef("bp-csv", "2026-01-24T06:30:00Z"),
 		Payload:   []byte(payload),
 	}
 }
@@ -288,7 +288,7 @@ func TestCommit_ConcurrentWritersBothLand(t *testing.T) {
 		`{"measured_at": "2026-01-25T06:30:00Z", "systolic": 120, "diastolic": 78}`,
 		`{"measured_at": "2026-01-26T06:30:00Z", "systolic": 117, "diastolic": 75}`,
 	}
-	refs := []string{"bp-csv:2026-01-25T06:30:00Z", "bp-csv:2026-01-26T06:30:00Z"}
+	refs := []string{facet.SourceRef("bp-csv", "2026-01-25T06:30:00Z"), facet.SourceRef("bp-csv", "2026-01-26T06:30:00Z")}
 
 	errc := make(chan error, len(payloads))
 	for i := range payloads {

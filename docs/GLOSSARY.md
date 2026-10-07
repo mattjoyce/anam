@@ -114,7 +114,9 @@ carried by one or more Facets.
 the axis the timeline is ordered by.
 
 It is **extracted from the payload at the gate**, by the Definition's `time_semantics.fact_time` JSON
-Pointer, and then promoted to a first-class governed field on the Facet and on every canonical entry. It
+Pointer, read in the Definition's declared **zone** (a zoneless source clock is the wall clock where the
+person stood: `Australia/Sydney` for every local export, `UTC` for Withings, which writes UTC), and then
+promoted to a first-class governed field on the Facet and on every canonical entry. It
 does not stay buried in the payload, and that promotion is load-bearing: it is why the timeline can be
 ordered and a span filtered without anything ever parsing a payload. Narrowed with `--from`/`--to`, which
 is a *derived span* and **not** an as-of. Contrast *Anam-time*; see *Bitemporal*, *Span*.
@@ -176,8 +178,15 @@ the world (the sources are). See *Canonical*, *Tombstone*.
 depth** — not freshness (the Ledger is always current, so a read replays to the head). Cadence is
 time-OR-size-OR-rate; a quiet bucket mints nothing. Manual in the MVP. See *Checkpoint*, *Bucket span*.
 
-**Native reference** — A binary Facet's payload: a pointer to a document in its source, resolved live.
-**Reserved**, not built in the first slice (Anam's early sources are all structured/verbatim).
+**Library** — A folder root whose rows are files, read by the `documents` worker: each file is a
+`doc.reference` Facet whose payload is its **library-relative path**, sha256, size, media type and the
+date its sidecar gives it. The **default library** is `documents/` beside the ledger and needs no
+declaration; a named library is a `documents` import with its own root. The root is a place and never
+enters a fact. The share's private folder is the **inbox**, not a library: documents move from it into
+the library once their records are written. See *Native reference*.
+
+**Native reference** — A reference Facet's payload: a pointer to a document in its *Library*, resolved
+live by the inspector from the library root. Built in card 24 as `doc.reference`.
 
 **Operational store** — The SQLite database holding Anam's own state: Facet Definitions, projection
 templates, token scopes, the facet and anam-event indexes, the span registry and per-span `V`/`Wᵥ`, the
@@ -234,8 +243,10 @@ Anam-time becomes historically meaningful only when ingest is incremental. Contr
 appears in provenance and cursors. See *Capture worker*.
 
 **Source ref** — The deterministic natural key identifying **which** source row this is — composed from
-the Definition's declared `identity_key` and **never from the row's values**: `bp-csv:<excel_datetime>`,
-*not* `bp-csv:<excel_datetime>:<systolic>/<diastolic>/<pulse>`. Basis for the `facet_id`. Braiding the
+the Definition's declared `identity_key` and **never from the row's values**: `bp-csv:19:<excel_datetime>:1:<reading>`,
+*not* `bp-csv:…:<systolic>/<diastolic>/<pulse>`. The shape is `facet.SourceRef`: the source, then each
+identity value length-prefixed, so distinct tuples never share a ref whatever their values contain; the
+gate and every worker compose it through that one function. Basis for the `facet_id`. Braiding the
 values in would give a corrected reading a new `facet_id`, so it would enter as a new Facet and orphan
 the original rather than supersede it. **Identity says which fact; `content_hash` says whether it
 changed.** See *Content hash*, *Idempotency*, *Supersession*.

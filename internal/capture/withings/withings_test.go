@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/facet"
+
 	_ "modernc.org/sqlite"
 
 	"github.com/mattjoyce/anam/internal/capture/withings"
@@ -121,8 +123,8 @@ func TestScan_SameInstantDifferentGroupsAreDistinctFacets(t *testing.T) {
 		refs[env.SourceRef] = true
 	}
 	for _, want := range []string{
-		"withings:6314440651:9", "withings:6314440651:10",
-		"withings:6314440652:9", "withings:6314440652:10",
+		facet.SourceRef("withings", "6314440651", "9"), facet.SourceRef("withings", "6314440651", "10"),
+		facet.SourceRef("withings", "6314440652", "9"), facet.SourceRef("withings", "6314440652", "10"),
 	} {
 		if !refs[want] {
 			t.Errorf("missing source_ref %q", want)
@@ -142,7 +144,7 @@ func TestScan_KeepsTheSourceLexeme(t *testing.T) {
 	}
 	var weight []byte
 	for _, env := range envs {
-		if env.SourceRef == "withings:5204716098:1" {
+		if env.SourceRef == facet.SourceRef("withings", "5204716098", "1") {
 			weight = env.Payload
 		}
 	}

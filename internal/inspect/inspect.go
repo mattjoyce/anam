@@ -17,8 +17,12 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"mime"
 	"net"
 	"net/http"
+	"net/url"
+	"os"
+	"path"
 	"sort"
 	"sync"
 	"time"
@@ -48,6 +52,11 @@ type Server struct {
 	ledger  Ledger
 	timeout time.Duration
 
+	// library is the default library's root: the folder a doc.reference's path is
+	// relative to. The inspector serves those bytes itself, confined to the root, so
+	// a reference facet opens as the document it points at. Empty means no library.
+	library string
+
 	// buckets is the operator's bucketing, so the id shown beside a facet is the one
 	// the operational index holds for it rather than whatever this package assumed.
 	buckets span.Buckets
@@ -73,15 +82,17 @@ type Server struct {
 // through a year of timestamps cannot grow the process without bound.
 const asOfCacheSize = 4
 
-// Handler returns the inspector's routes on a fresh mux.
-func Handler(l Ledger, timeout time.Duration, buckets span.Buckets) http.Handler {
-	s := &Server{ledger: l, timeout: timeout, buckets: buckets}
+// Handler returns the inspector's routes on a fresh mux. library is the default
+// library's root, or "" for none.
+func Handler(l Ledger, timeout time.Duration, buckets span.Buckets, library string) http.Handler {
+	s := &Server{ledger: l, timeout: timeout, buckets: buckets, library: library}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.timeline)
 	mux.HandleFunc("GET /facets", s.index)
 	mux.HandleFunc("GET /facet", s.facetPage)
 	mux.HandleFunc("GET /events", s.events)
 	mux.HandleFunc("GET /projection", s.projectionPage)
+	mux.HandleFunc("GET /document", s.document)
 	return mux
 }
 
@@ -142,10 +153,10 @@ func (s *Server) readAt(ctx context.Context, w ledger.Watermark) (fold.Result, e
 }
 
 // Serve runs the inspector at addr until ctx is cancelled.
-func Serve(ctx context.Context, l Ledger, addr string, timeout time.Duration, buckets span.Buckets) error {
+func Serve(ctx context.Context, l Ledger, addr string, timeout time.Duration, buckets span.Buckets, library string) error {
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           Handler(l, timeout, buckets),
+		Handler:           Handler(l, timeout, buckets, library),
 		ReadHeaderTimeout: 5 * time.Second,
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}
@@ -254,6 +265,10 @@ type facetData struct {
 	Status   facet.Status
 	FactTime string
 
+	// DocumentURL is set for a reference facet whose path the library can serve:
+	// the inspector's own route to the bytes. Empty otherwise.
+	DocumentURL string
+
 	// AnamTime is read off this artifact's own admitted event, not off the Facet: a
 	// Facet carries one clock, the world's. When Anam learned of it is the ledger's
 	// business, and the ledger is where the page has to go to ask.
@@ -308,14 +323,70 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	render(w, "facet.html", facetData{
-		Facet:    f,
-		Status:   states[id].Status,
-		FactTime: f.FactTime.Format(time.RFC3339),
-		AnamTime: anamTimeOf(mine, f.ArtifactVersion),
-		Bucket:   s.buckets.Of(f.FactTime).ID(),
-		Payload:  pretty.String(),
-		Events:   mine,
+		Facet:       f,
+		Status:      states[id].Status,
+		FactTime:    f.FactTime.Format(time.RFC3339),
+		DocumentURL: s.documentURL(f),
+		AnamTime:    anamTimeOf(mine, f.ArtifactVersion),
+		Bucket:      s.buckets.Of(f.FactTime).ID(),
+		Payload:     pretty.String(),
+		Events:      mine,
 	})
+}
+
+// documentURL is the inspector's link to a reference facet's bytes, when it has a
+// library to serve them from. The path is read from the payload, which is where a
+// reference says what it points at (journal/notes/reference-payloads.md).
+func (s *Server) documentURL(f facet.Facet) string {
+	if s.library == "" || f.Descriptor.PayloadKind != facet.PayloadReference {
+		return ""
+	}
+	var ref struct {
+		Path string `json:"path"`
+	}
+	if err := json.Unmarshal(f.Payload.Bytes(), &ref); err != nil || ref.Path == "" {
+		return ""
+	}
+	return "/document?path=" + url.QueryEscape(ref.Path)
+}
+
+// document serves one file from the default library by its library-relative path,
+// as the reference facet recorded it. The open is confined to the library root
+// (os.Root), so a path that climbs out, or a symlink that points out, is refused
+// with the same answer as a file that is not there. The bytes are served as they
+// are, with the media type the extension names; the inspector shows and never
+// interprets.
+func (s *Server) document(w http.ResponseWriter, r *http.Request) {
+	rel := r.URL.Query().Get("path")
+	if s.library == "" || rel == "" {
+		http.NotFound(w, r)
+		return
+	}
+	root, err := os.OpenRoot(s.library)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer func() { _ = root.Close() }()
+	f, err := root.Open(rel)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer func() { _ = f.Close() }()
+	info, err := f.Stat()
+	if err != nil || !info.Mode().IsRegular() {
+		http.NotFound(w, r)
+		return
+	}
+	if mt := mime.TypeByExtension(path.Ext(rel)); mt != "" {
+		w.Header().Set("Content-Type", mt)
+	} else {
+		w.Header().Set("Content-Type", "application/octet-stream")
+	}
+	w.Header().Set("Content-Disposition", "inline; filename=\""+path.Base(rel)+"\"")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	http.ServeContent(w, r, path.Base(rel), info.ModTime(), f)
 }
 
 type eventsData struct {

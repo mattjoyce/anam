@@ -28,6 +28,7 @@ import (
 var mvpScopes = gate.StaticScopes{
 	healthdb.Source: {
 		"health.sleep", "health.body-composition", "health.heart-rate", "health.metric-group",
+		healthdb.AlertType,
 	},
 	bpcsv.Source:    {bpcsv.Type},
 	withings.Source: {withings.Type},

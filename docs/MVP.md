@@ -141,6 +141,7 @@ fact, a substrate swap is a re-ingest, not a migration.
 | Source | Facet type(s) | Payload (verbatim) | Notes |
 |---|---|---|---|
 | `health-db` | `health.sleep`, `health.body-composition`, `health.heart-rate`, `health.metric-group` | a period's metric rows as JSON | grain = one group per period; `fact_time = period_start`; `bp_*` excluded from `health.heart-rate` |
+| `health-db` | `health.heart-rate-alert` | one alert row from the `events` table as JSON | one facet per alert the watch raised; `fact_time` is the alert's UTC time; the ETL reads it from the FIT files because GarminDB drops it |
 | `bp-csv` | `health.blood-pressure` | one reading row as JSON | one facet per row; `fact_time` from `Date (Excel)`; values kept as source strings |
 | *(agent)* | `health.insight` *(illustrative)* | the finding value | `proposed`; provenance carries method + the watermark it was computed from |
 

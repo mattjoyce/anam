@@ -58,6 +58,36 @@ func fixture(t *testing.T) string {
 	return path
 }
 
+// fixtureWithEvents adds the events table the ETL writes from the watch's FIT
+// files: two heart rate alerts, one alert with no heart rate, and one event of a
+// kind that is not an alert. Only the first two may become facets.
+func fixtureWithEvents(t *testing.T) string {
+	t.Helper()
+	path := fixture(t)
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatalf("open fixture: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	stmts := `
+	CREATE TABLE events (
+	  source TEXT NOT NULL, kind TEXT NOT NULL, fact_time TEXT NOT NULL,
+	  value REAL, threshold REAL, unit TEXT, source_file TEXT NOT NULL,
+	  first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	  PRIMARY KEY (source, kind, fact_time));
+
+	INSERT INTO events (source, kind, fact_time, value, threshold, unit, source_file) VALUES
+	  ('garmin','hr_high_alert','2026-09-25T11:31:00Z',117.0,100.0,'bpm','2026/a_WELLNESS.fit'),
+	  ('garmin','hr_high_alert','2026-09-25T10:32:00Z',100.0,100.0,'bpm','2026/a_WELLNESS.fit'),
+	  ('garmin','hr_high_alert','2026-09-25T12:00:00Z',NULL,100.0,'bpm','2026/b_WELLNESS.fit'),
+	  ('garmin','stress_alert','2026-09-25T13:00:00Z',80.0,75.0,'score','2026/b_WELLNESS.fit');`
+	if _, err := db.Exec(stmts); err != nil {
+		t.Fatalf("seed events: %v", err)
+	}
+	return path
+}
+
 // Every envelope the worker composes must clear the same bundled contract the gate
 // will hold it to: definition present, payload compliant, times parseable, and —
 // the strong one — the worker's source_ref byte-identical to the one the
@@ -70,14 +100,15 @@ func TestScan_ComposesGateCompliantEnvelopes(t *testing.T) {
 		t.Fatalf("Bundled: %v", err)
 	}
 
-	envs, err := healthdb.Scan(context.Background(), fixture(t), "matt")
+	envs, err := healthdb.Scan(context.Background(), fixtureWithEvents(t), "matt")
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
 
-	// 5 group-periods: sleep×2 days, body×1 month, heart×1 day, stress×1 day.
-	if len(envs) != 5 {
-		t.Fatalf("Scan composed %d envelopes, want 5", len(envs))
+	// 5 group-periods: sleep×2 days, body×1 month, heart×1 day, stress×1 day;
+	// then 2 heart rate alerts.
+	if len(envs) != 7 {
+		t.Fatalf("Scan composed %d envelopes, want 7", len(envs))
 	}
 
 	types := map[facet.Type]int{}
@@ -113,6 +144,7 @@ func TestScan_ComposesGateCompliantEnvelopes(t *testing.T) {
 	want := map[facet.Type]int{
 		"health.sleep": 2, "health.body-composition": 1,
 		"health.heart-rate": 1, "health.metric-group": 1,
+		healthdb.AlertType: 2,
 	}
 	for typ, n := range want {
 		if types[typ] != n {
@@ -132,7 +164,7 @@ func TestScan_ComposesGateCompliantEnvelopes(t *testing.T) {
 // worker's half of the idempotency promise (the gate's half hashes them).
 func TestScan_IsDeterministic(t *testing.T) {
 	t.Parallel()
-	path := fixture(t)
+	path := fixtureWithEvents(t)
 
 	a, err := healthdb.Scan(context.Background(), path, "matt")
 	if err != nil {
@@ -148,6 +180,51 @@ func TestScan_IsDeterministic(t *testing.T) {
 	for i := range a {
 		if a[i].SourceRef != b[i].SourceRef || !bytes.Equal(a[i].Payload, b[i].Payload) {
 			t.Errorf("scan %d not deterministic: %s", i, a[i].SourceRef)
+		}
+	}
+}
+
+// An alert's payload is what the watch said: no ETL bookkeeping (source_file,
+// first_seen) that a rebuilt source could change without the alert changing.
+func TestScan_AlertPayload(t *testing.T) {
+	t.Parallel()
+	envs, err := healthdb.Scan(context.Background(), fixtureWithEvents(t), "matt")
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	var alerts []facet.Envelope
+	for _, env := range envs {
+		if env.Type == healthdb.AlertType {
+			alerts = append(alerts, env)
+		}
+	}
+	if len(alerts) != 2 {
+		t.Fatalf("%d alerts, want 2", len(alerts))
+	}
+	want := `{"source":"garmin","kind":"hr_high_alert","fact_time":"2026-09-25T10:32:00Z",` +
+		`"heart_rate":100,"threshold":100,"unit":"bpm"}`
+	if got := string(alerts[0].Payload); got != want {
+		t.Errorf("first alert payload\n got %s\nwant %s", got, want)
+	}
+	if want := facet.SourceRef(healthdb.Source, "garmin", "hr_high_alert", "2026-09-25T10:32:00Z"); alerts[0].SourceRef != want {
+		t.Errorf("first alert source_ref = %q, want %q", alerts[0].SourceRef, want)
+	}
+}
+
+// A source written before the ETL kept events has no events table. It holds no
+// alerts, and its summaries still come through.
+func TestScan_NoEventsTable(t *testing.T) {
+	t.Parallel()
+	envs, err := healthdb.Scan(context.Background(), fixture(t), "matt")
+	if err != nil {
+		t.Fatalf("Scan: %v", err)
+	}
+	if len(envs) != 5 {
+		t.Fatalf("Scan composed %d envelopes, want 5", len(envs))
+	}
+	for _, env := range envs {
+		if env.Type == healthdb.AlertType {
+			t.Errorf("alert composed from a source with no events table: %s", env.SourceRef)
 		}
 	}
 }

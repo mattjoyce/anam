@@ -144,7 +144,7 @@ semantics, linking elements, validation bar, classification. Bundled as embedded
 `anam def load`. See *Facet*.
 
 **Facet type** — The kind of a Facet, named **lower-case dotted and namespaced**: `health.sleep`,
-`health.body-composition`, `health.heart-rate`, `health.blood-pressure`, `health.metric-group` (future:
+`health.body-composition`, `health.heart-rate`, `health.heart-rate-alert`, `health.blood-pressure`, `health.metric-group` (future:
 `calendar.event`, `mail.thread`, `note.zettel`). Deviates from Arch's snake_case on purpose.
 
 **Fold** — The computation that reads a span's anam-events up to a watermark and derives each Facet's

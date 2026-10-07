@@ -70,7 +70,7 @@ type metric struct {
 }
 
 // Scan reads the source database and composes one Envelope per (group,
-// period_type, period_start), in deterministic order. assertedPerson is stamped on
+// period_type, period_start), then one per heart rate alert, in deterministic order. assertedPerson is stamped on
 // every envelope — the source is the person's own database, so the binding
 // resolves high (§6).
 //
@@ -114,7 +114,12 @@ func Scan(ctx context.Context, dbPath, assertedPerson string) ([]facet.Envelope,
 			AssertedPerson: assertedPerson,
 		})
 	}
-	return envelopes, nil
+
+	alerts, err := scanAlerts(ctx, db, assertedPerson)
+	if err != nil {
+		return nil, err
+	}
+	return append(envelopes, alerts...), nil
 }
 
 // readGroups scans the summaries and assembles them into per-(group, period)

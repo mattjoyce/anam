@@ -85,7 +85,6 @@ var typeStyles = map[facet.Type]typeStyle{
 
 	"health.metric-group": {"activity", shapeCircle, kindMeasure},
 	"gym.visit":           {"activity", shapeSquare, kindEvent},
-	"exercise.session":    {"activity", shapeDiamond, kindEvent},
 
 	"lab.result": {"labs", shapeCircle, kindReading},
 	"lab.panel":  {"labs", shapeSquare, kindEvent},

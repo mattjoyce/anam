@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
@@ -61,11 +62,67 @@ func TestTypeStyles_ShapesMeanWhatTheLegendSays(t *testing.T) {
 	}
 }
 
-// Each family keeps one palette slot of the eight, never shared.
+// A shape means one kind of thing in every row, not only within one. The alert
+// shape is for alerts alone, and every alert takes it: a heart rate alert once
+// drew as a large red triangle and read as a trip beside travel's orange one.
+// Starts and ends keep their triangles wherever they sit.
+func TestTypeStyles_OneShapeMeansOneThingAcrossRows(t *testing.T) {
+	t.Parallel()
+	meaning := map[shape]func(facet.Type) bool{
+		shapeAlert:   func(typ facet.Type) bool { return strings.HasSuffix(string(typ), "-alert") },
+		shapeTriUp:   func(typ facet.Type) bool { return hasAnySuffix(typ, ".started", ".departed") },
+		shapeTriDown: func(typ facet.Type) bool { return hasAnySuffix(typ, ".stopped", ".ended", ".arrived") },
+	}
+	for typ, st := range typeStyles {
+		for sh, means := range meaning {
+			if means(typ) && st.Shape != sh {
+				t.Errorf("%s: want the %s shape, got %s", typ, sh, st.Shape)
+			}
+			if st.Shape == sh && !means(typ) {
+				t.Errorf("%s: the %s shape means something %s is not", typ, sh, typ)
+			}
+		}
+	}
+}
+
+func hasAnySuffix(typ facet.Type, suffixes ...string) bool {
+	for _, s := range suffixes {
+		if strings.HasSuffix(string(typ), s) {
+			return true
+		}
+	}
+	return false
+}
+
+// The alert's outline is its own: no other shape draws with the same sequence of
+// path commands, which a larger copy of a triangle would.
+func TestMarkPath_AlertOutlineIsItsOwn(t *testing.T) {
+	t.Parallel()
+	outline := func(s shape) string {
+		return strings.Map(func(r rune) rune {
+			if unicode.IsLetter(r) {
+				return r
+			}
+			return -1
+		}, markPath(s, 0, 0))
+	}
+	alert := outline(shapeAlert)
+	for _, s := range []shape{shapeCircle, shapeSquare, shapeDiamond, shapeTriUp, shapeTriDown, shapeCross, shapeStar} {
+		if outline(s) == alert {
+			t.Errorf("the alert draws the same outline as %s (%s)", s, alert)
+		}
+	}
+}
+
+// Each family keeps one palette slot of the eight, never shared. A family may
+// instead take the neutral grey.
 func TestFamilies_HuesAreDistinct(t *testing.T) {
 	t.Parallel()
 	seen := map[int]string{}
 	for _, f := range families {
+		if f.Hue == hueNeutral {
+			continue
+		}
 		if f.Hue < 0 || f.Hue > 7 {
 			t.Errorf("%s: hue %d is outside the eight palette slots", f.ID, f.Hue)
 		}

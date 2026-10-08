@@ -52,6 +52,10 @@ type Config struct {
 	// is standing. Defaults to Local.
 	Zone string `mapstructure:"zone"`
 
+	// Listen is the address `anam daemon` serves on. It defaults to loopback, and the
+	// daemon refuses anything else until its requests carry a token.
+	Listen string `mapstructure:"listen"`
+
 	// Timeout bounds every call to a store. Anam fails fast rather than hanging (§8).
 	Timeout time.Duration `mapstructure:"timeout"`
 
@@ -91,6 +95,7 @@ func Load(path string) (Config, error) {
 	v.SetDefault("bucket_width", string(span.Default))
 	v.SetDefault("library_dir", "")
 	v.SetDefault("zone", "Local")
+	v.SetDefault("listen", DefaultListen)
 
 	if path != "" {
 		v.SetConfigFile(path)
@@ -171,6 +176,10 @@ func (c Config) Location() (*time.Location, error) { return time.LoadLocation(c.
 // Buckets is the bucketing this configuration selects. Validate has already rejected
 // an unknown width, so a config that loaded yields one here.
 func (c Config) Buckets() (span.Buckets, error) { return span.New(c.BucketWidth) }
+
+// DefaultListen is the daemon's address when none is configured: loopback, on the
+// port the inspector has always used.
+const DefaultListen = "127.0.0.1:8787"
 
 // DefaultLedgerPath is the ledger: <data dir>/anam/ledger.db.
 func DefaultLedgerPath() string { return dataPath("ledger.db") }

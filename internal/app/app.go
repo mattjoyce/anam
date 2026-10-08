@@ -35,7 +35,8 @@ func Run(ctx context.Context, info BuildInfo) error {
 
 	root.AddCommand(versionCmd(info), initCmd(&cfgPath), ingestCmd(&cfgPath),
 		inspectCmd(&cfgPath), timelineCmd(&cfgPath), changesCmd(&cfgPath),
-		serveCmd(&cfgPath), receiptCmd(&cfgPath), checkpointCmd(&cfgPath), retractCmd(&cfgPath))
+		serveCmd(&cfgPath), receiptCmd(&cfgPath), checkpointCmd(&cfgPath), retractCmd(&cfgPath),
+		daemonCmd(&cfgPath))
 	return root.ExecuteContext(ctx)
 }
 

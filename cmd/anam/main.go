@@ -9,6 +9,10 @@ import (
 	"os/signal"
 	"syscall"
 
+	// Definitions name the zone their source's clock is read in, and a container
+	// image need not carry a zone database. Embedding it makes every build load them.
+	_ "time/tzdata"
+
 	"github.com/mattjoyce/anam/internal/app"
 )
 

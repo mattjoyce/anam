@@ -42,6 +42,7 @@ func TestLoadDefaults(t *testing.T) {
 		ArtifactDir: "/data/anam/artifacts",
 		LibraryDir:  "/data/anam/documents",
 		Zone:        "Local",
+		Listen:      config.DefaultListen,
 		Timeout:     5 * time.Second,
 		BucketWidth: span.Default,
 	}
@@ -106,6 +107,7 @@ bucket_width: weekly
 		ArtifactDir: "/srv/anam/artifacts",
 		LibraryDir:  "/srv/anam/documents",
 		Zone:        "Local",
+		Listen:      config.DefaultListen,
 		Timeout:     12 * time.Second,
 		BucketWidth: span.Weekly,
 	}

@@ -53,6 +53,10 @@ artifact_dir: ~/.local/share/anam/artifacts
 # Bounds every call to a store. Anam fails fast rather than hanging.
 timeout: 5s
 
+# Where `anam daemon` serves the inspector and /healthz. Loopback only: the daemon
+# refuses any other address until its requests carry a token.
+listen: 127.0.0.1:8787
+
 # --- bucketing ----------------------------------------------------------------
 # How much fact-time one checkpoint bucket covers: `monthly` or `weekly`.
 #

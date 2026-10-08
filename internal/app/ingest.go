@@ -114,15 +114,26 @@ declarations for that source. A path typed ad hoc is provenance that evaporates
 with the shell history; a declared import is reviewable and repeatable.
 
 Every import is read before any is admitted. A source that cannot be read stops
-the run with nothing written.`,
+the run with nothing written.
+
+With a server configured the daemon runs its own declared imports, and this waits
+for the run to finish, up to ingest_timeout. A source, --imports and --batch name
+local files and are refused there.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if batch < 1 || batch > gate.MaxBatch {
 				return fmt.Errorf("--batch %d is outside 1..%d", batch, gate.MaxBatch)
 			}
-			cfg, err := loadConfig(*cfgPath, cmd)
+			cfg, err := loadRoutedConfig(*cfgPath, cmd)
 			if err != nil {
 				return err
+			}
+			if cfg.Server != "" {
+				if len(args) > 0 || cmd.Flags().Changed("imports") || cmd.Flags().Changed("batch") {
+					return fmt.Errorf("a source, --imports and --batch name local files; "+
+						"the daemon at %s runs the imports it declares", cfg.Server)
+				}
+				return remoteIngest(cmd, cfg)
 			}
 			imports, err := loadImports(importsPath, cmd)
 			if err != nil {
@@ -181,13 +192,39 @@ func runIngest(cmd *cobra.Command, cfg config.Config, imports []config.Import, b
 	// landed are in the ledger whatever the exit code says, and an operator deciding
 	// whether to re-run needs to know there were any.
 	changed, err := admitSources(cmd.Context(), g, all, cfg.Timeout, batch, func(sc scanned, prog progress) {
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n", sc.source, prog.report(len(sc.envs)))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), sourceLine(resultOf(sc.source, len(sc.envs), prog)))
 	})
 	if err != nil {
 		return err
 	}
 	_, err = fmt.Fprintln(cmd.OutOrStdout(), verdict(changed))
 	return err
+}
+
+// remoteIngest asks the daemon for an ingest, waits for it, and reports it as a local
+// run does: a line per source, then the verdict or the error.
+func remoteIngest(cmd *cobra.Command, cfg config.Config) error {
+	c, err := newClient(cfg)
+	if err != nil {
+		return err
+	}
+	op, err := c.Ingest(cmd.Context(), cfg.IngestTimeout)
+	if err != nil {
+		return err
+	}
+	for _, r := range op.Sources {
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), sourceLine(r))
+	}
+	switch op.State {
+	case api.StateSucceeded:
+		_, err = fmt.Fprintln(cmd.OutOrStdout(), op.Summary)
+		return err
+	case api.StateFailed:
+		return fmt.Errorf("ingest %s on %s: %s", op.ID, c.Server(), op.Error)
+	default:
+		return fmt.Errorf("ingest %s on %s is still %s after %s; anam status shows it",
+			op.ID, c.Server(), op.State, cfg.IngestTimeout)
+	}
 }
 
 // admitSources admits each scanned import in declared order and calls each with its
@@ -395,17 +432,33 @@ type progress struct {
 	done int
 }
 
-// report renders progress against the number of envelopes offered, naming itself
-// partial when it is.
-func (p progress) report(offered int) string {
-	if p.done == 0 {
-		return fmt.Sprintf("%d envelopes → nothing committed", offered)
+// resultOf is one source's part of a run as the API reports it, whichever process ran
+// it.
+func resultOf(source string, offered int, p progress) api.SourceResult {
+	r := api.SourceResult{
+		Source:     source,
+		Offered:    offered,
+		Admitted:   p.tally[gate.OutcomeAdmitted],
+		Superseded: p.tally[gate.OutcomeSuperseded],
+		Unchanged:  p.tally[gate.OutcomeNoOp],
+		Committed:  p.done,
 	}
-	s := fmt.Sprintf("%d envelopes → admitted=%d superseded=%d no-op=%d  W=%d",
-		offered, p.tally[gate.OutcomeAdmitted], p.tally[gate.OutcomeSuperseded],
-		p.tally[gate.OutcomeNoOp], p.w)
-	if p.done < offered {
-		s += fmt.Sprintf("  (stopped after %d of %d — commit is idempotent, so re-run)", p.done, offered)
+	if p.done > 0 {
+		w := int64(p.w)
+		r.W = &w
+	}
+	return r
+}
+
+// sourceLine renders one source's part of a run, naming itself partial when it is.
+func sourceLine(r api.SourceResult) string {
+	if r.Committed == 0 || r.W == nil {
+		return fmt.Sprintf("%s: %d envelopes → nothing committed", r.Source, r.Offered)
+	}
+	s := fmt.Sprintf("%s: %d envelopes → admitted=%d superseded=%d no-op=%d  W=%d",
+		r.Source, r.Offered, r.Admitted, r.Superseded, r.Unchanged, *r.W)
+	if r.Committed < r.Offered {
+		s += fmt.Sprintf("  (stopped after %d of %d — commit is idempotent, so re-run)", r.Committed, r.Offered)
 	}
 	return s
 }

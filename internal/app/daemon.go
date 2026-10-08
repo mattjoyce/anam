@@ -122,14 +122,7 @@ func daemonIngest(cfg config.Config, importsPath string) daemon.IngestFunc {
 		g := gate.New(s.Ledger, reg, mvpScopes, clock.Real{}, cfg.PersonID)
 		var out []api.SourceResult
 		_, err = admitSources(ctx, g, all, cfg.Timeout, gate.MaxBatch, func(sc scanned, p progress) {
-			out = append(out, api.SourceResult{
-				Source:     sc.source,
-				Offered:    len(sc.envs),
-				Admitted:   p.tally[gate.OutcomeAdmitted],
-				Superseded: p.tally[gate.OutcomeSuperseded],
-				Unchanged:  p.tally[gate.OutcomeNoOp],
-				Committed:  p.done,
-			})
+			out = append(out, resultOf(sc.source, len(sc.envs), p))
 		})
 		return out, err
 	}

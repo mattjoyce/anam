@@ -89,7 +89,7 @@ func TestAdmitAll_ReportsWhatLandedWhenABlockFails(t *testing.T) {
 		t.Errorf("admitted = %d, want 3", got)
 	}
 
-	report := prog.report(5)
+	report := sourceLine(resultOf("bp-csv", 5, prog))
 	for _, want := range []string{"W=3", "admitted=3", "stopped after 3 of 5", "re-run"} {
 		if !strings.Contains(report, want) {
 			t.Errorf("report %q missing %q", report, want)
@@ -112,7 +112,7 @@ func TestAdmitAll_SaysNothingCommittedRatherThanReportingWZero(t *testing.T) {
 		t.Errorf("done = %d, want 0", prog.done)
 	}
 
-	report := prog.report(5)
+	report := sourceLine(resultOf("bp-csv", 5, prog))
 	if !strings.Contains(report, "nothing committed") {
 		t.Errorf("report %q does not say nothing was committed", report)
 	}
@@ -157,7 +157,7 @@ func TestAdmitAll_CompleteRunReportsNoRemainder(t *testing.T) {
 		t.Errorf("done = %d, W = %d, want 5 and 5", prog.done, prog.w)
 	}
 
-	report := prog.report(5)
+	report := sourceLine(resultOf("bp-csv", 5, prog))
 	if strings.Contains(report, "stopped after") {
 		t.Errorf("a complete run reported itself partial: %q", report)
 	}

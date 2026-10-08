@@ -54,6 +54,10 @@ type SourceResult struct {
 	// Committed is how many of Offered have an outcome. Less than Offered means the
 	// run stopped inside this source.
 	Committed int `json:"committed"`
+	// W is the watermark this source's last committed block left behind. It is nil
+	// when no block committed: the zero watermark is a real value meaning "empty
+	// ledger", and a run that committed nothing never observed it.
+	W *int64 `json:"w,omitempty"`
 }
 
 // Operation states.

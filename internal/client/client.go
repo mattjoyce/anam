@@ -201,3 +201,17 @@ func (c *Client) Mint(ctx context.Context, dryRun bool) (api.Mint, error) {
 	_, err := c.do(ctx, c.timeout, http.MethodPost, "/v1/checkpoints", q, nil, &m)
 	return m, err
 }
+
+// Ingest asks the daemon to run its imports and waits up to wait for the run to
+// finish. It returns the operation as it stands: succeeded, failed, or still going
+// when the wait ran out. A run that failed is an answer, not an error.
+func (c *Client) Ingest(ctx context.Context, wait time.Duration) (api.Operation, error) {
+	var op api.Operation
+	q := url.Values{"wait": {wait.String()}}
+	_, err := c.do(ctx, wait+c.timeout, http.MethodPost, "/v1/ingest", q, nil, &op)
+	var refused *Error
+	if errors.As(err, &refused) && refused.Status == http.StatusInternalServerError && op.ID != "" {
+		return op, nil
+	}
+	return op, err
+}

@@ -388,3 +388,47 @@ func TestCheckpoints_SameOverTheDaemon(t *testing.T) {
 		t.Errorf("a second mint would mint again:\n%s", out)
 	}
 }
+
+// An ingest asked of the daemon reports as a local one does: a line per source, then
+// the verdict. The daemon reads the imports it declares; the fixture's are the same.
+func TestIngest_SameOverTheDaemon(t *testing.T) {
+	t.Parallel()
+	f := newRemoteFixture(t)
+	importsPath := filepath.Join(f.dir, "imports.yaml")
+
+	local, _, err := cli(t, f.cfgPath, "ingest", "--imports", importsPath)
+	if err != nil {
+		t.Fatalf("local ingest: %v", err)
+	}
+	remote, _, err := cli(t, f.remoteCfg, "ingest")
+	if err != nil {
+		t.Fatalf("remote ingest: %v", err)
+	}
+	if local != remote {
+		t.Fatalf("ingest differs\n--- local\n%s--- remote\n%s", local, remote)
+	}
+	if !strings.Contains(remote, "no-op=3  W=3") || !strings.Contains(remote, nothingNew) {
+		t.Errorf("a repeat ingest over the daemon:\n%s", remote)
+	}
+
+	for _, args := range [][]string{{"ingest", "bp-csv"}, {"ingest", "--batch", "1"}, {"ingest", "--imports", importsPath}} {
+		if _, _, err := cli(t, f.remoteCfg, args...); err == nil || !strings.Contains(err.Error(), "local files") {
+			t.Errorf("%v with a server: %v, want a refusal", args, err)
+		}
+	}
+}
+
+// A run the daemon could not finish fails the command, after saying what landed.
+func TestIngest_AFailedRunOverTheDaemonFails(t *testing.T) {
+	t.Parallel()
+	f := newRemoteFixture(t)
+	missing := filepath.Join(f.dir, "unmounted", "healthdata.db")
+	decl := fmt.Sprintf("imports:\n  - source: bp-csv\n    path: %s\n  - source: health-db\n    path: %s\n", f.bpPath, missing)
+	if err := os.WriteFile(filepath.Join(f.dir, "imports.yaml"), []byte(decl), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := cli(t, f.remoteCfg, "ingest")
+	if err == nil || !strings.Contains(err.Error(), "health-db") || !strings.Contains(err.Error(), f.server) {
+		t.Fatalf("remote ingest of a missing source: %v", err)
+	}
+}

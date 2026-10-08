@@ -46,7 +46,7 @@ func newConfig(t *testing.T) config.Config {
 
 func open(t *testing.T, cfg config.Config) *Daemon {
 	t.Helper()
-	d, err := Open(context.Background(), cfg)
+	d, err := Open(context.Background(), cfg, Options{})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestOpenRefuses(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := newConfig(t)
 			tt.mutate(&cfg)
-			_, err := Open(context.Background(), cfg)
+			_, err := Open(context.Background(), cfg, Options{})
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("Open: got %v, want %v", err, tt.want)
 			}

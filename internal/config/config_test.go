@@ -36,15 +36,16 @@ func TestLoadDefaults(t *testing.T) {
 	}
 
 	want := config.Config{
-		PersonID:    "matt",
-		LedgerPath:  "/data/anam/ledger.db",
-		DBPath:      "/data/anam/tracking.db",
-		ArtifactDir: "/data/anam/artifacts",
-		LibraryDir:  "/data/anam/documents",
-		Zone:        "Local",
-		Listen:      config.DefaultListen,
-		Timeout:     5 * time.Second,
-		BucketWidth: span.Default,
+		PersonID:      "matt",
+		LedgerPath:    "/data/anam/ledger.db",
+		DBPath:        "/data/anam/tracking.db",
+		ArtifactDir:   "/data/anam/artifacts",
+		LibraryDir:    "/data/anam/documents",
+		Zone:          "Local",
+		Listen:        config.DefaultListen,
+		Timeout:       5 * time.Second,
+		IngestTimeout: 15 * time.Minute,
+		BucketWidth:   span.Default,
 	}
 	if got != want {
 		t.Errorf("Load() = %+v, want %+v", got, want)
@@ -101,15 +102,16 @@ bucket_width: weekly
 	}
 
 	want := config.Config{
-		PersonID:    "matt",
-		LedgerPath:  "/srv/anam/ledger.db",
-		DBPath:      "/srv/anam/tracking.db",
-		ArtifactDir: "/srv/anam/artifacts",
-		LibraryDir:  "/srv/anam/documents",
-		Zone:        "Local",
-		Listen:      config.DefaultListen,
-		Timeout:     12 * time.Second,
-		BucketWidth: span.Weekly,
+		PersonID:      "matt",
+		LedgerPath:    "/srv/anam/ledger.db",
+		DBPath:        "/srv/anam/tracking.db",
+		ArtifactDir:   "/srv/anam/artifacts",
+		LibraryDir:    "/srv/anam/documents",
+		Zone:          "Local",
+		Listen:        config.DefaultListen,
+		Timeout:       12 * time.Second,
+		IngestTimeout: 15 * time.Minute,
+		BucketWidth:   span.Weekly,
 	}
 	if got != want {
 		t.Errorf("Load() = %+v, want %+v", got, want)
@@ -222,14 +224,15 @@ func TestValidate(t *testing.T) {
 	t.Parallel()
 
 	valid := config.Config{
-		PersonID:    "matt",
-		LedgerPath:  "/srv/ledger.db",
-		DBPath:      "/srv/tracking.db",
-		ArtifactDir: "/srv/artifacts",
-		LibraryDir:  "/srv/documents",
-		Zone:        "Australia/Sydney",
-		Timeout:     5 * time.Second,
-		BucketWidth: span.Default,
+		PersonID:      "matt",
+		LedgerPath:    "/srv/ledger.db",
+		DBPath:        "/srv/tracking.db",
+		ArtifactDir:   "/srv/artifacts",
+		LibraryDir:    "/srv/documents",
+		Zone:          "Australia/Sydney",
+		Timeout:       5 * time.Second,
+		IngestTimeout: time.Minute,
+		BucketWidth:   span.Default,
 	}
 
 	tests := []struct {
@@ -247,6 +250,7 @@ func TestValidate(t *testing.T) {
 		{"unknown zone", func(c *config.Config) { c.Zone = "Mars/Olympus" }, true},
 		{"utc zone", func(c *config.Config) { c.Zone = "UTC" }, false},
 		{"zero timeout", func(c *config.Config) { c.Timeout = 0 }, true},
+		{"zero ingest_timeout", func(c *config.Config) { c.IngestTimeout = 0 }, true},
 		{"negative timeout", func(c *config.Config) { c.Timeout = -time.Second }, true},
 		{"weekly bucket_width", func(c *config.Config) { c.BucketWidth = span.Weekly }, false},
 		{"unknown bucket_width", func(c *config.Config) { c.BucketWidth = "fortnightly" }, true},

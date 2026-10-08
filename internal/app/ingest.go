@@ -176,20 +176,36 @@ func runIngest(cmd *cobra.Command, cfg config.Config, imports []config.Import, b
 	defer func() { _ = l.Close() }()
 	g := gate.New(l, reg, mvpScopes, clock.Real{}, cfg.PersonID)
 
-	changed := 0
-	for _, sc := range all {
-		// The report is printed on both paths, and before the error: the writes
-		// that landed are in the ledger whatever the exit code says, and an
-		// operator deciding whether to re-run needs to know there were any.
-		prog, err := admitAll(cmd.Context(), g, sc.envs, cfg.Timeout, batch)
+	// The report is printed on both paths, and before the error: the writes that
+	// landed are in the ledger whatever the exit code says, and an operator deciding
+	// whether to re-run needs to know there were any.
+	changed, err := admitSources(cmd.Context(), g, all, cfg.Timeout, batch, func(sc scanned, prog progress) {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s: %s\n", sc.source, prog.report(len(sc.envs)))
-		if err != nil {
-			return err
-		}
-		changed += prog.tally[gate.OutcomeAdmitted] + prog.tally[gate.OutcomeSuperseded]
+	})
+	if err != nil {
+		return err
 	}
 	_, err = fmt.Fprintln(cmd.OutOrStdout(), verdict(changed))
 	return err
+}
+
+// admitSources admits each scanned import in declared order and calls each with its
+// progress once it is done, or once it fails, before the error is returned. It
+// stops at the first failure and returns how many facets were admitted or
+// superseded before it.
+func admitSources(ctx context.Context, g admitter, all []scanned, timeout time.Duration, batch int,
+	each func(scanned, progress),
+) (int, error) {
+	changed := 0
+	for _, sc := range all {
+		prog, err := admitAll(ctx, g, sc.envs, timeout, batch)
+		each(sc, prog)
+		changed += prog.tally[gate.OutcomeAdmitted] + prog.tally[gate.OutcomeSuperseded]
+		if err != nil {
+			return changed, err
+		}
+	}
+	return changed, nil
 }
 
 // nothingNew is the last line of a complete run that wrote nothing. It is a fixed
@@ -279,7 +295,12 @@ func guardDefinitions(ctx context.Context, cfg config.Config, reg *def.Registry)
 		return err
 	}
 	defer func() { _ = db.Close() }()
+	return guardWith(ctx, db, reg)
+}
 
+// guardWith is guardDefinitions on an operational store the caller already holds,
+// which is how the daemon holds it.
+func guardWith(ctx context.Context, db *ops.DB, reg *def.Registry) error {
 	rows, err := db.Definitions(ctx)
 	if err != nil {
 		return err

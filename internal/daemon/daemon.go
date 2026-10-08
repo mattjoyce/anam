@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -33,9 +34,10 @@ import (
 // ErrStopped is returned by Write once shutdown has begun. The write was not run.
 var ErrStopped = errors.New("daemon: stopping, write not accepted")
 
-// ErrNotLoopback is returned by Open for a listen address beyond loopback. The
-// inspector serves the whole record unprojected and the library's documents, so it
-// may not be reachable from the network until requests carry a token (card 43).
+// ErrNotLoopback is returned by Open for a listen address beyond loopback with no
+// token configured. The inspector serves the whole record unprojected and the
+// library's documents, and the API can write, so neither may be reachable from the
+// network without a token.
 var ErrNotLoopback = errors.New("daemon: listen address is not loopback")
 
 // shutdownGrace bounds how long shutdown waits for in-flight HTTP requests. Each
@@ -59,11 +61,23 @@ type job struct {
 	done     chan error
 }
 
+// Options are what the daemon is given rather than configured with.
+type Options struct {
+	// Ingest is the ingest the API runs. Nil means POST /v1/ingest fails.
+	Ingest IngestFunc
+	// Version is the build, reported by /v1/status.
+	Version string
+}
+
 // Daemon owns the stores. Open it, then Run it; Run closes the stores when it returns.
 type Daemon struct {
-	cfg    config.Config
-	writes Stores
-	read   *ledger.Ledger
+	cfg     config.Config
+	opts    Options
+	token   []byte
+	started string
+	writes  Stores
+	read    *ledger.Ledger
+	ingests *ingests
 
 	jobs chan job
 	quit chan struct{}
@@ -74,8 +88,18 @@ type Daemon struct {
 // same checks ingest makes: the ledger must exist, belong to cfg's person and hold this
 // build's schema, and the operational store must match its schema and bucket width.
 // Any mismatch refuses to start.
-func Open(ctx context.Context, cfg config.Config) (*Daemon, error) {
-	if err := loopbackOnly(cfg.Listen); err != nil {
+//
+// With a token file configured every request but /healthz must carry the token, and
+// the daemon may listen on any address. Without one it listens on loopback only.
+func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error) {
+	var token []byte
+	if cfg.TokenFile != "" {
+		t, err := readToken(cfg.TokenFile)
+		if err != nil {
+			return nil, err
+		}
+		token = t
+	} else if err := loopbackOnly(cfg.Listen); err != nil {
 		return nil, err
 	}
 	buckets, err := cfg.Buckets()
@@ -102,11 +126,15 @@ func Open(ctx context.Context, cfg config.Config) (*Daemon, error) {
 		return nil, err
 	}
 	return &Daemon{
-		cfg:    cfg,
-		writes: Stores{Ledger: w, Ops: db},
-		read:   r,
-		jobs:   make(chan job),
-		quit:   make(chan struct{}),
+		cfg:     cfg,
+		opts:    opts,
+		token:   token,
+		started: clock.Format(time.Now()),
+		writes:  Stores{Ledger: w, Ops: db},
+		read:    r,
+		ingests: newIngests(),
+		jobs:    make(chan job),
+		quit:    make(chan struct{}),
 	}, nil
 }
 
@@ -123,16 +151,20 @@ func loopbackOnly(addr string) error {
 	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
 		return nil
 	}
-	return fmt.Errorf("%w: %q (the inspector may not leave this host until requests carry a token)",
-		ErrNotLoopback, addr)
+	return fmt.Errorf("%w: %q (set token_file to listen beyond this host)", ErrNotLoopback, addr)
 }
 
-// Handler is the daemon's routes: /healthz, and the inspector on everything else.
+// Handler is the daemon's routes: /healthz open to all, and behind the token the /v1
+// API and the inspector on everything else.
 func (d *Daemon) Handler() http.Handler {
 	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
+	inner := http.NewServeMux()
+	d.routes(inner)
+	inner.Handle("/", inspect.Handler(d.read, d.cfg.Timeout, buckets, d.cfg.LibraryDir))
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", d.healthz)
-	mux.Handle("/", inspect.Handler(d.read, d.cfg.Timeout, buckets, d.cfg.LibraryDir))
+	mux.Handle("/", d.authorize(inner))
 	return mux
 }
 

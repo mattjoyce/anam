@@ -56,6 +56,15 @@ type Config struct {
 	// daemon refuses anything else until its requests carry a token.
 	Listen string `mapstructure:"listen"`
 
+	// TokenFile names the file holding the daemon's bearer token. With one, every
+	// request but /healthz must present it, and the daemon may listen beyond
+	// loopback. Empty means no token, and loopback only.
+	TokenFile string `mapstructure:"token_file"`
+
+	// IngestTimeout bounds one whole ingest run inside the daemon: every scan and
+	// every batch. Timeout still bounds each call within it.
+	IngestTimeout time.Duration `mapstructure:"ingest_timeout"`
+
 	// Timeout bounds every call to a store. Anam fails fast rather than hanging (§8).
 	Timeout time.Duration `mapstructure:"timeout"`
 
@@ -96,6 +105,8 @@ func Load(path string) (Config, error) {
 	v.SetDefault("library_dir", "")
 	v.SetDefault("zone", "Local")
 	v.SetDefault("listen", DefaultListen)
+	v.SetDefault("token_file", "")
+	v.SetDefault("ingest_timeout", 15*time.Minute)
 
 	if path != "" {
 		v.SetConfigFile(path)
@@ -121,10 +132,14 @@ func Load(path string) (Config, error) {
 	if c.LibraryDir == "" {
 		c.LibraryDir = filepath.Join(filepath.Dir(c.LedgerPath), "documents")
 	}
-	for name, p := range map[string]*string{
+	paths := map[string]*string{
 		"ledger_path": &c.LedgerPath, "db_path": &c.DBPath, "artifact_dir": &c.ArtifactDir,
 		"library_dir": &c.LibraryDir,
-	} {
+	}
+	if c.TokenFile != "" {
+		paths["token_file"] = &c.TokenFile
+	}
+	for name, p := range paths {
 		expanded, err := safepath.Expand(*p)
 		if err != nil {
 			return Config{}, fmt.Errorf("%w: %s: %v", ErrInvalid, name, err)
@@ -158,6 +173,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("%w: library_dir is required", ErrInvalid)
 	case c.Timeout <= 0:
 		return fmt.Errorf("%w: timeout must be positive, got %s", ErrInvalid, c.Timeout)
+	case c.IngestTimeout <= 0:
+		return fmt.Errorf("%w: ingest_timeout must be positive, got %s", ErrInvalid, c.IngestTimeout)
 	}
 	// A typo'd width dies here, at startup, where it costs a re-run — not on the ingest
 	// path, where falling back would write months of plausible, wrongly-named buckets.

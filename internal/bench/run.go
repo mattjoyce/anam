@@ -228,7 +228,7 @@ type scenario struct {
 }
 
 func scenarios(l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) []scenario {
-	src := read.Source{Ledger: l, Checkpoints: db, Artifacts: deps.Artifacts}
+	src := read.Source{Ledger: l, Checkpoints: db, Artifacts: deps.Artifacts, Buckets: deps.Buckets}
 	timeline := func(q api.TimelineQuery) func(context.Context) (int, error) {
 		return func(ctx context.Context) (int, error) {
 			q.Zone = "UTC"

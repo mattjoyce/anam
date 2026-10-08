@@ -121,6 +121,16 @@ CREATE TABLE IF NOT EXISTS mint_run (
   ran_at TEXT NOT NULL
 );
 
+-- tier: derived — how many facets each checkpoint's value holds, so a read can count
+-- the whole value without decoding the buckets it does not show. Additive, like
+-- mint_run: a checkpoint without a row here is counted by decoding it.
+CREATE TABLE IF NOT EXISTS checkpoint_size (
+  span_id TEXT NOT NULL,
+  v       INTEGER NOT NULL,
+  facets  INTEGER NOT NULL,
+  PRIMARY KEY (span_id, v)
+);
+
 -- tier: derived — per-source resumption markers. Losing one costs a re-scan, never a
 -- fact: ingest is idempotent.
 CREATE TABLE IF NOT EXISTS sync_cursor (

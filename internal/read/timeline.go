@@ -17,6 +17,7 @@ import (
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
+	"github.com/mattjoyce/anam/internal/span"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
@@ -62,8 +63,11 @@ type Ledger interface {
 // before any run, it folds the ledger from the beginning. The answer is the same.
 type Source struct {
 	Ledger      Ledger
-	Checkpoints mint.CheckpointLog
+	Checkpoints mint.WindowLog
 	Artifacts   mint.Store
+	// Buckets is how the checkpoints partition fact-time. A read bounded by fact-time
+	// decodes only the buckets its bounds overlap.
+	Buckets span.Buckets
 }
 
 // Timeline performs the read q describes over src: at head or at an anam-time, through
@@ -88,7 +92,12 @@ func Timeline(ctx context.Context, src Source, q api.TimelineQuery) (api.Timelin
 	if q.Explain {
 		src.Checkpoints = nil
 	}
-	v, err := readView(ctx, src, asOf, q.Projection, at)
+	var v view
+	if narrow(src, q, b) {
+		v, err = readWindow(ctx, src, asOf, b)
+	} else {
+		v, err = readView(ctx, src, asOf, q.Projection, at)
+	}
 	if err != nil {
 		return api.Timeline{}, err
 	}
@@ -132,6 +141,10 @@ type view struct {
 	// composed is set when the read was composed from checkpoints. res.States is then
 	// empty, and a shown row's version comes from versionsOf.
 	composed *mint.Composed
+
+	// whole is set when res.Value holds only the buckets a bounded read needed: the
+	// size and hash of the whole value, for the header.
+	whole *mint.Window
 }
 
 // describe is the read's header as a value: which watermark, which lens, and the
@@ -142,6 +155,9 @@ func (v view) describe() api.Timeline {
 	t := api.Timeline{
 		W: int64(v.res.W), Live: v.res.Value.Len(), AsOf: v.asOfAt, At: v.at,
 		Canonical: v.res.Value.Hash(),
+	}
+	if v.whole != nil {
+		t.Live, t.Canonical = v.whole.Live, v.whole.Hash
 	}
 	if v.at != "" {
 		t.AtHash = v.shown.Hash()
@@ -198,18 +214,56 @@ func readView(ctx context.Context, src Source, asOfTime time.Time, projName, at 
 	return v, nil
 }
 
+// narrow reports whether q can be read from only the buckets its fact-time bounds
+// overlap. A projection or a snapshot reads the whole value (a projection's served
+// hash is over all of it, a snapshot's series can start anywhere earlier), and so does
+// explain, which needs every facet's history.
+func narrow(src Source, q api.TimelineQuery, b bounds) bool {
+	return src.Checkpoints != nil && src.Artifacts != nil && src.Buckets.Width() != "" &&
+		q.Projection == "" && q.At == "" && !q.Explain && (b.from != "" || b.toX != "")
+}
+
+// readWindow reads the buckets b overlaps, and the whole value's size and hash, at the
+// head or the watermark an anam-time names. With no mint run to start from it is the
+// full read.
+func readWindow(ctx context.Context, src Source, asOfTime time.Time, b bounds) (view, error) {
+	defs, err := def.Bundled()
+	if err != nil {
+		return view{}, err
+	}
+	v := view{defs: defs}
+	w, err := watermarkOf(ctx, src.Ledger, asOfTime, &v)
+	if err != nil {
+		return view{}, err
+	}
+	win, ok, err := mint.ReadWindow(ctx, src.Ledger, src.Checkpoints, src.Artifacts, src.Buckets, w, b.from, b.toX)
+	if err != nil {
+		return view{}, err
+	}
+	if !ok {
+		return readView(ctx, src, asOfTime, "", "")
+	}
+	v.res = fold.Result{W: w, Value: win.Value}
+	v.shown = win.Value
+	v.whole = &win
+	v.composed = &mint.Composed{W: w, Value: win.Value, Run: win.Run, Versions: win.Versions}
+	return v, nil
+}
+
+// watermarkOf is the head, or the watermark an anam-time names.
+func watermarkOf(ctx context.Context, l Ledger, asOfTime time.Time, v *view) (ledger.Watermark, error) {
+	if asOfTime.IsZero() {
+		return l.Head(ctx)
+	}
+	v.asOfAt = clock.Format(asOfTime)
+	return fold.WatermarkAt(ctx, l, asOfTime)
+}
+
 // readAtOrHead reads the canonical at the head, or at the watermark an anam-time names,
 // composed from checkpoints when src has them and a mint run is at or below it.
 func readAtOrHead(ctx context.Context, src Source, asOfTime time.Time, v *view) (fold.Result, error) {
 	l := src.Ledger
-	var w ledger.Watermark
-	var err error
-	if asOfTime.IsZero() {
-		w, err = l.Head(ctx)
-	} else {
-		w, err = fold.WatermarkAt(ctx, l, asOfTime)
-		v.asOfAt = clock.Format(asOfTime)
-	}
+	w, err := watermarkOf(ctx, l, asOfTime, v)
 	if err != nil {
 		return fold.Result{}, err
 	}

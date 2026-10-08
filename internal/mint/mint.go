@@ -47,6 +47,7 @@ type Index interface {
 	SpanHeads(ctx context.Context) (map[string]ops.CheckpointRow, error)
 	AppendCheckpoint(ctx context.Context, r ops.CheckpointRow) error
 	AppendMintRun(ctx context.Context, w int64, ranAt string) error
+	AppendCheckpointSize(ctx context.Context, span string, v, facets int) error
 }
 
 // Store is the published-artifact tier the values are written to and read back from.
@@ -164,6 +165,9 @@ func Run(ctx context.Context, d Deps, dryRun bool) (Result, error) {
 			ValueHash: o.ValueHash, MintedAt: clock.Format(d.Clock.Now()),
 		}
 		if err := d.Index.AppendCheckpoint(ctx, row); err != nil {
+			return Result{}, err
+		}
+		if err := d.Index.AppendCheckpointSize(ctx, spanID, o.V, o.Len); err != nil {
 			return Result{}, err
 		}
 	}

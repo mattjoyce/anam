@@ -147,3 +147,42 @@ func (d *DB) LedgerID(ctx context.Context) (string, error) {
 	}
 	return id, nil
 }
+
+// AppendCheckpointSize records how many facets checkpoint span v holds.
+func (d *DB) AppendCheckpointSize(ctx context.Context, span string, v, facets int) error {
+	_, err := d.db.ExecContext(ctx,
+		`INSERT INTO checkpoint_size (span_id, v, facets) VALUES (?, ?, ?) ON CONFLICT DO NOTHING`, span, v, facets)
+	if err != nil {
+		return fmt.Errorf("ops: append checkpoint size %s v%d: %w", span, v, err)
+	}
+	return nil
+}
+
+// CheckpointSizes returns the recorded facet count of every checkpoint, keyed by
+// span id and version.
+func (d *DB) CheckpointSizes(ctx context.Context) (map[SpanVersion]int, error) {
+	rows, err := d.db.QueryContext(ctx, `SELECT span_id, v, facets FROM checkpoint_size`)
+	if err != nil {
+		return nil, fmt.Errorf("ops: read checkpoint sizes: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	out := map[SpanVersion]int{}
+	for rows.Next() {
+		var k SpanVersion
+		var n int
+		if err := rows.Scan(&k.SpanID, &k.V, &n); err != nil {
+			return nil, fmt.Errorf("ops: scan checkpoint size: %w", err)
+		}
+		out[k] = n
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("ops: iterate checkpoint sizes: %w", err)
+	}
+	return out, nil
+}
+
+// SpanVersion names one checkpoint.
+type SpanVersion struct {
+	SpanID string
+	V      int
+}

@@ -117,3 +117,72 @@ func TestReadAt_RefusesATamperedCheckpoint(t *testing.T) {
 		t.Fatalf("ReadAt over a tampered checkpoint: %v", err)
 	}
 }
+
+// The narrow read's oracle: at every watermark from the first run on, and for windows
+// that cut across the buckets the tail dirtied, the whole hash and live count are the
+// full fold's, and the window's entries are the full fold's entries in that window.
+func TestReadWindow_IsTheFoldInTheWindow(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.seed(t)
+	h.weight(t, "w-1", "2026-07-09T07:00:00Z", 81.2)
+	alone := h.bp(t, "2026-05-20T06:30:00Z", 125)
+	first := h.run(t, false).W
+	h.weight(t, "w-1", "2026-08-09T07:00:00Z", 81.2)
+	h.bp(t, "2026-07-02T06:30:00Z", 122)
+	if _, _, err := h.gate.Retract(ctx, alone); err != nil {
+		t.Fatal(err)
+	}
+	h.weight(t, "w-2", "2026-10-01T07:00:00Z", 80.0) // a bucket no checkpoint has
+	h.run(t, false)
+	h.weight(t, "w-2", "2026-09-30T07:00:00Z", 80.0) // moved back, after the run
+
+	windows := [][2]string{
+		{"", ""},
+		{"2026-07-01T00:00:00.000000000Z", "2026-08-01T00:00:00.000000000Z"},
+		{"2026-08-01T00:00:00.000000000Z", ""},
+		{"", "2026-06-01T00:00:00.000000000Z"},
+		{"2026-09-15T00:00:00.000000000Z", "2026-10-15T00:00:00.000000000Z"},
+	}
+	head, _ := h.l.Head(ctx)
+	for w := first; w <= head; w++ {
+		want, err := fold.ReadAt(ctx, h.l, w)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, win := range windows {
+			got, ok, err := mint.ReadWindow(ctx, h.l, h.db, h.deps.Artifacts, h.deps.Buckets, w, win[0], win[1])
+			if err != nil || !ok {
+				t.Fatalf("W=%d %v: ok=%v %v", w, win, ok, err)
+			}
+			if got.Hash != want.Value.Hash() || got.Live != want.Value.Len() {
+				t.Fatalf("W=%d %v: whole %s/%d, fold %s/%d", w, win, got.Hash, got.Live, want.Value.Hash(), want.Value.Len())
+			}
+			if a, b := inWindow(got.Value.Entries(), win), inWindow(want.Value.Entries(), win); !sameIDs(a, b) {
+				t.Fatalf("W=%d %v: window %v, fold %v", w, win, a, b)
+			}
+		}
+	}
+}
+
+func inWindow(entries []fold.Entry, win [2]string) []string {
+	var ids []string
+	for _, e := range entries {
+		if (win[0] == "" || e.FactTime >= win[0]) && (win[1] == "" || e.FactTime < win[1]) {
+			ids = append(ids, e.FacetID+"@"+e.FactTime+"#"+e.ContentHash)
+		}
+	}
+	return ids
+}
+
+func sameIDs(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}

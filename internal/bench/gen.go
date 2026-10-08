@@ -323,3 +323,50 @@ func MintRecord(ctx context.Context, p Paths, person string) (int, int64, error)
 	}
 	return res.Minted(), int64(res.W), nil
 }
+
+// BackfillSizes records the facet count of every checkpoint in the record at p that has
+// none, by decoding it. A record minted before counts were recorded can then be read
+// narrowly without re-minting, which would also discard its tail.
+func BackfillSizes(ctx context.Context, p Paths) (int, error) {
+	buckets, err := span.New(span.Default)
+	if err != nil {
+		return 0, err
+	}
+	db, err := ops.Open(ctx, p.DB, buckets)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = db.Close() }()
+	store, err := artifact.New(p.Artifacts)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = store.Close() }()
+	rows, err := db.Checkpoints(ctx)
+	if err != nil {
+		return 0, err
+	}
+	have, err := db.CheckpointSizes(ctx)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, r := range rows {
+		if _, ok := have[ops.SpanVersion{SpanID: r.SpanID, V: r.V}]; ok {
+			continue
+		}
+		b, err := store.Get(mint.Kind, r.ValueHash)
+		if err != nil {
+			return n, err
+		}
+		var entries []json.RawMessage
+		if err := json.Unmarshal(b, &entries); err != nil {
+			return n, err
+		}
+		if err := db.AppendCheckpointSize(ctx, r.SpanID, r.V, len(entries)); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
+}

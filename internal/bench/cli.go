@@ -22,7 +22,7 @@ func Main(ctx context.Context, build string) error {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.AddCommand(genCmd(), runCmd(build), mintCmd(), compareCmd())
+	root.AddCommand(genCmd(), runCmd(build), mintCmd(), sizesCmd(), compareCmd())
 	return root.ExecuteContext(ctx)
 }
 
@@ -136,6 +136,26 @@ were minted before runs were recorded.`,
 	}
 	cmd.Flags().StringVar(&dir, "dir", "", "the record's directory")
 	cmd.Flags().StringVar(&person, "person", Person, "whose ledger it is")
+	_ = cmd.MarkFlagRequired("dir")
+	return cmd
+}
+
+func sizesCmd() *cobra.Command {
+	var dir string
+	cmd := &cobra.Command{
+		Use:   "sizes",
+		Short: "record the facet count of every checkpoint that has none, keeping the tail",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			n, err := BackfillSizes(cmd.Context(), PathsIn(dir))
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "recorded %d checkpoint sizes\n", n)
+			return err
+		},
+	}
+	cmd.Flags().StringVar(&dir, "dir", "", "the record's directory")
 	_ = cmd.MarkFlagRequired("dir")
 	return cmd
 }

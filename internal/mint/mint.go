@@ -149,6 +149,13 @@ func Run(ctx context.Context, d Deps, dryRun bool) (Result, error) {
 		if minted && head.ValueHash == value.Hash() {
 			o.V, o.CoversW = head.V, head.CoversW
 			out.Outcomes = append(out.Outcomes, o)
+			// A checkpoint minted before counts were recorded gets its count now; one
+			// that has it keeps it.
+			if !dryRun {
+				if err := d.Index.AppendCheckpointSize(ctx, spanID, o.V, o.Len); err != nil {
+					return Result{}, err
+				}
+			}
 			continue
 		}
 

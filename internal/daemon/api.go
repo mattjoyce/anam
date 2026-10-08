@@ -54,6 +54,11 @@ func (d *Daemon) postIngest(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusAccepted, op)
 		return
 	}
+	// The server's write deadline is shorter than a long wait; this response is
+	// allowed the wait plus the usual margin.
+	if err := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(wait + writeTimeout)); err != nil {
+		slog.Warn("daemon: extend write deadline", "err", err)
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), wait)
 	defer cancel()
 	op, _ := d.WaitOperation(ctx, id)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -257,5 +258,50 @@ func TestIngestWaitRefusesANonsenseDuration(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("POST /v1/ingest%s: %d, want 400", q, rec.Code)
 		}
+	}
+}
+
+// Shutdown answers a caller waiting on a run at once, rather than holding Shutdown up
+// until its grace runs out and then reporting an error.
+func TestShutdownAnswersAWaitingCaller(t *testing.T) {
+	g := newGatedIngest()
+	d := openWith(t, Options{Ingest: g.run})
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	ran := make(chan error, 1)
+	go func() { ran <- d.serve(ctx, ln) }()
+
+	answered := make(chan int, 1)
+	go func() {
+		resp, err := http.Post("http://"+ln.Addr().String()+"/v1/ingest?wait=1m", "", nil)
+		if err != nil {
+			answered <- -1
+			return
+		}
+		_ = resp.Body.Close()
+		answered <- resp.StatusCode
+	}()
+	<-g.started
+
+	began := time.Now()
+	cancel()
+	select {
+	case code := <-answered:
+		if code != http.StatusAccepted {
+			t.Fatalf("waiting caller got %d at shutdown, want 202", code)
+		}
+		if waited := time.Since(began); waited > 2*time.Second {
+			t.Fatalf("waiting caller was answered after %s", waited)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("shutdown left a waiting caller hanging")
+	}
+
+	g.release <- nil
+	if err := <-ran; err != nil {
+		t.Fatalf("run: %v", err)
 	}
 }

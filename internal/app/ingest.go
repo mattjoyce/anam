@@ -244,18 +244,44 @@ func scanImport(ctx context.Context, imp config.Import, cfg config.Config, defs 
 		defer cancel()
 		return healthdb.Scan(scanCtx, imp.Path, cfg.PersonID)
 	case bpcsv.Source:
-		return bpcsv.Scan(imp.Path, cfg.PersonID)
+		return bounded(ctx, func() ([]facet.Envelope, error) { return bpcsv.Scan(imp.Path, cfg.PersonID) })
 	case withings.Source:
 		scanCtx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 		defer cancel()
 		return withings.Scan(scanCtx, imp.Path, cfg.PersonID)
 	case records.Source:
-		return records.Scan(imp.Path, cfg.PersonID, defs)
+		return bounded(ctx, func() ([]facet.Envelope, error) { return records.Scan(imp.Path, cfg.PersonID, defs) })
 	case documents.Source:
-		return documents.Scan(imp.Path, cfg.PersonID)
+		return bounded(ctx, func() ([]facet.Envelope, error) { return documents.Scan(imp.Path, cfg.PersonID) })
 	default:
 		return nil, fmt.Errorf("import names unknown source %q (have: %s, %s, %s, %s, %s)",
 			imp.Source, healthdb.Source, bpcsv.Source, withings.Source, records.Source, documents.Source)
+	}
+}
+
+// bounded runs a scan that takes no context and returns when ctx ends, if that is
+// first. The file scanners read plain files and cannot be interrupted, but a read on
+// a share whose server has gone can block for as long as it likes, and the run must
+// still end at its deadline. The abandoned scan finishes or fails on its own; its
+// result is discarded and it holds nothing the run needs.
+func bounded(ctx context.Context, scan func() ([]facet.Envelope, error)) ([]facet.Envelope, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	type result struct {
+		envs []facet.Envelope
+		err  error
+	}
+	done := make(chan result, 1)
+	go func() {
+		envs, err := scan()
+		done <- result{envs, err}
+	}()
+	select {
+	case r := <-done:
+		return r.envs, r.err
+	case <-ctx.Done():
+		return nil, fmt.Errorf("scan abandoned: %w", ctx.Err())
 	}
 }
 

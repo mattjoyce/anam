@@ -40,6 +40,10 @@ var ErrStopped = errors.New("daemon: stopping, write not accepted")
 // network without a token.
 var ErrNotLoopback = errors.New("daemon: listen address is not loopback")
 
+// writeTimeout bounds writing one response. The inspector's whole-record page is about
+// 5 MB and renders in about a second, so this leaves a slow link plenty.
+const writeTimeout = 2 * time.Minute
+
 // shutdownGrace bounds how long shutdown waits for in-flight HTTP requests. Each
 // request is already bounded by the configured timeout, so this only has to cover it.
 const shutdownGrace = 10 * time.Second
@@ -238,7 +242,16 @@ func (d *Daemon) Run(ctx context.Context) error {
 }
 
 func (d *Daemon) serve(ctx context.Context, ln net.Listener) error {
-	srv := &http.Server{Handler: d.Handler(), ReadHeaderTimeout: 5 * time.Second}
+	srv := &http.Server{
+		Handler:           d.Handler(),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		// A response that cannot be written in this long is a client that has gone.
+		// The one handler that holds a response longer, a POST /v1/ingest that asks
+		// to wait, extends its own deadline by the wait it asked for.
+		WriteTimeout: writeTimeout,
+		IdleTimeout:  2 * time.Minute,
+	}
 
 	var worker sync.WaitGroup
 	worker.Add(1)
@@ -259,12 +272,14 @@ func (d *Daemon) serve(ctx context.Context, ln net.Listener) error {
 	case serveErr = <-errc:
 	}
 
+	// Stop taking writes first: callers waiting on a run are answered now rather than
+	// holding Shutdown up, and the worker leaves once the running write returns.
+	d.stop.Do(func() { close(d.quit) })
 	shutCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownGrace)
 	defer cancel()
 	if err := srv.Shutdown(shutCtx); err != nil {
 		serveErr = errors.Join(serveErr, fmt.Errorf("daemon: shutdown: %w", err))
 	}
-	d.stop.Do(func() { close(d.quit) })
 	worker.Wait()
 
 	if err := d.closeStores(); err != nil {

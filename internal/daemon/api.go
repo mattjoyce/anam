@@ -8,9 +8,12 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/read"
 	"github.com/mattjoyce/anam/internal/serve"
 	"github.com/mattjoyce/anam/internal/store/artifact"
@@ -28,6 +31,61 @@ func (d *Daemon) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/receipts", d.getReceipts)
 	mux.HandleFunc("GET /v1/receipts/{hash}", d.getReceipt)
 	mux.HandleFunc("GET /v1/receipts/{hash}/verify", d.verifyReceipt)
+	mux.HandleFunc("GET /v1/checkpoints", d.getCheckpoints)
+	mux.HandleFunc("POST /v1/checkpoints", d.postCheckpoints)
+}
+
+func (d *Daemon) getCheckpoints(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), d.cfg.Timeout)
+	defer cancel()
+	list, err := read.Checkpoints(ctx, d.writes.Ops, d.cfg.DBPath)
+	if err != nil {
+		writeReadError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+// ErrBusy is the answer to a write asked for while an ingest holds the write queue.
+var ErrBusy = errors.New("an ingest is running; ask again when it has finished")
+
+// postCheckpoints mints, or with ?dry_run=true derives without publishing. Minting
+// writes the operational store and the artifacts, so it runs on the write queue
+// under the configured timeout. While an ingest holds the queue it answers 503 at
+// once rather than wait out a run that may take minutes.
+func (d *Daemon) postCheckpoints(w http.ResponseWriter, r *http.Request) {
+	dryRun := false
+	if v := r.URL.Query().Get("dry_run"); v != "" {
+		var err error
+		if dryRun, err = strconv.ParseBool(v); err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("dry_run %q: %w", v, err))
+			return
+		}
+	}
+	if running, _ := d.ingests.ids(); running != "" {
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("%w (%s)", ErrBusy, running))
+		return
+	}
+	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
+
+	var m api.Mint
+	ctx, cancel := context.WithTimeout(r.Context(), 2*d.cfg.Timeout)
+	defer cancel()
+	err := d.Write(ctx, d.cfg.Timeout, func(ctx context.Context, s Stores) error {
+		var err error
+		m, err = read.Mint(ctx, mint.Deps{
+			Ledger: s.Ledger, Index: s.Ops, Artifacts: d.artifacts, Buckets: buckets, Clock: clock.Real{},
+		}, dryRun)
+		return err
+	})
+	switch {
+	case errors.Is(err, ErrStopped):
+		writeError(w, http.StatusServiceUnavailable, err)
+	case err != nil:
+		writeReadError(w, err)
+	default:
+		writeJSON(w, http.StatusOK, m)
+	}
 }
 
 func (d *Daemon) getReceipts(w http.ResponseWriter, _ *http.Request) {

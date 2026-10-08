@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -305,5 +306,43 @@ func TestShutdownAnswersAWaitingCaller(t *testing.T) {
 	g.release <- nil
 	if err := <-ran; err != nil {
 		t.Fatalf("run: %v", err)
+	}
+}
+
+// Minting waits on the write queue, so while an ingest holds it the answer is a 503
+// at once that names the run, never a request held for the length of the ingest.
+func TestMintWhileAnIngestRunsIsBusy(t *testing.T) {
+	g := newGatedIngest()
+	d := openWith(t, Options{Ingest: g.run})
+	start(t, d)
+	srv := httptest.NewServer(d.Handler())
+	defer srv.Close()
+
+	id := mustRequest(t, d)
+	<-g.started
+	began := time.Now()
+	resp, err := http.Post(srv.URL+"/v1/checkpoints", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var e api.Error
+	_ = json.NewDecoder(resp.Body).Decode(&e)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusServiceUnavailable || !strings.Contains(e.Error, id) {
+		t.Fatalf("mint during an ingest: %d %q, want 503 naming %s", resp.StatusCode, e.Error, id)
+	}
+	if waited := time.Since(began); waited > time.Second {
+		t.Errorf("the busy answer took %s", waited)
+	}
+	g.release <- nil
+	waitFor(t, "the run to finish", func() bool { return d.state(id) == api.StateSucceeded })
+
+	resp, err = http.Post(srv.URL+"/v1/checkpoints?dry_run=true", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("mint after the ingest: %d", resp.StatusCode)
 	}
 }

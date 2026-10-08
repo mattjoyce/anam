@@ -182,3 +182,22 @@ func (c *Client) VerifyReceipt(ctx context.Context, hash string) (api.ReceiptVer
 	_, err := c.do(ctx, c.timeout, http.MethodGet, "/v1/receipts/"+url.PathEscape(hash)+"/verify", nil, nil, &r)
 	return r, err
 }
+
+// Checkpoints lists every checkpoint the daemon's operational store has logged.
+func (c *Client) Checkpoints(ctx context.Context) (api.Checkpoints, error) {
+	var cp api.Checkpoints
+	_, err := c.do(ctx, c.timeout, http.MethodGet, "/v1/checkpoints", nil, nil, &cp)
+	return cp, err
+}
+
+// Mint asks the daemon to mint a checkpoint per changed bucket, or with dryRun to
+// derive and report without publishing.
+func (c *Client) Mint(ctx context.Context, dryRun bool) (api.Mint, error) {
+	var m api.Mint
+	q := url.Values{}
+	if dryRun {
+		q.Set("dry_run", "true")
+	}
+	_, err := c.do(ctx, c.timeout, http.MethodPost, "/v1/checkpoints", q, nil, &m)
+	return m, err
+}

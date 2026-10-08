@@ -368,3 +368,23 @@ func TestReceipts_SameOverTheDaemon(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckpoints_SameOverTheDaemon(t *testing.T) {
+	t.Parallel()
+	f := newRemoteFixture(t)
+	f.sameOutput(t, "checkpoint", "list")
+	f.sameOutput(t, "checkpoint", "--dry-run")
+
+	// Minted over the daemon, then nothing left to mint by either path.
+	minted, _, err := cli(t, f.remoteCfg, "checkpoint")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(minted, "minted") || strings.Contains(minted, "minted 0 of") {
+		t.Errorf("the daemon minted nothing:\n%s", minted)
+	}
+	f.sameOutput(t, "checkpoint", "list")
+	if out := f.sameOutput(t, "checkpoint", "--dry-run"); !strings.Contains(out, "would mint (dry run — nothing written) 0 of") {
+		t.Errorf("a second mint would mint again:\n%s", out)
+	}
+}

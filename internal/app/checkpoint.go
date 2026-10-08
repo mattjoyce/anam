@@ -7,9 +7,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/mint"
+	"github.com/mattjoyce/anam/internal/read"
 	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
@@ -30,49 +32,15 @@ the watermark it folded. Minting writes nothing to the ledger; a checkpoint is a
 cache of the fold, there to bound replay, and is rebuilt by running this again.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := loadConfig(*cfgPath, cmd)
+			cfg, err := loadRoutedConfig(*cfgPath, cmd)
 			if err != nil {
 				return err
 			}
-			deps, closeAll, err := mintDeps(cmd.Context(), cfg)
+			m, err := runMint(cmd.Context(), cfg, dryRun)
 			if err != nil {
 				return err
 			}
-			defer closeAll()
-
-			ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
-			defer cancel()
-			res, err := mint.Run(ctx, deps, dryRun)
-			if err != nil {
-				return err
-			}
-
-			out := cmd.OutOrStdout()
-			w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
-			_, _ = fmt.Fprintln(w, "BUCKET\tV\tCOVERS W\tFACETS\tVALUE\t")
-			for _, o := range res.Outcomes {
-				note := ""
-				switch {
-				case o.Minted && !res.Written:
-					note = "would mint"
-				case o.Minted:
-					note = "minted"
-				default:
-					note = "unchanged"
-				}
-				_, _ = fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%s\t%s\n",
-					o.SpanID, o.V, o.CoversW, o.Len, o.ValueHash, note)
-			}
-			if err := w.Flush(); err != nil {
-				return err
-			}
-			verb := "minted"
-			if !res.Written {
-				verb = "would mint (dry run — nothing written)"
-			}
-			_, err = fmt.Fprintf(out, "%s %d of %d buckets at W=%d\n",
-				verb, res.Minted(), len(res.Outcomes), res.W)
-			return err
+			return writeMint(cmd, m)
 		},
 	}
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "derive and report, but publish nothing")
@@ -86,38 +54,101 @@ func checkpointListCmd(cfgPath *string) *cobra.Command {
 		Short: "list every checkpoint ever minted, by bucket and version",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := loadConfig(*cfgPath, cmd)
+			cfg, err := loadRoutedConfig(*cfgPath, cmd)
 			if err != nil {
 				return err
 			}
-			buckets, err := cfg.Buckets()
+			list, err := listCheckpoints(cmd.Context(), cfg)
 			if err != nil {
 				return err
 			}
-			// Listing reads the checkpoint log and nothing else, so it still answers
-			// when there is no ledger to open.
-			db, err := ops.Open(cmd.Context(), cfg.DBPath, buckets)
-			if err != nil {
-				return err
-			}
-			defer func() { _ = db.Close() }()
-
-			rows, err := db.Checkpoints(cmd.Context())
-			if err != nil {
-				return err
-			}
-			if len(rows) == 0 {
-				_, err := fmt.Fprintf(cmd.OutOrStdout(), "no checkpoints in %s\n", cfg.DBPath)
-				return err
-			}
-			w := tabwriter.NewWriter(cmd.OutOrStdout(), 2, 0, 2, ' ', 0)
-			_, _ = fmt.Fprintln(w, "BUCKET\tV\tCOVERS W\tMINTED AT\tVALUE")
-			for _, r := range rows {
-				_, _ = fmt.Fprintf(w, "%s\t%d\t%d\t%s\t%s\n", r.SpanID, r.V, r.CoversW, r.MintedAt, r.ValueHash)
-			}
-			return w.Flush()
+			return writeCheckpoints(cmd, list)
 		},
 	}
+}
+
+// runMint asks the daemon to mint when a server is configured, and mints into the
+// local files when not.
+func runMint(ctx context.Context, cfg config.Config, dryRun bool) (api.Mint, error) {
+	if cfg.Server != "" {
+		c, err := newClient(cfg)
+		if err != nil {
+			return api.Mint{}, err
+		}
+		return c.Mint(ctx, dryRun)
+	}
+	deps, closeAll, err := mintDeps(ctx, cfg)
+	if err != nil {
+		return api.Mint{}, err
+	}
+	defer closeAll()
+	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+	defer cancel()
+	return read.Mint(ctx, deps, dryRun)
+}
+
+func writeMint(cmd *cobra.Command, m api.Mint) error {
+	out := cmd.OutOrStdout()
+	w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
+	_, _ = fmt.Fprintln(w, "BUCKET\tV\tCOVERS W\tFACETS\tVALUE\t")
+	for _, o := range m.Outcomes {
+		note := ""
+		switch {
+		case o.Minted && !m.Written:
+			note = "would mint"
+		case o.Minted:
+			note = "minted"
+		default:
+			note = "unchanged"
+		}
+		_, _ = fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%s\t%s\n",
+			o.SpanID, o.V, o.CoversW, o.Len, o.ValueHash, note)
+	}
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	verb := "minted"
+	if !m.Written {
+		verb = "would mint (dry run — nothing written)"
+	}
+	_, err := fmt.Fprintf(out, "%s %d of %d buckets at W=%d\n",
+		verb, m.MintedCount(), len(m.Outcomes), m.W)
+	return err
+}
+
+// listCheckpoints asks the daemon when a server is configured. Locally it reads the
+// checkpoint log and nothing else, so it still answers when there is no ledger.
+func listCheckpoints(ctx context.Context, cfg config.Config) (api.Checkpoints, error) {
+	if cfg.Server != "" {
+		c, err := newClient(cfg)
+		if err != nil {
+			return api.Checkpoints{}, err
+		}
+		return c.Checkpoints(ctx)
+	}
+	buckets, err := cfg.Buckets()
+	if err != nil {
+		return api.Checkpoints{}, err
+	}
+	db, err := ops.Open(ctx, cfg.DBPath, buckets)
+	if err != nil {
+		return api.Checkpoints{}, err
+	}
+	defer func() { _ = db.Close() }()
+	return read.Checkpoints(ctx, db, cfg.DBPath)
+}
+
+func writeCheckpoints(cmd *cobra.Command, list api.Checkpoints) error {
+	if len(list.Checkpoints) == 0 {
+		_, err := fmt.Fprintf(cmd.OutOrStdout(), "no checkpoints in %s\n", list.DB)
+		return err
+	}
+	w := tabwriter.NewWriter(cmd.OutOrStdout(), 2, 0, 2, ' ', 0)
+	_, _ = fmt.Fprintln(w, "BUCKET\tV\tCOVERS W\tMINTED AT\tVALUE")
+	for _, r := range list.Checkpoints {
+		_, _ = fmt.Fprintf(w, "%s\t%d\t%d\t%s\t%s\n", r.SpanID, r.V, r.CoversW, r.MintedAt, r.ValueHash)
+	}
+	return w.Flush()
 }
 
 // mintDeps assembles the mint's dependencies from config. The ledger is opened

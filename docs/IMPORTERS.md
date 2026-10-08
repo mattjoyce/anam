@@ -64,7 +64,8 @@ These make an importer correct in any language, without importing Anam's code.
    locally with a stock library before sending, and the gate runs the same check. The Anam-specific
    contract (`identity_key`, `time_semantics`, classification, validation mode) stays in `meta`.
    Health Definitions adopt or cite an [Open mHealth](https://www.openmhealth.org/) (IEEE 1752)
-   schema where one fits.
+   schema where one fits. The first is `exercise.session` (card 56): an OMH `physical-activity`
+   payload, one type for Technogym, Strong and later Garmin, each shaping to the same Definition.
 3. **Validation becomes real.** `lenient` with a near-empty schema is harmless while Anam writes its
    own payloads. Once outside code writes them, facet-compliance is the guard, so each Definition an
    importer targets states what a valid payload is.

@@ -390,6 +390,15 @@ read, paid by a range-scan; it is not bought by a periodic tick.
   monthly, `bucket:2026-W28` weekly — so ids already written keep their meaning when the default changes.
   Every facet is a member of exactly one bucket, so the minted set is never empty and every facet sits
   inside a mintable scope.
+- **Checkpoint buckets subdivide** (card 59, 2026-10-09). With `checkpoint_budget` set (default 1 MiB),
+  the mint starts from one bucket per year and splits any bucket whose value is over budget along the
+  calendar: a year into months, a month into days (`span.Layout`). Bytes decide when, the calendar
+  decides where, so a fact-time is still in exactly one bucket and every version of a facet is still in
+  one. The layout is derived from the checkpoint log, not stored: a bucket is split once a checkpoint of
+  one of its children exists. Splits only add. A log minted at a fixed monthly width reads as years
+  split into months; `checkpoint_budget: 0` keeps the fixed `bucket_width`. The budget prices a read: a
+  bucket a late correction dirties is re-derived whole, at about 46 ms a MB on the NAS. `bucket_width`
+  still sets the operational index's bucket ids below.
 - **The width is checked once and then carried, never re-decided.** `span.New` is the only constructor of
   a `span.Buckets`, and it is where an unknown width is refused; `Buckets.Of` is arithmetic with nothing
   to fall back to. A width that defaulted quietly would be the worst kind of wrong — the ids it wrote
@@ -412,8 +421,8 @@ read, paid by a range-scan; it is not bought by a periodic tick.
     current 6,181 facets: **31 monthly buckets, mean 199, worst 575, thinnest 7** — and it is the
     *worst* bucket that prices a re-mint, never the mean. Garmin's `monitoring_*` and `stress` tables
     would put ~73,000 in one month. A re-mint that is free at the first density is not free at the second, so
-    **either the width narrows as density rises, or re-mint becomes incremental**. Undecided, and it
-    must be decided before a dense source is ingested rather than discovered afterwards. Monthly is
+    **either the width narrows as density rises, or re-mint becomes incremental**. Decided 2026-10-09:
+    the width narrows where density rises, by subdivision (above). Monthly is
     chosen for the density this record has now — 31 buckets to stitch rather than 135 — and is expected
     to be re-checked, not inherited. Measured again at 11,246 live facets (2026-10-06, the first
     mint): **34 monthly buckets, mean 330, worst 744, thinnest 19**; a dry run of every bucket took
@@ -421,6 +430,13 @@ read, paid by a range-scan; it is not bought by a periodic tick.
 - **The lifelong / derived view composes, it never re-folds.** A Span the person names (`--from/--to`, a
   saved bookmark, "everything") is a **derived span**: computed on demand by stitching bucket values,
   materialised only when a receipt is served. It is never pulsed and never minted.
+  Built 2026-10-09 (card 59): a timeline read starts from the checkpoints of the latest mint run at or
+  below its watermark and applies only the events after it (`mint.ReadAt`). A read bounded by fact-time
+  decodes only the buckets it overlaps and those the tail dirtied, and streams every other bucket's
+  bytes into the whole value's hash without decoding them (`mint.ReadWindow`): the whole value's bytes
+  are its buckets' bytes in time order, joined. Projections, snapshots and explain still read the whole
+  value; explain, the inspector and retract read the full fold. Whether the whole hash should instead
+  be a hash of the bucket hashes is card 60.
 - **Cadence is adaptive** — time-OR-size-OR-rate, whichever trips first. A quiet bucket mints nothing.
   The first slice mints on a **manual trigger** (`anam checkpoint`, R8, `internal/mint`); the adaptive
   trigger is deferred, the seam is not.
@@ -447,6 +463,11 @@ is kept as the cheap pre-filter an incremental mint would put in front of the fo
 makes the moved-fact-time case (above) need no second index: a facet that left one bucket for another
 moves both hashes, and both buckets re-mint. A bucket that has emptied is found through its head and
 re-mints as the empty value, or a composed read would still list the facets that left.
+
+Each mint run that writes records its `W` in `mint_run`, after its checkpoints, with each checkpoint's
+facet count in `checkpoint_size`. A run checks every bucket, minting or finding it unchanged, so the
+checkpoints at or below a run's `W` are the value at that `W`, and a read starts there. A run in progress
+has no `mint_run` row yet, so no reader starts from it.
 
 **Receipts** prove exactly what was served at a watermark (§9). Unserved interstitial checkpoints are
 garbage-collectable once a later checkpoint subsumes them and no receipt pins them; they were only ever

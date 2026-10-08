@@ -29,7 +29,12 @@ checkpoint. A bucket that has not changed is left alone: same hash, no new row.
 Each value is written to the artifact directory under the SHA-256 of its own bytes,
 and the checkpoint log in the operational store records the bucket, its version and
 the watermark it folded. Minting writes nothing to the ledger; a checkpoint is a
-cache of the fold, there to bound replay, and is rebuilt by running this again.`,
+cache of the fold, there to bound replay, and is rebuilt by running this again.
+
+Buckets subdivide: a bucket whose value is over checkpoint_budget bytes (default
+1 MiB) is split along the calendar, a year into months, a month into days. The run
+is recorded, and a timeline read then starts from these checkpoints and replays only
+what came after, so mint again after an ingest to keep reads short.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := loadRoutedConfig(*cfgPath, cmd)

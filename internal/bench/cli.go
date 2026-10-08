@@ -28,6 +28,7 @@ func Main(ctx context.Context, build string) error {
 
 func genCmd() *cobra.Command {
 	var shape, dir string
+	budget := 0
 	cmd := &cobra.Command{
 		Use:   "gen",
 		Short: "build a synthetic record of a named shape in an empty directory",
@@ -43,6 +44,7 @@ Shapes: ` + shapeList(),
 			if !ok {
 				return fmt.Errorf("no shape %q: %s", shape, shapeList())
 			}
+			sh.Budget = budget
 			if _, err := os.Stat(PathsIn(dir).Ledger); err == nil {
 				return fmt.Errorf("%s already holds a ledger", dir)
 			}
@@ -59,6 +61,7 @@ Shapes: ` + shapeList(),
 	}
 	cmd.Flags().StringVar(&shape, "shape", "S", "the shape to build")
 	cmd.Flags().StringVar(&dir, "dir", "", "an empty directory to build it in")
+	cmd.Flags().IntVar(&budget, "budget", 0, "checkpoint_budget in bytes for the mint; 0 is the fixed monthly width")
 	_ = cmd.MarkFlagRequired("dir")
 	return cmd
 }
@@ -111,13 +114,15 @@ a record, never at one a daemon holds.`,
 	cmd.Flags().IntVar(&o.Reps, "reps", 5, "runs of each scenario")
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 10*time.Minute, "bound on one run of one scenario")
 	cmd.Flags().StringVar(&out, "out", "", "write the report as JSON here")
-	cmd.Flags().StringSliceVar(&o.Only, "only", nil, "run only scenarios whose names contain one of these")
+	cmd.Flags().StringArrayVar(&o.Only, "only", nil, "run only scenarios whose names contain this (repeatable)")
+	cmd.Flags().IntVar(&o.Budget, "budget", 0, "checkpoint_budget for the dry-run mint scenario")
 	_ = cmd.MarkFlagRequired("dir")
 	return cmd
 }
 
 func mintCmd() *cobra.Command {
 	var dir, person string
+	budget := 0
 	cmd := &cobra.Command{
 		Use:   "mint",
 		Short: "mint the record in a directory, as anam checkpoint does, recording the run",
@@ -126,7 +131,7 @@ a composed read can start from it. Use it on a copy of a real record, whose chec
 were minted before runs were recorded.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			n, w, err := MintRecord(cmd.Context(), PathsIn(dir), person)
+			n, w, err := MintRecord(cmd.Context(), PathsIn(dir), person, budget)
 			if err != nil {
 				return err
 			}
@@ -136,6 +141,7 @@ were minted before runs were recorded.`,
 	}
 	cmd.Flags().StringVar(&dir, "dir", "", "the record's directory")
 	cmd.Flags().StringVar(&person, "person", Person, "whose ledger it is")
+	cmd.Flags().IntVar(&budget, "budget", 0, "checkpoint_budget in bytes; 0 is the fixed monthly width")
 	_ = cmd.MarkFlagRequired("dir")
 	return cmd
 }

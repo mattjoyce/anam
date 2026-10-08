@@ -17,7 +17,6 @@ import (
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
-	"github.com/mattjoyce/anam/internal/span"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
@@ -65,9 +64,6 @@ type Source struct {
 	Ledger      Ledger
 	Checkpoints mint.WindowLog
 	Artifacts   mint.Store
-	// Buckets is how the checkpoints partition fact-time. A read bounded by fact-time
-	// decodes only the buckets its bounds overlap.
-	Buckets span.Buckets
 }
 
 // Timeline performs the read q describes over src: at head or at an anam-time, through
@@ -219,7 +215,7 @@ func readView(ctx context.Context, src Source, asOfTime time.Time, projName, at 
 // hash is over all of it, a snapshot's series can start anywhere earlier), and so does
 // explain, which needs every facet's history.
 func narrow(src Source, q api.TimelineQuery, b bounds) bool {
-	return src.Checkpoints != nil && src.Artifacts != nil && src.Buckets.Width() != "" &&
+	return src.Checkpoints != nil && src.Artifacts != nil &&
 		q.Projection == "" && q.At == "" && !q.Explain && (b.from != "" || b.toX != "")
 }
 
@@ -236,7 +232,7 @@ func readWindow(ctx context.Context, src Source, asOfTime time.Time, b bounds) (
 	if err != nil {
 		return view{}, err
 	}
-	win, ok, err := mint.ReadWindow(ctx, src.Ledger, src.Checkpoints, src.Artifacts, src.Buckets, w, b.from, b.toX)
+	win, ok, err := mint.ReadWindow(ctx, src.Ledger, src.Checkpoints, src.Artifacts, w, b.from, b.toX)
 	if err != nil {
 		return view{}, err
 	}

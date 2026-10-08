@@ -3,6 +3,7 @@ package mint_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -151,7 +152,7 @@ func TestReadWindow_IsTheFoldInTheWindow(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, win := range windows {
-			got, ok, err := mint.ReadWindow(ctx, h.l, h.db, h.deps.Artifacts, h.deps.Buckets, w, win[0], win[1])
+			got, ok, err := mint.ReadWindow(ctx, h.l, h.db, h.deps.Artifacts, w, win[0], win[1])
 			if err != nil || !ok {
 				t.Fatalf("W=%d %v: ok=%v %v", w, win, ok, err)
 			}
@@ -185,4 +186,69 @@ func sameIDs(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// With a budget the mint subdivides: a sparse year stays one bucket, a dense month is
+// split into days, and later growth splits further. Reads composed across those
+// splits, whole and windowed, are still the full fold at every watermark.
+func TestSubdivision_SplitsByBytesAndReadsAreStillTheFold(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.deps.Budget = 1000 // two readings fit, six do not
+	h.bp(t, "2024-03-01T06:30:00Z", 120)
+	h.bp(t, "2024-11-01T06:30:00Z", 121)
+	for d := 1; d <= 6; d++ {
+		h.bp(t, fmt.Sprintf("2026-07-%02dT06:30:00Z", d), 110+d)
+	}
+	first := h.run(t, false)
+	ids := map[string]bool{}
+	for _, o := range first.Outcomes {
+		ids[o.SpanID] = true
+	}
+	if !ids["bucket:2024"] || !ids["bucket:2026-07-03"] || ids["bucket:2026"] || ids["bucket:2026-07"] {
+		t.Fatalf("first layout: %v", ids)
+	}
+
+	// Growth after the run: August fills and must split; a correction moves a weight
+	// from a split day back into the unsplit 2024.
+	h.weight(t, "w-1", "2026-07-02T08:00:00Z", 80)
+	for d := 1; d <= 6; d++ {
+		h.bp(t, fmt.Sprintf("2026-08-%02dT06:30:00Z", d), 100+d)
+	}
+	h.weight(t, "w-1", "2024-05-02T08:00:00Z", 80)
+	second := h.run(t, false)
+	ids = map[string]bool{}
+	for _, o := range second.Outcomes {
+		ids[o.SpanID] = true
+	}
+	if !ids["bucket:2026-08-04"] || ids["bucket:2026-08"] {
+		t.Fatalf("second layout did not split August: %v", ids)
+	}
+	h.bp(t, "2026-08-09T06:30:00Z", 99) // a tail after the second run
+
+	head, _ := h.l.Head(ctx)
+	for w := first.W; w <= head; w++ {
+		want, err := fold.ReadAt(ctx, h.l, w)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, ok, err := mint.ReadAt(ctx, h.l, h.db, h.deps.Artifacts, w)
+		if err != nil || !ok || got.Value.Hash() != want.Value.Hash() {
+			t.Fatalf("W=%d: composed %v %v %s, fold %s", w, ok, err, got.Value.Hash(), want.Value.Hash())
+		}
+		for _, win := range [][2]string{
+			{"2026-08-01T00:00:00.000000000Z", "2026-09-01T00:00:00.000000000Z"},
+			{"2024-01-01T00:00:00.000000000Z", "2025-01-01T00:00:00.000000000Z"},
+			{"2026-07-02T00:00:00.000000000Z", "2026-07-03T00:00:00.000000000Z"},
+		} {
+			got, ok, err := mint.ReadWindow(ctx, h.l, h.db, h.deps.Artifacts, w, win[0], win[1])
+			if err != nil || !ok || got.Hash != want.Value.Hash() || got.Live != want.Value.Len() {
+				t.Fatalf("W=%d %v: %v %v %s/%d, fold %s/%d", w, win, ok, err, got.Hash, got.Live,
+					want.Value.Hash(), want.Value.Len())
+			}
+			if a, b := inWindow(got.Value.Entries(), win), inWindow(want.Value.Entries(), win); !sameIDs(a, b) {
+				t.Fatalf("W=%d %v: window %v, fold %v", w, win, a, b)
+			}
+		}
+	}
 }

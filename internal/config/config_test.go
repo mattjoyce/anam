@@ -36,16 +36,17 @@ func TestLoadDefaults(t *testing.T) {
 	}
 
 	want := config.Config{
-		PersonID:      "matt",
-		LedgerPath:    "/data/anam/ledger.db",
-		DBPath:        "/data/anam/tracking.db",
-		ArtifactDir:   "/data/anam/artifacts",
-		LibraryDir:    "/data/anam/documents",
-		Zone:          "Local",
-		Listen:        config.DefaultListen,
-		Timeout:       5 * time.Second,
-		IngestTimeout: 15 * time.Minute,
-		BucketWidth:   span.Default,
+		PersonID:         "matt",
+		LedgerPath:       "/data/anam/ledger.db",
+		DBPath:           "/data/anam/tracking.db",
+		ArtifactDir:      "/data/anam/artifacts",
+		LibraryDir:       "/data/anam/documents",
+		Zone:             "Local",
+		Listen:           config.DefaultListen,
+		Timeout:          5 * time.Second,
+		IngestTimeout:    15 * time.Minute,
+		BucketWidth:      span.Default,
+		CheckpointBudget: config.DefaultCheckpointBudget,
 	}
 	if got != want {
 		t.Errorf("Load() = %+v, want %+v", got, want)
@@ -102,16 +103,17 @@ bucket_width: weekly
 	}
 
 	want := config.Config{
-		PersonID:      "matt",
-		LedgerPath:    "/srv/anam/ledger.db",
-		DBPath:        "/srv/anam/tracking.db",
-		ArtifactDir:   "/srv/anam/artifacts",
-		LibraryDir:    "/srv/anam/documents",
-		Zone:          "Local",
-		Listen:        config.DefaultListen,
-		Timeout:       12 * time.Second,
-		IngestTimeout: 15 * time.Minute,
-		BucketWidth:   span.Weekly,
+		PersonID:         "matt",
+		LedgerPath:       "/srv/anam/ledger.db",
+		DBPath:           "/srv/anam/tracking.db",
+		ArtifactDir:      "/srv/anam/artifacts",
+		LibraryDir:       "/srv/anam/documents",
+		Zone:             "Local",
+		Listen:           config.DefaultListen,
+		Timeout:          12 * time.Second,
+		IngestTimeout:    15 * time.Minute,
+		BucketWidth:      span.Weekly,
+		CheckpointBudget: config.DefaultCheckpointBudget,
 	}
 	if got != want {
 		t.Errorf("Load() = %+v, want %+v", got, want)
@@ -339,5 +341,18 @@ func TestZoneName(t *testing.T) {
 				t.Errorf("ZoneName with TZ=%q = %q, %v; want %q", tt.tz, got, err, tt.want)
 			}
 		})
+	}
+}
+
+func TestCheckpointBudget(t *testing.T) {
+	t.Setenv("ANAM_PERSON_ID", "matt")
+	t.Setenv("ANAM_CHECKPOINT_BUDGET", "")
+	c, err := config.Load("")
+	if err != nil || c.CheckpointBudget != config.DefaultCheckpointBudget {
+		t.Fatalf("default budget = %d, %v", c.CheckpointBudget, err)
+	}
+	t.Setenv("ANAM_CHECKPOINT_BUDGET", "-1")
+	if _, err := config.Load(""); err == nil {
+		t.Error("a negative budget was accepted")
 	}
 }

@@ -38,10 +38,13 @@ var ErrInvalidWidth = errors.New("invalid bucket width")
 // a read returns.
 type Width string
 
-// The widths. Monthly and Weekly are enough until a corpus argues for another.
+// The widths. Monthly and Weekly are the ones an operator can configure; Yearly and
+// Daily exist for a Layout, which subdivides years into months and months into days.
 const (
 	Monthly Width = "monthly"
 	Weekly  Width = "weekly"
+	Yearly  Width = "yearly"
+	Daily   Width = "daily"
 )
 
 // Default is the width Anam buckets at unless an operator says otherwise.
@@ -63,6 +66,8 @@ func (w Width) Valid() bool { return w == Monthly || w == Weekly }
 var (
 	weekPattern  = regexp.MustCompile(`^bucket:(\d{4})-W(\d{2})$`)
 	monthPattern = regexp.MustCompile(`^bucket:(\d{4})-(\d{2})$`)
+	yearPattern  = regexp.MustCompile(`^bucket:(\d{4})$`)
+	dayPattern   = regexp.MustCompile(`^bucket:(\d{4})-(\d{2})-(\d{2})$`)
 )
 
 // Bucket is a half-open interval of fact-time, [From, To). It is a value: two buckets
@@ -71,6 +76,7 @@ type Bucket struct {
 	width Width
 	year  int
 	n     int // ISO week number, or calendar month
+	day   int // day of the month, for a daily bucket
 	from  time.Time
 }
 
@@ -147,7 +153,22 @@ func Parse(id string) (Bucket, error) {
 		return Bucket{width: Monthly, year: year, n: month,
 			from: time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)}, nil
 	}
-	return Bucket{}, fmt.Errorf("%w: %q is neither bucket:YYYY-MM nor bucket:YYYY-Www", ErrInvalidID, id)
+	if m := yearPattern.FindStringSubmatch(id); m != nil {
+		year, _ := strconv.Atoi(m[1])
+		return yearOf(time.Date(year, time.January, 1, 0, 0, 0, 0, time.UTC)), nil
+	}
+	if m := dayPattern.FindStringSubmatch(id); m != nil {
+		year, _ := strconv.Atoi(m[1])
+		month, _ := strconv.Atoi(m[2])
+		day, _ := strconv.Atoi(m[3])
+		t := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+		if month < 1 || month > 12 || t.Day() != day {
+			return Bucket{}, fmt.Errorf("%w: %q is not a calendar day", ErrInvalidID, id)
+		}
+		return dayOf(t), nil
+	}
+	return Bucket{}, fmt.Errorf("%w: %q is none of bucket:YYYY, bucket:YYYY-MM, bucket:YYYY-MM-DD, bucket:YYYY-Www",
+		ErrInvalidID, id)
 }
 
 // ID is the bucket's identity: "bucket:2026-07" monthly, "bucket:2026-W28" weekly.
@@ -161,8 +182,13 @@ func Parse(id string) (Bucket, error) {
 // The number is zero-padded because ids are compared lexically wherever they are stored
 // or sorted. Unpadded, 7 sorts after 10.
 func (b Bucket) ID() string {
-	if b.width == Weekly {
+	switch b.width {
+	case Weekly:
 		return fmt.Sprintf("bucket:%04d-W%02d", b.year, b.n)
+	case Yearly:
+		return fmt.Sprintf("bucket:%04d", b.year)
+	case Daily:
+		return fmt.Sprintf("bucket:%04d-%02d-%02d", b.year, b.n, b.day)
 	}
 	return fmt.Sprintf("bucket:%04d-%02d", b.year, b.n)
 }
@@ -179,8 +205,13 @@ func (b Bucket) From() time.Time { return b.from }
 // A month is not a fixed duration, which is why this is arithmetic on the date rather
 // than an addition of some constant width. February and July are both one bucket.
 func (b Bucket) To() time.Time {
-	if b.width == Weekly {
+	switch b.width {
+	case Weekly:
 		return b.from.AddDate(0, 0, 7)
+	case Yearly:
+		return b.from.AddDate(1, 0, 0)
+	case Daily:
+		return b.from.AddDate(0, 0, 1)
 	}
 	return b.from.AddDate(0, 1, 0)
 }

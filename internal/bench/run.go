@@ -68,6 +68,8 @@ type Options struct {
 	Timeout                    time.Duration
 	// Only, when set, names the scenarios to run by a substring of their names.
 	Only []string
+	// Budget is the checkpoint_budget the dry-run mint scenario mints with.
+	Budget int
 }
 
 // Run times every scenario against the record at o.Paths. It catches the index up
@@ -100,7 +102,7 @@ func Run(ctx context.Context, o Options, progress func(string)) (Report, error) 
 	if err != nil {
 		return Report{}, err
 	}
-	deps := mint.Deps{Ledger: l, Index: db, Artifacts: store, Buckets: buckets, Clock: clock.Real{}}
+	deps := mint.Deps{Ledger: l, Index: db, Artifacts: store, Buckets: buckets, Clock: clock.Real{}, Budget: o.Budget}
 	for _, sc := range scenarios(l, db, plan, deps) {
 		if !o.wants(sc.name) {
 			continue
@@ -228,7 +230,7 @@ type scenario struct {
 }
 
 func scenarios(l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) []scenario {
-	src := read.Source{Ledger: l, Checkpoints: db, Artifacts: deps.Artifacts, Buckets: deps.Buckets}
+	src := read.Source{Ledger: l, Checkpoints: db, Artifacts: deps.Artifacts}
 	timeline := func(q api.TimelineQuery) func(context.Context) (int, error) {
 		return func(ctx context.Context) (int, error) {
 			q.Zone = "UTC"

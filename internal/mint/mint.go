@@ -73,6 +73,10 @@ type Deps struct {
 	Artifacts Store
 	Buckets   span.Buckets
 	Clock     Clock
+	// Budget, when positive, is the most bytes a bucket's value may hold before the
+	// mint splits it: years into months, months into days (span.Layout). Zero mints
+	// at the fixed width Buckets names.
+	Budget int
 }
 
 // Outcome reports what happened to one bucket.
@@ -133,7 +137,7 @@ func Run(ctx context.Context, d Deps, dryRun bool) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	parts, err := Partition(res.Value, d.Buckets)
+	parts, heads, err := d.partition(res.Value, heads)
 	if err != nil {
 		return Result{}, err
 	}
@@ -227,10 +231,94 @@ func spanIDs(parts map[string][]fold.Entry, heads map[string]ops.CheckpointRow) 
 	return ids
 }
 
+// partition splits the value into the buckets to mint, and returns the heads that are
+// still buckets. At a fixed width that is Partition. With a budget the layout is the
+// one the log implies, any bucket over budget is split along the calendar until it
+// fits or is a day, and the heads of buckets split earlier drop out: their children
+// carry their facets now.
+func (d Deps) partition(v fold.Value, heads map[string]ops.CheckpointRow,
+) (map[string][]fold.Entry, map[string]ops.CheckpointRow, error) {
+	if d.Budget <= 0 {
+		parts, err := Partition(v, d.Buckets)
+		return parts, heads, err
+	}
+	ids := make([]string, 0, len(heads))
+	for id := range heads {
+		ids = append(ids, id)
+	}
+	layout, err := span.LayoutOf(ids)
+	if err != nil {
+		return nil, nil, fmt.Errorf("mint: the checkpoint log cannot subdivide (%w); clear it and mint again", err)
+	}
+	parts, layout, err := subdivide(v, layout, d.Budget)
+	if err != nil {
+		return nil, nil, err
+	}
+	leaves := make(map[string]ops.CheckpointRow, len(heads))
+	for id, row := range heads {
+		b, _ := span.Parse(id) // LayoutOf has parsed every id
+		if layout.Leaf(b) {
+			leaves[id] = row
+		}
+	}
+	return parts, leaves, nil
+}
+
+// subdivide partitions v by layout, splitting every bucket whose value is over budget
+// bytes until none is or it is a day. The size is the value's own serialisation, so
+// the same facts always split the same way.
+func subdivide(v fold.Value, layout span.Layout, budget int) (map[string][]fold.Entry, span.Layout, error) {
+	parts, err := Partition(v, layout)
+	if err != nil {
+		return nil, layout, err
+	}
+	for {
+		var over []span.Bucket
+		for id, entries := range parts {
+			val, err := fold.NewValue(entries)
+			if err != nil {
+				return nil, layout, err
+			}
+			if len(val.Bytes()) <= budget {
+				continue
+			}
+			b, err := span.Parse(id)
+			if err != nil {
+				return nil, layout, err
+			}
+			if next, ok := layout.Split(b); ok {
+				layout = next
+				over = append(over, b)
+			}
+		}
+		if len(over) == 0 {
+			return parts, layout, nil
+		}
+		for _, b := range over {
+			entries := parts[b.ID()]
+			delete(parts, b.ID())
+			for _, e := range entries {
+				t, err := clock.Parse(e.FactTime)
+				if err != nil {
+					return nil, layout, err
+				}
+				id := layout.Of(t).ID()
+				parts[id] = append(parts[id], e)
+			}
+		}
+	}
+}
+
+// Placer places a fact-time in a bucket: a fixed width (span.Buckets) or a
+// subdivision (span.Layout).
+type Placer interface {
+	Of(t time.Time) span.Bucket
+}
+
 // Partition splits a value's entries by the bucket their fact-time falls in. Every
 // entry lands in exactly one bucket, by arithmetic on fact_time and nothing else, so
 // the partition is a function of the value and the width alone.
-func Partition(v fold.Value, buckets span.Buckets) (map[string][]fold.Entry, error) {
+func Partition(v fold.Value, buckets Placer) (map[string][]fold.Entry, error) {
 	parts := map[string][]fold.Entry{}
 	for _, e := range v.Entries() {
 		t, err := clock.Parse(e.FactTime)

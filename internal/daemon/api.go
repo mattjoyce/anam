@@ -71,6 +71,7 @@ func (d *Daemon) postCheckpoints(w http.ResponseWriter, r *http.Request) {
 		var err error
 		m, err = mint.Report(ctx, mint.Deps{
 			Ledger: s.Ledger, Index: s.Ops, Artifacts: d.artifacts, Buckets: buckets, Clock: clock.Real{},
+			Budget: d.cfg.CheckpointBudget,
 		}, dryRun)
 		return err
 	})
@@ -147,8 +148,7 @@ func (d *Daemon) getTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
-	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
-	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts, Buckets: buckets}
+	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts}
 	t, err := read.Timeline(ctx, src, q)
 	if err != nil {
 		writeReadError(w, err)

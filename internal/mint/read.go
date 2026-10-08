@@ -8,6 +8,7 @@ import (
 
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
+	"github.com/mattjoyce/anam/internal/span"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
@@ -66,8 +67,8 @@ func ReadAt(ctx context.Context, l ReadLedger, log CheckpointLog, artifacts Stor
 	if err != nil || !ok {
 		return Composed{}, false, err
 	}
-	rows, err := log.CheckpointsAt(ctx, int64(run))
-	if err != nil {
+	rows, _, ok, err := leavesAt(ctx, log, run)
+	if err != nil || !ok {
 		return Composed{}, false, err
 	}
 	byID := map[string]fold.Entry{}
@@ -117,6 +118,34 @@ func startingRun(ctx context.Context, l ReadLedger, log CheckpointLog, w ledger.
 	}
 	run, ok, err := log.LastMintRun(ctx, int64(w))
 	return ledger.Watermark(run), ok, err
+}
+
+// leavesAt returns the checkpoints at run of the buckets the layout then held, and that
+// layout. A bucket split since its checkpoint was minted has children with their own,
+// so its row is history, not part of the value. ok is false for a log whose ids do
+// not subdivide (a weekly width): the caller reads the full fold instead.
+func leavesAt(ctx context.Context, log CheckpointLog, run ledger.Watermark,
+) ([]ops.CheckpointRow, span.Layout, bool, error) {
+	rows, err := log.CheckpointsAt(ctx, int64(run))
+	if err != nil {
+		return nil, span.Layout{}, false, err
+	}
+	ids := make([]string, len(rows))
+	for i, r := range rows {
+		ids[i] = r.SpanID
+	}
+	layout, err := span.LayoutOf(ids)
+	if err != nil {
+		return nil, span.Layout{}, false, nil
+	}
+	leaves := rows[:0:0]
+	for _, r := range rows {
+		b, _ := span.Parse(r.SpanID) // LayoutOf has parsed every id
+		if layout.Leaf(b) {
+			leaves = append(leaves, r)
+		}
+	}
+	return leaves, layout, true, nil
 }
 
 // loadInto adds a checkpoint's entries to byID. The artifact store checks the file's

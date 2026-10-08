@@ -51,15 +51,15 @@ type Window struct {
 // The whole value's bytes are its buckets' bytes in time order, joined: a value is a
 // JSON array in (fact_time, facet_id) order, and buckets partition fact-time. So the
 // hash streamed here is the hash the full fold computes.
-func ReadWindow(ctx context.Context, l ReadLedger, log WindowLog, artifacts Store, buckets span.Buckets,
+func ReadWindow(ctx context.Context, l ReadLedger, log WindowLog, artifacts Store,
 	w ledger.Watermark, from, toX string,
 ) (Window, bool, error) {
 	run, ok, err := startingRun(ctx, l, log, w)
 	if err != nil || !ok {
 		return Window{}, false, err
 	}
-	rows, err := log.CheckpointsAt(ctx, int64(run))
-	if err != nil {
+	rows, buckets, ok, err := leavesAt(ctx, log, run)
+	if err != nil || !ok {
 		return Window{}, false, err
 	}
 	sizes, err := log.CheckpointSizes(ctx)
@@ -122,10 +122,10 @@ type dirtied struct {
 	versions map[string]int
 }
 
-// dirty works out which buckets the tail changed. A touched facet left the bucket its
-// version at the run put it in, found from the version the first tail event names as
+// dirty works out which buckets of the run's layout the tail changed. A touched facet
+// left the bucket its version at the run put it in, found from the version the first tail event names as
 // prior, and joined the bucket its version at w puts it in, if the tail leaves it live.
-func dirty(ctx context.Context, l ReadLedger, buckets span.Buckets, tail []facet.AnamEvent) (dirtied, error) {
+func dirty(ctx context.Context, l ReadLedger, buckets span.Layout, tail []facet.AnamEvent) (dirtied, error) {
 	d := dirtied{touched: map[string]bool{}, buckets: map[string]bool{}, entries: map[string][]fold.Entry{},
 		versions: map[string]int{}}
 	first := map[string]facet.AnamEvent{}

@@ -177,5 +177,7 @@ func mintDeps(ctx context.Context, cfg config.Config) (mint.Deps, func(), error)
 		_ = db.Close()
 		_ = store.Close()
 	}
-	return mint.Deps{Ledger: l, Index: db, Artifacts: store, Buckets: buckets, Clock: clock.Real{}}, closeAll, nil
+	return mint.Deps{
+		Ledger: l, Index: db, Artifacts: store, Buckets: buckets, Clock: clock.Real{}, Budget: cfg.CheckpointBudget,
+	}, closeAll, nil
 }

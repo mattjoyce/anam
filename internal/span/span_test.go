@@ -231,7 +231,7 @@ func TestParse_Rejects(t *testing.T) {
 		"bucket:2026-7",     // unpadded
 		"derived:2026-W28",  // not a bucket
 		"bucket:2026-W28-x", // trailing junk
-		"bucket:2026-07-11", // an instant, not a bucket
+		"bucket:2026-02-30", // not a calendar day
 		"bucket:abcd-W28",   // year not numeric
 		"bucket:abcd-07",
 	} {
@@ -288,4 +288,48 @@ func bucketing(t *testing.T, w span.Width) span.Buckets {
 		t.Fatalf("span.New(%q): %v", w, err)
 	}
 	return b
+}
+
+// A layout walks year → month → day. It is derived from the checkpointed ids: a month
+// splits its year, a day its month and year. Every id round-trips through Parse.
+func TestLayout(t *testing.T) {
+	t.Parallel()
+	l, err := span.LayoutOf([]string{"bucket:2026", "bucket:2025-03", "bucket:2025-07-14", "bucket:2011"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		at   time.Time
+		want string
+	}{
+		{time.Date(2011, 5, 1, 0, 0, 0, 0, time.UTC), "bucket:2011"},
+		{time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), "bucket:2026"},
+		{time.Date(2025, 3, 31, 23, 59, 59, 0, time.UTC), "bucket:2025-03"},
+		{time.Date(2025, 8, 2, 0, 0, 0, 0, time.UTC), "bucket:2025-08"},
+		{time.Date(2025, 7, 14, 12, 0, 0, 0, time.UTC), "bucket:2025-07-14"},
+		{time.Date(2025, 7, 1, 0, 0, 0, 0, time.UTC), "bucket:2025-07-01"},
+	} {
+		b := l.Of(tt.at)
+		if b.ID() != tt.want {
+			t.Errorf("Of(%s) = %s, want %s", tt.at, b.ID(), tt.want)
+		}
+		back, err := span.Parse(b.ID())
+		if err != nil || back != b || !l.Leaf(b) {
+			t.Errorf("%s: Parse = %v, %v; leaf %v", b.ID(), back, err, l.Leaf(b))
+		}
+		if b.From().After(tt.at) || !b.To().After(tt.at) {
+			t.Errorf("%s does not hold %s", b.ID(), tt.at)
+		}
+	}
+	year, _ := span.Parse("bucket:2025")
+	if l.Leaf(year) {
+		t.Error("a split year is a leaf")
+	}
+	day, _ := span.Parse("bucket:2025-07-14")
+	if _, ok := l.Split(day); ok {
+		t.Error("a day was split")
+	}
+	if _, err := span.LayoutOf([]string{"bucket:2026-W28"}); err == nil {
+		t.Error("a weekly id was accepted into a layout")
+	}
 }

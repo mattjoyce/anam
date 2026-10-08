@@ -82,6 +82,13 @@ type Config struct {
 	// bucket id the operational index persists, so the ops store pins it and refuses a
 	// database that was built at a different width.
 	BucketWidth span.Width `mapstructure:"bucket_width"`
+
+	// CheckpointBudget is the most bytes one checkpoint's value may hold before the
+	// mint splits its bucket along the calendar: a year into months, a month into days
+	// (span.Layout). It prices a read: a bucket a late correction dirties is decoded
+	// and re-derived whole. Zero mints at the fixed bucket_width instead. The default,
+	// 1 MiB, re-derives in about 50 ms on the NAS (card 59's bench).
+	CheckpointBudget int `mapstructure:"checkpoint_budget"`
 }
 
 // Load resolves configuration, reading the YAML file at path when it is non-empty.
@@ -121,6 +128,7 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 	v.SetDefault("listen", DefaultListen)
 	v.SetDefault("token_file", "")
 	v.SetDefault("server", "")
+	v.SetDefault("checkpoint_budget", DefaultCheckpointBudget)
 	v.SetDefault("ingest_timeout", 15*time.Minute)
 
 	if path != "" {
@@ -195,6 +203,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("%w: timeout must be positive, got %s", ErrInvalid, c.Timeout)
 	case c.IngestTimeout <= 0:
 		return fmt.Errorf("%w: ingest_timeout must be positive, got %s", ErrInvalid, c.IngestTimeout)
+	case c.CheckpointBudget < 0:
+		return fmt.Errorf("%w: checkpoint_budget must be 0 or more bytes, got %d", ErrInvalid, c.CheckpointBudget)
 	}
 	if c.Server != "" {
 		if err := checkServer(c.Server); err != nil {
@@ -276,6 +286,9 @@ func (c Config) ZoneName() (string, error) {
 // Buckets is the bucketing this configuration selects. Validate has already rejected
 // an unknown width, so a config that loaded yields one here.
 func (c Config) Buckets() (span.Buckets, error) { return span.New(c.BucketWidth) }
+
+// DefaultCheckpointBudget is checkpoint_budget's default: 1 MiB.
+const DefaultCheckpointBudget = 1 << 20
 
 // DefaultListen is the daemon's address when none is configured: loopback, on the
 // port the inspector has always used.

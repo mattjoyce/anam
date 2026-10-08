@@ -51,6 +51,9 @@ type Shape struct {
 	TailNew     int       `json:"tail_new"`
 	TailCorrect int       `json:"tail_correct"`
 	Start       time.Time `json:"start"`
+	// Budget is the mint's checkpoint_budget in bytes; 0 mints at the fixed monthly
+	// width, as the first bench datasets were.
+	Budget int `json:"budget"`
 }
 
 // Shapes are the bench's named scales. S is about today's record; M is several years
@@ -115,7 +118,7 @@ func Generate(ctx context.Context, dir string, sh Shape, progress func(string)) 
 	if err := correctAndRetract(ctx, g, clk, sh, base, ids, progress); err != nil {
 		return err
 	}
-	if err := checkpoint(ctx, l, p, progress); err != nil {
+	if err := checkpoint(ctx, l, p, sh.Budget, progress); err != nil {
 		return err
 	}
 	return tail(ctx, g, clk, sh, base, l, p, progress)
@@ -264,7 +267,7 @@ func syncIndex(ctx context.Context, l *ledger.Ledger, p Paths) error {
 }
 
 // checkpoint catches the index up and mints every bucket, as `anam checkpoint` does.
-func checkpoint(ctx context.Context, l *ledger.Ledger, p Paths, progress func(string)) error {
+func checkpoint(ctx context.Context, l *ledger.Ledger, p Paths, budget int, progress func(string)) error {
 	buckets, err := span.New(span.Default)
 	if err != nil {
 		return err
@@ -282,7 +285,9 @@ func checkpoint(ctx context.Context, l *ledger.Ledger, p Paths, progress func(st
 		return err
 	}
 	defer func() { _ = store.Close() }()
-	res, err := mint.Run(ctx, mint.Deps{Ledger: l, Index: db, Artifacts: store, Buckets: buckets, Clock: clock.Real{}}, false)
+	res, err := mint.Run(ctx, mint.Deps{
+		Ledger: l, Index: db, Artifacts: store, Buckets: buckets, Clock: clock.Real{}, Budget: budget,
+	}, false)
 	if err != nil {
 		return err
 	}
@@ -294,7 +299,7 @@ func checkpoint(ctx context.Context, l *ledger.Ledger, p Paths, progress func(st
 
 // MintRecord mints the record at p, as `anam checkpoint` does, and returns how many
 // buckets it minted and the run's watermark.
-func MintRecord(ctx context.Context, p Paths, person string) (int, int64, error) {
+func MintRecord(ctx context.Context, p Paths, person string, budget int) (int, int64, error) {
 	l, err := ledger.OpenReadOnly(ctx, p.Ledger, person)
 	if err != nil {
 		return 0, 0, err
@@ -317,7 +322,9 @@ func MintRecord(ctx context.Context, p Paths, person string) (int, int64, error)
 		return 0, 0, err
 	}
 	defer func() { _ = store.Close() }()
-	res, err := mint.Run(ctx, mint.Deps{Ledger: l, Index: db, Artifacts: store, Buckets: buckets, Clock: clock.Real{}}, false)
+	res, err := mint.Run(ctx, mint.Deps{
+		Ledger: l, Index: db, Artifacts: store, Buckets: buckets, Clock: clock.Real{}, Budget: budget,
+	}, false)
 	if err != nil {
 		return 0, 0, err
 	}

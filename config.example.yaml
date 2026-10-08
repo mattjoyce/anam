@@ -53,9 +53,17 @@ artifact_dir: ~/.local/share/anam/artifacts
 # Bounds every call to a store. Anam fails fast rather than hanging.
 timeout: 5s
 
-# Where `anam daemon` serves the inspector and /healthz. Loopback only: the daemon
-# refuses any other address until its requests carry a token.
+# Where `anam daemon` serves the API, the inspector and /healthz. Without a
+# token_file it must be loopback.
 listen: 127.0.0.1:8787
+
+# The daemon's bearer token, one line of at least 32 characters
+# (`openssl rand -hex 24 > token`). With it, every request but /healthz must carry
+# it, as a bearer token or as a basic-auth password, and listen may be any address.
+# token_file: ~/.config/anam/token
+
+# Bounds one whole ingest run inside the daemon.
+ingest_timeout: 15m
 
 # --- bucketing ----------------------------------------------------------------
 # How much fact-time one checkpoint bucket covers: `monthly` or `weekly`.

@@ -66,11 +66,9 @@ one run; raise it deliberately when the source really has shrunk that far.`,
 			if err != nil {
 				return err
 			}
-			held := map[string]bool{}
-			for _, sc := range scanned {
-				for _, env := range sc.envs {
-					held[facet.NewID(env.SourceRef)] = true
-				}
+			held, err := heldIDs(scanned)
+			if err != nil {
+				return err
 			}
 
 			ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
@@ -188,4 +186,25 @@ func retractAll(cmd *cobra.Command, cfg config.Config, absent []facet.Facet) err
 	}
 	_, err = fmt.Fprintf(cmd.OutOrStdout(), "tombstoned %d facets; the ledger moved\n", done)
 	return err
+}
+
+// heldIDs is the facet id of every envelope a scan returned, under the identity the
+// gate would admit it with. A worker may leave source_ref to the gate, so it is
+// composed from the Definition here too, never read off the envelope.
+func heldIDs(scanned []scanned) (map[string]bool, error) {
+	reg, err := def.Bundled()
+	if err != nil {
+		return nil, err
+	}
+	held := map[string]bool{}
+	for _, sc := range scanned {
+		for _, env := range sc.envs {
+			ref, err := reg.Identify(env)
+			if err != nil {
+				return nil, fmt.Errorf("source %s: %w", sc.source, err)
+			}
+			held[facet.NewID(ref)] = true
+		}
+	}
+	return held, nil
 }

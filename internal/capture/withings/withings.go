@@ -138,12 +138,9 @@ func Scan(ctx context.Context, dbPath, assertedPerson string) ([]facet.Envelope,
 			return nil, fmt.Errorf("withings: marshal %s:%s: %w", p.WithingsID, p.Type, err)
 		}
 		envelopes = append(envelopes, facet.Envelope{
-			Type:     Type,
-			Source:   Source,
-			Injector: Source,
-			// The gate recomputes this from the definition's identity_key and
-			// rejects a mismatch — the worker must compose the same string.
-			SourceRef:      facet.SourceRef(Source, p.WithingsID, p.Type),
+			Type:           Type,
+			Source:         Source,
+			Injector:       Source,
 			Payload:        raw,
 			AssertedPerson: assertion(p, assertedPerson),
 		})

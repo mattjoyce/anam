@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/capture/documents"
+	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
@@ -47,6 +48,7 @@ func TestScan_DescribesEachFileFromItsSidecar(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
+	envs = identified(t, envs)
 	if len(envs) != 2 {
 		t.Fatalf("Scan returned %d envelopes, want 2", len(envs))
 	}
@@ -88,4 +90,24 @@ func TestScan_RefusesAFileWithoutAFactTime(t *testing.T) {
 	if _, err := documents.Scan(dir, "matt"); !errors.Is(err, documents.ErrBadSidecar) {
 		t.Errorf("sidecar declaring the hash = %v, want ErrBadSidecar", err)
 	}
+}
+
+// identified gives each envelope the source_ref the gate admits it under. The
+// worker leaves it empty; the Definition's identity_key composes it.
+func identified(t *testing.T, envs []facet.Envelope) []facet.Envelope {
+	t.Helper()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatalf("Bundled: %v", err)
+	}
+	out := make([]facet.Envelope, len(envs))
+	for i, env := range envs {
+		ref, err := reg.Identify(env)
+		if err != nil {
+			t.Fatalf("envelope %d (%s): %v", i, env.Type, err)
+		}
+		env.SourceRef = ref
+		out[i] = env
+	}
+	return out
 }

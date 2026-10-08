@@ -177,3 +177,24 @@ func TestBundled_DocReferenceIsAReference(t *testing.T) {
 		t.Errorf("a type that says nothing is verbatim, got %s", bp.PayloadKind)
 	}
 }
+
+// Identify composes the ref the gate admits under, from the payload alone: a ref the
+// envelope carries does not change the answer, and a type with no Definition has none.
+func TestRegistry_Identify(t *testing.T) {
+	t.Parallel()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatalf("Bundled: %v", err)
+	}
+	payload := []byte(`{"path":"scans/bp.jpg","sha256":"00","media_type":"image/jpeg","bytes":10,"date":"2024-09-16"}`)
+	want := facet.SourceRef("documents", "scans/bp.jpg")
+	for _, carried := range []string{"", want, "documents:something-else"} {
+		env := facet.Envelope{Type: "doc.reference", Source: "documents", SourceRef: carried, Payload: payload}
+		if got, err := reg.Identify(env); err != nil || got != want {
+			t.Errorf("carrying %q: Identify = %q, %v; want %q", carried, got, err, want)
+		}
+	}
+	if _, err := reg.Identify(facet.Envelope{Type: "no.such", Source: "documents", Payload: payload}); err == nil {
+		t.Error("Identify composed a ref for a type with no Definition")
+	}
+}

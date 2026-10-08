@@ -264,9 +264,13 @@ type AnamEvent struct {
 // Envelope is the message a capture worker hands the admission gate. It is the only
 // ingress: capture workers share nothing with the ledger except through it (§6).
 type Envelope struct {
-	Type      Type
-	Source    string
-	Injector  string
+	Type     Type
+	Source   string
+	Injector string
+
+	// SourceRef is optional. Left empty, the gate composes it from the Definition's
+	// identity_key; carried, the gate checks it against that composition. Identity
+	// is the Definition's, so a worker has no reason to compose it by hand.
 	SourceRef string
 
 	// Payload is the raw source fragment as JSON, canonicalised on admission.
@@ -290,8 +294,6 @@ func (e Envelope) Validate() error {
 		return fmt.Errorf("%w: source is required", ErrInvalidEnvelope)
 	case e.Injector == "":
 		return fmt.Errorf("%w: injector is required", ErrInvalidEnvelope)
-	case e.SourceRef == "":
-		return fmt.Errorf("%w: source_ref is required", ErrInvalidEnvelope)
 	case len(e.Payload) == 0:
 		return fmt.Errorf("%w: payload is required", ErrInvalidEnvelope)
 	}

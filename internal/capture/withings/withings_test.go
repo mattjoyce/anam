@@ -105,10 +105,10 @@ func TestScan_ComposesGateCompliantEnvelopes(t *testing.T) {
 
 	for _, env := range envs {
 		if env.Type != withings.Type {
-			t.Errorf("%s: type %s, want %s", env.SourceRef, env.Type, withings.Type)
+			t.Errorf("type %s, want %s", env.Type, withings.Type)
 		}
 		if err := env.Validate(); err != nil {
-			t.Errorf("%s: %v", env.SourceRef, err)
+			t.Errorf("%s: %v", env.Type, err)
 		}
 		d, ok := reg.Lookup(env.Type)
 		if !ok {
@@ -116,19 +116,19 @@ func TestScan_ComposesGateCompliantEnvelopes(t *testing.T) {
 		}
 		doc, err := def.Decode(env.Payload)
 		if err != nil {
-			t.Fatalf("%s: decode: %v", env.SourceRef, err)
+			t.Fatalf("%s: decode: %v", env.Type, err)
 		}
 		if err := d.Check(doc); err != nil {
-			t.Errorf("%s: not compliant: %v", env.SourceRef, err)
+			t.Errorf("%s: not compliant: %v", env.Type, err)
 		}
 		if _, err := d.FactTimeOf(doc); err != nil {
-			t.Errorf("%s: fact time: %v", env.SourceRef, err)
+			t.Errorf("%s: fact time: %v", env.Type, err)
 		}
-		ref, err := d.SourceRef(env.Source, doc)
-		if err != nil {
-			t.Errorf("%s: compose ref: %v", env.SourceRef, err)
-		} else if ref != env.SourceRef {
-			t.Errorf("identity disagreement: worker says %q, definition composes %q", env.SourceRef, ref)
+		if env.SourceRef != "" {
+			t.Errorf("%s: the worker composed source_ref %q; composing it is the gate's job", env.Type, env.SourceRef)
+		}
+		if _, err := d.SourceRef(env.Source, doc); err != nil {
+			t.Errorf("%s: compose ref: %v", env.Type, err)
 		}
 	}
 }
@@ -144,6 +144,7 @@ func TestScan_SameInstantDifferentGroupsAreDistinctFacets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
+	envs = identified(t, envs)
 
 	refs := map[string]bool{}
 	for _, env := range envs {
@@ -172,6 +173,7 @@ func TestScan_KeepsTheSourceLexeme(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
+	envs = identified(t, envs)
 	var weight []byte
 	for _, env := range envs {
 		if env.SourceRef == facet.SourceRef("withings", "5204716098", "1") {
@@ -198,6 +200,7 @@ func TestScan_ExcludesThePipelinesOwnColumns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
+	envs = identified(t, envs)
 	for _, env := range envs {
 		for _, forbidden := range []string{"created_at", `"id"`, "2025-02-24"} {
 			if bytes.Contains(env.Payload, []byte(forbidden)) {
@@ -217,10 +220,12 @@ func TestScan_IsDeterministic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
+	a = identified(t, a)
 	b, err := withings.Scan(context.Background(), path, "matt")
 	if err != nil {
 		t.Fatalf("re-Scan: %v", err)
 	}
+	b = identified(t, b)
 	if len(a) != len(b) {
 		t.Fatalf("scans disagree on count: %d vs %d", len(a), len(b))
 	}
@@ -242,6 +247,7 @@ func TestScan_AttributionDecidesTheAssertion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
+	envs = identified(t, envs)
 	want := map[string]string{
 		facet.SourceRef("withings", "5204716098", "1"):  "",     // attrib 1, ambiguous
 		facet.SourceRef("withings", "6314440651", "9"):  "matt", // attrib 2, entered by hand
@@ -265,6 +271,7 @@ func TestScan_CarriesTheGroupAsWritten(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
+	envs = identified(t, envs)
 	byRef := map[string][]byte{}
 	for _, env := range envs {
 		byRef[env.SourceRef] = env.Payload
@@ -300,4 +307,24 @@ func TestScan_RefusesASourceWithoutGroups(t *testing.T) {
 	if _, err := withings.Scan(context.Background(), measurementsOnly(t), "matt"); err == nil {
 		t.Fatal("Scan accepted a source with no measure_groups")
 	}
+}
+
+// identified gives each envelope the source_ref the gate admits it under. The
+// worker leaves it empty; the Definition's identity_key composes it.
+func identified(t *testing.T, envs []facet.Envelope) []facet.Envelope {
+	t.Helper()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatalf("Bundled: %v", err)
+	}
+	out := make([]facet.Envelope, len(envs))
+	for i, env := range envs {
+		ref, err := reg.Identify(env)
+		if err != nil {
+			t.Fatalf("envelope %d (%s): %v", i, env.Type, err)
+		}
+		env.SourceRef = ref
+		out[i] = env
+	}
+	return out
 }

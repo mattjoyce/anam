@@ -31,7 +31,7 @@ const Type facet.Type = "health.blood-pressure"
 // Identity is (date_excel, reading): the export carries no reading id, and
 // distinct readings genuinely share a timestamp, so the row's position within its
 // timestamp is part of WHICH reading it is. The ordinal rides in the payload as
-// "reading" because identity is definition-owned (§6a) — the gate recomposes
+// "reading" because identity is definition-owned (§6a) — the gate composes
 // source_ref from the payload, so everything the identity needs must be in it.
 func Scan(path, assertedPerson string) ([]facet.Envelope, error) {
 	f, err := safepath.Open(path)
@@ -92,7 +92,6 @@ func Scan(path, assertedPerson string) ([]facet.Envelope, error) {
 			Type:           Type,
 			Source:         Source,
 			Injector:       Source,
-			SourceRef:      facet.SourceRef(Source, ts, reading),
 			Payload:        payload,
 			AssertedPerson: assertedPerson,
 		})

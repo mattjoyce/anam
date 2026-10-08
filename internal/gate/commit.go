@@ -68,7 +68,7 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 	for i, env := range envs {
 		p, err := g.prepare(env, bindings[i])
 		if err != nil {
-			return nil, 0, fmt.Errorf("%s: %w", env.SourceRef, err)
+			return nil, 0, fmt.Errorf("envelope %d (%s): %w", i, env.Type, err)
 		}
 		ps[i] = p
 	}
@@ -201,7 +201,11 @@ func (g *Gate) prepare(env facet.Envelope, binding facet.Binding) (prepared, err
 	if err != nil {
 		return prepared{}, err
 	}
-	if ref != env.SourceRef {
+	switch env.SourceRef {
+	case "":
+		env.SourceRef = ref
+	case ref:
+	default:
 		return prepared{}, fmt.Errorf("%w: envelope says %q, identity_key composes %q",
 			ErrIdentityMismatch, env.SourceRef, ref)
 	}

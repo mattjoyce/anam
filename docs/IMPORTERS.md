@@ -56,9 +56,10 @@ back on that side. Anam scheduling, polling or knowing a vendor's tables is the 
 
 These make an importer correct in any language, without importing Anam's code.
 
-1. **The gate composes identity.** It already recomputes `source_ref` from the Definition's
-   `identity_key` and refuses a mismatch. When an envelope leaves `source_ref` out, the gate composes
-   it. The identity rule then lives once, in the Definition, and importers only shape payload fields.
+1. **The gate composes identity.** Done (card 51). The gate composes `source_ref` from the
+   Definition's `identity_key`; an envelope may leave it out, and one that carries it is refused on a
+   mismatch. The identity rule lives once, in the Definition, and importers only shape payload fields.
+   The built-in workers no longer compose it.
 2. **A Definition's schema is standard JSON Schema.** Today the `schema` block is Anam's own
    pointer-keyed format, checkable only by Go inside Anam. As JSON Schema, an importer validates
    locally with a stock library before sending, and the gate runs the same check. The Anam-specific

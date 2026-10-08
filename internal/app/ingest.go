@@ -432,7 +432,7 @@ func admitAll(ctx context.Context, g admitter, envs []facet.Envelope, timeout ti
 		for i, env := range chunk {
 			b, err := g.Resolve(env)
 			if err != nil {
-				return prog, fmt.Errorf("resolve %s: %w", env.SourceRef, err)
+				return prog, fmt.Errorf("resolve envelope %d (%s): %w", start+i, env.Type, err)
 			}
 			bindings[i] = b
 		}

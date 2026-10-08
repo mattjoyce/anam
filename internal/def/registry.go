@@ -46,6 +46,21 @@ func (r *Registry) Closes(t facet.Type) bool {
 	return ok && d.Series != nil && d.Series.Closes
 }
 
+// Identify is the source_ref the gate admits an envelope under: its Definition's
+// identity_key composed over the payload. It ignores any source_ref the envelope
+// carries, which the gate only checks against this.
+func (r *Registry) Identify(env facet.Envelope) (string, error) {
+	d, ok := r.byType[env.Type]
+	if !ok {
+		return "", fmt.Errorf("%w: no definition for %s", ErrNotCompliant, env.Type)
+	}
+	doc, err := Decode(env.Payload)
+	if err != nil {
+		return "", err
+	}
+	return d.SourceRef(env.Source, doc)
+}
+
 // Lookup returns the Definition for a type.
 func (r *Registry) Lookup(t facet.Type) (Definition, bool) {
 	d, ok := r.byType[t]

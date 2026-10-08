@@ -16,6 +16,7 @@ import (
 	"github.com/mattjoyce/anam/internal/capture/withings"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
+	"github.com/mattjoyce/anam/internal/daemon"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
@@ -208,18 +209,13 @@ func admitSources(ctx context.Context, g admitter, all []scanned, timeout time.D
 	return changed, nil
 }
 
-// nothingNew is the last line of a complete run that wrote nothing. It is a fixed
-// string because a scheduler matches on it to stay quiet about such a run.
-const nothingNew = "ledger unchanged: nothing new in any source"
+// nothingNew is the last line of a complete run that wrote nothing. A scheduler
+// matches on it to stay quiet about such a run; daemon.Verdict owns the wording, so
+// the CLI and the API say the same thing.
+const nothingNew = daemon.NothingNew
 
-// verdict is the last line of a complete run: whether the ledger moved, in one line
-// that reads the same to a person and to a string match.
-func verdict(changed int) string {
-	if changed == 0 {
-		return nothingNew
-	}
-	return fmt.Sprintf("ledger changed: %d facets admitted or superseded", changed)
-}
+// verdict is the last line of a complete run.
+func verdict(changed int) string { return daemon.Verdict(changed) }
 
 // scanAll reads every declared import before any of them is admitted, and stops at the
 // first that cannot be read. Its error names the declared source and says nothing was

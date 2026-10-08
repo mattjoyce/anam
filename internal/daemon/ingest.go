@@ -31,6 +31,19 @@ type SourceResult struct {
 	Committed int `json:"committed"`
 }
 
+// NothingNew is the summary of a complete run that wrote nothing. It is a fixed
+// string because a scheduler matches on it to stay quiet about such a run.
+const NothingNew = "ledger unchanged: nothing new in any source"
+
+// Verdict is the one-line summary of a complete run: whether the ledger moved, in a
+// line that reads the same to a person and to a string match.
+func Verdict(changed int) string {
+	if changed == 0 {
+		return NothingNew
+	}
+	return fmt.Sprintf("ledger changed: %d facets admitted or superseded", changed)
+}
+
 // Operation states.
 const (
 	StatePending   = "pending"
@@ -52,8 +65,18 @@ type Operation struct {
 	WBefore     *int64         `json:"w_before,omitempty"`
 	WAfter      *int64         `json:"w_after,omitempty"`
 	Sources     []SourceResult `json:"sources,omitempty"`
-	Error       string         `json:"error,omitempty"`
+	// Changed is how many facets the run admitted or superseded, failed or not.
+	Changed int `json:"changed"`
+	// Summary is Verdict's line for a run that succeeded.
+	Summary string `json:"summary,omitempty"`
+	Error   string `json:"error,omitempty"`
+
+	// done is closed when the run finishes.
+	done chan struct{}
 }
+
+// finished reports whether the operation has reached a final state.
+func (op Operation) finished() bool { return op.State == StateSucceeded || op.State == StateFailed }
 
 // SourceStatus is what the daemon has seen of one source since it started.
 type SourceStatus struct {
@@ -104,7 +127,7 @@ func (d *Daemon) RequestIngest() (string, error) {
 	if in.pending != nil {
 		return in.pending.ID, nil
 	}
-	op := &Operation{ID: newID(), Kind: "ingest", State: StatePending, RequestedAt: d.now()}
+	op := &Operation{ID: newID(), Kind: "ingest", State: StatePending, RequestedAt: d.now(), done: make(chan struct{})}
 	in.remember(op)
 	if in.running == nil {
 		in.running = op
@@ -144,6 +167,21 @@ func (d *Daemon) Operation(id string) (Operation, bool) {
 	return c, true
 }
 
+// WaitOperation returns the operation with id once it has finished, or as it stands
+// when ctx ends or shutdown begins, whichever is first.
+func (d *Daemon) WaitOperation(ctx context.Context, id string) (Operation, bool) {
+	op, ok := d.Operation(id)
+	if !ok || op.finished() {
+		return op, ok
+	}
+	select {
+	case <-op.done:
+	case <-ctx.Done():
+	case <-d.quit: // shutdown answers a waiting caller rather than holding it up
+	}
+	return d.Operation(id)
+}
+
 // runIngests runs op, then each run that became pending meanwhile, until none is.
 func (d *Daemon) runIngests(op *Operation) {
 	for op != nil {
@@ -177,10 +215,14 @@ func (d *Daemon) runIngest(op *Operation) {
 
 	in.mu.Lock()
 	defer in.mu.Unlock()
+	defer close(op.done)
 	op.FinishedAt, op.WBefore, op.WAfter, op.Sources = d.now(), before, after, results
-	op.State = StateSucceeded
+	for _, r := range results {
+		op.Changed += r.Admitted + r.Superseded
+	}
+	op.State, op.Summary = StateSucceeded, Verdict(op.Changed)
 	if err != nil {
-		op.State, op.Error = StateFailed, err.Error()
+		op.State, op.Summary, op.Error = StateFailed, "", err.Error()
 		slog.Error("daemon: ingest failed", "operation", op.ID, "err", err)
 	} else {
 		slog.Info("daemon: ingest done", "operation", op.ID, "w_before", deref(before), "w_after", deref(after))

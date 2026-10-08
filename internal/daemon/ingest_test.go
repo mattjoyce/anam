@@ -198,3 +198,64 @@ func getJSON(t *testing.T, url string, want int, into any) {
 		t.Fatalf("GET %s: decode: %v", url, err)
 	}
 }
+
+func TestIngestWait(t *testing.T) {
+	tests := []struct {
+		name       string
+		query      string
+		release    error
+		wantStatus int
+		wantState  string
+		wantSumm   string
+	}{
+		{"a run that succeeds", "?wait=5s", nil, http.StatusOK, StateSucceeded, "ledger changed: 3 facets admitted or superseded"},
+		{"a run that fails", "?wait=5s", errors.New("source gone"), http.StatusInternalServerError, StateFailed, ""},
+		{"a wait that ends first", "?wait=30ms", nil, http.StatusAccepted, "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := newGatedIngest()
+			d := openWith(t, Options{Ingest: g.run})
+			start(t, d)
+			srv := httptest.NewServer(d.Handler())
+			defer srv.Close()
+
+			go func() {
+				<-g.started
+				if tt.wantStatus == http.StatusAccepted {
+					time.Sleep(100 * time.Millisecond)
+				}
+				g.release <- tt.release
+			}()
+			resp, err := http.Post(srv.URL+"/v1/ingest"+tt.query, "", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = resp.Body.Close() }()
+			var op Operation
+			if err := json.NewDecoder(resp.Body).Decode(&op); err != nil {
+				t.Fatal(err)
+			}
+			// An unfinished run may still be pending or already running; either is
+			// what a wait that ends first should report.
+			stateOK := op.State == tt.wantState || (tt.wantState == "" && !op.finished())
+			if resp.StatusCode != tt.wantStatus || !stateOK || op.Summary != tt.wantSumm {
+				t.Fatalf("got %d %s %q, want %d %s %q",
+					resp.StatusCode, op.State, op.Summary, tt.wantStatus, tt.wantState, tt.wantSumm)
+			}
+			waitFor(t, "the run to finish", func() bool { o, _ := d.Operation(op.ID); return o.finished() })
+		})
+	}
+}
+
+func TestIngestWaitRefusesANonsenseDuration(t *testing.T) {
+	d := openWith(t, Options{Ingest: newGatedIngest().run})
+	t.Cleanup(func() { _ = d.closeStores() })
+	for _, q := range []string{"?wait=soon", "?wait=-1s", "?wait=0s"} {
+		rec := httptest.NewRecorder()
+		d.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/ingest"+q, nil))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("POST /v1/ingest%s: %d, want 400", q, rec.Code)
+		}
+	}
+}

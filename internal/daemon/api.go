@@ -4,13 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"sort"
+	"time"
 )
 
-// The /v1 routes. Every handler is bounded by the configured timeout; none waits on
-// the write queue, so a busy ledger never holds a request.
+// The /v1 routes. Every handler is bounded by the configured timeout, and none waits
+// on the write queue, so a busy ledger never holds a request. The one exception is a
+// POST /v1/ingest that asks to wait, bounded by the wait it asked for.
 func (d *Daemon) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/ingest", d.postIngest)
 	mux.HandleFunc("GET /v1/operations/{id}", d.getOperation)
@@ -19,7 +22,23 @@ func (d *Daemon) routes(mux *http.ServeMux) {
 
 // postIngest asks for an ingest and answers 202 with the run that will take in what
 // the sources hold now.
-func (d *Daemon) postIngest(w http.ResponseWriter, _ *http.Request) {
+//
+// With ?wait=<duration> it holds the response until that run finishes, for at most
+// that long and never past ingest_timeout, and then answers 200 for a run that
+// succeeded and 500 for one that failed, with the operation either way. A run still
+// going when the wait ends answers 202 as without it. This is for a scheduler that
+// judges a job by how it ends: the run itself is the same either way.
+func (d *Daemon) postIngest(w http.ResponseWriter, r *http.Request) {
+	var wait time.Duration
+	if v := r.URL.Query().Get("wait"); v != "" {
+		var err error
+		if wait, err = time.ParseDuration(v); err != nil || wait <= 0 {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("wait %q: want a positive duration such as 300s", v))
+			return
+		}
+		wait = min(wait, d.cfg.IngestTimeout)
+	}
+
 	id, err := d.RequestIngest()
 	if errors.Is(err, ErrStopped) {
 		writeError(w, http.StatusServiceUnavailable, err)
@@ -29,9 +48,23 @@ func (d *Daemon) postIngest(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	op, _ := d.Operation(id)
 	w.Header().Set("Location", "/v1/operations/"+id)
-	writeJSON(w, http.StatusAccepted, op)
+	if wait == 0 {
+		op, _ := d.Operation(id)
+		writeJSON(w, http.StatusAccepted, op)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), wait)
+	defer cancel()
+	op, _ := d.WaitOperation(ctx, id)
+	switch op.State {
+	case StateSucceeded:
+		writeJSON(w, http.StatusOK, op)
+	case StateFailed:
+		writeJSON(w, http.StatusInternalServerError, op)
+	default:
+		writeJSON(w, http.StatusAccepted, op)
+	}
 }
 
 func (d *Daemon) getOperation(w http.ResponseWriter, r *http.Request) {

@@ -24,15 +24,16 @@ func newConfig(t *testing.T) config.Config {
 	t.Helper()
 	dir := t.TempDir()
 	cfg := config.Config{
-		PersonID:    "matt",
-		LedgerPath:  filepath.Join(dir, "ledger.db"),
-		DBPath:      filepath.Join(dir, "tracking.db"),
-		ArtifactDir: filepath.Join(dir, "artifacts"),
-		LibraryDir:  filepath.Join(dir, "documents"),
-		Zone:        "UTC",
-		Timeout:     5 * time.Second,
-		BucketWidth: span.Default,
-		Listen:      "127.0.0.1:0",
+		PersonID:      "matt",
+		LedgerPath:    filepath.Join(dir, "ledger.db"),
+		DBPath:        filepath.Join(dir, "tracking.db"),
+		ArtifactDir:   filepath.Join(dir, "artifacts"),
+		LibraryDir:    filepath.Join(dir, "documents"),
+		Zone:          "UTC",
+		Timeout:       5 * time.Second,
+		IngestTimeout: time.Minute,
+		BucketWidth:   span.Default,
+		Listen:        "127.0.0.1:0",
 	}
 	l, err := ledger.Create(context.Background(), cfg.LedgerPath, cfg.PersonID)
 	if err != nil {

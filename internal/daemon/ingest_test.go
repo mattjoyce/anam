@@ -274,7 +274,7 @@ func TestShutdownAnswersAWaitingCaller(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	ran := make(chan error, 1)
-	go func() { ran <- d.serve(ctx, ln) }()
+	go func() { ran <- d.Serve(ctx, ln) }()
 
 	answered := make(chan int, 1)
 	go func() {

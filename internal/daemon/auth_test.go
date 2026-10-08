@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mattjoyce/anam/internal/token"
 )
 
 const testToken = "0123456789abcdef0123456789abcdef"
@@ -29,7 +31,7 @@ func TestTokenFile(t *testing.T) {
 		want   error
 	}{
 		{"a token lets the daemon leave loopback", testToken, "0.0.0.0:8787", nil},
-		{"a short token is refused", "too-short", "127.0.0.1:0", ErrWeakToken},
+		{"a short token is refused", "too-short", "127.0.0.1:0", token.ErrWeak},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

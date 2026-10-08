@@ -242,6 +242,14 @@ func TestValidate(t *testing.T) {
 	}{
 		{"valid", func(*config.Config) {}, false},
 		{"missing person_id", func(c *config.Config) { c.PersonID = "" }, true},
+		{"no person_id for a client of a daemon", func(c *config.Config) {
+			c.PersonID, c.Server = "", "http://192.168.20.4:8787"
+		}, false},
+		{"https server", func(c *config.Config) { c.Server = "https://anam.example:443/" }, false},
+		{"server without scheme", func(c *config.Config) { c.Server = "192.168.20.4:8787" }, true},
+		{"server with a path", func(c *config.Config) { c.Server = "http://host:8787/v1" }, true},
+		{"server with a user", func(c *config.Config) { c.Server = "http://u:p@host:8787" }, true},
+		{"server of another scheme", func(c *config.Config) { c.Server = "ftp://host" }, true},
 		{"missing ledger_path", func(c *config.Config) { c.LedgerPath = "" }, true},
 		{"ledger and tracking in one file", func(c *config.Config) { c.LedgerPath = c.DBPath }, true},
 		{"missing db_path", func(c *config.Config) { c.DBPath = "" }, true},

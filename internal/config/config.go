@@ -5,6 +5,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -58,8 +59,15 @@ type Config struct {
 
 	// TokenFile names the file holding the daemon's bearer token. With one, every
 	// request but /healthz must present it, and the daemon may listen beyond
-	// loopback. Empty means no token, and loopback only.
+	// loopback. Empty means no token, and loopback only. The CLI presents the token in
+	// the same file when Server is set.
 	TokenFile string `mapstructure:"token_file"`
+
+	// Server is the URL of a running daemon, such as http://192.168.20.4:8787. With it
+	// set, the CLI asks the daemon and opens no local file: the daemon owns the
+	// stores. Empty means the CLI opens the files itself, which is maintenance mode
+	// and wants the daemon stopped.
+	Server string `mapstructure:"server"`
 
 	// IngestTimeout bounds one whole ingest run inside the daemon: every scan and
 	// every batch. Timeout still bounds each call within it.
@@ -77,7 +85,12 @@ type Config struct {
 
 // Load resolves configuration, reading the YAML file at path when it is non-empty.
 // Environment variables override the file, which overrides the defaults.
-func Load(path string) (Config, error) {
+func Load(path string) (Config, error) { return LoadOverriding(path, nil) }
+
+// LoadOverriding is Load with set taking precedence over everything else, keyed by
+// config key. It is how a command-line flag such as --server wins over the
+// environment while still passing the same validation.
+func LoadOverriding(path string, set map[string]string) (Config, error) {
 	v := viper.New()
 	v.SetEnvPrefix("ANAM")
 	v.AutomaticEnv()
@@ -106,6 +119,7 @@ func Load(path string) (Config, error) {
 	v.SetDefault("zone", "Local")
 	v.SetDefault("listen", DefaultListen)
 	v.SetDefault("token_file", "")
+	v.SetDefault("server", "")
 	v.SetDefault("ingest_timeout", 15*time.Minute)
 
 	if path != "" {
@@ -113,6 +127,10 @@ func Load(path string) (Config, error) {
 		if err := v.ReadInConfig(); err != nil {
 			return Config{}, fmt.Errorf("read config %q: %w", path, err)
 		}
+	}
+
+	for k, val := range set {
+		v.Set(k, val)
 	}
 
 	// An unrecognised key is an error, not a shrug. Config is external input, and a
@@ -156,7 +174,8 @@ func Load(path string) (Config, error) {
 // Validate reports whether c is usable.
 func (c Config) Validate() error {
 	switch {
-	case c.PersonID == "":
+	case c.PersonID == "" && c.Server == "":
+		// A client of a daemon names no person: the daemon serves exactly one.
 		return fmt.Errorf("%w: person_id is required", ErrInvalid)
 	case c.LedgerPath == "":
 		return fmt.Errorf("%w: ledger_path is required", ErrInvalid)
@@ -176,6 +195,11 @@ func (c Config) Validate() error {
 	case c.IngestTimeout <= 0:
 		return fmt.Errorf("%w: ingest_timeout must be positive, got %s", ErrInvalid, c.IngestTimeout)
 	}
+	if c.Server != "" {
+		if err := checkServer(c.Server); err != nil {
+			return fmt.Errorf("%w: server: %v", ErrInvalid, err)
+		}
+	}
 	// A typo'd width dies here, at startup, where it costs a re-run — not on the ingest
 	// path, where falling back would write months of plausible, wrongly-named buckets.
 	if _, err := span.New(c.BucketWidth); err != nil {
@@ -183,6 +207,24 @@ func (c Config) Validate() error {
 	}
 	if _, err := time.LoadLocation(c.Zone); err != nil {
 		return fmt.Errorf("%w: zone %q: %v", ErrInvalid, c.Zone, err)
+	}
+	return nil
+}
+
+// checkServer accepts an http or https URL naming a host, and nothing else: no path,
+// query or user, which the client would otherwise drop or send somewhere unexpected.
+func checkServer(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return err
+	}
+	switch {
+	case u.Scheme != "http" && u.Scheme != "https":
+		return fmt.Errorf("%q: want http:// or https://", raw)
+	case u.Host == "":
+		return fmt.Errorf("%q: names no host", raw)
+	case u.User != nil, u.RawQuery != "", u.Fragment != "", u.Path != "" && u.Path != "/":
+		return fmt.Errorf("%q: want scheme and host only, such as http://192.168.20.4:8787", raw)
 	}
 	return nil
 }

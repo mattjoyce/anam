@@ -64,7 +64,7 @@ func start(t *testing.T, d *Daemon) (stop func() error) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	errc := make(chan error, 1)
-	go func() { errc <- d.serve(ctx, ln) }()
+	go func() { errc <- d.Serve(ctx, ln) }()
 	var once sync.Once
 	var runErr error
 	stop = func() error {

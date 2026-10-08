@@ -29,6 +29,7 @@ import (
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
+	"github.com/mattjoyce/anam/internal/token"
 )
 
 // ErrStopped is returned by Write once shutdown has begun. The write was not run.
@@ -96,13 +97,13 @@ type Daemon struct {
 // With a token file configured every request but /healthz must carry the token, and
 // the daemon may listen on any address. Without one it listens on loopback only.
 func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error) {
-	var token []byte
+	var tok []byte
 	if cfg.TokenFile != "" {
-		t, err := readToken(cfg.TokenFile)
+		t, err := token.Read(cfg.TokenFile)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("daemon: %w", err)
 		}
-		token = t
+		tok = t
 	} else if err := loopbackOnly(cfg.Listen); err != nil {
 		return nil, err
 	}
@@ -132,7 +133,7 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 	return &Daemon{
 		cfg:     cfg,
 		opts:    opts,
-		token:   token,
+		token:   tok,
 		started: clock.Format(time.Now()),
 		writes:  Stores{Ledger: w, Ops: db},
 		read:    r,
@@ -238,10 +239,11 @@ func (d *Daemon) Run(ctx context.Context) error {
 	if err != nil {
 		return errors.Join(fmt.Errorf("daemon: listen %s: %w", d.cfg.Listen, err), d.closeStores())
 	}
-	return d.serve(ctx, ln)
+	return d.Serve(ctx, ln)
 }
 
-func (d *Daemon) serve(ctx context.Context, ln net.Listener) error {
+// Serve is Run on a listener the caller has opened.
+func (d *Daemon) Serve(ctx context.Context, ln net.Listener) error {
 	srv := &http.Server{
 		Handler:           d.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,

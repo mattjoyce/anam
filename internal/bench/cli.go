@@ -111,6 +111,7 @@ a record, never at one a daemon holds.`,
 	cmd.Flags().IntVar(&o.Reps, "reps", 5, "runs of each scenario")
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 10*time.Minute, "bound on one run of one scenario")
 	cmd.Flags().StringVar(&out, "out", "", "write the report as JSON here")
+	cmd.Flags().StringSliceVar(&o.Only, "only", nil, "run only scenarios whose names contain one of these")
 	_ = cmd.MarkFlagRequired("dir")
 	return cmd
 }

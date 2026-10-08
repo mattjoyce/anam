@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
@@ -65,6 +66,8 @@ type Options struct {
 	Paths                      Paths
 	Reps                       int
 	Timeout                    time.Duration
+	// Only, when set, names the scenarios to run by a substring of their names.
+	Only []string
 }
 
 // Run times every scenario against the record at o.Paths. It catches the index up
@@ -99,6 +102,9 @@ func Run(ctx context.Context, o Options, progress func(string)) (Report, error) 
 	}
 	deps := mint.Deps{Ledger: l, Index: db, Artifacts: store, Buckets: buckets, Clock: clock.Real{}}
 	for _, sc := range scenarios(l, db, plan, deps) {
+		if !o.wants(sc.name) {
+			continue
+		}
 		if progress != nil {
 			progress(sc.name)
 		}
@@ -109,6 +115,19 @@ func Run(ctx context.Context, o Options, progress func(string)) (Report, error) 
 		rep.Scenarios = append(rep.Scenarios, s)
 	}
 	return rep, nil
+}
+
+// wants reports whether a scenario is among those Only names.
+func (o Options) wants(name string) bool {
+	if len(o.Only) == 0 {
+		return true
+	}
+	for _, s := range o.Only {
+		if strings.Contains(name, s) {
+			return true
+		}
+	}
+	return false
 }
 
 // plan is the parameters the scenarios read with, taken from the record itself so

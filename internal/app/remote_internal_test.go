@@ -330,3 +330,41 @@ func TestTheDaemonRefusesALocalZone(t *testing.T) {
 		t.Fatalf("timeline in zone Local: %v", err)
 	}
 }
+
+func TestReceipts_SameOverTheDaemon(t *testing.T) {
+	t.Parallel()
+	f := newRemoteFixture(t)
+	f.sameOutput(t, "receipt", "list")
+
+	// A serve publishes a receipt into the artifact directory the daemon reads.
+	if _, _, err := cli(t, f.cfgPath, "serve", "bp"); err != nil {
+		t.Fatalf("serve bp: %v", err)
+	}
+	list := f.sameOutput(t, "receipt", "list")
+	hash := ""
+	for _, field := range strings.Fields(list) {
+		if strings.HasPrefix(field, "sha256:") {
+			hash = field
+		}
+	}
+	if hash == "" {
+		t.Fatalf("no receipt listed:\n%s", list)
+	}
+	f.sameOutput(t, "receipt", "show", hash)
+	f.sameOutput(t, "receipt", "show", hash, "--json")
+	if out := f.sameOutput(t, "receipt", "verify", hash); !strings.Contains(out, "OK   reproduced") {
+		t.Errorf("verify did not reproduce:\n%s", out)
+	}
+
+	for _, args := range [][]string{
+		{"receipt", "show", "sha256:" + strings.Repeat("0", 64)},
+		{"receipt", "verify", "sha256:" + strings.Repeat("0", 64)},
+		{"receipt", "show", "not-a-digest"},
+	} {
+		_, _, localErr := cli(t, f.cfgPath, args...)
+		_, _, remoteErr := cli(t, f.remoteCfg, args...)
+		if localErr == nil || remoteErr == nil || !strings.Contains(remoteErr.Error(), localErr.Error()) {
+			t.Errorf("%v: local %v, remote %v", args, localErr, remoteErr)
+		}
+	}
+}

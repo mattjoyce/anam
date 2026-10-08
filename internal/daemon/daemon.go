@@ -27,6 +27,7 @@ import (
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/inspect"
+	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
 	"github.com/mattjoyce/anam/internal/token"
@@ -82,7 +83,9 @@ type Daemon struct {
 	started string
 	writes  Stores
 	read    *ledger.Ledger
-	ingests *ingests
+	// artifacts is the published-artifact tier: checkpoint values and receipts.
+	artifacts *artifact.Store
+	ingests   *ingests
 
 	jobs chan job
 	quit chan struct{}
@@ -130,16 +133,24 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		_ = w.Close()
 		return nil, err
 	}
+	artifacts, err := artifact.New(cfg.ArtifactDir)
+	if err != nil {
+		_ = db.Close()
+		_ = r.Close()
+		_ = w.Close()
+		return nil, err
+	}
 	return &Daemon{
-		cfg:     cfg,
-		opts:    opts,
-		token:   tok,
-		started: clock.Format(time.Now()),
-		writes:  Stores{Ledger: w, Ops: db},
-		read:    r,
-		ingests: newIngests(),
-		jobs:    make(chan job),
-		quit:    make(chan struct{}),
+		cfg:       cfg,
+		opts:      opts,
+		token:     tok,
+		started:   clock.Format(time.Now()),
+		writes:    Stores{Ledger: w, Ops: db},
+		read:      r,
+		artifacts: artifacts,
+		ingests:   newIngests(),
+		jobs:      make(chan job),
+		quit:      make(chan struct{}),
 	}, nil
 }
 
@@ -304,7 +315,7 @@ func (d *Daemon) Serve(ctx context.Context, ln net.Listener) error {
 }
 
 func (d *Daemon) closeStores() error {
-	return errors.Join(d.read.Close(), d.writes.Ledger.Close(), d.writes.Ops.Close())
+	return errors.Join(d.read.Close(), d.writes.Ledger.Close(), d.writes.Ops.Close(), d.artifacts.Close())
 }
 
 // Ready asks the daemon listening on addr whether it is ready. An address bound to

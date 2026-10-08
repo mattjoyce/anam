@@ -8,11 +8,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/config"
-	"github.com/mattjoyce/anam/internal/consent"
-	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/projection"
+	"github.com/mattjoyce/anam/internal/read"
 	"github.com/mattjoyce/anam/internal/serve"
 	"github.com/mattjoyce/anam/internal/store/artifact"
 )
@@ -48,7 +47,7 @@ receipt is the record of the serve.`,
 			if err != nil {
 				return err
 			}
-			deps, closeLedger, err := serveDeps(cmd.Context(), cfg, templates)
+			deps, closeLedger, err := serveDeps(cmd.Context(), cfg)
 			if err != nil {
 				return err
 			}
@@ -93,35 +92,49 @@ func receiptListCmd(cfgPath *string) *cobra.Command {
 		Short: "list the receipts in the artifact directory, newest first",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := loadConfig(*cfgPath, cmd)
+			cfg, err := loadRoutedConfig(*cfgPath, cmd)
 			if err != nil {
 				return err
 			}
-			// Listing reads the artifact directory and nothing else, so it still
-			// answers when there is no ledger to open.
-			store, err := artifact.New(cfg.ArtifactDir)
-			if err != nil {
-				return err
+			var list api.Receipts
+			if cfg.Server != "" {
+				c, err := newClient(cfg)
+				if err != nil {
+					return err
+				}
+				list, err = c.Receipts(cmd.Context())
+				if err != nil {
+					return err
+				}
+			} else {
+				// Listing reads the artifact directory and nothing else, so it still
+				// answers when there is no ledger to open.
+				store, err := artifact.New(cfg.ArtifactDir)
+				if err != nil {
+					return err
+				}
+				if list, err = read.Receipts(serve.Deps{Artifacts: store}, cfg.ArtifactDir); err != nil {
+					return err
+				}
 			}
-
-			receipts, hashes, err := serve.List(serve.Deps{Artifacts: store})
-			if err != nil {
-				return err
-			}
-			if len(receipts) == 0 {
-				_, err := fmt.Fprintf(cmd.OutOrStdout(), "no receipts in %s\n", cfg.ArtifactDir)
-				return err
-			}
-
-			w := tabwriter.NewWriter(cmd.OutOrStdout(), 2, 0, 2, ' ', 0)
-			_, _ = fmt.Fprintln(w, "SERVED AT\tPROJECTION\tW\tFACETS\tRECEIPT")
-			for i, r := range receipts {
-				_, _ = fmt.Fprintf(w, "%s\t%s v%d\t%d\t%d\t%s\n",
-					r.ServedAt, r.Template, r.TemplateVersion, r.Watermark, len(r.FacetIDs), hashes[i])
-			}
-			return w.Flush()
+			return writeReceipts(cmd, list)
 		},
 	}
+}
+
+func writeReceipts(cmd *cobra.Command, list api.Receipts) error {
+	if len(list.Receipts) == 0 {
+		_, err := fmt.Fprintf(cmd.OutOrStdout(), "no receipts in %s\n", list.Dir)
+		return err
+	}
+	w := tabwriter.NewWriter(cmd.OutOrStdout(), 2, 0, 2, ' ', 0)
+	_, _ = fmt.Fprintln(w, "SERVED AT\tPROJECTION\tW\tFACETS\tRECEIPT")
+	for _, l := range list.Receipts {
+		r := l.Receipt
+		_, _ = fmt.Fprintf(w, "%s\t%s v%d\t%d\t%d\t%s\n",
+			r.ServedAt, r.Template, r.TemplateVersion, r.Watermark, len(r.FacetIDs), l.Hash)
+	}
+	return w.Flush()
 }
 
 func receiptShowCmd(cfgPath *string) *cobra.Command {
@@ -140,48 +153,62 @@ doubt. Both files are checked against their own content addresses on the way out
 so a tampered artifact is refused rather than displayed as if it were genuine.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := loadConfig(*cfgPath, cmd)
+			cfg, err := loadRoutedConfig(*cfgPath, cmd)
 			if err != nil {
 				return err
 			}
-			store, err := artifact.New(cfg.ArtifactDir)
-			if err != nil {
-				return err
-			}
-
-			r, entries, err := serve.Show(serve.Deps{Artifacts: store}, args[0])
-			if err != nil {
-				return err
-			}
-
-			out := cmd.OutOrStdout()
-			if asJSON {
-				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s v%d at W=%d, served %s\n",
-					r.Template, r.TemplateVersion, r.Watermark, r.ServedAt)
-				b, err := json.Marshal(entries)
+			var shown api.ReceiptShown
+			if cfg.Server != "" {
+				c, err := newClient(cfg)
 				if err != nil {
-					return fmt.Errorf("receipt show: marshal: %w", err)
+					return err
 				}
-				_, err = fmt.Fprintf(out, "%s\n", b)
-				return err
+				shown, err = c.Receipt(cmd.Context(), args[0])
+				if err != nil {
+					return err
+				}
+			} else {
+				store, err := artifact.New(cfg.ArtifactDir)
+				if err != nil {
+					return err
+				}
+				if shown, err = read.Receipt(serve.Deps{Artifacts: store}, args[0]); err != nil {
+					return err
+				}
 			}
-
-			_, _ = fmt.Fprintf(out, "%s v%d at W=%d, served %s\n", r.Template, r.TemplateVersion, r.Watermark, r.ServedAt)
-			_, _ = fmt.Fprintf(out, "  %d facets, span %s\n", len(r.FacetIDs), r.Span)
-			_, _ = fmt.Fprintf(out, "  served     %s  [intact]\n", r.ServedHash)
-			_, _ = fmt.Fprintf(out, "  definitions %s\n", r.DefinitionSetVersion)
-			_, _ = fmt.Fprintf(out, "  ledger     %s\n\n", ledgerOrUnnamed(r.LedgerID))
-
-			w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
-			_, _ = fmt.Fprintln(w, "FACT TIME\tTYPE\tSTATUS\tPAYLOAD")
-			for _, e := range entries {
-				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", e.FactTime, e.Type, e.Status, clipPayload(e.Payload))
-			}
-			return w.Flush()
+			return writeReceipt(cmd, shown, asJSON)
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit the served entries as JSON, exactly as published")
 	return cmd
+}
+
+func writeReceipt(cmd *cobra.Command, shown api.ReceiptShown, asJSON bool) error {
+	r, entries := shown.Receipt, shown.Entries
+	out := cmd.OutOrStdout()
+	if asJSON {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s v%d at W=%d, served %s\n",
+			r.Template, r.TemplateVersion, r.Watermark, r.ServedAt)
+		b, err := json.Marshal(entries)
+		if err != nil {
+			return fmt.Errorf("receipt show: marshal: %w", err)
+		}
+		_, err = fmt.Fprintf(out, "%s\n", b)
+		return err
+	}
+
+	_, _ = fmt.Fprintf(out, "%s v%d at W=%d, served %s\n", r.Template, r.TemplateVersion, r.Watermark, r.ServedAt)
+	_, _ = fmt.Fprintf(out, "  %d facets, span %s\n", len(r.FacetIDs), r.Span)
+	_, _ = fmt.Fprintf(out, "  served     %s  [intact]\n", r.ServedHash)
+	_, _ = fmt.Fprintf(out, "  definitions %s\n", r.DefinitionSetVersion)
+	_, _ = fmt.Fprintf(out, "  ledger     %s\n\n", ledgerOrUnnamed(r.LedgerID))
+
+	w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
+	_, _ = fmt.Fprintln(w, "FACT TIME\tTYPE\tSTATUS\tPAYLOAD")
+	for _, e := range entries {
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", e.FactTime, e.Type, e.Status, clipPayload(e.Payload))
+	}
+	return w.Flush()
 }
 
 // clipPayload keeps a payload on one terminal line. The whole value is in the served
@@ -210,38 +237,48 @@ Either can fail without the other: a tampered file under a sound ledger, or a
 corrupted ledger under an untouched file. Both must hold for the serve to be proved.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := loadConfig(*cfgPath, cmd)
+			cfg, err := loadRoutedConfig(*cfgPath, cmd)
 			if err != nil {
 				return err
 			}
-			templates, err := projection.Bundled()
+			v, err := verifyReceipt(cmd.Context(), cfg, args[0])
 			if err != nil {
 				return err
 			}
-			deps, closeLedger, err := serveDeps(cmd.Context(), cfg, templates)
-			if err != nil {
-				return err
-			}
-			defer closeLedger()
-
-			ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
-			defer cancel()
-			r, res, err := serve.Verify(ctx, deps, args[0])
-			if err != nil {
-				return err
-			}
-
-			w := cmd.OutOrStdout()
-			_, _ = fmt.Fprintf(w, "receipt %s\n", args[0])
-			_, _ = fmt.Fprintf(w, "  served %s v%d at W=%d on %s — %d facets, span %s, ledger %s\n\n",
-				r.Template, r.TemplateVersion, r.Watermark, r.ServedAt, len(r.FacetIDs), r.Span, ledgerOrUnnamed(r.LedgerID))
-			_, _ = fmt.Fprint(w, res.Summary())
-			if !res.OK() {
-				return fmt.Errorf("receipt %s did not verify", args[0])
-			}
-			return nil
+			return writeVerified(cmd, v)
 		},
 	}
+}
+
+func verifyReceipt(ctx context.Context, cfg config.Config, hash string) (api.ReceiptVerified, error) {
+	if cfg.Server != "" {
+		c, err := newClient(cfg)
+		if err != nil {
+			return api.ReceiptVerified{}, err
+		}
+		return c.VerifyReceipt(ctx, hash)
+	}
+	deps, closeLedger, err := serveDeps(ctx, cfg)
+	if err != nil {
+		return api.ReceiptVerified{}, err
+	}
+	defer closeLedger()
+	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+	defer cancel()
+	return read.VerifyReceipt(ctx, deps, hash)
+}
+
+func writeVerified(cmd *cobra.Command, v api.ReceiptVerified) error {
+	r, res := v.Receipt, v.Result
+	w := cmd.OutOrStdout()
+	_, _ = fmt.Fprintf(w, "receipt %s\n", v.Hash)
+	_, _ = fmt.Fprintf(w, "  served %s v%d at W=%d on %s — %d facets, span %s, ledger %s\n\n",
+		r.Template, r.TemplateVersion, r.Watermark, r.ServedAt, len(r.FacetIDs), r.Span, ledgerOrUnnamed(r.LedgerID))
+	_, _ = fmt.Fprint(w, res.Summary())
+	if !res.OK() {
+		return fmt.Errorf("receipt %s did not verify", v.Hash)
+	}
+	return nil
 }
 
 // listProjections prints the bundled templates. A consumer selects one; this is the
@@ -296,22 +333,11 @@ func ledgerOrUnnamed(id string) string {
 	return id
 }
 
-// serveDeps assembles the serve path's dependencies from config. The consent gate is
-// the pass-through one (§10) — it is wired in on the real path rather than reserved
-// for later, because a gate threaded through afterwards is a gate a caller can forget.
-//
+// serveDeps assembles the serve path's dependencies from config (read.ServeDeps).
 // The ledger is opened read-only: serving writes nothing to it. The returned func
 // closes it.
-func serveDeps(ctx context.Context, cfg config.Config, templates *projection.Registry) (serve.Deps, func(), error) {
+func serveDeps(ctx context.Context, cfg config.Config) (serve.Deps, func(), error) {
 	store, err := artifact.New(cfg.ArtifactDir)
-	if err != nil {
-		return serve.Deps{}, nil, err
-	}
-	defSet, err := def.SetVersion()
-	if err != nil {
-		return serve.Deps{}, nil, err
-	}
-	defs, err := def.Bundled()
 	if err != nil {
 		return serve.Deps{}, nil, err
 	}
@@ -319,13 +345,10 @@ func serveDeps(ctx context.Context, cfg config.Config, templates *projection.Reg
 	if err != nil {
 		return serve.Deps{}, nil, err
 	}
-	return serve.Deps{
-		Ledger:               l,
-		Templates:            templates,
-		Artifacts:            store,
-		Gate:                 consent.Open{},
-		Clock:                clock.Real{},
-		DefinitionSetVersion: defSet,
-		Series:               defs,
-	}, func() { _ = l.Close() }, nil
+	deps, err := read.ServeDeps(l, store)
+	if err != nil {
+		_ = l.Close()
+		return serve.Deps{}, nil, err
+	}
+	return deps, func() { _ = l.Close() }, nil
 }

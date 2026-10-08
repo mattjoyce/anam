@@ -37,6 +37,9 @@ import (
 // ErrNotFound is returned by Get for a digest with no file.
 var ErrNotFound = errors.New("artifact: not found")
 
+// ErrInvalid is returned for a kind or digest that cannot name an artifact.
+var ErrInvalid = errors.New("artifact: invalid name")
+
 // ErrCorrupt is returned when a stored file's bytes do not hash to the digest that
 // names it. Content addressing makes this detectable, so it is detected rather than
 // assumed away.
@@ -248,10 +251,10 @@ func (s *Store) openRoot(create bool) (*os.Root, error) {
 // copied to a backup drive formatted anywhere.
 func entryName(kind, digest string) (string, error) {
 	if !kindPattern.MatchString(kind) {
-		return "", fmt.Errorf("artifact: %q is not a valid artifact kind", kind)
+		return "", fmt.Errorf("%w: %q is not a valid artifact kind", ErrInvalid, kind)
 	}
 	if !digestPattern.MatchString(digest) {
-		return "", fmt.Errorf("artifact: %q is not a sha256:<64 hex> digest", digest)
+		return "", fmt.Errorf("%w: %q is not a sha256:<64 hex> digest", ErrInvalid, digest)
 	}
 	return path.Join(kind, strings.Replace(digest, "sha256:", "sha256-", 1)+".json"), nil
 }

@@ -121,23 +121,23 @@ func Parse(raw []byte) (Receipt, error) {
 // ledger, or a corrupted ledger under an untouched file. Collapsing them into one
 // boolean would let each hide behind the other.
 type Result struct {
-	Reproduced bool
-	Intact     bool
+	Reproduced bool `json:"reproduced"`
+	Intact     bool `json:"intact"`
 
 	// StoredHash is what the served file on disk actually hashes to; empty when the
 	// file is absent.
-	StoredHash string
+	StoredHash string `json:"stored_hash,omitempty"`
 
 	// DerivedHash is what re-deriving at the receipt's watermark produced.
-	DerivedHash string
+	DerivedHash string `json:"derived_hash"`
 
 	// Missing and Unexpected name the facet-id differences, so a mismatch can be read
 	// rather than merely noticed.
-	Missing    []string
-	Unexpected []string
+	Missing    []string `json:"missing,omitempty"`
+	Unexpected []string `json:"unexpected,omitempty"`
 
 	// Notes carries non-fatal observations, e.g. a moved definition set.
-	Notes []string
+	Notes []string `json:"notes,omitempty"`
 }
 
 // OK reports whether both proofs held.

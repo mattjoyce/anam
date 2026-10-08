@@ -12,6 +12,8 @@ import (
 
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/read"
+	"github.com/mattjoyce/anam/internal/serve"
+	"github.com/mattjoyce/anam/internal/store/artifact"
 )
 
 // The /v1 routes. Every handler is bounded by the configured timeout, and none waits
@@ -23,6 +25,53 @@ func (d *Daemon) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/status", d.getStatus)
 	mux.HandleFunc("GET /v1/timeline", d.getTimeline)
 	mux.HandleFunc("GET /v1/changes", d.getChanges)
+	mux.HandleFunc("GET /v1/receipts", d.getReceipts)
+	mux.HandleFunc("GET /v1/receipts/{hash}", d.getReceipt)
+	mux.HandleFunc("GET /v1/receipts/{hash}/verify", d.verifyReceipt)
+}
+
+func (d *Daemon) getReceipts(w http.ResponseWriter, _ *http.Request) {
+	deps, err := read.ServeDeps(d.read, d.artifacts)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	list, err := read.Receipts(deps, d.cfg.ArtifactDir)
+	if err != nil {
+		writeReadError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+func (d *Daemon) getReceipt(w http.ResponseWriter, r *http.Request) {
+	deps, err := read.ServeDeps(d.read, d.artifacts)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	shown, err := read.Receipt(deps, r.PathValue("hash"))
+	if err != nil {
+		writeReadError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, shown)
+}
+
+func (d *Daemon) verifyReceipt(w http.ResponseWriter, r *http.Request) {
+	deps, err := read.ServeDeps(d.read, d.artifacts)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), d.cfg.Timeout)
+	defer cancel()
+	v, err := read.VerifyReceipt(ctx, deps, r.PathValue("hash"))
+	if err != nil {
+		writeReadError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
 }
 
 // getTimeline is the CLI's timeline read, run here on the read handle. The query
@@ -81,11 +130,16 @@ func namedZone(zone string) error {
 }
 
 // writeReadError answers a failed read: 400 for a query that cannot be read as asked,
-// 504 for one that ran out of time, 500 for anything else.
+// 404 for an artifact that is not there, 409 for a receipt this daemon cannot honour,
+// 504 for a read that ran out of time, 500 for anything else.
 func writeReadError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, read.ErrQuery):
+	case errors.Is(err, read.ErrQuery), errors.Is(err, artifact.ErrInvalid):
 		writeError(w, http.StatusBadRequest, err)
+	case errors.Is(err, artifact.ErrNotFound):
+		writeError(w, http.StatusNotFound, err)
+	case errors.Is(err, serve.ErrTemplateMoved), errors.Is(err, serve.ErrOtherLedger):
+		writeError(w, http.StatusConflict, err)
 	case errors.Is(err, context.DeadlineExceeded):
 		writeError(w, http.StatusGatewayTimeout, err)
 	default:

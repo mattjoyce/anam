@@ -160,3 +160,25 @@ func (c *Client) Changes(ctx context.Context, q api.ChangesQuery) (api.Changes, 
 	_, err := c.do(ctx, c.timeout, http.MethodGet, "/v1/changes", q.Values(), nil, &ch)
 	return ch, err
 }
+
+// Receipts lists the daemon's receipts, newest first.
+func (c *Client) Receipts(ctx context.Context) (api.Receipts, error) {
+	var r api.Receipts
+	_, err := c.do(ctx, c.timeout, http.MethodGet, "/v1/receipts", nil, nil, &r)
+	return r, err
+}
+
+// Receipt reads one receipt and the value it served, from the artifacts alone.
+func (c *Client) Receipt(ctx context.Context, hash string) (api.ReceiptShown, error) {
+	var r api.ReceiptShown
+	_, err := c.do(ctx, c.timeout, http.MethodGet, "/v1/receipts/"+url.PathEscape(hash), nil, nil, &r)
+	return r, err
+}
+
+// VerifyReceipt asks the daemon to prove one receipt against its ledger and its
+// artifacts.
+func (c *Client) VerifyReceipt(ctx context.Context, hash string) (api.ReceiptVerified, error) {
+	var r api.ReceiptVerified
+	_, err := c.do(ctx, c.timeout, http.MethodGet, "/v1/receipts/"+url.PathEscape(hash)+"/verify", nil, nil, &r)
+	return r, err
+}

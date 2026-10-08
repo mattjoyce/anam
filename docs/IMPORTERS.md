@@ -133,5 +133,7 @@ Where log management stops applying: logs tolerate loss and sampling and have no
    `withings` worker once it matches it facet for facet.
 5. **Garmin importer**, daily observations from `garmin.db`; then retire `healthdb`, the ETL and
    healthdata.db.
-6. `bpcsv` as a folder-watch importer. `records` and `documents` stay inside Anam: they are formats,
-   not sources.
+6. One-off exports (the blood pressure app, Technogym, Strong, Fitbit) get no importer. Each is a
+   document in the library, turned into a records file once by a script kept in `scripts/`, and
+   reshaped by regenerating that file with the same ids (card 58). `bpcsv` goes that way. `records`
+   and `documents` stay inside Anam: they are formats, not sources.

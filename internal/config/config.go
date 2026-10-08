@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -231,6 +232,30 @@ func checkServer(raw string) error {
 
 // Location is the reader's zone, loaded. Validate has already accepted the name.
 func (c Config) Location() (*time.Location, error) { return time.LoadLocation(c.Zone) }
+
+// ZoneName is the reader's zone as an IANA name, for a read another machine runs.
+// "Local" means this machine's zone, which the other machine cannot know, so it is
+// resolved here from $TZ or /etc/localtime. A zone that cannot be named is an error
+// that says to set one.
+func (c Config) ZoneName() (string, error) {
+	if c.Zone != "Local" {
+		return c.Zone, nil
+	}
+	if tz := strings.TrimPrefix(os.Getenv("TZ"), ":"); tz != "" {
+		if _, err := time.LoadLocation(tz); err == nil && tz != "Local" {
+			return tz, nil
+		}
+	}
+	if target, err := os.Readlink("/etc/localtime"); err == nil {
+		if _, name, ok := strings.Cut(target, "zoneinfo/"); ok {
+			if _, err := time.LoadLocation(name); err == nil {
+				return name, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("%w: zone is Local and this machine's zone has no name to send; set zone (ANAM_ZONE)",
+		ErrInvalid)
+}
 
 // Buckets is the bucketing this configuration selects. Validate has already rejected
 // an unknown width, so a config that loaded yields one here.

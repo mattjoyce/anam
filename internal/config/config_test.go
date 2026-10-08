@@ -313,3 +313,18 @@ func TestLoadRejectsAnUnknownBucketWidth(t *testing.T) {
 		t.Errorf("error does not name the key: %v", err)
 	}
 }
+
+// A read the daemon runs needs the reader's zone by name: Local would mean the
+// daemon's own.
+func TestZoneName(t *testing.T) {
+	t.Setenv("TZ", "Australia/Sydney")
+	for _, tt := range []struct{ zone, want string }{
+		{"Europe/London", "Europe/London"},
+		{"Local", "Australia/Sydney"},
+	} {
+		got, err := config.Config{Zone: tt.zone}.ZoneName()
+		if err != nil || got != tt.want {
+			t.Errorf("ZoneName(%q) = %q, %v; want %q", tt.zone, got, err, tt.want)
+		}
+	}
+}

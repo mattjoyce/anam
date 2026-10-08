@@ -264,6 +264,15 @@ func (d *Daemon) Serve(ctx context.Context, ln net.Listener) error {
 		d.work(context.WithoutCancel(ctx))
 	}()
 
+	// The index may be behind a ledger that was written while no daemon ran. Catch it
+	// up as the first write, so reads of it start current.
+	go func() {
+		_ = d.Write(ctx, d.cfg.Timeout, func(ctx context.Context, s Stores) error {
+			d.catchUp(ctx, s)
+			return nil
+		})
+	}()
+
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()
 	slog.Info("daemon: serving", "addr", ln.Addr().String(), "ledger", d.cfg.LedgerPath, "person", d.cfg.PersonID)

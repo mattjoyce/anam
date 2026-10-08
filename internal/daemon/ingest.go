@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
@@ -154,6 +155,7 @@ func (d *Daemon) runIngest(op *operation) {
 		var err error
 		results, err = d.opts.Ingest(ctx, s)
 		after = d.head(ctx, s.Ledger)
+		d.catchUp(ctx, s)
 		return err
 	})
 
@@ -181,6 +183,25 @@ func (d *Daemon) runIngest(op *operation) {
 		if r.Admitted+r.Superseded > 0 {
 			st.LastAdmissionAt = op.StartedAt
 		}
+	}
+}
+
+// catchUp replays the ledger into the operational store's index, so reads of it are
+// as fresh as the last write. It runs inside a write, on the write handles, and has
+// its own deadline so a run that spent its own still leaves the index current. A
+// failure is logged and not the write's: the index is left behind, never wrong, and
+// the next write catches it up.
+func (d *Daemon) catchUp(ctx context.Context, s Stores) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), d.cfg.Timeout)
+	defer cancel()
+	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
+	res, err := catchup.Sync(ctx, s.Ledger, s.Ops, buckets)
+	if err != nil {
+		slog.Warn("daemon: index catch-up", "err", err)
+		return
+	}
+	if res.To != res.From {
+		slog.Info("daemon: index caught up", "from", res.From, "to", res.To)
 	}
 }
 

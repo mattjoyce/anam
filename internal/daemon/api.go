@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/read"
 )
 
 // The /v1 routes. Every handler is bounded by the configured timeout, and none waits
@@ -20,6 +21,76 @@ func (d *Daemon) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/ingest", d.postIngest)
 	mux.HandleFunc("GET /v1/operations/{id}", d.getOperation)
 	mux.HandleFunc("GET /v1/status", d.getStatus)
+	mux.HandleFunc("GET /v1/timeline", d.getTimeline)
+	mux.HandleFunc("GET /v1/changes", d.getChanges)
+}
+
+// getTimeline is the CLI's timeline read, run here on the read handle. The query
+// carries the reader's zone; the daemon has none of its own.
+func (d *Daemon) getTimeline(w http.ResponseWriter, r *http.Request) {
+	q, err := api.TimelineQueryOf(r.URL.Query())
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("explain: %w", err))
+		return
+	}
+	if err := namedZone(q.Zone); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), d.cfg.Timeout)
+	defer cancel()
+	t, err := read.Timeline(ctx, d.read, q)
+	if err != nil {
+		writeReadError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, t)
+}
+
+// getChanges reads the anam-event index as it stands. The daemon catches the index
+// up inside each ingest's write, so a read never writes and never waits on a write;
+// the answer carries W, which says when the index is behind.
+func (d *Daemon) getChanges(w http.ResponseWriter, r *http.Request) {
+	q := api.ChangesQueryOf(r.URL.Query())
+	if err := namedZone(q.Zone); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), d.cfg.Timeout)
+	defer cancel()
+	head, err := d.read.Head(ctx)
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, err)
+		return
+	}
+	c, err := read.Changes(ctx, d.writes.Ops, int64(head), q)
+	if err != nil {
+		writeReadError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, c)
+}
+
+// namedZone refuses Local: on the daemon it would mean the daemon's zone, and the
+// reader's is the one that counts.
+func namedZone(zone string) error {
+	if zone == "Local" {
+		return errors.New("zone Local names the daemon's zone, not the reader's: send an IANA name")
+	}
+	return nil
+}
+
+// writeReadError answers a failed read: 400 for a query that cannot be read as asked,
+// 504 for one that ran out of time, 500 for anything else.
+func writeReadError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, read.ErrQuery):
+		writeError(w, http.StatusBadRequest, err)
+	case errors.Is(err, context.DeadlineExceeded):
+		writeError(w, http.StatusGatewayTimeout, err)
+	default:
+		writeError(w, http.StatusInternalServerError, err)
+	}
 }
 
 // postIngest asks for an ingest and answers 202 with the run that will take in what

@@ -9,11 +9,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/clock"
-	"github.com/mattjoyce/anam/internal/consent"
-	"github.com/mattjoyce/anam/internal/def"
-	"github.com/mattjoyce/anam/internal/fold"
-	"github.com/mattjoyce/anam/internal/projection"
+	"github.com/mattjoyce/anam/internal/config"
+	"github.com/mattjoyce/anam/internal/read"
 )
 
 func timelineCmd(cfgPath *string) *cobra.Command {
@@ -48,7 +47,7 @@ Four lenses compose over that read:
                 This is the same decision procedure the projection applies, not a
                 second account of it.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := loadConfig(*cfgPath, cmd)
+			cfg, err := loadRoutedConfig(*cfgPath, cmd)
 			if err != nil {
 				return err
 			}
@@ -56,33 +55,18 @@ Four lenses compose over that read:
 			if err != nil {
 				return err
 			}
-			bounds, atBound, err := parseBoundsAt(from, to, at, explain, loc)
+			q := api.TimelineQuery{
+				From: from, To: to, At: at, AsOf: asOf, Type: typeFilter, Projection: projName,
+				Explain: explain,
+			}
+			t, err := readTimeline(cmd.Context(), cfg, q)
 			if err != nil {
 				return err
 			}
-			asOfTime, err := parseAsOf(asOf, loc)
-			if err != nil {
-				return err
-			}
-
-			l, err := openLedgerReadOnly(cmd.Context(), cfg)
-			if err != nil {
-				return err
-			}
-			defer func() { _ = l.Close() }()
-
-			ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
-			defer cancel()
-
-			view, err := readView(ctx, l, asOfTime, projName, atBound)
-			if err != nil {
-				return err
-			}
-			view.loc = loc
 			if explain {
-				return writeExplain(cmd, ctx, l, view, bounds, typeFilter)
+				return writeExplain(cmd, t)
 			}
-			return writeTimeline(cmd, view, bounds, typeFilter, asJSON)
+			return writeTimeline(cmd, t, loc, asJSON)
 		},
 	}
 
@@ -97,154 +81,74 @@ Four lenses compose over that read:
 	return cmd
 }
 
-// parseAsOf reads the --as-of anam-time. A bare date means "as Anam knew it at the
-// end of that day", which is deliberately NOT --to's rule: --to feeds an exclusive
-// comparison and so rolls to the next midnight, while --as-of names one instant to read
-// at. Rolling it forward too would silently read a day further than was asked for.
-func parseAsOf(asOf string, loc *time.Location) (time.Time, error) {
-	if asOf == "" {
-		return time.Time{}, nil
-	}
-	t, dateOnly, err := parseInstant(asOf, loc)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("--as-of: %w", err)
-	}
-	if dateOnly {
-		t = t.AddDate(0, 0, 1).Add(-time.Nanosecond)
-	}
-	return t, nil
-}
-
-// view is one read of the person, optionally wound back, optionally pruned, and
-// optionally taken as a snapshot.
-type view struct {
-	res fold.Result
-
-	// tmpl and served are set only when a projection was named. shown is whichever
-	// value the caller should render — the canonical, the served variant, or the
-	// snapshot of either.
-	tmpl   *projection.Template
-	shown  fold.Value
-	asOf   bool
-	asOfAt string
-
-	// at is the snapshot's fact-time bound when --at was given, else "".
-	at string
-
-	// defs is the bundled Definition set: which types close a series.
-	defs *def.Registry
-
-	// loc is the reader's zone, for showing fact-times where the reader stands.
-	loc *time.Location
-}
-
-// show renders a stored fact-time in the reader's zone, at the wire format's full
-// precision so nothing is rounded away. The stored string is what Anam holds; this
-// is only where the reader is standing when they look at it.
-func (v view) show(stored string) string {
-	if v.loc == nil {
-		return stored
-	}
-	t, err := clock.Parse(stored)
-	if err != nil {
-		return stored
-	}
-	return t.In(v.loc).Format(clock.Layout)
-}
-
-// readView performs the read the flags describe: at head or at an anam-time, through
-// a projection or not, as a log or as the snapshot at a fact-time.
-func readView(ctx context.Context, l fold.Ledger, asOfTime time.Time, projName, at string) (view, error) {
-	defs, err := def.Bundled()
-	if err != nil {
-		return view{}, err
-	}
-	v := view{defs: defs, at: at}
-
-	res, err := readAtOrHead(ctx, l, asOfTime, &v)
-	if err != nil {
-		return view{}, err
-	}
-	v.res, v.shown = res, res.Value
-
-	if projName != "" {
-		templates, err := projection.Bundled()
+// readTimeline asks the daemon when a server is configured and reads the local
+// ledger when not. Either way the reader's zone goes with the query.
+func readTimeline(ctx context.Context, cfg config.Config, q api.TimelineQuery) (api.Timeline, error) {
+	if cfg.Server != "" {
+		zone, err := cfg.ZoneName()
 		if err != nil {
-			return view{}, err
+			return api.Timeline{}, err
 		}
-		t, err := templates.Lookup(projName)
+		q.Zone = zone
+		c, err := newClient(cfg)
 		if err != nil {
-			return view{}, err
+			return api.Timeline{}, err
 		}
-		served, err := projection.Apply(res.Value, t, consent.Open{}, defs)
-		if err != nil {
-			return view{}, err
-		}
-		v.tmpl, v.shown = &t, served
+		return c.Timeline(ctx, q)
 	}
-
-	if at != "" {
-		// The snapshot is taken over whatever the lenses above produced: the
-		// canonical, or the served variant. Over a served snapshot shape it is the
-		// same value again, which is the right answer, not a double count.
-		snap, err := fold.Snapshot(v.shown, at, defs.Closes)
-		if err != nil {
-			return view{}, err
-		}
-		v.shown = snap
-	}
-	return v, nil
-}
-
-func readAtOrHead(ctx context.Context, l fold.Ledger, asOfTime time.Time, v *view) (fold.Result, error) {
-	if asOfTime.IsZero() {
-		return fold.Read(ctx, l)
-	}
-	w, err := fold.WatermarkAt(ctx, l, asOfTime)
+	q.Zone = cfg.Zone
+	l, err := openLedgerReadOnly(ctx, cfg)
 	if err != nil {
-		return fold.Result{}, err
+		return api.Timeline{}, err
 	}
-	v.asOf, v.asOfAt = true, clock.Format(asOfTime)
-	return fold.ReadAt(ctx, l, w)
+	defer func() { _ = l.Close() }()
+	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+	defer cancel()
+	return read.Timeline(ctx, l, q)
 }
 
-// header describes the read: which watermark, which lens, and the hash that identifies
-// what is being shown. When a projection is in force the served hash is the one a
-// receipt would carry, so the viewer and the publisher can be checked against each
-// other by eye.
-func (v view) header(shownCount int) string {
-	h := fmt.Sprintf("W=%d  live=%d", v.res.W, v.res.Value.Len())
-	if v.tmpl != nil {
-		h += fmt.Sprintf("  served=%d", v.shown.Len())
+// timelineHeader describes the read: which watermark, which lens, and the hash that
+// identifies what is being shown. When a projection is in force the served hash is
+// the one a receipt would carry, so the viewer and the publisher can be checked
+// against each other by eye.
+func timelineHeader(t api.Timeline) string {
+	h := fmt.Sprintf("W=%d  live=%d", t.W, t.Live)
+	if t.Projection != nil {
+		h += fmt.Sprintf("  served=%d", t.Projection.Served)
 	}
-	h += fmt.Sprintf("  shown=%d\n", shownCount)
+	h += fmt.Sprintf("  shown=%d\n", t.Shown)
 
-	if v.asOf {
-		h += fmt.Sprintf("as-of      %s (anam-time)\n", v.asOfAt)
+	if t.AsOf != "" {
+		h += fmt.Sprintf("as-of      %s (anam-time)\n", t.AsOf)
 	}
-	if v.at != "" {
-		h += fmt.Sprintf("at         %s (fact-time, snapshot: latest per series)  %s\n", v.at, v.shown.Hash())
+	if t.At != "" {
+		h += fmt.Sprintf("at         %s (fact-time, snapshot: latest per series)  %s\n", t.At, t.AtHash)
 	}
-	h += fmt.Sprintf("canonical  %s\n", v.res.Value.Hash())
-	if v.tmpl != nil {
-		h += fmt.Sprintf("projection %s v%d  %s\n", v.tmpl.Name, v.tmpl.Version, v.shown.Hash())
+	h += fmt.Sprintf("canonical  %s\n", t.Canonical)
+	if p := t.Projection; p != nil {
+		h += fmt.Sprintf("projection %s v%d  %s\n", p.Name, p.Version, p.Hash)
 	}
 	return h
 }
 
-func writeTimeline(cmd *cobra.Command, v view, b bounds, typeFilter string, asJSON bool) error {
-	var shown []fold.Entry
-	for _, e := range v.shown.Entries() {
-		if b.admits(e) && (typeFilter == "" || string(e.Type) == typeFilter) {
-			shown = append(shown, e)
-		}
+// showIn renders a stored fact-time in the reader's zone, at the wire format's full
+// precision so nothing is rounded away. The stored string is what Anam holds; this
+// is only where the reader is standing when they look at it.
+func showIn(loc *time.Location, stored string) string {
+	t, err := clock.Parse(stored)
+	if err != nil {
+		return stored
 	}
-	header := v.header(len(shown))
+	return t.In(loc).Format(clock.Layout)
+}
+
+func writeTimeline(cmd *cobra.Command, t api.Timeline, loc *time.Location, asJSON bool) error {
+	header := timelineHeader(t)
 
 	if asJSON {
 		// Entries to stdout, bookkeeping to stderr, so the output pipes clean.
 		_, _ = fmt.Fprint(cmd.ErrOrStderr(), header)
-		out, err := json.Marshal(shown)
+		out, err := json.Marshal(t.Entries)
 		if err != nil {
 			return fmt.Errorf("timeline: marshal entries: %w", err)
 		}
@@ -255,101 +159,9 @@ func writeTimeline(cmd *cobra.Command, v view, b bounds, typeFilter string, asJS
 	_, _ = fmt.Fprint(cmd.OutOrStdout(), header)
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 2, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintln(w, "FACT TIME\tTYPE\tV\tSTATUS\tSOURCE REF\tID")
-	for _, e := range shown {
+	for _, e := range t.Entries {
 		_, _ = fmt.Fprintf(w, "%s\t%s\tv%d\t%s\t%s\t%s\n",
-			v.show(e.FactTime), e.Type, v.res.States[e.FacetID].Version, e.Status, e.SourceRef, e.FacetID)
+			showIn(loc, e.FactTime), e.Type, t.Versions[e.FacetID], e.Status, e.SourceRef, e.FacetID)
 	}
 	return w.Flush()
-}
-
-// bounds is a derived span over fact-time: an inclusive [from, to] the person
-// names (ARCHITECTURE.md §4), held as clock.Layout strings so admission is the
-// same lexical comparison the entries were sorted by.
-type bounds struct {
-	from string // inclusive lower, "" for unbounded
-	toX  string // exclusive upper, "" for unbounded
-}
-
-func (b bounds) admits(e fold.Entry) bool {
-	if b.from != "" && e.FactTime < b.from {
-		return false
-	}
-	if b.toX != "" && e.FactTime >= b.toX {
-		return false
-	}
-	return true
-}
-
-// parseBoundsAt reads the fact-time flags. --at is a bound like --to (a bare date
-// includes its whole day) and also asks for the snapshot shape, so the two exclude
-// each other: one upper bound, and it says which read it wants.
-func parseBoundsAt(from, to, at string, explain bool, loc *time.Location) (bounds, string, error) {
-	if at != "" && to != "" {
-		return bounds{}, "", fmt.Errorf("--at and --to both bound fact-time: give one")
-	}
-	if at != "" && explain {
-		return bounds{}, "", fmt.Errorf("--explain shows the log's verdicts; to explain a snapshot, name a snapshot-shaped projection (e.g. --projection meds --explain)")
-	}
-	b, err := parseBounds(from, to, loc)
-	if err != nil {
-		return bounds{}, "", err
-	}
-	if at == "" {
-		return b, "", nil
-	}
-	t, dateOnly, err := parseInstant(at, loc)
-	if err != nil {
-		return bounds{}, "", fmt.Errorf("--at: %w", err)
-	}
-	if dateOnly {
-		t = t.AddDate(0, 0, 1).Add(-time.Nanosecond)
-	}
-	if b.from != "" && clock.Format(t) < b.from {
-		return bounds{}, "", fmt.Errorf("--at %s is before --from", at)
-	}
-	return b, clock.Format(t), nil
-}
-
-func parseBounds(from, to string, loc *time.Location) (bounds, error) {
-	var b bounds
-	if from != "" {
-		t, _, err := parseInstant(from, loc)
-		if err != nil {
-			return bounds{}, fmt.Errorf("--from: %w", err)
-		}
-		b.from = clock.Format(t)
-	}
-	if to != "" {
-		t, dateOnly, err := parseInstant(to, loc)
-		if err != nil {
-			return bounds{}, fmt.Errorf("--to: %w", err)
-		}
-		// The interval is inclusive; the comparison is exclusive. A bare date rolls
-		// to the next midnight so it includes its whole day; an instant nudges one
-		// nanosecond — the wire format's full precision — so ≤t becomes <t'.
-		if dateOnly {
-			t = t.AddDate(0, 0, 1)
-		} else {
-			t = t.Add(time.Nanosecond)
-		}
-		b.toX = clock.Format(t)
-	}
-	return b, nil
-}
-
-// parseInstant reads a bound as a bare date in the reader's zone or an RFC 3339
-// instant. A bare date is a day where the person stands, so "2025-12-23" is that day
-// in loc, not the UTC day that overlaps it.
-func parseInstant(s string, loc *time.Location) (t time.Time, dateOnly bool, err error) {
-	if loc == nil {
-		loc = time.UTC
-	}
-	if t, err := time.ParseInLocation("2006-01-02", s, loc); err == nil {
-		return t, true, nil
-	}
-	t, err = time.Parse(time.RFC3339, s)
-	if err != nil {
-		return time.Time{}, false, fmt.Errorf("%q is neither 2006-01-02 nor RFC 3339", s)
-	}
-	return t, false, nil
 }

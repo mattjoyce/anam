@@ -146,3 +146,17 @@ type Error struct {
 func (e *Error) Error() string {
 	return fmt.Sprintf("server %s: %s (%d %s)", e.Server, e.Message, e.Status, http.StatusText(e.Status))
 }
+
+// Timeline asks for a timeline read. The query carries the reader's zone.
+func (c *Client) Timeline(ctx context.Context, q api.TimelineQuery) (api.Timeline, error) {
+	var t api.Timeline
+	_, err := c.do(ctx, c.timeout, http.MethodGet, "/v1/timeline", q.Values(), nil, &t)
+	return t, err
+}
+
+// Changes asks what Anam learned in a window of anam-time.
+func (c *Client) Changes(ctx context.Context, q api.ChangesQuery) (api.Changes, error) {
+	var ch api.Changes
+	_, err := c.do(ctx, c.timeout, http.MethodGet, "/v1/changes", q.Values(), nil, &ch)
+	return ch, err
+}

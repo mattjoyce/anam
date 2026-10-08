@@ -10,7 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/client"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/daemon"
 )
@@ -29,6 +32,12 @@ type remoteFixture struct {
 
 func newRemoteFixture(t *testing.T) remoteFixture {
 	t.Helper()
+	return newRemoteFixtureIn(t, "UTC")
+}
+
+// newRemoteFixtureIn is newRemoteFixture with both configs reading in zone.
+func newRemoteFixtureIn(t *testing.T, zone string) remoteFixture {
+	t.Helper()
 	f := remoteFixture{ingestFixture: newIngestFixture(t)}
 	f.imports = fmt.Sprintf("imports:\n  - source: bp-csv\n    path: %s\n", f.bpPath)
 	if _, _, err := f.ingest(t, f.imports); err != nil {
@@ -36,7 +45,7 @@ func newRemoteFixture(t *testing.T) remoteFixture {
 	}
 	// Both sides read the reader's zone from config; UTC keeps the expected output
 	// independent of the machine running the test.
-	appendFile(t, f.cfgPath, "zone: UTC\n")
+	appendFile(t, f.cfgPath, "zone: "+zone+"\n")
 
 	tokenPath := filepath.Join(f.dir, "token")
 	if err := os.WriteFile(tokenPath, []byte(testToken+"\n"), 0o600); err != nil {
@@ -72,13 +81,35 @@ func newRemoteFixture(t *testing.T) remoteFixture {
 	// No person and no file that exists: if the CLI opened anything local it would fail.
 	nowhere := filepath.Join(f.dir, "not-here")
 	f.remoteCfg = filepath.Join(f.dir, "remote.yaml")
-	remote := fmt.Sprintf("server: %s\ntoken_file: %s\nzone: UTC\nledger_path: %s\ndb_path: %s\nartifact_dir: %s\n",
-		f.server, tokenPath, filepath.Join(nowhere, "ledger.db"), filepath.Join(nowhere, "tracking.db"),
+	remote := fmt.Sprintf("server: %s\ntoken_file: %s\nzone: %s\nledger_path: %s\ndb_path: %s\nartifact_dir: %s\n",
+		f.server, tokenPath, zone, filepath.Join(nowhere, "ledger.db"), filepath.Join(nowhere, "tracking.db"),
 		filepath.Join(nowhere, "artifacts"))
 	if err := os.WriteFile(f.remoteCfg, []byte(remote), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	f.awaitIndex(t, tokenPath)
 	return f
+}
+
+// awaitIndex waits for the daemon's first write, which catches its index up to the
+// ledger, so a test of changes compares like with like.
+func (f remoteFixture) awaitIndex(t *testing.T, tokenPath string) {
+	t.Helper()
+	c, err := client.New(f.server, tokenPath, 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		ch, err := c.Changes(context.Background(), api.ChangesQuery{Since: "2000-01-01", Zone: "UTC"})
+		if err == nil && ch.IndexSeq == ch.W {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the daemon's index never caught up: %+v %v", ch, err)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 func appendFile(t *testing.T, path, s string) {
@@ -104,6 +135,24 @@ func cli(t *testing.T, cfg string, args ...string) (stdout, stderr string, err e
 	root.SetArgs(append([]string{"--config", cfg}, args...))
 	err = root.ExecuteContext(context.Background())
 	return out.String(), errOut.String(), err
+}
+
+// sameOutput runs args against the local files and against the daemon and requires
+// the same stdout: one value, one renderer, whichever side produced it.
+func (f remoteFixture) sameOutput(t *testing.T, args ...string) string {
+	t.Helper()
+	local, _, err := cli(t, f.cfgPath, args...)
+	if err != nil {
+		t.Fatalf("local %v: %v", args, err)
+	}
+	remote, _, err := cli(t, f.remoteCfg, args...)
+	if err != nil {
+		t.Fatalf("remote %v: %v", args, err)
+	}
+	if local != remote {
+		t.Fatalf("%v differs between local and remote\n--- local\n%s--- remote\n%s", args, local, remote)
+	}
+	return local
 }
 
 func TestStatus_AsksTheDaemon(t *testing.T) {
@@ -211,5 +260,73 @@ func TestUnroutedCommandsRefuseWithAServer(t *testing.T) {
 	var target *os.PathError
 	if _, err := os.Stat(filepath.Join(f.dir, "not-here")); !errors.As(err, &target) {
 		t.Errorf("a refused command created the local data directory: %v", err)
+	}
+}
+
+func TestTimeline_SameOverTheDaemon(t *testing.T) {
+	t.Parallel()
+	f := newRemoteFixtureIn(t, "Australia/Sydney")
+	for _, args := range [][]string{
+		{"timeline"},
+		{"timeline", "--json"},
+		{"timeline", "--from", "2026-02-10"},
+		{"timeline", "--to", "2026-02-10"},
+		{"timeline", "--at", "2026-02-10"},
+		{"timeline", "--type", "health.blood-pressure"},
+		{"timeline", "--type", "no.such-type", "--json"},
+		{"timeline", "--as-of", "2000-01-01"},
+		{"timeline", "--explain"},
+		{"timeline", "--explain", "--from", "2026-02-10T00:00:00Z"},
+	} {
+		out := f.sameOutput(t, args...)
+		if args[len(args)-1] == "timeline" && !strings.Contains(out, "shown=3") {
+			t.Errorf("timeline shows the wrong readings:\n%s", out)
+		}
+	}
+}
+
+// A query the daemon cannot read is the reader's error, worded as it is locally.
+func TestTimeline_ABadQueryIsTheSameErrorOverTheDaemon(t *testing.T) {
+	t.Parallel()
+	f := newRemoteFixture(t)
+	for _, args := range [][]string{
+		{"timeline", "--from", "last tuesday"},
+		{"timeline", "--at", "2026-01-01", "--to", "2026-01-02"},
+		{"timeline", "--projection", "no-such-projection"},
+		{"changes", "--since", "yesterday"},
+	} {
+		_, _, localErr := cli(t, f.cfgPath, args...)
+		_, _, remoteErr := cli(t, f.remoteCfg, args...)
+		if localErr == nil || remoteErr == nil || !strings.Contains(remoteErr.Error(), localErr.Error()) {
+			t.Errorf("%v: local %v, remote %v", args, localErr, remoteErr)
+		}
+		if remoteErr != nil && !strings.Contains(remoteErr.Error(), "400") {
+			t.Errorf("%v: remote error is not a 400: %v", args, remoteErr)
+		}
+	}
+}
+
+func TestChanges_SameOverTheDaemon(t *testing.T) {
+	t.Parallel()
+	f := newRemoteFixture(t)
+	out := f.sameOutput(t, "changes", "--since", "2000-01-01")
+	if !strings.Contains(out, "3 change(s)") {
+		t.Errorf("changes missed the readings:\n%s", out)
+	}
+	f.sameOutput(t, "changes", "--since", "2000-01-01", "--until", "2000-01-02")
+}
+
+// The daemon has no zone of its own, so a query that names Local is refused rather
+// than read in the daemon's.
+func TestTheDaemonRefusesALocalZone(t *testing.T) {
+	t.Parallel()
+	f := newRemoteFixture(t)
+	c, err := client.New(f.server, filepath.Join(f.dir, "token"), 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.Timeline(context.Background(), api.TimelineQuery{Zone: "Local"})
+	if err == nil || !strings.Contains(err.Error(), "IANA") {
+		t.Fatalf("timeline in zone Local: %v", err)
 	}
 }

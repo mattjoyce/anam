@@ -106,6 +106,7 @@ var typeStyles = map[facet.Type]typeStyle{
 	"travel.departed": {"documents", shapeTriUp, kindEvent},
 	"travel.arrived":  {"documents", shapeTriDown, kindEvent},
 	"travel.returned": {"documents", shapeDiamond, kindEvent},
+	"travel.flight":   {"documents", shapeCross, kindEvent},
 }
 
 func styleOf(t facet.Type) typeStyle {

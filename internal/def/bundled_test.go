@@ -2,6 +2,7 @@ package def_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
@@ -91,6 +92,7 @@ func TestBundled_LifeEventTypes(t *testing.T) {
 		{"travel.departed", facet.ClassificationConfidential, "travel.trip", false},
 		{"travel.arrived", facet.ClassificationConfidential, "travel.trip", false},
 		{"travel.returned", facet.ClassificationConfidential, "travel.trip", true},
+		{"travel.flight", facet.ClassificationConfidential, "", false},
 		{"donation.blood", facet.ClassificationSensitive, "", false},
 		{"gym.visit", facet.ClassificationConfidential, "", false},
 	}
@@ -111,6 +113,46 @@ func TestBundled_LifeEventTypes(t *testing.T) {
 		}
 		if reg.Closes(c.typ) != c.closes {
 			t.Errorf("%s closes = %t, want %t", c.typ, reg.Closes(c.typ), c.closes)
+		}
+	}
+}
+
+// A flight is evidence of a movement, not a state of the trip, so it stands outside
+// the travel.trip series and only carries the trip's key. Inside the series a flight
+// dated in Singapore would sort after a return dated the same day in Sydney and hold
+// the trip open for good.
+//
+// A flight is dated where it left from. Its date carries the departure airport's own
+// offset, because a trip's legs are dated in different zones and one zone per type
+// would put a London departure up to a day from where it happened.
+func TestBundled_FlightIsDatedWhereItLeft(t *testing.T) {
+	t.Parallel()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatalf("Bundled: %v", err)
+	}
+	d, ok := reg.Lookup("travel.flight")
+	if !ok {
+		t.Fatal("no bundled definition for travel.flight")
+	}
+	cases := []struct{ date, want string }{
+		{"2018-10-10 +01:00", "2018-10-09T23:00:00Z"}, // SQ317 out of London, BST
+		{"2024-12-27 +11:00", "2024-12-26T13:00:00Z"}, // SQ222 out of Sydney, AEDT
+	}
+	for _, c := range cases {
+		doc, err := def.Decode([]byte(`{"id":"x","trip":"t","from":"LHR","to":"SIN","date":"` + c.date + `"}`))
+		if err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if err := d.Check(doc); err != nil {
+			t.Errorf("%s: %v", c.date, err)
+		}
+		got, err := d.FactTimeOf(doc)
+		if err != nil {
+			t.Fatalf("%s: %v", c.date, err)
+		}
+		if g := got.UTC().Format(time.RFC3339); g != c.want {
+			t.Errorf("%s placed at %s, want %s", c.date, g, c.want)
 		}
 	}
 }

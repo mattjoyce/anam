@@ -87,9 +87,13 @@ A plain file you edit, one row per event, read by a capture worker like any othe
 | `donation` | `donation.blood` | point | none |
 | `illness` | `illness.started`, `illness.ended`, `illness.hangover` | series for an illness; hangover is a point | `illness.episode` keyed by `/episode`; `illness.ended` closes |
 | `travel` | `travel.departed`, `travel.arrived`, `travel.returned` | series per trip; arrived is a leg within it | `travel.trip` keyed by `/trip`; `travel.returned` closes |
+| `travel` | `travel.flight` | point per flight leg: `from` and `to` as IATA codes, dated where it left, `date` carrying the departure airport's offset (`2018-10-10 +01:00`) | none; it carries `/trip` to group with its trip but stays outside the series |
 | `gym` | `gym.visit` | point, generic or detailed | none |
 
-Hangover is a point fact under `illness` because that is what it is; one row, one day. Detailed gym
+Hangover is a point fact under `illness` because that is what it is; one row, one day.
+A flight is evidence of a movement, not a state of the trip. Inside `travel.trip` a flight
+dated in Singapore would sort after a return dated the same day in Sydney and hold the trip open,
+so the trip's state is departed, arrived and returned, and flights stand beside it (card 35). Detailed gym
 data that a device already records (Garmin activities) stays with its device source; `gym.visit` is
 your word that you went, and the two can be correlated later, never merged.
 

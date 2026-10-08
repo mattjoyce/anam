@@ -41,7 +41,7 @@ var mvpScopes = gate.StaticScopes{
 		"lab.result", "lab.panel", "condition.noted", "donation.blood", "health.weight",
 		"med.missed-dose", "med.started", "med.dose-changed", "med.stopped", "med.compliance-estimate",
 		"illness.started", "illness.ended", "illness.hangover",
-		"travel.departed", "travel.arrived", "travel.returned",
+		"travel.departed", "travel.arrived", "travel.returned", "travel.flight",
 		"visit.clinic", "gym.visit", bpcsv.Type,
 	},
 	// documents is a folder of files whose bytes stay there: each becomes a

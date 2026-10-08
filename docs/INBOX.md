@@ -55,7 +55,7 @@ records:
 Types today: `lab.result`, `lab.panel`, `condition.noted`, `donation.blood`, `health.weight`,
 `med.missed-dose`, `med.started`, `med.dose-changed`, `med.stopped`, `med.compliance-estimate`,
 `illness.started`, `illness.ended`,
-`illness.hangover`, `travel.departed`, `travel.arrived`, `travel.returned`, `visit.clinic`, `gym.visit`,
+`illness.hangover`, `travel.departed`, `travel.arrived`, `travel.returned`, `travel.flight`, `visit.clinic`, `gym.visit`,
 and `health.blood-pressure` for diary readings. Each is a manifest in `internal/def/manifests/`,
 lenient, Sensitive (visits, gym and travel Confidential). Illness rows carry an `episode` and travel
 rows a `trip`; those are the series keys, so `illness.ended` and `travel.returned` close what

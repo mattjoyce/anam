@@ -11,10 +11,8 @@ type ChangesQuery struct {
 // Changes is what was admitted, superseded or tombstoned in a window of anam-time,
 // read from the operational store's index of anam-events.
 type Changes struct {
-	// IndexSeq is the last anam-event the index holds. CaughtUpFrom is where it stood
-	// before this read caught it up; equal when the read did not need to.
-	IndexSeq     int64 `json:"index_seq"`
-	CaughtUpFrom int64 `json:"caught_up_from"`
+	// IndexSeq is the last anam-event the index holds.
+	IndexSeq int64 `json:"index_seq"`
 	// W is the ledger's head when it was read. Above IndexSeq means the index is
 	// behind and the newest changes are missing from this answer.
 	W int64 `json:"w"`

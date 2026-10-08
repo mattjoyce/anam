@@ -23,6 +23,15 @@ import (
 // largest answer, about 5 MB today; this leaves it room to grow tenfold.
 const maxBody = 64 << 20
 
+// networkMargin is how much longer the client waits for an answer than the daemon is
+// asked to take. The daemon bounds each request by the timeout the client sends; this
+// covers the trip.
+const networkMargin = 10 * time.Second
+
+// timeoutHeader is the daemon's daemon.TimeoutHeader, spelled here so the client does
+// not import the daemon.
+const timeoutHeader = "Anam-Timeout"
+
 // Client is one daemon, and the token to present to it.
 type Client struct {
 	server  string
@@ -32,7 +41,8 @@ type Client struct {
 }
 
 // New returns a client of the daemon at server. tokenFile may be empty for a daemon
-// on loopback without a token. timeout bounds each call that does not set its own.
+// on loopback without a token. timeout is what the daemon is asked to answer within,
+// for each call that does not set its own; the client waits that plus a margin.
 func New(server, tokenFile string, timeout time.Duration) (*Client, error) {
 	c := &Client{server: strings.TrimSuffix(server, "/"), timeout: timeout, http: &http.Client{}}
 	if tokenFile != "" {
@@ -61,7 +71,7 @@ func (c *Client) Status(ctx context.Context) (api.Status, error) {
 func (c *Client) do(ctx context.Context, timeout time.Duration, method, path string, q url.Values,
 	body any, out any,
 ) (int, error) {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout+networkMargin)
 	defer cancel()
 
 	target := c.server + path
@@ -83,6 +93,7 @@ func (c *Client) do(ctx context.Context, timeout time.Duration, method, path str
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	req.Header.Set(timeoutHeader, timeout.String())
 	if c.token != nil {
 		req.Header.Set("Authorization", "Bearer "+string(c.token))
 	}
@@ -90,7 +101,7 @@ func (c *Client) do(ctx context.Context, timeout time.Duration, method, path str
 	resp, err := c.http.Do(req)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return 0, fmt.Errorf("server %s: no answer within %s", c.server, timeout)
+			return 0, fmt.Errorf("server %s: no answer within %s", c.server, timeout+networkMargin)
 		}
 		// The url.Error repeats the method and URL; the server is already named.
 		var ue *url.Error
@@ -100,9 +111,13 @@ func (c *Client) do(ctx context.Context, timeout time.Duration, method, path str
 		return 0, fmt.Errorf("server %s unreachable: %w", c.server, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-	b, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
+	b, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
 	if err != nil {
 		return resp.StatusCode, fmt.Errorf("server %s: read response: %w", c.server, err)
+	}
+	if len(b) > maxBody {
+		return resp.StatusCode, fmt.Errorf("server %s: %s answered more than %d MB; narrow the read",
+			c.server, path, maxBody>>20)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
@@ -213,7 +228,7 @@ func (c *Client) Mint(ctx context.Context, dryRun bool) (api.Mint, error) {
 func (c *Client) Ingest(ctx context.Context, wait time.Duration) (api.Operation, error) {
 	var op api.Operation
 	q := url.Values{"wait": {wait.String()}}
-	_, err := c.do(ctx, wait+c.timeout, http.MethodPost, "/v1/ingest", q, nil, &op)
+	_, err := c.do(ctx, wait, http.MethodPost, "/v1/ingest", q, nil, &op)
 	var refused *Error
 	if errors.As(err, &refused) && refused.Status == http.StatusInternalServerError && op.ID != "" {
 		return op, nil

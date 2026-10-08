@@ -222,3 +222,29 @@ func TestPinLedger_RefusesADifferentLedger(t *testing.T) {
 		t.Error("an empty ledger id was pinned")
 	}
 }
+
+// A read-only handle reads what the writer wrote and refuses to write.
+func TestOpenReadOnlyRefusesWrites(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "tracking.db")
+	w, err := ops.Open(context.Background(), path, buckets(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = w.Close() }()
+	if err := w.PinLedger(context.Background(), "ledger-a"); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := ops.OpenReadOnly(context.Background(), path)
+	if err != nil {
+		t.Fatalf("OpenReadOnly: %v", err)
+	}
+	defer func() { _ = r.Close() }()
+	if _, err := r.LastSeq(context.Background()); err != nil {
+		t.Errorf("read on the read-only handle: %v", err)
+	}
+	if err := r.PinLedger(context.Background(), "ledger-b"); err == nil {
+		t.Error("the read-only handle accepted a write")
+	}
+}

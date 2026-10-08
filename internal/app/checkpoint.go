@@ -84,7 +84,7 @@ func runMint(ctx context.Context, cfg config.Config, dryRun bool) (api.Mint, err
 	defer closeAll()
 	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()
-	return read.Mint(ctx, deps, dryRun)
+	return mint.Report(ctx, deps, dryRun)
 }
 
 func writeMint(cmd *cobra.Command, m api.Mint) error {

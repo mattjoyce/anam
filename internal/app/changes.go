@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"io"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -32,7 +33,7 @@ header says how far the index is behind W.`,
 			if err != nil {
 				return err
 			}
-			c, err := readChanges(cmd.Context(), cfg, api.ChangesQuery{Since: since, Until: until})
+			c, err := readChanges(cmd.Context(), cfg, api.ChangesQuery{Since: since, Until: until}, cmd.ErrOrStderr())
 			if err != nil {
 				return err
 			}
@@ -46,8 +47,9 @@ header says how far the index is behind W.`,
 }
 
 // readChanges asks the daemon when a server is configured. Locally it catches the
-// index up to the ledger's head first: this process is the only one writing it.
-func readChanges(ctx context.Context, cfg config.Config, q api.ChangesQuery) (api.Changes, error) {
+// index up to the ledger's head first, saying so on stderr: this process is the only
+// one writing it.
+func readChanges(ctx context.Context, cfg config.Config, q api.ChangesQuery, stderr io.Writer) (api.Changes, error) {
 	if cfg.Server != "" {
 		zone, err := cfg.ZoneName()
 		if err != nil {
@@ -83,18 +85,15 @@ func readChanges(ctx context.Context, cfg config.Config, q api.ChangesQuery) (ap
 	if err != nil {
 		return api.Changes{}, err
 	}
-	c, err := read.Changes(ctx, db, sync.To, q)
-	if err != nil {
-		return api.Changes{}, err
+	if sync.To != sync.From {
+		_, _ = fmt.Fprintf(stderr, "caught the index up from seq %d to %d\n", sync.From, sync.To)
 	}
-	c.CaughtUpFrom = sync.From
-	return c, nil
+	return read.Changes(ctx, db, sync.To, q)
 }
 
 func writeChanges(cmd *cobra.Command, c api.Changes) error {
 	out := cmd.OutOrStdout()
-	_, _ = fmt.Fprintf(out, "index at seq %d (caught up from %d)  ·  %d change(s) since %s\n",
-		c.IndexSeq, c.CaughtUpFrom, len(c.Changes), c.Since)
+	_, _ = fmt.Fprintf(out, "index at seq %d  ·  %d change(s) since %s\n", c.IndexSeq, len(c.Changes), c.Since)
 	if c.W > c.IndexSeq {
 		_, _ = fmt.Fprintf(out, "the ledger is at W=%d: the index is behind, and its newest changes are not shown\n", c.W)
 	}

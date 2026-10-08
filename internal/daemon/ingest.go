@@ -14,6 +14,7 @@ import (
 	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/store/ledger"
+	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
 // IngestFunc runs one ingest of every declared import on the daemon's write handles.
@@ -187,20 +188,24 @@ func (d *Daemon) runIngest(op *operation) {
 }
 
 // catchUp replays the ledger into the operational store's index, so reads of it are
-// as fresh as the last write. It runs inside a write, on the write handles, and has
-// its own deadline so a run that spent its own still leaves the index current. A
-// failure is logged and not the write's: the index is left behind, never wrong, and
-// the next write catches it up.
+// as fresh as the last write. It runs inside a write, on the write handles, with the
+// ingest budget rather than the per-call timeout: a replay of the whole ledger after
+// the index was rebuilt must be able to finish. A failure is not the write's. An
+// index left behind is reported in every answer read from it; an index found wrong,
+// built from another ledger or ahead of this one, is recorded, and the routes that
+// read it refuse until the daemon is restarted on a sound one.
 func (d *Daemon) catchUp(ctx context.Context, s Stores) {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), d.cfg.Timeout)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), d.cfg.IngestTimeout)
 	defer cancel()
 	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
 	res, err := catchup.Sync(ctx, s.Ledger, s.Ops, buckets)
-	if err != nil {
-		slog.Warn("daemon: index catch-up", "err", err)
-		return
-	}
-	if res.To != res.From {
+	switch {
+	case errors.Is(err, ops.ErrLedgerChanged), errors.Is(err, catchup.ErrIndexAhead):
+		d.index.set(err)
+		slog.Error("daemon: operational index is wrong", "err", err)
+	case err != nil:
+		slog.Warn("daemon: index catch-up, left behind", "err", err)
+	case res.To != res.From:
 		slog.Info("daemon: index caught up", "from", res.From, "to", res.To)
 	}
 }

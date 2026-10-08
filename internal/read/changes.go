@@ -53,7 +53,7 @@ func Changes(ctx context.Context, idx ChangeIndex, w int64, q api.ChangesQuery) 
 		return api.Changes{}, err
 	}
 	c := api.Changes{
-		IndexSeq: seq, CaughtUpFrom: seq, W: w, Since: clock.Format(sinceT), Until: until,
+		IndexSeq: seq, W: w, Since: clock.Format(sinceT), Until: until,
 		Changes: make([]api.Change, 0, len(rows)),
 	}
 	for _, r := range rows {

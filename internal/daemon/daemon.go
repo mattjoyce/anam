@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/inspect"
@@ -35,6 +36,10 @@ import (
 
 // ErrStopped is returned by Write once shutdown has begun. The write was not run.
 var ErrStopped = errors.New("daemon: stopping, write not accepted")
+
+// ErrBusy is returned by TryWrite while another write holds the queue. The write was
+// not run.
+var ErrBusy = errors.New("daemon: a write is running")
 
 // ErrNotLoopback is returned by Open for a listen address beyond loopback with no
 // token configured. The inspector serves the whole record unprojected and the
@@ -83,9 +88,14 @@ type Daemon struct {
 	started string
 	writes  Stores
 	read    *ledger.Ledger
+	// readOps is a read-only handle on the operational store, so the routes that only
+	// read it cannot write it.
+	readOps *ops.DB
 	// artifacts is the published-artifact tier: checkpoint values and receipts.
 	artifacts *artifact.Store
-	ingests   *ingests
+	// index is whether the operational index is wrong rather than merely behind.
+	index   indexState
+	ingests *ingests
 
 	jobs chan job
 	quit chan struct{}
@@ -133,11 +143,20 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		_ = w.Close()
 		return nil, err
 	}
+	closeAll := func() { _ = db.Close(); _ = r.Close(); _ = w.Close() }
+	if err := checkIndex(ctx, r, db); err != nil {
+		closeAll()
+		return nil, err
+	}
+	readOps, err := ops.OpenReadOnly(ctx, cfg.DBPath)
+	if err != nil {
+		closeAll()
+		return nil, err
+	}
 	artifacts, err := artifact.New(cfg.ArtifactDir)
 	if err != nil {
-		_ = db.Close()
-		_ = r.Close()
-		_ = w.Close()
+		_ = readOps.Close()
+		closeAll()
 		return nil, err
 	}
 	return &Daemon{
@@ -147,11 +166,57 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		started:   clock.Format(time.Now()),
 		writes:    Stores{Ledger: w, Ops: db},
 		read:      r,
+		readOps:   readOps,
 		artifacts: artifacts,
 		ingests:   newIngests(),
 		jobs:      make(chan job),
 		quit:      make(chan struct{}),
 	}, nil
+}
+
+// checkIndex refuses an operational store whose index is wrong for this ledger:
+// derived from another ledger, or claiming events this one does not hold. Behind is
+// fine; the first write catches it up. Wrong would be served as an answer, so the
+// daemon does not start.
+func checkIndex(ctx context.Context, l *ledger.Ledger, db *ops.DB) error {
+	id, err := l.ID(ctx)
+	if err != nil {
+		return err
+	}
+	if err := db.PinLedger(ctx, id); err != nil {
+		return err
+	}
+	last, err := db.LastSeq(ctx)
+	if err != nil {
+		return err
+	}
+	head, err := l.Head(ctx)
+	if err != nil {
+		return err
+	}
+	if last > int64(head) {
+		return fmt.Errorf("%w: cursor %d, head %d", catchup.ErrIndexAhead, last, head)
+	}
+	return nil
+}
+
+// indexState holds why the operational index is wrong, once a catch-up finds that it
+// is. Behind is not recorded: a reader sees it in the answer.
+type indexState struct {
+	mu  sync.Mutex
+	err error
+}
+
+func (s *indexState) set(err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.err = err
+}
+
+func (s *indexState) wrong() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.err
 }
 
 // loopbackOnly refuses any listen address that a host other than this one can reach.
@@ -220,6 +285,29 @@ func (d *Daemon) Write(ctx context.Context, deadline time.Duration, fn WriteFunc
 	}
 }
 
+// acceptWait is how long TryWrite waits for the worker to take a write. The worker
+// is back at the queue microseconds after a write ends; a write still running after
+// this long is one worth refusing for, not waiting on.
+const acceptWait = 250 * time.Millisecond
+
+// TryWrite runs fn alone, under deadline, if the queue takes it within acceptWait,
+// and returns ErrBusy if another write holds it longer. Once fn is accepted it is
+// waited for: its own deadline bounds it, and an answer given before it ended would
+// misreport a write that went on to happen.
+func (d *Daemon) TryWrite(deadline time.Duration, fn WriteFunc) error {
+	j := job{fn: fn, deadline: deadline, done: make(chan error, 1)}
+	busy := time.NewTimer(acceptWait)
+	defer busy.Stop()
+	select {
+	case d.jobs <- j:
+	case <-d.quit:
+		return ErrStopped
+	case <-busy.C:
+		return ErrBusy
+	}
+	return <-j.done
+}
+
 // work is the single write worker. It returns when quit closes, but never while a
 // write is running: the select is only reached between writes.
 func (d *Daemon) work(base context.Context) {
@@ -276,9 +364,12 @@ func (d *Daemon) Serve(ctx context.Context, ln net.Listener) error {
 	}()
 
 	// The index may be behind a ledger that was written while no daemon ran. Catch it
-	// up as the first write, so reads of it start current.
+	// up as the first write, so reads of it start current. Its error is ignored on
+	// purpose: catchUp records a wrong index itself, and the only other outcome is
+	// ErrStopped or the daemon's context ending, when there is nothing left to catch
+	// up for.
 	go func() {
-		_ = d.Write(ctx, d.cfg.Timeout, func(ctx context.Context, s Stores) error {
+		_ = d.Write(ctx, d.cfg.IngestTimeout, func(ctx context.Context, s Stores) error {
 			d.catchUp(ctx, s)
 			return nil
 		})
@@ -315,7 +406,8 @@ func (d *Daemon) Serve(ctx context.Context, ln net.Listener) error {
 }
 
 func (d *Daemon) closeStores() error {
-	return errors.Join(d.read.Close(), d.writes.Ledger.Close(), d.writes.Ops.Close(), d.artifacts.Close())
+	return errors.Join(d.read.Close(), d.readOps.Close(), d.writes.Ledger.Close(), d.writes.Ops.Close(),
+		d.artifacts.Close())
 }
 
 // Ready asks the daemon listening on addr whether it is ready. An address bound to

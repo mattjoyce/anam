@@ -30,6 +30,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/span"
@@ -164,6 +165,22 @@ func Run(ctx context.Context, d Deps, dryRun bool) (Result, error) {
 		if err := d.Index.AppendCheckpoint(ctx, row); err != nil {
 			return Result{}, err
 		}
+	}
+	return out, nil
+}
+
+// Report runs a mint and reports it as the API's value, which the CLI renders whether
+// it minted here or asked the daemon to.
+func Report(ctx context.Context, d Deps, dryRun bool) (api.Mint, error) {
+	res, err := Run(ctx, d, dryRun)
+	if err != nil {
+		return api.Mint{}, err
+	}
+	out := api.Mint{W: int64(res.W), Written: res.Written, Outcomes: make([]api.MintOutcome, 0, len(res.Outcomes))}
+	for _, o := range res.Outcomes {
+		out.Outcomes = append(out.Outcomes, api.MintOutcome{
+			SpanID: o.SpanID, V: o.V, CoversW: o.CoversW, ValueHash: o.ValueHash, Len: o.Len, Minted: o.Minted,
+		})
 	}
 	return out, nil
 }

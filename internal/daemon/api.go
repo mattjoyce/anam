@@ -36,9 +36,13 @@ func (d *Daemon) routes(mux *http.ServeMux) {
 }
 
 func (d *Daemon) getCheckpoints(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), d.cfg.Timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
-	list, err := read.Checkpoints(ctx, d.writes.Ops, d.cfg.DBPath)
+	if err := d.index.wrong(); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	list, err := read.Checkpoints(ctx, d.readOps, d.cfg.DBPath)
 	if err != nil {
 		writeReadError(w, err)
 		return
@@ -46,13 +50,11 @@ func (d *Daemon) getCheckpoints(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, list)
 }
 
-// ErrBusy is the answer to a write asked for while an ingest holds the write queue.
-var ErrBusy = errors.New("an ingest is running; ask again when it has finished")
-
 // postCheckpoints mints, or with ?dry_run=true derives without publishing. Minting
-// writes the operational store and the artifacts, so it runs on the write queue
-// under the configured timeout. While an ingest holds the queue it answers 503 at
-// once rather than wait out a run that may take minutes.
+// writes the operational store and the artifacts, so it runs on the write queue. While
+// another write holds the queue it answers 503 at once, naming the ingest if one is
+// running, rather than wait out a run that may take minutes. Once accepted, the mint
+// is answered whenever it ends, so a 2xx or an error always says what happened.
 func (d *Daemon) postCheckpoints(w http.ResponseWriter, r *http.Request) {
 	dryRun := false
 	if v := r.URL.Query().Get("dry_run"); v != "" {
@@ -62,24 +64,23 @@ func (d *Daemon) postCheckpoints(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if running, _ := d.ingests.ids(); running != "" {
-		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("%w (%s)", ErrBusy, running))
-		return
-	}
 	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
 
 	var m api.Mint
-	ctx, cancel := context.WithTimeout(r.Context(), 2*d.cfg.Timeout)
-	defer cancel()
-	err := d.Write(ctx, d.cfg.Timeout, func(ctx context.Context, s Stores) error {
+	err := d.TryWrite(d.timeout(r), func(ctx context.Context, s Stores) error {
 		var err error
-		m, err = read.Mint(ctx, mint.Deps{
+		m, err = mint.Report(ctx, mint.Deps{
 			Ledger: s.Ledger, Index: s.Ops, Artifacts: d.artifacts, Buckets: buckets, Clock: clock.Real{},
 		}, dryRun)
 		return err
 	})
+	if errors.Is(err, ErrBusy) {
+		if running, _ := d.ingests.ids(); running != "" {
+			err = fmt.Errorf("%w: ingest %s; ask again when it has finished", err, running)
+		}
+	}
 	switch {
-	case errors.Is(err, ErrStopped):
+	case errors.Is(err, ErrStopped), errors.Is(err, ErrBusy):
 		writeError(w, http.StatusServiceUnavailable, err)
 	case err != nil:
 		writeReadError(w, err)
@@ -122,7 +123,7 @@ func (d *Daemon) verifyReceipt(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), d.cfg.Timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
 	v, err := read.VerifyReceipt(ctx, deps, r.PathValue("hash"))
 	if err != nil {
@@ -144,7 +145,7 @@ func (d *Daemon) getTimeline(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), d.cfg.Timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
 	t, err := read.Timeline(ctx, d.read, q)
 	if err != nil {
@@ -163,19 +164,48 @@ func (d *Daemon) getChanges(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), d.cfg.Timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
-	head, err := d.read.Head(ctx)
-	if err != nil {
-		writeError(w, http.StatusServiceUnavailable, err)
+	if err := d.index.wrong(); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	c, err := read.Changes(ctx, d.writes.Ops, int64(head), q)
+	head, err := d.read.Head(ctx)
+	if err != nil {
+		writeLedgerError(w, err)
+		return
+	}
+	c, err := read.Changes(ctx, d.readOps, int64(head), q)
 	if err != nil {
 		writeReadError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, c)
+}
+
+// TimeoutHeader carries the caller's own deadline for a request. The daemon works to
+// the shorter of it and its configured timeout, so it answers before the caller gives
+// up, and the caller never misses an answer to a write that happened.
+const TimeoutHeader = "Anam-Timeout"
+
+// timeout is the bound for one request: the configured timeout, or the caller's if
+// that is shorter.
+func (d *Daemon) timeout(r *http.Request) time.Duration {
+	t := d.cfg.Timeout
+	if v, err := time.ParseDuration(r.Header.Get(TimeoutHeader)); err == nil && v > 0 && v < t {
+		t = v
+	}
+	return t
+}
+
+// writeLedgerError answers a ledger that could not be read: 504 if it ran out of
+// time, 503 otherwise.
+func writeLedgerError(w http.ResponseWriter, err error) {
+	if errors.Is(err, context.DeadlineExceeded) {
+		writeError(w, http.StatusGatewayTimeout, err)
+		return
+	}
+	writeError(w, http.StatusServiceUnavailable, err)
 }
 
 // namedZone refuses Local: on the daemon it would mean the daemon's zone, and the
@@ -268,16 +298,16 @@ func (d *Daemon) getOperation(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Daemon) getStatus(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), d.cfg.Timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
 	id, err := d.read.ID(ctx)
 	if err != nil {
-		writeError(w, http.StatusServiceUnavailable, err)
+		writeLedgerError(w, err)
 		return
 	}
 	head, err := d.read.Head(ctx)
 	if err != nil {
-		writeError(w, http.StatusServiceUnavailable, err)
+		writeLedgerError(w, err)
 		return
 	}
 	s := api.Status{
@@ -288,10 +318,14 @@ func (d *Daemon) getStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s)
 }
 
+// writeJSON answers with v. HTML is not escaped: a payload's bytes reach the client as
+// they are held, so the CLI renders them as it would from local files.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(v); err != nil {
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
 		slog.Warn("daemon: write response", "err", err)
 	}
 }

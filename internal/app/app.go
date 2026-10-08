@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -173,11 +172,7 @@ func loadRoutedConfig(explicit string, cmd *cobra.Command) (config.Config, error
 	return cfg, nil
 }
 
-// networkMargin is how much longer the CLI waits for a daemon's answer than its own
-// timeout. The daemon bounds each read by its timeout; this covers the trip.
-const networkMargin = 10 * time.Second
-
 // newClient is the client of cfg's server, presenting cfg's token.
 func newClient(cfg config.Config) (*client.Client, error) {
-	return client.New(cfg.Server, cfg.TokenFile, cfg.Timeout+networkMargin)
+	return client.New(cfg.Server, cfg.TokenFile, cfg.Timeout)
 }

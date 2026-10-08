@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	_ "modernc.org/sqlite" // registers the pure-Go "sqlite" driver
 
@@ -181,6 +182,22 @@ func Open(ctx context.Context, path string, buckets span.Buckets) (*DB, error) {
 	if err := pinBucketWidth(ctx, db, buckets.Width()); err != nil {
 		_ = db.Close()
 		return nil, err
+	}
+	return &DB{db: db}, nil
+}
+
+// OpenReadOnly opens an operational store that Open has already prepared, on a handle
+// SQLite will not accept a write from. It is for a process that also holds Open's
+// handle and wants its reads to be reads by construction, not by convention.
+func OpenReadOnly(ctx context.Context, path string) (*DB, error) {
+	escaped := strings.NewReplacer("%", "%25", "?", "%3f", "#", "%23").Replace(path)
+	db, err := sql.Open("sqlite", "file:"+escaped+"?mode=ro&_pragma=busy_timeout(5000)")
+	if err != nil {
+		return nil, fmt.Errorf("ops: open %q read-only: %w", path, err)
+	}
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("ops: open %q read-only: %w", path, err)
 	}
 	return &DB{db: db}, nil
 }

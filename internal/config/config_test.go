@@ -315,16 +315,29 @@ func TestLoadRejectsAnUnknownBucketWidth(t *testing.T) {
 }
 
 // A read the daemon runs needs the reader's zone by name: Local would mean the
-// daemon's own.
+// daemon's own. Local is named the way Go finds it, and a TZ that is not a name is
+// refused rather than replaced by /etc/localtime's.
 func TestZoneName(t *testing.T) {
-	t.Setenv("TZ", "Australia/Sydney")
-	for _, tt := range []struct{ zone, want string }{
-		{"Europe/London", "Europe/London"},
-		{"Local", "Australia/Sydney"},
+	for _, tt := range []struct{ zone, tz, want string }{
+		{"Europe/London", "Australia/Sydney", "Europe/London"},
+		{"Local", "Australia/Sydney", "Australia/Sydney"},
+		{"Local", ":Australia/Sydney", "Australia/Sydney"},
+		{"Local", "", "UTC"},
+		{"Local", "/usr/share/zoneinfo/Australia/Sydney", ""},
+		{"Local", "AEST-10", ""},
 	} {
-		got, err := config.Config{Zone: tt.zone}.ZoneName()
-		if err != nil || got != tt.want {
-			t.Errorf("ZoneName(%q) = %q, %v; want %q", tt.zone, got, err, tt.want)
-		}
+		t.Run(tt.zone+"/"+tt.tz, func(t *testing.T) {
+			t.Setenv("TZ", tt.tz)
+			got, err := config.Config{Zone: tt.zone}.ZoneName()
+			if tt.want == "" {
+				if err == nil {
+					t.Fatalf("ZoneName with TZ=%q = %q, want an error", tt.tz, got)
+				}
+				return
+			}
+			if err != nil || got != tt.want {
+				t.Errorf("ZoneName with TZ=%q = %q, %v; want %q", tt.tz, got, err, tt.want)
+			}
+		})
 	}
 }

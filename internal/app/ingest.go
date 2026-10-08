@@ -201,32 +201,6 @@ func runIngest(cmd *cobra.Command, cfg config.Config, imports []config.Import, b
 	return err
 }
 
-// remoteIngest asks the daemon for an ingest, waits for it, and reports it as a local
-// run does: a line per source, then the verdict or the error.
-func remoteIngest(cmd *cobra.Command, cfg config.Config) error {
-	c, err := newClient(cfg)
-	if err != nil {
-		return err
-	}
-	op, err := c.Ingest(cmd.Context(), cfg.IngestTimeout)
-	if err != nil {
-		return err
-	}
-	for _, r := range op.Sources {
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), sourceLine(r))
-	}
-	switch op.State {
-	case api.StateSucceeded:
-		_, err = fmt.Fprintln(cmd.OutOrStdout(), op.Summary)
-		return err
-	case api.StateFailed:
-		return fmt.Errorf("ingest %s on %s: %s", op.ID, c.Server(), op.Error)
-	default:
-		return fmt.Errorf("ingest %s on %s is still %s after %s; anam status shows it",
-			op.ID, c.Server(), op.State, cfg.IngestTimeout)
-	}
-}
-
 // admitSources admits each scanned import in declared order and calls each with its
 // progress once it is done, or once it fails, before the error is returned. It
 // stops at the first failure and returns how many facets were admitted or
@@ -430,37 +404,6 @@ type progress struct {
 	// means anything: zero blocks completed leaves w at the zero watermark, which is
 	// a real value meaning "empty ledger" and must not be reported as one.
 	done int
-}
-
-// resultOf is one source's part of a run as the API reports it, whichever process ran
-// it.
-func resultOf(source string, offered int, p progress) api.SourceResult {
-	r := api.SourceResult{
-		Source:     source,
-		Offered:    offered,
-		Admitted:   p.tally[gate.OutcomeAdmitted],
-		Superseded: p.tally[gate.OutcomeSuperseded],
-		Unchanged:  p.tally[gate.OutcomeNoOp],
-		Committed:  p.done,
-	}
-	if p.done > 0 {
-		w := int64(p.w)
-		r.W = &w
-	}
-	return r
-}
-
-// sourceLine renders one source's part of a run, naming itself partial when it is.
-func sourceLine(r api.SourceResult) string {
-	if r.Committed == 0 || r.W == nil {
-		return fmt.Sprintf("%s: %d envelopes → nothing committed", r.Source, r.Offered)
-	}
-	s := fmt.Sprintf("%s: %d envelopes → admitted=%d superseded=%d no-op=%d  W=%d",
-		r.Source, r.Offered, r.Admitted, r.Superseded, r.Unchanged, *r.W)
-	if r.Committed < r.Offered {
-		s += fmt.Sprintf("  (stopped after %d of %d — commit is idempotent, so re-run)", r.Committed, r.Offered)
-	}
-	return s
 }
 
 // admitAll drives every envelope through resolve → commit in blocks of `batch`,

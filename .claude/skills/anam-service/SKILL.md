@@ -1,6 +1,6 @@
 ---
 name: anam-service
-description: Call and operate the Anam service, `anam daemon`, the one process that owns Anam's ledger (Docker on unraid, http://192.168.20.4:8787). Use when asked to check Anam's status or health, run or trigger an Anam ingest, find out what an ingest did or why it failed, open the Anam inspector, call the Anam API or its /v1 endpoints, use the Anam token, or deploy, restart or inspect the anam container. Not for reading the record's contents through the API (no read endpoints exist yet), and not for editing Anam's code.
+description: Call and operate the Anam service, `anam daemon`, the one process that owns Anam's ledger (Docker on unraid, http://192.168.20.4:8787). Use when asked to check Anam's status or health, run or trigger an Anam ingest, find out what an ingest did or why it failed, open the Anam inspector, call the Anam API or its /v1 endpoints, point the anam CLI at the daemon (ANAM_SERVER), use the Anam token, or deploy, restart or inspect the anam container. Not for editing Anam's code.
 ---
 
 # Anam service
@@ -29,11 +29,35 @@ runs, nothing else may open those files. Ask it over HTTP instead.
 | `POST /v1/ingest?wait=10m` | yes | Same, but holds the response until the run ends (max `ingest_timeout`, 15m): 200 succeeded, 500 failed, 202 still going. |
 | `GET /v1/operations/{id}` | yes | One run: state, per-source tallies, W before and after. 404 if unknown. |
 | `GET /v1/status` | yes | Version, person, ledger id, W, each source as last seen, running and pending run ids. |
+| `GET /v1/timeline` | yes | The CLI's timeline read. Query: `zone` (IANA, required; `Local` is refused), `from`, `to`, `at`, `as_of`, `type`, `projection`, `explain=true`, typed as on the CLI. Whole, not paged. |
+| `GET /v1/changes` | yes | Anam-events by anam-time: `since` (required), `until`, `zone`. Carries `index_seq` and `w`; `w` above `index_seq` means the index is behind. |
+| `GET /v1/receipts`, `/v1/receipts/{hash}`, `/v1/receipts/{hash}/verify` | yes | List, show (from artifacts alone), prove against the ledger. 404 unknown, 400 malformed hash, 409 a receipt this ledger cannot honour. |
+| `GET /v1/checkpoints` | yes | The checkpoint log. |
+| `POST /v1/checkpoints` | yes | Mint (`?dry_run=true` derives only). 503 at once while an ingest runs. |
 | `GET /` and below | yes | The inspector (timeline, facets, events, documents). Browser: basic auth, any user name, the token as password. |
 
-That is the whole surface. There is no API for timeline, snapshot, as-of, changes, receipts,
-checkpoints, retraction, or writing a record. Those exist only in the CLI against local files
-(card 45 routes them through the daemon), or in `docs/API.md` as design.
+There is no API for retraction or for writing a record; those are local maintenance or design
+(`docs/API.md`).
+
+## The CLI against the daemon
+
+Set `ANAM_SERVER` (or `--server`) and `ANAM_TOKEN_FILE`, and `status`, `version`, `timeline`,
+`changes`, `receipt`, `checkpoint` and `ingest` ask the daemon, printing what they print against
+local files. `inspect` prints the inspector's URL. No person or ledger path is needed.
+
+```bash
+export ANAM_SERVER=http://192.168.20.4:8787 ANAM_TOKEN_FILE=~/.config/anam/token ANAM_ZONE=Australia/Sydney
+anam status
+anam timeline --from 2026-06-01 --to 2026-06-30 --type health.blood-pressure
+```
+
+- With a server set, `init`, `serve`, `retract` and `daemon` refuse: they open local files the
+  daemon owns. Unset `ANAM_SERVER` to run them as maintenance, with the daemon stopped.
+- An unreachable server is an error that names it. There is no fallback to local files.
+- The reader's zone travels with each read. `zone: Local` is resolved to its IANA name from
+  `$TZ` or `/etc/localtime` before it is sent; if neither names it, set `ANAM_ZONE`.
+- `ingest` with a server takes no source, `--imports` or `--batch`: the daemon runs its own
+  imports file. It waits up to `ingest_timeout`.
 
 Ingest takes no parameters: it runs the imports file the daemon was given
 (`/etc/anam/imports.yaml` in the container), re-read at every run. To ingest one source only,
@@ -77,9 +101,10 @@ An operation:
 - At most one run is in progress and one pending. A POST during a run returns the **pending**
   run's id (the running one has already read its sources), so two POSTs can share an id.
 
-Errors are `{"error": "…"}`: 400 bad `wait`, 401 no or wrong token (with
-`WWW-Authenticate: Basic`), 404 unknown operation, 503 while stopping or when the ledger cannot
-be read.
+Errors are `{"error": "…"}`: 400 a query that cannot be read (bad `wait`, a malformed date, an
+unknown projection), 401 no or wrong token (with `WWW-Authenticate: Basic`), 404 unknown
+operation or receipt, 409 a receipt this ledger cannot honour, 503 while stopping, while an
+ingest holds the write queue, or when the ledger cannot be read, 504 a read that ran out of time.
 
 ## Operating the container
 

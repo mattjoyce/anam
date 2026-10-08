@@ -27,11 +27,18 @@ a time; reads use a read-only handle.
 
 It serves on the configured address (listen, ANAM_LISTEN):
 
-    GET  /healthz              ready or not, without a token
-    POST /v1/ingest            run the declared imports; 202 with an operation
-    GET  /v1/operations/{id}   that run's state, tallies and W before and after
-    GET  /v1/status            ledger id, W, and each source as last seen
-    GET  /                     the inspector
+    GET  /healthz                       ready or not, without a token
+    POST /v1/ingest                     run the declared imports; 202 with an operation
+    GET  /v1/operations/{id}            that run's state, tallies and W before and after
+    GET  /v1/status                     ledger id, W, and each source as last seen
+    GET  /v1/timeline                   the timeline read, with the reader's zone
+    GET  /v1/changes                    anam-events in a window of anam-time
+    GET  /v1/receipts[/{hash}[/verify]] receipts: list, show, prove
+    GET  /v1/checkpoints                the checkpoint log
+    POST /v1/checkpoints                mint (?dry_run=true to derive only)
+    GET  /                              the inspector
+
+The CLI asks these when server is set (ANAM_SERVER, --server); see anam --help.
 
 With token_file set, everything but /healthz needs the token, as a bearer token or
 as a basic-auth password, and the daemon may listen on any address. Without it the

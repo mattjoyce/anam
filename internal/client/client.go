@@ -92,7 +92,12 @@ func (c *Client) do(ctx context.Context, timeout time.Duration, method, path str
 		if errors.Is(err, context.DeadlineExceeded) {
 			return 0, fmt.Errorf("server %s: no answer within %s", c.server, timeout)
 		}
-		return 0, fmt.Errorf("server %s: %w", c.server, err)
+		// The url.Error repeats the method and URL; the server is already named.
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			err = ue.Err
+		}
+		return 0, fmt.Errorf("server %s unreachable: %w", c.server, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	b, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))

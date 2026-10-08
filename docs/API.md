@@ -2,6 +2,15 @@
 
 Design proposal · 2026-10-07 · documentation only; these APIs are not implemented.
 
+**What runs today (2026-10-08, cards 42–45).** `anam daemon` serves an interim `/v1` surface
+that carries the CLI's existing reads, not the `ReadRecord` contract below: `status`, `ingest`
+and `operations/{id}`, `timeline`, `changes`, `receipts` (list, show, verify) and `checkpoints`
+(list, mint). Each answers with a value from `internal/api`, the same value the CLI computes
+from local files, so the CLI renders one type either way. With `server` set (`ANAM_SERVER`,
+`--server`) the CLI asks the daemon and opens no local file. Reads are whole, bounded by the
+daemon's timeout; paging and receipted reads remain this proposal's work. The route list is
+in `anam daemon --help`.
+
 This document proposes the application API that the CLI, inspector, and MCP adapter can share.
 The two conversational features are **chat with my record** and **log this**. The API supplies
 record operations and evidence; the conversational client supplies language understanding and

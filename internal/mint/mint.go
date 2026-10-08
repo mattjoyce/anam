@@ -6,10 +6,14 @@
 // Whether a bucket needs re-minting is decided by its value, not by bookkeeping about
 // it: the bucket's value at the head watermark is built and its hash compared with the
 // head checkpoint's. Equal means nothing a reader could see has changed, and nothing
-// is written; different means a new version. The architecture's `W > Wᵥ` comparison is
-// the cheap pre-filter an incremental mint would add in front of this; it is not needed
-// while the mint folds the whole person, and a hash is exact where a watermark is only
+// is written; different means a new version. A hash is exact where a watermark is only
 // sufficient (journal: checkpoint-is-a-replay-floor — staleness is dedup'd by hash).
+//
+// A mint starts from the last run where it can (incremental.go): the buckets the tail
+// after that run touched are the only ones whose value can differ, so only they are
+// rebuilt and compared. The full mint folds the whole ledger and compares every
+// bucket; it is the oracle the incremental one is tested against, and the repair if
+// the log is ever wrong.
 //
 // The same rule covers the one awkward case: a facet whose fact-time moved between
 // versions sits in a new bucket and has left its old one, so both hashes move and both
@@ -48,12 +52,16 @@ type Index interface {
 	AppendCheckpoint(ctx context.Context, r ops.CheckpointRow) error
 	AppendMintRun(ctx context.Context, w int64, ranAt string) error
 	AppendCheckpointSize(ctx context.Context, span string, v, facets int) error
+	LastMintRun(ctx context.Context, w int64) (int64, bool, error)
+	LogSealed(ctx context.Context) (bool, error)
+	CheckpointSizes(ctx context.Context) (map[ops.SpanVersion]int, error)
 }
 
 // Store is the published-artifact tier the values are written to and read back from.
 type Store interface {
 	Put(kind string, b []byte) (string, error)
 	Get(kind, digest string) ([]byte, error)
+	Size(kind, digest string) (int64, error)
 }
 
 // Ledger is the read surface the mint folds: fold's own, plus the ledger's identity so
@@ -104,6 +112,11 @@ type Result struct {
 
 	// Written is false for a dry run: everything was derived, nothing was published.
 	Written bool
+
+	// Full is true when the mint folded the whole ledger; false when it started from
+	// the mint run at From and rebuilt only what the tail after it touched.
+	Full bool
+	From ledger.Watermark
 }
 
 // Minted counts the buckets that received a new version.
@@ -118,17 +131,40 @@ func (r Result) Minted() int {
 }
 
 // Run mints every bucket whose value has changed since its last checkpoint, at the
-// ledger's head watermark. With dryRun set it derives everything and writes nothing —
-// the same code path, so a dry run cannot flatter a real one.
+// ledger's head watermark. It starts from the last mint run when it can, and folds the
+// whole ledger when it cannot (fromLastRun). With dryRun set it derives everything and
+// writes nothing — the same code path, so a dry run cannot flatter a real one.
 func Run(ctx context.Context, d Deps, dryRun bool) (Result, error) {
+	if err := d.pin(ctx); err != nil {
+		return Result{}, err
+	}
+	res, ok, err := d.fromLastRun(ctx, dryRun)
+	if err != nil || ok {
+		return res, err
+	}
+	return d.full(ctx, dryRun)
+}
+
+// RunFull is Run without the last run: it folds the whole ledger and compares every
+// bucket's value with its head. Whatever the log holds, the checkpoints it leaves are
+// the fold's.
+func RunFull(ctx context.Context, d Deps, dryRun bool) (Result, error) {
+	if err := d.pin(ctx); err != nil {
+		return Result{}, err
+	}
+	return d.full(ctx, dryRun)
+}
+
+// pin refuses a checkpoint log built from another ledger.
+func (d Deps) pin(ctx context.Context) error {
 	id, err := d.Ledger.ID(ctx)
 	if err != nil {
-		return Result{}, err
+		return err
 	}
-	if err := d.Index.PinLedger(ctx, id); err != nil {
-		return Result{}, err
-	}
+	return d.Index.PinLedger(ctx, id)
+}
 
+func (d Deps) full(ctx context.Context, dryRun bool) (Result, error) {
 	res, err := fold.Read(ctx, d.Ledger)
 	if err != nil {
 		return Result{}, err
@@ -142,64 +178,85 @@ func Run(ctx context.Context, d Deps, dryRun bool) (Result, error) {
 		return Result{}, err
 	}
 
-	out := Result{W: res.W, Written: !dryRun}
+	out := Result{W: res.W, Written: !dryRun, Full: true}
 	for _, spanID := range spanIDs(parts, heads) {
-		value, err := fold.NewValue(parts[spanID])
+		head, minted := heads[spanID]
+		o, err := d.settle(ctx, res.W, spanID, parts[spanID], head, minted, dryRun)
 		if err != nil {
 			return Result{}, err
 		}
-		head, minted := heads[spanID]
-		o := Outcome{SpanID: spanID, ValueHash: value.Hash(), Len: value.Len()}
-		if minted && head.ValueHash == value.Hash() {
-			o.V, o.CoversW = head.V, head.CoversW
-			out.Outcomes = append(out.Outcomes, o)
-			// A checkpoint minted before counts were recorded gets its count now; one
-			// that has it keeps it.
-			if !dryRun {
-				if err := d.Index.AppendCheckpointSize(ctx, spanID, o.V, o.Len); err != nil {
-					return Result{}, err
-				}
-			}
-			continue
-		}
-
-		o.V, o.CoversW, o.Minted = head.V+1, int64(res.W), true
 		out.Outcomes = append(out.Outcomes, o)
-		if dryRun {
-			continue
-		}
-		if _, err := d.Artifacts.Put(Kind, value.Bytes()); err != nil {
-			return Result{}, err
-		}
-		row := ops.CheckpointRow{
-			SpanID: spanID, V: o.V, CoversW: o.CoversW,
-			ValueHash: o.ValueHash, MintedAt: clock.Format(d.Clock.Now()),
-		}
-		if err := d.Index.AppendCheckpoint(ctx, row); err != nil {
-			return Result{}, err
-		}
-		if err := d.Index.AppendCheckpointSize(ctx, spanID, o.V, o.Len); err != nil {
-			return Result{}, err
-		}
 	}
-	// Recorded last, so a reader never starts from a run whose checkpoints are not all
-	// written. Every span was checked at W, minted or found unchanged.
-	if !dryRun {
-		if err := d.Index.AppendMintRun(ctx, int64(res.W), clock.Format(d.Clock.Now())); err != nil {
-			return Result{}, err
-		}
+	return out, d.recordRun(ctx, res.W, dryRun)
+}
+
+// settle decides one bucket at w: unchanged when entries are the value its head
+// checkpoint already holds, a new version otherwise.
+func (d Deps) settle(ctx context.Context, w ledger.Watermark, spanID string, entries []fold.Entry,
+	head ops.CheckpointRow, minted, dryRun bool,
+) (Outcome, error) {
+	value, err := fold.NewValue(entries)
+	if err != nil {
+		return Outcome{}, err
 	}
-	return out, nil
+	o := Outcome{SpanID: spanID, ValueHash: value.Hash(), Len: value.Len()}
+	if minted && head.ValueHash == value.Hash() {
+		o.V, o.CoversW = head.V, head.CoversW
+		// A checkpoint minted before counts were recorded gets its count now; one
+		// that has it keeps it.
+		if !dryRun {
+			if err := d.Index.AppendCheckpointSize(ctx, spanID, o.V, o.Len); err != nil {
+				return Outcome{}, err
+			}
+		}
+		return o, nil
+	}
+
+	o.V, o.CoversW, o.Minted = head.V+1, int64(w), true
+	if dryRun {
+		return o, nil
+	}
+	if _, err := d.Artifacts.Put(Kind, value.Bytes()); err != nil {
+		return Outcome{}, err
+	}
+	row := ops.CheckpointRow{
+		SpanID: spanID, V: o.V, CoversW: o.CoversW,
+		ValueHash: o.ValueHash, MintedAt: clock.Format(d.Clock.Now()),
+	}
+	if err := d.Index.AppendCheckpoint(ctx, row); err != nil {
+		return Outcome{}, err
+	}
+	if err := d.Index.AppendCheckpointSize(ctx, spanID, o.V, o.Len); err != nil {
+		return Outcome{}, err
+	}
+	return o, nil
+}
+
+// recordRun records the run at w after its checkpoints, so a reader never starts from
+// a run whose checkpoints are not all written. Every span was checked at w, minted or
+// found unchanged.
+func (d Deps) recordRun(ctx context.Context, w ledger.Watermark, dryRun bool) error {
+	if dryRun {
+		return nil
+	}
+	return d.Index.AppendMintRun(ctx, int64(w), clock.Format(d.Clock.Now()))
 }
 
 // Report runs a mint and reports it as the API's value, which the CLI renders whether
 // it minted here or asked the daemon to.
-func Report(ctx context.Context, d Deps, dryRun bool) (api.Mint, error) {
-	res, err := Run(ctx, d, dryRun)
+func Report(ctx context.Context, d Deps, q api.MintQuery) (api.Mint, error) {
+	run := Run
+	if q.Full {
+		run = RunFull
+	}
+	res, err := run(ctx, d, q.DryRun)
 	if err != nil {
 		return api.Mint{}, err
 	}
-	out := api.Mint{W: int64(res.W), Written: res.Written, Outcomes: make([]api.MintOutcome, 0, len(res.Outcomes))}
+	out := api.Mint{
+		W: int64(res.W), Written: res.Written, Full: res.Full, From: int64(res.From),
+		Outcomes: make([]api.MintOutcome, 0, len(res.Outcomes)),
+	}
 	for _, o := range res.Outcomes {
 		out.Outcomes = append(out.Outcomes, api.MintOutcome{
 			SpanID: o.SpanID, V: o.V, CoversW: o.CoversW, ValueHash: o.ValueHash, Len: o.Len, Minted: o.Minted,
@@ -265,13 +322,20 @@ func (d Deps) partition(v fold.Value, heads map[string]ops.CheckpointRow,
 }
 
 // subdivide partitions v by layout, splitting every bucket whose value is over budget
-// bytes until none is or it is a day. The size is the value's own serialisation, so
-// the same facts always split the same way.
+// bytes until none is or it is a day.
 func subdivide(v fold.Value, layout span.Layout, budget int) (map[string][]fold.Entry, span.Layout, error) {
 	parts, err := Partition(v, layout)
 	if err != nil {
 		return nil, layout, err
 	}
+	return split(parts, layout, budget)
+}
+
+// split divides every bucket of parts whose value is over budget bytes until none is or
+// it is a day, and returns the layout that leaves. The size is the value's own
+// serialisation, so the same facts always split the same way.
+func split(parts map[string][]fold.Entry, layout span.Layout, budget int,
+) (map[string][]fold.Entry, span.Layout, error) {
 	for {
 		var over []span.Bucket
 		for id, entries := range parts {

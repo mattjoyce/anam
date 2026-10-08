@@ -387,6 +387,13 @@ func TestCheckpoints_SameOverTheDaemon(t *testing.T) {
 	if out := f.sameOutput(t, "checkpoint", "--dry-run"); !strings.Contains(out, "would mint (dry run — nothing written) 0 of") {
 		t.Errorf("a second mint would mint again:\n%s", out)
 	}
+	if out := f.sameOutput(t, "checkpoint", "--dry-run"); !strings.Contains(out, "from the run at W=") {
+		t.Errorf("a mint after a run did not start from it:\n%s", out)
+	}
+	if out := f.sameOutput(t, "checkpoint", "--dry-run", "--full"); !strings.Contains(out, "0 of") ||
+		!strings.Contains(out, "folding the whole ledger") {
+		t.Errorf("a full mint after a run:\n%s", out)
+	}
 }
 
 // An ingest asked of the daemon reports as a local one does: a line per source, then

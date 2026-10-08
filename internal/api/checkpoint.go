@@ -22,8 +22,20 @@ type Checkpoint struct {
 type Mint struct {
 	W int64 `json:"w"`
 	// Written is false for a dry run: everything was derived, nothing was published.
-	Written  bool          `json:"written"`
+	Written bool `json:"written"`
+	// Full is true when the mint folded the whole ledger; false when it started from
+	// the mint run at From and rebuilt only the buckets the events after it touched.
+	Full     bool          `json:"full"`
+	From     int64         `json:"from,omitempty"`
 	Outcomes []MintOutcome `json:"outcomes"`
+}
+
+// MintQuery is how a mint is asked for. DryRun derives and publishes nothing; Full
+// folds the whole ledger instead of starting from the last run, the repair if the
+// checkpoint log is ever wrong.
+type MintQuery struct {
+	DryRun bool
+	Full   bool
 }
 
 // MintOutcome is one bucket in a mint. Minted is false when the head checkpoint's

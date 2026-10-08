@@ -167,6 +167,24 @@ func TestGet_NotFound(t *testing.T) {
 	}
 }
 
+// Size is the stored length, and a missing artifact is ErrNotFound as it is for Get.
+func TestSize(t *testing.T) {
+	t.Parallel()
+	s, _ := newStore(t)
+
+	b := []byte(`{"n": 1}`)
+	digest, err := s.Put("served", b)
+	if err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	if n, err := s.Size("served", digest); err != nil || n != int64(len(b)) {
+		t.Errorf("Size = %d, %v; want %d", n, err, len(b))
+	}
+	if _, err := s.Size("served", artifact.Digest([]byte("never stored"))); !errors.Is(err, artifact.ErrNotFound) {
+		t.Errorf("Size absent: err = %v, want ErrNotFound", err)
+	}
+}
+
 // Digests reach this package from a command line. A name that cannot contain a
 // separator cannot escape the store, so the shape is checked before any path is built.
 func TestPath_RejectsMalformedNames(t *testing.T) {

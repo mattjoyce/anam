@@ -210,13 +210,16 @@ func (c *Client) Checkpoints(ctx context.Context) (api.Checkpoints, error) {
 	return cp, err
 }
 
-// Mint asks the daemon to mint a checkpoint per changed bucket, or with dryRun to
-// derive and report without publishing.
-func (c *Client) Mint(ctx context.Context, dryRun bool) (api.Mint, error) {
+// Mint asks the daemon to mint a checkpoint per changed bucket, or with DryRun to
+// derive and report without publishing; Full folds the whole ledger.
+func (c *Client) Mint(ctx context.Context, mq api.MintQuery) (api.Mint, error) {
 	var m api.Mint
 	q := url.Values{}
-	if dryRun {
+	if mq.DryRun {
 		q.Set("dry_run", "true")
+	}
+	if mq.Full {
+		q.Set("full", "true")
 	}
 	_, err := c.do(ctx, c.timeout, http.MethodPost, "/v1/checkpoints", q, nil, &m)
 	return m, err

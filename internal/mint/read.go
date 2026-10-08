@@ -26,6 +26,7 @@ var ErrOtherLedger = errors.New("mint: checkpoints belong to another ledger")
 type CheckpointLog interface {
 	LedgerID(ctx context.Context) (string, error)
 	LastMintRun(ctx context.Context, w int64) (int64, bool, error)
+	LogSealed(ctx context.Context) (bool, error)
 	CheckpointsAt(ctx context.Context, w int64) ([]ops.CheckpointRow, error)
 }
 
@@ -102,7 +103,9 @@ func ReadAt(ctx context.Context, l ReadLedger, log CheckpointLog, artifacts Stor
 }
 
 // startingRun is the latest mint run at or below w, once the log is known to describe
-// this ledger.
+// this ledger and every checkpoint in it to belong to a recorded run. A mint that
+// crashed may have left rows a run at w would take for its own, so until a mint seals
+// the log again, reads fold in full.
 func startingRun(ctx context.Context, l ReadLedger, log CheckpointLog, w ledger.Watermark,
 ) (ledger.Watermark, bool, error) {
 	pinned, err := log.LedgerID(ctx)
@@ -115,6 +118,9 @@ func startingRun(ctx context.Context, l ReadLedger, log CheckpointLog, w ledger.
 	}
 	if pinned != id {
 		return 0, false, fmt.Errorf("%w: the log was built from %s, this is %s", ErrOtherLedger, pinned, id)
+	}
+	if sealed, err := log.LogSealed(ctx); err != nil || !sealed {
+		return 0, false, err
 	}
 	run, ok, err := log.LastMintRun(ctx, int64(w))
 	return ledger.Watermark(run), ok, err

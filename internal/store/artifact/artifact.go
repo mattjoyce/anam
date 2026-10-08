@@ -177,6 +177,31 @@ func (s *Store) Raw(kind, digest string) ([]byte, error) {
 	return b, nil
 }
 
+// Size returns how many bytes are stored under kind at digest, from the file's
+// metadata alone. It does not read or check the bytes: it answers how big an artifact
+// is, and a caller that needs the bytes uses Get, which checks them.
+func (s *Store) Size(kind, digest string) (int64, error) {
+	name, err := entryName(kind, digest)
+	if err != nil {
+		return 0, err
+	}
+	root, err := s.openRoot(false)
+	if errors.Is(err, os.ErrNotExist) {
+		return 0, fmt.Errorf("%w: %s %s", ErrNotFound, kind, digest)
+	}
+	if err != nil {
+		return 0, err
+	}
+	info, err := root.Stat(name)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return 0, fmt.Errorf("%w: %s %s", ErrNotFound, kind, digest)
+	case err != nil:
+		return 0, fmt.Errorf("artifact: stat %s: %w", name, err)
+	}
+	return info.Size(), nil
+}
+
 // List returns the digests stored under kind, sorted. An absent directory is not an
 // error: nothing published yet is a state, not a fault.
 func (s *Store) List(kind string) ([]string, error) {

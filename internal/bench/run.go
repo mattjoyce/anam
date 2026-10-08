@@ -276,7 +276,11 @@ func scenarios(l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) []scenario 
 			return len(c.Changes), err
 		}},
 		{"checkpoint --dry-run", func(ctx context.Context) (int, error) {
-			m, err := mint.Report(ctx, deps, true)
+			m, err := mint.Report(ctx, deps, api.MintQuery{DryRun: true})
+			return m.MintedCount(), err
+		}},
+		{"checkpoint --dry-run --full", func(ctx context.Context) (int, error) {
+			m, err := mint.Report(ctx, deps, api.MintQuery{DryRun: true, Full: true})
 			return m.MintedCount(), err
 		}},
 	}

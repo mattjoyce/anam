@@ -223,6 +223,57 @@ func TestPinLedger_RefusesADifferentLedger(t *testing.T) {
 	}
 }
 
+// The log is sealed while every checkpoint belongs to a recorded run: a row written
+// after the last run unseals it, even one at that run's own watermark, and the next
+// recorded run seals it again.
+func TestLogSealed_UntilARowNoRunAccountsFor(t *testing.T) {
+	t.Parallel()
+	d, _ := open(t)
+	ctx := context.Background()
+	sealed := func() bool {
+		t.Helper()
+		ok, err := d.LogSealed(ctx)
+		if err != nil {
+			t.Fatalf("LogSealed: %v", err)
+		}
+		return ok
+	}
+	row := func(span string, v int) {
+		t.Helper()
+		r := ops.CheckpointRow{SpanID: span, V: v, CoversW: 5, ValueHash: "sha256:x", MintedAt: "t"}
+		if err := d.AppendCheckpoint(ctx, r); err != nil {
+			t.Fatalf("AppendCheckpoint: %v", err)
+		}
+	}
+	run := func() {
+		t.Helper()
+		if err := d.AppendMintRun(ctx, 5, "t"); err != nil {
+			t.Fatalf("AppendMintRun: %v", err)
+		}
+	}
+
+	if sealed() {
+		t.Fatal("a log no run has sealed reads as sealed")
+	}
+	row("bucket:2026", 1)
+	run()
+	if !sealed() {
+		t.Fatal("a recorded run did not seal the log")
+	}
+	run()
+	if !sealed() {
+		t.Fatal("recording the same run again unsealed the log")
+	}
+	row("bucket:2026-07", 1) // a mint at the same W that crashed before recording
+	if sealed() {
+		t.Fatal("a row no run accounts for left the log sealed")
+	}
+	run()
+	if !sealed() {
+		t.Fatal("a run at the same W did not seal the log again")
+	}
+}
+
 // A read-only handle reads what the writer wrote and refuses to write.
 func TestOpenReadOnlyRefusesWrites(t *testing.T) {
 	t.Parallel()

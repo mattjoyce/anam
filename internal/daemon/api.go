@@ -50,18 +50,21 @@ func (d *Daemon) getCheckpoints(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, list)
 }
 
-// postCheckpoints mints, or with ?dry_run=true derives without publishing. Minting
+// postCheckpoints mints, or with ?dry_run=true derives without publishing; ?full=true
+// folds the whole ledger instead of starting from the last run. Minting
 // writes the operational store and the artifacts, so it runs on the write queue. While
 // another write holds the queue it answers 503 at once, naming the ingest if one is
 // running, rather than wait out a run that may take minutes. Once accepted, the mint
 // is answered whenever it ends, so a 2xx or an error always says what happened.
 func (d *Daemon) postCheckpoints(w http.ResponseWriter, r *http.Request) {
-	dryRun := false
-	if v := r.URL.Query().Get("dry_run"); v != "" {
-		var err error
-		if dryRun, err = strconv.ParseBool(v); err != nil {
-			writeError(w, http.StatusBadRequest, fmt.Errorf("dry_run %q: %w", v, err))
-			return
+	var q api.MintQuery
+	for name, into := range map[string]*bool{"dry_run": &q.DryRun, "full": &q.Full} {
+		if v := r.URL.Query().Get(name); v != "" {
+			var err error
+			if *into, err = strconv.ParseBool(v); err != nil {
+				writeError(w, http.StatusBadRequest, fmt.Errorf("%s %q: %w", name, v, err))
+				return
+			}
 		}
 	}
 	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
@@ -72,7 +75,7 @@ func (d *Daemon) postCheckpoints(w http.ResponseWriter, r *http.Request) {
 		m, err = mint.Report(ctx, mint.Deps{
 			Ledger: s.Ledger, Index: s.Ops, Artifacts: d.artifacts, Buckets: buckets, Clock: clock.Real{},
 			Budget: d.cfg.CheckpointBudget,
-		}, dryRun)
+		}, q)
 		return err
 	})
 	if errors.Is(err, ErrBusy) {

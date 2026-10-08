@@ -87,15 +87,47 @@ func (d *DB) AppendCheckpoint(ctx context.Context, r CheckpointRow) error {
 	return nil
 }
 
-// AppendMintRun records that a mint at w checked every span. Recording the same w
-// twice is a no-op: a second run at an unchanged head checked the same thing.
-func (d *DB) AppendMintRun(ctx context.Context, w int64, ranAt string) error {
-	_, err := d.db.ExecContext(ctx,
-		`INSERT INTO mint_run (w, ran_at) VALUES (?, ?) ON CONFLICT (w) DO NOTHING`, w, ranAt)
+// AppendMintRun records that a mint at w checked every span, and seals the log at the
+// rows it holds now (LogSealed). Recording the same w twice adds no run: a second run
+// at an unchanged head checked the same thing, though it may have minted, and its seal
+// says so.
+func (d *DB) AppendMintRun(ctx context.Context, w int64, ranAt string) (err error) {
+	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("ops: append mint run at %d: %w", w, err)
 	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback() // the error being returned is the one that matters
+		}
+	}()
+	if _, err = tx.ExecContext(ctx,
+		`INSERT INTO mint_run (w, ran_at) VALUES (?, ?) ON CONFLICT (w) DO NOTHING`, w, ranAt); err != nil {
+		return fmt.Errorf("ops: append mint run at %d: %w", w, err)
+	}
+	if _, err = tx.ExecContext(ctx,
+		`INSERT INTO mint_seal (checkpoints, w) SELECT COUNT(*), ? FROM checkpoint WHERE true
+		 ON CONFLICT (checkpoints) DO NOTHING`, w); err != nil {
+		return fmt.Errorf("ops: seal mint run at %d: %w", w, err)
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("ops: append mint run at %d: %w", w, err)
+	}
 	return nil
+}
+
+// LogSealed reports whether every checkpoint in the log belongs to a recorded run: the
+// log holds as many rows as it did when the newest run was recorded. False means a
+// mint since then crashed after writing, or no run has been sealed.
+func (d *DB) LogSealed(ctx context.Context) (bool, error) {
+	var sealed bool
+	err := d.db.QueryRowContext(ctx, `
+		SELECT COALESCE((SELECT MAX(checkpoints) FROM mint_seal), -1) = (SELECT COUNT(*) FROM checkpoint)`,
+	).Scan(&sealed)
+	if err != nil {
+		return false, fmt.Errorf("ops: read mint seal: %w", err)
+	}
+	return sealed, nil
 }
 
 // LastMintRun is the watermark of the latest mint run at or below w. ok is false

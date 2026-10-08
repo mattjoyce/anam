@@ -33,7 +33,7 @@ runs, nothing else may open those files. Ask it over HTTP instead.
 | `GET /v1/changes` | yes | Anam-events by anam-time: `since` (required), `until`, `zone`. Carries `index_seq` and `w`; `w` above `index_seq` means the index is behind. |
 | `GET /v1/receipts`, `/v1/receipts/{hash}`, `/v1/receipts/{hash}/verify` | yes | List, show (from artifacts alone), prove against the ledger. 404 unknown, 400 malformed hash, 409 a receipt this ledger cannot honour. |
 | `GET /v1/checkpoints` | yes | The checkpoint log. |
-| `POST /v1/checkpoints` | yes | Mint (`?dry_run=true` derives only). 503 at once while an ingest runs. |
+| `POST /v1/checkpoints` | yes | Mint from the last run (`?dry_run=true` derives only, `?full=true` folds the whole ledger, the repair). 503 at once while an ingest runs. |
 | `GET /` and below | yes | The inspector (timeline, facets, events, documents). Browser: basic auth, any user name, the token as password. |
 
 There is no API for retraction or for writing a record; those are local maintenance or design

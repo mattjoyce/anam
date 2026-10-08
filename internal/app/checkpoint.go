@@ -17,7 +17,7 @@ import (
 )
 
 func checkpointCmd(cfgPath *string) *cobra.Command {
-	var dryRun bool
+	var q api.MintQuery
 
 	cmd := &cobra.Command{
 		Use:   "checkpoint",
@@ -34,21 +34,26 @@ cache of the fold, there to bound replay, and is rebuilt by running this again.
 Buckets subdivide: a bucket whose value is over checkpoint_budget bytes (default
 1 MiB) is split along the calendar, a year into months, a month into days. The run
 is recorded, and a timeline read then starts from these checkpoints and replays only
-what came after, so mint again after an ingest to keep reads short.`,
+what came after, so mint again after an ingest to keep reads short.
+
+A mint starts from the last run: only the buckets the events since then touched are
+rebuilt and compared. --full folds the whole ledger and compares every bucket instead,
+which repairs any checkpoint that is not the fold's.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := loadRoutedConfig(*cfgPath, cmd)
 			if err != nil {
 				return err
 			}
-			m, err := runMint(cmd.Context(), cfg, dryRun)
+			m, err := runMint(cmd.Context(), cfg, q)
 			if err != nil {
 				return err
 			}
 			return writeMint(cmd, m)
 		},
 	}
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "derive and report, but publish nothing")
+	cmd.Flags().BoolVar(&q.DryRun, "dry-run", false, "derive and report, but publish nothing")
+	cmd.Flags().BoolVar(&q.Full, "full", false, "fold the whole ledger rather than start from the last run")
 	cmd.AddCommand(checkpointListCmd(cfgPath))
 	return cmd
 }
@@ -74,13 +79,13 @@ func checkpointListCmd(cfgPath *string) *cobra.Command {
 
 // runMint asks the daemon to mint when a server is configured, and mints into the
 // local files when not.
-func runMint(ctx context.Context, cfg config.Config, dryRun bool) (api.Mint, error) {
+func runMint(ctx context.Context, cfg config.Config, q api.MintQuery) (api.Mint, error) {
 	if cfg.Server != "" {
 		c, err := newClient(cfg)
 		if err != nil {
 			return api.Mint{}, err
 		}
-		return c.Mint(ctx, dryRun)
+		return c.Mint(ctx, q)
 	}
 	deps, closeAll, err := mintDeps(ctx, cfg)
 	if err != nil {
@@ -89,7 +94,7 @@ func runMint(ctx context.Context, cfg config.Config, dryRun bool) (api.Mint, err
 	defer closeAll()
 	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()
-	return mint.Report(ctx, deps, dryRun)
+	return mint.Report(ctx, deps, q)
 }
 
 func writeMint(cmd *cobra.Command, m api.Mint) error {
@@ -116,8 +121,12 @@ func writeMint(cmd *cobra.Command, m api.Mint) error {
 	if !m.Written {
 		verb = "would mint (dry run — nothing written)"
 	}
-	_, err := fmt.Fprintf(out, "%s %d of %d buckets at W=%d\n",
-		verb, m.MintedCount(), len(m.Outcomes), m.W)
+	from := "folding the whole ledger"
+	if !m.Full {
+		from = fmt.Sprintf("from the run at W=%d", m.From)
+	}
+	_, err := fmt.Fprintf(out, "%s %d of %d buckets at W=%d, %s\n",
+		verb, m.MintedCount(), len(m.Outcomes), m.W, from)
 	return err
 }
 

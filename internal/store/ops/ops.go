@@ -121,6 +121,17 @@ CREATE TABLE IF NOT EXISTS mint_run (
   ran_at TEXT NOT NULL
 );
 
+-- tier: derived — how many checkpoint rows the log held when a run at w was recorded.
+-- A run's own rows and an earlier run's share a covers_w when both mint at one W (a
+-- lowered budget splits with no new event), so covers_w cannot say a row was left by a
+-- run that crashed. The count can: a log holding more rows than its newest seal has
+-- checkpoints no recorded run accounts for, and nothing starts from it until a full
+-- mint seals it again. Additive, like mint_run: a store without seals mints in full.
+CREATE TABLE IF NOT EXISTS mint_seal (
+  checkpoints INTEGER PRIMARY KEY,
+  w           INTEGER NOT NULL
+);
+
 -- tier: derived — how many facets each checkpoint's value holds, so a read can count
 -- the whole value without decoding the buckets it does not show. Additive, like
 -- mint_run: a checkpoint without a row here is counted by decoding it.

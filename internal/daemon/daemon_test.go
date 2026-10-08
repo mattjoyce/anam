@@ -266,3 +266,21 @@ func TestShutdownDuringWrite(t *testing.T) {
 		t.Fatalf("write after shutdown: got %v, want ErrStopped", err)
 	}
 }
+
+func TestReady(t *testing.T) {
+	d := open(t, newConfig(t))
+	t.Cleanup(func() { _ = d.closeStores() })
+	srv := httptest.NewServer(d.Handler())
+	defer srv.Close()
+	_, port, _ := net.SplitHostPort(srv.Listener.Addr().String())
+
+	for _, addr := range []string{"127.0.0.1:" + port, "0.0.0.0:" + port, ":" + port} {
+		if err := Ready(context.Background(), addr); err != nil {
+			t.Errorf("Ready(%s): %v", addr, err)
+		}
+	}
+	srv.Close()
+	if err := Ready(context.Background(), "127.0.0.1:"+port); err == nil {
+		t.Error("Ready reported a stopped daemon as ready")
+	}
+}

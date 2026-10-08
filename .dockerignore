@@ -1,0 +1,7 @@
+# Admit only what the image is built from. Everything else stays out of the build
+# context, above all private/ and the health exports.
+*
+!go.mod
+!go.sum
+!cmd/
+!internal/

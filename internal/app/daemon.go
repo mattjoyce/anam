@@ -60,7 +60,27 @@ or reaches its deadline, and the stores are closed.`,
 	}
 	cmd.Flags().StringVar(&importsPath, "imports", "",
 		"imports file (default: $ANAM_IMPORTS, then <user config dir>/anam/imports.yaml)")
+	cmd.AddCommand(daemonReadyCmd(cfgPath))
 	return cmd
+}
+
+// daemonReadyCmd asks a running daemon's /healthz and exits by its answer. It is the
+// container's health check: a distroless image has no curl to do it with.
+func daemonReadyCmd(cfgPath *string) *cobra.Command {
+	return &cobra.Command{
+		Use:   "ready",
+		Short: "exit 0 if the daemon on the configured address answers ready",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cfg, err := loadConfig(*cfgPath, cmd)
+			if err != nil {
+				return err
+			}
+			ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
+			defer cancel()
+			return daemon.Ready(ctx, cfg.Listen)
+		},
+	}
 }
 
 // daemonIngest is the CLI's ingest on the daemon's held stores: the same guard, the

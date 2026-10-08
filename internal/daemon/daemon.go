@@ -280,3 +280,28 @@ func (d *Daemon) serve(ctx context.Context, ln net.Listener) error {
 func (d *Daemon) closeStores() error {
 	return errors.Join(d.read.Close(), d.writes.Ledger.Close(), d.writes.Ops.Close())
 }
+
+// Ready asks the daemon listening on addr whether it is ready. An address bound to
+// every interface is asked on loopback.
+func Ready(ctx context.Context, addr string) error {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return fmt.Errorf("daemon: ready: %q: %w", addr, err)
+	}
+	if ip := net.ParseIP(host); host == "" || (ip != nil && ip.IsUnspecified()) {
+		host = "127.0.0.1"
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+net.JoinHostPort(host, port)+"/healthz", nil)
+	if err != nil {
+		return fmt.Errorf("daemon: ready: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("daemon: ready: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("daemon: ready: /healthz answered %s", resp.Status)
+	}
+	return nil
+}

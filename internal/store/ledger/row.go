@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/clock"
@@ -24,6 +25,16 @@ const facetColumns = `facet_id, artifact_version, type, confidence, classificati
 	binding_person_id, binding_assurance, binding_span_hint,
 	prov_source, prov_injector, prov_source_ref, prov_method, prov_model, prov_watermark,
 	source_schema, schema_version, content_hash, payload_kind, media_type, payload`
+
+// qualified is facetColumns with each column prefixed by a table alias, for a select
+// that joins the facet table to something else.
+func qualified(alias string) string {
+	cols := strings.Split(facetColumns, ",")
+	for i, c := range cols {
+		cols[i] = alias + "." + strings.TrimSpace(c)
+	}
+	return strings.Join(cols, ", ")
+}
 
 const insertFacetSQL = `INSERT INTO facet (` + facetColumns + `)
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`

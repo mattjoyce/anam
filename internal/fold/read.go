@@ -16,6 +16,7 @@ type Ledger interface {
 	Head(ctx context.Context) (ledger.Watermark, error)
 	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.AnamEvent, error)
 	Version(ctx context.Context, facetID string, version int) (facet.Facet, error)
+	Versions(ctx context.Context, refs []ledger.VersionRef) ([]facet.Facet, error)
 }
 
 // Result is one consistent read of the whole person at a watermark.
@@ -90,64 +91,20 @@ func ReadAt(ctx context.Context, l Ledger, w ledger.Watermark) (Result, error) {
 	return Result{W: w, States: states, Live: live, Value: value}, nil
 }
 
-// fetchWorkers bounds the concurrent artifact reads. The whole-person read is one
-// fetch per live facet; serially that priced a 659-facet person at minutes. The reads
-// are independent and strongly consistent, so ordering is imposed afterwards by sort,
-// not by the fetch.
-const fetchWorkers = 16
-
-// fetchLive reads each live facet at the exact version the fold derived.
+// fetchLive reads each live facet at the exact version the fold derived, in batches
+// rather than one query per facet: a read of the whole person fetches every live
+// artifact, and a query each priced 14,000 facets at most of a second in SQL parsing
+// alone.
 func fetchLive(ctx context.Context, l Ledger, states map[string]State) ([]facet.Facet, error) {
-	ids := make([]string, 0, len(states))
+	refs := make([]ledger.VersionRef, 0, len(states))
 	for id, st := range states {
 		if st.Live() {
-			ids = append(ids, id)
+			refs = append(refs, ledger.VersionRef{FacetID: id, Version: st.Version})
 		}
 	}
-
-	type fetched struct {
-		f   facet.Facet
-		err error
-	}
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel() // stops in-flight workers once a bad result lands
-
-	work := make(chan string)
-	results := make(chan fetched)
-	for range fetchWorkers {
-		go func() {
-			for id := range work {
-				f, err := l.Version(ctx, id, states[id].Version)
-				if err != nil {
-					err = fmt.Errorf("%w: facet %s folded to v%d: %v",
-						ErrCorruptStream, id, states[id].Version, err)
-				}
-				select {
-				case results <- fetched{f: f, err: err}:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
-	}
-	go func() {
-		defer close(work)
-		for _, id := range ids {
-			select {
-			case work <- id:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	live := make([]facet.Facet, 0, len(ids))
-	for range ids {
-		r := <-results
-		if r.err != nil {
-			return nil, r.err
-		}
-		live = append(live, r.f)
+	live, err := l.Versions(ctx, refs)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrCorruptStream, err)
 	}
 
 	sort.Slice(live, func(i, j int) bool {

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/mattjoyce/anam/internal/facet"
 )
@@ -101,6 +102,86 @@ func (l *Ledger) Version(ctx context.Context, facetID string, version int) (face
 		return facet.Facet{}, classify(fmt.Sprintf("read %s v%d", facetID, version), err)
 	}
 	return f, nil
+}
+
+// VersionRef names one artifact version of one facet.
+type VersionRef struct {
+	FacetID string
+	Version int
+}
+
+// versionsBatch bounds the refs one Versions query carries: two parameters each, well
+// inside SQLite's limit on bound parameters.
+const versionsBatch = 500
+
+// Versions returns the artifact at each ref, in no particular order. It is Version for
+// many facets at once: a read that needs thousands of artifacts asks in batches, each
+// one query that walks the primary key, rather than a query per artifact. A ref that
+// names no artifact is ErrNotFound.
+func (l *Ledger) Versions(ctx context.Context, refs []VersionRef) ([]facet.Facet, error) {
+	out := make([]facet.Facet, 0, len(refs))
+	for start := 0; start < len(refs); start += versionsBatch {
+		batch := refs[start:min(start+versionsBatch, len(refs))]
+		got, err := l.versions(ctx, batch)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, got...)
+	}
+	return out, nil
+}
+
+func (l *Ledger) versions(ctx context.Context, refs []VersionRef) ([]facet.Facet, error) {
+	var q strings.Builder
+	args := make([]any, 0, 2*len(refs))
+	q.WriteString(`SELECT ` + qualified("f") + ` FROM (VALUES `)
+	for i, r := range refs {
+		if r.Version < 1 {
+			return nil, fmt.Errorf("ledger: artifact version %d is not a version", r.Version)
+		}
+		if i > 0 {
+			q.WriteString(",")
+		}
+		q.WriteString("(?,?)")
+		args = append(args, r.FacetID, r.Version)
+	}
+	// The VALUES list drives the join, so each ref is one lookup on the primary key.
+	q.WriteString(`) AS v CROSS JOIN facet AS f ON f.facet_id = v.column1 AND f.artifact_version = v.column2`)
+
+	rows, err := l.db.QueryContext(ctx, q.String(), args...)
+	if err != nil {
+		return nil, classify("read versions", err)
+	}
+	defer func() { _ = rows.Close() }()
+	out := make([]facet.Facet, 0, len(refs))
+	for rows.Next() {
+		f, err := scanFacet(rows)
+		if err != nil {
+			return nil, classify("read versions", err)
+		}
+		out = append(out, f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, classify("read versions", err)
+	}
+	if len(out) != len(refs) {
+		return nil, missing(refs, out)
+	}
+	return out, nil
+}
+
+// missing names a ref that Versions found no artifact for.
+func missing(refs []VersionRef, found []facet.Facet) error {
+	have := make(map[VersionRef]bool, len(found))
+	for _, f := range found {
+		have[VersionRef{FacetID: f.ID, Version: f.ArtifactVersion}] = true
+	}
+	for _, r := range refs {
+		if !have[r] {
+			return fmt.Errorf("%w: %s v%d", ErrNotFound, r.FacetID, r.Version)
+		}
+	}
+	return fmt.Errorf("%w: %d of %d versions", ErrNotFound, len(refs)-len(found), len(refs))
 }
 
 // Replay returns the anam-events in (sinceW, uptoW], in seq order: the range scan

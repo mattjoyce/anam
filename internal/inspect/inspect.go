@@ -40,6 +40,7 @@ type Ledger interface {
 	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.AnamEvent, error)
 	CurrentVersion(ctx context.Context, facetID string) (facet.Facet, error)
 	Version(ctx context.Context, facetID string, version int) (facet.Facet, error)
+	Versions(ctx context.Context, refs []ledger.VersionRef) ([]facet.Facet, error)
 }
 
 //go:embed templates/*.html

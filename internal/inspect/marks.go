@@ -28,7 +28,7 @@ const (
 	shapeTriDown  shape = "tri-down"
 	shapeCross    shape = "cross"
 	shapeStar     shape = "star"
-	shapeAlert    shape = "alert" // a triangle drawn larger: the watch raising its voice
+	shapeAlert    shape = "alert" // an exclamation mark drawn larger: the watch raising its voice
 	markR               = 5.0
 	markAlertR          = 7.5
 	otherFamilyID       = "other"
@@ -38,8 +38,13 @@ const (
 type family struct {
 	ID    string
 	Label string
-	Hue   int // palette slot, 0..7; the row's colour whatever else is on screen
+	Hue   int // palette slot, 0..7, or hueNeutral; the row's colour whatever else is on screen
 }
+
+// hueNeutral is the grey outside the eight palette slots. Documents take it: a
+// library file is a reference, not something that happened to the person, and
+// the eight hues are spent on the families that are.
+const hueNeutral = -1
 
 // families in row order, top to bottom. Hues are assigned once, here, and never
 // move when a filter hides a family (dataviz: colour follows the entity).
@@ -51,7 +56,8 @@ var families = []family{
 	{"labs", "labs", 2},
 	{"meds", "meds", 4},
 	{"clinical", "clinical", 5},
-	{"documents", "docs & travel", 1},
+	{"travel", "travel", 1},
+	{"documents", "documents", hueNeutral},
 }
 
 // kind is what sort of fact a type records.
@@ -103,10 +109,10 @@ var typeStyles = map[facet.Type]typeStyle{
 	"illness.hangover": {"clinical", shapeCross, kindEvent},
 
 	"doc.reference":   {"documents", shapeSquare, kindEvent},
-	"travel.departed": {"documents", shapeTriUp, kindEvent},
-	"travel.arrived":  {"documents", shapeTriDown, kindEvent},
-	"travel.returned": {"documents", shapeDiamond, kindEvent},
-	"travel.flight":   {"documents", shapeCross, kindEvent},
+	"travel.departed": {"travel", shapeTriUp, kindEvent},
+	"travel.arrived":  {"travel", shapeTriDown, kindEvent},
+	"travel.returned": {"travel", shapeDiamond, kindEvent},
+	"travel.flight":   {"travel", shapeCross, kindEvent},
 }
 
 func styleOf(t facet.Type) typeStyle {
@@ -133,7 +139,7 @@ func markClass(t facet.Type) string {
 // hueClass is the CSS class that colours a family's marks.
 func hueClass(familyID string) string {
 	for _, f := range families {
-		if f.ID == familyID {
+		if f.ID == familyID && f.Hue != hueNeutral {
 			return fmt.Sprintf("h%d", f.Hue)
 		}
 	}
@@ -150,10 +156,14 @@ func markPath(s shape, x, y float64) string {
 	case shapeDiamond:
 		d := r * 1.15
 		return fmt.Sprintf("M%.1f %.1fl%.1f %.1fl%.1f %.1fl%.1f %.1fz", x, y-d, d, d, -d, d, -d, -d)
-	case shapeTriUp, shapeAlert:
-		if s == shapeAlert {
-			r = markAlertR
-		}
+	case shapeAlert:
+		// a bar over a dot, two subpaths in one path so it fills as one mark
+		r = markAlertR
+		w := r * 0.36
+		return fmt.Sprintf("M%.1f %.1fh%.1fl%.1f %.1fh%.1fzM%.1f %.1fh%.1fv%.1fh%.1fz",
+			x-w, y-r*1.1, 2*w, -w*0.4, r*1.25, -1.2*w,
+			x-w*0.8, y+r*0.55, 1.6*w, r*0.5, -1.6*w)
+	case shapeTriUp:
 		return fmt.Sprintf("M%.1f %.1fL%.1f %.1fL%.1f %.1fz", x, y-r*1.1, x+r, y+r*0.75, x-r, y+r*0.75)
 	case shapeTriDown:
 		return fmt.Sprintf("M%.1f %.1fL%.1f %.1fL%.1f %.1fz", x, y+r*1.1, x+r, y-r*0.75, x-r, y-r*0.75)
@@ -197,7 +207,7 @@ func rowsFor(types []facet.Type) []tlRow {
 		byFamily[f] = append(byFamily[f], t)
 	}
 	order := append([]family{}, families...)
-	order = append(order, family{otherFamilyID, "other", -1})
+	order = append(order, family{otherFamilyID, "other", hueNeutral})
 	var rows []tlRow
 	for _, f := range order {
 		ts := byFamily[f.ID]

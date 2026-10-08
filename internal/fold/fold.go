@@ -121,6 +121,29 @@ func Apply(cur State, known bool, ev facet.AnamEvent) (State, error) {
 	}
 }
 
+// StateAfter is the state ev leaves its facet in, whatever came before: every event
+// names the artifact version it concerns, and its kind decides the status. It is what
+// lets a reader apply a tail of events to a checkpoint without the facets' history.
+// It does not check the stream; Apply does, on the full fold, and the two must agree
+// on every event Apply accepts.
+func StateAfter(ev facet.AnamEvent) (State, error) {
+	var st facet.Status
+	switch ev.Kind {
+	case facet.EventAdmitted, facet.EventSuperseded:
+		st = facet.StatusAdmitted
+	case facet.EventTombstoned:
+		st = facet.StatusTombstoned
+	case facet.EventEndorsed:
+		st = facet.StatusEndorsed
+	case facet.EventRejected:
+		st = facet.StatusRejected
+	default:
+		return State{}, fmt.Errorf("%w: unknown anam-event kind %q on facet %s",
+			ErrCorruptStream, ev.Kind, ev.FacetID)
+	}
+	return State{Version: ev.ArtifactVersion, Status: st}, nil
+}
+
 // mustConcernCurrent checks that a pure status transition names the artifact version
 // actually in force — the gate stamps the current version into every Mark, so any
 // other version is a stream nothing wrote.

@@ -10,8 +10,8 @@ import (
 func WriteTable(w io.Writer, r Report) error {
 	d := r.Dataset
 	_, _ = fmt.Fprintf(w, "%s on %s (%s, %d CPUs), build %s, %s\n", r.Label, r.Host, r.Platform, r.CPUs, r.Build, r.Started)
-	_, _ = fmt.Fprintf(w, "dataset %s: W=%d, %d facets, %d live, %d buckets, %d checkpoints, ledger %.1f MB\n\n",
-		d.Name, d.W, d.Facets, d.Live, d.Buckets, d.Checkpoints, float64(d.LedgerBytes)/(1<<20))
+	_, _ = fmt.Fprintf(w, "dataset %s: W=%d, %d facets, %d live, %d buckets, %d checkpoints, last mint run W=%d, ledger %.1f MB\n\n",
+		d.Name, d.W, d.Facets, d.Live, d.Buckets, d.Checkpoints, d.LastRun, float64(d.LedgerBytes)/(1<<20))
 	tw := tabwriter.NewWriter(w, 2, 0, 2, ' ', tabwriter.AlignRight)
 	_, _ = fmt.Fprintln(tw, "SCENARIO\tMIN ms\tMEDIAN ms\tMAX ms\tROWS\t")
 	for _, s := range r.Scenarios {

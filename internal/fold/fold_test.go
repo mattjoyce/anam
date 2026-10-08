@@ -168,3 +168,34 @@ func TestFold_FacetsFoldIndependently(t *testing.T) {
 		t.Error("a facet with no events has no state")
 	}
 }
+
+// StateAfter must agree with Apply on every event Apply accepts: it is how a composed
+// read applies a tail without the history, and a disagreement would be a second
+// account of the same fold.
+func TestStateAfterAgreesWithApply(t *testing.T) {
+	t.Parallel()
+	events := []facet.AnamEvent{
+		{Kind: facet.EventAdmitted, FacetID: "a", ArtifactVersion: 1},
+		{Kind: facet.EventSuperseded, FacetID: "a", ArtifactVersion: 2, PriorArtifactVersion: 1},
+		{Kind: facet.EventEndorsed, FacetID: "a", ArtifactVersion: 2},
+		{Kind: facet.EventSuperseded, FacetID: "a", ArtifactVersion: 3, PriorArtifactVersion: 2},
+		{Kind: facet.EventRejected, FacetID: "a", ArtifactVersion: 3},
+		{Kind: facet.EventTombstoned, FacetID: "a", ArtifactVersion: 3},
+	}
+	var cur fold.State
+	known := false
+	for _, ev := range events {
+		want, err := fold.Apply(cur, known, ev)
+		if err != nil {
+			t.Fatalf("Apply %s: %v", ev.Kind, err)
+		}
+		got, err := fold.StateAfter(ev)
+		if err != nil || got != want {
+			t.Errorf("after %s: StateAfter = %+v, %v; Apply = %+v", ev.Kind, got, err, want)
+		}
+		cur, known = want, true
+	}
+	if _, err := fold.StateAfter(facet.AnamEvent{Kind: "bogus"}); err == nil {
+		t.Error("an unknown kind was accepted")
+	}
+}

@@ -13,8 +13,11 @@ import (
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/consent"
 	"github.com/mattjoyce/anam/internal/def"
+	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
+	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
+	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
 // ErrQuery marks a query that cannot be read as asked: a malformed instant, flags
@@ -45,10 +48,28 @@ func Location(zone string) (*time.Location, error) {
 	return loc, nil
 }
 
-// Timeline performs the read q describes over l: at head or at an anam-time, through
+// Ledger is the ledger surface the reads need: the fold's, its identity, and the
+// newest version of each facet for the rows a composed read shows.
+type Ledger interface {
+	fold.Ledger
+	ID(ctx context.Context) (string, error)
+	LatestVersions(ctx context.Context, ids []string) (map[string]int, error)
+}
+
+// Source is the record a read is taken from: the ledger, and when they are to hand,
+// the checkpoint log and the artifacts its checkpoints are filed in. With them a read
+// starts from the last mint run and replays only what came after; without them, or
+// before any run, it folds the ledger from the beginning. The answer is the same.
+type Source struct {
+	Ledger      Ledger
+	Checkpoints mint.CheckpointLog
+	Artifacts   mint.Store
+}
+
+// Timeline performs the read q describes over src: at head or at an anam-time, through
 // a projection or not, as a log or as the snapshot at a fact-time, narrowed by
 // fact-time and type, with or without the verdicts.
-func Timeline(ctx context.Context, l fold.Ledger, q api.TimelineQuery) (api.Timeline, error) {
+func Timeline(ctx context.Context, src Source, q api.TimelineQuery) (api.Timeline, error) {
 	loc, err := Location(q.Zone)
 	if err != nil {
 		return api.Timeline{}, err
@@ -62,21 +83,29 @@ func Timeline(ctx context.Context, l fold.Ledger, q api.TimelineQuery) (api.Time
 		return api.Timeline{}, badQuery(err)
 	}
 
-	v, err := readView(ctx, l, asOf, q.Projection, at)
+	// Explain shows every version ever in force, the displaced ones included, so it
+	// needs every facet's history: the full fold, always.
+	if q.Explain {
+		src.Checkpoints = nil
+	}
+	v, err := readView(ctx, src, asOf, q.Projection, at)
 	if err != nil {
 		return api.Timeline{}, err
 	}
 	t := v.describe()
 	if q.Explain {
-		return explain(ctx, l, v, b, q.Type, t)
+		return explain(ctx, src.Ledger, v, b, q.Type, t)
 	}
 
-	t.Versions = map[string]int{}
+	var ids []string
 	for _, e := range v.shown.Entries() {
 		if b.admits(e) && (q.Type == "" || string(e.Type) == q.Type) {
 			t.Entries = append(t.Entries, e)
-			t.Versions[e.FacetID] = v.res.States[e.FacetID].Version
+			ids = append(ids, e.FacetID)
 		}
+	}
+	if t.Versions, err = v.versionsOf(ctx, src.Ledger, ids); err != nil {
+		return api.Timeline{}, err
 	}
 	t.Shown = len(t.Entries)
 	return t, nil
@@ -99,6 +128,10 @@ type view struct {
 
 	// defs is the bundled Definition set: which types close a series.
 	defs *def.Registry
+
+	// composed is set when the read was composed from checkpoints. res.States is then
+	// empty, and a shown row's version comes from versionsOf.
+	composed *mint.Composed
 }
 
 // describe is the read's header as a value: which watermark, which lens, and the
@@ -123,14 +156,14 @@ func (v view) describe() api.Timeline {
 
 // readView performs the read the flags describe: at head or at an anam-time, through
 // a projection or not, as a log or as the snapshot at a fact-time.
-func readView(ctx context.Context, l fold.Ledger, asOfTime time.Time, projName, at string) (view, error) {
+func readView(ctx context.Context, src Source, asOfTime time.Time, projName, at string) (view, error) {
 	defs, err := def.Bundled()
 	if err != nil {
 		return view{}, err
 	}
 	v := view{defs: defs, at: at}
 
-	res, err := readAtOrHead(ctx, l, asOfTime, &v)
+	res, err := readAtOrHead(ctx, src, asOfTime, &v)
 	if err != nil {
 		return view{}, err
 	}
@@ -165,14 +198,81 @@ func readView(ctx context.Context, l fold.Ledger, asOfTime time.Time, projName, 
 	return v, nil
 }
 
-func readAtOrHead(ctx context.Context, l fold.Ledger, asOfTime time.Time, v *view) (fold.Result, error) {
+// readAtOrHead reads the canonical at the head, or at the watermark an anam-time names,
+// composed from checkpoints when src has them and a mint run is at or below it.
+func readAtOrHead(ctx context.Context, src Source, asOfTime time.Time, v *view) (fold.Result, error) {
+	l := src.Ledger
+	var w ledger.Watermark
+	var err error
 	if asOfTime.IsZero() {
-		return fold.Read(ctx, l)
+		w, err = l.Head(ctx)
+	} else {
+		w, err = fold.WatermarkAt(ctx, l, asOfTime)
+		v.asOfAt = clock.Format(asOfTime)
 	}
-	w, err := fold.WatermarkAt(ctx, l, asOfTime)
 	if err != nil {
 		return fold.Result{}, err
 	}
-	v.asOfAt = clock.Format(asOfTime)
+	if src.Checkpoints != nil && src.Artifacts != nil {
+		c, ok, err := mint.ReadAt(ctx, l, src.Checkpoints, src.Artifacts, w)
+		if err != nil {
+			return fold.Result{}, err
+		}
+		if ok {
+			v.composed = &c
+			return fold.Result{W: c.W, Value: c.Value}, nil
+		}
+	}
 	return fold.ReadAt(ctx, l, w)
+}
+
+// versionsOf is the artifact version in force at the read's W of each facet in ids.
+// A full fold knows every one. A composed read knows those its tail touched; the rest
+// were untouched since the mint run, so their version is the newest the ledger holds,
+// unless an event after W moved it, and then the first such event names it.
+func (v view) versionsOf(ctx context.Context, l Ledger, ids []string) (map[string]int, error) {
+	out := make(map[string]int, len(ids))
+	if v.composed == nil {
+		for _, id := range ids {
+			out[id] = v.res.States[id].Version
+		}
+		return out, nil
+	}
+	var rest []string
+	for _, id := range ids {
+		if ver, ok := v.composed.Versions[id]; ok {
+			out[id] = ver
+		} else {
+			rest = append(rest, id)
+		}
+	}
+	latest, err := l.LatestVersions(ctx, rest)
+	if err != nil {
+		return nil, err
+	}
+	head, err := l.Head(ctx)
+	if err != nil {
+		return nil, err
+	}
+	later, err := l.Replay(ctx, v.res.W, head)
+	if err != nil {
+		return nil, err
+	}
+	atW := map[string]int{}
+	for _, ev := range later {
+		if _, seen := atW[ev.FacetID]; seen {
+			continue
+		}
+		atW[ev.FacetID] = ev.ArtifactVersion
+		if ev.Kind == facet.EventSuperseded {
+			atW[ev.FacetID] = ev.PriorArtifactVersion
+		}
+	}
+	for _, id := range rest {
+		out[id] = latest[id]
+		if ver, ok := atW[id]; ok {
+			out[id] = ver
+		}
+	}
+	return out, nil
 }

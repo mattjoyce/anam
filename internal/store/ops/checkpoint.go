@@ -2,6 +2,8 @@ package ops
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 )
 
@@ -83,4 +85,65 @@ func (d *DB) AppendCheckpoint(ctx context.Context, r CheckpointRow) error {
 		return fmt.Errorf("ops: append checkpoint %s v%d: %w", r.SpanID, r.V, err)
 	}
 	return nil
+}
+
+// AppendMintRun records that a mint at w checked every span. Recording the same w
+// twice is a no-op: a second run at an unchanged head checked the same thing.
+func (d *DB) AppendMintRun(ctx context.Context, w int64, ranAt string) error {
+	_, err := d.db.ExecContext(ctx,
+		`INSERT INTO mint_run (w, ran_at) VALUES (?, ?) ON CONFLICT (w) DO NOTHING`, w, ranAt)
+	if err != nil {
+		return fmt.Errorf("ops: append mint run at %d: %w", w, err)
+	}
+	return nil
+}
+
+// LastMintRun is the watermark of the latest mint run at or below w. ok is false
+// when there is none.
+func (d *DB) LastMintRun(ctx context.Context, w int64) (run int64, ok bool, err error) {
+	var got sql.NullInt64
+	if err := d.db.QueryRowContext(ctx, `SELECT MAX(w) FROM mint_run WHERE w <= ?`, w).Scan(&got); err != nil {
+		return 0, false, fmt.Errorf("ops: read mint runs: %w", err)
+	}
+	return got.Int64, got.Valid, nil
+}
+
+// CheckpointsAt returns each span's latest checkpoint whose covers_w is at or below w:
+// the span's value as a mint at w found it, when w is a mint run.
+func (d *DB) CheckpointsAt(ctx context.Context, w int64) ([]CheckpointRow, error) {
+	rows, err := d.db.QueryContext(ctx, `
+		SELECT span_id, v, covers_w, value_hash, minted_at FROM checkpoint c
+		WHERE v = (SELECT MAX(v) FROM checkpoint WHERE span_id = c.span_id AND covers_w <= ?)
+		ORDER BY span_id`, w)
+	if err != nil {
+		return nil, fmt.Errorf("ops: read checkpoints at %d: %w", w, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []CheckpointRow
+	for rows.Next() {
+		var r CheckpointRow
+		if err := rows.Scan(&r.SpanID, &r.V, &r.CoversW, &r.ValueHash, &r.MintedAt); err != nil {
+			return nil, fmt.Errorf("ops: scan checkpoint: %w", err)
+		}
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("ops: iterate checkpoints: %w", err)
+	}
+	return out, nil
+}
+
+// LedgerID is the ledger the store's derived tier was built from, or "" before any
+// was pinned.
+func (d *DB) LedgerID(ctx context.Context) (string, error) {
+	var id string
+	err := d.db.QueryRowContext(ctx, `SELECT value FROM meta WHERE key = 'ledger_id'`).Scan(&id)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return "", nil
+	case err != nil:
+		return "", fmt.Errorf("ops: read ledger pin: %w", err)
+	}
+	return id, nil
 }

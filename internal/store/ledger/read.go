@@ -184,6 +184,63 @@ func missing(refs []VersionRef, found []facet.Facet) error {
 	return fmt.Errorf("%w: %d of %d versions", ErrNotFound, len(refs)-len(found), len(refs))
 }
 
+// latestScanAt is the number of facets above which LatestVersions reads the whole
+// primary key once instead of asking in batches: past it, one scan of a narrow index
+// is cheaper than the lookups.
+const latestScanAt = 20000
+
+// LatestVersions returns the newest artifact version of each facet in ids that the
+// ledger holds. A facet it does not hold is absent from the map.
+func (l *Ledger) LatestVersions(ctx context.Context, ids []string) (map[string]int, error) {
+	out := make(map[string]int, len(ids))
+	if len(ids) > latestScanAt {
+		want := make(map[string]bool, len(ids))
+		for _, id := range ids {
+			want[id] = true
+		}
+		return out, l.latestVersions(ctx,
+			`SELECT facet_id, MAX(artifact_version) FROM facet GROUP BY facet_id`, nil,
+			func(id string, v int) {
+				if want[id] {
+					out[id] = v
+				}
+			})
+	}
+	for start := 0; start < len(ids); start += versionsBatch {
+		batch := ids[start:min(start+versionsBatch, len(ids))]
+		args := make([]any, len(batch))
+		for i, id := range batch {
+			args[i] = id
+		}
+		q := `SELECT facet_id, MAX(artifact_version) FROM facet WHERE facet_id IN (?` +
+			strings.Repeat(",?", len(batch)-1) + `) GROUP BY facet_id`
+		if err := l.latestVersions(ctx, q, args, func(id string, v int) { out[id] = v }); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+func (l *Ledger) latestVersions(ctx context.Context, q string, args []any, each func(string, int)) error {
+	rows, err := l.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return classify("read latest versions", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var id string
+		var v int
+		if err := rows.Scan(&id, &v); err != nil {
+			return classify("read latest versions", err)
+		}
+		each(id, v)
+	}
+	if err := rows.Err(); err != nil {
+		return classify("read latest versions", err)
+	}
+	return nil
+}
+
 // Replay returns the anam-events in (sinceW, uptoW], in seq order: the range scan
 // that every derived state is rebuilt from (§7). Pass the head watermark as uptoW for
 // "everything since"; pass a historical watermark for an as-of bound.

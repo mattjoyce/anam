@@ -22,7 +22,7 @@ func Main(ctx context.Context, build string) error {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.AddCommand(genCmd(), runCmd(build), compareCmd())
+	root.AddCommand(genCmd(), runCmd(build), mintCmd(), compareCmd())
 	return root.ExecuteContext(ctx)
 }
 
@@ -111,6 +111,30 @@ a record, never at one a daemon holds.`,
 	cmd.Flags().IntVar(&o.Reps, "reps", 5, "runs of each scenario")
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 10*time.Minute, "bound on one run of one scenario")
 	cmd.Flags().StringVar(&out, "out", "", "write the report as JSON here")
+	_ = cmd.MarkFlagRequired("dir")
+	return cmd
+}
+
+func mintCmd() *cobra.Command {
+	var dir, person string
+	cmd := &cobra.Command{
+		Use:   "mint",
+		Short: "mint the record in a directory, as anam checkpoint does, recording the run",
+		Long: `Mint catches the index up and mints every bucket that changed, recording the run, so
+a composed read can start from it. Use it on a copy of a real record, whose checkpoints
+were minted before runs were recorded.`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			n, w, err := MintRecord(cmd.Context(), PathsIn(dir), person)
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "minted %d buckets, run recorded at W=%d\n", n, w)
+			return err
+		},
+	}
+	cmd.Flags().StringVar(&dir, "dir", "", "the record's directory")
+	cmd.Flags().StringVar(&person, "person", Person, "whose ledger it is")
 	_ = cmd.MarkFlagRequired("dir")
 	return cmd
 }

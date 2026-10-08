@@ -291,3 +291,35 @@ func checkpoint(ctx context.Context, l *ledger.Ledger, p Paths, progress func(st
 	}
 	return nil
 }
+
+// MintRecord mints the record at p, as `anam checkpoint` does, and returns how many
+// buckets it minted and the run's watermark.
+func MintRecord(ctx context.Context, p Paths, person string) (int, int64, error) {
+	l, err := ledger.OpenReadOnly(ctx, p.Ledger, person)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer func() { _ = l.Close() }()
+	buckets, err := span.New(span.Default)
+	if err != nil {
+		return 0, 0, err
+	}
+	db, err := ops.Open(ctx, p.DB, buckets)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer func() { _ = db.Close() }()
+	if _, err := catchup.Sync(ctx, l, db, buckets); err != nil {
+		return 0, 0, err
+	}
+	store, err := artifact.New(p.Artifacts)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer func() { _ = store.Close() }()
+	res, err := mint.Run(ctx, mint.Deps{Ledger: l, Index: db, Artifacts: store, Buckets: buckets, Clock: clock.Real{}}, false)
+	if err != nil {
+		return 0, 0, err
+	}
+	return res.Minted(), int64(res.W), nil
+}

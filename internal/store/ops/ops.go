@@ -110,6 +110,17 @@ CREATE VIEW IF NOT EXISTS span_head AS
   FROM checkpoint c
   WHERE v = (SELECT MAX(v) FROM checkpoint WHERE span_id = c.span_id);
 
+-- tier: derived — one row per mint run that wrote. Every span's latest checkpoint at or
+-- below a run's w was checked against the fold at w, minted or found unchanged, so a
+-- read at or after w can start from those checkpoints and replay only what came after.
+-- A run is recorded after its checkpoints, so a run still in progress is invisible.
+-- Added without a schema version: the table is additive, and a store without it simply
+-- has no runs, which reads as "no checkpoint to start from".
+CREATE TABLE IF NOT EXISTS mint_run (
+  w      INTEGER PRIMARY KEY,
+  ran_at TEXT NOT NULL
+);
+
 -- tier: derived — per-source resumption markers. Losing one costs a re-scan, never a
 -- fact: ingest is idempotent.
 CREATE TABLE IF NOT EXISTS sync_cursor (

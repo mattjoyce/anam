@@ -82,7 +82,7 @@ func ReadAt(ctx context.Context, l Ledger, w ledger.Watermark) (Result, error) {
 
 	entries := make([]Entry, len(live))
 	for i, f := range live {
-		entries[i] = entryOf(f, states[f.ID])
+		entries[i] = EntryOf(f, states[f.ID])
 	}
 	value, err := NewValue(entries)
 	if err != nil {

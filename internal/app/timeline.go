@@ -13,6 +13,8 @@ import (
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/read"
+	"github.com/mattjoyce/anam/internal/store/artifact"
+	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
 func timelineCmd(cfgPath *string) *cobra.Command {
@@ -97,14 +99,42 @@ func readTimeline(ctx context.Context, cfg config.Config, q api.TimelineQuery) (
 		return c.Timeline(ctx, q)
 	}
 	q.Zone = cfg.Zone
-	l, err := openLedgerReadOnly(ctx, cfg)
+	src, closeAll, err := readSource(ctx, cfg)
 	if err != nil {
 		return api.Timeline{}, err
 	}
-	defer func() { _ = l.Close() }()
+	defer closeAll()
 	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()
-	return read.Timeline(ctx, l, q)
+	return read.Timeline(ctx, src, q)
+}
+
+// readSource opens what a local read is taken from: the ledger read-only, and the
+// checkpoint log and artifacts so the read can start from the last mint run. The
+// returned func closes them.
+func readSource(ctx context.Context, cfg config.Config) (read.Source, func(), error) {
+	l, err := openLedgerReadOnly(ctx, cfg)
+	if err != nil {
+		return read.Source{}, nil, err
+	}
+	buckets, err := cfg.Buckets()
+	if err != nil {
+		_ = l.Close()
+		return read.Source{}, nil, err
+	}
+	db, err := ops.Open(ctx, cfg.DBPath, buckets)
+	if err != nil {
+		_ = l.Close()
+		return read.Source{}, nil, err
+	}
+	store, err := artifact.New(cfg.ArtifactDir)
+	if err != nil {
+		_ = db.Close()
+		_ = l.Close()
+		return read.Source{}, nil, err
+	}
+	closeAll := func() { _ = store.Close(); _ = db.Close(); _ = l.Close() }
+	return read.Source{Ledger: l, Checkpoints: db, Artifacts: store}, closeAll, nil
 }
 
 // timelineHeader describes the read: which watermark, which lens, and the hash that

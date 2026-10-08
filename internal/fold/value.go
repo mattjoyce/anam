@@ -45,8 +45,8 @@ type Entry struct {
 	Payload        json.RawMessage      `json:"payload"`
 }
 
-// entryOf projects a live facet at its folded state into the value.
-func entryOf(f facet.Facet, s State) Entry {
+// EntryOf projects a live facet at its folded state into the value.
+func EntryOf(f facet.Facet, s State) Entry {
 	return Entry{
 		FacetID:        f.ID,
 		Type:           f.Type,

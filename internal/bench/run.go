@@ -42,7 +42,10 @@ type Dataset struct {
 	Live        int    `json:"live"`
 	Buckets     int    `json:"buckets"`
 	Checkpoints int    `json:"checkpoints"`
-	LedgerBytes int64  `json:"ledger_bytes"`
+	// LastRun is the latest mint run at or below W, 0 for none; W minus it is the
+	// tail a composed read replays.
+	LastRun     int64 `json:"last_run"`
+	LedgerBytes int64 `json:"ledger_bytes"`
 }
 
 // Scenario is one read, timed Reps times. Rows is what the read returned, so a run
@@ -159,6 +162,10 @@ func describe(ctx context.Context, o Options, l *ledger.Ledger, db *ops.DB, buck
 	if err != nil {
 		return Report{}, plan{}, err
 	}
+	lastRun, _, err := db.LastMintRun(ctx, int64(res.W))
+	if err != nil {
+		return Report{}, plan{}, err
+	}
 	var size int64
 	if fi, err := os.Stat(o.Paths.Ledger); err == nil {
 		size = fi.Size()
@@ -169,7 +176,7 @@ func describe(ctx context.Context, o Options, l *ledger.Ledger, db *ops.DB, buck
 		CPUs: runtime.NumCPU(), Started: time.Now().UTC().Format(time.RFC3339),
 		Dataset: Dataset{
 			Name: o.Name, W: int64(res.W), Facets: len(res.States), Live: res.Value.Len(),
-			Buckets: len(parts), Checkpoints: len(cps), LedgerBytes: size,
+			Buckets: len(parts), Checkpoints: len(cps), LastRun: lastRun, LedgerBytes: size,
 		},
 	}, p, nil
 }
@@ -202,10 +209,11 @@ type scenario struct {
 }
 
 func scenarios(l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) []scenario {
+	src := read.Source{Ledger: l, Checkpoints: db, Artifacts: deps.Artifacts}
 	timeline := func(q api.TimelineQuery) func(context.Context) (int, error) {
 		return func(ctx context.Context) (int, error) {
 			q.Zone = "UTC"
-			t, err := read.Timeline(ctx, l, q)
+			t, err := read.Timeline(ctx, src, q)
 			return t.Shown, err
 		}
 	}
@@ -218,13 +226,20 @@ func scenarios(l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) []scenario 
 			res, err := fold.ReadAt(ctx, l, p.head)
 			return res.Value.Len(), err
 		}},
+		{"composed read (mint.ReadAt)", func(ctx context.Context) (int, error) {
+			c, ok, err := mint.ReadAt(ctx, l, db, deps.Artifacts, p.head)
+			if !ok {
+				return 0, err // no mint run to start from: zero rows says so
+			}
+			return c.Value.Len(), err
+		}},
 		{"timeline, whole", timeline(api.TimelineQuery{})},
 		{"timeline, one month", timeline(api.TimelineQuery{From: p.monthFrom, To: p.monthTo})},
 		{"timeline, one type", timeline(api.TimelineQuery{Type: p.commonType})},
 		{"timeline, snapshot --at", timeline(api.TimelineQuery{At: p.at})},
 		{"timeline, --as-of half W", timeline(api.TimelineQuery{AsOf: p.asOf})},
 		{"timeline, whole, as JSON", func(ctx context.Context) (int, error) {
-			t, err := read.Timeline(ctx, l, api.TimelineQuery{Zone: "UTC"})
+			t, err := read.Timeline(ctx, src, api.TimelineQuery{Zone: "UTC"})
 			if err != nil {
 				return 0, err
 			}

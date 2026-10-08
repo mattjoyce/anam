@@ -147,7 +147,7 @@ func (d *Daemon) getTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
-	t, err := read.Timeline(ctx, d.read, q)
+	t, err := read.Timeline(ctx, read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts}, q)
 	if err != nil {
 		writeReadError(w, err)
 		return

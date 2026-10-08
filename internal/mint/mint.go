@@ -46,6 +46,7 @@ type Index interface {
 	PinLedger(ctx context.Context, ledgerID string) error
 	SpanHeads(ctx context.Context) (map[string]ops.CheckpointRow, error)
 	AppendCheckpoint(ctx context.Context, r ops.CheckpointRow) error
+	AppendMintRun(ctx context.Context, w int64, ranAt string) error
 }
 
 // Store is the published-artifact tier the values are written to and read back from.
@@ -163,6 +164,13 @@ func Run(ctx context.Context, d Deps, dryRun bool) (Result, error) {
 			ValueHash: o.ValueHash, MintedAt: clock.Format(d.Clock.Now()),
 		}
 		if err := d.Index.AppendCheckpoint(ctx, row); err != nil {
+			return Result{}, err
+		}
+	}
+	// Recorded last, so a reader never starts from a run whose checkpoints are not all
+	// written. Every span was checked at W, minted or found unchanged.
+	if !dryRun {
+		if err := d.Index.AppendMintRun(ctx, int64(res.W), clock.Format(d.Clock.Now())); err != nil {
 			return Result{}, err
 		}
 	}

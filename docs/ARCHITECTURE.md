@@ -458,8 +458,9 @@ and `V`, the checkpoint version, one row per mint in the `checkpoint` log; the h
 over the log, never a second copy. **Whether a span needs re-minting is decided by its value, not by
 bookkeeping about it**: the mint builds the bucket's value at `W` and compares its hash with the head
 checkpoint's. Equal means nothing a reader could see has changed, and nothing is written. `W > Wᵥ` is
-only *sufficient* — `W` is global, so on that test alone every ingest would re-mint every bucket — and it
-is kept as the cheap pre-filter an incremental mint would put in front of the fold. The hash is also what
+only *sufficient* — `W` is global, so on that test alone every ingest would re-mint every bucket. The
+pre-filter the mint uses instead is the tail (below): a bucket no event since the last run touched cannot
+have changed. The hash is also what
 makes the moved-fact-time case (above) need no second index: a facet that left one bucket for another
 moves both hashes, and both buckets re-mint. A bucket that has emptied is found through its head and
 re-mints as the empty value, or a composed read would still list the facets that left.
@@ -468,6 +469,22 @@ Each mint run that writes records its `W` in `mint_run`, after its checkpoints, 
 facet count in `checkpoint_size`. A run checks every bucket, minting or finding it unchanged, so the
 checkpoints at or below a run's `W` are the value at that `W`, and a read starts there. A run in progress
 has no `mint_run` row yet, so no reader starts from it.
+
+**A mint starts from the last run** (card 62, 2026-10-09). The checkpoints at the last run `R` are the
+value at `R`, so the only buckets whose value can differ at `W` are the ones the events in `(R, W]`
+touched, found as a narrow read finds them: the bucket each touched facet's version at `R` sat in, and
+the bucket its version at `W` sits in. Those are rebuilt from their checkpoint and the tail, split if now
+over budget, and compared by hash as above. So is any bucket whose checkpoint file is over budget, read
+from the file's size, because the budget was lowered or `R` minted at a fixed width. Every other bucket
+stands without being decoded, and the run is still a run that checked every bucket. A mint costs its tail,
+the buckets the tail touched, and a stat per checkpoint: at 600k facets, 132 ms for a tail touching 32
+daily buckets against 19.8 s for the full fold, on the ThinkPad. The full mint (`anam checkpoint --full`)
+remains, and is taken without a budget, without a run, and when the log is not sealed. Recording a run
+also records how many checkpoint rows the log then held (`mint_seal`); a log holding more has rows from
+a mint that crashed, which `covers_w` cannot show, since a run at the last run's own `W` (a lowered
+budget, no new event) writes rows at that `W` too. Until a mint seals the log again, reads fold in full
+as well, or a read would take the crashed run's rows for the last run's. The full mint settles every bucket against the fold whatever the
+log holds, so it is both the oracle the incremental mint is tested against and the repair.
 
 **Receipts** prove exactly what was served at a watermark (§9). Unserved interstitial checkpoints are
 garbage-collectable once a later checkpoint subsumes them and no receipt pins them; they were only ever

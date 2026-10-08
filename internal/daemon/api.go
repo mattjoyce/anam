@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"sort"
 	"time"
+
+	"github.com/mattjoyce/anam/internal/api"
 )
 
 // The /v1 routes. Every handler is bounded by the configured timeout, and none waits
@@ -63,9 +65,9 @@ func (d *Daemon) postIngest(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	op, _ := d.WaitOperation(ctx, id)
 	switch op.State {
-	case StateSucceeded:
+	case api.StateSucceeded:
 		writeJSON(w, http.StatusOK, op)
-	case StateFailed:
+	case api.StateFailed:
 		writeJSON(w, http.StatusInternalServerError, op)
 	default:
 		writeJSON(w, http.StatusAccepted, op)
@@ -82,21 +84,6 @@ func (d *Daemon) getOperation(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, op)
 }
 
-// Status is the daemon's answer to "what state is the record in".
-type Status struct {
-	Version  string `json:"version"`
-	Person   string `json:"person"`
-	LedgerID string `json:"ledger_id"`
-	W        int64  `json:"w"`
-	// Since is when this daemon started; Sources covers only what it has seen since.
-	Since   string         `json:"since"`
-	Sources []SourceStatus `json:"sources"`
-	Ingest  struct {
-		Running string `json:"running,omitempty"`
-		Pending string `json:"pending,omitempty"`
-	} `json:"ingest"`
-}
-
 func (d *Daemon) getStatus(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), d.cfg.Timeout)
 	defer cancel()
@@ -110,7 +97,7 @@ func (d *Daemon) getStatus(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, err)
 		return
 	}
-	s := Status{
+	s := api.Status{
 		Version: d.opts.Version, Person: d.cfg.PersonID, LedgerID: id, W: int64(head),
 		Since: d.started, Sources: d.ingests.sourceStatuses(),
 	}
@@ -127,9 +114,9 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func writeError(w http.ResponseWriter, status int, err error) {
-	writeJSON(w, status, map[string]string{"error": err.Error()})
+	writeJSON(w, status, api.Error{Error: err.Error()})
 }
 
-func sortSources(s []SourceStatus) {
+func sortSources(s []api.SourceStatus) {
 	sort.Slice(s, func(i, j int) bool { return s[i].Source < s[j].Source })
 }

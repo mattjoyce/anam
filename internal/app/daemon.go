@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/daemon"
@@ -87,7 +88,7 @@ func daemonReadyCmd(cfgPath *string) *cobra.Command {
 // same read-everything-first scan, the same gate and scopes. It differs only in where
 // the handles come from and where the tallies go.
 func daemonIngest(cfg config.Config, importsPath string) daemon.IngestFunc {
-	return func(ctx context.Context, s daemon.Stores) ([]daemon.SourceResult, error) {
+	return func(ctx context.Context, s daemon.Stores) ([]api.SourceResult, error) {
 		path, origin, err := config.ResolveImports(importsPath)
 		if err != nil {
 			return nil, err
@@ -119,9 +120,9 @@ func daemonIngest(cfg config.Config, importsPath string) daemon.IngestFunc {
 		}
 
 		g := gate.New(s.Ledger, reg, mvpScopes, clock.Real{}, cfg.PersonID)
-		var out []daemon.SourceResult
+		var out []api.SourceResult
 		_, err = admitSources(ctx, g, all, cfg.Timeout, gate.MaxBatch, func(sc scanned, p progress) {
-			out = append(out, daemon.SourceResult{
+			out = append(out, api.SourceResult{
 				Source:     sc.source,
 				Offered:    len(sc.envs),
 				Admitted:   p.tally[gate.OutcomeAdmitted],

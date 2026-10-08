@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/daemon"
 )
@@ -57,7 +58,7 @@ func TestDaemonIngestAdmitsThenFindsNothingNew(t *testing.T) {
 	}
 }
 
-func ingestOnce(t *testing.T, d *daemon.Daemon) daemon.Operation {
+func ingestOnce(t *testing.T, d *daemon.Daemon) api.Operation {
 	t.Helper()
 	id, err := d.RequestIngest()
 	if err != nil {
@@ -67,9 +68,9 @@ func ingestOnce(t *testing.T, d *daemon.Daemon) daemon.Operation {
 	for {
 		op, _ := d.Operation(id)
 		switch op.State {
-		case daemon.StateSucceeded:
+		case api.StateSucceeded:
 			return op
-		case daemon.StateFailed:
+		case api.StateFailed:
 			t.Fatalf("ingest failed: %s", op.Error)
 		}
 		if time.Now().After(deadline) {

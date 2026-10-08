@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/capture/bpcsv"
 	"github.com/mattjoyce/anam/internal/capture/documents"
 	"github.com/mattjoyce/anam/internal/capture/healthdb"
@@ -16,7 +17,6 @@ import (
 	"github.com/mattjoyce/anam/internal/capture/withings"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
-	"github.com/mattjoyce/anam/internal/daemon"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
@@ -210,12 +210,12 @@ func admitSources(ctx context.Context, g admitter, all []scanned, timeout time.D
 }
 
 // nothingNew is the last line of a complete run that wrote nothing. A scheduler
-// matches on it to stay quiet about such a run; daemon.Verdict owns the wording, so
+// matches on it to stay quiet about such a run; api.Verdict owns the wording, so
 // the CLI and the API say the same thing.
-const nothingNew = daemon.NothingNew
+const nothingNew = api.NothingNew
 
 // verdict is the last line of a complete run.
-func verdict(changed int) string { return daemon.Verdict(changed) }
+func verdict(changed int) string { return api.Verdict(changed) }
 
 // scanAll reads every declared import before any of them is admitted, and stops at the
 // first that cannot be read. Its error names the declared source and says nothing was

@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/mattjoyce/anam/internal/api"
 )
 
 // gatedIngest is an IngestFunc that announces each run and waits to be released. It
@@ -16,18 +18,18 @@ import (
 type gatedIngest struct {
 	started chan struct{}
 	release chan error
-	result  []SourceResult
+	result  []api.SourceResult
 }
 
 func newGatedIngest() *gatedIngest {
 	return &gatedIngest{
 		started: make(chan struct{}, 8),
 		release: make(chan error),
-		result:  []SourceResult{{Source: "bp-csv", Offered: 3, Admitted: 3, Committed: 3}},
+		result:  []api.SourceResult{{Source: "bp-csv", Offered: 3, Admitted: 3, Committed: 3}},
 	}
 }
 
-func (g *gatedIngest) run(ctx context.Context, s Stores) ([]SourceResult, error) {
+func (g *gatedIngest) run(ctx context.Context, s Stores) ([]api.SourceResult, error) {
 	g.started <- struct{}{}
 	err := <-g.release
 	return g.result, err
@@ -83,20 +85,20 @@ func TestIngestRequestsJoinThePendingRun(t *testing.T) {
 	if third != second {
 		t.Fatalf("a third request made another run (%s), want the pending %s", third, second)
 	}
-	if got := d.state(first); got != StateRunning {
+	if got := d.state(first); got != api.StateRunning {
 		t.Fatalf("first run is %s, want running", got)
 	}
-	if got := d.state(second); got != StatePending {
+	if got := d.state(second); got != api.StatePending {
 		t.Fatalf("second run is %s, want pending", got)
 	}
 
 	g.release <- nil
 	<-g.started
-	if got := d.state(first); got != StateSucceeded {
+	if got := d.state(first); got != api.StateSucceeded {
 		t.Fatalf("first run is %s, want succeeded", got)
 	}
 	g.release <- nil
-	waitFor(t, "the pending run to finish", func() bool { return d.state(second) == StateSucceeded })
+	waitFor(t, "the pending run to finish", func() bool { return d.state(second) == api.StateSucceeded })
 
 	select {
 	case <-g.started:
@@ -127,7 +129,7 @@ func TestFailedIngestKeepsItsTallies(t *testing.T) {
 	id := mustRequest(t, d)
 	<-g.started
 	g.release <- errors.New("commit batch at 500: ledger busy")
-	waitFor(t, "the run to fail", func() bool { return d.state(id) == StateFailed })
+	waitFor(t, "the run to fail", func() bool { return d.state(id) == api.StateFailed })
 
 	op, _ := d.Operation(id)
 	if op.Error == "" || len(op.Sources) != 1 || op.WAfter == nil {
@@ -146,7 +148,7 @@ func TestIngestOverHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var op Operation
+	var op api.Operation
 	if err := json.NewDecoder(resp.Body).Decode(&op); err != nil {
 		t.Fatal(err)
 	}
@@ -157,17 +159,17 @@ func TestIngestOverHTTP(t *testing.T) {
 	}
 
 	<-g.started
-	var status Status
+	var status api.Status
 	getJSON(t, srv.URL+"/v1/status", http.StatusOK, &status)
 	if status.Ingest.Running != op.ID || status.Version != "v0.test" || status.LedgerID == "" {
 		t.Fatalf("status = %+v", status)
 	}
 	g.release <- nil
-	waitFor(t, "the run to finish", func() bool { return d.state(op.ID) == StateSucceeded })
+	waitFor(t, "the run to finish", func() bool { return d.state(op.ID) == api.StateSucceeded })
 
-	var got Operation
+	var got api.Operation
 	getJSON(t, srv.URL+"/v1/operations/"+op.ID, http.StatusOK, &got)
-	if got.State != StateSucceeded {
+	if got.State != api.StateSucceeded {
 		t.Fatalf("operation = %+v", got)
 	}
 	getJSON(t, srv.URL+"/v1/operations/op-gone", http.StatusNotFound, &map[string]string{})
@@ -209,8 +211,8 @@ func TestIngestWait(t *testing.T) {
 		wantState  string
 		wantSumm   string
 	}{
-		{"a run that succeeds", "?wait=5s", nil, http.StatusOK, StateSucceeded, "ledger changed: 3 facets admitted or superseded"},
-		{"a run that fails", "?wait=5s", errors.New("source gone"), http.StatusInternalServerError, StateFailed, ""},
+		{"a run that succeeds", "?wait=5s", nil, http.StatusOK, api.StateSucceeded, "ledger changed: 3 facets admitted or superseded"},
+		{"a run that fails", "?wait=5s", errors.New("source gone"), http.StatusInternalServerError, api.StateFailed, ""},
 		{"a wait that ends first", "?wait=30ms", nil, http.StatusAccepted, "", ""},
 	}
 	for _, tt := range tests {
@@ -233,18 +235,18 @@ func TestIngestWait(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer func() { _ = resp.Body.Close() }()
-			var op Operation
+			var op api.Operation
 			if err := json.NewDecoder(resp.Body).Decode(&op); err != nil {
 				t.Fatal(err)
 			}
 			// An unfinished run may still be pending or already running; either is
 			// what a wait that ends first should report.
-			stateOK := op.State == tt.wantState || (tt.wantState == "" && !op.finished())
+			stateOK := op.State == tt.wantState || (tt.wantState == "" && !op.Finished())
 			if resp.StatusCode != tt.wantStatus || !stateOK || op.Summary != tt.wantSumm {
 				t.Fatalf("got %d %s %q, want %d %s %q",
 					resp.StatusCode, op.State, op.Summary, tt.wantStatus, tt.wantState, tt.wantSumm)
 			}
-			waitFor(t, "the run to finish", func() bool { o, _ := d.Operation(op.ID); return o.finished() })
+			waitFor(t, "the run to finish", func() bool { o, _ := d.Operation(op.ID); return o.Finished() })
 		})
 	}
 }

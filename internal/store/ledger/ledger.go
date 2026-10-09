@@ -150,7 +150,22 @@ func openExisting(ctx context.Context, path, personID, mode string) (*Ledger, er
 		_ = l.Close()
 		return nil, err
 	}
+	if mode != modeReadOnly {
+		if err := l.ensureIndexes(ctx); err != nil {
+			_ = l.Close()
+			return nil, err
+		}
+	}
 	return l, nil
+}
+
+// ensureIndexes creates the ledger's lookups if the file lacks them (schema.go,
+// indexes). It is DDL, idempotent, and touches no row.
+func (l *Ledger) ensureIndexes(ctx context.Context) error {
+	if _, err := l.db.ExecContext(ctx, indexes); err != nil {
+		return classify("create indexes", err)
+	}
+	return nil
 }
 
 func open(path, personID, mode string) (*Ledger, error) {
@@ -197,7 +212,10 @@ func (l *Ledger) Init(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return l.migrate(ctx, from)
+	if err := l.migrate(ctx, from); err != nil {
+		return err
+	}
+	return l.ensureIndexes(ctx)
 }
 
 // initPins applies the base schema and the pins in one transaction and returns the

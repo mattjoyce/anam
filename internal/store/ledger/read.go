@@ -270,3 +270,32 @@ func (l *Ledger) Replay(ctx context.Context, sinceW, uptoW Watermark) ([]facet.A
 	}
 	return events, nil
 }
+
+// FacetEvents returns one facet's anam-events with seq at or below uptoW, in seq
+// order: its whole history to that watermark, and nothing of any other facet. A
+// facet's folded state depends only on its own events (fold.Apply), so folding these
+// gives the same State for it as folding the ledger. It is one statement, so it sees
+// one committed state; the anam_event_by_facet index makes its cost that facet's
+// history, not the ledger's.
+func (l *Ledger) FacetEvents(ctx context.Context, facetID string, uptoW Watermark) ([]facet.AnamEvent, error) {
+	doing := fmt.Sprintf("read the events of %s to %d", facetID, uptoW)
+	rows, err := l.db.QueryContext(ctx, `SELECT `+eventColumns+` FROM anam_event
+		WHERE facet_id = ? AND seq <= ? ORDER BY seq`, facetID, int64(uptoW))
+	if err != nil {
+		return nil, classify(doing, err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var events []facet.AnamEvent
+	for rows.Next() {
+		ev, err := scanEvent(rows)
+		if err != nil {
+			return nil, classify(doing, err)
+		}
+		events = append(events, ev)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, classify(doing, err)
+	}
+	return events, nil
+}

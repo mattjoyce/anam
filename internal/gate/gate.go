@@ -60,6 +60,7 @@ type Ledger interface {
 	Head(ctx context.Context) (ledger.Watermark, error)
 	CurrentVersion(ctx context.Context, facetID string) (facet.Facet, error)
 	Replay(ctx context.Context, sinceW, uptoW ledger.Watermark) ([]facet.AnamEvent, error)
+	FacetEvents(ctx context.Context, facetID string, uptoW ledger.Watermark) ([]facet.AnamEvent, error)
 	Admit(ctx context.Context, readW ledger.Watermark, f facet.Facet, ev facet.AnamEvent) error
 	Mark(ctx context.Context, readW ledger.Watermark, ev facet.AnamEvent) error
 

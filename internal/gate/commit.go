@@ -321,10 +321,13 @@ func (g *Gate) disposition(ctx context.Context, facetID, hash string) (dispositi
 // a status transition, never a delete, never a new artifact (§6a).
 //
 // Retracting a facet that is already tombstoned is a no-op, decided the only way
-// status is ever decided: by folding the anam-events. The check sits inside the
-// retry loop, against the same head the write is conditioned on, so a raced second
-// tombstone is caught on the re-read rather than appended. (Streams written by the
-// R3 gate may hold a double tombstone; the fold absorbs those.)
+// status is ever decided: by folding the anam-events. Only this facet's events are
+// folded. Its state depends on nothing else (fold.Apply), so the answer is the full
+// fold's, and the check costs the facet's history rather than the ledger's (card 65).
+// The check sits inside the retry loop, against the same head the write is
+// conditioned on, so a raced second tombstone is caught on the re-read rather than
+// appended. (Streams written by the R3 gate may hold a double tombstone; the fold
+// absorbs those.)
 func (g *Gate) Retract(ctx context.Context, facetID string) (Result, ledger.Watermark, error) {
 	current, err := g.ledger.CurrentVersion(ctx, facetID)
 	if err != nil {
@@ -337,7 +340,7 @@ func (g *Gate) Retract(ctx context.Context, facetID string) (Result, ledger.Wate
 			return Result{}, 0, err
 		}
 
-		events, err := g.ledger.Replay(ctx, 0, head)
+		events, err := g.ledger.FacetEvents(ctx, facetID, head)
 		if err != nil {
 			return Result{}, 0, err
 		}

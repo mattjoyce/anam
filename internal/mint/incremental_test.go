@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/facet"
@@ -236,5 +238,72 @@ func sameLogs(t *testing.T, a, b *ops.DB, w int64) {
 	runB, okB, errB := b.LastMintRun(ctx, w)
 	if errA != nil || errB != nil || runA != runB || okA != okB || runA != w {
 		t.Fatalf("mint runs: %d %v %v / %d %v %v, want %d", runA, okA, errA, runB, okB, errB, w)
+	}
+}
+
+// removeCheckpointFile deletes the file a bucket's head names, as a lost or
+// half-restored artifact directory would, and returns its path.
+func (h *harness) removeCheckpointFile(t *testing.T, spanID string) string {
+	t.Helper()
+	head, ok := h.heads(t)[spanID]
+	if !ok {
+		t.Fatalf("no head for %s", spanID)
+	}
+	path := filepath.Join(h.dir, mint.Kind, strings.Replace(head.ValueHash, "sha256:", "sha256-", 1)+".json")
+	if err := os.Remove(path); err != nil {
+		t.Fatalf("remove %s: %v", path, err)
+	}
+	return path
+}
+
+// Card 66: a checkpoint whose file has gone is written again by the next mint, from
+// the last run or in full, with no new row; a dry run only reports.
+func TestRun_RestoresAMissingCheckpointFile(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		run      func(context.Context, mint.Deps, bool) (mint.Result, error)
+		ingest   bool
+		wantFull bool
+	}{
+		{name: "full", run: mint.RunFull, wantFull: true},
+		{name: "from the last run, nothing new", run: mint.Run, wantFull: true},
+		{name: "from the last run, a tail elsewhere", run: mint.Run, ingest: true, wantFull: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.deps.Budget = 1000
+			h.seed(t)
+			h.run(t, false)
+			path := h.removeCheckpointFile(t, "bucket:2026-08")
+			if tc.ingest {
+				h.bp(t, "2026-09-20T06:30:00Z", 120)
+			}
+			rows := len(h.rows(t))
+
+			dry, err := tc.run(context.Background(), h.deps, true)
+			if err != nil {
+				t.Fatalf("dry run: %v", err)
+			}
+			if _, err := os.Stat(path); !os.IsNotExist(err) {
+				t.Fatalf("a dry run wrote %s (%v)", path, err)
+			}
+			res, err := tc.run(context.Background(), h.deps, false)
+			if err != nil {
+				t.Fatalf("mint: %v", err)
+			}
+			if res.Full != tc.wantFull || dry.Full != tc.wantFull {
+				t.Fatalf("full = %v (dry %v), want %v", res.Full, dry.Full, tc.wantFull)
+			}
+			if _, err := os.Stat(path); err != nil {
+				t.Fatalf("the missing file was not restored: %v", err)
+			}
+			if aug := outcomes(res)["bucket:2026-08"]; aug.Minted || aug.V != 1 {
+				t.Fatalf("August re-minted for a missing file: %+v", aug)
+			}
+			if want := rows + res.Minted(); len(h.rows(t)) != want {
+				t.Fatalf("checkpoint rows %d, want %d", len(h.rows(t)), want)
+			}
+			readIsTheFold(t, h)
+		})
 	}
 }

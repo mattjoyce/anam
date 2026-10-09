@@ -30,6 +30,7 @@ package mint
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -38,6 +39,7 @@ import (
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/span"
+	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
@@ -139,7 +141,10 @@ func Run(ctx context.Context, d Deps, dryRun bool) (Result, error) {
 		return Result{}, err
 	}
 	res, ok, err := d.fromLastRun(ctx, dryRun)
-	if err != nil || ok {
+	switch {
+	case errors.Is(err, artifact.ErrNotFound):
+		// A checkpoint's file has gone: the full mint writes it again (settle).
+	case err != nil || ok:
 		return res, err
 	}
 	return d.full(ctx, dryRun)
@@ -202,12 +207,22 @@ func (d Deps) settle(ctx context.Context, w ledger.Watermark, spanID string, ent
 	o := Outcome{SpanID: spanID, ValueHash: value.Hash(), Len: value.Len()}
 	if minted && head.ValueHash == value.Hash() {
 		o.V, o.CoversW = head.V, head.CoversW
+		if dryRun {
+			return o, nil
+		}
 		// A checkpoint minted before counts were recorded gets its count now; one
 		// that has it keeps it.
-		if !dryRun {
-			if err := d.Index.AppendCheckpointSize(ctx, spanID, o.V, o.Len); err != nil {
+		if err := d.Index.AppendCheckpointSize(ctx, spanID, o.V, o.Len); err != nil {
+			return Outcome{}, err
+		}
+		// A checkpoint whose file has gone gets it back: the same bytes under the same
+		// name, so the row that names it can be loaded again. No new version.
+		if _, err := d.Artifacts.Size(Kind, head.ValueHash); errors.Is(err, artifact.ErrNotFound) {
+			if _, err := d.Artifacts.Put(Kind, value.Bytes()); err != nil {
 				return Outcome{}, err
 			}
+		} else if err != nil {
+			return Outcome{}, err
 		}
 		return o, nil
 	}

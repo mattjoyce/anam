@@ -25,7 +25,9 @@ import (
 // run accounts for. Their covers_w cannot say so, since a run at the last run's W
 // writes rows at that W too; the log's seal can (ops.LogSealed). The next mint finds
 // the log unsealed and folds in full, which settles every bucket against the fold
-// whatever the log holds, and seals it again.
+// whatever the log holds, and seals it again. A checkpoint file that has gone is met
+// as artifact.ErrNotFound, which Run answers with the full mint, which writes the
+// file again.
 
 // fromLastRun mints from the last run at or below the head. ok is false when it
 // cannot, and the caller folds in full: without a budget, the fixed width (and any

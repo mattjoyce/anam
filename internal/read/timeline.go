@@ -266,6 +266,15 @@ func watermarkOf(ctx context.Context, l Ledger, asOfTime time.Time, v *view) (le
 	return fold.WatermarkAt(ctx, l, asOfTime)
 }
 
+// Canonical is the whole-person value at the ledger's head: composed from the last
+// mint run and the tail after it when src has the checkpoint log, folded from the
+// beginning when it does not. The result's States are empty when it was composed; a
+// caller that needs a facet's history folds the ledger itself.
+func Canonical(ctx context.Context, src Source) (fold.Result, error) {
+	var v view
+	return readAtOrHead(ctx, src, time.Time{}, &v)
+}
+
 // readAtOrHead reads the canonical at the head, or at the watermark an anam-time names,
 // composed from checkpoints when src has them and a mint run is at or below it.
 func readAtOrHead(ctx context.Context, src Source, asOfTime time.Time, v *view) (fold.Result, error) {

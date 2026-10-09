@@ -14,6 +14,8 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/gate"
+	"github.com/mattjoyce/anam/internal/read"
+	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
 // Ingest admits and supersedes; it never retracts, because a row's absence from a
@@ -73,17 +75,10 @@ one run; raise it deliberately when the source really has shrunk that far.`,
 
 			ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
 			defer cancel()
-			l, err := openLedgerReadOnly(ctx, cfg)
+			absent, total, err := planFromRecord(ctx, cfg, source, held)
 			if err != nil {
 				return err
 			}
-			res, err := fold.Read(ctx, l)
-			_ = l.Close()
-			if err != nil {
-				return err
-			}
-
-			absent, total := planRetraction(res.Live, source, held)
 			writeRetractionReport(cmd, source, absent, total, len(held))
 			if len(absent) == 0 {
 				return nil
@@ -106,26 +101,89 @@ one run; raise it deliberately when the source really has shrunk that far.`,
 	return cmd
 }
 
-// planRetraction is the report as a value: the live facets of the source whose ids
+// planFromRecord plans against the live value at the head, read the way the timeline
+// reads it: from the last mint run and its tail, not a fold of the whole ledger
+// (card 65). Only the facets the plan names are then fetched from the ledger, at the
+// version in force, for the report and the tombstones.
+func planFromRecord(ctx context.Context, cfg config.Config, source string, held map[string]bool,
+) ([]facet.Facet, int, error) {
+	src, closeAll, err := readSource(ctx, cfg)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer closeAll()
+	res, err := read.Canonical(ctx, src)
+	if err != nil {
+		return nil, 0, err
+	}
+	absent, total := planRetraction(res.Value.Entries(), source, held)
+	facets, err := facetsOf(ctx, src.Ledger, absent)
+	return facets, total, err
+}
+
+// planRetraction is the report as a value: the live entries of the source whose ids
 // the source no longer holds, in timeline order, and how many live facets the
 // source has in all.
-func planRetraction(live []facet.Facet, source string, held map[string]bool) (absent []facet.Facet, total int) {
-	for _, f := range live {
-		if f.Provenance.Source != source {
+func planRetraction(live []fold.Entry, source string, held map[string]bool) (absent []fold.Entry, total int) {
+	for _, e := range live {
+		if e.Source != source {
 			continue
 		}
 		total++
-		if !held[f.ID] {
-			absent = append(absent, f)
+		if !held[e.FacetID] {
+			absent = append(absent, e)
 		}
 	}
+	// fact_time is fixed-width clock.Layout text, so the lexical order is the
+	// chronological one.
 	sort.Slice(absent, func(i, j int) bool {
-		if !absent[i].FactTime.Equal(absent[j].FactTime) {
-			return absent[i].FactTime.Before(absent[j].FactTime)
+		if absent[i].FactTime != absent[j].FactTime {
+			return absent[i].FactTime < absent[j].FactTime
 		}
-		return absent[i].ID < absent[j].ID
+		return absent[i].FacetID < absent[j].FacetID
 	})
 	return absent, total
+}
+
+// planLedger is what facetsOf asks of the ledger.
+type planLedger interface {
+	LatestVersions(ctx context.Context, ids []string) (map[string]int, error)
+	Versions(ctx context.Context, refs []ledger.VersionRef) ([]facet.Facet, error)
+}
+
+// facetsOf fetches each planned entry's facet at its newest version, in the plan's
+// order. A live facet's newest version is the one in force, unless an ingest
+// superseded it since the read; then the report shows the newer one, and the gate,
+// which tombstones whatever version is current, is unaffected.
+func facetsOf(ctx context.Context, l planLedger, entries []fold.Entry) ([]facet.Facet, error) {
+	if len(entries) == 0 {
+		return nil, nil
+	}
+	ids := make([]string, len(entries))
+	for i, e := range entries {
+		ids[i] = e.FacetID
+	}
+	latest, err := l.LatestVersions(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	refs := make([]ledger.VersionRef, len(ids))
+	for i, id := range ids {
+		refs[i] = ledger.VersionRef{FacetID: id, Version: latest[id]}
+	}
+	got, err := l.Versions(ctx, refs)
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[string]facet.Facet, len(got))
+	for _, f := range got {
+		byID[f.ID] = f
+	}
+	out := make([]facet.Facet, len(ids))
+	for i, id := range ids {
+		out[i] = byID[id]
+	}
+	return out, nil
 }
 
 // guardRetraction refuses the two shapes of a bad read: a source that holds nothing,

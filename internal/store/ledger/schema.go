@@ -115,6 +115,19 @@ WHEN NEW.seq IS NOT (SELECT COALESCE(MAX(seq), 0) + 1 FROM anam_event)
 BEGIN SELECT RAISE(ABORT, 'ledger: anam-event seq does not follow the newest seq'); END;
 `
 
+// indexes are the ledger's lookups. They hold no rows and no fact, every read is
+// correct without them, and they fire no trigger, so they are not schema in the sense
+// schemaVersion pins: adding one changes how fast the ledger answers, never what. Every
+// writer creates them when it opens the file (ensureIndexes), so a ledger written by an
+// older build gains them on its next writable open without a migration, and a
+// read-only handle on a file that lacks one is slower, not wrong.
+//
+//	anam_event_by_facet  one facet's events in seq order, for the gate's retraction
+//	                     check, which folds that facet and nothing else (card 65)
+const indexes = `
+CREATE INDEX IF NOT EXISTS anam_event_by_facet ON anam_event (facet_id, seq);
+`
+
 // dropSchema removes every ledger object. DROP TABLE takes a table's triggers with it
 // and fires none of them, which is why Drop can remove what no statement can delete
 // from.

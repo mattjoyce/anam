@@ -132,3 +132,17 @@ names; the deviation is deliberate and lives here so it doesn't drift.
 - Commit regularly, in logical chunks; keep the tree buildable.
 - Conventional-ish subjects (`feat:`, `docs:`, `chore:`, `test:`, `fix:`).
 - Run `scripts/check.sh` green before a commit that touches Go code.
+
+---
+
+## Cards
+
+Work is tracked on the kanban board at `~/kanban/anam/cards`, outside this repo.
+
+- A new card has at least one **Job Story** under its title, in a `## Job story` section:
+  "When [situation], I want to [motivation], so I can [outcome]." It names whose job the card
+  serves, which is what lets the board be ordered. A card cut by an agent on someone's behalf is
+  marked as drafted, for the person to correct.
+- `blocked_by` lists only cards that are not yet done. Clear a blocker when its card closes.
+- Every card change (created, amended, moved, reordered, closed) is a line in
+  `~/kanban/anam/CHANGELOG.md`, committed with the change.

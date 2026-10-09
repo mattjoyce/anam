@@ -276,6 +276,11 @@ type Envelope struct {
 	// Payload is the raw source fragment as JSON, canonicalised on admission.
 	Payload []byte
 
+	// DefinitionVersion is the Definition version the payload was shaped to, when the
+	// sender says. Zero says nothing, and the gate admits against the type's current
+	// version; any other value must be that version.
+	DefinitionVersion int
+
 	// AssertedPerson and SpanHint are optional; a source may volunteer either, and
 	// neither is required to bind.
 	AssertedPerson string

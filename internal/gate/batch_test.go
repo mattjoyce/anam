@@ -2,6 +2,7 @@ package gate_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -279,5 +280,33 @@ func TestCommitBatch_RefusesOversizedBatches(t *testing.T) {
 	envs := envelopes(gate.MaxBatch + 1)
 	if _, _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs)); err == nil {
 		t.Errorf("a batch of %d was accepted (MaxBatch is %d)", len(envs), gate.MaxBatch)
+	}
+}
+
+// Card 53: a refused batch names every envelope that failed and writes nothing, and an
+// envelope shaped to another Definition version is one of them.
+func TestCommitBatch_RefusesWithEveryFailure(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	g, l := newGate(t)
+
+	envs := envelopes(4)
+	envs[1].Payload = []byte(`{"measured_at": "2026-01-24T06:01:00Z", "systolic": 120}`) // no diastolic
+	envs[2].DefinitionVersion = 9
+	envs[3].DefinitionVersion = 1 // the current version: fine
+
+	_, _, err := g.CommitBatch(ctx, envs, resolveAll(t, g, envs))
+	var refused *gate.Refused
+	if !errors.As(err, &refused) {
+		t.Fatalf("CommitBatch: got %v, want *gate.Refused", err)
+	}
+	if len(refused.Envelopes) != 2 || refused.Envelopes[0].Index != 1 || refused.Envelopes[1].Index != 2 {
+		t.Fatalf("refused %+v, want envelopes 1 and 2", refused.Envelopes)
+	}
+	if !errors.Is(err, gate.ErrDefinitionVersion) {
+		t.Errorf("errors.Is(ErrDefinitionVersion) = false for %v", err)
+	}
+	if w, err := l.Head(ctx); err != nil || w != 0 {
+		t.Fatalf("head = %d, %v; want 0, nothing written", w, err)
 	}
 }

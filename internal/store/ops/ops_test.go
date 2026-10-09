@@ -325,3 +325,33 @@ func TestBackupTo_IsTheSameStore(t *testing.T) {
 		t.Fatalf("backup pins %q (%v), want ledger-a", id, err)
 	}
 }
+
+// Card 53: a registered Definition is immutable, for every writer, and a second
+// registration at the same type and version is refused.
+func TestRegisteredDefinitions_AreImmutable(t *testing.T) {
+	t.Parallel()
+	d, _ := open(t)
+	ctx := context.Background()
+	row := ops.DefinitionRow{Type: "test.reading", Version: 1, Body: `{"meta":{}}`}
+	if err := d.RegisterDefinition(ctx, row, "2026-10-09T00:00:00.000000000Z"); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.RegisterDefinition(ctx, row, "2026-10-09T00:00:01.000000000Z"); err == nil {
+		t.Error("a second registration at v1 was accepted")
+	}
+	for _, stmt := range []string{
+		`UPDATE registered_definition SET body = '{}'`,
+		`DELETE FROM registered_definition`,
+	} {
+		if _, err := d.SQL().Exec(stmt); err == nil {
+			t.Errorf("%s was accepted", stmt)
+		}
+	}
+	got, err := d.RegisteredDefinitions(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != row {
+		t.Fatalf("RegisteredDefinitions = %+v, want [%+v]", got, row)
+	}
+}

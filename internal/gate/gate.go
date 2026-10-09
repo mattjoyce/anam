@@ -11,6 +11,8 @@ package gate
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/def"
@@ -28,6 +30,10 @@ var (
 	// against a bar that is not set.
 	ErrNoDefinition = errors.New("gate: no definition for facet type")
 
+	// ErrDefinitionVersion: the envelope was shaped to a Definition version that is
+	// not the type's current one.
+	ErrDefinitionVersion = errors.New("gate: envelope shaped to another definition version")
+
 	// ErrAssuranceBelowFloor: the associated pillar — the binding did not clear the
 	// definition's min_binding_assurance.
 	ErrAssuranceBelowFloor = errors.New("gate: binding assurance below the definition's floor")
@@ -40,6 +46,10 @@ var (
 	// ErrPayloadTooLarge: the payload exceeds the gate's size policy. The ledger itself
 	// would hold it; the bound is a choice about what one facet may be.
 	ErrPayloadTooLarge = errors.New("gate: payload exceeds the configured maximum")
+
+	// ErrSameFacet: two envelopes in one batch are the same facet. A batch is one
+	// transaction, and one facet takes one version per transaction.
+	ErrSameFacet = errors.New("gate: two envelopes in one batch are the same facet")
 
 	// ErrContention: the bounded retry gave up. The worker may simply re-run;
 	// commit is idempotent.
@@ -166,4 +176,34 @@ func (g *Gate) Resolve(env facet.Envelope) (facet.Binding, error) {
 		b.Assurance = facet.AssuranceReview
 	}
 	return b, nil
+}
+
+// Refused is a batch the gate wrote nothing of, with every envelope that failed a
+// pillar and why. errors.Is and errors.As see each envelope's own error through it.
+type Refused struct {
+	Envelopes []RefusedEnvelope
+}
+
+// RefusedEnvelope is one envelope of a refused batch, by its index in the batch.
+type RefusedEnvelope struct {
+	Index int
+	Type  facet.Type
+	Err   error
+}
+
+func (r *Refused) Error() string {
+	msgs := make([]string, len(r.Envelopes))
+	for i, e := range r.Envelopes {
+		msgs[i] = fmt.Sprintf("envelope %d (%s): %v", e.Index, e.Type, e.Err)
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// Unwrap is every refused envelope's error.
+func (r *Refused) Unwrap() []error {
+	out := make([]error, len(r.Envelopes))
+	for i, e := range r.Envelopes {
+		out[i] = e.Err
+	}
+	return out
 }

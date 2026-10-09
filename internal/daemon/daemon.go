@@ -96,6 +96,13 @@ type Daemon struct {
 	// index is whether the operational index is wrong rather than merely behind.
 	index   indexState
 	ingests *ingests
+	// importers are who may post envelopes and Definitions; defs is what their
+	// envelopes are admitted against.
+	importers importers
+	defs      *definitions
+	// mints asks the mint worker to mint at the head. It holds one request, so any
+	// number of batches landing during a mint cost one more mint, not one each.
+	mints chan struct{}
 
 	jobs chan job
 	quit chan struct{}
@@ -124,6 +131,10 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 	if err != nil {
 		return nil, err
 	}
+	imps, err := loadImporters(cfg.ImportersFile)
+	if err != nil {
+		return nil, err
+	}
 
 	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()
@@ -148,6 +159,11 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		closeAll()
 		return nil, err
 	}
+	defs, err := loadDefinitions(ctx, db)
+	if err != nil {
+		closeAll()
+		return nil, err
+	}
 	readOps, err := ops.OpenReadOnly(ctx, cfg.DBPath)
 	if err != nil {
 		closeAll()
@@ -169,6 +185,9 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		readOps:   readOps,
 		artifacts: artifacts,
 		ingests:   newIngests(),
+		importers: imps,
+		defs:      defs,
+		mints:     make(chan struct{}, 1),
 		jobs:      make(chan job),
 		quit:      make(chan struct{}),
 	}, nil
@@ -245,6 +264,13 @@ func (d *Daemon) Handler() http.Handler {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", d.healthz)
+	// The importer routes sit outside the operator's token: an importer's token
+	// opens these and nothing else.
+	mux.Handle("POST /v1/envelopes", d.asImporter(d.postEnvelopes))
+	mux.Handle("POST /v1/definitions", d.asImporter(d.postDefinitions))
+	mux.Handle("GET /v1/definitions", d.asReader(d.getDefinitions))
+	mux.Handle("GET /v1/definitions/{type}", d.asReader(d.getDefinition))
+	mux.Handle("GET /v1/definitions/{type}/{version}", d.asReader(d.getDefinition))
 	mux.Handle("/", d.authorize(inner))
 	return mux
 }
@@ -355,12 +381,16 @@ func (d *Daemon) Serve(ctx context.Context, ln net.Listener) error {
 	}
 
 	var worker sync.WaitGroup
-	worker.Add(1)
+	worker.Add(2)
 	go func() {
 		defer worker.Done()
 		// Writes outlive the signal that starts shutdown; each is bounded by its own
 		// deadline instead.
 		d.work(context.WithoutCancel(ctx))
+	}()
+	go func() {
+		defer worker.Done()
+		d.mintOnRequest()
 	}()
 
 	// The index may be behind a ledger that was written while no daemon ran. Catch it

@@ -213,6 +213,34 @@ func (d *Daemon) mintAfterIngest() *api.MintRun {
 	return &api.MintRun{W: m.W, Full: m.Full, From: m.From, Minted: m.MintedCount(), Buckets: len(m.Outcomes)}
 }
 
+// requestMint asks the mint worker for a mint at the head, without waiting. A request
+// already waiting covers this one.
+func (d *Daemon) requestMint() {
+	select {
+	case d.mints <- struct{}{}:
+	default:
+	}
+}
+
+// mintOnRequest is the mint worker: it mints once per waiting request until shutdown.
+// An importer's batch is answered when it is admitted, not when it is minted, so its
+// mint runs here rather than in the request.
+func (d *Daemon) mintOnRequest() {
+	for {
+		select {
+		case <-d.quit:
+			return
+		case <-d.mints:
+			select {
+			case <-d.quit: // shutdown wins over a request that arrived with it
+				return
+			default:
+			}
+			d.mintAfterIngest()
+		}
+	}
+}
+
 // catchUp replays the ledger into the operational store's index, so reads of it are
 // as fresh as the last write. It runs inside a write, on the write handles, with the
 // ingest budget rather than the per-call timeout: a replay of the whole ledger after

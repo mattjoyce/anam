@@ -67,13 +67,18 @@ func TestDaemonIngestAdmitsThenFindsNothingNew(t *testing.T) {
 		t.Fatalf("a run that changed nothing minted: %+v", second.Mint)
 	}
 
-	// A correction moves W again; the mint after it starts from the first one.
+	// A correction moves W again; the mint after it starts from a run, not from
+	// genesis, and reaches the new head. The run is the first ingest's, unless the
+	// mint worker got there first: the daemon's startup check can ask it for a mint
+	// that lands between this ingest's write and its own mint, which then starts from
+	// the worker's run at the same head and has nothing left to cut. Both are correct.
 	more := strings.Replace(bpFixture, "114.0", "115.0", 1)
 	if err := os.WriteFile(f.bpPath, []byte(more), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	third := ingestOnce(t, d)
-	if m := third.Mint; m == nil || m.Error != "" || m.Full || m.From != *first.WAfter || m.W != *third.WAfter {
+	if m := third.Mint; m == nil || m.Error != "" || m.Full || m.W != *third.WAfter ||
+		(m.From != *first.WAfter && m.From != *third.WAfter) {
 		t.Fatalf("third run's mint: %+v (first W %d)", third.Mint, *first.WAfter)
 	}
 }

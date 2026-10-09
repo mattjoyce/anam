@@ -299,3 +299,29 @@ func TestOpenReadOnlyRefusesWrites(t *testing.T) {
 		t.Error("the read-only handle accepted a write")
 	}
 }
+
+// A backup of the operational store opens as one and holds what the store held; it
+// never writes over a file.
+func TestBackupTo_IsTheSameStore(t *testing.T) {
+	t.Parallel()
+	d, _ := open(t)
+	ctx := context.Background()
+	if err := d.PinLedger(ctx, "ledger-a"); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "tracking.db")
+	if err := d.BackupTo(ctx, path); err != nil {
+		t.Fatalf("BackupTo: %v", err)
+	}
+	if err := d.BackupTo(ctx, path); !errors.Is(err, ops.ErrBackupExists) {
+		t.Fatalf("second BackupTo = %v, want ErrBackupExists", err)
+	}
+	b, err := ops.Open(ctx, path, buckets(t))
+	if err != nil {
+		t.Fatalf("open the backup: %v", err)
+	}
+	defer func() { _ = b.Close() }()
+	if id, err := b.LedgerID(ctx); err != nil || id != "ledger-a" {
+		t.Fatalf("backup pins %q (%v), want ledger-a", id, err)
+	}
+}

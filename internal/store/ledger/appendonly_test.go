@@ -199,3 +199,21 @@ func TestClassify_LockContentionIsErrBusy(t *testing.T) {
 		t.Errorf("classify = %v, want ErrBusy", got)
 	}
 }
+
+// A backup carries the triggers: a restored ledger is append-only for every writer,
+// as the one it was taken from.
+func TestAppendOnly_ABackupKeepsTheTriggers(t *testing.T) {
+	t.Parallel()
+	l, _, _ := seeded(t)
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "ledger.db")
+	if err := l.BackupTo(ctx, path); err != nil {
+		t.Fatalf("BackupTo: %v", err)
+	}
+	raw := outsider(t, path)
+	for _, stmt := range []string{`DELETE FROM facet`, `UPDATE anam_event SET kind = 'tombstoned'`, `DELETE FROM ledger_meta`} {
+		if _, err := raw.ExecContext(ctx, stmt); err == nil {
+			t.Errorf("%s: the backup accepted it", stmt)
+		}
+	}
+}

@@ -45,6 +45,7 @@ func TestLoadDefaults(t *testing.T) {
 		Listen:           config.DefaultListen,
 		Timeout:          5 * time.Second,
 		IngestTimeout:    15 * time.Minute,
+		BackupKeep:       14,
 		BucketWidth:      span.Default,
 		CheckpointBudget: config.DefaultCheckpointBudget,
 	}
@@ -112,6 +113,7 @@ bucket_width: weekly
 		Listen:           config.DefaultListen,
 		Timeout:          12 * time.Second,
 		IngestTimeout:    15 * time.Minute,
+		BackupKeep:       14,
 		BucketWidth:      span.Weekly,
 		CheckpointBudget: config.DefaultCheckpointBudget,
 	}

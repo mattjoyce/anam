@@ -91,6 +91,16 @@ type Operation struct {
 	Mint *MintRun `json:"mint,omitempty"`
 }
 
+// Backup is one backup of the record the daemon took: where it is, the W its ledger
+// holds, its size, and the older backups removed to keep the count.
+type Backup struct {
+	Path   string   `json:"path"`
+	W      int64    `json:"w"`
+	Bytes  int64    `json:"bytes"`
+	Files  int      `json:"files"`
+	Pruned []string `json:"pruned,omitempty"`
+}
+
 // MintRun is a mint the daemon ran on its own account, after an ingest.
 type MintRun struct {
 	W       int64 `json:"w"`

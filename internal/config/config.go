@@ -70,6 +70,15 @@ type Config struct {
 	// and wants the daemon stopped.
 	Server string `mapstructure:"server"`
 
+	// BackupDir is where the daemon writes backups of the record (POST /v1/backups),
+	// one directory each. Empty means the daemon takes none. It should be on another
+	// disk from the record: a backup on the same disk shares its failure.
+	BackupDir string `mapstructure:"backup_dir"`
+
+	// BackupKeep is how many backups the daemon keeps; each new one removes the
+	// oldest beyond it.
+	BackupKeep int `mapstructure:"backup_keep"`
+
 	// IngestTimeout bounds one whole ingest run inside the daemon: every scan and
 	// every batch. Timeout still bounds each call within it.
 	IngestTimeout time.Duration `mapstructure:"ingest_timeout"`
@@ -130,6 +139,8 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 	v.SetDefault("server", "")
 	v.SetDefault("checkpoint_budget", DefaultCheckpointBudget)
 	v.SetDefault("ingest_timeout", 15*time.Minute)
+	v.SetDefault("backup_dir", "")
+	v.SetDefault("backup_keep", 14)
 
 	if path != "" {
 		v.SetConfigFile(path)
@@ -203,6 +214,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("%w: timeout must be positive, got %s", ErrInvalid, c.Timeout)
 	case c.IngestTimeout <= 0:
 		return fmt.Errorf("%w: ingest_timeout must be positive, got %s", ErrInvalid, c.IngestTimeout)
+	case c.BackupDir != "" && c.BackupKeep < 1:
+		return fmt.Errorf("%w: backup_keep must be at least 1, got %d", ErrInvalid, c.BackupKeep)
 	case c.CheckpointBudget < 0:
 		return fmt.Errorf("%w: checkpoint_budget must be 0 or more bytes, got %d", ErrInvalid, c.CheckpointBudget)
 	}

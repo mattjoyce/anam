@@ -33,6 +33,7 @@ func (d *Daemon) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/receipts/{hash}/verify", d.verifyReceipt)
 	mux.HandleFunc("GET /v1/checkpoints", d.getCheckpoints)
 	mux.HandleFunc("POST /v1/checkpoints", d.postCheckpoints)
+	mux.HandleFunc("POST /v1/backups", d.postBackups)
 }
 
 func (d *Daemon) getCheckpoints(w http.ResponseWriter, r *http.Request) {

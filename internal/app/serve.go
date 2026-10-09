@@ -14,6 +14,7 @@ import (
 	"github.com/mattjoyce/anam/internal/read"
 	"github.com/mattjoyce/anam/internal/serve"
 	"github.com/mattjoyce/anam/internal/store/artifact"
+	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
 func serveCmd(cfgPath *string) *cobra.Command {
@@ -333,22 +334,41 @@ func ledgerOrUnnamed(id string) string {
 	return id
 }
 
-// serveDeps assembles the serve path's dependencies from config (read.ServeDeps).
-// The ledger is opened read-only: serving writes nothing to it. The returned func
-// closes it.
+// serveDeps assembles the serve path's dependencies from config (read.ServeDeps):
+// the ledger read-only, since serving writes nothing to it, the artifacts, and the
+// checkpoint log so a serve or a verify starts from the last mint run rather than
+// the ledger's first event. The returned func closes them.
 func serveDeps(ctx context.Context, cfg config.Config) (serve.Deps, func(), error) {
-	store, err := artifact.New(cfg.ArtifactDir)
-	if err != nil {
-		return serve.Deps{}, nil, err
-	}
 	l, err := openLedgerReadOnly(ctx, cfg)
 	if err != nil {
 		return serve.Deps{}, nil, err
 	}
-	deps, err := read.ServeDeps(l, store, nil)
+	buckets, err := cfg.Buckets()
 	if err != nil {
 		_ = l.Close()
 		return serve.Deps{}, nil, err
 	}
-	return deps, func() { _ = l.Close() }, nil
+	db, err := ops.Open(ctx, cfg.DBPath, buckets)
+	if err != nil {
+		_ = l.Close()
+		return serve.Deps{}, nil, err
+	}
+	store, err := artifact.New(cfg.ArtifactDir)
+	if err != nil {
+		_ = db.Close()
+		_ = l.Close()
+		return serve.Deps{}, nil, err
+	}
+	closeAll := func() { _ = store.Close(); _ = db.Close(); _ = l.Close() }
+	defs, err := registryOf(ctx, db)
+	if err != nil {
+		closeAll()
+		return serve.Deps{}, nil, err
+	}
+	deps, err := read.ServeDeps(l, store, db, defs)
+	if err != nil {
+		closeAll()
+		return serve.Deps{}, nil, err
+	}
+	return deps, closeAll, nil
 }

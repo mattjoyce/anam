@@ -13,10 +13,13 @@ import (
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
+	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/serve"
+	"github.com/mattjoyce/anam/internal/span"
 	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
+	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
 // Serve is tested end to end over the real ledger and the real artifact tier
@@ -67,6 +70,12 @@ type harness struct {
 	deps  serve.Deps
 	dir   string
 	store *artifact.Store
+
+	// db is the operational store and mint the deps to cut checkpoints into it, for
+	// the tests that serve and verify from a mint run. deps.Checkpoints starts nil:
+	// a test opts in.
+	db   *ops.DB
+	mint mint.Deps
 }
 
 func newHarness(t *testing.T) *harness {
@@ -105,12 +114,28 @@ func newHarness(t *testing.T) *harness {
 	if err != nil {
 		t.Fatalf("artifact.New: %v", err)
 	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	buckets, err := span.New(span.Monthly)
+	if err != nil {
+		t.Fatalf("span.New: %v", err)
+	}
+	db, err := ops.Open(ctx, filepath.Join(t.TempDir(), "tracking.db"), buckets)
+	if err != nil {
+		t.Fatalf("ops.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
 
 	return &harness{
 		gate:  gate.New(l, defs, scopes, clock.Real{}, person),
 		l:     l,
 		dir:   dir,
 		store: store,
+		db:    db,
+		mint: mint.Deps{
+			Ledger: l, Index: db, Artifacts: store, Buckets: buckets,
+			Clock: clock.Fixed{Instant: time.Date(2026, 7, 25, 9, 0, 0, 0, time.UTC)},
+		},
 		deps: serve.Deps{
 			Ledger:               l,
 			Templates:            templates,

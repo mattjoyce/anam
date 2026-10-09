@@ -45,7 +45,7 @@ var mvpScopes = gate.StaticScopes{
 		"med.missed-dose", "med.started", "med.dose-changed", "med.stopped", "med.compliance-estimate",
 		"illness.started", "illness.ended", "illness.hangover",
 		"travel.departed", "travel.arrived", "travel.returned", "travel.flight",
-		"visit.clinic", "gym.visit", bpcsv.Type,
+		"visit.clinic", "gym.visit", "exercise.session", bpcsv.Type,
 	},
 	// documents is a folder of files whose bytes stay there: each becomes a
 	// doc.reference whose payload is the path, the hash and the sidecar's date.

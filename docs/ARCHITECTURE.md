@@ -444,9 +444,13 @@ read, paid by a range-scan; it is not bought by a periodic tick.
   are its buckets' bytes in time order, joined. Projections, snapshots and explain still read the whole
   value; explain, the inspector and retract read the full fold. Whether the whole hash should instead
   be a hash of the bucket hashes is card 60.
-- **Cadence is adaptive** — time-OR-size-OR-rate, whichever trips first. A quiet bucket mints nothing.
-  The first slice mints on a **manual trigger** (`anam checkpoint`, R8, `internal/mint`); the adaptive
-  trigger is deferred, the seam is not.
+- **Cadence follows the ledger** (card 61, 2026-10-09). The daemon mints after every ingest that moved
+  `W`, as its own write on the write queue, before the ingest's operation finishes, so a caller that
+  waited on the ingest reads from checkpoints with no tail. A mint from the last run costs the buckets
+  the ingest touched (60 ms on the NAS at 19,631 events), so no size or time trigger earns its
+  complexity; a quiet bucket still mints nothing. The mint is not part of what the ingest admitted: its
+  failure is reported on the operation (`mint.error`) and fails nothing, and the next changing ingest,
+  or `anam checkpoint`, catches up. A local `anam ingest` (maintenance, daemon stopped) does not mint.
 
 ### The watermark and the head
 

@@ -28,7 +28,10 @@ func remoteIngest(cmd *cobra.Command, cfg config.Config) error {
 	}
 	switch op.State {
 	case api.StateSucceeded:
-		_, err = fmt.Fprintln(cmd.OutOrStdout(), op.Summary)
+		if _, err = fmt.Fprintln(cmd.OutOrStdout(), op.Summary); err != nil || op.Mint == nil {
+			return err
+		}
+		_, err = fmt.Fprintln(cmd.OutOrStdout(), mintLine(*op.Mint))
 		return err
 	case api.StateFailed:
 		return fmt.Errorf("ingest %s on %s: %s", op.ID, c.Server(), op.Error)
@@ -36,6 +39,19 @@ func remoteIngest(cmd *cobra.Command, cfg config.Config) error {
 		return fmt.Errorf("ingest %s on %s is still %s after %s; anam status shows it",
 			op.ID, c.Server(), op.State, cfg.IngestTimeout)
 	}
+}
+
+// mintLine renders the mint the daemon ran after an ingest. Its failure is a line,
+// not an error: the ingest succeeded, and the next mint catches up.
+func mintLine(m api.MintRun) string {
+	if m.Error != "" {
+		return "checkpoints: mint failed, reads replay the tail until the next one: " + m.Error
+	}
+	from := "folding the whole ledger"
+	if !m.Full {
+		from = fmt.Sprintf("from the run at W=%d", m.From)
+	}
+	return fmt.Sprintf("checkpoints: minted %d of %d buckets at W=%d, %s", m.Minted, m.Buckets, m.W, from)
 }
 
 // resultOf is one source's part of a run as the API reports it, whichever process ran

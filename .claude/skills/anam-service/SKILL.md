@@ -97,6 +97,8 @@ An operation:
 - `w_before`..`w_after` is the durable answer to "what landed". Operations and the per-source
   times in `/v1/status` live in memory and are lost on restart; `since` in the status says
   when the daemon started. A 404 for an id after a restart is expected: read the ledger.
+- `mint` appears when W moved: the daemon minted after the ingest (`minted` of `buckets`, from
+  the run at `from`, or `full`). `mint.error` is a failed mint; the ingest still succeeded.
 - `summary` is `ledger unchanged: nothing new in any source` when nothing moved. The gateway's
   Discord notice keys on that string.
 - At most one run is in progress and one pending. A POST during a run returns the **pending**

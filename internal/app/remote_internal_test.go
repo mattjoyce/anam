@@ -423,6 +423,14 @@ func TestIngest_SameOverTheDaemon(t *testing.T) {
 			t.Errorf("%v with a server: %v, want a refusal", args, err)
 		}
 	}
+	// A run that changes the ledger reports the mint the daemon ran after it (card 61).
+	if err := os.WriteFile(f.bpPath, []byte(strings.Replace(bpFixture, "114.0", "115.0", 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	changed, _, err := cli(t, f.remoteCfg, "ingest")
+	if err != nil || !strings.Contains(changed, "superseded=1") || !strings.Contains(changed, "checkpoints: minted ") {
+		t.Errorf("a changing ingest over the daemon: %v\n%s", err, changed)
+	}
 }
 
 // A run the daemon could not finish fails the command, after saying what landed.

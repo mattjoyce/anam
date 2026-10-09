@@ -50,6 +50,15 @@ func (d *Daemon) getCheckpoints(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, list)
 }
 
+// mintDeps is a mint on the write handles, with the daemon's width and budget.
+func (d *Daemon) mintDeps(s Stores) mint.Deps {
+	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
+	return mint.Deps{
+		Ledger: s.Ledger, Index: s.Ops, Artifacts: d.artifacts, Buckets: buckets, Clock: clock.Real{},
+		Budget: d.cfg.CheckpointBudget,
+	}
+}
+
 // postCheckpoints mints, or with ?dry_run=true derives without publishing; ?full=true
 // folds the whole ledger instead of starting from the last run. Minting
 // writes the operational store and the artifacts, so it runs on the write queue. While
@@ -67,15 +76,10 @@ func (d *Daemon) postCheckpoints(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
-
 	var m api.Mint
 	err := d.TryWrite(d.timeout(r), func(ctx context.Context, s Stores) error {
 		var err error
-		m, err = mint.Report(ctx, mint.Deps{
-			Ledger: s.Ledger, Index: s.Ops, Artifacts: d.artifacts, Buckets: buckets, Clock: clock.Real{},
-			Budget: d.cfg.CheckpointBudget,
-		}, q)
+		m, err = mint.Report(ctx, d.mintDeps(s), q)
 		return err
 	})
 	if errors.Is(err, ErrBusy) {

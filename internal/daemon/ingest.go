@@ -13,6 +13,7 @@ import (
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
@@ -159,11 +160,17 @@ func (d *Daemon) runIngest(op *operation) {
 		d.catchUp(ctx, s)
 		return err
 	})
+	// Before the operation finishes, so a caller waiting on it reads from checkpoints
+	// at the new head.
+	var minted *api.MintRun
+	if before == nil || after == nil || *after != *before {
+		minted = d.mintAfterIngest()
+	}
 
 	in.mu.Lock()
 	defer in.mu.Unlock()
 	defer close(op.done)
-	op.FinishedAt, op.WBefore, op.WAfter, op.Sources = d.now(), before, after, results
+	op.FinishedAt, op.WBefore, op.WAfter, op.Sources, op.Mint = d.now(), before, after, results, minted
 	for _, r := range results {
 		op.Changed += r.Admitted + r.Superseded
 	}
@@ -185,6 +192,25 @@ func (d *Daemon) runIngest(op *operation) {
 			st.LastAdmissionAt = op.StartedAt
 		}
 	}
+}
+
+// mintAfterIngest mints at the head, as its own write: a mint is not part of what the
+// ingest admitted, so its failure is reported and fails nothing (ARCHITECTURE.md §7).
+// It starts from the last run, so it costs the buckets the ingest touched.
+func (d *Daemon) mintAfterIngest() *api.MintRun {
+	var m api.Mint
+	err := d.Write(context.Background(), d.cfg.Timeout, func(ctx context.Context, s Stores) error {
+		var err error
+		m, err = mint.Report(ctx, d.mintDeps(s), api.MintQuery{})
+		return err
+	})
+	if err != nil {
+		slog.Error("daemon: mint after ingest failed", "err", err)
+		return &api.MintRun{Error: err.Error()}
+	}
+	slog.Info("daemon: minted after ingest", "w", m.W, "full", m.Full, "from", m.From,
+		"minted", m.MintedCount(), "buckets", len(m.Outcomes))
+	return &api.MintRun{W: m.W, Full: m.Full, From: m.From, Minted: m.MintedCount(), Buckets: len(m.Outcomes)}
 }
 
 // catchUp replays the ledger into the operational store's index, so reads of it are

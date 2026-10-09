@@ -86,6 +86,21 @@ type Operation struct {
 	// Summary is Verdict's line for a run that succeeded.
 	Summary string `json:"summary,omitempty"`
 	Error   string `json:"error,omitempty"`
+	// Mint is the mint the daemon ran after the ingest, present when the ingest moved
+	// W. Its failure is its own: the ingest's state does not depend on it.
+	Mint *MintRun `json:"mint,omitempty"`
+}
+
+// MintRun is a mint the daemon ran on its own account, after an ingest.
+type MintRun struct {
+	W       int64 `json:"w"`
+	Full    bool  `json:"full"`
+	From    int64 `json:"from,omitempty"`
+	Minted  int   `json:"minted"`
+	Buckets int   `json:"buckets"`
+	// Error is set when the mint failed; the checkpoints stand where they were, and
+	// the next mint (after the next changing ingest, or `anam checkpoint`) catches up.
+	Error string `json:"error,omitempty"`
 }
 
 // Finished reports whether the operation has reached a final state.

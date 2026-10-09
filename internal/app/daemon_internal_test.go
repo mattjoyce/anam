@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -52,9 +53,72 @@ func TestDaemonIngestAdmitsThenFindsNothingNew(t *testing.T) {
 		t.Fatalf("first run did not move W: %d..%d", *first.WBefore, *first.WAfter)
 	}
 
+	// Card 61: an ingest that moved W is followed by a mint at the new head, so a read
+	// after it starts from checkpoints with no tail.
+	if m := first.Mint; m == nil || m.Error != "" || m.W != *first.WAfter || m.Minted == 0 || m.Minted != m.Buckets {
+		t.Fatalf("first run's mint: %+v", first.Mint)
+	}
+
 	second := ingestOnce(t, d)
 	if second.Sources[0].Unchanged != 3 || *second.WAfter != *second.WBefore {
 		t.Fatalf("second run changed the ledger: %+v W %d..%d", second.Sources, *second.WBefore, *second.WAfter)
+	}
+	if second.Mint != nil {
+		t.Fatalf("a run that changed nothing minted: %+v", second.Mint)
+	}
+
+	// A correction moves W again; the mint after it starts from the first one.
+	more := strings.Replace(bpFixture, "114.0", "115.0", 1)
+	if err := os.WriteFile(f.bpPath, []byte(more), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	third := ingestOnce(t, d)
+	if m := third.Mint; m == nil || m.Error != "" || m.Full || m.From != *first.WAfter || m.W != *third.WAfter {
+		t.Fatalf("third run's mint: %+v (first W %d)", third.Mint, *first.WAfter)
+	}
+}
+
+// A mint that fails after an ingest is reported on the operation and fails nothing:
+// what the ingest admitted is in the ledger whatever the mint did.
+func TestDaemonIngestSucceedsWhenItsMintFails(t *testing.T) {
+	t.Parallel()
+	f := newIngestFixture(t)
+	importsPath := filepath.Join(f.dir, "imports.yaml")
+	decl := fmt.Sprintf("imports:\n  - source: bp-csv\n    path: %s\n", f.bpPath)
+	if err := os.WriteFile(importsPath, []byte(decl), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(f.cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Listen = "127.0.0.1:0"
+	// A file where the artifact directory should be: every Put fails.
+	cfg.ArtifactDir = filepath.Join(f.dir, "not-a-dir")
+	if err := os.WriteFile(cfg.ArtifactDir, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	d, err := daemon.Open(context.Background(), cfg, daemon.Options{Ingest: daemonIngest(cfg, importsPath)})
+	if err != nil {
+		t.Fatalf("open daemon: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	ran := make(chan error, 1)
+	go func() { ran <- d.Run(ctx) }()
+	defer func() {
+		cancel()
+		if err := <-ran; err != nil {
+			t.Errorf("run: %v", err)
+		}
+	}()
+
+	op := ingestOnce(t, d)
+	if op.State != api.StateSucceeded || op.Changed != 3 {
+		t.Fatalf("ingest: %s, changed %d, error %q", op.State, op.Changed, op.Error)
+	}
+	if op.Mint == nil || op.Mint.Error == "" {
+		t.Fatalf("a failed mint was not reported: %+v", op.Mint)
 	}
 }
 

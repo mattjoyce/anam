@@ -62,6 +62,14 @@ listen: 127.0.0.1:8787
 # it, as a bearer token or as a basic-auth password, and listen may be any address.
 # token_file: ~/.config/anam/token
 
+# The importers the daemon accepts envelopes and Definitions from, each under its
+# own token, held here only as a SHA-256 (docs/IMPORTERS.md §8):
+#   importers:
+#     - source: withings
+#       token_sha256: <printf %s "$token" | sha256sum>
+#       types: [health.weight]
+# importers_file: ~/.config/anam/importers.yaml
+
 # Bounds one whole ingest run inside the daemon.
 ingest_timeout: 15m
 

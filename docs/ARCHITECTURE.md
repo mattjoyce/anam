@@ -307,7 +307,8 @@ simplified for a single person but kept in shape:
    input, checked before admission.
 2. **Authenticated** — the capture worker's `source` identity and its token scope: a token may inject
    only the facet type(s) it is scoped for (least privilege); the injector identity becomes part of the
-   facet's provenance.
+   facet's provenance. For an importer the scope is real credentials: its own token, held by the
+   daemon as a hash beside its source and types (`importers_file`, docs/IMPORTERS.md §8).
 3. **Associated** — the facet **binds** to the person. With one person this is near-trivial, but the
    shape holds: assurance is *high* when the source explicitly scopes to the person, *medium* when
    defaulted, *review* when a carried identity element contradicts. A `span_hint` may be recorded if a
@@ -527,7 +528,7 @@ rebuild has to know what it may drop:
 | Tier | Tables | Recovery |
 |---|---|---|
 | **Derived** | facet index, anam-event index, checkpoint index, `span_head`, sync cursors | replay the ledger |
-| **Provisioned** | Facet Definitions, projection templates, token scopes | the embedded assets and config — i.e. git |
+| **Provisioned** | Facet Definitions (bundled and registered), projection templates, token scopes | the embedded assets, config, and each importer registering its Definitions again — i.e. git |
 | **Authored** | saved span bookmarks, GC state, the operational log | nowhere. Back it up |
 
 The tier belongs in the schema beside each table, because it is the only thing that tells a later reader
@@ -633,8 +634,12 @@ chronological order (§5). The **payload is a BLOB, never a JSON column** — th
 metadata/payload separation (§3) is enforced.
 
 **Facet Definitions are not in the ledger.** A Definition is not something Anam *knew*; it is how Anam
-*interprets* — governance, not record. It lives in the operational store, provisioned from embedded JSON
-(every version, so an artifact's `definition_version` still resolves). The error kernel is smaller for it.
+*interprets* — governance, not record. It lives in the operational store, every version, so an
+artifact's `definition_version` still resolves. It is provisioned from one of two places, never both
+for one type: the JSON embedded in the binary, for the types Anam's own workers capture, or the
+importer that emits it, which registers it from its repo (`POST /v1/definitions`, docs/IMPORTERS.md
+§8). A registered version is immutable, and the store's triggers hold it so. The error kernel is
+smaller for it.
 
 > **Design note (Hickey).** The row mapping is **quarantined to the store package**. A row is not a
 > domain type. Current status has no column: it is folded from anam-events (§9).

@@ -36,11 +36,18 @@ It serves on the configured address (listen, ANAM_LISTEN):
     GET  /v1/receipts[/{hash}[/verify]] receipts: list, show, prove
     GET  /v1/checkpoints                the checkpoint log
     POST /v1/checkpoints                mint (?dry_run=true to derive only)
+    POST /v1/backups                    back up the record into backup_dir
     GET  /                              the inspector
+
+and to importers, each under its own token (importers_file, docs/IMPORTERS.md §8):
+
+    POST /v1/envelopes                  a batch of envelopes, admitted whole or refused whole
+    POST /v1/definitions                register a Definition the importer emits
+    GET  /v1/definitions[/{type}[/{v}]] the published Definitions (the operator may read too)
 
 The CLI asks these when server is set (ANAM_SERVER, --server); see anam --help.
 
-With token_file set, everything but /healthz needs the token, as a bearer token or
+With token_file set, everything but /healthz and the importer routes needs the token, as a bearer token or
 as a basic-auth password, and the daemon may listen on any address. Without it the
 daemon listens on loopback only.
 

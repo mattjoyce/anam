@@ -1,9 +1,9 @@
 {
   "meta": {
     "facet_type": "travel.departed",
-    "definition_version": 1,
+    "definition_version": 2,
     "classification": "Confidential",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "records/travel.departed",
     "time_semantics": {
       "fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}
@@ -13,6 +13,20 @@
     "series": {"name": "travel.trip", "key": ["/trip"], "closes": false}
   },
   "schema": {
-    "required": ["/id", "/date", "/trip"]
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["id", "date", "trip"],
+    "properties": {
+      "agency": {"type": "string", "minLength": 1},
+      "basis": {"type": "string", "minLength": 1},
+      "booking": {"type": "string", "minLength": 1},
+      "date": {"type": "string", "minLength": 1},
+      "destination": {"type": "string", "minLength": 1},
+      "from": {"type": "string", "minLength": 1},
+      "id": {"type": "string", "minLength": 1},
+      "purpose": {"type": "string", "minLength": 1},
+      "trip": {"type": "string", "minLength": 1}
+    },
+    "additionalProperties": false
   }
 }

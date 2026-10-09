@@ -139,6 +139,12 @@ Two rules make this safe:
 - A **Facet Definition** is versioned **independently** — the per-*type* contract: schema, envelope,
   time semantics, the declared linking elements, the validation bar, and the type's `classification`.
   Old artifacts stay interpretable as definitions evolve.
+- A Definition's `schema` is standard **JSON Schema** (draft 2020-12) and it is **closed**: it declares
+  every field a payload may hold, with its type, and refuses the rest, nested objects included. A
+  required field refuses null and the empty string. A source that grows a field gets the field
+  declared; a source with a second shape gets a second Definition. `validation_mode` is `strict`
+  (the schema as written) or `verbatim` (no schema). Validation reads the payload and never rewrites
+  it, so a number the source wrote as text stays text, checked by a pattern.
 
 Granularity is a choice: start coarse (one Facet per source fragment) and decompose only where real
 fact-times or finer access control earn the cut. Facet types are **dotted and namespaced** —

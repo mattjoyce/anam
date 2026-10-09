@@ -1,9 +1,9 @@
 {
   "meta": {
     "facet_type": "med.compliance-estimate",
-    "definition_version": 1,
+    "definition_version": 2,
     "classification": "Sensitive",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "records/med.compliance-estimate",
     "time_semantics": {
       "fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}
@@ -12,9 +12,20 @@
     "min_binding_assurance": "medium"
   },
   "schema": {
-    "required": ["/id", "/date", "/drug", "/course", "/period_start", "/period_end", "/estimate"],
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["id", "date", "drug", "course", "period_start", "period_end", "estimate"],
     "properties": {
-      "/estimate": {"pattern": "^(0(\\.[0-9]+)?|1(\\.0+)?)$"}
-    }
+      "course": {"type": "number"},
+      "date": {"type": "string", "minLength": 1},
+      "drug": {"type": "string", "minLength": 1},
+      "estimate": {"type": "number", "minimum": 0, "maximum": 1},
+      "id": {"type": "string", "minLength": 1},
+      "note": {"type": "string", "minLength": 1},
+      "period_end": {"type": "string", "minLength": 1},
+      "period_start": {"type": "string", "minLength": 1},
+      "source_note": {"type": "string", "minLength": 1}
+    },
+    "additionalProperties": false
   }
 }

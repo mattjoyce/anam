@@ -32,14 +32,16 @@ const bpManifest = `{
     "facet_type": "health.blood-pressure",
     "definition_version": 1,
     "classification": "Normal",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "bp-csv/reading",
     "time_semantics": {
       "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
     },
     "identity_key": ["/measured_at"]
   },
-  "schema": {"required": ["/systolic"]}
+  "schema": {"type": "object", "required": ["measured_at", "systolic"],
+    "properties": {"measured_at": {"type": "string", "minLength": 1}, "systolic": {"type": "number"}, "diastolic": {"type": "number"}},
+    "additionalProperties": false}
 }`
 
 const sleepManifest = `{
@@ -47,14 +49,16 @@ const sleepManifest = `{
     "facet_type": "health.sleep",
     "definition_version": 1,
     "classification": "Normal",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "health-db/sleep",
     "time_semantics": {
       "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
     },
     "identity_key": ["/measured_at"]
   },
-  "schema": {"required": ["/deep_minutes"]}
+  "schema": {"type": "object", "required": ["measured_at", "deep_minutes"],
+    "properties": {"measured_at": {"type": "string", "minLength": 1}, "deep_minutes": {"type": "number"}},
+    "additionalProperties": false}
 }`
 
 type harness struct {

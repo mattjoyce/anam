@@ -1,9 +1,9 @@
 {
   "meta": {
     "facet_type": "lab.result",
-    "definition_version": 1,
+    "definition_version": 2,
     "classification": "Sensitive",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "records/lab.result",
     "time_semantics": {
       "fact_time": {"pointer": "/collected", "layout": "2006-01-02 15:04", "zone": "Australia/Sydney"}
@@ -12,6 +12,29 @@
     "min_binding_assurance": "medium"
   },
   "schema": {
-    "required": ["/id", "/collected", "/analyte", "/value", "/lab_number"]
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["id", "collected", "analyte", "value", "lab_number"],
+    "properties": {
+      "analyte": {"type": "string", "minLength": 1},
+      "collected": {"type": "string", "minLength": 1},
+      "collection_type": {"type": "string", "minLength": 1},
+      "fasting": {"type": "boolean"},
+      "flag_as_printed": {"type": "string", "minLength": 1},
+      "flagged": {"type": "boolean"},
+      "id": {"type": "string", "minLength": 1},
+      "lab": {"type": "string", "minLength": 1},
+      "lab_number": {"type": "string", "minLength": 1},
+      "note": {"type": "string", "minLength": 1},
+      "panel": {"type": "string", "minLength": 1},
+      "range": {"type": "string", "minLength": 1},
+      "source_note": {"type": "string", "minLength": 1},
+      "specimen": {"type": "string", "minLength": 1},
+      "status_bands": {"type": "string", "minLength": 1},
+      "unit": {"type": "string", "minLength": 1},
+      "value": {"type": "string", "minLength": 1},
+      "value_num": {"type": "number"}
+    },
+    "additionalProperties": false
   }
 }

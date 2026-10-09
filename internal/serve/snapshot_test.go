@@ -16,12 +16,14 @@ func medManifest(typ string, closes bool) string {
 	return fmt.Sprintf(`{
   "meta": {
     "facet_type": %q, "definition_version": 1, "classification": "Sensitive",
-    "validation_mode": "lenient", "source_schema": "records/%s",
+    "validation_mode": "strict", "source_schema": "records/%s",
     "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "UTC"}},
     "identity_key": ["/id"],
     "series": {"name": "med.regimen", "key": ["/drug", "/course"], "closes": %t}
   },
-  "schema": {"required": ["/id", "/date", "/drug"]}
+  "schema": {"type": "object", "required": ["id", "date", "drug", "course"],
+    "properties": {"id": {"type": "string", "minLength": 1}, "date": {"type": "string", "minLength": 1}, "drug": {"type": "string", "minLength": 1}, "course": {"type": "number"}, "dose": {"type": "string", "minLength": 1}},
+    "additionalProperties": false}
 }`, typ, typ, closes)
 }
 

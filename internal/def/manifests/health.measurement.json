@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "health.measurement",
-    "definition_version": 2,
+    "definition_version": 3,
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "withings/measurement",
@@ -13,12 +13,20 @@
     "min_binding_assurance": "medium"
   },
   "schema": {
-    "required": ["/withings_id", "/date", "/type", "/value", "/unit"],
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["withings_id", "date", "type", "value", "unit"],
     "properties": {
-      "/attrib": {"pattern": "^[0-9]+$"},
-      "/model": {},
-      "/deviceid": {"pattern": "^[0-9a-f]+$"},
-      "/timezone": {}
-    }
+      "attrib": {"type": "string", "minLength": 1, "pattern": "^[0-9]+$"},
+      "date": {"type": "string", "minLength": 1},
+      "deviceid": {"type": "string", "minLength": 1, "pattern": "^[0-9a-f]+$"},
+      "model": {"type": "string", "minLength": 1},
+      "timezone": {"type": "string", "minLength": 1},
+      "type": {"type": "string", "minLength": 1},
+      "unit": {"type": "string", "minLength": 1},
+      "value": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$"},
+      "withings_id": {"type": "string", "minLength": 1}
+    },
+    "additionalProperties": false
   }
 }

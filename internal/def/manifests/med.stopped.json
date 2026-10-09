@@ -1,9 +1,9 @@
 {
   "meta": {
     "facet_type": "med.stopped",
-    "definition_version": 1,
+    "definition_version": 2,
     "classification": "Sensitive",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "records/med.stopped",
     "time_semantics": {
       "fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}
@@ -13,6 +13,18 @@
     "series": {"name": "med.regimen", "key": ["/drug", "/course"], "closes": true}
   },
   "schema": {
-    "required": ["/id", "/date", "/drug", "/course"]
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["id", "date", "drug", "course"],
+    "properties": {
+      "agreed_with": {"type": "string", "minLength": 1},
+      "course": {"type": "number"},
+      "date": {"type": "string", "minLength": 1},
+      "drug": {"type": "string", "minLength": 1},
+      "id": {"type": "string", "minLength": 1},
+      "reason": {"type": "string", "minLength": 1},
+      "source_note": {"type": "string", "minLength": 1}
+    },
+    "additionalProperties": false
   }
 }

@@ -35,8 +35,8 @@ func TestBundled_HoldsTheHealthDBTypes(t *testing.T) {
 			t.Errorf("no bundled definition for %s", typ)
 			continue
 		}
-		if d.Version != 1 || d.Classification != facet.ClassificationSensitive {
-			t.Errorf("%s = v%d %s, want v1 Sensitive", typ, d.Version, d.Classification)
+		if d.Version != 2 || d.Classification != facet.ClassificationSensitive {
+			t.Errorf("%s = v%d %s, want v2 Sensitive", typ, d.Version, d.Classification)
 		}
 		// All four share the identity grain: one facet per (group, period_type,
 		// period_start). The worker composes source_ref on the same promise.
@@ -62,8 +62,8 @@ func TestBundled_MedTypesShareTheRegimenSeries(t *testing.T) {
 		if d.Series == nil || d.Series.Name != "med.regimen" || len(d.Series.Key) != 2 {
 			t.Errorf("%s series = %+v, want med.regimen over [/drug /course]", typ, d.Series)
 		}
-		if d.Classification != facet.ClassificationSensitive || d.Mode != def.ModeLenient {
-			t.Errorf("%s = %s %s, want Sensitive lenient", typ, d.Classification, d.Mode)
+		if d.Classification != facet.ClassificationSensitive || d.Mode != def.ModeStrict {
+			t.Errorf("%s = %s %s, want Sensitive strict", typ, d.Classification, d.Mode)
 		}
 	}
 	if !reg.Closes("med.stopped") || reg.Closes("med.started") || reg.Closes("med.dose-changed") {
@@ -102,8 +102,8 @@ func TestBundled_LifeEventTypes(t *testing.T) {
 			t.Errorf("no bundled definition for %s", c.typ)
 			continue
 		}
-		if d.Classification != c.class || d.Mode != def.ModeLenient {
-			t.Errorf("%s = %s %s, want %s lenient", c.typ, d.Classification, d.Mode, c.class)
+		if d.Classification != c.class || d.Mode != def.ModeStrict {
+			t.Errorf("%s = %s %s, want %s strict", c.typ, d.Classification, d.Mode, c.class)
 		}
 		switch {
 		case c.series == "" && d.Series != nil:

@@ -37,11 +37,11 @@ func TestGuard_RefusesAChangedKeyingAndNothingElse(t *testing.T) {
 	}{
 		{"unchanged", bpManifest, false},
 		{"new version, same keying", v2, false},
-		{"schema tightened", strings.Replace(v2, `"required": [`, `"required": ["/comment", `, 1), false},
+		{"schema tightened", strings.Replace(v2, `"required": [`, `"required": ["comment", `, 1), false},
 		{"classification raised", strings.Replace(v2, `"classification": "Sensitive"`, `"classification": "Confidential"`, 1), false},
 		{"identity key changed", strings.Replace(v2, `"identity_key": ["/measured_at"]`, `"identity_key": ["/measured_at", "/systolic"]`, 1), true},
 		{"fact-time zone changed", strings.Replace(v2, `"zone": "UTC"`, `"zone": "Australia/Sydney"`, 1), true},
-		{"fact-time pointer changed", strings.Replace(v2, `"pointer": "/measured_at"`, `"pointer": "/taken_at"`, 1), true},
+		{"fact-time pointer changed", strings.Replace(v2, `"pointer": "/measured_at"`, `"pointer": "/systolic"`, 1), true},
 		{"same version, identity changed", strings.Replace(bpManifest, `"identity_key": ["/measured_at"]`, `"identity_key": ["/systolic"]`, 1), true},
 	}
 	for _, c := range cases {
@@ -88,5 +88,37 @@ func TestGuard_RefusesAChangedKeyingAndNothingElse(t *testing.T) {
 	}
 	if len(manifests) != len(bundled.All()) || manifests[0].Type == facet.Type("") {
 		t.Errorf("Manifests() lists %d, Bundled() holds %d", len(manifests), len(bundled.All()))
+	}
+}
+
+// The store keeps each body in the format current when it was stored, and the schema
+// half's format changed at card 52. The guard reads only the keying, so a body from
+// before still compares: same keying passes, a changed one is refused.
+func TestGuard_ComparesAStoredBodyOfAnEarlierFormat(t *testing.T) {
+	t.Parallel()
+	before := `{
+  "meta": {
+    "facet_type": "health.blood-pressure", "definition_version": 1, "classification": "Normal",
+    "validation_mode": "lenient", "source_schema": "bp-csv/reading",
+    "time_semantics": {"fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}},
+    "identity_key": ["/measured_at"]
+  },
+  "schema": {"required": ["/systolic", "/diastolic"], "properties": {"/position": {"enum": ["sitting"]}}}
+}`
+	stored := []def.Stored{{Type: "health.blood-pressure", Version: 1, Body: []byte(before)}}
+
+	same, err := def.NewRegistry(mustParse(t, strings.Replace(bpManifest, `"definition_version": 1`, `"definition_version": 2`, 1)))
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	if err := def.Guard(stored, same); err != nil {
+		t.Errorf("Guard refused the same keying across formats: %v", err)
+	}
+	rekeyed, err := def.NewRegistry(mustParse(t, strings.Replace(bpManifest, `"identity_key": ["/measured_at"]`, `"identity_key": ["/measured_at", "/systolic"]`, 1)))
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	if err := def.Guard(stored, rekeyed); !errors.Is(err, def.ErrKeyed) {
+		t.Errorf("Guard = %v across formats, want ErrKeyed", err)
 	}
 }

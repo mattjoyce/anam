@@ -1,9 +1,9 @@
 {
   "meta": {
     "facet_type": "travel.flight",
-    "definition_version": 1,
+    "definition_version": 2,
     "classification": "Confidential",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "records/travel.flight",
     "time_semantics": {
       "fact_time": {"pointer": "/date", "layout": "2006-01-02 -07:00", "zone": "UTC"}
@@ -12,10 +12,22 @@
     "min_binding_assurance": "medium"
   },
   "schema": {
-    "required": ["/id", "/date", "/trip", "/from", "/to"],
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["id", "date", "trip", "from", "to"],
     "properties": {
-      "/from": {"pattern": "^[A-Z]{3}$"},
-      "/to": {"pattern": "^[A-Z]{3}$"}
-    }
+      "airline": {"type": "string", "minLength": 1},
+      "arrives": {"type": "string", "minLength": 1},
+      "booking": {"type": "string", "minLength": 1},
+      "date": {"type": "string", "minLength": 1},
+      "flight": {"type": "string", "minLength": 1},
+      "from": {"type": "string", "minLength": 1, "pattern": "^[A-Z]{3}$"},
+      "id": {"type": "string", "minLength": 1},
+      "note": {"type": "string", "minLength": 1},
+      "to": {"type": "string", "minLength": 1, "pattern": "^[A-Z]{3}$"},
+      "trip": {"type": "string", "minLength": 1},
+      "via": {"type": "string", "minLength": 1}
+    },
+    "additionalProperties": false
   }
 }

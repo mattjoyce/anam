@@ -160,8 +160,9 @@ unbounded computation or storage. Large operator work uses an operation handle.
 | `GetCoverage` | Projection, optional window and pinned position | Observed counts and date ranges by type/source, freshness observations, gaps only where justified |
 
 Definition discovery is important because payloads vary. An agent needs to know that a lab result
-may carry a unit and reference range, or that a medication change needs a course reference. Today’s
-lenient required-pointer definitions are not a complete authoring interface. Authorable types need
+may carry a unit and reference range, or that a medication change needs a course reference. Today's
+closed JSON Schema definitions (card 52) give field names and types, which is not yet a complete
+authoring interface. Authorable types need
 descriptions, field types, examples, precision rules, and writable-field guidance. Missing schema
 knowledge must be reported rather than guessed into an invented normalized payload.
 
@@ -335,7 +336,7 @@ the definition, source revision, or authorization cannot change before submissio
 ```
 
 The example illustrates the proposed authoring contract. `course_ref` needs an agreed Definition;
-it is not a claim about today's lenient `med.missed-dose` schema. Discovery must advertise exactly
+it is not a claim about today's `med.missed-dose` schema. Discovery must advertise exactly
 what the installed version accepts.
 
 The source writer assigns a stable row ID on the user's behalf and returns it. It retains the original
@@ -347,8 +348,8 @@ managed `/id` types and say so in discovery.
 
 The authenticated actor is attached by the application. The model cannot mark itself as the user,
 claim human endorsement, set classification, or supply anam-time. It may translate an explicit user
-assertion into the declared type. Unsupported types fail with alternatives; lenient validation is
-not permission to invent a medication schema or discard uncertain meaning.
+assertion into the declared type. Unsupported types fail with alternatives; a schema's optional
+fields are not permission to invent a medication schema or discard uncertain meaning.
 
 ### Idempotency, concurrency, and recovery
 

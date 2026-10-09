@@ -24,14 +24,16 @@ const bpManifest = `{
     "facet_type": "health.blood-pressure",
     "definition_version": 1,
     "classification": "Normal",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "bp-csv/reading",
     "time_semantics": {
       "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
     },
     "identity_key": ["/measured_at"]
   },
-  "schema": {"required": ["/systolic", "/diastolic"]}
+  "schema": {"type": "object", "required": ["measured_at", "systolic", "diastolic"],
+    "properties": {"measured_at": {"type": "string", "minLength": 1}, "systolic": {"type": "number"}, "diastolic": {"type": "number"}, "comment": {"type": "string", "minLength": 1}},
+    "additionalProperties": false}
 }`
 
 // newGate wires a Gate over a fresh real ledger.

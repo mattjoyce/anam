@@ -16,7 +16,7 @@ const bpManifest = `{
     "facet_type": "health.blood-pressure",
     "definition_version": 1,
     "classification": "Normal",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "bp-csv/reading",
     "time_semantics": {
       "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
@@ -24,12 +24,24 @@ const bpManifest = `{
     "identity_key": ["/measured_at"]
   },
   "schema": {
-    "required": ["/systolic", "/diastolic"],
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["measured_at", "systolic", "diastolic"],
     "properties": {
-      "/position": {"enum": ["sitting", "standing", "lying"]}
-    }
+      "measured_at": {"type": "string", "minLength": 1},
+      "systolic": {"type": "number"},
+      "diastolic": {"type": "number"},
+      "pulse": {"type": "number"},
+      "position": {"type": "string", "enum": ["sitting", "standing", "lying"]},
+      "comment": {"type": "string", "minLength": 1}
+    },
+    "additionalProperties": false
   }
 }`
+
+// verbatimManifest is bpManifest with no schema to hold a payload to.
+var verbatimManifest = bpManifest[:strings.Index(bpManifest, `,
+  "schema"`)] + "\n}"
 
 const bpPayload = `{
   "measured_at": "2026-01-24T06:30:00Z",
@@ -62,9 +74,6 @@ func TestParse_DefaultsAndValidation(t *testing.T) {
 	if d.SchemaVersion != 1 || d.MediaType != "application/json" {
 		t.Errorf("defaults: schema v%d media %q", d.SchemaVersion, d.MediaType)
 	}
-	if !d.AdditionalProperties {
-		t.Error("lenient mode should allow additional fields")
-	}
 }
 
 func TestParse_RejectsBadManifests(t *testing.T) {
@@ -73,11 +82,45 @@ func TestParse_RejectsBadManifests(t *testing.T) {
 		"unknown key":      func(m string) string { return strings.Replace(m, `"meta"`, `"metta"`, 1) },
 		"snake type":       func(m string) string { return strings.Replace(m, "health.blood-pressure", "blood_pressure", 1) },
 		"no identity":      func(m string) string { return strings.Replace(m, `["/measured_at"]`, `[]`, 1) },
-		"bad mode":         func(m string) string { return strings.Replace(m, "lenient", "relaxed", 1) },
-		"pointer no slash": func(m string) string { return strings.Replace(m, `"/systolic"`, `"systolic"`, 1) },
+		"bad mode":         func(m string) string { return strings.Replace(m, `"strict"`, `"relaxed"`, 1) },
+		"lenient is gone":  func(m string) string { return strings.Replace(m, `"strict"`, `"lenient"`, 1) },
+		"pointer no slash": func(m string) string { return strings.Replace(m, `["/measured_at"]`, `["measured_at"]`, 1) },
 		"bad pattern": func(m string) string {
 			return strings.Replace(m, `"enum": ["sitting", "standing", "lying"]`, `"pattern": "["`, 1)
 		},
+		"open schema": func(m string) string {
+			return strings.Replace(m, `"additionalProperties": false`, `"additionalProperties": true`, 1)
+		},
+		"closed by nobody": func(m string) string {
+			return strings.Replace(m, `,
+    "additionalProperties": false`, ``, 1)
+		},
+		"open nested object": func(m string) string {
+			return strings.Replace(m, `"pulse": {"type": "number"}`,
+				`"pulse": {"type": "object", "properties": {"bpm": {"type": "number"}}}`, 1)
+		},
+		"ref leaves the manifest": func(m string) string {
+			return strings.Replace(m, `"pulse": {"type": "number"}`, `"pulse": {"$ref": "https://example.com/pulse.json"}`, 1)
+		},
+		"another draft": func(m string) string {
+			return strings.Replace(m, "draft/2020-12", "draft-07", 1)
+		},
+		"required not declared": func(m string) string {
+			return strings.Replace(m, `"required": ["measured_at",`, `"required": ["weight", "measured_at",`, 1)
+		},
+		"required admits null": func(m string) string {
+			return strings.Replace(m, `"systolic": {"type": "number"}`, `"systolic": {"type": ["number", "null"]}`, 1)
+		},
+		"required admits empty": func(m string) string {
+			return strings.Replace(m, `"measured_at": {"type": "string", "minLength": 1}`, `"measured_at": {"type": "string"}`, 1)
+		},
+		"required names no type": func(m string) string {
+			return strings.Replace(m, `"systolic": {"type": "number"}`, `"systolic": {}`, 1)
+		},
+		"identity not required": func(m string) string {
+			return strings.Replace(m, `"required": ["measured_at", `, `"required": [`, 1)
+		},
+		"verbatim with a schema": func(m string) string { return strings.Replace(m, `"strict"`, `"verbatim"`, 1) },
 		"no event layout": func(m string) string {
 			return strings.Replace(m, `"layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"`, `"layout": "", "zone": "UTC"`, 1)
 		},
@@ -92,44 +135,38 @@ func TestParse_RejectsBadManifests(t *testing.T) {
 	}
 }
 
-func TestCheck_LenientAcceptsExtrasAndEnforcesRules(t *testing.T) {
+// The schema is closed and typed: a valid payload passes, and each way a payload can
+// be wrong is refused as not compliant.
+func TestCheck_HoldsThePayloadToTheSchema(t *testing.T) {
 	t.Parallel()
 	d := mustParse(t, bpManifest)
 
 	if err := d.Check(mustDecode(t, bpPayload)); err != nil {
 		t.Errorf("valid payload rejected: %v", err)
 	}
-	if err := d.Check(mustDecode(t, `{"measured_at": "x", "systolic": 118}`)); !errors.Is(err, def.ErrNotCompliant) {
-		t.Errorf("missing required diastolic = %v, want ErrNotCompliant", err)
+	refused := map[string]string{
+		"missing required": `{"measured_at": "x", "systolic": 118}`,
+		"enum violation":   strings.Replace(bpPayload, "sitting", "hovering", 1),
+		"undeclared field": strings.Replace(bpPayload, `"comment"`, `"commment"`, 1),
+		"wrong type":       strings.Replace(bpPayload, `"systolic": 118`, `"systolic": "118"`, 1),
+		"not an object":    `[1, 2]`,
 	}
-	if err := d.Check(mustDecode(t, strings.Replace(bpPayload, "sitting", "hovering", 1))); !errors.Is(err, def.ErrNotCompliant) {
-		t.Errorf("enum violation = %v, want ErrNotCompliant", err)
-	}
-}
-
-func TestCheck_StrictRejectsUnknownTopLevelFields(t *testing.T) {
-	t.Parallel()
-	strict := strings.Replace(bpManifest, "lenient", "strict", 1)
-	d := mustParse(t, strict)
-
-	// pulse and comment are not named by the schema, identity, or time semantics.
-	if err := d.Check(mustDecode(t, bpPayload)); !errors.Is(err, def.ErrNotCompliant) {
-		t.Errorf("strict Check with extras = %v, want ErrNotCompliant", err)
-	}
-
-	trimmed := `{"measured_at": "2026-01-24T06:30:00Z", "systolic": 118, "diastolic": 76, "position": "sitting"}`
-	if err := d.Check(mustDecode(t, trimmed)); err != nil {
-		t.Errorf("strict Check without extras: %v", err)
+	for name, payload := range refused {
+		if err := d.Check(mustDecode(t, payload)); !errors.Is(err, def.ErrNotCompliant) {
+			t.Errorf("%s: Check = %v, want ErrNotCompliant", name, err)
+		}
 	}
 }
 
 func TestCheck_VerbatimChecksNothing(t *testing.T) {
 	t.Parallel()
-	verbatim := strings.Replace(bpManifest, "lenient", "verbatim", 1)
-	d := mustParse(t, verbatim)
+	d := mustParse(t, strings.Replace(verbatimManifest, `"strict"`, `"verbatim"`, 1))
 
 	if err := d.Check(mustDecode(t, `{"anything": true}`)); err != nil {
 		t.Errorf("verbatim Check: %v", err)
+	}
+	if _, err := def.Parse([]byte(verbatimManifest)); !errors.Is(err, def.ErrBadManifest) {
+		t.Errorf("strict with no schema = %v, want ErrBadManifest", err)
 	}
 }
 

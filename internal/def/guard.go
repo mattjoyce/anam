@@ -1,6 +1,7 @@
 package def
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -54,12 +55,12 @@ func Guard(stored []Stored, bundled *Registry) error {
 		if !ok {
 			continue
 		}
-		old, err := Parse(prev.Body)
+		old, err := keyingOf(prev.Body)
 		if err != nil {
 			return fmt.Errorf("def: stored definition %s v%d: %w", t, prev.Version, err)
 		}
 		now := bundled.byType[t]
-		if err := sameKeying(old, now); err != nil {
+		if err := sameKeying(old, keying{IdentityKey: now.IdentityKey, FactTime: now.FactTime}); err != nil {
 			return fmt.Errorf("%w: %s v%d → v%d: %v. The ledger's %s facets were admitted under the stored rule; "+
 				"a new rule needs a new ledger from the sources, not a new definition version",
 				ErrKeyed, t, prev.Version, now.Version, err, t)
@@ -68,7 +69,34 @@ func Guard(stored []Stored, bundled *Registry) error {
 	return nil
 }
 
-func sameKeying(old, now Definition) error {
+// keying is the part of a Definition that says what its facets are.
+type keying struct {
+	IdentityKey []string
+	FactTime    TimeField
+}
+
+// keyingOf reads only the keying from a stored manifest. A stored body is whatever
+// format was current when it was stored, and the schema half's format has changed
+// before (card 52), so the guard does not parse what it does not compare.
+func keyingOf(body []byte) (keying, error) {
+	var m struct {
+		Meta struct {
+			IdentityKey   []string `json:"identity_key"`
+			TimeSemantics struct {
+				FactTime TimeField `json:"fact_time"`
+			} `json:"time_semantics"`
+		} `json:"meta"`
+	}
+	if err := json.Unmarshal(body, &m); err != nil {
+		return keying{}, fmt.Errorf("%w: %v", ErrBadManifest, err)
+	}
+	if len(m.Meta.IdentityKey) == 0 || m.Meta.TimeSemantics.FactTime.Pointer == "" {
+		return keying{}, fmt.Errorf("%w: no identity_key or fact_time", ErrBadManifest)
+	}
+	return keying{IdentityKey: m.Meta.IdentityKey, FactTime: m.Meta.TimeSemantics.FactTime}, nil
+}
+
+func sameKeying(old, now keying) error {
 	if !equalStrings(old.IdentityKey, now.IdentityKey) {
 		return fmt.Errorf("identity_key was %v, is %v", old.IdentityKey, now.IdentityKey)
 	}

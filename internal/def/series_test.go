@@ -15,13 +15,16 @@ const medStartedManifest = `{
     "facet_type": "med.started",
     "definition_version": 1,
     "classification": "Sensitive",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "records/med.started",
     "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "UTC"}},
     "identity_key": ["/id"],
     "series": {"name": "med.regimen", "key": ["/drug", "/course"]}
   },
-  "schema": {"required": ["/id", "/date", "/drug"]}
+  "schema": {"type": "object", "required": ["id", "date", "drug", "course"],
+    "properties": {"id": {"type": "string", "minLength": 1}, "date": {"type": "string", "minLength": 1},
+      "drug": {"type": "string", "minLength": 1}, "course": {"type": "number"}},
+    "additionalProperties": false}
 }`
 
 const medStoppedManifest = `{
@@ -29,13 +32,16 @@ const medStoppedManifest = `{
     "facet_type": "med.stopped",
     "definition_version": 1,
     "classification": "Sensitive",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "records/med.stopped",
     "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "UTC"}},
     "identity_key": ["/id"],
     "series": {"name": "med.regimen", "key": ["/drug", "/course"], "closes": true}
   },
-  "schema": {"required": ["/id", "/date", "/drug"]}
+  "schema": {"type": "object", "required": ["id", "date", "drug", "course"],
+    "properties": {"id": {"type": "string", "minLength": 1}, "date": {"type": "string", "minLength": 1},
+      "drug": {"type": "string", "minLength": 1}, "course": {"type": "number"}},
+    "additionalProperties": false}
 }`
 
 func TestSeries_ParsesAndComposesTheStamp(t *testing.T) {
@@ -120,13 +126,19 @@ func TestSeries_RejectsBadDeclarations(t *testing.T) {
 	}
 }
 
-func TestSeries_StrictModeAdmitsTheKeyFields(t *testing.T) {
+// A series key keys the facet as much as its identity does, so the schema must
+// require it: a schema that let course be absent would admit a payload the gate
+// cannot place in a series.
+func TestSeries_TheKeyFieldsMustBeRequired(t *testing.T) {
 	t.Parallel()
-	m := strings.Replace(medStartedManifest, `"validation_mode": "lenient"`, `"validation_mode": "strict"`, 1)
-	d := mustParse(t, m)
+	d := mustParse(t, medStartedManifest)
 	doc := mustDecode(t, `{"id": "r1", "date": "2026-03-01", "drug": "ramipril", "course": 1}`)
 	if err := d.Check(doc); err != nil {
-		t.Errorf("strict Check refused the series key fields: %v", err)
+		t.Errorf("Check refused the series key fields: %v", err)
+	}
+	m := strings.Replace(medStartedManifest, `"required": ["id", "date", "drug", "course"]`, `"required": ["id", "date", "drug"]`, 1)
+	if _, err := def.Parse([]byte(m)); !errors.Is(err, def.ErrBadManifest) {
+		t.Errorf("course left optional = %v, want ErrBadManifest", err)
 	}
 }
 
@@ -150,39 +162,36 @@ func TestRegistry_RefusesAFamilyKeyedTwoWays(t *testing.T) {
 
 func TestParse_PayloadKind(t *testing.T) {
 	t.Parallel()
-	ref := strings.Replace(medStartedManifest, `"validation_mode": "lenient",`, `"validation_mode": "lenient", "payload_kind": "reference",`, 1)
+	ref := strings.Replace(medStartedManifest, `"validation_mode": "strict",`, `"validation_mode": "strict", "payload_kind": "reference",`, 1)
 	if d := mustParse(t, ref); d.PayloadKind != "reference" {
 		t.Errorf("payload_kind = %q", d.PayloadKind)
 	}
-	bad := strings.Replace(medStartedManifest, `"validation_mode": "lenient",`, `"validation_mode": "lenient", "payload_kind": "pointer",`, 1)
+	bad := strings.Replace(medStartedManifest, `"validation_mode": "strict",`, `"validation_mode": "strict", "payload_kind": "pointer",`, 1)
 	if _, err := def.Parse([]byte(bad)); !errors.Is(err, def.ErrBadManifest) {
 		t.Errorf("payload_kind pointer = %v, want ErrBadManifest", err)
 	}
 }
 
-// Required means filled: present but null or empty is refused in lenient and strict
-// modes, and an empty list is a value the source wrote, not a gap.
+// Required means filled: a required field present but null or "" is refused, and a
+// zero is a value the source wrote, not a gap. The schema says so (Parse refuses one
+// that does not), so this is the validator honouring it.
 func TestCheck_RequiredMeansFilled(t *testing.T) {
 	t.Parallel()
-	for _, mode := range []string{"lenient", "strict"} {
-		m := strings.Replace(bpManifest, `"validation_mode": "lenient"`, `"validation_mode": "`+mode+`"`, 1)
-		d := mustParse(t, m)
-		cases := map[string]bool{
-			`{"measured_at": "2026-01-24T06:30:00Z", "systolic": 118, "diastolic": 76}`:   true,
-			`{"measured_at": "2026-01-24T06:30:00Z", "systolic": null, "diastolic": 76}`:  false,
-			`{"measured_at": "2026-01-24T06:30:00Z", "systolic": "", "diastolic": 76}`:    false,
-			`{"measured_at": "2026-01-24T06:30:00Z", "systolic": 0, "diastolic": 76}`:     true,
-			`{"measured_at": "2026-01-24T06:30:00Z", "systolic": [], "diastolic": 76}`:    true,
-			`{"measured_at": "2026-01-24T06:30:00Z", "systolic": false, "diastolic": 76}`: true,
+	d := mustParse(t, bpManifest)
+	cases := map[string]bool{
+		`{"measured_at": "2026-01-24T06:30:00Z", "systolic": 118, "diastolic": 76}`:  true,
+		`{"measured_at": "2026-01-24T06:30:00Z", "systolic": null, "diastolic": 76}`: false,
+		`{"measured_at": "2026-01-24T06:30:00Z", "systolic": "", "diastolic": 76}`:   false,
+		`{"measured_at": "2026-01-24T06:30:00Z", "systolic": 0, "diastolic": 76}`:    true,
+		`{"measured_at": "", "systolic": 118, "diastolic": 76}`:                      false,
+	}
+	for payload, want := range cases {
+		err := d.Check(mustDecode(t, payload))
+		if got := err == nil; got != want {
+			t.Errorf("Check(%s) = %v, want admitted=%t", payload, err, want)
 		}
-		for payload, want := range cases {
-			err := d.Check(mustDecode(t, payload))
-			if got := err == nil; got != want {
-				t.Errorf("%s: Check(%s) = %v, want admitted=%t", mode, payload, err, want)
-			}
-			if err != nil && !errors.Is(err, def.ErrNotCompliant) {
-				t.Errorf("%s: %v is not ErrNotCompliant", mode, err)
-			}
+		if err != nil && !errors.Is(err, def.ErrNotCompliant) {
+			t.Errorf("%v is not ErrNotCompliant", err)
 		}
 	}
 }

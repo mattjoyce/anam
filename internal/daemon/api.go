@@ -99,7 +99,7 @@ func (d *Daemon) postCheckpoints(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Daemon) getReceipts(w http.ResponseWriter, _ *http.Request) {
-	deps, err := read.ServeDeps(d.read, d.artifacts, d.defs.current.Load())
+	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, d.defs.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -113,7 +113,7 @@ func (d *Daemon) getReceipts(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (d *Daemon) getReceipt(w http.ResponseWriter, r *http.Request) {
-	deps, err := read.ServeDeps(d.read, d.artifacts, d.defs.current.Load())
+	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, d.defs.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -127,7 +127,7 @@ func (d *Daemon) getReceipt(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Daemon) verifyReceipt(w http.ResponseWriter, r *http.Request) {
-	deps, err := read.ServeDeps(d.read, d.artifacts, d.defs.current.Load())
+	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, d.defs.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return

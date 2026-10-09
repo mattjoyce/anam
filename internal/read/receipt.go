@@ -7,6 +7,7 @@ import (
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/consent"
 	"github.com/mattjoyce/anam/internal/def"
+	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/serve"
 )
@@ -16,9 +17,12 @@ import (
 // pass-through one (§10). It is wired in on the real path rather than reserved for
 // later, because a gate threaded through afterwards is a gate a caller can forget.
 //
-// defs are the Definitions the record's facets were admitted against; nil means the
-// bundled ones alone.
-func ServeDeps(l serve.Ledger, artifacts serve.Store, defs *def.Registry) (serve.Deps, error) {
+// checkpoints is the mint's log, so a serve or a verify composes from the last mint
+// run rather than folding the ledger from the beginning; nil folds in full. defs are
+// the Definitions the record's facets were admitted against; nil means the bundled
+// ones alone.
+func ServeDeps(l serve.Ledger, artifacts serve.Store, checkpoints mint.CheckpointLog, defs *def.Registry,
+) (serve.Deps, error) {
 	templates, err := projection.Bundled()
 	if err != nil {
 		return serve.Deps{}, err
@@ -36,6 +40,7 @@ func ServeDeps(l serve.Ledger, artifacts serve.Store, defs *def.Registry) (serve
 		Ledger:               l,
 		Templates:            templates,
 		Artifacts:            artifacts,
+		Checkpoints:          checkpoints,
 		Gate:                 consent.Open{},
 		Clock:                clock.Real{},
 		DefinitionSetVersion: defSet,

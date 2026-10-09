@@ -1,9 +1,10 @@
 // Package serve publishes a projection and honours a receipt — the two halves of
 // R7's claim, kept in one place because they must stay each other's inverse.
 //
-// Serving reads: fold the person at the head watermark, prune through the selected
-// template and the consent gate, write the served value and its receipt to the
-// published-artifact tier. It writes nothing to the ledger and does not move W —
+// Serving reads: the person at the head watermark, composed from the last mint run and
+// the tail after it when the checkpoint log is to hand and folded from the beginning
+// when it is not, pruned through the selected template and the consent gate; the
+// served value and its receipt are written to the published-artifact tier. It writes nothing to the ledger and does not move W —
 // being shown is not something Anam learned (§9).
 //
 // Verifying re-runs exactly that derivation at the receipt's own watermark and checks
@@ -22,6 +23,7 @@ import (
 
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/fold"
+	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/receipt"
 	"github.com/mattjoyce/anam/internal/store/artifact"
@@ -47,10 +49,10 @@ type Ledger interface {
 	ID(ctx context.Context) (string, error)
 }
 
-// Store is the published-artifact tier this package writes to and reads back.
+// Store is the published-artifact tier this package writes to and reads back. It is
+// also where the mint files its checkpoints, so it is the mint's Store too.
 type Store interface {
-	Put(kind string, b []byte) (string, error)
-	Get(kind, digest string) ([]byte, error)
+	mint.Store
 	Raw(kind, digest string) ([]byte, error)
 	List(kind string) ([]string, error)
 }
@@ -67,6 +69,13 @@ type Deps struct {
 	Artifacts Store
 	Gate      projection.Gate
 	Clock     Clock
+
+	// Checkpoints is the mint's log, when the caller has it open. With it a serve or
+	// a verify composes the canonical from the last mint run at or below its
+	// watermark and the events after it (mint.ReadAt), so the cost is the tail, not
+	// the ledger. Nil, or before any run, it folds from the beginning. Both are the
+	// fold at that watermark, so a receipt served one way verifies the other.
+	Checkpoints mint.CheckpointLog
 
 	// Series is the Definitions' word on which types close a series, which a
 	// snapshot-shaped template needs and a log-shaped one never consults.
@@ -87,8 +96,42 @@ type Served struct {
 	CanonicalHash string
 	CanonicalLen  int
 
+	// Run is the mint run the canonical was composed from, and Tail the events
+	// applied after it; Run is zero when the ledger was folded from the beginning.
+	Run  ledger.Watermark
+	Tail int
+
 	// Written is false for a dry run: everything was derived, nothing was published.
 	Written bool
+}
+
+// canonical is the whole-person value at a watermark and how it was reached.
+type canonical struct {
+	W     ledger.Watermark
+	Value fold.Value
+	Run   ledger.Watermark
+	Tail  int
+}
+
+// valueAt is the canonical at w: composed from the checkpoint log and the tail when d
+// has the log and a mint run is at or below w, else the full fold. The two are the
+// same value (mint's oracle test holds ReadAt to the fold at every watermark), which
+// is what lets serve and verify use either and still be each other's inverse.
+func valueAt(ctx context.Context, d Deps, w ledger.Watermark) (canonical, error) {
+	if d.Checkpoints != nil {
+		c, ok, err := mint.ReadAt(ctx, d.Ledger, d.Checkpoints, d.Artifacts, w)
+		if err != nil {
+			return canonical{}, err
+		}
+		if ok {
+			return canonical{W: c.W, Value: c.Value, Run: c.Run, Tail: c.Tail}, nil
+		}
+	}
+	res, err := fold.ReadAt(ctx, d.Ledger, w)
+	if err != nil {
+		return canonical{}, err
+	}
+	return canonical{W: res.W, Value: res.Value}, nil
 }
 
 // Run serves one projection at the ledger's head watermark. With dryRun set it derives
@@ -104,7 +147,11 @@ func Run(ctx context.Context, d Deps, name string, dryRun bool) (Served, error) 
 	if err != nil {
 		return Served{}, err
 	}
-	res, err := fold.Read(ctx, d.Ledger)
+	head, err := d.Ledger.Head(ctx)
+	if err != nil {
+		return Served{}, err
+	}
+	res, err := valueAt(ctx, d, head)
 	if err != nil {
 		return Served{}, err
 	}
@@ -137,6 +184,8 @@ func Run(ctx context.Context, d Deps, name string, dryRun bool) (Served, error) 
 		ReceiptHash:   artifact.Digest(receiptBytes),
 		CanonicalHash: res.Value.Hash(),
 		CanonicalLen:  res.Value.Len(),
+		Run:           res.Run,
+		Tail:          res.Tail,
 	}
 	if dryRun {
 		return out, nil
@@ -191,7 +240,7 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 			ErrOtherLedger, r.LedgerID, ledgerID, r.Watermark)
 	}
 
-	res, err := fold.ReadAt(ctx, d.Ledger, ledger.Watermark(r.Watermark))
+	res, err := valueAt(ctx, d, ledger.Watermark(r.Watermark))
 	if err != nil {
 		return r, receipt.Result{}, err
 	}

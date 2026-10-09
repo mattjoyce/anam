@@ -116,7 +116,7 @@ func TestScan_ComposesGateCompliantEnvelopes(t *testing.T) {
 		types[env.Type]++
 
 		if err := env.Validate(); err != nil {
-			t.Errorf("%s: %v", env.SourceRef, err)
+			t.Errorf("%s: %v", env.Type, err)
 		}
 		d, ok := reg.Lookup(env.Type)
 		if !ok {
@@ -125,19 +125,19 @@ func TestScan_ComposesGateCompliantEnvelopes(t *testing.T) {
 		}
 		doc, err := def.Decode(env.Payload)
 		if err != nil {
-			t.Fatalf("%s: decode: %v", env.SourceRef, err)
+			t.Fatalf("%s: decode: %v", env.Type, err)
 		}
 		if err := d.Check(doc); err != nil {
-			t.Errorf("%s: not compliant: %v", env.SourceRef, err)
+			t.Errorf("%s: not compliant: %v", env.Type, err)
 		}
 		if _, err := d.FactTimeOf(doc); err != nil {
-			t.Errorf("%s: times: %v", env.SourceRef, err)
+			t.Errorf("%s: times: %v", env.Type, err)
 		}
-		ref, err := d.SourceRef(env.Source, doc)
-		if err != nil {
-			t.Errorf("%s: compose ref: %v", env.SourceRef, err)
-		} else if ref != env.SourceRef {
-			t.Errorf("identity disagreement: worker says %q, definition composes %q", env.SourceRef, ref)
+		if env.SourceRef != "" {
+			t.Errorf("%s: the worker composed source_ref %q; composing it is the gate's job", env.Type, env.SourceRef)
+		}
+		if _, err := d.SourceRef(env.Source, doc); err != nil {
+			t.Errorf("%s: compose ref: %v", env.Type, err)
 		}
 	}
 
@@ -170,10 +170,12 @@ func TestScan_IsDeterministic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
+	a = identified(t, a)
 	b, err := healthdb.Scan(context.Background(), path, "matt")
 	if err != nil {
 		t.Fatalf("re-Scan: %v", err)
 	}
+	b = identified(t, b)
 	if len(a) != len(b) {
 		t.Fatalf("scans disagree on count: %d vs %d", len(a), len(b))
 	}
@@ -192,6 +194,7 @@ func TestScan_AlertPayload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
+	envs = identified(t, envs)
 	var alerts []facet.Envelope
 	for _, env := range envs {
 		if env.Type == healthdb.AlertType {
@@ -219,6 +222,7 @@ func TestScan_NoEventsTable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
+	envs = identified(t, envs)
 	if len(envs) != 5 {
 		t.Fatalf("Scan composed %d envelopes, want 5", len(envs))
 	}
@@ -227,4 +231,24 @@ func TestScan_NoEventsTable(t *testing.T) {
 			t.Errorf("alert composed from a source with no events table: %s", env.SourceRef)
 		}
 	}
+}
+
+// identified gives each envelope the source_ref the gate admits it under. The
+// worker leaves it empty; the Definition's identity_key composes it.
+func identified(t *testing.T, envs []facet.Envelope) []facet.Envelope {
+	t.Helper()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatalf("Bundled: %v", err)
+	}
+	out := make([]facet.Envelope, len(envs))
+	for i, env := range envs {
+		ref, err := reg.Identify(env)
+		if err != nil {
+			t.Fatalf("envelope %d (%s): %v", i, env.Type, err)
+		}
+		env.SourceRef = ref
+		out[i] = env
+	}
+	return out
 }

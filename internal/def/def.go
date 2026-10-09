@@ -3,22 +3,22 @@
 // facet-definition-format).
 //
 // A Definition is a JSON manifest in two halves. `meta` is Anam's governance DSL —
-// identity, time semantics, classification, the validation bar. `schema` is a curated
-// subset of JSON Schema vocabulary (required, pattern, enum, additionalProperties)
-// and nothing more: the payload is inspected once, at the gate, then held verbatim
-// and opaque. Running a full validator over a body Anam has promised not to
-// normalise would fight the core principle (§3).
+// identity, time semantics, classification, the validation bar. `schema` is standard
+// JSON Schema (draft 2020-12), closed: it declares every field a payload may hold
+// (schema.go). The payload is inspected once, at the gate, then held verbatim and
+// opaque; validating reads it and never rewrites it.
 //
-// Fields are addressed by JSON Pointer (RFC 6901), because Anam's payloads are
-// nested where the reference implementation's were flat.
+// Fields in `meta` are addressed by JSON Pointer (RFC 6901), because Anam's payloads
+// are nested where the reference implementation's were flat.
 package def
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"time"
+
+	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/mattjoyce/anam/internal/facet"
 )
@@ -29,12 +29,12 @@ var ErrBadManifest = errors.New("def: bad manifest")
 // ValidationMode is the pressure valve: one mechanism serving tidy and messy sources.
 type ValidationMode string
 
-// The modes. Strict rejects fields the schema does not name; lenient lets a source
-// grow fields (the BP CSV already carries weight/SpO2/glucose sporadically); verbatim
-// checks only that identity and time resolve.
+// The modes. Strict holds the payload to the schema, which is closed: a field it does
+// not declare is refused. Verbatim has no schema and checks only that identity and
+// time resolve. There is no mode between them; a source that grows a field gets the
+// field declared, and a source with a second shape gets a second Definition.
 const (
 	ModeStrict   ValidationMode = "strict"
-	ModeLenient  ValidationMode = "lenient"
 	ModeVerbatim ValidationMode = "verbatim"
 )
 
@@ -96,19 +96,11 @@ type Definition struct {
 	// Series is nil for a type whose facets stand alone. See Series.
 	Series *Series
 
-	// The schema half.
-	Required             []string
-	Properties           map[string]PropRule
-	AdditionalProperties bool
+	// schema is the compiled schema half; nil in verbatim mode.
+	schema *jsonschema.Schema
 
 	// loc is FactTime.Zone loaded, once, at Parse.
 	loc *time.Location
-}
-
-// PropRule is the per-pointer constraint vocabulary: pattern and enum, nothing more.
-type PropRule struct {
-	Pattern *regexp.Regexp
-	Enum    []string
 }
 
 // manifest mirrors the JSON layout; Parse converts and validates it.
@@ -129,14 +121,7 @@ type manifest struct {
 		MinBindingAssurance string   `json:"min_binding_assurance"`
 		Series              *Series  `json:"series"`
 	} `json:"meta"`
-	Schema struct {
-		Required   []string `json:"required"`
-		Properties map[string]struct {
-			Pattern string   `json:"pattern"`
-			Enum    []string `json:"enum"`
-		} `json:"properties"`
-		AdditionalProperties *bool `json:"additionalProperties"`
-	} `json:"schema"`
+	Schema json.RawMessage `json:"schema"`
 }
 
 // Parse reads and validates one manifest. A manifest is config from a file, so
@@ -162,7 +147,6 @@ func Parse(raw []byte) (Definition, error) {
 		IdentityKey:    m.Meta.IdentityKey,
 		MinAssurance:   facet.BindingAssurance(m.Meta.MinBindingAssurance),
 		Series:         m.Meta.Series,
-		Required:       m.Schema.Required,
 	}
 
 	// Defaults, applied before validation so the rules below see the final shape.
@@ -178,29 +162,18 @@ func Parse(raw []byte) (Definition, error) {
 	if m.Meta.MinBindingAssurance == "" {
 		d.MinAssurance = facet.AssuranceMedium
 	}
-	d.AdditionalProperties = true
-	if m.Schema.AdditionalProperties != nil {
-		d.AdditionalProperties = *m.Schema.AdditionalProperties
-	}
-	if d.Mode == ModeStrict {
-		d.AdditionalProperties = false
-	}
-
-	d.Properties = map[string]PropRule{}
-	for ptr, rule := range m.Schema.Properties {
-		pr := PropRule{Enum: rule.Enum}
-		if rule.Pattern != "" {
-			re, err := regexp.Compile(rule.Pattern)
-			if err != nil {
-				return Definition{}, fmt.Errorf("%w: property %s pattern: %v", ErrBadManifest, ptr, err)
-			}
-			pr.Pattern = re
-		}
-		d.Properties[ptr] = pr
-	}
-
 	if err := d.validate(); err != nil {
 		return Definition{}, err
+	}
+	switch {
+	case d.Mode == ModeVerbatim && len(m.Schema) > 0:
+		return Definition{}, fmt.Errorf("%w: verbatim mode checks no schema, so it must not declare one", ErrBadManifest)
+	case d.Mode == ModeStrict:
+		s, err := compileSchema(string(d.Type), m.Schema, d.keyedFields())
+		if err != nil {
+			return Definition{}, err
+		}
+		d.schema = s
 	}
 	loc, err := time.LoadLocation(d.FactTime.Zone)
 	if err != nil {
@@ -218,7 +191,7 @@ func (d Definition) validate() error {
 		return fmt.Errorf("%w: definition_version %d", ErrBadManifest, d.Version)
 	case !d.Classification.Valid():
 		return fmt.Errorf("%w: classification %q", ErrBadManifest, d.Classification)
-	case d.Mode != ModeStrict && d.Mode != ModeLenient && d.Mode != ModeVerbatim:
+	case d.Mode != ModeStrict && d.Mode != ModeVerbatim:
 		return fmt.Errorf("%w: validation_mode %q", ErrBadManifest, d.Mode)
 	case d.SourceSchema == "":
 		return fmt.Errorf("%w: source_schema is required", ErrBadManifest)
@@ -231,12 +204,7 @@ func (d Definition) validate() error {
 	case !d.MinAssurance.Valid():
 		return fmt.Errorf("%w: min_binding_assurance %q", ErrBadManifest, d.MinAssurance)
 	}
-	for _, p := range append(append([]string{d.FactTime.Pointer}, d.IdentityKey...), d.Required...) {
-		if err := checkPointerSyntax(p); err != nil {
-			return fmt.Errorf("%w: %v", ErrBadManifest, err)
-		}
-	}
-	for p := range d.Properties {
+	for _, p := range append([]string{d.FactTime.Pointer}, d.IdentityKey...) {
 		if err := checkPointerSyntax(p); err != nil {
 			return fmt.Errorf("%w: %v", ErrBadManifest, err)
 		}
@@ -261,4 +229,18 @@ func (d Definition) validateSeries() error {
 		}
 	}
 	return nil
+}
+
+// keyedFields is the top-level field behind every pointer that keys or places a facet:
+// the fact time, the identity key and the series key. The schema must require them.
+func (d Definition) keyedFields() []string {
+	ptrs := append([]string{d.FactTime.Pointer}, d.IdentityKey...)
+	if d.Series != nil {
+		ptrs = append(ptrs, d.Series.Key...)
+	}
+	out := make([]string, 0, len(ptrs))
+	for _, p := range ptrs {
+		out = append(out, topToken(p))
+	}
+	return out
 }

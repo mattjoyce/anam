@@ -34,6 +34,7 @@ func scan(t *testing.T) []struct {
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
+	envs = identified(t, envs)
 	out := make([]struct {
 		SourceRef string
 		Payload   string
@@ -113,26 +114,46 @@ func TestScan_ComposesGateCompliantEnvelopes(t *testing.T) {
 
 	for _, env := range envs {
 		if err := env.Validate(); err != nil {
-			t.Errorf("%s: %v", env.SourceRef, err)
+			t.Errorf("%s: %v", env.Type, err)
 		}
 		doc, err := def.Decode(env.Payload)
 		if err != nil {
-			t.Fatalf("%s: decode: %v", env.SourceRef, err)
+			t.Fatalf("%s: decode: %v", env.Type, err)
 		}
 		if err := d.Check(doc); err != nil {
-			t.Errorf("%s: not compliant: %v", env.SourceRef, err)
+			t.Errorf("%s: not compliant: %v", env.Type, err)
 		}
 		event, err := d.FactTimeOf(doc)
 		if err != nil {
-			t.Errorf("%s: times: %v", env.SourceRef, err)
+			t.Errorf("%s: times: %v", env.Type, err)
 		} else if event.Year() != 2026 {
-			t.Errorf("%s: fact time %s", env.SourceRef, event)
+			t.Errorf("%s: fact time %s", env.Type, event)
 		}
-		ref, err := d.SourceRef(env.Source, doc)
-		if err != nil {
-			t.Errorf("%s: compose ref: %v", env.SourceRef, err)
-		} else if ref != env.SourceRef {
-			t.Errorf("identity disagreement: worker %q, definition %q", env.SourceRef, ref)
+		if env.SourceRef != "" {
+			t.Errorf("%s: the worker composed source_ref %q; composing it is the gate's job", env.Type, env.SourceRef)
+		}
+		if _, err := d.SourceRef(env.Source, doc); err != nil {
+			t.Errorf("%s: compose ref: %v", env.Type, err)
 		}
 	}
+}
+
+// identified gives each envelope the source_ref the gate admits it under. The
+// worker leaves it empty; the Definition's identity_key composes it.
+func identified(t *testing.T, envs []facet.Envelope) []facet.Envelope {
+	t.Helper()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatalf("Bundled: %v", err)
+	}
+	out := make([]facet.Envelope, len(envs))
+	for i, env := range envs {
+		ref, err := reg.Identify(env)
+		if err != nil {
+			t.Fatalf("envelope %d (%s): %v", i, env.Type, err)
+		}
+		env.SourceRef = ref
+		out[i] = env
+	}
+	return out
 }

@@ -139,15 +139,15 @@ func TestRecords_BloodPressureIdentityComposes(t *testing.T) {
     id: "2024-09-16 06:14:00:1"
     date_excel: "2024-09-16 06:14:00"
     reading: "1"
-    systolic: 145
-    diastolic: 95
-    pulse: 70
+    systolic: "145"
+    diastolic: "95"
+    pulse: "70"
   - type: health.blood-pressure
     id: "wrong"
     date_excel: "2024-09-16 06:16:00"
     reading: "1"
-    systolic: 142
-    diastolic: 88
+    systolic: "142"
+    diastolic: "88"
 `)
 	envs, err := records.Scan(dir, "matt", defs)
 	if err != nil {

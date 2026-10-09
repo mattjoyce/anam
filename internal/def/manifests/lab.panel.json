@@ -1,9 +1,9 @@
 {
   "meta": {
     "facet_type": "lab.panel",
-    "definition_version": 1,
+    "definition_version": 2,
     "classification": "Sensitive",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "records/lab.panel",
     "time_semantics": {
       "fact_time": {"pointer": "/collected", "layout": "2006-01-02 15:04", "zone": "Australia/Sydney"}
@@ -12,6 +12,28 @@
     "min_binding_assurance": "medium"
   },
   "schema": {
-    "required": ["/id", "/collected", "/panel", "/lab_number"]
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["id", "collected", "panel", "lab_number"],
+    "properties": {
+      "clinical_notes": {"type": "string", "minLength": 1},
+      "collected": {"type": "string", "minLength": 1},
+      "comment": {"type": "string", "minLength": 1},
+      "fasting": {"type": "boolean"},
+      "id": {"type": "string", "minLength": 1},
+      "lab": {"type": "string", "minLength": 1},
+      "lab_number": {"type": "string", "minLength": 1},
+      "lab_ref": {"type": "string", "minLength": 1},
+      "note": {"type": "string", "minLength": 1},
+      "panel": {"type": "string", "minLength": 1},
+      "reported": {"type": "string", "minLength": 1},
+      "reported_by": {"type": "string", "minLength": 1},
+      "requested": {"type": "string", "minLength": 1},
+      "requested_by": {"type": "string", "minLength": 1},
+      "section": {"type": "string", "minLength": 1},
+      "specimen": {"type": "string", "minLength": 1},
+      "your_reference": {"type": "string", "minLength": 1}
+    },
+    "additionalProperties": false
   }
 }

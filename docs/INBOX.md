@@ -57,7 +57,8 @@ Types today: `lab.result`, `lab.panel`, `condition.noted`, `donation.blood`, `he
 `illness.started`, `illness.ended`,
 `illness.hangover`, `travel.departed`, `travel.arrived`, `travel.returned`, `travel.flight`, `visit.clinic`, `gym.visit`,
 and `health.blood-pressure` for diary readings. Each is a manifest in `internal/def/manifests/`,
-lenient, Sensitive (visits, gym and travel Confidential). Illness rows carry an `episode` and travel
+strict, Sensitive (visits, gym and travel Confidential). Each schema is closed: a records row may
+carry only the fields its Definition declares, so a new field means a line in the manifest first. Illness rows carry an `episode` and travel
 rows a `trip`; those are the series keys, so `illness.ended` and `travel.returned` close what
 `illness.started` and `travel.departed` opened, and `anam timeline --at` shows what was open on a day.
 

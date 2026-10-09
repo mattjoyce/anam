@@ -1,9 +1,9 @@
 {
   "meta": {
     "facet_type": "health.sleep",
-    "definition_version": 1,
+    "definition_version": 2,
     "classification": "Sensitive",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "health-db/summary-group",
     "time_semantics": {
       "fact_time": {"pointer": "/period_start", "layout": "2006-01-02T15:04:05", "zone": "Australia/Sydney"}
@@ -11,10 +11,30 @@
     "identity_key": ["/group", "/period_type", "/period_start"]
   },
   "schema": {
-    "required": ["/group", "/period_type", "/period_start", "/metrics"],
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["group", "period_type", "period_start", "metrics"],
     "properties": {
-      "/group": {"enum": ["sleep"]},
-      "/period_type": {"enum": ["day", "week", "month", "year"]}
-    }
+      "group": {"type": "string", "minLength": 1, "enum": ["sleep"]},
+      "metrics": {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "avg": {"type": "number"},
+            "max": {"type": ["null", "number"]},
+            "min": {"type": ["null", "number"]},
+            "samples": {"type": "number"},
+            "unit": {"type": "string", "minLength": 1}
+          },
+          "required": ["avg", "max", "min", "samples", "unit"],
+          "additionalProperties": false
+        }
+      },
+      "period_start": {"type": "string", "minLength": 1},
+      "period_type": {"type": "string", "minLength": 1, "enum": ["day", "week", "month", "year"]}
+    },
+    "additionalProperties": false
   }
 }

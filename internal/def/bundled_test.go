@@ -35,8 +35,8 @@ func TestBundled_HoldsTheHealthDBTypes(t *testing.T) {
 			t.Errorf("no bundled definition for %s", typ)
 			continue
 		}
-		if d.Version != 1 || d.Classification != facet.ClassificationSensitive {
-			t.Errorf("%s = v%d %s, want v1 Sensitive", typ, d.Version, d.Classification)
+		if d.Version != 2 || d.Classification != facet.ClassificationSensitive {
+			t.Errorf("%s = v%d %s, want v2 Sensitive", typ, d.Version, d.Classification)
 		}
 		// All four share the identity grain: one facet per (group, period_type,
 		// period_start). The worker composes source_ref on the same promise.
@@ -62,8 +62,8 @@ func TestBundled_MedTypesShareTheRegimenSeries(t *testing.T) {
 		if d.Series == nil || d.Series.Name != "med.regimen" || len(d.Series.Key) != 2 {
 			t.Errorf("%s series = %+v, want med.regimen over [/drug /course]", typ, d.Series)
 		}
-		if d.Classification != facet.ClassificationSensitive || d.Mode != def.ModeLenient {
-			t.Errorf("%s = %s %s, want Sensitive lenient", typ, d.Classification, d.Mode)
+		if d.Classification != facet.ClassificationSensitive || d.Mode != def.ModeStrict {
+			t.Errorf("%s = %s %s, want Sensitive strict", typ, d.Classification, d.Mode)
 		}
 	}
 	if !reg.Closes("med.stopped") || reg.Closes("med.started") || reg.Closes("med.dose-changed") {
@@ -102,8 +102,8 @@ func TestBundled_LifeEventTypes(t *testing.T) {
 			t.Errorf("no bundled definition for %s", c.typ)
 			continue
 		}
-		if d.Classification != c.class || d.Mode != def.ModeLenient {
-			t.Errorf("%s = %s %s, want %s lenient", c.typ, d.Classification, d.Mode, c.class)
+		if d.Classification != c.class || d.Mode != def.ModeStrict {
+			t.Errorf("%s = %s %s, want %s strict", c.typ, d.Classification, d.Mode, c.class)
 		}
 		switch {
 		case c.series == "" && d.Series != nil:
@@ -175,5 +175,26 @@ func TestBundled_DocReferenceIsAReference(t *testing.T) {
 	bp, _ := reg.Lookup("health.blood-pressure")
 	if bp.PayloadKind != facet.PayloadVerbatim {
 		t.Errorf("a type that says nothing is verbatim, got %s", bp.PayloadKind)
+	}
+}
+
+// Identify composes the ref the gate admits under, from the payload alone: a ref the
+// envelope carries does not change the answer, and a type with no Definition has none.
+func TestRegistry_Identify(t *testing.T) {
+	t.Parallel()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatalf("Bundled: %v", err)
+	}
+	payload := []byte(`{"path":"scans/bp.jpg","sha256":"00","media_type":"image/jpeg","bytes":10,"date":"2024-09-16"}`)
+	want := facet.SourceRef("documents", "scans/bp.jpg")
+	for _, carried := range []string{"", want, "documents:something-else"} {
+		env := facet.Envelope{Type: "doc.reference", Source: "documents", SourceRef: carried, Payload: payload}
+		if got, err := reg.Identify(env); err != nil || got != want {
+			t.Errorf("carrying %q: Identify = %q, %v; want %q", carried, got, err, want)
+		}
+	}
+	if _, err := reg.Identify(facet.Envelope{Type: "no.such", Source: "documents", Payload: payload}); err == nil {
+		t.Error("Identify composed a ref for a type with no Definition")
 	}
 }

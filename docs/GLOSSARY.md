@@ -91,8 +91,9 @@ captured from a source. Re-enters through the ordinary gate as `proposed`. See *
 **Endorsement** — The review status of a derived facet (`proposed` → `endorsed` / `rejected`), recorded
 as an anam-event. **Never writes back** into source systems. See *Derived facet*.
 
-**Envelope** — The message a capture worker hands the gate: `{type, source, injector, source_ref,
-payload, asserted_person?, span_hint?}`. The **only ingress**; capture workers share nothing with the
+**Envelope** — The message a capture worker hands the gate: `{type, source, injector, source_ref?,
+payload, asserted_person?, span_hint?}`. Left out, `source_ref` is composed by the gate from the
+Definition's `identity_key`. The **only ingress**; capture workers share nothing with the
 ledger except through it. See *Admission gate*.
 
 **Episode** — *Not a first-class Anam concept.* In Arch the Episode is the unit of storage, cost and

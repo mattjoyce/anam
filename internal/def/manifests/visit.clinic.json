@@ -1,9 +1,9 @@
 {
   "meta": {
     "facet_type": "visit.clinic",
-    "definition_version": 1,
+    "definition_version": 2,
     "classification": "Confidential",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "records/visit.clinic",
     "time_semantics": {
       "fact_time": {"pointer": "/date", "layout": "2006-01-02 15:04", "zone": "Australia/Sydney"}
@@ -12,6 +12,21 @@
     "min_binding_assurance": "medium"
   },
   "schema": {
-    "required": ["/id", "/date", "/provider"]
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["id", "date", "provider"],
+    "properties": {
+      "date": {"type": "string", "minLength": 1},
+      "id": {"type": "string", "minLength": 1},
+      "kind": {"type": "string", "minLength": 1},
+      "location": {"type": "string", "minLength": 1},
+      "note": {"type": "string", "minLength": 1},
+      "outcome": {"type": "string", "minLength": 1},
+      "provider": {"type": "string", "minLength": 1},
+      "purpose": {"type": "string", "minLength": 1},
+      "specialty": {"type": "string", "minLength": 1},
+      "time_unknown": {"type": "boolean"}
+    },
+    "additionalProperties": false
   }
 }

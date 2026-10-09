@@ -1,9 +1,9 @@
 {
   "meta": {
     "facet_type": "gym.visit",
-    "definition_version": 1,
+    "definition_version": 2,
     "classification": "Confidential",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "records/gym.visit",
     "time_semantics": {
       "fact_time": {"pointer": "/date", "layout": "2006-01-02 15:04", "zone": "Australia/Sydney"}
@@ -12,6 +12,44 @@
     "min_binding_assurance": "medium"
   },
   "schema": {
-    "required": ["/id", "/date"]
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["id", "date"],
+    "properties": {
+      "activity": {"type": "string", "minLength": 1},
+      "app": {"type": "string", "minLength": 1},
+      "avg_watts": {"type": "number"},
+      "date": {"type": "string", "minLength": 1},
+      "distance_m": {"type": "number"},
+      "duration": {"type": "string", "minLength": 1},
+      "duration_sec": {"type": "number"},
+      "exercises": {"type": "array", "items": {"type": "string", "minLength": 1}},
+      "id": {"type": "string", "minLength": 1},
+      "max_watts": {"type": "number"},
+      "sets": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "distance_m": {"type": "number"},
+            "exercise": {"type": "string", "minLength": 1},
+            "kg": {"type": "number"},
+            "note": {"type": "string", "minLength": 1},
+            "reps": {"type": "number"},
+            "rpe": {"type": "number"},
+            "seconds": {"type": "number"},
+            "set": {"type": "string", "minLength": 1}
+          },
+          "required": ["exercise", "set"],
+          "additionalProperties": false
+        }
+      },
+      "split_500m": {"type": "string", "minLength": 1},
+      "started": {"type": "string", "minLength": 1},
+      "time_unknown": {"type": "boolean"},
+      "workout_name": {"type": "string", "minLength": 1},
+      "workout_notes": {"type": "array", "items": {"type": "string", "minLength": 1}}
+    },
+    "additionalProperties": false
   }
 }

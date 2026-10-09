@@ -75,6 +75,7 @@ func TestNew_RejectsIllegalParams(t *testing.T) {
 
 	mutations := map[string]func(*facet.NewParams){
 		"invalid envelope type":   func(p *facet.NewParams) { p.Envelope.Type = "notdotted" },
+		"no source_ref":           func(p *facet.NewParams) { p.Envelope.SourceRef = "" },
 		"empty binding person":    func(p *facet.NewParams) { p.Binding.PersonID = "" },
 		"bad assurance":           func(p *facet.NewParams) { p.Binding.Assurance = "low" },
 		"empty payload":           func(p *facet.NewParams) { p.Payload = facet.Canonical{} },

@@ -56,20 +56,22 @@ back on that side. Anam scheduling, polling or knowing a vendor's tables is the 
 
 These make an importer correct in any language, without importing Anam's code.
 
-1. **The gate composes identity.** It already recomputes `source_ref` from the Definition's
-   `identity_key` and refuses a mismatch. When an envelope leaves `source_ref` out, the gate composes
-   it. The identity rule then lives once, in the Definition, and importers only shape payload fields.
-2. **A Definition's schema is standard JSON Schema.** Today the `schema` block is Anam's own
-   pointer-keyed format, checkable only by Go inside Anam. As JSON Schema, an importer validates
-   locally with a stock library before sending, and the gate runs the same check. The Anam-specific
+1. **The gate composes identity.** Done (card 51). The gate composes `source_ref` from the
+   Definition's `identity_key`; an envelope may leave it out, and one that carries it is refused on a
+   mismatch. The identity rule lives once, in the Definition, and importers only shape payload fields.
+   The built-in workers no longer compose it.
+2. **A Definition's schema is standard JSON Schema.** Done (card 52). The `schema` block is JSON
+   Schema draft 2020-12, so an importer validates locally with a stock library (Python's
+   `jsonschema`: `jsonschema.validate(payload, manifest["schema"])`) before sending, and the gate
+   runs the same check. The Anam-specific
    contract (`identity_key`, `time_semantics`, classification, validation mode) stays in `meta`.
    Health measures conform to a pinned [Open mHealth](https://www.openmhealth.org/) (IEEE 1752)
    schema where one exists, decided on 2026-10-08
    ([journal note](../journal/notes/open-mhealth-is-the-payload-vocabulary-for-health-measures.md)). The first is `exercise.session` (card 56): an OMH `physical-activity`
    payload, one type for Technogym, Strong and later Garmin, each shaping to the same Definition.
-3. **Validation becomes real.** `lenient` with a near-empty schema is harmless while Anam writes its
-   own payloads. Once outside code writes them, facet-compliance is the guard, so each Definition an
-   importer targets states what a valid payload is.
+3. **Validation becomes real.** Done (card 52). Every schema is closed: it declares each field with
+   its type and refuses anything else, and `lenient` is gone. Once outside code writes payloads,
+   facet-compliance is the guard, and each Definition states exactly what a valid payload is.
 4. **Two endpoints on the service.**
    - `GET /v1/definitions[/{type}[/{version}]]`: the published contract an importer shapes to.
    - `POST /v1/envelopes`: a batch, each envelope naming its type and Definition version, admitted

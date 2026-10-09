@@ -151,7 +151,7 @@ func TestEnvelopeValidate(t *testing.T) {
 		{"malformed type", func(e *facet.Envelope) { e.Type = "blood_pressure" }, true},
 		{"missing source", func(e *facet.Envelope) { e.Source = "" }, true},
 		{"missing injector", func(e *facet.Envelope) { e.Injector = "" }, true},
-		{"missing source_ref", func(e *facet.Envelope) { e.SourceRef = "" }, true},
+		{"no source_ref: the gate composes it", func(e *facet.Envelope) { e.SourceRef = "" }, false},
 		{"nil payload", func(e *facet.Envelope) { e.Payload = nil }, true},
 		{"empty payload", func(e *facet.Envelope) { e.Payload = []byte{} }, true},
 	}

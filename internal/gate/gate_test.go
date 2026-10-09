@@ -24,14 +24,16 @@ const bpManifest = `{
     "facet_type": "health.blood-pressure",
     "definition_version": 1,
     "classification": "Normal",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "bp-csv/reading",
     "time_semantics": {
       "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
     },
     "identity_key": ["/measured_at"]
   },
-  "schema": {"required": ["/systolic", "/diastolic"]}
+  "schema": {"type": "object", "required": ["measured_at", "systolic", "diastolic"],
+    "properties": {"measured_at": {"type": "string", "minLength": 1}, "systolic": {"type": "number"}, "diastolic": {"type": "number"}, "comment": {"type": "string", "minLength": 1}},
+    "additionalProperties": false}
 }`
 
 // newGate wires a Gate over a fresh real ledger.
@@ -179,6 +181,61 @@ func TestCommit_AdmitNoopSupersedeRetract(t *testing.T) {
 	}
 	if events[1].PriorArtifactVersion != 1 {
 		t.Errorf("superseded event prior = %d, want 1", events[1].PriorArtifactVersion)
+	}
+}
+
+// Identity is the Definition's. An envelope may leave source_ref out and the gate
+// composes it; one that carries it is checked and lands on the same facet. Either
+// way the ledger holds the composed ref, so the two paths are one facet.
+func TestCommit_ComposesASourceRefLeftOut(t *testing.T) {
+	t.Parallel()
+	composed := facet.SourceRef("bp-csv", "2026-01-24T06:30:00Z")
+	tests := []struct {
+		name  string
+		first string // the source_ref the first envelope carries
+		then  string // and the second, with the same payload
+	}{
+		{"left out, then left out", "", ""},
+		{"left out, then carried", "", composed},
+		{"carried, then left out", composed, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			g, l := newGate(t)
+			ctx := context.Background()
+
+			first := bpEnvelope(bpPayload)
+			first.SourceRef = tt.first
+			binding, err := g.Resolve(first)
+			if err != nil {
+				t.Fatalf("Resolve: %v", err)
+			}
+			res, _, err := g.Commit(ctx, first, binding)
+			if err != nil {
+				t.Fatalf("Commit: %v", err)
+			}
+			if res.Outcome != gate.OutcomeAdmitted || res.FacetID != facet.NewID(composed) {
+				t.Fatalf("first = %+v, want admitted as %s", res, facet.NewID(composed))
+			}
+			f, err := l.CurrentVersion(ctx, res.FacetID)
+			if err != nil {
+				t.Fatalf("CurrentVersion: %v", err)
+			}
+			if f.Provenance.SourceRef != composed {
+				t.Errorf("ledger holds source_ref %q, want %q", f.Provenance.SourceRef, composed)
+			}
+
+			then := bpEnvelope(bpPayload)
+			then.SourceRef = tt.then
+			res2, w, err := g.Commit(ctx, then, binding)
+			if err != nil {
+				t.Fatalf("second Commit: %v", err)
+			}
+			if res2.Outcome != gate.OutcomeNoOp || res2.FacetID != res.FacetID || w != 1 {
+				t.Errorf("second = %+v at W=%d, want a no-op on the same facet at W=1", res2, w)
+			}
+		})
 	}
 }
 

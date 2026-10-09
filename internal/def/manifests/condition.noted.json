@@ -1,9 +1,9 @@
 {
   "meta": {
     "facet_type": "condition.noted",
-    "definition_version": 1,
+    "definition_version": 2,
     "classification": "Sensitive",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "records/condition.noted",
     "time_semantics": {
       "fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}
@@ -12,6 +12,19 @@
     "min_binding_assurance": "medium"
   },
   "schema": {
-    "required": ["/id", "/date", "/condition"]
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["id", "date", "condition"],
+    "properties": {
+      "as_written": {"type": "string", "minLength": 1},
+      "clinical_notes": {"type": "string", "minLength": 1},
+      "condition": {"type": "string", "minLength": 1},
+      "context": {"type": "string", "minLength": 1},
+      "date": {"type": "string", "minLength": 1},
+      "id": {"type": "string", "minLength": 1},
+      "kind": {"type": "string", "minLength": 1},
+      "noted_by": {"type": "string", "minLength": 1}
+    },
+    "additionalProperties": false
   }
 }

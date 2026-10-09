@@ -47,7 +47,6 @@ func scanAlerts(ctx context.Context, db *sql.DB, assertedPerson string) ([]facet
 			Type:           AlertType,
 			Source:         Source,
 			Injector:       Source,
-			SourceRef:      facet.SourceRef(Source, a.Source, a.Kind, a.FactTime),
 			Payload:        raw,
 			AssertedPerson: assertedPerson,
 		})

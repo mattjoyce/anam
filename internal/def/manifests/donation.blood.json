@@ -1,9 +1,9 @@
 {
   "meta": {
     "facet_type": "donation.blood",
-    "definition_version": 1,
+    "definition_version": 2,
     "classification": "Sensitive",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "records/donation.blood",
     "time_semantics": {
       "fact_time": {"pointer": "/date", "layout": "2006-01-02 15:04", "zone": "Australia/Sydney"}
@@ -12,6 +12,17 @@
     "min_binding_assurance": "medium"
   },
   "schema": {
-    "required": ["/id", "/date", "/outcome"]
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["id", "date", "outcome"],
+    "properties": {
+      "centre": {"type": "string", "minLength": 1},
+      "date": {"type": "string", "minLength": 1},
+      "id": {"type": "string", "minLength": 1},
+      "note": {"type": "string", "minLength": 1},
+      "outcome": {"type": "string", "minLength": 1},
+      "product": {"type": "string", "minLength": 1}
+    },
+    "additionalProperties": false
   }
 }

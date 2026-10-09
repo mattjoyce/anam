@@ -139,6 +139,12 @@ Two rules make this safe:
 - A **Facet Definition** is versioned **independently** — the per-*type* contract: schema, envelope,
   time semantics, the declared linking elements, the validation bar, and the type's `classification`.
   Old artifacts stay interpretable as definitions evolve.
+- A Definition's `schema` is standard **JSON Schema** (draft 2020-12) and it is **closed**: it declares
+  every field a payload may hold, with its type, and refuses the rest, nested objects included. A
+  required field refuses null and the empty string. A source that grows a field gets the field
+  declared; a source with a second shape gets a second Definition. `validation_mode` is `strict`
+  (the schema as written) or `verbatim` (no schema). Validation reads the payload and never rewrites
+  it, so a number the source wrote as text stays text, checked by a pattern.
 
 Granularity is a choice: start coarse (one Facet per source fragment) and decompose only where real
 fact-times or finer access control earn the cut. Facet types are **dotted and namespaced** —
@@ -322,8 +328,9 @@ The gate is exposed as two calls:
   `bp-csv:20:2026-01-24T06:30:00`, not `bp-csv:…:118/76/61`. The composition is one function,
   `facet.SourceRef`: the source name, then each identity value **length-prefixed** (`<bytes>:<value>`),
   so that two different tuples can never compose one string however many colons the values carry (a
-  timestamp does; a lab's id prefix does). The gate composes it from the Definition and every capture
-  worker composes it the same way, through the same function. Braiding the values into the
+  timestamp does; a lab's id prefix does). The gate composes it from the Definition. An envelope
+  may leave `source_ref` out, and the built-in workers do; one that carries it is refused if it
+  disagrees (`ErrIdentityMismatch`). Braiding the values into the
   natural key would give a corrected reading a *different* `facet_id`, so it would enter as a **new
   facet** and orphan the original instead of superseding it — silently disabling the entire
   idempotency-and-supersession mechanism for that source. Identity decides *which fact*; `content_hash`

@@ -107,7 +107,8 @@ func TestExpected_LeavesTheLedgerUntouched(t *testing.T) {
 	}
 }
 
-// A bad estimate never reaches the ledger: the Definition bounds it to (0, 1].
+// A bad estimate never reaches the ledger: the Definition holds it to a number in
+// [0, 1]. A number written as text is refused, as any wrong type is.
 func TestComplianceEstimate_IsBoundedAtTheGate(t *testing.T) {
 	t.Parallel()
 	defs, err := def.Bundled()
@@ -118,7 +119,7 @@ func TestComplianceEstimate_IsBoundedAtTheGate(t *testing.T) {
 	if !ok {
 		t.Fatal("no bundled definition for med.compliance-estimate")
 	}
-	for value, want := range map[string]bool{`0.95`: true, `1`: true, `"0.5"`: true, `95`: false, `1.5`: false, `-0.1`: false} {
+	for value, want := range map[string]bool{`0.95`: true, `1`: true, `0`: true, `"0.5"`: false, `95`: false, `1.5`: false, `-0.1`: false} {
 		doc, err := def.Decode([]byte(`{"id": "e", "date": "2026-02-03", "drug": "x", "course": 1,
 			"period_start": "2026-01-01", "period_end": "2026-01-31", "estimate": ` + value + `}`))
 		if err != nil {

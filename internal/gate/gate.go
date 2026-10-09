@@ -32,7 +32,7 @@ var (
 	// definition's min_binding_assurance.
 	ErrAssuranceBelowFloor = errors.New("gate: binding assurance below the definition's floor")
 
-	// ErrIdentityMismatch: the worker's asserted source_ref disagrees with the one the
+	// ErrIdentityMismatch: the source_ref an envelope carries disagrees with the one the
 	// Definition composes from the payload. Identity is definition-owned (§6a); a
 	// drifting worker would silently re-key its facets.
 	ErrIdentityMismatch = errors.New("gate: envelope source_ref disagrees with the definition's identity_key")

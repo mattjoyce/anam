@@ -1,9 +1,9 @@
 {
   "meta": {
     "facet_type": "illness.started",
-    "definition_version": 1,
+    "definition_version": 2,
     "classification": "Sensitive",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "records/illness.started",
     "time_semantics": {
       "fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}
@@ -13,6 +13,15 @@
     "series": {"name": "illness.episode", "key": ["/episode"], "closes": false}
   },
   "schema": {
-    "required": ["/id", "/date", "/episode"]
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["id", "date", "episode"],
+    "properties": {
+      "date": {"type": "string", "minLength": 1},
+      "episode": {"type": "string", "minLength": 1},
+      "id": {"type": "string", "minLength": 1},
+      "note": {"type": "string", "minLength": 1}
+    },
+    "additionalProperties": false
   }
 }

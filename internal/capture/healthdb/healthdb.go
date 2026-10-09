@@ -104,12 +104,9 @@ func Scan(ctx context.Context, dbPath, assertedPerson string) ([]facet.Envelope,
 			return nil, fmt.Errorf("healthdb: marshal %s %s %s: %w", p.Group, p.PeriodType, p.PeriodStart, err)
 		}
 		envelopes = append(envelopes, facet.Envelope{
-			Type:     typeFor(p.Group),
-			Source:   Source,
-			Injector: Source,
-			// The gate recomputes this from the definition's identity_key and
-			// rejects a mismatch — the worker must compose the same string.
-			SourceRef:      facet.SourceRef(Source, p.Group, p.PeriodType, p.PeriodStart),
+			Type:           typeFor(p.Group),
+			Source:         Source,
+			Injector:       Source,
 			Payload:        raw,
 			AssertedPerson: assertedPerson,
 		})

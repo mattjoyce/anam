@@ -13,85 +13,26 @@ import (
 // facet-compliant pillar (§6).
 var ErrNotCompliant = errors.New("def: payload not compliant")
 
-// Check enforces the schema half against a decoded payload, per the validation mode.
-// Verbatim checks nothing here (identity and time are enforced by their own calls);
-// lenient enforces required/pattern/enum and ignores unknown fields; strict also
-// rejects top-level fields the schema does not name.
+// Check holds a decoded payload to the Definition's schema. Verbatim checks nothing
+// here (identity and time are enforced by their own calls).
 //
-// Required means filled: a field that is present but null or an empty string is not
-// there in any sense a reader cares about, and a measurement the source left blank
-// must not be admitted as if it were taken. An empty container is not empty for this
-// purpose; a list the source wrote as `[]` is what the source said.
+// The schema is closed and its required fields refuse null and "" (schema.go), so a
+// passing payload names no field the Definition does not declare and leaves no
+// required field blank.
 func (d Definition) Check(doc any) error {
-	if d.Mode == ModeVerbatim {
+	if d.schema == nil {
 		return nil
 	}
-
-	for _, ptr := range d.Required {
-		v, err := resolve(doc, ptr)
-		if err != nil {
-			return fmt.Errorf("%w: required %s: %v", ErrNotCompliant, ptr, err)
-		}
-		if err := filled(v); err != nil {
-			return fmt.Errorf("%w: required %s: %v", ErrNotCompliant, ptr, err)
-		}
-	}
-
-	for ptr, rule := range d.Properties {
-		v, err := resolve(doc, ptr)
-		if err != nil {
-			continue // absent is required's business, not the rule's
-		}
-		s, err := scalarString(v)
-		if err != nil {
-			return fmt.Errorf("%w: %s: %v", ErrNotCompliant, ptr, err)
-		}
-		if rule.Pattern != nil && !rule.Pattern.MatchString(s) {
-			return fmt.Errorf("%w: %s value %q does not match %s", ErrNotCompliant, ptr, s, rule.Pattern)
-		}
-		if len(rule.Enum) > 0 && !contains(rule.Enum, s) {
-			return fmt.Errorf("%w: %s value %q is not one of %v", ErrNotCompliant, ptr, s, rule.Enum)
-		}
-	}
-
-	if !d.AdditionalProperties {
-		if err := d.checkNoExtras(doc); err != nil {
-			return err
-		}
+	if err := d.schema.Validate(doc); err != nil {
+		return fmt.Errorf("%w: %s", ErrNotCompliant, oneLine(err))
 	}
 	return nil
 }
 
-// checkNoExtras rejects top-level members the schema does not name. Top-level only:
-// the payload below named members is the source's own nested shape, and policing it
-// would creep toward the normalisation the verbatim rule forbids.
-func (d Definition) checkNoExtras(doc any) error {
-	obj, ok := doc.(map[string]any)
-	if !ok {
-		return fmt.Errorf("%w: strict mode requires a top-level object", ErrNotCompliant)
-	}
-	named := map[string]bool{}
-	for _, ptr := range d.Required {
-		named[topToken(ptr)] = true
-	}
-	for ptr := range d.Properties {
-		named[topToken(ptr)] = true
-	}
-	named[topToken(d.FactTime.Pointer)] = true
-	for _, ptr := range d.IdentityKey {
-		named[topToken(ptr)] = true
-	}
-	if d.Series != nil {
-		for _, ptr := range d.Series.Key {
-			named[topToken(ptr)] = true
-		}
-	}
-	for k := range obj {
-		if !named[k] {
-			return fmt.Errorf("%w: unexpected field %q (strict mode)", ErrNotCompliant, k)
-		}
-	}
-	return nil
+// oneLine flattens the validator's indented report into one line for a log or an
+// API response.
+func oneLine(err error) string {
+	return strings.Join(strings.Fields(err.Error()), " ")
 }
 
 func topToken(pointer string) string {
@@ -166,26 +107,4 @@ func compose(what, prefix string, pointers []string, doc any) (string, error) {
 		parts = append(parts, s)
 	}
 	return facet.Stamp(prefix, parts...), nil
-}
-
-// filled rejects null and the empty string.
-func filled(v any) error {
-	switch t := v.(type) {
-	case nil:
-		return fmt.Errorf("is null")
-	case string:
-		if t == "" {
-			return fmt.Errorf("is empty")
-		}
-	}
-	return nil
-}
-
-func contains(list []string, s string) bool {
-	for _, v := range list {
-		if v == s {
-			return true
-		}
-	}
-	return false
 }

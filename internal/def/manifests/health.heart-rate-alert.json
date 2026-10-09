@@ -1,9 +1,9 @@
 {
   "meta": {
     "facet_type": "health.heart-rate-alert",
-    "definition_version": 1,
+    "definition_version": 2,
     "classification": "Sensitive",
-    "validation_mode": "lenient",
+    "validation_mode": "strict",
     "source_schema": "health-db/event",
     "time_semantics": {
       "fact_time": {"pointer": "/fact_time", "layout": "2006-01-02T15:04:05Z", "zone": "UTC"}
@@ -11,9 +11,17 @@
     "identity_key": ["/source", "/kind", "/fact_time"]
   },
   "schema": {
-    "required": ["/source", "/kind", "/fact_time", "/heart_rate", "/threshold", "/unit"],
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["source", "kind", "fact_time", "heart_rate", "threshold", "unit"],
     "properties": {
-      "/kind": {"enum": ["hr_high_alert"]}
-    }
+      "fact_time": {"type": "string", "minLength": 1},
+      "heart_rate": {"type": "number"},
+      "kind": {"type": "string", "minLength": 1, "enum": ["hr_high_alert"]},
+      "source": {"type": "string", "minLength": 1},
+      "threshold": {"type": "number"},
+      "unit": {"type": "string", "minLength": 1}
+    },
+    "additionalProperties": false
   }
 }

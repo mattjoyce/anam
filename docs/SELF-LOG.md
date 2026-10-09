@@ -69,8 +69,10 @@ A plain file you edit, one row per event, read by a capture worker like any othe
   corrected in place, and a row that should never have been is retracted on purpose.
 - **Fact-time is the row's date**, the day the thing happened, as you record it. A row added late is
   a backfill and re-opens its bucket, which is the system working.
-- **Validation is lenient** for every self-log type, so a row can carry as much or as little as you
-  know. "Went to the gym" is a row. "Went to the gym, 45 minutes, legs" is the same row with more.
+- **Validation is closed** for every self-log type (card 52). A row carries as much or as little as
+  you know of the fields its Definition declares: "Went to the gym" is a row, and "Went to the gym,
+  45 minutes, legs" is the same row with more. A field the Definition does not declare is refused,
+  so a new kind of detail is a line in the manifest first.
 - **Classification** is Sensitive for everything medical; travel and gym can be Confidential.
 - Format: **records files**, one YAML per source document, read by `internal/capture/records`
   (decided and built 2026-10-06; `INBOX.md` is the runbook). A hand-kept log is one records file

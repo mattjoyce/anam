@@ -33,9 +33,9 @@ func heldBy(t *testing.T, dir string) map[string]bool {
 	if err != nil {
 		t.Fatalf("Scan: %v", err)
 	}
-	held := map[string]bool{}
-	for _, env := range envs {
-		held[facet.NewID(env.SourceRef)] = true
+	held, err := heldIDs([]scanned{{source: records.Source, envs: envs}})
+	if err != nil {
+		t.Fatalf("heldIDs: %v", err)
 	}
 	return held
 }
@@ -117,5 +117,23 @@ func TestGuardRetraction(t *testing.T) {
 	}
 	if err := guardRetraction(1, 10, 9, 0.1); err != nil {
 		t.Errorf("at the fraction: %v", err)
+	}
+}
+
+// A worker that leaves source_ref to the gate is still held: retraction composes the
+// ref from the Definition, as the gate does, rather than reading it off the envelope.
+// Were it read off, every such facet would look dropped from its source.
+func TestHeldIDs_ComposesTheRefTheGateAdmits(t *testing.T) {
+	t.Parallel()
+	env := facet.Envelope{
+		Type: "doc.reference", Source: "documents", Injector: "documents",
+		Payload: []byte(`{"path":"scans/bp.jpg","sha256":"00","media_type":"image/jpeg","bytes":10,"date":"2024-09-16"}`),
+	}
+	held, err := heldIDs([]scanned{{source: "documents", envs: []facet.Envelope{env}}})
+	if err != nil {
+		t.Fatalf("heldIDs: %v", err)
+	}
+	if want := facet.NewID(facet.SourceRef("documents", "scans/bp.jpg")); len(held) != 1 || !held[want] {
+		t.Errorf("held = %v, want only %s", held, want)
 	}
 }

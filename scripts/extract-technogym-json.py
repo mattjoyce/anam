@@ -34,10 +34,14 @@ EXTRA = {
     "AvgPower": "avg_power_w", "MaxPower": "max_power_w", "MaxSpm": "max_spm",
     "RowingSplit": "split_500m_sec", "Level": "level", "AvgHr": "avg_hr_bpm",
     "MaxHr": "max_hr_bpm", "Move": "move", "CaloriesConsumption": "calories_consumption",
-    "Mets": "mets", "MetsMin": "mets_min", "DragFactor": "drag_factor",
+    "DragFactor": "drag_factor",
     "UserWeight": "user_weight_kg", "Floors": "floors", "Vo2": "vo2",
     "DrivePerc": "drive_perc", "AvgPeakForce": "avg_peak_force",
 }
+# Technogym measures left out on purpose. Mets and MetsMin are Technogym's own, undefined by
+# its API, present on 3 of 498 sessions, and not METs: in each one Mets = MetsMin x minutes, the
+# reverse of the names, and one rowing rate reads 427. Matt, 2026-10-09: bespoke, no value.
+IGNORED = {"Mets", "MetsMin"}
 # Splits are flat: each measure as a plain number under one name.
 SPLIT = {"Duration": "duration_sec", "RowingDistance": "distance_m", "Calories": "kcal",
          "IsoReps": "strokes", "AvgSpm": "avg_spm", **EXTRA}
@@ -49,6 +53,8 @@ def num(v):
 def measures(pr, where):
     m = {}
     for p in pr:
+        if p["n"] in IGNORED:
+            continue
         if p["n"] not in IEEE and p["n"] not in EXTRA:
             raise SystemExit(f"{where}: unknown measure {p['n']!r}")
         if p["n"] in m:
@@ -119,7 +125,7 @@ def main():
         raise SystemExit("two sessions share an `on`; identity would collide")
     records = [session(s) for s in sorted(sessions, key=lambda s: datetime.fromisoformat(s["on"]))]
     doc = {"document": {"name": p.name, "sha256": sha},
-           "extracted": {"method": "scripts/extract-technogym-json.py", "version": 1},
+           "extracted": {"method": "scripts/extract-technogym-json.py", "version": 2},
            "records": records}
     out = Path(a.out_dir) / f"technogym.{sha[:12]}.yaml"
     out.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True, width=100))

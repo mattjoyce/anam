@@ -123,7 +123,6 @@ Where log management stops applying: logs tolerate loss and sampling and have no
   what Anam authors), so it is decided deliberately, not drifted into.
 - **The rebuild protocol:** how Anam asks an importer to resend, and how it knows one has finished.
 - **CloudEvents verbatim or Anam's `Envelope` with CloudEvents field names.**
-- **Huma** for the new endpoints (card 49), since adding routes is when it is cheapest.
 
 ## 7. Order
 

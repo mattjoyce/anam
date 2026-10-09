@@ -11,8 +11,6 @@ package gate
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/def"
@@ -176,34 +174,4 @@ func (g *Gate) Resolve(env facet.Envelope) (facet.Binding, error) {
 		b.Assurance = facet.AssuranceReview
 	}
 	return b, nil
-}
-
-// Refused is a batch the gate wrote nothing of, with every envelope that failed a
-// pillar and why. errors.Is and errors.As see each envelope's own error through it.
-type Refused struct {
-	Envelopes []RefusedEnvelope
-}
-
-// RefusedEnvelope is one envelope of a refused batch, by its index in the batch.
-type RefusedEnvelope struct {
-	Index int
-	Type  facet.Type
-	Err   error
-}
-
-func (r *Refused) Error() string {
-	msgs := make([]string, len(r.Envelopes))
-	for i, e := range r.Envelopes {
-		msgs[i] = fmt.Sprintf("envelope %d (%s): %v", e.Index, e.Type, e.Err)
-	}
-	return strings.Join(msgs, "; ")
-}
-
-// Unwrap is every refused envelope's error.
-func (r *Refused) Unwrap() []error {
-	out := make([]error, len(r.Envelopes))
-	for i, e := range r.Envelopes {
-		out[i] = e.Err
-	}
-	return out
 }

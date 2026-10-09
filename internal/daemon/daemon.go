@@ -131,7 +131,7 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 	if err != nil {
 		return nil, err
 	}
-	imps, err := loadImporters(cfg.ImportersFile)
+	imps, err := loadImporters(cfg.ImportersFile, tok)
 	if err != nil {
 		return nil, err
 	}
@@ -238,29 +238,13 @@ func (s *indexState) wrong() error {
 	return s.err
 }
 
-// loopbackOnly refuses any listen address that a host other than this one can reach.
-// An empty host means every interface, so it is refused too.
-func loopbackOnly(addr string) error {
-	host, _, err := net.SplitHostPort(addr)
-	if err != nil {
-		return fmt.Errorf("daemon: listen %q: %w", addr, err)
-	}
-	if host == "localhost" {
-		return nil
-	}
-	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
-		return nil
-	}
-	return fmt.Errorf("%w: %q (set token_file to listen beyond this host)", ErrNotLoopback, addr)
-}
-
 // Handler is the daemon's routes: /healthz open to all, and behind the token the /v1
 // API and the inspector on everything else.
 func (d *Daemon) Handler() http.Handler {
 	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
 	inner := http.NewServeMux()
 	d.routes(inner)
-	inner.Handle("/", inspect.Handler(d.read, d.cfg.Timeout, buckets, d.cfg.LibraryDir))
+	inner.Handle("/", inspect.Handler(d.read, d.cfg.Timeout, buckets, d.cfg.LibraryDir, d.defs.current.Load))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", d.healthz)
@@ -288,71 +272,6 @@ func (d *Daemon) healthz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, _ = fmt.Fprintln(w, "ready")
-}
-
-// Write runs fn alone, under deadline, and returns its error. ctx bounds only the wait
-// to be accepted and the wait for the result: once fn starts it runs on the daemon's
-// context, so a caller that gives up does not cut a write short. Write returns
-// ErrStopped once shutdown has begun.
-func (d *Daemon) Write(ctx context.Context, deadline time.Duration, fn WriteFunc) error {
-	j := job{fn: fn, deadline: deadline, done: make(chan error, 1)}
-	select {
-	case d.jobs <- j:
-	case <-d.quit:
-		return ErrStopped
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	select {
-	case err := <-j.done:
-		return err
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
-// acceptWait is how long TryWrite waits for the worker to take a write. The worker
-// is back at the queue microseconds after a write ends; a write still running after
-// this long is one worth refusing for, not waiting on.
-const acceptWait = 250 * time.Millisecond
-
-// TryWrite runs fn alone, under deadline, if the queue takes it within acceptWait,
-// and returns ErrBusy if another write holds it longer. Once fn is accepted it is
-// waited for: its own deadline bounds it, and an answer given before it ended would
-// misreport a write that went on to happen.
-func (d *Daemon) TryWrite(deadline time.Duration, fn WriteFunc) error {
-	j := job{fn: fn, deadline: deadline, done: make(chan error, 1)}
-	busy := time.NewTimer(acceptWait)
-	defer busy.Stop()
-	select {
-	case d.jobs <- j:
-	case <-d.quit:
-		return ErrStopped
-	case <-busy.C:
-		return ErrBusy
-	}
-	return <-j.done
-}
-
-// work is the single write worker. It returns when quit closes, but never while a
-// write is running: the select is only reached between writes.
-func (d *Daemon) work(base context.Context) {
-	for {
-		// Shutdown wins over a write offered at the same moment.
-		select {
-		case <-d.quit:
-			return
-		default:
-		}
-		select {
-		case <-d.quit:
-			return
-		case j := <-d.jobs:
-			ctx, cancel := context.WithTimeout(base, j.deadline)
-			j.done <- j.fn(ctx, d.writes)
-			cancel()
-		}
-	}
 }
 
 // Run serves on the configured address until ctx ends, then shuts down in order: stop
@@ -403,6 +322,7 @@ func (d *Daemon) Serve(ctx context.Context, ln net.Listener) error {
 			d.catchUp(ctx, s)
 			return nil
 		})
+		d.mintIfBehind(ctx)
 	}()
 
 	errc := make(chan error, 1)

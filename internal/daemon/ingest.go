@@ -222,22 +222,49 @@ func (d *Daemon) requestMint() {
 	}
 }
 
-// mintOnRequest is the mint worker: it mints once per waiting request until shutdown.
-// An importer's batch is answered when it is admitted, not when it is minted, so its
-// mint runs here rather than in the request.
+// mintQuiet is how long the mint worker waits for batches to stop arriving before it
+// mints. An importer sending a hundred batches gets one mint at the end, not one
+// between each, each holding the write queue.
+const mintQuiet = 2 * time.Second
+
+// mintOnRequest is the mint worker: once requests stop arriving for mintQuiet, it
+// mints, until shutdown. An importer's batch is answered when it is admitted, not
+// when it is minted, so its mint runs here rather than in the request.
 func (d *Daemon) mintOnRequest() {
 	for {
 		select {
 		case <-d.quit:
 			return
 		case <-d.mints:
-			select {
-			case <-d.quit: // shutdown wins over a request that arrived with it
-				return
-			default:
-			}
-			d.mintAfterIngest()
 		}
+		quiet := time.NewTimer(mintQuiet)
+		for waiting := true; waiting; {
+			select {
+			case <-d.quit:
+				quiet.Stop()
+				return
+			case <-d.mints:
+				quiet.Reset(mintQuiet)
+			case <-quiet.C:
+				waiting = false
+			}
+		}
+		d.mintAfterIngest()
+	}
+}
+
+// mintIfBehind asks for a mint when the last mint run is behind the head: a batch
+// admitted just before a shutdown left its mint undone.
+func (d *Daemon) mintIfBehind(ctx context.Context) {
+	ctx, cancel := context.WithTimeout(ctx, d.cfg.Timeout)
+	defer cancel()
+	head, err := d.read.Head(ctx)
+	if err != nil || head == 0 {
+		return
+	}
+	run, ok, err := d.readOps.LastMintRun(ctx, int64(head))
+	if err == nil && (!ok || run < int64(head)) {
+		d.requestMint()
 	}
 }
 

@@ -2,6 +2,8 @@ package daemon
 
 import (
 	"crypto/subtle"
+	"fmt"
+	"net"
 	"net/http"
 	"strings"
 )
@@ -32,4 +34,20 @@ func presented(r *http.Request) []byte {
 		return []byte(pass)
 	}
 	return nil
+}
+
+// loopbackOnly refuses any listen address that a host other than this one can reach.
+// An empty host means every interface, so it is refused too.
+func loopbackOnly(addr string) error {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return fmt.Errorf("daemon: listen %q: %w", addr, err)
+	}
+	if host == "localhost" {
+		return nil
+	}
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		return nil
+	}
+	return fmt.Errorf("%w: %q (set token_file to listen beyond this host)", ErrNotLoopback, addr)
 }

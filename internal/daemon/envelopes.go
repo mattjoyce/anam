@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/clock"
@@ -18,9 +19,14 @@ import (
 // gate admits, with room for the envelopes around them.
 const maxSubmission = gate.MaxBatch*300*1024 + 1<<20
 
-// retryAfter is what a 503 asks an importer to wait, in seconds. A write holding the
-// queue is usually an ingest, which takes tens of seconds.
-const retryAfter = "30"
+// retryAfter is what a 503 asks an importer to wait, in seconds. A batch has already
+// waited importerWait for the queue, so what holds it is an ingest, which takes tens
+// of seconds.
+const retryAfter = "15"
+
+// importerWait is how long an importer's write waits for the queue: long enough to
+// wait out a mint after the batch before it, short of an ingest.
+const importerWait = 5 * time.Second
 
 // postEnvelopes admits one batch from an importer, whole or not at all. The importer
 // is the source of every envelope and may submit only its own types: the gate's
@@ -38,10 +44,12 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reg := d.defs.current.Load()
 	var results []gate.Result
 	var head ledger.Watermark
-	err = d.TryWrite(d.timeout(r), func(ctx context.Context, s Stores) error {
+	err = d.tryWriteWithin(importerWait, d.timeout(r), func(ctx context.Context, s Stores) error {
+		// Inside the write, where a registration cannot land between this and the
+		// admission.
+		reg := d.defs.current.Load()
 		g := gate.New(s.Ledger, reg, gate.StaticScopes{imp.Source: imp.Types}, clock.Real{}, d.cfg.PersonID)
 		bindings := make([]facet.Binding, len(envs))
 		for i, env := range envs {

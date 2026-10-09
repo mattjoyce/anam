@@ -52,6 +52,31 @@ func Register(body []byte, stored, registered []Stored, bundled *Registry) (Regi
 		return Registration{}, fmt.Errorf("%w: %v", ErrBadManifest, err)
 	}
 
+	reg, newest, found, err := againstHeld(d, canon, stored, registered)
+	if err != nil || found {
+		return reg, err
+	}
+	if newest == nil {
+		return Registration{Definition: d, New: true}, nil
+	}
+	if d.Version < newest.Version {
+		return Registration{}, fmt.Errorf("%w: %s v%d, newest is v%d", ErrVersionBehind, d.Type, d.Version, newest.Version)
+	}
+	old, err := keyingOf(newest.Body)
+	if err != nil {
+		return Registration{}, fmt.Errorf("def: held definition %s v%d: %w", newest.Type, newest.Version, err)
+	}
+	if err := sameKeying(old, keying{IdentityKey: d.IdentityKey, FactTime: d.FactTime}); err != nil {
+		return Registration{}, fmt.Errorf("%w: %s v%d → v%d: %v", ErrKeyed, d.Type, newest.Version, d.Version, err)
+	}
+	return Registration{Definition: d, New: true}, nil
+}
+
+// againstHeld looks for d's own version among what is held. found says it is there,
+// with the same body: unchanged when registered, adopted when only bundled. Otherwise
+// newest is the newest version held of d's type, if any, for the caller to check d
+// against. A different body at d's version is refused.
+func againstHeld(d Definition, canon facet.Canonical, stored, registered []Stored) (Registration, *Stored, bool, error) {
 	type held struct {
 		Stored
 		registered bool
@@ -73,33 +98,20 @@ func Register(body []byte, stored, registered []Stored, bundled *Registry) (Regi
 		if h.Version == d.Version {
 			same, err := sameBody(canon, h.Body)
 			if err != nil {
-				return Registration{}, fmt.Errorf("def: held definition %s v%d: %w", h.Type, h.Version, err)
+				return Registration{}, nil, false, fmt.Errorf("def: held definition %s v%d: %w", h.Type, h.Version, err)
 			}
 			if !same {
-				return Registration{}, fmt.Errorf("%w: %s v%d", ErrRegistered, d.Type, d.Version)
+				return Registration{}, nil, false, fmt.Errorf("%w: %s v%d", ErrRegistered, d.Type, d.Version)
 			}
 			// Registered rows come first, so a body both registered and bundled is
 			// found registered: unchanged, not adopted twice.
-			return Registration{Definition: d, New: !h.registered}, nil
+			return Registration{Definition: d, New: !h.registered}, nil, true, nil
 		}
 		if newest == nil || h.Version > newest.Version {
 			newest = &h.Stored
 		}
 	}
-	if newest == nil {
-		return Registration{Definition: d, New: true}, nil
-	}
-	if d.Version < newest.Version {
-		return Registration{}, fmt.Errorf("%w: %s v%d, newest is v%d", ErrVersionBehind, d.Type, d.Version, newest.Version)
-	}
-	old, err := keyingOf(newest.Body)
-	if err != nil {
-		return Registration{}, fmt.Errorf("def: held definition %s v%d: %w", newest.Type, newest.Version, err)
-	}
-	if err := sameKeying(old, keying{IdentityKey: d.IdentityKey, FactTime: d.FactTime}); err != nil {
-		return Registration{}, fmt.Errorf("%w: %s v%d → v%d: %v", ErrKeyed, d.Type, newest.Version, d.Version, err)
-	}
-	return Registration{Definition: d, New: true}, nil
+	return Registration{}, newest, false, nil
 }
 
 // sameBody compares two manifests as canonical JSON, so a file reformatted in the
@@ -113,11 +125,17 @@ func sameBody(canon facet.Canonical, held []byte) (bool, error) {
 }
 
 // WithRegistered is the registry the gate admits importers' envelopes against: the
-// bundled Definitions, and the newest registered version of every other type. A type
-// both bundled and registered is refused, as NewRegistry refuses any duplicate.
+// bundled Definitions, and the newest registered version of every other type.
+//
+// A type both bundled and registered is a release that took a type back from an
+// importer. The bundled Definition wins: Register refuses the type from then on, and
+// its registered rows stay held, immutable, for the facets admitted under them.
 func WithRegistered(bundled *Registry, registered []Stored) (*Registry, error) {
 	newest := map[facet.Type]Stored{}
 	for _, s := range registered {
+		if _, taken := bundled.byType[s.Type]; taken {
+			continue
+		}
 		if cur, ok := newest[s.Type]; !ok || s.Version > cur.Version {
 			newest[s.Type] = s
 		}

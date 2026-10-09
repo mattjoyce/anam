@@ -42,6 +42,7 @@ importers:
 		{"an upper-case hash", strings.Replace(valid, hashA, strings.ToUpper(hashA), 1)},
 		{"a source named twice", strings.Replace(valid, "source: garmin", "source: withings", 1)},
 		{"a shared token", strings.Replace(valid, hashB, hashA, 1)},
+		{"a type two importers name", strings.Replace(valid, "types: [health.sleep, exercise.session]", "types: [health.weight]", 1)},
 		{"no types", strings.Replace(valid, "types: [health.weight]", "types: []", 1)},
 		{"a type that is not namespaced", strings.Replace(valid, "types: [health.weight]", "types: [weight]", 1)},
 	}

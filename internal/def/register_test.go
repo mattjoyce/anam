@@ -102,13 +102,17 @@ func TestWithRegistered(t *testing.T) {
 		}
 	})
 
-	t.Run("a type both bundled and registered is refused", func(t *testing.T) {
+	t.Run("a type the binary took back is admitted against the bundled one", func(t *testing.T) {
 		t.Parallel()
-		_, err := def.WithRegistered(bundled, []def.Stored{{
+		r, err := def.WithRegistered(bundled, []def.Stored{{
 			Type: facet.Type("health.blood-pressure"), Version: 9, Body: []byte(versioned(bpManifest, 9)),
 		}})
-		if !errors.Is(err, def.ErrBadManifest) {
-			t.Fatalf("got %v, want ErrBadManifest", err)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, _ := bundled.Lookup("health.blood-pressure")
+		if got, _ := r.Lookup("health.blood-pressure"); got.Version != want.Version {
+			t.Fatalf("health.blood-pressure is v%d, want the bundled v%d", got.Version, want.Version)
 		}
 	})
 }

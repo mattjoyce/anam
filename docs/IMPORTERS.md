@@ -165,7 +165,10 @@ A Definition is a JSON manifest in exactly the format of Anam's own (`internal/d
 `meta` carries the type, version, `identity_key`, `time_semantics`, classification and
 `validation_mode`; `schema` is closed JSON Schema 2020-12 (§3, prerequisite 3). A type lives in one
 place. While Anam's binary bundles a type, no importer may register it; an importer takes a type over
-when a release drops it from the binary, registering the same body at the same version.
+when a release drops it from the binary, registering the same body at the same version. The other
+direction works too: a release that bundles a type an importer registered admits it against the
+bundled Definition from then on, keeps the registered rows for the facets admitted under them, and
+says so in its log. No two importers may name the same type.
 
 ### 8.2 Tokens
 
@@ -227,14 +230,23 @@ The batch is admitted whole or not at all:
 | 422 | `error`, `refused[]` (`index`, `type`, `reason`) | Nothing written. Every envelope that failed is named. Fix or drop them and send the batch again. |
 | 400 | `error` | The body is not a submission: bad JSON, an unknown field, no version, 0 or more than 49 envelopes. |
 | 401 / 403 | `error` | No importer's token, or the operator's. |
-| 503 | `error`, `Retry-After` | Another write holds the ledger, usually an ingest. Wait and send the same batch again. |
+| 503 | `error`, `Retry-After` | Another write held the ledger for more than 5 s, usually an ingest. Wait and send the same batch again. |
 
 Sending a batch again is always safe. The same payload under the same identity is a `no-op`; a
 changed payload supersedes, keeping the old version. That is the whole retry and resend protocol: an
-importer that is unsure whether a batch landed sends it again.
+importer that is unsure whether a batch landed, because the connection dropped or timed out, sends it
+again.
 
-The daemon mints after a batch that changed anything, in the background, so the answer does not wait
-on it.
+The daemon mints once batches stop arriving for 2 s, in the background, so neither the answer nor the
+next batch waits on it.
+
+### 8.6 Not yet
+
+- **Retraction.** An importer cannot tombstone a facet, and `anam retract` plans from the built-in
+  workers' scans only. A row the source deleted stays live in the record until there is a route for
+  it.
+- **Receipts.** A receipt pins the bundled Definition set's version (`def.SetVersion`); registered
+  Definitions are not in it.
 
 ### 8.5 What an importer must do
 

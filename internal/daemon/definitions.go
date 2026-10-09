@@ -41,7 +41,7 @@ func (d *Daemon) postDefinitions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var reg def.Registration
-	err = d.TryWrite(d.timeout(r), func(ctx context.Context, s Stores) error {
+	err = d.tryWriteWithin(importerWait, d.timeout(r), func(ctx context.Context, s Stores) error {
 		var err error
 		reg, err = d.register(ctx, s.Ops, body)
 		return err

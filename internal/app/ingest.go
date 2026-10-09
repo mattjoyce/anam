@@ -363,6 +363,24 @@ func guardWith(ctx context.Context, db *ops.DB, reg *def.Registry) error {
 	return db.PutDefinitions(ctx, put)
 }
 
+// registryOf is the bundled Definitions with those importers registered, as db holds
+// them: the Definitions the record's facets were admitted against.
+func registryOf(ctx context.Context, db *ops.DB) (*def.Registry, error) {
+	bundled, err := def.Bundled()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.RegisteredDefinitions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	stored := make([]def.Stored, len(rows))
+	for i, r := range rows {
+		stored[i] = def.Stored{Type: facet.Type(r.Type), Version: r.Version, Body: []byte(r.Body)}
+	}
+	return def.WithRegistered(bundled, stored)
+}
+
 func filterImports(imports []config.Import, source string) []config.Import {
 	var out []config.Import
 	for _, imp := range imports {

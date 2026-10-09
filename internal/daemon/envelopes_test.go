@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -113,6 +114,20 @@ func head(t *testing.T, d *Daemon) int64 {
 		t.Fatal(err)
 	}
 	return int64(w)
+}
+
+// An importer may not hold the operator's token: it would submit as the importer and
+// run the daemon too.
+func TestOpenRefusesAnImporterWithTheOperatorsToken(t *testing.T) {
+	cfg := importerConfig(t)
+	sum := sha256.Sum256([]byte(testToken))
+	body := fmt.Sprintf("importers:\n  - source: x\n    token_sha256: %s\n    types: [health.weight]\n", hex.EncodeToString(sum[:]))
+	if err := os.WriteFile(cfg.ImportersFile, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Open(context.Background(), cfg, Options{}); !errors.Is(err, config.ErrInvalidImporters) {
+		t.Fatalf("Open: got %v, want ErrInvalidImporters", err)
+	}
 }
 
 // Card 53: an importer's token opens the importer routes and nothing else, and the

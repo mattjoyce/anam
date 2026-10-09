@@ -168,41 +168,6 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 	return nil, 0, fmt.Errorf("%w: after %d attempts", ErrContention, g.maxRetries)
 }
 
-// prepareAll prepares every envelope, and refuses the batch with every envelope that
-// failed rather than the first, so whoever sent it can mend them all before sending
-// it again.
-func (g *Gate) prepareAll(envs []facet.Envelope, bindings []facet.Binding) ([]prepared, error) {
-	var refused Refused
-	ps := make([]prepared, len(envs))
-	for i, env := range envs {
-		p, err := g.prepare(env, bindings[i])
-		if err != nil {
-			refused.Envelopes = append(refused.Envelopes, RefusedEnvelope{Index: i, Type: env.Type, Err: err})
-			continue
-		}
-		ps[i] = p
-	}
-	if len(refused.Envelopes) > 0 {
-		return nil, &refused
-	}
-	// Two envelopes for one facet cannot share a transaction, and the second is
-	// almost always a duplicated source row rather than an intended supersession.
-	seen := make(map[string]int, len(ps))
-	for i, p := range ps {
-		if first, dup := seen[p.facetID]; dup {
-			refused.Envelopes = append(refused.Envelopes, RefusedEnvelope{Index: i, Type: p.env.Type,
-				Err: fmt.Errorf("%w: envelopes %d (%s) and %d (%s) are the same facet %s, and a batch cannot hold both",
-					ErrSameFacet, first, ps[first].env.SourceRef, i, p.env.SourceRef, p.facetID)})
-			continue
-		}
-		seen[p.facetID] = i
-	}
-	if len(refused.Envelopes) > 0 {
-		return nil, &refused
-	}
-	return ps, nil
-}
-
 // prepare runs every pillar that needs no ledger read and derives identity and
 // integrity — everything Commit does before its first Head.
 func (g *Gate) prepare(env facet.Envelope, binding facet.Binding) (prepared, error) {

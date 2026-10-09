@@ -38,7 +38,9 @@ type importersFile struct {
 
 // LoadImporters reads and validates an importers file. Unknown keys are errors, as
 // in Load. A source or a token named twice is refused: either would make one
-// importer's envelopes indistinguishable from another's.
+// importer's envelopes indistinguishable from another's. So is a type named by two
+// importers: a type's Definitions come from one place, and a second importer could
+// register a version that refuses every envelope of the first.
 func LoadImporters(path string) ([]Importer, error) {
 	v := viper.New()
 	v.SetConfigFile(path)
@@ -52,7 +54,7 @@ func LoadImporters(path string) ([]Importer, error) {
 		return nil, fmt.Errorf("decode importers %q: %w: %v", path, ErrInvalidImporters, err)
 	}
 
-	sources, hashes := map[string]bool{}, map[string]bool{}
+	sources, hashes, owners := map[string]bool{}, map[string]bool{}, map[facet.Type]string{}
 	for i, imp := range f.Importers {
 		bad := func(format string, a ...any) error {
 			return fmt.Errorf("%w: %s: importer %d (%s): %s", ErrInvalidImporters, path, i+1, imp.Source,
@@ -74,6 +76,10 @@ func LoadImporters(path string) ([]Importer, error) {
 			if !t.Valid() {
 				return nil, bad("type %q is not a valid namespaced facet type", t)
 			}
+			if owner, taken := owners[t]; taken {
+				return nil, bad("type %s is %s's", t, owner)
+			}
+			owners[t] = imp.Source
 		}
 		sources[imp.Source], hashes[imp.TokenSHA256] = true, true
 	}

@@ -345,7 +345,7 @@ func serveDeps(ctx context.Context, cfg config.Config) (serve.Deps, func(), erro
 	if err != nil {
 		return serve.Deps{}, nil, err
 	}
-	deps, err := read.ServeDeps(l, store)
+	deps, err := read.ServeDeps(l, store, nil)
 	if err != nil {
 		_ = l.Close()
 		return serve.Deps{}, nil, err

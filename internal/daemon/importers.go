@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync/atomic"
 
@@ -19,7 +20,9 @@ import (
 // the hex SHA-256 of their token. The daemon never holds an importer's token.
 type importers map[string]config.Importer
 
-func loadImporters(path string) (importers, error) {
+// loadImporters reads the importers file at path, refusing one whose token is the
+// operator's: that token would both run the daemon and submit as the importer.
+func loadImporters(path string, operator []byte) (importers, error) {
 	out := importers{}
 	if path == "" {
 		return out, nil
@@ -28,7 +31,11 @@ func loadImporters(path string) (importers, error) {
 	if err != nil {
 		return nil, fmt.Errorf("daemon: %w", err)
 	}
+	sum := sha256.Sum256(operator)
 	for _, imp := range list {
+		if operator != nil && imp.TokenSHA256 == hex.EncodeToString(sum[:]) {
+			return nil, fmt.Errorf("daemon: %w: importer %s has the operator's token", config.ErrInvalidImporters, imp.Source)
+		}
 		out[imp.TokenSHA256] = imp
 	}
 	return out, nil
@@ -111,8 +118,8 @@ type definitions struct {
 }
 
 // loadDefinitions builds the registry from the bundled Definitions and those the
-// operational store holds as registered. A type both bundled and registered refuses
-// the start: one of the two would have to win silently.
+// operational store holds as registered. A registered type this build bundles is
+// admitted against the bundled Definition, and said so in the log.
 func loadDefinitions(ctx context.Context, db *ops.DB) (*definitions, error) {
 	bundled, err := def.Bundled()
 	if err != nil {
@@ -121,6 +128,12 @@ func loadDefinitions(ctx context.Context, db *ops.DB) (*definitions, error) {
 	rows, err := db.RegisteredDefinitions(ctx)
 	if err != nil {
 		return nil, err
+	}
+	for _, r := range rows {
+		if _, taken := bundled.Lookup(facet.Type(r.Type)); taken {
+			slog.Warn("daemon: a registered definition is shadowed by the bundled one",
+				"type", r.Type, "version", r.Version)
+		}
 	}
 	reg, err := def.WithRegistered(bundled, storedOf(rows))
 	if err != nil {

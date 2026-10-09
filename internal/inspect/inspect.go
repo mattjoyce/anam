@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/span"
@@ -62,6 +63,9 @@ type Server struct {
 	// the operational index holds for it rather than whatever this package assumed.
 	buckets span.Buckets
 
+	// defs answers the Definitions in force; nil means the bundled ones.
+	defs func() *def.Registry
+
 	// The fold cache, keyed by watermark: a whole-person read is one replay plus
 	// one fetch per live facet, too dear to repeat per page view. Every request
 	// still reads the head (one cheap call), so a moved W is never served stale —
@@ -85,8 +89,11 @@ const asOfCacheSize = 4
 
 // Handler returns the inspector's routes on a fresh mux. library is the default
 // library's root, or "" for none.
-func Handler(l Ledger, timeout time.Duration, buckets span.Buckets, library string) http.Handler {
-	s := &Server{ledger: l, timeout: timeout, buckets: buckets, library: library}
+//
+// defs answers the Definitions the record's facets were admitted against, asked at
+// each page so a registration shows at once; nil means the bundled ones alone.
+func Handler(l Ledger, timeout time.Duration, buckets span.Buckets, library string, defs func() *def.Registry) http.Handler {
+	s := &Server{ledger: l, timeout: timeout, buckets: buckets, library: library, defs: defs}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.timeline)
 	mux.HandleFunc("GET /facets", s.index)
@@ -95,6 +102,14 @@ func Handler(l Ledger, timeout time.Duration, buckets span.Buckets, library stri
 	mux.HandleFunc("GET /projection", s.projectionPage)
 	mux.HandleFunc("GET /document", s.document)
 	return mux
+}
+
+// definitions is the Definitions in force, or the bundled ones when none are given.
+func (s *Server) definitions() (*def.Registry, error) {
+	if s.defs != nil {
+		return s.defs(), nil
+	}
+	return def.Bundled()
 }
 
 // read returns the whole person at the current head, from cache when the
@@ -157,7 +172,7 @@ func (s *Server) readAt(ctx context.Context, w ledger.Watermark) (fold.Result, e
 func Serve(ctx context.Context, l Ledger, addr string, timeout time.Duration, buckets span.Buckets, library string) error {
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           Handler(l, timeout, buckets, library),
+		Handler:           Handler(l, timeout, buckets, library, nil),
 		ReadHeaderTimeout: 5 * time.Second,
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}

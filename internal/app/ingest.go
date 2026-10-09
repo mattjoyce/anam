@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"strconv"
 	"time"
@@ -169,6 +171,11 @@ type scanned struct {
 // read, such as a file on a share that is not mounted, ends the run with the ledger
 // never opened for writing.
 func runIngest(cmd *cobra.Command, cfg config.Config, imports []config.Import, batch int) error {
+	// Before the guard opens the operational store, which would create one: a path
+	// with no ledger is no record, and should not look like the start of one.
+	if _, err := os.Stat(cfg.LedgerPath); errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("%w: no file at %s", ledger.ErrNotInitialised, cfg.LedgerPath)
+	}
 	reg, err := def.Bundled()
 	if err != nil {
 		return err

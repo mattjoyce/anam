@@ -86,3 +86,34 @@ func TestGuardDefinitions_StoresThenRefusesAChangedKeying(t *testing.T) {
 		t.Fatalf("guard against a differently keyed store = %v, want ErrKeyed", err)
 	}
 }
+
+// Ingest against a path with no ledger fails naming `anam init`, and leaves nothing
+// behind: not an operational store either, which would look like the start of a
+// record where there is none (card 46, the ThinkPad after the move).
+func TestIngest_WithNoLedgerCreatesNothing(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	data := filepath.Join(dir, "data")
+	records := filepath.Join(dir, "records")
+	if err := os.MkdirAll(records, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	imports := filepath.Join(dir, "imports.yaml")
+	if err := os.WriteFile(imports, []byte("imports:\n  - source: records\n    path: "+records+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfgPath := filepath.Join(dir, "anam.yaml")
+	cfg := "person_id: matt\nledger_path: " + filepath.Join(data, "ledger.db") +
+		"\ndb_path: " + filepath.Join(data, "tracking.db") + "\nartifact_dir: " + filepath.Join(data, "artifacts") + "\n"
+	if err := os.WriteFile(cfgPath, []byte(cfg), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, err := cli(t, cfgPath, "ingest", "--imports", imports)
+	if err == nil || !strings.Contains(err.Error(), "anam init") {
+		t.Fatalf("ingest with no ledger: %v, want an error naming anam init", err)
+	}
+	if _, err := os.Stat(data); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("ingest with no ledger left %s behind (%v)", data, err)
+	}
+}

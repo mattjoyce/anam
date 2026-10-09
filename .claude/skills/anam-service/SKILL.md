@@ -115,8 +115,11 @@ ingest holds the write queue, or when the ledger cannot be read, 504 a read that
 - Deploy committed code: `bash /mnt/Projects/unraid_admin/anam/deploy.sh` from the ThinkPad.
   It refuses a dirty tree, builds on the NAS, starts, waits for `/healthz`.
 - Logs: `/mnt/Projects/unraid_admin/unraid_cmd.sh 'docker logs --tail 50 anam'`.
-- Maintenance commands need the daemon stopped, then run in the container:
-  `cd /mnt/user/appdata/anam && docker compose stop && docker compose run --rm anam <cmd> && docker compose up -d`.
+- Maintenance commands need the daemon stopped, then run in the container. Export the deployed
+  version first: the compose file tags the image `anam:${ANAM_VERSION:-dev}`, so without it both
+  `run` and `up` take the stale `anam:dev` image, and `up` restarts the daemon on old code
+  (2026-10-09, card 56). The version is in `GET /v1/status`.
+  `cd /mnt/user/appdata/anam && export ANAM_VERSION=<v0.N-hash> && docker compose stop && docker compose run --rm -T anam <cmd> && docker compose up -d`.
   Never open the data directory's SQLite files from the host while `anam` runs.
 - The gateway job `anam_ingest` (unraid ductile, hourly and on `healthdata.etl.completed`)
   calls `?wait=10m`. Its failures post to Discord through `anam-ingest-failed`.

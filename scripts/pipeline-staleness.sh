@@ -11,6 +11,10 @@
 #
 # The ThinkPad ductile gateway runs this daily as job `health_staleness` and posts
 # stdout to Discord on exit 1. Paths can be overridden for a test.
+#
+# With ANAM_SERVER set, Anam's stages are asked of the daemon (its timeline, with
+# the token in ANAM_TOKEN_FILE), since the daemon owns the ledger and nothing else
+# may open it. Without it they are read from LEDGER_DB.
 set -uo pipefail
 
 MAX_LAG_DAYS="${MAX_LAG_DAYS:-2}"
@@ -18,6 +22,8 @@ GARMIN_DB="${GARMIN_DB:-/mnt/Projects/healthdata/garmin/DBs/garmin_summary.db}"
 WITHINGS_DB="${WITHINGS_DB:-/mnt/Projects/healthdata/withings/withings.db}"
 HEALTH_DB="${HEALTH_DB:-/mnt/Projects/healthdata/healthdata.db}"
 LEDGER_DB="${LEDGER_DB:-$HOME/.local/share/anam/ledger.db}"
+ANAM_SERVER="${ANAM_SERVER:-}"
+ANAM_TOKEN_FILE="${ANAM_TOKEN_FILE:-$HOME/.config/anam/token}"
 TODAY="${TODAY:-$(date +%F)}"
 
 # newest <label> <db> <sql>: prints the first 10 characters of the scalar (a date),
@@ -41,6 +47,33 @@ newest() {
   printf '%s' "${out:0:10}"
 }
 
+# newest_anam <label> <facet type>: the newest live fact-time of a type, from the
+# daemon when ANAM_SERVER is set, else from the ledger file. The window is the last
+# 90 days: a stage further behind than that is stale whatever its exact date.
+newest_anam() {
+  local label=$1 typ=$2 out from
+  if [ -z "$ANAM_SERVER" ]; then
+    newest "$label" "$LEDGER_DB" "SELECT MAX(fact_time) FROM facet WHERE type='$typ'"
+    return
+  fi
+  from=$(date -d "$TODAY -90 days" +%F)
+  if ! out=$(curl -sS --fail-with-body --max-time 30 \
+      -H "Authorization: Bearer $(cat "$ANAM_TOKEN_FILE")" \
+      "${ANAM_SERVER%/}/v1/timeline?zone=UTC&type=${typ}&from=${from}" 2>&1); then
+    echo "CHECK FAILED: $label: $out" >&2
+    exit 2
+  fi
+  if ! out=$(jq -r '.entries[-1].fact_time // empty' <<<"$out" 2>&1); then
+    echo "CHECK FAILED: $label: $out" >&2
+    exit 2
+  fi
+  if [ -z "$out" ]; then
+    echo "CHECK FAILED: $label: no rows since $from" >&2
+    exit 2
+  fi
+  printf '%s' "${out:0:10}"
+}
+
 # days_between <earlier> <later>: whole days from one calendar date to another.
 days_between() {
   echo $(( ( $(date -d "$2" +%s) - $(date -d "$1" +%s) ) / 86400 ))
@@ -49,8 +82,8 @@ days_between() {
 garmin=$(newest "Garmin collected" "$GARMIN_DB" "SELECT MAX(day) FROM days_summary") || exit $?
 withings=$(newest "Withings collected" "$WITHINGS_DB" "SELECT MAX(date) FROM measurements") || exit $?
 etl=$(newest "ETL summarised" "$HEALTH_DB" "SELECT MAX(period_start) FROM summaries WHERE period_type='day'") || exit $?
-anam_day=$(newest "Anam ingested (daily)" "$LEDGER_DB" "SELECT MAX(fact_time) FROM facet WHERE type='health.metric-group'") || exit $?
-anam_meas=$(newest "Anam ingested (Withings)" "$LEDGER_DB" "SELECT MAX(fact_time) FROM facet WHERE type='health.measurement'") || exit $?
+anam_day=$(newest_anam "Anam ingested (daily)" health.metric-group) || exit $?
+anam_meas=$(newest_anam "Anam ingested (Withings)" health.measurement) || exit $?
 
 printf 'Garmin collected      %s\nWithings collected    %s\nETL summarised        %s\nAnam, daily rows      %s\nAnam, Withings rows   %s\n' \
   "$garmin" "$withings" "$etl" "$anam_day" "$anam_meas"

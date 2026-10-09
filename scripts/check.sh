@@ -60,6 +60,9 @@ if command -v gosec >/dev/null 2>&1; then run gosec -severity medium -quiet ./..
 # The suite is integration-heavy by choice (AGENTS.md: real components over mocks).
 # Every ledger and every operational store under test is a file in that test's own temp
 # directory, so packages run in parallel without queueing on anything shared.
+# Tests are hermetic: the developer's ANAM_ settings (a profile exporting ANAM_SERVER,
+# say) must not steer a test toward a real daemon or ledger.
+for v in $(compgen -e | grep '^ANAM_' || true); do unset "$v"; done
 run go test -race -count=1 -shuffle=on -vet=all ./...
 
 if [ "$fail" -ne 0 ]; then echo "CHECK FAILED"; exit 1; fi

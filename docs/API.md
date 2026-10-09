@@ -11,7 +11,7 @@ from local files, so the CLI renders one type either way. With `server` set (`AN
 daemon's timeout; paging and receipted reads remain this proposal's work. The route list is
 in `anam daemon --help`. An ingest operation that moved W carries `mint`, the mint the daemon ran
 after it (card 61): `w`, `full`, `from`, `minted`, `buckets`, or `error` when it failed, which
-fails nothing. `POST /v1/backups` (card 68) copies the record into `backup_dir` on the write
+fails nothing. `POST /v1/backups` (card 69) copies the record into `backup_dir` on the write
 queue and answers where, at what W, and how big.
 
 This document proposes the application API that the CLI, inspector, and MCP adapter can share.

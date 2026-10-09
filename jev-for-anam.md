@@ -193,3 +193,11 @@ My expectation is that Jev's value here would be repeated semantic discriminatio
 agent tell an event from a mention and a supported extraction from an unsupported one. Anam's
 trust still comes from preserved evidence, explicit provenance, deterministic mechanics, and
 review of authored interpretations.
+
+## Follow-up, 2026-10-10
+
+Card 81 revisited this recommendation against the live TypeSafe docs, Anam’s goals, code, open
+board and source inventory. [Where Jev earns a place in Anam](journal/notes/jev-shaped-problems.md)
+recommends testing source support for candidate claims first, broadens the review to conversational
+consumers, and records where deterministic rules already suffice. No integration or Jev evaluation
+has been performed. This earlier exploration is retained as the starting point.

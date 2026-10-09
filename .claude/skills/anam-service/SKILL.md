@@ -15,10 +15,11 @@ runs, nothing else may open those files. Ask it over HTTP instead.
 - Token: `~/.config/anam/token` on the ThinkPad; `/mnt/user/appdata/anam/token` on the NAS;
   `/app/secrets/anam.token` inside the ductile container. Never print it, log it, or paste it
   into a message.
-- Until anam card 46, the container runs against a **scratch ledger**
-  (`/mnt/disk2/appdata/anam/scratch`). The record is still the ThinkPad's
-  `~/.local/share/anam/`, ingested hourly by the ThinkPad gateway. Say which ledger an answer
-  came from, and check the board card before assuming the move has happened.
+- Since 2026-10-09 (anam card 46) the container holds **the record**:
+  `/mnt/disk2/appdata/anam/data` (ledger, operational store, `artifacts/`, `documents/`). The
+  ThinkPad's old directory is `~/.local/share/anam.moved-2026-10-09`, kept read-only as the
+  pre-move copy; nothing on the ThinkPad writes a ledger any more. Ingest is the unraid gateway's
+  `anam_ingest` job. `ANAM_TIMEOUT` is 30s in the container (a full mint takes ~10 s there).
 
 ## What the API allows today
 

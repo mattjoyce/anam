@@ -96,6 +96,13 @@ type Daemon struct {
 	// index is whether the operational index is wrong rather than merely behind.
 	index   indexState
 	ingests *ingests
+	// importers are who may post envelopes and Definitions; defs is what their
+	// envelopes are admitted against.
+	importers importers
+	defs      *definitions
+	// mints asks the mint worker to mint at the head. It holds one request, so any
+	// number of batches landing during a mint cost one more mint, not one each.
+	mints chan struct{}
 
 	jobs chan job
 	quit chan struct{}
@@ -124,6 +131,10 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 	if err != nil {
 		return nil, err
 	}
+	imps, err := loadImporters(cfg.ImportersFile, tok)
+	if err != nil {
+		return nil, err
+	}
 
 	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()
@@ -148,6 +159,11 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		closeAll()
 		return nil, err
 	}
+	defs, err := loadDefinitions(ctx, db)
+	if err != nil {
+		closeAll()
+		return nil, err
+	}
 	readOps, err := ops.OpenReadOnly(ctx, cfg.DBPath)
 	if err != nil {
 		closeAll()
@@ -169,6 +185,9 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		readOps:   readOps,
 		artifacts: artifacts,
 		ingests:   newIngests(),
+		importers: imps,
+		defs:      defs,
+		mints:     make(chan struct{}, 1),
 		jobs:      make(chan job),
 		quit:      make(chan struct{}),
 	}, nil
@@ -219,32 +238,23 @@ func (s *indexState) wrong() error {
 	return s.err
 }
 
-// loopbackOnly refuses any listen address that a host other than this one can reach.
-// An empty host means every interface, so it is refused too.
-func loopbackOnly(addr string) error {
-	host, _, err := net.SplitHostPort(addr)
-	if err != nil {
-		return fmt.Errorf("daemon: listen %q: %w", addr, err)
-	}
-	if host == "localhost" {
-		return nil
-	}
-	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
-		return nil
-	}
-	return fmt.Errorf("%w: %q (set token_file to listen beyond this host)", ErrNotLoopback, addr)
-}
-
 // Handler is the daemon's routes: /healthz open to all, and behind the token the /v1
 // API and the inspector on everything else.
 func (d *Daemon) Handler() http.Handler {
 	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
 	inner := http.NewServeMux()
 	d.routes(inner)
-	inner.Handle("/", inspect.Handler(d.read, d.cfg.Timeout, buckets, d.cfg.LibraryDir))
+	inner.Handle("/", inspect.Handler(d.read, d.cfg.Timeout, buckets, d.cfg.LibraryDir, d.defs.current.Load))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", d.healthz)
+	// The importer routes sit outside the operator's token: an importer's token
+	// opens these and nothing else.
+	mux.Handle("POST /v1/envelopes", d.asImporter(d.postEnvelopes))
+	mux.Handle("POST /v1/definitions", d.asImporter(d.postDefinitions))
+	mux.Handle("GET /v1/definitions", d.asReader(d.getDefinitions))
+	mux.Handle("GET /v1/definitions/{type}", d.asReader(d.getDefinition))
+	mux.Handle("GET /v1/definitions/{type}/{version}", d.asReader(d.getDefinition))
 	mux.Handle("/", d.authorize(inner))
 	return mux
 }
@@ -262,71 +272,6 @@ func (d *Daemon) healthz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, _ = fmt.Fprintln(w, "ready")
-}
-
-// Write runs fn alone, under deadline, and returns its error. ctx bounds only the wait
-// to be accepted and the wait for the result: once fn starts it runs on the daemon's
-// context, so a caller that gives up does not cut a write short. Write returns
-// ErrStopped once shutdown has begun.
-func (d *Daemon) Write(ctx context.Context, deadline time.Duration, fn WriteFunc) error {
-	j := job{fn: fn, deadline: deadline, done: make(chan error, 1)}
-	select {
-	case d.jobs <- j:
-	case <-d.quit:
-		return ErrStopped
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	select {
-	case err := <-j.done:
-		return err
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
-// acceptWait is how long TryWrite waits for the worker to take a write. The worker
-// is back at the queue microseconds after a write ends; a write still running after
-// this long is one worth refusing for, not waiting on.
-const acceptWait = 250 * time.Millisecond
-
-// TryWrite runs fn alone, under deadline, if the queue takes it within acceptWait,
-// and returns ErrBusy if another write holds it longer. Once fn is accepted it is
-// waited for: its own deadline bounds it, and an answer given before it ended would
-// misreport a write that went on to happen.
-func (d *Daemon) TryWrite(deadline time.Duration, fn WriteFunc) error {
-	j := job{fn: fn, deadline: deadline, done: make(chan error, 1)}
-	busy := time.NewTimer(acceptWait)
-	defer busy.Stop()
-	select {
-	case d.jobs <- j:
-	case <-d.quit:
-		return ErrStopped
-	case <-busy.C:
-		return ErrBusy
-	}
-	return <-j.done
-}
-
-// work is the single write worker. It returns when quit closes, but never while a
-// write is running: the select is only reached between writes.
-func (d *Daemon) work(base context.Context) {
-	for {
-		// Shutdown wins over a write offered at the same moment.
-		select {
-		case <-d.quit:
-			return
-		default:
-		}
-		select {
-		case <-d.quit:
-			return
-		case j := <-d.jobs:
-			ctx, cancel := context.WithTimeout(base, j.deadline)
-			j.done <- j.fn(ctx, d.writes)
-			cancel()
-		}
-	}
 }
 
 // Run serves on the configured address until ctx ends, then shuts down in order: stop
@@ -355,12 +300,16 @@ func (d *Daemon) Serve(ctx context.Context, ln net.Listener) error {
 	}
 
 	var worker sync.WaitGroup
-	worker.Add(1)
+	worker.Add(2)
 	go func() {
 		defer worker.Done()
 		// Writes outlive the signal that starts shutdown; each is bounded by its own
 		// deadline instead.
 		d.work(context.WithoutCancel(ctx))
+	}()
+	go func() {
+		defer worker.Done()
+		d.mintOnRequest()
 	}()
 
 	// The index may be behind a ledger that was written while no daemon ran. Catch it
@@ -373,6 +322,7 @@ func (d *Daemon) Serve(ctx context.Context, ln net.Listener) error {
 			d.catchUp(ctx, s)
 			return nil
 		})
+		d.mintIfBehind(ctx)
 	}()
 
 	errc := make(chan error, 1)

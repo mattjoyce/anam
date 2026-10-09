@@ -64,23 +64,9 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 		return nil, 0, fmt.Errorf("gate: batch of %d exceeds %d", len(envs), MaxBatch)
 	}
 
-	ps := make([]prepared, len(envs))
-	for i, env := range envs {
-		p, err := g.prepare(env, bindings[i])
-		if err != nil {
-			return nil, 0, fmt.Errorf("envelope %d (%s): %w", i, env.Type, err)
-		}
-		ps[i] = p
-	}
-	// Two envelopes for one facet cannot share a transaction, and the second is
-	// almost always a duplicated source row rather than an intended supersession.
-	seen := make(map[string]int, len(ps))
-	for i, p := range ps {
-		if first, dup := seen[p.facetID]; dup {
-			return nil, 0, fmt.Errorf("gate: envelopes %d (%s) and %d (%s) are the same facet %s — a batch cannot hold both",
-				first, ps[first].env.SourceRef, i, p.env.SourceRef, p.facetID)
-		}
-		seen[p.facetID] = i
+	ps, err := g.prepareAll(envs, bindings)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	results := make([]Result, len(ps))
@@ -276,7 +262,7 @@ type disposition struct {
 }
 
 // admitChecks runs the pillars that need no ledger read: structure, token scope,
-// definition existence, assurance floor, size, and compliance.
+// definition existence and version, assurance floor, size, and compliance.
 func (g *Gate) admitChecks(env facet.Envelope, binding facet.Binding) (def.Definition, any, error) {
 	if err := env.Validate(); err != nil {
 		return def.Definition{}, nil, err
@@ -290,6 +276,10 @@ func (g *Gate) admitChecks(env facet.Envelope, binding facet.Binding) (def.Defin
 	d, ok := g.defs.Lookup(env.Type)
 	if !ok {
 		return def.Definition{}, nil, fmt.Errorf("%w: %s", ErrNoDefinition, env.Type)
+	}
+	if env.DefinitionVersion != 0 && env.DefinitionVersion != d.Version {
+		return def.Definition{}, nil, fmt.Errorf("%w: shaped to v%d, %s is v%d",
+			ErrDefinitionVersion, env.DefinitionVersion, env.Type, d.Version)
 	}
 	if assuranceRank(binding.Assurance) < assuranceRank(d.MinAssurance) {
 		return def.Definition{}, nil, fmt.Errorf("%w: %s < %s", ErrAssuranceBelowFloor, binding.Assurance, d.MinAssurance)

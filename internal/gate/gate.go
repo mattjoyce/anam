@@ -28,6 +28,10 @@ var (
 	// against a bar that is not set.
 	ErrNoDefinition = errors.New("gate: no definition for facet type")
 
+	// ErrDefinitionVersion: the envelope was shaped to a Definition version that is
+	// not the type's current one.
+	ErrDefinitionVersion = errors.New("gate: envelope shaped to another definition version")
+
 	// ErrAssuranceBelowFloor: the associated pillar — the binding did not clear the
 	// definition's min_binding_assurance.
 	ErrAssuranceBelowFloor = errors.New("gate: binding assurance below the definition's floor")
@@ -40,6 +44,10 @@ var (
 	// ErrPayloadTooLarge: the payload exceeds the gate's size policy. The ledger itself
 	// would hold it; the bound is a choice about what one facet may be.
 	ErrPayloadTooLarge = errors.New("gate: payload exceeds the configured maximum")
+
+	// ErrSameFacet: two envelopes in one batch are the same facet. A batch is one
+	// transaction, and one facet takes one version per transaction.
+	ErrSameFacet = errors.New("gate: two envelopes in one batch are the same facet")
 
 	// ErrContention: the bounded retry gave up. The worker may simply re-run;
 	// commit is idempotent.

@@ -64,6 +64,11 @@ type Config struct {
 	// the same file when Server is set.
 	TokenFile string `mapstructure:"token_file"`
 
+	// ImportersFile names the YAML file of importers the daemon accepts envelopes
+	// from (docs/IMPORTERS.md): each one's source, token hash and facet types. Empty
+	// means none, and POST /v1/envelopes refuses everything. It is read at start.
+	ImportersFile string `mapstructure:"importers_file"`
+
 	// Server is the URL of a running daemon, such as http://192.168.20.4:8787. With it
 	// set, the CLI asks the daemon and opens no local file: the daemon owns the
 	// stores. Empty means the CLI opens the files itself, which is maintenance mode
@@ -136,6 +141,7 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 	v.SetDefault("zone", "Local")
 	v.SetDefault("listen", DefaultListen)
 	v.SetDefault("token_file", "")
+	v.SetDefault("importers_file", "")
 	v.SetDefault("server", "")
 	v.SetDefault("checkpoint_budget", DefaultCheckpointBudget)
 	v.SetDefault("ingest_timeout", 15*time.Minute)
@@ -176,6 +182,9 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 	}
 	if c.TokenFile != "" {
 		paths["token_file"] = &c.TokenFile
+	}
+	if c.ImportersFile != "" {
+		paths["importers_file"] = &c.ImportersFile
 	}
 	for name, p := range paths {
 		expanded, err := safepath.Expand(*p)

@@ -10,7 +10,6 @@ import (
 
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/consent"
-	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/projection"
@@ -72,7 +71,7 @@ func (s *Server) projectionPage(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err)
 		return
 	}
-	defs, err := def.Bundled()
+	defs, err := s.definitions()
 	if err != nil {
 		httpError(w, err)
 		return

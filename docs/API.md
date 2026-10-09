@@ -12,7 +12,9 @@ daemon's timeout; paging and receipted reads remain this proposal's work. The ro
 in `anam daemon --help`. An ingest operation that moved W carries `mint`, the mint the daemon ran
 after it (card 61): `w`, `full`, `from`, `minted`, `buckets`, or `error` when it failed, which
 fails nothing. `POST /v1/backups` (card 69) copies the record into `backup_dir` on the write
-queue and answers where, at what W, and how big.
+queue and answers where, at what W, and how big. `POST /v1/envelopes` and the `/v1/definitions`
+routes (card 53) are the importers' side, under importers' own tokens; their contract is
+[IMPORTERS.md](IMPORTERS.md) §8.
 
 This document proposes the application API that the CLI, inspector, and MCP adapter can share.
 The two conversational features are **chat with my record** and **log this**. The API supplies

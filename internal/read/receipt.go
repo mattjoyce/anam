@@ -15,7 +15,10 @@ import (
 // store: the bundled templates and Definitions, and the consent gate. The gate is the
 // pass-through one (§10). It is wired in on the real path rather than reserved for
 // later, because a gate threaded through afterwards is a gate a caller can forget.
-func ServeDeps(l serve.Ledger, artifacts serve.Store) (serve.Deps, error) {
+//
+// defs are the Definitions the record's facets were admitted against; nil means the
+// bundled ones alone.
+func ServeDeps(l serve.Ledger, artifacts serve.Store, defs *def.Registry) (serve.Deps, error) {
 	templates, err := projection.Bundled()
 	if err != nil {
 		return serve.Deps{}, err
@@ -24,9 +27,10 @@ func ServeDeps(l serve.Ledger, artifacts serve.Store) (serve.Deps, error) {
 	if err != nil {
 		return serve.Deps{}, err
 	}
-	defs, err := def.Bundled()
-	if err != nil {
-		return serve.Deps{}, err
+	if defs == nil {
+		if defs, err = def.Bundled(); err != nil {
+			return serve.Deps{}, err
+		}
 	}
 	return serve.Deps{
 		Ledger:               l,

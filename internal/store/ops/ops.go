@@ -39,6 +39,10 @@ import (
 // 5 -> 6 is the same move for the ledger pin. A database written before it names no
 // ledger, so the first catch-up would pin whichever ledger it met and read an index
 // derived from another as an index of that one.
+//
+// registered_definition (card 53) does not bump it. Open creates the table and its
+// triggers in a version-6 file as in a new one, and a build that predates it never
+// reads it, so neither build can misread the other's file.
 const schemaVersion = 6
 
 // ErrSchemaVersion is returned by Open for a database written by a different schema.
@@ -166,6 +170,24 @@ CREATE TABLE IF NOT EXISTS definition (
   body    TEXT NOT NULL,
   PRIMARY KEY (type, version)
 );
+
+-- tier: provisioned — Facet Definitions registered by importers (POST /v1/definitions),
+-- every version. Each importer's repo holds its Definitions, so a lost table comes
+-- back by registering them again. A registered version is immutable: the triggers
+-- refuse a change or a removal, for every writer.
+CREATE TABLE IF NOT EXISTS registered_definition (
+  type          TEXT NOT NULL,
+  version       INTEGER NOT NULL,
+  body          TEXT NOT NULL,
+  registered_at TEXT NOT NULL,
+  PRIMARY KEY (type, version)
+);
+CREATE TRIGGER IF NOT EXISTS registered_definition_no_update
+BEFORE UPDATE ON registered_definition
+BEGIN SELECT RAISE(ABORT, 'registered_definition is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS registered_definition_no_delete
+BEFORE DELETE ON registered_definition
+BEGIN SELECT RAISE(ABORT, 'registered_definition is immutable'); END;
 
 -- tier: provisioned — the static source -> facet-type token map (the gate's
 -- authenticated pillar). One row per grant.
@@ -300,60 +322,6 @@ func pin(ctx context.Context, db *sql.DB, key, value string) (stored string, fre
 		return "", false, err
 	}
 	return stored, false, nil
-}
-
-// DefinitionRow is one stored Definition: the manifest as loaded, by type and
-// version. The store keeps every version it has seen so that a later build can be
-// checked against the interpretation the ledger's facets were keyed under.
-type DefinitionRow struct {
-	Type    string
-	Version int
-	Body    string
-}
-
-// Definitions returns every stored Definition, in type then version order.
-func (d *DB) Definitions(ctx context.Context) ([]DefinitionRow, error) {
-	rows, err := d.db.QueryContext(ctx, `SELECT type, version, body FROM definition ORDER BY type, version`)
-	if err != nil {
-		return nil, fmt.Errorf("ops: read definitions: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-	var out []DefinitionRow
-	for rows.Next() {
-		var r DefinitionRow
-		if err := rows.Scan(&r.Type, &r.Version, &r.Body); err != nil {
-			return nil, fmt.Errorf("ops: scan definition: %w", err)
-		}
-		out = append(out, r)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("ops: read definitions: %w", err)
-	}
-	return out, nil
-}
-
-// PutDefinitions stores the given Definitions, replacing a stored body at the same
-// type and version. The provisioned tier is a copy of what the binary carries, so
-// overwriting it is a reload, not a loss; the guard that decides whether the reload
-// is safe runs before this is called.
-func (d *DB) PutDefinitions(ctx context.Context, defs []DefinitionRow) error {
-	tx, err := d.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("ops: put definitions: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }() // no-op after Commit
-	for _, r := range defs {
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO definition (type, version, body) VALUES (?, ?, ?)
-			 ON CONFLICT(type, version) DO UPDATE SET body = excluded.body`,
-			r.Type, r.Version, r.Body); err != nil {
-			return fmt.Errorf("ops: put definition %s v%d: %w", r.Type, r.Version, err)
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("ops: put definitions: %w", err)
-	}
-	return nil
 }
 
 // Close releases the handle.

@@ -213,6 +213,61 @@ func (d *Daemon) mintAfterIngest() *api.MintRun {
 	return &api.MintRun{W: m.W, Full: m.Full, From: m.From, Minted: m.MintedCount(), Buckets: len(m.Outcomes)}
 }
 
+// requestMint asks the mint worker for a mint at the head, without waiting. A request
+// already waiting covers this one.
+func (d *Daemon) requestMint() {
+	select {
+	case d.mints <- struct{}{}:
+	default:
+	}
+}
+
+// mintQuiet is how long the mint worker waits for batches to stop arriving before it
+// mints. An importer sending a hundred batches gets one mint at the end, not one
+// between each, each holding the write queue.
+const mintQuiet = 2 * time.Second
+
+// mintOnRequest is the mint worker: once requests stop arriving for mintQuiet, it
+// mints, until shutdown. An importer's batch is answered when it is admitted, not
+// when it is minted, so its mint runs here rather than in the request.
+func (d *Daemon) mintOnRequest() {
+	for {
+		select {
+		case <-d.quit:
+			return
+		case <-d.mints:
+		}
+		quiet := time.NewTimer(mintQuiet)
+		for waiting := true; waiting; {
+			select {
+			case <-d.quit:
+				quiet.Stop()
+				return
+			case <-d.mints:
+				quiet.Reset(mintQuiet)
+			case <-quiet.C:
+				waiting = false
+			}
+		}
+		d.mintAfterIngest()
+	}
+}
+
+// mintIfBehind asks for a mint when the last mint run is behind the head: a batch
+// admitted just before a shutdown left its mint undone.
+func (d *Daemon) mintIfBehind(ctx context.Context) {
+	ctx, cancel := context.WithTimeout(ctx, d.cfg.Timeout)
+	defer cancel()
+	head, err := d.read.Head(ctx)
+	if err != nil || head == 0 {
+		return
+	}
+	run, ok, err := d.readOps.LastMintRun(ctx, int64(head))
+	if err == nil && (!ok || run < int64(head)) {
+		d.requestMint()
+	}
+}
+
 // catchUp replays the ledger into the operational store's index, so reads of it are
 // as fresh as the last write. It runs inside a write, on the write handles, with the
 // ingest budget rather than the per-call timeout: a replay of the whole ledger after

@@ -1,6 +1,7 @@
 # Importers — sources outside Anam
 
-Design proposal · 2026-10-08 · documentation only; nothing here is implemented yet.
+Design proposal · 2026-10-08. The service's side is built (cards 51, 52, 53); §8 is the contract
+every importer complies with. No importer exists yet.
 
 Anam's capture workers for vendor sources (`healthdb`, `withings`, `bpcsv`) are compiled into the
 binary that owns the ledger. This proposal moves them out: an importer is a ductile plugin that
@@ -72,13 +73,13 @@ These make an importer correct in any language, without importing Anam's code.
 3. **Validation becomes real.** Done (card 52). Every schema is closed: it declares each field with
    its type and refuses anything else, and `lenient` is gone. Once outside code writes payloads,
    facet-compliance is the guard, and each Definition states exactly what a valid payload is.
-4. **Two endpoints on the service.**
+4. **Two endpoints on the service.** Done (card 53); §8 is the contract.
    - `GET /v1/definitions[/{type}[/{version}]]`: the published contract an importer shapes to.
    - `POST /v1/envelopes`: a batch, each envelope naming its type and Definition version, admitted
      through the gate. Per-source tokens scoped to the types a source may submit replace the static
      `mvpScopes` map: the authenticated pillar as credentials, as Splunk's HTTP Event Collector
      pins a token to its sourcetypes.
-5. **Registering a Definition** (`POST /v1/definitions`) checks a new version against the
+5. **Registering a Definition** (`POST /v1/definitions`). Done (card 53). It checks a new version against the
    compatibility rule `def.Guard` already enforces (no re-keying, no re-placing in time), and a
    registered version is immutable, as in a schema registry. Installing an importer registers the
    Definitions it emits, so adding a source is one act.
@@ -138,3 +139,121 @@ Where log management stops applying: logs tolerate loss and sampling and have no
    document in the library, turned into a records file once by a script kept in `scripts/`, and
    reshaped by regenerating that file with the same ids (card 58). `bpcsv` goes that way. `records`
    and `documents` stay inside Anam: they are formats, not sources.
+
+## 8. The importer contract
+
+What an importer must do to put facts in the record, and what the service promises back. Built in
+card 53; the Python base every importer starts from is card 54's.
+
+### 8.1 The repo
+
+Importers live in one repo, `anam-importers`, one folder each. A folder holds the importer's code
+and the Definitions it emits, so installing an importer brings its contract with it:
+
+```text
+anam-importers/
+  withings/
+    manifest.yaml              ductile plugin manifest
+    importer.py                reads the source, shapes payloads
+    definitions/
+      health.weight.json       one manifest per type it emits
+    tests/
+  anam_submit/                 the generic plugin that posts envelopes
+```
+
+A Definition is a JSON manifest in exactly the format of Anam's own (`internal/def/manifests`):
+`meta` carries the type, version, `identity_key`, `time_semantics`, classification and
+`validation_mode`; `schema` is closed JSON Schema 2020-12 (§3, prerequisite 3). A type lives in one
+place. While Anam's binary bundles a type, no importer may register it; an importer takes a type over
+when a release drops it from the binary, registering the same body at the same version. The other
+direction works too: a release that bundles a type an importer registered admits it against the
+bundled Definition from then on, keeps the registered rows for the facets admitted under them, and
+says so in its log. No two importers may name the same type.
+
+### 8.2 Tokens
+
+Each importer has its own token, and the daemon knows only its SHA-256. `importers_file`
+(`ANAM_IMPORTERS_FILE`) names a YAML file, read when the daemon starts:
+
+```yaml
+importers:
+  - source: withings
+    token_sha256: 9f86d081...      # printf %s "$token" | sha256sum
+    types: [health.weight]
+```
+
+- `source` is the source every envelope it submits is admitted as. A facet's identity includes its
+  source, so an importer that takes over a built-in worker's facets uses that worker's source name.
+- `types` are the types it may submit, and the only types it may register Definitions for.
+- An importer's token opens `POST /v1/envelopes`, `POST /v1/definitions` and
+  `GET /v1/definitions...`, and nothing else: it cannot read the record. The operator's token
+  (`token_file`) reads the Definitions but submits nothing (403).
+- Make a token with `openssl rand -hex 32`. Present it as `Authorization: Bearer <token>`.
+
+### 8.3 Definitions
+
+| Call | Answers |
+|---|---|
+| `GET /v1/definitions` | Every type the gate admits: `type`, `origin` (`bundled` or `registered`), `current`, `versions`. |
+| `GET /v1/definitions/{type}` | The current manifest, as published. |
+| `GET /v1/definitions/{type}/{version}` | That version's manifest. 404 if not held. |
+| `POST /v1/definitions` | Body: one manifest. 201 registered; 200 already registered, same body; 409 a different body at that version, an older version than one held, a changed `identity_key` or `fact_time`, or a type the binary bundles; 422 not a valid manifest; 403 a type outside the token's `types`. |
+
+A registered version is immutable, and "same body" compares canonical JSON, so reformatting the file
+is harmless. A change is a new version, which may change the schema, classification or series freely
+but not what keys or places a facet. An importer registers its Definitions every time it starts:
+that is a no-op until a manifest changes, and it is how a lost operational store comes back.
+
+### 8.4 Envelopes
+
+`POST /v1/envelopes`, body:
+
+```json
+{"envelopes": [
+  {"type": "health.weight", "definition_version": 2,
+   "payload": {"id": "withings-123", "date": "2026-10-09 07:30", "kg": 80.5}}
+]}
+```
+
+- `type`, `definition_version` and `payload` are required. `definition_version` must be the type's
+  current version: the gate refuses a payload shaped to any other.
+- `source_ref` is optional. The gate composes it from the Definition's `identity_key`; sent, it must
+  match. `asserted_person` and `span_hint` are optional.
+- There is no `source` field, and an unknown field is a 400: the token names the source.
+- A batch holds 1 to 49 envelopes, at most one per facet. Send more as more batches.
+
+The batch is admitted whole or not at all:
+
+| Status | Body | Meaning |
+|---|---|---|
+| 200 | `w`, `changed`, `results[]` (`index`, `outcome`, `facet_id`, `artifact_version`) | Admitted. `outcome` is `admitted`, `superseded` or `no-op`. |
+| 422 | `error`, `refused[]` (`index`, `type`, `reason`) | Nothing written. Every envelope that failed is named. Fix or drop them and send the batch again. |
+| 400 | `error` | The body is not a submission: bad JSON, an unknown field, no version, 0 or more than 49 envelopes. |
+| 401 / 403 | `error` | No importer's token, or the operator's. |
+| 503 | `error`, `Retry-After` | Another write held the ledger for more than 5 s, usually an ingest. Wait and send the same batch again. |
+
+Sending a batch again is always safe. The same payload under the same identity is a `no-op`; a
+changed payload supersedes, keeping the old version. That is the whole retry and resend protocol: an
+importer that is unsure whether a batch landed, because the connection dropped or timed out, sends it
+again.
+
+The daemon mints once batches stop arriving for 2 s, in the background, so neither the answer nor the
+next batch waits on it.
+
+### 8.6 Not yet
+
+- **Retraction.** An importer cannot tombstone a facet, and `anam retract` plans from the built-in
+  workers' scans only. A row the source deleted stays live in the record until there is a route for
+  it.
+- **Receipts.** A receipt pins the bundled Definition set's version (`def.SetVersion`); registered
+  Definitions are not in it.
+
+### 8.5 What an importer must do
+
+1. Register every Definition in its folder at start, and stop if one is refused.
+2. Validate each payload locally against its Definition's `schema` with a stock JSON Schema library,
+   so a refusal at the gate means the importer and Anam disagree, not that a row was malformed.
+3. Shape payloads only. Compose no identity, join nothing, summarise nothing (§2).
+4. Submit in batches of at most 49, resubmit on 503, and report a 422's reasons as a failed run.
+5. Offer a resend-everything mode. It is a rebuild's first step, and idempotent by construction.
+

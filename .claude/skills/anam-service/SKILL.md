@@ -36,9 +36,14 @@ runs, nothing else may open those files. Ask it over HTTP instead.
 | `GET /v1/checkpoints` | yes | The checkpoint log. |
 | `POST /v1/checkpoints` | yes | Mint from the last run (`?dry_run=true` derives only, `?full=true` folds the whole ledger, the repair). 503 at once while an ingest runs. |
 | `POST /v1/backups` | yes | Back up the record into `backup_dir` (`/mnt/disk1/backup/anam/daily`), keeping 14. Waits behind a running ingest. The gateway's `anam_backup` asks nightly at 02:30. 503 without a `backup_dir`. |
+| `GET /v1/definitions[/{type}[/{version}]]` | yes, or an importer's | The published Definitions: list, current manifest, one version. |
+| `POST /v1/definitions` | an importer's | Register a Definition the importer emits. 201 new, 200 same body, 409 immutable or re-keyed. |
+| `POST /v1/envelopes` | an importer's | A batch of up to 49 envelopes, admitted whole (200, per-envelope outcomes) or refused whole (422, every reason). 503 with `Retry-After` while a write runs. The operator's token gets 403. Contract: `docs/IMPORTERS.md` §8. |
 | `GET /` and below | yes | The inspector (timeline, facets, events, documents). Browser: basic auth, any user name, the token as password. |
 
-There is no API for retraction or for writing a record; those are local maintenance or design
+Importers' tokens live in `importers_file` (`ANAM_IMPORTERS_FILE`) as SHA-256 hashes beside each
+importer's source and types; an importer's token opens only the three importer routes. There is no
+API for retraction or for writing a record; those are local maintenance or design
 (`docs/API.md`).
 
 ## The CLI against the daemon

@@ -134,7 +134,12 @@ func readSource(ctx context.Context, cfg config.Config) (read.Source, func(), er
 		return read.Source{}, nil, err
 	}
 	closeAll := func() { _ = store.Close(); _ = db.Close(); _ = l.Close() }
-	return read.Source{Ledger: l, Checkpoints: db, Artifacts: store}, closeAll, nil
+	defs, err := registryOf(ctx, db)
+	if err != nil {
+		closeAll()
+		return read.Source{}, nil, err
+	}
+	return read.Source{Ledger: l, Checkpoints: db, Artifacts: store, Definitions: defs}, closeAll, nil
 }
 
 // timelineHeader describes the read: which watermark, which lens, and the hash that

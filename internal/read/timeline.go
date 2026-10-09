@@ -64,6 +64,17 @@ type Source struct {
 	Ledger      Ledger
 	Checkpoints mint.WindowLog
 	Artifacts   mint.Store
+	// Definitions are the ones the record's facets were admitted against: the
+	// bundled ones and those importers registered. Nil means the bundled ones alone.
+	Definitions *def.Registry
+}
+
+// definitions is src's Definitions, or the bundled ones when it names none.
+func (src Source) definitions() (*def.Registry, error) {
+	if src.Definitions != nil {
+		return src.Definitions, nil
+	}
+	return def.Bundled()
 }
 
 // Timeline performs the read q describes over src: at head or at an anam-time, through
@@ -169,7 +180,7 @@ func (v view) describe() api.Timeline {
 // readView performs the read the flags describe: at head or at an anam-time, through
 // a projection or not, as a log or as the snapshot at a fact-time.
 func readView(ctx context.Context, src Source, asOfTime time.Time, projName, at string) (view, error) {
-	defs, err := def.Bundled()
+	defs, err := src.definitions()
 	if err != nil {
 		return view{}, err
 	}
@@ -223,7 +234,7 @@ func narrow(src Source, q api.TimelineQuery, b bounds) bool {
 // head or the watermark an anam-time names. With no mint run to start from it is the
 // full read.
 func readWindow(ctx context.Context, src Source, asOfTime time.Time, b bounds) (view, error) {
-	defs, err := def.Bundled()
+	defs, err := src.definitions()
 	if err != nil {
 		return view{}, err
 	}

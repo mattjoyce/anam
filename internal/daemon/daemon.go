@@ -244,7 +244,7 @@ func (d *Daemon) Handler() http.Handler {
 	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
 	inner := http.NewServeMux()
 	d.routes(inner)
-	inner.Handle("/", inspect.Handler(d.read, d.cfg.Timeout, buckets, d.cfg.LibraryDir, d.defs.current.Load))
+	inner.Handle("/", inspect.Handler(d.read, d.cfg.Timeout, buckets, d.cfg.LibraryDir, d.defs.current.Load, d.heldDefinitions))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", d.healthz)

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>anam — definitions</title>
+{{template "style.html"}}
+</head>
+<body>
+<header>
+  <h1>facet definitions</h1>
+  {{template "nav.html"}}
+</header>
+
+<p class="meta">Each type's contract: how a facet is keyed and placed in time, and the fields its payload may hold.
+Every version Anam holds is listed; a facet links to the one it was admitted under.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>type</th><th>current</th><th>versions held</th><th>origin</th><th>class</th><th>described</th></tr></thead>
+  <tbody>
+    {{range .Definitions}}{{$t := .Type}}
+    <tr>
+      <td><a class="mono" href="/definition?type={{.Type}}">{{.Type}}</a></td>
+      <td>v{{.Current}}</td>
+      <td>{{range $i, $v := .Versions}}{{if $i}} {{end}}<a href="/definition?type={{$t}}&v={{$v}}">v{{$v}}</a>{{end}}</td>
+      <td>{{.Origin}}</td>
+      <td>{{.Classification}}</td>
+      <td{{if lt .Described .Fields}} class="dim"{{end}}>{{.Described}} of {{.Fields}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+</div>
+</body>
+</html>

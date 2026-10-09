@@ -66,6 +66,10 @@ type Server struct {
 	// defs answers the Definitions in force; nil means the bundled ones.
 	defs func() *def.Registry
 
+	// heldDefs answers every Definition version held, for the Definitions pages and a
+	// facet's link to the version it was admitted under; nil means the bundled ones.
+	heldDefs HeldDefinitions
+
 	// The fold cache, keyed by watermark: a whole-person read is one replay plus
 	// one fetch per live facet, too dear to repeat per page view. Every request
 	// still reads the head (one cheap call), so a moved W is never served stale —
@@ -91,9 +95,13 @@ const asOfCacheSize = 4
 // library's root, or "" for none.
 //
 // defs answers the Definitions the record's facets were admitted against, asked at
-// each page so a registration shows at once; nil means the bundled ones alone.
-func Handler(l Ledger, timeout time.Duration, buckets span.Buckets, library string, defs func() *def.Registry) http.Handler {
-	s := &Server{ledger: l, timeout: timeout, buckets: buckets, library: library, defs: defs}
+// each page so a registration shows at once; nil means the bundled ones alone. held
+// answers every version held of each, for the Definitions pages; nil means the
+// bundled manifests.
+func Handler(l Ledger, timeout time.Duration, buckets span.Buckets, library string, defs func() *def.Registry,
+	held HeldDefinitions,
+) http.Handler {
+	s := &Server{ledger: l, timeout: timeout, buckets: buckets, library: library, defs: defs, heldDefs: held}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.timeline)
 	mux.HandleFunc("GET /facets", s.index)
@@ -101,6 +109,8 @@ func Handler(l Ledger, timeout time.Duration, buckets span.Buckets, library stri
 	mux.HandleFunc("GET /events", s.events)
 	mux.HandleFunc("GET /projection", s.projectionPage)
 	mux.HandleFunc("GET /document", s.document)
+	mux.HandleFunc("GET /definitions", s.definitionsIndex)
+	mux.HandleFunc("GET /definition", s.definitionPage)
 	return mux
 }
 
@@ -172,7 +182,7 @@ func (s *Server) readAt(ctx context.Context, w ledger.Watermark) (fold.Result, e
 func Serve(ctx context.Context, l Ledger, addr string, timeout time.Duration, buckets span.Buckets, library string) error {
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           Handler(l, timeout, buckets, library, nil),
+		Handler:           Handler(l, timeout, buckets, library, nil, nil),
 		ReadHeaderTimeout: 5 * time.Second,
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}
@@ -291,8 +301,13 @@ type facetData struct {
 	AnamTime string
 
 	Bucket  string
-	Payload string
+	Payload []jsonToken
 	Events  []facet.AnamEvent
+
+	// DefinitionURL is the Definition the facet was admitted under; CurrentDefinition
+	// is the version in force now, so the page can say when they differ.
+	DefinitionURL     string
+	CurrentDefinition int
 }
 
 func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
@@ -332,21 +347,27 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var pretty bytes.Buffer
-	if err := json.Indent(&pretty, f.Payload.Bytes(), "", "  "); err != nil {
-		pretty.Reset()
-		pretty.Write(f.Payload.Bytes()) // verbatim beats absent
+	// The facet links to the Definition it was admitted under, and says so when a
+	// newer one is current (card 71: the admitted words lead).
+	defURL := fmt.Sprintf("/definition?type=%s&v=%d", url.QueryEscape(string(f.Type)), f.DefinitionVersion)
+	var currentDef int
+	if reg, err := s.definitions(); err == nil {
+		if d, ok := reg.Lookup(f.Type); ok {
+			currentDef = d.Version
+		}
 	}
 
 	render(w, "facet.html", facetData{
-		Facet:       f,
-		Status:      states[id].Status,
-		FactTime:    f.FactTime.Format(time.RFC3339),
-		DocumentURL: s.documentURL(f),
-		AnamTime:    anamTimeOf(mine, f.ArtifactVersion),
-		Bucket:      s.buckets.Of(f.FactTime).ID(),
-		Payload:     pretty.String(),
-		Events:      mine,
+		DefinitionURL:     defURL,
+		CurrentDefinition: currentDef,
+		Facet:             f,
+		Status:            states[id].Status,
+		FactTime:          f.FactTime.Format(time.RFC3339),
+		DocumentURL:       s.documentURL(f),
+		AnamTime:          anamTimeOf(mine, f.ArtifactVersion),
+		Bucket:            s.buckets.Of(f.FactTime).ID(),
+		Payload:           highlightJSON(f.Payload.Bytes()),
+		Events:            mine,
 	})
 }
 

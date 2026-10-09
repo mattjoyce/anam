@@ -1,4 +1,5 @@
 {{define "style.html"}}
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root { color-scheme: light dark; }
   body { font: 15px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 72rem; padding: 0 1rem; }
@@ -18,5 +19,27 @@
   .kind-tombstoned, .kind-rejected { color: #b3261e; }
   .kind-superseded { color: #7a5c00; }
   .kind-admitted, .kind-endorsed { color: #1a7f37; }
+  /* JSON, colour-coded the way an editor shows it */
+  pre.json { line-height: 1.45; }
+  .j-key { color: #0451a5; } .j-str { color: #a31515; } .j-num { color: #098658; } .j-lit { color: #0000ff; } .j-pun { opacity: .55; }
+  @media (prefers-color-scheme: dark) {
+    .j-key { color: #9cdcfe; } .j-str { color: #ce9178; } .j-num { color: #b5cea8; } .j-lit { color: #569cd6; }
+  }
+  .role { display: inline-block; padding: 0 .4rem; margin-right: .25rem; border-radius: 4px; font-size: .75rem; border: 1px solid currentColor; opacity: .85; }
+  .undescribed { opacity: .55; font-style: italic; }
+  .scroll { overflow-x: auto; }
+  td.mono, td .mono { overflow-wrap: anywhere; }
+  .role { font-family: system-ui, sans-serif; }
+  @media (max-width: 40rem) {
+    body { margin: 1rem auto; font-size: 14px; }
+    header { flex-direction: column; }
+    nav a { margin: 0 .5rem 0 0; }
+    th, td { padding: .3rem .35rem; }
+    table.kv th { width: auto; }
+    /* a field's cells stack: name and roles, then type, then what it means */
+    table.fields thead { display: none; }
+    table.fields tr { display: block; padding: .4rem 0; border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent); }
+    table.fields td { display: block; border: 0; padding: .1rem .35rem; }
+  }
 </style>
 {{end}}

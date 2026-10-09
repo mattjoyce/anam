@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>anam — {{.Def.Type}} v{{.Def.Version}}</title>
+{{template "style.html"}}
+</head>
+<body>
+<header>
+  <h1><span class="mono">{{.Def.Type}}</span> v{{.Def.Version}}</h1>
+  {{template "nav.html"}}
+</header>
+
+<p class="meta">
+  {{if .Description}}{{.Description}}<br>{{end}}
+  versions held: {{$cur := .Current}}{{$t := .Def.Type}}{{$v := .Def.Version}}{{range $i, $n := .Versions}}{{if $i}} · {{end}}{{if eq $n $v}}<strong>v{{$n}}</strong>{{else}}<a href="/definition?type={{$t}}&v={{$n}}">v{{$n}}</a>{{end}}{{if eq $n $cur}} <span class="dim">(current)</span>{{end}}{{end}}
+  {{if lt .Def.Version .Current}}<br><strong>v{{.Current}} is current.</strong> This is an earlier version, as it was in force for the facets admitted under it.{{end}}
+  <br><a href="{{.TimelineURL}}">this type's facts on the timeline</a>
+</p>
+
+{{if .ParseError}}<p><strong>This build cannot parse this version:</strong> <span class="mono">{{.ParseError}}</span>. The body below is as it was held.</p>{{end}}
+
+{{if not .ParseError}}
+<h2>contract</h2>
+<table class="kv">
+  <tr><th>origin</th><td>{{.Origin}}</td></tr>
+  <tr><th>classification</th><td>{{.Def.Classification}}</td></tr>
+  <tr><th>validation</th><td>{{.Def.Mode}}{{if eq (print .Def.Mode) "strict"}} <span class="dim">closed: no field outside the list below; a required field is never null or ""</span>{{end}}</td></tr>
+  <tr><th>source schema</th><td class="mono">{{.Def.SourceSchema}}</td></tr>
+  <tr><th>identity</th><td class="mono">{{range $i, $p := .Def.IdentityKey}}{{if $i}}, {{end}}{{$p}}{{end}}</td></tr>
+  <tr><th>fact time</th><td><span class="mono">{{.Def.FactTime.Pointer}}</span> <span class="dim">read as <span class="mono">{{.Def.FactTime.Layout}}</span> in {{.Def.FactTime.Zone}}</span></td></tr>
+  {{with .Def.Series}}<tr><th>series</th><td><span class="mono">{{.Name}}</span> keyed by <span class="mono">{{range $i, $p := .Key}}{{if $i}}, {{end}}{{$p}}{{end}}</span>{{if .Closes}} · <strong>closes the series</strong>{{end}}</td></tr>{{end}}
+  <tr><th>min assurance</th><td>{{.Def.MinAssurance}}</td></tr>
+</table>
+
+<h2>fields <span class="dim">{{.Described}} of {{len .Fields}} described</span></h2>
+<div class="scroll">
+<table class="fields">
+  <thead><tr><th>field</th><th>type</th><th>description</th></tr></thead>
+  <tbody>
+    {{range .Fields}}
+    <tr id="f{{.Pointer}}">
+      <td class="mono" style="padding-left: {{.Depth}}.2rem">{{if .Depth}}<span class="dim">└ </span>{{end}}{{.Name}}{{if .Required}} <span title="required">*</span>{{end}}{{range .Roles}} <span class="role">{{.}}</span>{{end}}</td>
+      <td>{{.Type}}{{range .Notes}}<br><span class="dim">{{.}}</span>{{end}}</td>
+      <td>{{if .Description}}{{.Description}}{{else}}<span class="undescribed">not described</span>{{end}}{{if .Examples}}<br><span class="dim">e.g.</span> <span class="mono">{{range $i, $e := .Examples}}{{if $i}}, {{end}}{{$e}}{{end}}</span>{{end}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+</div>
+<p class="dim">* required. A pointer like <span class="mono">/a/b</span> names a field inside <span class="mono">a</span>; <span class="mono">a[]</span> means each item of the array <span class="mono">a</span>.</p>
+{{end}}
+
+<details{{if .ParseError}} open{{end}}>
+  <summary>the definition as held (JSON)</summary>
+  <pre class="json mono">{{template "json.html" .Raw}}</pre>
+</details>
+</body>
+</html>

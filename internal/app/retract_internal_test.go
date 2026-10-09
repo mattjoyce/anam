@@ -74,7 +74,7 @@ func TestRetract_PlansOnlyWhatTheSourceDropped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fold.Read: %v", err)
 	}
-	absent, total := planRetraction(res.Live, records.Source, heldBy(t, dir))
+	absent, total := planRetraction(res.Value.Entries(), records.Source, heldBy(t, dir))
 	if len(absent) != 0 || total != 3 {
 		t.Fatalf("plan over an unchanged source = %d absent of %d", len(absent), total)
 	}
@@ -82,16 +82,25 @@ func TestRetract_PlansOnlyWhatTheSourceDropped(t *testing.T) {
 	// w2 is deleted from the source.
 	writeDoc(t, filepath.Join(dir, "diary.yaml"), strings.Replace(threeWeights,
 		`  - {type: health.weight, id: w2, date: "2026-01-02 07:00", kg: 80.2}`+"\n", "", 1))
-	absent, total = planRetraction(res.Live, records.Source, heldBy(t, dir))
-	if len(absent) != 1 || absent[0].Provenance.SourceRef != facet.SourceRef("records", "w2") || total != 3 {
+	absent, total = planRetraction(res.Value.Entries(), records.Source, heldBy(t, dir))
+	if len(absent) != 1 || absent[0].SourceRef != facet.SourceRef("records", "w2") || total != 3 {
 		t.Fatalf("plan after deleting w2 = %v of %d", absent, total)
+	}
+	// The report fetches only the planned facets, at the version in force.
+	facets, err := facetsOf(ctx, l, absent)
+	if err != nil {
+		t.Fatalf("facetsOf: %v", err)
+	}
+	if len(facets) != 1 || facets[0].ID != absent[0].FacetID || facets[0].ArtifactVersion != 1 ||
+		facets[0].Provenance.SourceRef != absent[0].SourceRef {
+		t.Fatalf("facetsOf(w2) = %+v", facets)
 	}
 	if err := guardRetraction(len(absent), total, 2, 0.5); err != nil {
 		t.Fatalf("guard refused a third: %v", err)
 	}
 
 	// Retracting it is one tombstone through the gate; the plan is then empty.
-	out, _, err := g.Retract(ctx, absent[0].ID)
+	out, _, err := g.Retract(ctx, absent[0].FacetID)
 	if err != nil || out.Outcome != gate.OutcomeTombstoned {
 		t.Fatalf("Retract = %v %v", out.Outcome, err)
 	}
@@ -99,7 +108,7 @@ func TestRetract_PlansOnlyWhatTheSourceDropped(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fold.Read: %v", err)
 	}
-	absent, total = planRetraction(res.Live, records.Source, heldBy(t, dir))
+	absent, total = planRetraction(res.Value.Entries(), records.Source, heldBy(t, dir))
 	if len(absent) != 0 || total != 2 || res.States[out.FacetID].Status != facet.StatusTombstoned {
 		t.Errorf("after the tombstone: %d absent of %d, status %s", len(absent), total, res.States[out.FacetID].Status)
 	}

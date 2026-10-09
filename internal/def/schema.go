@@ -90,7 +90,16 @@ func lintSchema(tree map[string]any, keyed []string) error {
 }
 
 // filledSchema says whether a property's schema refuses null and, for a string, "".
+// An enum that lists neither already does.
 func filledSchema(sub map[string]any) error {
+	if enum, ok := sub["enum"].([]any); ok && len(enum) > 0 {
+		for _, v := range enum {
+			if v == nil || v == "" {
+				return fmt.Errorf("its enum admits %q", v)
+			}
+		}
+		return nil
+	}
 	types := typesOf(sub)
 	if len(types) == 0 {
 		return fmt.Errorf("names no type, so null would pass")

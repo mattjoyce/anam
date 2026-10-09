@@ -1,0 +1,9 @@
+{"id": "technogym:2024-03-05T07:30:00.0000000+11:00", "activity_name": "rowing.machine",
+ "effective_time_frame": {"time_interval": {"start_date_time": "2024-03-05T07:00:00+11:00", "duration": {"value": 1800, "unit": "sec"}}},
+ "duration": {"value": 1800, "unit": "sec"}, "distance": {"value": 6000, "unit": "m"},
+ "kcal_burned": {"value": 300, "unit": "kcal"}, "base_movement_quantity": {"value": 700, "unit": "strokes"},
+ "average_cadence": {"value": 24, "unit": "strokes/min"}, "avg_power_w": 150, "max_power_w": 250, "max_spm": 28,
+ "split_500m_sec": 150.0, "level": 5, "move": 400, "source": "Technogym mywellness",
+ "ph_id": "00000000-0000-0000-0000-000000000001", "facility": "00000000-0000-0000-0000-000000000002",
+ "splits": [{"position": 0, "duration_sec": 1800, "distance_m": 6000, "kcal": 300, "strokes": 700, "avg_spm": 24,
+             "avg_power_w": 150, "max_power_w": 250, "max_spm": 28, "split_500m_sec": 150, "level": 5}]}

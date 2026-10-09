@@ -114,6 +114,11 @@ func TestParse_RejectsBadManifests(t *testing.T) {
 		"required admits empty": func(m string) string {
 			return strings.Replace(m, `"measured_at": {"type": "string", "minLength": 1}`, `"measured_at": {"type": "string"}`, 1)
 		},
+		"required enum admits empty": func(m string) string {
+			return strings.Replace(strings.Replace(m, `"required": ["measured_at", "systolic", "diastolic"]`,
+				`"required": ["measured_at", "systolic", "diastolic", "position"]`, 1),
+				`"enum": ["sitting", "standing", "lying"]`, `"enum": ["sitting", ""]`, 1)
+		},
 		"required names no type": func(m string) string {
 			return strings.Replace(m, `"systolic": {"type": "number"}`, `"systolic": {}`, 1)
 		},
@@ -257,5 +262,17 @@ func TestDecode_PreservesNumberLexemes(t *testing.T) {
 	}
 	if got := m["weight"]; got == nil || got.(interface{ String() string }).String() != "82.50" {
 		t.Errorf("number lexeme not preserved: %v", got)
+	}
+}
+
+// A required enum is filled when its values are: an enum that lists neither null nor
+// "" refuses both without a minLength.
+func TestParse_ARequiredEnumIsFilled(t *testing.T) {
+	t.Parallel()
+	m := strings.Replace(bpManifest, `"required": ["measured_at", "systolic", "diastolic"]`,
+		`"required": ["measured_at", "systolic", "diastolic", "position"]`, 1)
+	d := mustParse(t, m)
+	if err := d.Check(mustDecode(t, strings.Replace(bpPayload, `"sitting"`, `""`, 1))); !errors.Is(err, def.ErrNotCompliant) {
+		t.Errorf("empty enum value = %v, want ErrNotCompliant", err)
 	}
 }

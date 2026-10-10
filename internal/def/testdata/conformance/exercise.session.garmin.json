@@ -1,0 +1,7 @@
+{"id": "garmin:session:2024-03-07T19:30:00Z", "activity_name": "walking",
+ "effective_time_frame": {"time_interval": {"start_date_time": "2024-03-07T19:30:00Z", "duration": {"value": 3600.5, "unit": "sec"}}},
+ "duration": {"value": 3540.25, "unit": "sec"}, "distance": {"value": 5200.4, "unit": "m"},
+ "kcal_burned": {"value": 320, "unit": "kcal"}, "avg_hr_bpm": 110, "max_hr_bpm": 140,
+ "cumulative_elevation_gain": {"value": 80, "unit": "m"}, "descent_m": 78,
+ "training_effect_aerobic": 2.1, "training_effect_anaerobic": 0.3, "training_load": 40.5,
+ "source": "Garmin", "fit_sport": "walking", "fit_sub_sport": "generic", "sport_profile": "Walk"}

@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "travel.departed",
-    "definition_version": 3,
+    "definition_version": 4,
     "classification": "Confidential",
     "validation_mode": "strict",
     "source_schema": "records/travel.departed",
@@ -19,7 +19,7 @@
     "required": ["id", "date", "trip"],
     "properties": {
       "agency": {"type": "string", "minLength": 1, "description": "The travel agent the trip was booked through, with its reference where the source gave one, as written.", "examples": ["Harbor Travel 40213377"]},
-      "basis": {"type": "string", "minLength": 1, "description": "The evidence the row rests on, free text as the extraction wrote it: a booking, an email, or a note that the date is inferred. Read it before trusting the date."},
+      "basis": {"type": "string", "minLength": 1, "description": "Why the departure date is believed, in the extraction's own words rather than the source's. Present only on a trip with no itinerary to stand on: it names the documents the date rests on and says no itinerary was found. Read it before trusting the date.", "examples": ["a leave plan of 2 Feb 2019 and an email of 1 Mar 2019; no itinerary found"]},
       "booking": {"type": "string", "minLength": 1, "description": "The booking reference (airline record locator or agent's code) as written.", "examples": ["K7QXZB"]},
       "date": {"type": "string", "minLength": 1, "description": "The day of departure. Sydney local date, YYYY-MM-DD, as the records row writes it. This is the fact time.", "examples": ["2019-03-04"]},
       "destination": {"type": "string", "minLength": 1, "description": "Where the trip went, free text as written: one place, a country, or a list.", "examples": ["Porthaven, Westmere"]},

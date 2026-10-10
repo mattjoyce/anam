@@ -88,6 +88,9 @@ var typeStyles = map[facet.Type]typeStyle{
 	"health.measurement":      {"body", shapeDiamond, kindReading},
 
 	"health.sleep": {"sleep", shapeCircle, kindMeasure},
+	// One facet per CPAP session (card 70), registered by the DreamStation importer
+	// rather than bundled: a session, drawn as the activity row draws one.
+	"sleep.cpap-session": {"sleep", shapeDiamond, kindEvent},
 
 	"health.metric-group": {"activity", shapeCircle, kindMeasure},
 	"gym.visit":           {"activity", shapeSquare, kindEvent},

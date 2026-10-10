@@ -24,6 +24,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -308,6 +309,15 @@ type facetData struct {
 	// is the version in force now, so the page can say when they differ.
 	DefinitionURL     string
 	CurrentDefinition int
+
+	// Rows is the payload read through its admitted Definition; Changes what this
+	// artifact version changed from the one before; Versions every artifact version,
+	// for links, and Latest the newest.
+	Rows     []payloadRow
+	Changes  []changeRow
+	Versions []int
+	Latest   int
+	Prior    int
 }
 
 func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
@@ -320,7 +330,7 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	f, err := s.ledger.CurrentVersion(ctx, id)
+	latest, err := s.ledger.CurrentVersion(ctx, id)
 	if errors.Is(err, ledger.ErrNotFound) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -328,6 +338,33 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httpError(w, err)
 		return
+	}
+	// ?v= shows any artifact version, so "why did this supersede" has an answer: the
+	// version and what it changed from the one before.
+	f := latest
+	if q := r.URL.Query().Get("v"); q != "" {
+		n, err := strconv.Atoi(q)
+		if err != nil || n < 1 || n > latest.ArtifactVersion {
+			http.Error(w, fmt.Sprintf("?v=%q: want 1 to %d", q, latest.ArtifactVersion), http.StatusBadRequest)
+			return
+		}
+		if f, err = s.ledger.Version(ctx, id, n); err != nil {
+			httpError(w, err)
+			return
+		}
+	}
+	var changes []changeRow
+	if f.ArtifactVersion > 1 {
+		prior, err := s.ledger.Version(ctx, id, f.ArtifactVersion-1)
+		if err != nil {
+			httpError(w, err)
+			return
+		}
+		changes = changedFields(prior.Payload.Bytes(), f.Payload.Bytes())
+	}
+	versions := make([]int, latest.ArtifactVersion)
+	for i := range versions {
+		versions[i] = i + 1
 	}
 
 	_, events, err := s.headAndEvents(ctx)
@@ -360,6 +397,11 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 	render(w, "facet.html", facetData{
 		DefinitionURL:     defURL,
 		CurrentDefinition: currentDef,
+		Rows:              s.payloadRows(ctx, f),
+		Changes:           changes,
+		Versions:          versions,
+		Latest:            latest.ArtifactVersion,
+		Prior:             f.ArtifactVersion - 1,
 		Facet:             f,
 		Status:            states[id].Status,
 		FactTime:          f.FactTime.Format(time.RFC3339),

@@ -209,6 +209,51 @@ func TestPostEnvelopes(t *testing.T) {
 	}
 }
 
+// Card 109: the body is one submission and nothing else. A valid batch followed by a
+// second value, by garbage, or by enough whitespace to carry the body over its bound
+// is refused whole, before the queue: the ledger does not move, no snapshot part is
+// recorded, and the source is not marked as seen. A batch padded to the bound exactly
+// is still a submission.
+func TestPostEnvelopesReadTheWholeBody(t *testing.T) {
+	d, url, _ := serveImporters(t, importerConfig(t))
+	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	one := batch(weighIn("w-1", 80.5, weight.Version))
+
+	for name, tc := range map[string]struct {
+		body string
+		want int
+	}{
+		"a second submission": {one + ` {"envelopes": []}`, http.StatusBadRequest},
+		"a second value":      {one + ` 1`, http.StatusBadRequest},
+		"garbage":             {one + ` garbage`, http.StatusBadRequest},
+		"whitespace past the bound": {
+			one + strings.Repeat(" ", maxSubmission-len(one)+1), http.StatusRequestEntityTooLarge},
+		"a snapshot part with garbage": {
+			snapBatch("torn", 1, 1, weighIn("w-1", 80.5, weight.Version)) + ` garbage`, http.StatusBadRequest},
+	} {
+		t.Run(name, func(t *testing.T) {
+			call(t, "POST", url+"/v1/envelopes", importerToken, tc.body, tc.want, nil)
+		})
+	}
+	if got := head(t, d); got != 0 {
+		t.Fatalf("W = %d after refused bodies, want 0", got)
+	}
+	call(t, "GET", url+"/v1/snapshots/torn", importerToken, "", http.StatusNotFound, nil)
+	if st := d.ingests.sourceStatuses(); len(st) != 0 {
+		t.Fatalf("a refused body marked the source as seen: %+v", st)
+	}
+
+	var a api.Admission
+	call(t, "POST", url+"/v1/envelopes", importerToken, one+"\n  \t\n", http.StatusOK, &a)
+	if a.Changed != 1 || a.W != 1 {
+		t.Fatalf("batch with trailing whitespace: %+v", a)
+	}
+	call(t, "POST", url+"/v1/envelopes", importerToken, one+strings.Repeat(" ", maxSubmission-len(one)), http.StatusOK, &a)
+	if a.Changed != 0 || a.W != 1 || a.Results[0].Outcome != "no-op" {
+		t.Fatalf("batch padded to the bound: %+v", a)
+	}
+}
+
 // Card 53: an importer registers the Definitions it emits; a registered version is
 // immutable; envelopes of the type are admitted against it, and still are after a
 // restart.

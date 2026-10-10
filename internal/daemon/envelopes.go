@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -114,7 +115,11 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 
 // decodeSubmission reads a batch into envelopes from imp's source, and its snapshot
 // label when it has one. Unknown fields are refused, a source among them: the token
-// names the source.
+// names the source. The body is one submission and nothing after it: the whole body
+// is read, through the one bounded reader, before anything is queued, so a second
+// value or garbage behind a valid batch is refused (400) and a body over
+// maxSubmission is refused (413) however the excess is spread. The server's
+// ReadTimeout bounds the read; a client that stalls is cut off there (card 109).
 func decodeSubmission(w http.ResponseWriter, r *http.Request, imp config.Importer,
 ) ([]facet.Envelope, *api.SnapshotPart, error) {
 	source := imp.Source
@@ -122,6 +127,9 @@ func decodeSubmission(w http.ResponseWriter, r *http.Request, imp config.Importe
 	dec.DisallowUnknownFields()
 	var sub api.Submission
 	if err := dec.Decode(&sub); err != nil {
+		return nil, nil, fmt.Errorf("submission: %w", err)
+	}
+	if err := atEOF(dec); err != nil {
 		return nil, nil, fmt.Errorf("submission: %w", err)
 	}
 	switch n := len(sub.Envelopes); {
@@ -145,6 +153,21 @@ func decodeSubmission(w http.ResponseWriter, r *http.Request, imp config.Importe
 		}
 	}
 	return envs, sub.Snapshot, nil
+}
+
+// atEOF is nil once dec has nothing left but whitespace. Anything else is the error:
+// a JSON token names a second value, a syntax error names garbage, and the reader's
+// own error (a *http.MaxBytesError when the body ran over its bound) is kept whole.
+func atEOF(dec *json.Decoder) error {
+	tok, err := dec.Token()
+	switch {
+	case errors.Is(err, io.EOF):
+		return nil
+	case err != nil:
+		return err
+	default:
+		return fmt.Errorf("one submission per request; found %v after it", tok)
+	}
 }
 
 func changedBy(results []gate.Result) int {

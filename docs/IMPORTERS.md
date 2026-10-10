@@ -272,8 +272,10 @@ it no longer does (card 78; Matt, 2026-10-10).
 - **The report.** `GET /v1/snapshots/{id}`, under the importer's token (its own snapshots only) or
   the operator's: `complete`, `parts_admitted`, `carried`, and once complete `live` (the source's live
   facets of the types now), `absent` and up to 1,000 `absent_ids`. Absent means live, not carried,
-  and untouched since the snapshot completed (`completed_w`): a facet a later incremental run sent is
-  never called absent.
+  and untouched since the run began (`started_w`, the watermark after its first part): a facet an
+  incremental run sent beside or after the run is never called absent (card 94). The one gap Anam
+  cannot see is the importer's own: a facet admitted between the importer reading its source and
+  sending its first part is judged as if the run had read it.
 - **Retracting.** `anam retract <source>` on an importer's source plans from its newest complete
   snapshot, with the same guards as a scan: an empty run is refused, `--max-fraction` bounds a run,
   and nothing is written without `--yes`. There is no automatic retraction: a tombstone cannot be

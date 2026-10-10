@@ -46,10 +46,14 @@ type Snapshot struct {
 	PartsAdmitted int
 	Carried       int
 	StartedAt     time.Time
-	CompletedAt   time.Time // zero until complete
-	// CompletedW is the watermark just after the last part was admitted. A facet
-	// touched after it may have been sent by a later, incremental run, so absence is
-	// judged only for facets untouched since.
+	// StartedW is the ledger's watermark just after the first part was admitted:
+	// nothing outside the run lands between a part's admission and its recording.
+	// A facet touched after it was sent either by this run (and is carried) or by an
+	// incremental run beside it (card 94), so absence is judged only for facets
+	// untouched since the run began.
+	StartedW    int64
+	CompletedAt time.Time // zero until complete
+	// CompletedW is the watermark just after the last part was admitted.
 	CompletedW int64
 }
 
@@ -60,7 +64,8 @@ func (s Snapshot) Complete() bool { return !s.CompletedAt.IsZero() }
 // snapshots older than a day are dropped first; the snapshot is begun on its first
 // part; the part and its facet ids are added as sets, so a part sent twice adds
 // nothing; and the snapshot is marked complete when its last missing part lands. w is
-// the ledger's watermark just after this part was admitted.
+// the ledger's watermark just after this part was admitted; the first part's is kept
+// as the run's start.
 func (d *DB) RecordSnapshotPart(ctx context.Context, p SnapshotPart, at time.Time, w int64) (Snapshot, error) {
 	types := typesKey(p.Types)
 	tx, err := d.db.BeginTx(ctx, nil)
@@ -77,8 +82,8 @@ func (d *DB) RecordSnapshotPart(ctx context.Context, p SnapshotPart, at time.Tim
 	err = tx.QueryRowContext(ctx, `SELECT source, types, parts FROM snapshot WHERE id = ?`, p.ID).Scan(&source, &held, &parts)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		if _, err := tx.ExecContext(ctx, `INSERT INTO snapshot (id, source, types, parts, started_at) VALUES (?, ?, ?, ?, ?)`,
-			p.ID, p.Source, types, p.Parts, clock.Format(at)); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO snapshot (id, source, types, parts, started_at, started_w) VALUES (?, ?, ?, ?, ?, ?)`,
+			p.ID, p.Source, types, p.Parts, clock.Format(at), w); err != nil {
 			return Snapshot{}, fmt.Errorf("ops: snapshot %s: %w", p.ID, err)
 		}
 	case err != nil:
@@ -172,11 +177,11 @@ func snapshotOf(ctx context.Context, q queryer, id string) (Snapshot, bool, erro
 	var types, started string
 	var completed sql.NullString
 	var completedW sql.NullInt64
-	err := q.QueryRowContext(ctx, `SELECT id, source, types, parts, started_at, completed_at, completed_w,
+	err := q.QueryRowContext(ctx, `SELECT id, source, types, parts, started_at, started_w, completed_at, completed_w,
 		(SELECT COUNT(*) FROM snapshot_part WHERE id = s.id),
 		(SELECT COUNT(*) FROM snapshot_facet WHERE id = s.id)
 		FROM snapshot AS s WHERE id = ?`, id).
-		Scan(&s.ID, &s.Source, &types, &s.Parts, &started, &completed, &completedW, &s.PartsAdmitted, &s.Carried)
+		Scan(&s.ID, &s.Source, &types, &s.Parts, &started, &s.StartedW, &completed, &completedW, &s.PartsAdmitted, &s.Carried)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Snapshot{}, false, nil
 	}

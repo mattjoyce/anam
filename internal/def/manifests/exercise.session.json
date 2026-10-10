@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "exercise.session",
-    "definition_version": 3,
+    "definition_version": 4,
     "classification": "Confidential",
     "validation_mode": "strict",
     "source_schema": "ieee-1752/physical-activity-1.0",
@@ -17,13 +17,13 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "One session of exercise, shaped as an IEEE 1752 physical-activity-1.0 payload, from a records file. Two extractors write it: scripts/extract-technogym-json.py for Technogym mywellness indoor sessions (rower and stair climber) and scripts/extract-strong-csv.py for Strong workouts. Measures IEEE has no field for sit beside it in snake_case; values are the app's own, apart from the start time, activity name and Strong's capped duration, which the extractor derives.",
+    "description": "One session of exercise, shaped as an IEEE 1752 physical-activity-1.0 payload, from three sources. Two extractors write a records file: scripts/extract-technogym-json.py for Technogym mywellness indoor sessions (rower and stair climber) and scripts/extract-strong-csv.py for Strong workouts. The anam_garmin importer sends each session a Garmin watch recorded, read from its activity FIT file. Measures IEEE has no field for sit beside it in snake_case; values are the source's own, apart from the start time, activity name and Strong's capped duration, which the extractor or importer derives.",
     "type": "object",
     "required": ["id", "activity_name", "effective_time_frame"],
     "properties": {
       "activity_name": {
         "type": "string",
-        "description": "The IEEE 1752 activity name, chosen by the extractor: rowing.machine for a Technogym session with a rowing distance, stair_climbing.machine for one with floors, strength_training for every Strong workout.",
+        "description": "The IEEE 1752 activity name, chosen by the extractor: rowing.machine for a Technogym session with a rowing distance, stair_climbing.machine for one with floors, strength_training for every Strong workout. For Garmin, the importer maps the FIT sport and sub-sport: walking to walking, running on a treadmill to running.treadmill, indoor rowing to rowing.machine, cardio training to other (Google Fit has no general cardio), and any pair it has no mapping for to unknown. fit_sport and fit_sub_sport keep what the watch wrote.",
         "examples": ["rowing.machine"],
         "enum": [
           "aerobics", "archery", "badminton", "baseball", "basketball", "biathlon", "biking",
@@ -57,33 +57,42 @@
         "required": ["unit", "value"],
         "additionalProperties": false
       },
-      "avg_hr_bpm": {"type": "number", "description": "Technogym's AvgHr, average heart rate in beats per minute. Technogym only.", "examples": [132]},
+      "avg_hr_bpm": {"type": "number", "description": "Average heart rate in beats per minute: Technogym's AvgHr, Garmin's session avg_heart_rate.", "examples": [132]},
       "avg_peak_force": {"type": "number", "description": "Technogym's AvgPeakForce, as reported. A single rowing session in the export carries it, reading zero, so its meaning and unit are not settled by the source. Technogym only."},
-      "avg_power_w": {"type": "number", "description": "Technogym's AvgPower, average power in watts. Technogym only.", "examples": [148]},
+      "avg_power_w": {"type": "number", "description": "Average power in watts: Technogym's AvgPower, Garmin's session avg_power.", "examples": [148]},
       "base_movement_quantity": {
         "type": "object",
-        "description": "Technogym's IsoReps, the stroke count, as an IEEE 1752 movement count. Rowing sessions only: the stair climber reports no IsoReps.",
+        "description": "The stroke count, as an IEEE 1752 movement count: Technogym's IsoReps, Garmin's session total_strokes. Rowing sessions only: the stair climber reports no IsoReps.",
         "examples": [{"value": 612, "unit": "strokes"}],
-        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"strokes\", set by the extractor."}, "value": {"type": "number", "description": "Technogym's IsoReps, as reported."}},
+        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"strokes\", set by the extractor or importer."}, "value": {"type": "number", "description": "The source's stroke count, as reported."}},
         "required": ["unit", "value"],
         "additionalProperties": false
       },
       "calories_consumption": {"type": "number", "description": "Technogym's CaloriesConsumption, the session's energy rate in kcal per hour: wherever it appears it equals Calories divided by the duration in hours. Technogym only."},
       "distance": {
         "type": "object",
-        "description": "Technogym's RowingDistance, metres rowed. Technogym only.",
+        "description": "Distance covered in metres: Technogym's RowingDistance, metres rowed; Garmin's session total_distance, left out when the watch reports zero, as it does for a session that measures no distance.",
         "examples": [{"value": 5000, "unit": "m"}],
-        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"m\", set by the extractor."}, "value": {"type": "number", "description": "Technogym's RowingDistance, as reported."}},
+        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"m\", set by the extractor or importer."}, "value": {"type": "number", "description": "The source's distance, as reported."}},
         "required": ["unit", "value"],
         "additionalProperties": false
       },
+      "cumulative_elevation_gain": {
+        "type": "object",
+        "description": "Total ascent in metres, as an IEEE 1752 elevation gain: Garmin's session total_ascent. Garmin only, on sessions that record altitude.",
+        "examples": [{"value": 127, "unit": "m"}],
+        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"m\", set by the importer."}, "value": {"type": "number", "description": "Garmin's total_ascent, as reported."}},
+        "required": ["unit", "value"],
+        "additionalProperties": false
+      },
+      "descent_m": {"type": "number", "description": "Garmin's session total_descent, total descent in metres. Garmin only, on sessions that record altitude.", "examples": [127]},
       "drag_factor": {"type": "number", "description": "Technogym's DragFactor, the rower's drag setting, as reported. Technogym only."},
       "drive_perc": {"type": "number", "description": "Technogym's DrivePerc, as reported. A single rowing session in the export carries it, reading zero, so its meaning and unit are not settled by the source. Technogym only."},
       "duration": {
         "type": "object",
-        "description": "Technogym's Duration in seconds, the same figure the interval's duration holds. Technogym only.",
+        "description": "The session's net duration in seconds. Technogym's Duration, the same figure the interval's duration holds; Garmin's session total_timer_time, which leaves out time the timer was paused, so it can be shorter than the interval.",
         "examples": [{"value": 1260.5, "unit": "sec"}],
-        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"sec\", set by the extractor."}, "value": {"type": "number", "description": "Technogym's Duration, as reported."}},
+        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"sec\", set by the extractor or importer."}, "value": {"type": "number", "description": "The source's duration, as reported."}},
         "required": ["unit", "value"],
         "additionalProperties": false
       },
@@ -99,13 +108,13 @@
             "properties": {
               "duration": {
                 "type": "object",
-                "description": "The session's length in seconds. Technogym's Duration; for Strong, its reported duration, or 3 hours when duration_capped.",
+                "description": "The session's length in seconds. Technogym's Duration; for Strong, its reported duration, or 3 hours when duration_capped; for Garmin, the session's total_elapsed_time, start to stop with pauses included.",
                 "examples": [{"value": 1260.5, "unit": "sec"}],
                 "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"sec\", set by the extractor."}, "value": {"type": "number", "description": "Seconds, a whole or decimal number."}},
                 "required": ["unit", "value"],
                 "additionalProperties": false
               },
-              "start_date_time": {"type": "string", "minLength": 1, "description": "The start, ISO 8601 with offset, to the second. Derived by the extractor: for Technogym, the export's `on` (the session's end) minus its Duration; for Strong, its \"Date\" column read as Sydney time, so a workout logged abroad is placed as if at home. This is the fact time.", "examples": ["2026-01-24T18:21:08+11:00"]}
+              "start_date_time": {"type": "string", "minLength": 1, "description": "The start, ISO 8601 with offset, to the second. Derived by the extractor: for Technogym, the export's `on` (the session's end) minus its Duration; for Strong, its \"Date\" column read as Sydney time, so a workout logged abroad is placed as if at home; for Garmin, the FIT session's start_time, a true UTC instant written with Z. This is the fact time.", "examples": ["2026-01-24T18:21:08+11:00"]}
             },
             "required": ["duration", "start_date_time"],
             "additionalProperties": false
@@ -116,19 +125,21 @@
       },
       "exercises": {"type": "array", "items": {"type": "string", "minLength": 1, "description": "One exercise name, verbatim."}, "description": "The workout's exercise names in the order Strong first lists them, from the \"Exercise Name\" column. Strong only.", "examples": [["Bench Press (Barbell)", "Squat (Barbell)"]]},
       "facility": {"type": "string", "minLength": 1, "description": "Technogym's facility id, an opaque identifier for the site whose machine logged the session. It repeats on every session at one site, and the export does not name the site. Technogym only.", "examples": ["3f2b9c1e-8a4d-4e2f-9b7c-1d2e3f4a5b6c"]},
+      "fit_sport": {"type": "string", "minLength": 1, "description": "The FIT session's sport, as the Garmin FIT SDK names it, or its number when the SDK has no name for it (\"54\" is the watch's Safety profile). Garmin only.", "examples": ["training"]},
+      "fit_sub_sport": {"type": "string", "minLength": 1, "description": "The FIT session's sub-sport, as the Garmin FIT SDK names it, or its number when the SDK has no name for it. Garmin only.", "examples": ["cardio_training"]},
       "floors": {"type": "number", "description": "Technogym's Floors, floors climbed on the stair climber, as reported. Technogym only."},
-      "id": {"type": "string", "minLength": 1, "description": "The records row's id. Technogym sessions are technogym: and the export's `on` timestamp, verbatim; Strong workouts are strong:session: and the workout's start.", "examples": ["technogym:2026-01-24T18:42:09.1234567+11:00"]},
+      "id": {"type": "string", "minLength": 1, "description": "The records row's id. Technogym sessions are technogym: and the export's `on` timestamp, verbatim; Strong workouts are strong:session: and the workout's start. Garmin sessions are not records rows: garmin:session: and the session's UTC start.", "examples": ["technogym:2026-01-24T18:42:09.1234567+11:00"]},
       "kcal_burned": {
         "type": "object",
-        "description": "Technogym's Calories, energy burned in kcal. Technogym only.",
+        "description": "Energy burned in kcal: Technogym's Calories, Garmin's session total_calories.",
         "examples": [{"value": 312, "unit": "kcal"}],
-        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"kcal\", set by the extractor."}, "value": {"type": "number", "description": "Technogym's Calories, as reported."}},
+        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"kcal\", set by the extractor or importer."}, "value": {"type": "number", "description": "The source's calories, as reported."}},
         "required": ["unit", "value"],
         "additionalProperties": false
       },
       "level": {"type": "number", "description": "Technogym's Level, the machine's resistance level, as reported. A split's level is a whole number; the session's can be fractional, a figure Technogym computes that is close to, but not exactly, the mean of its splits' levels. Technogym only.", "examples": [6]},
-      "max_hr_bpm": {"type": "number", "description": "Technogym's MaxHr, peak heart rate in beats per minute. Technogym only.", "examples": [151]},
-      "max_power_w": {"type": "number", "description": "Technogym's MaxPower, peak power in watts. Technogym only.", "examples": [212]},
+      "max_hr_bpm": {"type": "number", "description": "Peak heart rate in beats per minute: Technogym's MaxHr, Garmin's session max_heart_rate.", "examples": [151]},
+      "max_power_w": {"type": "number", "description": "Peak power in watts: Technogym's MaxPower, Garmin's session max_power.", "examples": [212]},
       "max_spm": {"type": "number", "description": "Technogym's MaxSpm, peak stroke rate in strokes per minute. Technogym only.", "examples": [28.5]},
       "mets": {"type": "number", "description": "Technogym's Mets, which despite the name holds MET-minutes: on every session with both, it equals mets_min times the session's minutes. The extractor has left it out since version 2 (Matt: a bespoke measure), so only facets written by version 1 carry it, each since superseded by a version without it. Technogym only. Checked on the live record, 2026-10-10: no live facet carries it; only the superseded extractor v1 versions did."},
       "mets_min": {"type": "number", "description": "Technogym's MetsMin, which despite the name holds the session's MET rate, mets divided by the session's minutes; on stair climber sessions vo2 is exactly 3.5 times it. The extractor has left it out since version 2, so only facets written by version 1 carry it, each since superseded by a version without it. Technogym only. Checked on the live record, 2026-10-10: no live facet carries it; only the superseded extractor v1 versions did."},
@@ -156,7 +167,8 @@
           "additionalProperties": false
         }
       },
-      "source": {"type": "string", "minLength": 1, "description": "Which app the session came from, written by the extractor: \"Technogym mywellness\" or \"Strong\".", "examples": ["Technogym mywellness"]},
+      "source": {"type": "string", "minLength": 1, "description": "Which app the session came from, written by the extractor or importer: \"Technogym mywellness\", \"Strong\" or \"Garmin\".", "examples": ["Technogym mywellness"]},
+      "sport_profile": {"type": "string", "minLength": 1, "description": "The name of the activity profile on the watch that recorded the session, Garmin's sport_profile_name, such as Cardio, Walk or Safety. Garmin only.", "examples": ["Cardio"]},
       "split_500m_sec": {"type": "number", "description": "Technogym's RowingSplit, pace per 500 m in seconds. Technogym only.", "examples": [126.123456]},
       "splits": {
         "type": "array",
@@ -183,6 +195,9 @@
           "additionalProperties": false
         }
       },
+      "training_effect_aerobic": {"type": "number", "description": "Garmin's session total_training_effect, its aerobic training effect on a 0 to 5 scale, computed by the watch. Garmin only.", "examples": [3.3]},
+      "training_effect_anaerobic": {"type": "number", "description": "Garmin's session total_anaerobic_training_effect, its anaerobic training effect on a 0 to 5 scale, computed by the watch. Garmin only.", "examples": [2.4]},
+      "training_load": {"type": "number", "description": "Garmin's session training_load_peak, the training load the watch computes for the session; Garmin does not publish how. Garmin only.", "examples": [74]},
       "user_weight_kg": {"type": "number", "description": "Technogym's UserWeight, the body weight entered on the machine, in kilograms. Technogym only."},
       "vo2": {"type": "number", "description": "Technogym's Vo2, estimated oxygen uptake in ml/kg/min: it is exactly 3.5 times the session's MET rate (1 MET = 3.5 ml/kg/min), so it is derived, not measured. The export has it on stair climber sessions only. Technogym only."},
       "workout_name": {"type": "string", "minLength": 1, "description": "Strong's \"Workout Name\" column. Strong only.", "examples": ["Morning Workout"]},

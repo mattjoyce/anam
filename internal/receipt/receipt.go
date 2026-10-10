@@ -49,6 +49,10 @@ const ServedKind = "served"
 //     and a verify there must say "other ledger", never "failed reproduction".
 //     Receipts served before 2026-10-07 have none, and they parse; the verify notes
 //     it. It is last, so their bytes are unchanged.
+//   - Query is the narrowing a read applied to what the template served: a window,
+//     a snapshot, a type (card 87). Nil when the whole projection was served, which
+//     every receipt before 2026-10-10 did; it is after LedgerID and omitted when nil,
+//     so their bytes are unchanged too.
 type Receipt struct {
 	ServedHash           string   `json:"served_hash"`
 	FacetIDs             []string `json:"facet_ids"`
@@ -59,7 +63,22 @@ type Receipt struct {
 	ServedAt             string   `json:"served_at"`
 	Span                 string   `json:"span"`
 	LedgerID             string   `json:"ledger_id,omitempty"`
+	Query                *Query   `json:"query,omitempty"`
 }
+
+// Query is how a read narrowed the template's value before it was served, resolved to
+// instants so that replaying it needs no zone: the snapshot at At first, then the
+// fact-time window [From, Before) and the type. Each part is optional; at least one is
+// set, or the receipt carries no Query at all.
+type Query struct {
+	From   string `json:"from,omitempty"`
+	Before string `json:"before,omitempty"`
+	At     string `json:"at,omitempty"`
+	Type   string `json:"type,omitempty"`
+}
+
+// IsZero reports whether q narrows nothing.
+func (q Query) IsZero() bool { return q == Query{} }
 
 // Bytes is the receipt's one serialisation, and the bytes its own content address is
 // taken over. Field order is the struct's, which is fixed, so the same receipt always
@@ -92,6 +111,10 @@ func (r Receipt) Validate() error {
 		return fmt.Errorf("%w: served_at is required", ErrMalformed)
 	case r.Span == "":
 		return fmt.Errorf("%w: span is required", ErrMalformed)
+	case r.Query != nil && r.Query.IsZero():
+		return fmt.Errorf("%w: query narrows nothing; omit it", ErrMalformed)
+	case r.Query != nil && r.Query.At != "" && r.Query.Before != "":
+		return fmt.Errorf("%w: query has both at and before; a snapshot has one upper bound", ErrMalformed)
 	}
 	return nil
 }

@@ -17,7 +17,6 @@ import (
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
-	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
 // ErrQuery marks a query that cannot be read as asked: a malformed instant, flags
@@ -89,9 +88,9 @@ func Timeline(ctx context.Context, src Source, q api.TimelineQuery) (api.Timelin
 	if err != nil {
 		return api.Timeline{}, badQuery(err)
 	}
-	asOf, err := parseAsOf(q.AsOf, loc)
+	know, err := knowledgeOf(q, loc)
 	if err != nil {
-		return api.Timeline{}, badQuery(err)
+		return api.Timeline{}, err
 	}
 
 	// Explain shows every version ever in force, the displaced ones included, so it
@@ -102,11 +101,11 @@ func Timeline(ctx context.Context, src Source, q api.TimelineQuery) (api.Timelin
 	var v view
 	switch {
 	case narrow(src, q, b):
-		v, err = readWindow(ctx, src, asOf, b)
+		v, err = readWindow(ctx, src, know, b)
 	case snapshotPrefix(src, q):
-		v, err = readSnapshotPrefix(ctx, src, asOf, at)
+		v, err = readSnapshotPrefix(ctx, src, know, at)
 	default:
-		v, err = readView(ctx, src, asOf, q.Projection, at)
+		v, err = readView(ctx, src, know, q.Projection, at)
 	}
 	if err != nil {
 		return api.Timeline{}, err
@@ -182,14 +181,14 @@ func (v view) describe() api.Timeline {
 
 // readView performs the read the flags describe: at head or at an anam-time, through
 // a projection or not, as a log or as the snapshot at a fact-time.
-func readView(ctx context.Context, src Source, asOfTime time.Time, projName, at string) (view, error) {
+func readView(ctx context.Context, src Source, know knowledge, projName, at string) (view, error) {
 	defs, err := src.definitions()
 	if err != nil {
 		return view{}, err
 	}
 	v := view{defs: defs, at: at}
 
-	res, err := readAtOrHead(ctx, src, asOfTime, &v)
+	res, err := readAtOrHead(ctx, src, know, &v)
 	if err != nil {
 		return view{}, err
 	}
@@ -246,12 +245,12 @@ func snapshotPrefix(src Source, q api.TimelineQuery) bool {
 // composed from checkpoints, with the whole value's size and hash for the header. It
 // is fold.Snapshot over the prefix, which is fold.Snapshot over the whole value,
 // because nothing after at can change what the snapshot keeps.
-func readSnapshotPrefix(ctx context.Context, src Source, asOfTime time.Time, at string) (view, error) {
+func readSnapshotPrefix(ctx context.Context, src Source, know knowledge, at string) (view, error) {
 	t, err := clock.Parse(at)
 	if err != nil {
 		return view{}, err
 	}
-	v, err := readWindow(ctx, src, asOfTime, bounds{toX: clock.Format(t.Add(time.Nanosecond))})
+	v, err := readWindow(ctx, src, know, bounds{toX: clock.Format(t.Add(time.Nanosecond))})
 	if err != nil {
 		return view{}, err
 	}
@@ -266,13 +265,13 @@ func readSnapshotPrefix(ctx context.Context, src Source, asOfTime time.Time, at 
 // readWindow reads the buckets b overlaps, and the whole value's size and hash, at the
 // head or the watermark an anam-time names. With no mint run to start from it is the
 // full read.
-func readWindow(ctx context.Context, src Source, asOfTime time.Time, b bounds) (view, error) {
+func readWindow(ctx context.Context, src Source, know knowledge, b bounds) (view, error) {
 	defs, err := src.definitions()
 	if err != nil {
 		return view{}, err
 	}
 	v := view{defs: defs}
-	w, err := watermarkOf(ctx, src.Ledger, asOfTime, &v)
+	w, err := watermarkOf(ctx, src.Ledger, know, &v)
 	if err != nil {
 		return view{}, err
 	}
@@ -281,7 +280,7 @@ func readWindow(ctx context.Context, src Source, asOfTime time.Time, b bounds) (
 		return view{}, err
 	}
 	if !ok {
-		return readView(ctx, src, asOfTime, "", "")
+		return readView(ctx, src, know, "", "")
 	}
 	v.res = fold.Result{W: w, Value: win.Value}
 	v.shown = win.Value
@@ -290,29 +289,20 @@ func readWindow(ctx context.Context, src Source, asOfTime time.Time, b bounds) (
 	return v, nil
 }
 
-// watermarkOf is the head, or the watermark an anam-time names.
-func watermarkOf(ctx context.Context, l Ledger, asOfTime time.Time, v *view) (ledger.Watermark, error) {
-	if asOfTime.IsZero() {
-		return l.Head(ctx)
-	}
-	v.asOfAt = clock.Format(asOfTime)
-	return fold.WatermarkAt(ctx, l, asOfTime)
-}
-
 // Canonical is the whole-person value at the ledger's head: composed from the last
 // mint run and the tail after it when src has the checkpoint log, folded from the
 // beginning when it does not. The result's States are empty when it was composed; a
 // caller that needs a facet's history folds the ledger itself.
 func Canonical(ctx context.Context, src Source) (fold.Result, error) {
 	var v view
-	return readAtOrHead(ctx, src, time.Time{}, &v)
+	return readAtOrHead(ctx, src, knowledge{}, &v)
 }
 
 // readAtOrHead reads the canonical at the head, or at the watermark an anam-time names,
 // composed from checkpoints when src has them and a mint run is at or below it.
-func readAtOrHead(ctx context.Context, src Source, asOfTime time.Time, v *view) (fold.Result, error) {
+func readAtOrHead(ctx context.Context, src Source, know knowledge, v *view) (fold.Result, error) {
 	l := src.Ledger
-	w, err := watermarkOf(ctx, l, asOfTime, v)
+	w, err := watermarkOf(ctx, l, know, v)
 	if err != nil {
 		return fold.Result{}, err
 	}

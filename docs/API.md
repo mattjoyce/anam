@@ -17,6 +17,13 @@ queue and answers where, at what W, and how big. `POST /v1/envelopes` and the `/
 routes (card 53) are the importers' side, under importers' own tokens; their contract is
 [IMPORTERS.md](IMPORTERS.md) §8.
 
+**Receipted reads (2026-10-10, card 87).** `POST /v1/receipts` takes a timeline query that names
+a projection, reads it as `GET /v1/timeline` would, and files what it shows with a receipt. The
+receipt records W and the resolved narrowing (`query`: `at`, `from`, `before`, `type`), and
+`/v1/receipts/{hash}/verify` replays it. Reads also take `w`, a watermark, in place of `as_of`, so a
+follow-up stands on a cited read's knowledge. This is the first piece of §5's receipted reads;
+paging, evidence by facet and the size budget are cards 92, 91 and 88.
+
 This document proposes the application API that every client shares: the CLI, the inspector,
 importers, and conversational clients (§8). The two conversational features are **chat with my
 record** and **log this**. The API supplies record operations and evidence; the conversational

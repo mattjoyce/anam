@@ -29,6 +29,7 @@ func (d *Daemon) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/timeline", d.getTimeline)
 	mux.HandleFunc("GET /v1/changes", d.getChanges)
 	mux.HandleFunc("GET /v1/receipts", d.getReceipts)
+	mux.HandleFunc("POST /v1/receipts", d.postReceipt)
 	mux.HandleFunc("GET /v1/receipts/{hash}", d.getReceipt)
 	mux.HandleFunc("GET /v1/receipts/{hash}/verify", d.verifyReceipt)
 	mux.HandleFunc("GET /v1/checkpoints", d.getCheckpoints)
@@ -142,12 +143,43 @@ func (d *Daemon) verifyReceipt(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, v)
 }
 
+// postReceipt publishes a read: the timeline read the query describes, through its
+// projection, filed with a receipt (card 87). The query is the timeline's, in the
+// same parameters. Publishing writes artifacts only, so it takes no turn on the write
+// queue and never waits on an ingest.
+func (d *Daemon) postReceipt(w http.ResponseWriter, r *http.Request) {
+	q, err := api.TimelineQueryOf(r.URL.Query())
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := namedZone(q.Zone); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	defs := d.defs.current.Load()
+	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, defs)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
+	defer cancel()
+	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts, Definitions: defs}
+	p, err := read.Publish(ctx, src, deps, q)
+	if err != nil {
+		writeReadError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, p)
+}
+
 // getTimeline is the CLI's timeline read, run here on the read handle. The query
 // carries the reader's zone; the daemon has none of its own.
 func (d *Daemon) getTimeline(w http.ResponseWriter, r *http.Request) {
 	q, err := api.TimelineQueryOf(r.URL.Query())
 	if err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Errorf("explain: %w", err))
+		writeError(w, http.StatusBadRequest, err)
 		return
 	}
 	if err := namedZone(q.Zone); err != nil {

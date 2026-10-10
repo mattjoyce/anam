@@ -8,9 +8,26 @@ package api
 
 import "fmt"
 
-// Error is the body of every response that is not a success.
+// Error is the body of every response that is not a success. Error says what went
+// wrong in words. Code, when set, names it for a program: today result_too_large
+// alone, with its measure in TooLarge.
 type Error struct {
-	Error string `json:"error"`
+	Error    string    `json:"error"`
+	Code     string    `json:"code,omitempty"`
+	TooLarge *TooLarge `json:"too_large,omitempty"`
+}
+
+// CodeTooLarge is the Code of a read refused for its size (413).
+const CodeTooLarge = "result_too_large"
+
+// TooLarge measures a read the daemon refused to answer whole: how many entries
+// matched, what they encode to (counted up to the bound only), the bound, and the
+// narrowings the query has not used yet, each a query parameter name.
+type TooLarge struct {
+	Matched  int      `json:"matched"`
+	Bytes    int      `json:"bytes"`
+	MaxBytes int      `json:"max_bytes"`
+	Narrow   []string `json:"narrow,omitempty"`
 }
 
 // Status is the answer to "what state is the record in".

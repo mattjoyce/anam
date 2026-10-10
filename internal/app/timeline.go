@@ -157,7 +157,8 @@ func publishTimeline(ctx context.Context, cfg config.Config, q api.TimelineQuery
 	defer closeDeps()
 	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()
-	return read.Publish(ctx, src, deps, q)
+	// A local read is the operator at their own files: no bound.
+	return read.Publish(ctx, src, deps, q, 0)
 }
 
 // readSource opens what a local read is taken from: the ledger read-only, and the

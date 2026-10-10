@@ -22,7 +22,18 @@ a projection, reads it as `GET /v1/timeline` would, and files what it shows with
 receipt records W and the resolved narrowing (`query`: `at`, `from`, `before`, `type`), and
 `/v1/receipts/{hash}/verify` replays it. Reads also take `w`, a watermark, in place of `as_of`, so a
 follow-up stands on a cited read's knowledge. This is the first piece of §5's receipted reads;
-paging, evidence by facet and the size budget are cards 92, 91 and 88.
+paging and evidence by facet are cards 92 and 91.
+
+**Bounded reads (2026-10-11, card 88).** The daemon answers a read within `max_read_bytes`
+(`ANAM_MAX_READ_BYTES`, default 512 KiB, §3's budget; 0 is no bound), measured over the entries it
+would answer with, encoded as it sends them, whole facets only. `GET /v1/timeline`, `POST
+/v1/receipts` and `GET /v1/receipts/{hash}` refuse a larger answer with 413 and a body a program can
+act on: `code: result_too_large`, and `too_large` with `matched` (how many entries), `bytes` (counted
+up to the bound), `max_bytes`, and `narrow`, the query parameters still unused (`type`, `from`, `to`,
+`at`, `projection`). A refused publish files nothing. A receipt too large to show still verifies,
+and shows locally. A local read, the operator at their own files, has no bound. The fold still runs
+whole before the refusal: the bound protects the answer and the client's context, not the daemon's
+work.
 
 This document proposes the application API that every client shares: the CLI, the inspector,
 importers, and conversational clients (§8). The two conversational features are **chat with my

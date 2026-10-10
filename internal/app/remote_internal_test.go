@@ -38,6 +38,15 @@ func newRemoteFixture(t *testing.T) remoteFixture {
 // newRemoteFixtureIn is newRemoteFixture with both configs reading in zone.
 func newRemoteFixtureIn(t *testing.T, zone string) remoteFixture {
 	t.Helper()
+	return newRemoteFixtureWith(t, zone, nil)
+}
+
+// newRemoteFixtureWith is newRemoteFixtureIn with the daemon's config amended by
+// tweak before the daemon opens, once the ledger is seeded. The local config is not
+// amended: what the daemon alone enforces is tested against a local read that does
+// not.
+func newRemoteFixtureWith(t *testing.T, zone string, tweak func(t *testing.T, f remoteFixture, cfg *config.Config)) remoteFixture {
+	t.Helper()
 	f := remoteFixture{ingestFixture: newIngestFixture(t)}
 	f.imports = fmt.Sprintf("imports:\n  - source: records\n    path: %s\n", f.recordsDir)
 	if _, _, err := f.ingest(t, f.imports); err != nil {
@@ -56,6 +65,9 @@ func newRemoteFixtureIn(t *testing.T, zone string) remoteFixture {
 		t.Fatal(err)
 	}
 	cfg.TokenFile = tokenPath
+	if tweak != nil {
+		tweak(t, f, &cfg)
+	}
 	d, err := daemon.Open(context.Background(), cfg, daemon.Options{
 		Ingest:  daemonIngest(cfg, filepath.Join(f.dir, "imports.yaml")),
 		Version: "daemon-build",

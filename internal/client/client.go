@@ -151,16 +151,19 @@ func (c *Client) failure(resp *http.Response, b []byte, out any) error {
 	}
 	var e api.Error
 	if err := json.Unmarshal(b, &e); err == nil && e.Error != "" {
-		return &Error{Server: c.server, Status: resp.StatusCode, Message: e.Error}
+		return &Error{Server: c.server, Status: resp.StatusCode, Message: e.Error, Code: e.Code, TooLarge: e.TooLarge}
 	}
 	return &Error{Server: c.server, Status: resp.StatusCode, Message: strings.TrimSpace(string(b))}
 }
 
-// Error is a request the daemon answered and refused.
+// Error is a request the daemon answered and refused. Code and TooLarge are the
+// daemon's own, when it gave them (api.Error).
 type Error struct {
-	Server  string
-	Status  int
-	Message string
+	Server   string
+	Status   int
+	Message  string
+	Code     string
+	TooLarge *api.TooLarge
 }
 
 func (e *Error) Error() string {

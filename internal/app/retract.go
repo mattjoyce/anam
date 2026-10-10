@@ -35,7 +35,7 @@ import (
 
 func retractCmd(cfgPath *string) *cobra.Command {
 	var importsPath string
-	var yes bool
+	var yes, retired bool
 	var maxFraction float64
 
 	cmd := &cobra.Command{
@@ -55,13 +55,22 @@ completed. An importer never tombstones; this command, with --yes, does.
 A scan that fails writes nothing. A scan that holds nothing is refused: an
 empty source and an unreadable one look the same, and neither is a reason to
 forget a record. --max-fraction bounds how much of a source may be retracted in
-one run; raise it deliberately when the source really has shrunk that far.`,
+one run; raise it deliberately when the source really has shrunk that far.
+
+A source replaced by an importer under another name is retired, not rescanned:
+--retired plans every live facet of the source, by type, and tombstones them
+all with --yes. It refuses a source an import or an importer still declares,
+and asks for --max-fraction 1, so the whole source goes only on purpose. The
+artifacts stay; a read --at a time before the retirement still shows them.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			source := args[0]
 			cfg, err := loadConfig(*cfgPath, cmd)
 			if err != nil {
 				return err
+			}
+			if retired {
+				return runRetirement(cmd, cfg, source, importsPath, yes, maxFraction)
 			}
 			imports, err := loadImports(importsPath, cmd)
 			if err != nil {
@@ -113,6 +122,8 @@ one run; raise it deliberately when the source really has shrunk that far.`,
 	cmd.Flags().BoolVar(&yes, "yes", false, "write the tombstones; without it the command only reports")
 	cmd.Flags().Float64Var(&maxFraction, "max-fraction", 0.1,
 		"refuse to retract more than this fraction of the source's live facets in one run")
+	cmd.Flags().BoolVar(&retired, "retired", false,
+		"the source is retired, not rescanned: plan every live facet it holds (needs --max-fraction 1 to write)")
 	return cmd
 }
 

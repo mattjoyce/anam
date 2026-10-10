@@ -231,8 +231,9 @@ The batch is admitted whole or not at all:
 |---|---|---|
 | 200 | `w`, `changed`, `results[]` (`index`, `outcome`, `facet_id`, `artifact_version`) | Admitted. `outcome` is `admitted`, `superseded` or `no-op`. |
 | 422 | `error`, `refused[]` (`index`, `type`, `reason`) | Nothing written. Every envelope that failed is named. Fix or drop them and send the batch again. |
-| 400 | `error` | The body is not a submission: bad JSON, an unknown field, no version, 0 or more than 49 envelopes. |
+| 400 | `error` | The body is not one submission: bad JSON, an unknown field, no version, 0 or more than 49 envelopes, or anything but whitespace after the submission. Nothing written. |
 | 401 / 403 | `error` | No importer's token, or the operator's. |
+| 413 | `error` | The body is over 16 MB, counting whatever follows the submission. Nothing written. The whole body is read before the batch is queued, and the daemon cuts off a body that takes more than 30 s to arrive. |
 | 503 | `error`, `Retry-After` | Another write held the ledger for more than 5 s, usually an ingest. Wait and send the same batch again. |
 
 Sending a batch again is always safe. The same payload under the same identity is a `no-op`; a

@@ -10,9 +10,11 @@ import (
 
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
 	"github.com/mattjoyce/anam/internal/store/ledger"
+	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
 // maxSubmission bounds one batch's body: a full batch of the largest payloads the
@@ -33,7 +35,7 @@ const importerWait = 5 * time.Second
 // authenticated pillar holds it to them.
 func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 	imp := importerOf(r)
-	envs, err := decodeSubmission(w, r, imp.Source)
+	envs, snap, err := decodeSubmission(w, r, imp)
 	if err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
@@ -46,7 +48,13 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 
 	var results []gate.Result
 	var head ledger.Watermark
+	var progress *api.SnapshotProgress
 	err = d.tryWriteWithin(importerWait, d.timeout(r), func(ctx context.Context, s Stores) error {
+		// A part that does not belong to the run its id names is refused before
+		// anything is admitted.
+		if err := checkSnapshot(ctx, s.Ops, imp.Source, snap); err != nil {
+			return err
+		}
 		// Inside the write, where a registration cannot land between this and the
 		// admission.
 		reg := d.defs.current.Load()
@@ -62,11 +70,19 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 		if err == nil && changedBy(results) > 0 {
 			d.catchUp(ctx, s)
 		}
+		if err == nil && snap != nil {
+			// The ledger has the batch already; a failure here leaves the snapshot one
+			// part short, so it never completes and nothing follows from it. The
+			// importer resends the part, which admits as no-ops and records it.
+			progress, err = recordSnapshotPart(ctx, s.Ops, imp.Source, snap, results, head, time.Now())
+		}
 		return err
 	})
 
 	var refused *gate.Refused
 	switch {
+	case errors.Is(err, ops.ErrSnapshotMismatch):
+		writeError(w, http.StatusConflict, err)
 	case errors.As(err, &refused):
 		writeJSON(w, http.StatusUnprocessableEntity, refusalOf(refused))
 	case errors.Is(err, ErrBusy), errors.Is(err, ErrStopped), errors.Is(err, gate.ErrContention):
@@ -82,29 +98,37 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 		if changed > 0 {
 			d.requestMint()
 		}
-		writeJSON(w, http.StatusOK, admissionOf(results, head))
+		a := admissionOf(results, head)
+		a.Snapshot = progress
+		writeJSON(w, http.StatusOK, a)
 	}
 }
 
-// decodeSubmission reads a batch into envelopes from source. Unknown fields are
-// refused, a source among them: the token names the source.
-func decodeSubmission(w http.ResponseWriter, r *http.Request, source string) ([]facet.Envelope, error) {
+// decodeSubmission reads a batch into envelopes from imp's source, and its snapshot
+// label when it has one. Unknown fields are refused, a source among them: the token
+// names the source.
+func decodeSubmission(w http.ResponseWriter, r *http.Request, imp config.Importer,
+) ([]facet.Envelope, *api.SnapshotPart, error) {
+	source := imp.Source
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxSubmission))
 	dec.DisallowUnknownFields()
 	var sub api.Submission
 	if err := dec.Decode(&sub); err != nil {
-		return nil, fmt.Errorf("submission: %w", err)
+		return nil, nil, fmt.Errorf("submission: %w", err)
 	}
 	switch n := len(sub.Envelopes); {
 	case n == 0:
-		return nil, errors.New("submission holds no envelopes")
+		return nil, nil, errors.New("submission holds no envelopes")
 	case n > gate.MaxBatch:
-		return nil, fmt.Errorf("submission holds %d envelopes; a batch is at most %d", n, gate.MaxBatch)
+		return nil, nil, fmt.Errorf("submission holds %d envelopes; a batch is at most %d", n, gate.MaxBatch)
+	}
+	if err := validSnapshot(sub.Snapshot, imp, sub.Envelopes); err != nil {
+		return nil, nil, err
 	}
 	envs := make([]facet.Envelope, len(sub.Envelopes))
 	for i, e := range sub.Envelopes {
 		if e.DefinitionVersion < 1 {
-			return nil, fmt.Errorf("envelope %d (%s): definition_version is required", i, e.Type)
+			return nil, nil, fmt.Errorf("envelope %d (%s): definition_version is required", i, e.Type)
 		}
 		envs[i] = facet.Envelope{
 			Type: facet.Type(e.Type), Source: source, Injector: source, SourceRef: e.SourceRef,
@@ -112,7 +136,7 @@ func decodeSubmission(w http.ResponseWriter, r *http.Request, source string) ([]
 			AssertedPerson: e.AssertedPerson, SpanHint: e.SpanHint,
 		}
 	}
-	return envs, nil
+	return envs, sub.Snapshot, nil
 }
 
 func changedBy(results []gate.Result) int {

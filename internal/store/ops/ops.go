@@ -40,7 +40,7 @@ import (
 // ledger, so the first catch-up would pin whichever ledger it met and read an index
 // derived from another as an index of that one.
 //
-// registered_definition (card 53) does not bump it. Open creates the table and its
+// registered_definition (card 53) and the snapshot tables (card 78) do not bump it. Open creates the table and its
 // triggers in a version-6 file as in a new one, and a build that predates it never
 // reads it, so neither build can misread the other's file.
 const schemaVersion = 6
@@ -195,6 +195,31 @@ CREATE TABLE IF NOT EXISTS token_scope (
   source TEXT NOT NULL,
   type   TEXT NOT NULL,
   PRIMARY KEY (source, type)
+);
+
+-- tier: disposable — importers' complete-resend snapshots (card 78): which parts of a
+-- run were admitted and which facet ids they carried. Lost, the next resend makes
+-- another; nothing is ever tombstoned from here without an operator running
+-- anam retract --yes. An incomplete snapshot is dropped after a day.
+CREATE TABLE IF NOT EXISTS snapshot (
+  id           TEXT PRIMARY KEY,
+  source       TEXT NOT NULL,
+  types        TEXT NOT NULL,
+  parts        INTEGER NOT NULL CHECK (parts >= 1),
+  started_at   TEXT NOT NULL,
+  completed_at TEXT,
+  completed_w  INTEGER
+);
+CREATE INDEX IF NOT EXISTS snapshot_by_source ON snapshot (source, completed_at);
+CREATE TABLE IF NOT EXISTS snapshot_part (
+  id   TEXT NOT NULL,
+  part INTEGER NOT NULL,
+  PRIMARY KEY (id, part)
+);
+CREATE TABLE IF NOT EXISTS snapshot_facet (
+  id       TEXT NOT NULL,
+  facet_id TEXT NOT NULL,
+  PRIMARY KEY (id, facet_id)
 );
 
 -- tier: authored — Anam's own bookkeeping; comes back from a backup or not at all.

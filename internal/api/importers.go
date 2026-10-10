@@ -6,7 +6,50 @@ import "encoding/json"
 // not at all.
 type Submission struct {
 	Envelopes []SubmittedEnvelope `json:"envelopes"`
+	// Snapshot, when set, marks the batch as one part of a complete resend: a run
+	// that says it is everything the source holds of some types (card 78). Admission
+	// is the same either way.
+	Snapshot *SnapshotPart `json:"snapshot,omitempty"`
 }
+
+// SnapshotPart labels one batch of a complete resend. ID is the importer's, fresh for
+// each run; Part counts from 1 to Parts; Types are the types the run speaks for, all
+// within the importer's, and every envelope in the batch is one of them.
+type SnapshotPart struct {
+	ID    string   `json:"id"`
+	Part  int      `json:"part"`
+	Parts int      `json:"parts"`
+	Types []string `json:"types"`
+}
+
+// SnapshotProgress is how far a snapshot has got, returned with each part admitted.
+type SnapshotProgress struct {
+	ID            string `json:"id"`
+	Parts         int    `json:"parts"`
+	PartsAdmitted int    `json:"parts_admitted"`
+	Complete      bool   `json:"complete"`
+}
+
+// SnapshotReport is what Anam makes of a snapshot. Live and Absent are set once it is
+// complete: the source's live facets of its types, and those it did not carry and
+// that nothing has touched since it completed. Nothing is tombstoned by it; that is
+// an operator's anam retract --yes.
+type SnapshotReport struct {
+	SnapshotProgress
+	Source      string   `json:"source"`
+	Types       []string `json:"types"`
+	Carried     int      `json:"carried"`
+	StartedAt   string   `json:"started_at"`
+	CompletedAt string   `json:"completed_at,omitempty"`
+	CompletedW  int64    `json:"completed_w,omitempty"`
+	Live        *int     `json:"live,omitempty"`
+	Absent      *int     `json:"absent,omitempty"`
+	// AbsentIDs lists the absent facets, at most AbsentIDsMax of them.
+	AbsentIDs []string `json:"absent_ids,omitempty"`
+}
+
+// AbsentIDsMax bounds the absent ids a report lists; Absent still counts them all.
+const AbsentIDsMax = 1000
 
 // SubmittedEnvelope is one observation, shaped to a Definition. It names no source:
 // the token it arrives under does.
@@ -30,6 +73,8 @@ type Admission struct {
 	// Changed is how many envelopes were admitted or superseded.
 	Changed int              `json:"changed"`
 	Results []EnvelopeResult `json:"results"`
+	// Snapshot is the snapshot's progress when the batch was one of its parts.
+	Snapshot *SnapshotProgress `json:"snapshot,omitempty"`
 }
 
 // EnvelopeResult is what became of one envelope.

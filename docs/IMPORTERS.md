@@ -243,14 +243,6 @@ again.
 The daemon mints once batches stop arriving for 2 s, in the background, so neither the answer nor the
 next batch waits on it.
 
-### 8.6 Not yet
-
-- **Retraction.** An importer cannot tombstone a facet, and `anam retract` plans from the built-in
-  workers' scans only. A row the source deleted stays live in the record until there is a route for
-  it.
-- **Receipts.** A receipt pins the bundled Definition set's version (`def.SetVersion`); registered
-  Definitions are not in it.
-
 ### 8.5 What an importer must do
 
 1. Register every Definition in its folder at start, and stop if one is refused.
@@ -259,4 +251,38 @@ next batch waits on it.
 3. Shape payloads only. Compose no identity, join nothing, summarise nothing (§2).
 4. Submit in batches of at most 49, resubmit on 503, and report a 422's reasons as a failed run.
 5. Offer a resend-everything mode. It is a rebuild's first step, and idempotent by construction.
+   Label its batches as the parts of one snapshot (§8.6), so the operator can see what the source
+   no longer holds.
+
+### 8.6 Retraction by complete resend
+
+An importer never tombstones. It says what its source still holds, and the operator retracts what
+it no longer does (card 78; Matt, 2026-10-10).
+
+- **A snapshot.** A resend-everything run labels each batch as one part of a snapshot:
+  `{"snapshot": {"id": "<run id>", "part": 3, "parts": 27, "types": ["health.measurement"]}, "envelopes": [...]}`.
+  The id is the importer's and fresh for each run (1 to 128 of letters, digits and `. _ : -`). Every
+  type must be the importer's, and every envelope in the part one of them. A part admits exactly as a
+  batch does; the answer carries `snapshot: {parts_admitted, complete}`. Parts may come in any order
+  and be resent; a part sent twice adds nothing. A part naming an id begun with other types or another
+  part count is a 409, and nothing of it is admitted. An incremental run carries no snapshot.
+- **What Anam keeps.** The admitted parts and the facet ids they carried, `no-op` included, in the
+  operational store. It is disposable: an incomplete snapshot is dropped after a day, a source keeps
+  its two newest complete ones, and a lost table comes back with the next resend.
+- **The report.** `GET /v1/snapshots/{id}`, under the importer's token (its own snapshots only) or
+  the operator's: `complete`, `parts_admitted`, `carried`, and once complete `live` (the source's live
+  facets of the types now), `absent` and up to 1,000 `absent_ids`. Absent means live, not carried,
+  and untouched since the snapshot completed (`completed_w`): a facet a later incremental run sent is
+  never called absent.
+- **Retracting.** `anam retract <source>` on an importer's source plans from its newest complete
+  snapshot, with the same guards as a scan: an empty run is refused, `--max-fraction` bounds a run,
+  and nothing is written without `--yes`. There is no automatic retraction: a tombstone cannot be
+  undone (a resend of the same row is a no-op), and an importer is outside the error kernel.
+- **The alert.** An importer whose complete snapshot reports `absent` above zero raises a ductile
+  event so the gateway tells the operator; Anam sends nothing itself.
+
+### 8.7 Not yet
+
+- **Receipts.** A receipt pins the bundled Definition set's version (`def.SetVersion`); registered
+  Definitions are not in it.
 

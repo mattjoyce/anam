@@ -1,0 +1,230 @@
+package ops
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/mattjoyce/anam/internal/clock"
+)
+
+// A snapshot is an importer's statement that a run of batches is everything its
+// source holds of some types (card 78). Anam keeps which parts were admitted and the
+// facet ids they carried; what is absent is computed when asked, never stored.
+
+// ErrSnapshotMismatch is returned when a part names a snapshot already begun with a
+// different source, types or part count: it is not the same run.
+var ErrSnapshotMismatch = errors.New("ops: snapshot already begun with a different source, types or parts")
+
+// snapshotTTL is how long an incomplete snapshot is kept before it is dropped.
+const snapshotTTL = 24 * time.Hour
+
+// keepComplete is how many complete snapshots are kept per source: the newest is the
+// one retraction plans from; the one before it is kept to compare against.
+const keepComplete = 2
+
+// SnapshotPart is one admitted batch of a snapshot.
+type SnapshotPart struct {
+	ID       string
+	Source   string
+	Types    []string
+	Part     int
+	Parts    int
+	FacetIDs []string
+}
+
+// Snapshot is what is known of one snapshot.
+type Snapshot struct {
+	ID            string
+	Source        string
+	Types         []string
+	Parts         int
+	PartsAdmitted int
+	Carried       int
+	StartedAt     time.Time
+	CompletedAt   time.Time // zero until complete
+	// CompletedW is the watermark just after the last part was admitted. A facet
+	// touched after it may have been sent by a later, incremental run, so absence is
+	// judged only for facets untouched since.
+	CompletedW int64
+}
+
+// Complete reports whether every part has been admitted.
+func (s Snapshot) Complete() bool { return !s.CompletedAt.IsZero() }
+
+// RecordSnapshotPart records an admitted part, in one transaction: incomplete
+// snapshots older than a day are dropped first; the snapshot is begun on its first
+// part; the part and its facet ids are added as sets, so a part sent twice adds
+// nothing; and the snapshot is marked complete when its last missing part lands. w is
+// the ledger's watermark just after this part was admitted.
+func (d *DB) RecordSnapshotPart(ctx context.Context, p SnapshotPart, at time.Time, w int64) (Snapshot, error) {
+	types := typesKey(p.Types)
+	tx, err := d.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("ops: snapshot: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }() // no-op after Commit
+
+	if err := dropStale(ctx, tx, at); err != nil {
+		return Snapshot{}, err
+	}
+	var source, held string
+	var parts int
+	err = tx.QueryRowContext(ctx, `SELECT source, types, parts FROM snapshot WHERE id = ?`, p.ID).Scan(&source, &held, &parts)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		if _, err := tx.ExecContext(ctx, `INSERT INTO snapshot (id, source, types, parts, started_at) VALUES (?, ?, ?, ?, ?)`,
+			p.ID, p.Source, types, p.Parts, clock.Format(at)); err != nil {
+			return Snapshot{}, fmt.Errorf("ops: snapshot %s: %w", p.ID, err)
+		}
+	case err != nil:
+		return Snapshot{}, fmt.Errorf("ops: snapshot %s: %w", p.ID, err)
+	case source != p.Source || held != types || parts != p.Parts:
+		return Snapshot{}, fmt.Errorf("%w: %s", ErrSnapshotMismatch, p.ID)
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO snapshot_part (id, part) VALUES (?, ?) ON CONFLICT DO NOTHING`, p.ID, p.Part); err != nil {
+		return Snapshot{}, fmt.Errorf("ops: snapshot %s part %d: %w", p.ID, p.Part, err)
+	}
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO snapshot_facet (id, facet_id) VALUES (?, ?) ON CONFLICT DO NOTHING`)
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("ops: snapshot %s: %w", p.ID, err)
+	}
+	defer func() { _ = stmt.Close() }()
+	for _, f := range p.FacetIDs {
+		if _, err := stmt.ExecContext(ctx, p.ID, f); err != nil {
+			return Snapshot{}, fmt.Errorf("ops: snapshot %s facet: %w", p.ID, err)
+		}
+	}
+	var admitted int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM snapshot_part WHERE id = ?`, p.ID).Scan(&admitted); err != nil {
+		return Snapshot{}, fmt.Errorf("ops: snapshot %s: %w", p.ID, err)
+	}
+	if admitted == p.Parts {
+		if _, err := tx.ExecContext(ctx, `UPDATE snapshot SET completed_at = ?, completed_w = ? WHERE id = ? AND completed_at IS NULL`,
+			clock.Format(at), w, p.ID); err != nil {
+			return Snapshot{}, fmt.Errorf("ops: snapshot %s: %w", p.ID, err)
+		}
+		if err := keepNewest(ctx, tx, p.Source); err != nil {
+			return Snapshot{}, err
+		}
+	}
+	s, _, err := snapshotOf(ctx, tx, p.ID)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Snapshot{}, fmt.Errorf("ops: snapshot %s: %w", p.ID, err)
+	}
+	return s, nil
+}
+
+// Snapshot returns one snapshot, or ok false when it is not held.
+func (d *DB) Snapshot(ctx context.Context, id string) (Snapshot, bool, error) {
+	return snapshotOf(ctx, d.db, id)
+}
+
+// NewestCompleteSnapshot returns the source's most recently completed snapshot.
+func (d *DB) NewestCompleteSnapshot(ctx context.Context, source string) (Snapshot, bool, error) {
+	var id string
+	err := d.db.QueryRowContext(ctx, `SELECT id FROM snapshot WHERE source = ? AND completed_at IS NOT NULL
+		ORDER BY completed_at DESC, id DESC LIMIT 1`, source).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Snapshot{}, false, nil
+	}
+	if err != nil {
+		return Snapshot{}, false, fmt.Errorf("ops: newest snapshot of %s: %w", source, err)
+	}
+	return snapshotOf(ctx, d.db, id)
+}
+
+// SnapshotFacets returns the facet ids a snapshot's admitted parts carried.
+func (d *DB) SnapshotFacets(ctx context.Context, id string) (map[string]bool, error) {
+	rows, err := d.db.QueryContext(ctx, `SELECT facet_id FROM snapshot_facet WHERE id = ?`, id)
+	if err != nil {
+		return nil, fmt.Errorf("ops: snapshot %s facets: %w", id, err)
+	}
+	defer func() { _ = rows.Close() }()
+	out := map[string]bool{}
+	for rows.Next() {
+		var f string
+		if err := rows.Scan(&f); err != nil {
+			return nil, fmt.Errorf("ops: snapshot %s facets: %w", id, err)
+		}
+		out[f] = true
+	}
+	return out, rows.Err()
+}
+
+type queryer interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+type execer interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+func snapshotOf(ctx context.Context, q queryer, id string) (Snapshot, bool, error) {
+	var s Snapshot
+	var types, started string
+	var completed sql.NullString
+	var completedW sql.NullInt64
+	err := q.QueryRowContext(ctx, `SELECT id, source, types, parts, started_at, completed_at, completed_w,
+		(SELECT COUNT(*) FROM snapshot_part WHERE id = s.id),
+		(SELECT COUNT(*) FROM snapshot_facet WHERE id = s.id)
+		FROM snapshot AS s WHERE id = ?`, id).
+		Scan(&s.ID, &s.Source, &types, &s.Parts, &started, &completed, &completedW, &s.PartsAdmitted, &s.Carried)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Snapshot{}, false, nil
+	}
+	if err != nil {
+		return Snapshot{}, false, fmt.Errorf("ops: snapshot %s: %w", id, err)
+	}
+	s.Types = strings.Split(types, ",")
+	if s.StartedAt, err = clock.Parse(started); err != nil {
+		return Snapshot{}, false, fmt.Errorf("ops: snapshot %s started_at: %w", id, err)
+	}
+	s.CompletedW = completedW.Int64
+	if completed.Valid {
+		if s.CompletedAt, err = clock.Parse(completed.String); err != nil {
+			return Snapshot{}, false, fmt.Errorf("ops: snapshot %s completed_at: %w", id, err)
+		}
+	}
+	return s, true, nil
+}
+
+// dropStale removes incomplete snapshots begun more than a day before at.
+func dropStale(ctx context.Context, tx execer, at time.Time) error {
+	cut := clock.Format(at.Add(-snapshotTTL))
+	return dropWhere(ctx, tx, `completed_at IS NULL AND started_at < ?`, cut)
+}
+
+// keepNewest drops a source's complete snapshots beyond the newest keepComplete.
+func keepNewest(ctx context.Context, tx execer, source string) error {
+	return dropWhere(ctx, tx, `source = ? AND completed_at IS NOT NULL AND id NOT IN
+		(SELECT id FROM snapshot WHERE source = ? AND completed_at IS NOT NULL
+		 ORDER BY completed_at DESC, id DESC LIMIT ?)`, source, source, keepComplete)
+}
+
+func dropWhere(ctx context.Context, tx execer, where string, args ...any) error {
+	for _, q := range []string{
+		`DELETE FROM snapshot_facet WHERE id IN (SELECT id FROM snapshot WHERE ` + where + `)`,
+		`DELETE FROM snapshot_part WHERE id IN (SELECT id FROM snapshot WHERE ` + where + `)`,
+		`DELETE FROM snapshot WHERE ` + where,
+	} {
+		if _, err := tx.ExecContext(ctx, q, args...); err != nil {
+			return fmt.Errorf("ops: drop snapshots: %w", err)
+		}
+	}
+	return nil
+}
+
+// typesKey is a type list in one canonical form, so the same set compares equal.
+func typesKey(types []string) string {
+	t := append([]string(nil), types...)
+	sort.Strings(t)
+	return strings.Join(t, ",")
+}

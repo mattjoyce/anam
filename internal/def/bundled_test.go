@@ -312,8 +312,10 @@ func TestBundled_NoteAnnotationIsAFactAboutAFacet(t *testing.T) {
 		t.Errorf("a note was refused: %v", err)
 	}
 	for name, payload := range map[string]string{
-		"no about":           strings.Replace(note, `"about": "2c6f38a3-3db7-5e65-b933-9c59980e1c6c",`, "", 1),
+		"no about":           strings.Replace(note, `"about": ["2c6f38a3-3db7-5e65-b933-9c59980e1c6c", "fe61ec2a-6d8b-56b0-8930-e3270f4ad44c"],`, "", 1),
+		"about nothing":      strings.Replace(note, `["2c6f38a3-3db7-5e65-b933-9c59980e1c6c", "fe61ec2a-6d8b-56b0-8930-e3270f4ad44c"]`, `[]`, 1),
 		"not a facet id":     strings.Replace(note, `2c6f38a3-3db7-5e65-b933-9c59980e1c6c`, `the heart rate alert`, 1),
+		"the same id twice":  strings.Replace(note, `fe61ec2a-6d8b-56b0-8930-e3270f4ad44c`, `2c6f38a3-3db7-5e65-b933-9c59980e1c6c`, 1),
 		"empty text":         strings.Replace(note, `"During a large work meeting, presenting."`, `""`, 1),
 		"a field of its own": strings.Replace(note, `"text":`, `"mood": "tense", "text":`, 1),
 	} {

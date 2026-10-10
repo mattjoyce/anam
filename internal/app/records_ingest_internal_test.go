@@ -189,8 +189,7 @@ records:
   - type: note.annotation
     id: note:2c6f38a3:1
     at: 2026-10-09 11:29
-    about: 2c6f38a3-3db7-5e65-b933-9c59980e1c6c
-    about_version: 1
+    about: [2c6f38a3-3db7-5e65-b933-9c59980e1c6c]
     text: During a large work meeting, presenting.
 `
 	write(t, dir, "notes.yaml", note)

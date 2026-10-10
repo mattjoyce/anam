@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "travel.returned",
-    "definition_version": 3,
+    "definition_version": 4,
     "classification": "Confidential",
     "validation_mode": "strict",
     "source_schema": "records/travel.returned",
@@ -18,7 +18,7 @@
     "type": "object",
     "required": ["id", "date", "trip"],
     "properties": {
-      "basis": {"type": "string", "minLength": 1, "description": "The evidence the row rests on, free text as the extraction wrote it: a booking, an email, or a note that the date is inferred. Read it before trusting the date.", "examples": ["ZX442 arrived 12 Mar"]},
+      "basis": {"type": "string", "minLength": 1, "description": "Why the return date is believed, in the extraction's own words rather than the source's; every returned row carries one. Usually the flight that landed home, written as \"<flight> arrived <d Mon>\"; otherwise the documents the date rests on, which day was taken when the source printed two, or a reasoned estimate that starts \"inferred:\". Read it before trusting the date.", "examples": ["ZX442 arrived 12 Mar", "inferred: ZX442 left Porthaven on 10 Mar, about 30 hours to Lakeport"]},
       "date": {"type": "string", "minLength": 1, "description": "The day of return. Sydney local date, YYYY-MM-DD, as the records row writes it. This is the fact time.", "examples": ["2019-03-12"]},
       "id": {"type": "string", "minLength": 1, "description": "The row id the records file assigns, chosen once. The travel history writes it as <origin>:<trip>/<kind>, with the date and a place or route appended where a trip has several rows of a kind. This is the identity.", "examples": ["travel:2019-03-westmere/returned"]},
       "to": {"type": "string", "minLength": 1, "description": "The city the trip returned to, as written.", "examples": ["Lakeport"]},

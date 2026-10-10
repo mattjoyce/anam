@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "travel.flight",
-    "definition_version": 3,
+    "definition_version": 4,
     "classification": "Confidential",
     "validation_mode": "strict",
     "source_schema": "records/travel.flight",
@@ -17,8 +17,8 @@
     "type": "object",
     "required": ["id", "date", "trip", "from", "to"],
     "properties": {
-      "airline": {"type": "string", "minLength": 1, "description": "The airline's name as written, where the row names it."},
-      "arrives": {"type": "string", "minLength": 1, "description": "When the flight landed or was due to land, free text as written: usually YYYY-MM-DD, sometimes a phrase. Its zone is not stated.", "examples": ["2019-03-05"]},
+      "airline": {"type": "string", "minLength": 1, "description": "The airline's name as written, given only on a leg whose flight number the source did not print: such a row carries airline in place of flight.", "examples": ["Westmere Airways"]},
+      "arrives": {"type": "string", "minLength": 1, "description": "The day the leg landed, as the source printed it, present only where it printed one (legs that land on a later day than they left). Usually YYYY-MM-DD with no offset, read as the arrival airport's local date: the source states no zone, but every dated value lands at home and matches its trip's travel.returned date. A phrase \"<d>/<d> <Mon> as printed\" where the source printed a two-day span for a leg with a stop (via), kept as printed rather than resolved to one day.", "examples": ["2019-03-05", "11/12 Mar as printed"]},
       "booking": {"type": "string", "minLength": 1, "description": "The booking reference as written; two references joined by \" / \" when the leg was on two bookings.", "examples": ["K7QXZB"]},
       "date": {"type": "string", "minLength": 1, "description": "The day the flight left, in the departure airport's local time, written as YYYY-MM-DD and that airport's UTC offset. The offset is part of the value, so a leg is placed where it left. This is the fact time.", "examples": ["2019-03-04 +08:00"]},
       "flight": {"type": "string", "minLength": 1, "description": "The flight number as written; a connection on one ticket may be two numbers joined by \" / \".", "examples": ["ZX441"]},

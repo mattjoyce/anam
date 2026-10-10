@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "donation.blood",
-    "definition_version": 3,
+    "definition_version": 4,
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "records/donation.blood",
@@ -13,7 +13,7 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "One visit to give blood, as the donor service reported it. Written by hand readings of the service's emails.",
+    "description": "One visit to give blood, as the donor service reported it. Written by hand readings of a note compiled from the service's emails; booked visits not yet held are not recorded.",
     "type": "object",
     "required": ["id", "date", "outcome"],
     "properties": {
@@ -21,8 +21,8 @@
       "date": {"type": "string", "minLength": 1, "description": "The appointment's date and time, YYYY-MM-DD HH:MM in Sydney local time. This is the fact time.", "examples": ["2026-03-04 10:30"]},
       "id": {"type": "string", "minLength": 1, "description": "Identity, chosen by the reader: the service's prefix and the date.", "examples": ["lifeblood:2026-03-04"]},
       "note": {"type": "string", "minLength": 1, "description": "Anything else the reader took from the emails about this visit."},
-      "outcome": {"type": "string", "minLength": 1, "description": "What happened, in a word or a short phrase, from the service's wording; a reader's gloss may follow a semicolon."},
-      "product": {"type": "string", "minLength": 1, "description": "What was donated, as the service named it."}
+      "outcome": {"type": "string", "minLength": 1, "description": "What came of the visit, lower case: a word from the source's account of it (such as donated or attended), with a reader's gloss after a semicolon where the source leaves the result open."},
+      "product": {"type": "string", "minLength": 1, "description": "What was given, as the service's emails name it, lower case.", "examples": ["plasma"]}
     },
     "additionalProperties": false
   }

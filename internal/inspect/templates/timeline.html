@@ -27,7 +27,7 @@
       --select: rgba(57,135,229,0.18);
     }
   }
-  .band { width: 100%; height: auto; display: block; touch-action: none; cursor: crosshair; }
+  .band { width: 100%; height: auto; display: block; touch-action: pan-y; cursor: crosshair; }
   .band .rowbg { fill: var(--row); }
   .band .rowlabel { font-weight: 600; }
   .band .pt path { stroke: var(--ring); stroke-width: 1; }
@@ -175,6 +175,12 @@
         document.getElementById('to').value = toTime(Math.max(x0, x1)).toISOString();
         document.querySelector('.controls').submit();
       }
+      x0 = null;
+      sel.setAttribute('visibility', 'hidden');
+    });
+    // A vertical swipe on a phone is the page scrolling (touch-action: pan-y): the
+    // browser cancels the pointer, and the half-drawn selection goes with it.
+    band.addEventListener('pointercancel', () => {
       x0 = null;
       sel.setAttribute('visibility', 'hidden');
     });

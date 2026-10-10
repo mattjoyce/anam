@@ -1,0 +1,6 @@
+{"id": "concept2:session:50445637", "activity_name": "rowing.machine",
+ "effective_time_frame": {"time_interval": {"start_date_time": "2021-01-15T00:00:00+11:00", "duration": {"value": 1308, "unit": "sec"}}},
+ "duration": {"value": 1308, "unit": "sec"}, "distance": {"value": 5000, "unit": "m"},
+ "source": "Concept2 Logbook", "logbook_source": "Web", "erg_type": "rower", "workout_type": "unknown",
+ "logbook_date": "2021-01-15 00:00:00", "start_time_known": false,
+ "verified": false, "ranked": false, "weight_class": "H"}

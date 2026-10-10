@@ -20,6 +20,12 @@ import (
 // different source, types or part count: it is not the same run.
 var ErrSnapshotMismatch = errors.New("ops: snapshot already begun with a different source, types or parts")
 
+// ErrSnapshotPartChanged is returned when a part number was already recorded with
+// other envelopes (card 107). A part is a value: a resend of it with the same
+// envelopes adds nothing, and one with other envelopes is another part under a used
+// label, not a retry. A run that reads its source again is a new run with a new id.
+var ErrSnapshotPartChanged = errors.New("ops: snapshot part already recorded with other envelopes")
+
 // snapshotTTL is how long an incomplete snapshot is kept before it is dropped.
 const snapshotTTL = 24 * time.Hour
 
@@ -27,13 +33,16 @@ const snapshotTTL = 24 * time.Hour
 // one retraction plans from; the one before it is kept to compare against.
 const keepComplete = 2
 
-// SnapshotPart is one admitted batch of a snapshot.
+// SnapshotPart is one admitted batch of a snapshot. Digest is the content identity of
+// the batch's envelopes, as the caller computes it; the store holds it beside the part
+// number and refuses the number again under another digest.
 type SnapshotPart struct {
 	ID       string
 	Source   string
 	Types    []string
 	Part     int
 	Parts    int
+	Digest   string
 	FacetIDs []string
 }
 
@@ -62,8 +71,9 @@ func (s Snapshot) Complete() bool { return !s.CompletedAt.IsZero() }
 
 // RecordSnapshotPart records an admitted part, in one transaction: incomplete
 // snapshots older than a day are dropped first; the snapshot is begun on its first
-// part; the part and its facet ids are added as sets, so a part sent twice adds
-// nothing; and the snapshot is marked complete when its last missing part lands. w is
+// part; a part already recorded with the same digest adds nothing, and one recorded
+// with another digest is ErrSnapshotPartChanged; a new part and its facet ids are
+// added; and the snapshot is marked complete when its last missing part lands. w is
 // the ledger's watermark just after this part was admitted; the first part's is kept
 // as the run's start.
 func (d *DB) RecordSnapshotPart(ctx context.Context, p SnapshotPart, at time.Time, w int64) (Snapshot, error) {
@@ -91,31 +101,19 @@ func (d *DB) RecordSnapshotPart(ctx context.Context, p SnapshotPart, at time.Tim
 	case source != p.Source || held != types || parts != p.Parts:
 		return Snapshot{}, fmt.Errorf("%w: %s", ErrSnapshotMismatch, p.ID)
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO snapshot_part (id, part) VALUES (?, ?) ON CONFLICT DO NOTHING`, p.ID, p.Part); err != nil {
-		return Snapshot{}, fmt.Errorf("ops: snapshot %s part %d: %w", p.ID, p.Part, err)
-	}
-	stmt, err := tx.PrepareContext(ctx, `INSERT INTO snapshot_facet (id, facet_id) VALUES (?, ?) ON CONFLICT DO NOTHING`)
-	if err != nil {
-		return Snapshot{}, fmt.Errorf("ops: snapshot %s: %w", p.ID, err)
-	}
-	defer func() { _ = stmt.Close() }()
-	for _, f := range p.FacetIDs {
-		if _, err := stmt.ExecContext(ctx, p.ID, f); err != nil {
-			return Snapshot{}, fmt.Errorf("ops: snapshot %s facet: %w", p.ID, err)
-		}
-	}
-	var admitted int
-	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM snapshot_part WHERE id = ?`, p.ID).Scan(&admitted); err != nil {
-		return Snapshot{}, fmt.Errorf("ops: snapshot %s: %w", p.ID, err)
-	}
-	if admitted == p.Parts {
-		if _, err := tx.ExecContext(ctx, `UPDATE snapshot SET completed_at = ?, completed_w = ? WHERE id = ? AND completed_at IS NULL`,
-			clock.Format(at), w, p.ID); err != nil {
-			return Snapshot{}, fmt.Errorf("ops: snapshot %s: %w", p.ID, err)
-		}
-		if err := keepNewest(ctx, tx, p.Source); err != nil {
+	var recorded string
+	err = tx.QueryRowContext(ctx, `SELECT digest FROM snapshot_part WHERE id = ? AND part = ?`, p.ID, p.Part).Scan(&recorded)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		if err := addPart(ctx, tx, p, at, w); err != nil {
 			return Snapshot{}, err
 		}
+	case err != nil:
+		return Snapshot{}, fmt.Errorf("ops: snapshot %s part %d: %w", p.ID, p.Part, err)
+	case recorded != p.Digest:
+		return Snapshot{}, fmt.Errorf("%w: %s part %d", ErrSnapshotPartChanged, p.ID, p.Part)
+	default:
+		// An exact retry: the part is already a member, with its facets.
 	}
 	s, _, err := snapshotOf(ctx, tx, p.ID)
 	if err != nil {
@@ -127,9 +125,54 @@ func (d *DB) RecordSnapshotPart(ctx context.Context, p SnapshotPart, at time.Tim
 	return s, nil
 }
 
+// addPart records a part not yet held, with its facet ids, and completes the snapshot
+// when it was the last missing one.
+func addPart(ctx context.Context, tx *sql.Tx, p SnapshotPart, at time.Time, w int64) error {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO snapshot_part (id, part, digest) VALUES (?, ?, ?)`, p.ID, p.Part, p.Digest); err != nil {
+		return fmt.Errorf("ops: snapshot %s part %d: %w", p.ID, p.Part, err)
+	}
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO snapshot_facet (id, facet_id) VALUES (?, ?) ON CONFLICT DO NOTHING`)
+	if err != nil {
+		return fmt.Errorf("ops: snapshot %s: %w", p.ID, err)
+	}
+	defer func() { _ = stmt.Close() }()
+	for _, f := range p.FacetIDs {
+		if _, err := stmt.ExecContext(ctx, p.ID, f); err != nil {
+			return fmt.Errorf("ops: snapshot %s facet: %w", p.ID, err)
+		}
+	}
+	var admitted int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM snapshot_part WHERE id = ?`, p.ID).Scan(&admitted); err != nil {
+		return fmt.Errorf("ops: snapshot %s: %w", p.ID, err)
+	}
+	if admitted != p.Parts {
+		return nil
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE snapshot SET completed_at = ?, completed_w = ? WHERE id = ? AND completed_at IS NULL`,
+		clock.Format(at), w, p.ID); err != nil {
+		return fmt.Errorf("ops: snapshot %s: %w", p.ID, err)
+	}
+	return keepNewest(ctx, tx, p.Source)
+}
+
 // Snapshot returns one snapshot, or ok false when it is not held.
 func (d *DB) Snapshot(ctx context.Context, id string) (Snapshot, bool, error) {
 	return snapshotOf(ctx, d.db, id)
+}
+
+// SnapshotPartDigest returns the digest a part was recorded with, or ok false when
+// the part is not held. It lets a caller refuse a changed part before admitting it;
+// RecordSnapshotPart checks again, inside its transaction.
+func (d *DB) SnapshotPartDigest(ctx context.Context, id string, part int) (string, bool, error) {
+	var digest string
+	err := d.db.QueryRowContext(ctx, `SELECT digest FROM snapshot_part WHERE id = ? AND part = ?`, id, part).Scan(&digest)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return "", false, nil
+	case err != nil:
+		return "", false, fmt.Errorf("ops: snapshot %s part %d: %w", id, part, err)
+	}
+	return digest, true, nil
 }
 
 // NewestCompleteSnapshot returns the source's most recently completed snapshot.

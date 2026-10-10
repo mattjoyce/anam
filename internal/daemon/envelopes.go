@@ -49,10 +49,14 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 	var results []gate.Result
 	var head ledger.Watermark
 	var progress *api.SnapshotProgress
+	var digest string
+	if snap != nil {
+		digest = partDigest(envs)
+	}
 	err = d.tryWriteWithin(importerWait, d.timeout(r), func(ctx context.Context, s Stores) error {
-		// A part that does not belong to the run its id names is refused before
-		// anything is admitted.
-		if err := checkSnapshot(ctx, s.Ops, imp.Source, snap); err != nil {
+		// A part that does not belong to the run its id names, or that was already
+		// recorded with other envelopes, is refused before anything is admitted.
+		if err := checkSnapshot(ctx, s.Ops, imp.Source, snap, digest); err != nil {
 			return err
 		}
 		// Inside the write, where a registration cannot land between this and the
@@ -73,15 +77,19 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 		if err == nil && snap != nil {
 			// The ledger has the batch already; a failure here leaves the snapshot one
 			// part short, so it never completes and nothing follows from it. The
-			// importer resends the part, which admits as no-ops and records it.
-			progress, err = recordSnapshotPart(ctx, s.Ops, imp.Source, snap, results, head, time.Now())
+			// importer resends the part, which admits as no-ops and records it. A
+			// changed resend after such a crash is admitted as the part, since nothing
+			// was recorded to compare it to: the protocol fixes a part's envelopes for
+			// the life of its run id, and a run that reads its source again is a new
+			// run (card 107).
+			progress, err = recordSnapshotPart(ctx, s.Ops, imp.Source, snap, digest, results, head, time.Now())
 		}
 		return err
 	})
 
 	var refused *gate.Refused
 	switch {
-	case errors.Is(err, ops.ErrSnapshotMismatch):
+	case errors.Is(err, ops.ErrSnapshotMismatch), errors.Is(err, ops.ErrSnapshotPartChanged):
 		writeError(w, http.StatusConflict, err)
 	case errors.As(err, &refused):
 		writeJSON(w, http.StatusUnprocessableEntity, refusalOf(refused))

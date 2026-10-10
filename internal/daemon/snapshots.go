@@ -2,10 +2,15 @@ package daemon
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
@@ -58,9 +63,35 @@ func validSnapshot(s *api.SnapshotPart, imp config.Importer, envs []api.Submitte
 	return nil
 }
 
+// partDigest is a part's content identity (card 107): a hash over its envelopes'
+// canonical forms as a sorted set, so an exact retry matches in whatever order it
+// sends them, and a part carrying other envelopes does not. It is a function of the
+// request alone, needing no Definition and no gate result, so a changed part can be
+// refused before the ledger is touched. A payload that will not canonicalise is hashed
+// as sent: the gate refuses the batch, and the part is never recorded.
+func partDigest(envs []facet.Envelope) string {
+	lines := make([]string, len(envs))
+	for i, e := range envs {
+		payload := e.Payload
+		if c, err := facet.Canonicalize(e.Payload); err == nil {
+			payload = c.Bytes()
+		}
+		lines[i] = strings.Join([]string{string(e.Type), strconv.Itoa(e.DefinitionVersion), e.SourceRef,
+			e.AssertedPerson, e.SpanHint, string(payload)}, "\x00")
+	}
+	sort.Strings(lines)
+	h := sha256.New()
+	for _, l := range lines {
+		_, _ = fmt.Fprintf(h, "%d:%s\n", len(l), l)
+	}
+	return "sha256:" + hex.EncodeToString(h.Sum(nil))
+}
+
 // checkSnapshot refuses a part whose id names a run begun with another source, other
-// types or another part count.
-func checkSnapshot(ctx context.Context, db *ops.DB, source string, s *api.SnapshotPart) error {
+// types or another part count, and a part number already recorded with other
+// envelopes. It runs before admission, inside the write, so a refused part admits
+// nothing; the store checks again when the part is recorded.
+func checkSnapshot(ctx context.Context, db *ops.DB, source string, s *api.SnapshotPart, digest string) error {
 	if s == nil {
 		return nil
 	}
@@ -70,6 +101,13 @@ func checkSnapshot(ctx context.Context, db *ops.DB, source string, s *api.Snapsh
 	}
 	if held.Source != source || held.Parts != s.Parts || !sameTypes(held.Types, s.Types) {
 		return fmt.Errorf("%w: %s", ops.ErrSnapshotMismatch, s.ID)
+	}
+	recorded, ok, err := db.SnapshotPartDigest(ctx, s.ID, s.Part)
+	if err != nil {
+		return err
+	}
+	if ok && recorded != digest {
+		return fmt.Errorf("%w: %s part %d", ops.ErrSnapshotPartChanged, s.ID, s.Part)
 	}
 	return nil
 }
@@ -90,9 +128,10 @@ func sameTypes(a, b []string) bool {
 	return true
 }
 
-// recordSnapshotPart records an admitted part and the facet ids its results carried,
-// every outcome counted, no-op included: a no-op is a facet the source still holds.
-func recordSnapshotPart(ctx context.Context, db *ops.DB, source string, s *api.SnapshotPart,
+// recordSnapshotPart records an admitted part, under its digest, and the facet ids its
+// results carried, every outcome counted, no-op included: a no-op is a facet the
+// source still holds.
+func recordSnapshotPart(ctx context.Context, db *ops.DB, source string, s *api.SnapshotPart, digest string,
 	results []gate.Result, head ledger.Watermark, at time.Time,
 ) (*api.SnapshotProgress, error) {
 	ids := make([]string, len(results))
@@ -100,7 +139,7 @@ func recordSnapshotPart(ctx context.Context, db *ops.DB, source string, s *api.S
 		ids[i] = r.FacetID
 	}
 	rec, err := db.RecordSnapshotPart(ctx, ops.SnapshotPart{
-		ID: s.ID, Source: source, Types: s.Types, Part: s.Part, Parts: s.Parts, FacetIDs: ids,
+		ID: s.ID, Source: source, Types: s.Types, Part: s.Part, Parts: s.Parts, Digest: digest, FacetIDs: ids,
 	}, at, int64(head))
 	if err != nil {
 		return nil, fmt.Errorf("batch admitted, snapshot part not recorded; resend the part: %w", err)

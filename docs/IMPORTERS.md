@@ -264,8 +264,11 @@ it no longer does (card 78; Matt, 2026-10-10).
   The id is the importer's and fresh for each run (1 to 128 of letters, digits and `. _ : -`). Every
   type must be the importer's, and every envelope in the part one of them. A part admits exactly as a
   batch does; the answer carries `snapshot: {parts_admitted, complete}`. Parts may come in any order
-  and be resent; a part sent twice adds nothing. A part naming an id begun with other types or another
-  part count is a 409, and nothing of it is admitted. An incremental run carries no snapshot.
+  and be resent. A part is its envelopes, order aside: sent again with the same envelopes it adds
+  nothing, before or after the snapshot completes; sent again under the same number with other
+  envelopes it is a 409, and nothing of it is admitted (card 107). A run that reads its source again
+  is a new run, with a new id. A part naming an id begun with other types or another part count is
+  likewise a 409. An incremental run carries no snapshot.
 - **What Anam keeps.** The admitted parts and the facet ids they carried, `no-op` included, in the
   operational store. It is disposable: an incomplete snapshot is dropped after a day, a source keeps
   its two newest complete ones, and a lost table comes back with the next resend.

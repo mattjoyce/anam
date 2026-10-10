@@ -66,7 +66,7 @@ func TestTimeline_ComposedIsTheFullFold(t *testing.T) {
 	same("at the mint")
 
 	// A tail: a correction of one reading and a new one, after the mint.
-	more := bpFixture + `  - {type: health.blood-pressure, id: "2026-3-01 07:00:00:1", date_excel: "2026-3-01 07:00:00", reading: "1", systolic: "111.0", diastolic: "70.0", pulse: "60.0"}
+	more := bpFixture + `  - {type: health.blood-pressure, id: "2026-3-01 07:00:00:1", date_excel: "2026-3-01 07:00:00", reading: "1", systolic_blood_pressure: {value: 111.0, unit: mmHg}, diastolic_blood_pressure: {value: 70.0, unit: mmHg}, effective_time_frame: {date_time: "2026-03-01T07:00:00+11:00"}, pulse: "60.0"}
 `
 	more = strings.Replace(more, "114.0", "115.0", 1)
 	if err := os.WriteFile(f.bpPath, []byte(more), 0o600); err != nil {

@@ -21,9 +21,9 @@ import (
 const bpFixture = `document: {name: bp-diary.pdf, sha256: "0000000000000000000000000000000000000000000000000000000000000000"}
 extracted: {method: by hand, version: 1}
 records:
-  - {type: health.blood-pressure, id: "2026-1-24 06:36:00:1", date_excel: "2026-1-24 06:36:00", reading: "1", systolic: "114.0", diastolic: "80.0", pulse: "70.0"}
-  - {type: health.blood-pressure, id: "2026-2-10 05:04:00:1", date_excel: "2026-2-10 05:04:00", reading: "1", systolic: "102.0", diastolic: "72.0", pulse: "68.0"}
-  - {type: health.blood-pressure, id: "2026-2-11 05:10:00:1", date_excel: "2026-2-11 05:10:00", reading: "1", systolic: "101.0", diastolic: "72.0", pulse: "66.0"}
+  - {type: health.blood-pressure, id: "2026-1-24 06:36:00:1", date_excel: "2026-1-24 06:36:00", reading: "1", systolic_blood_pressure: {value: 114.0, unit: mmHg}, diastolic_blood_pressure: {value: 80.0, unit: mmHg}, effective_time_frame: {date_time: "2026-01-24T06:36:00+11:00"}, pulse: "70.0"}
+  - {type: health.blood-pressure, id: "2026-2-10 05:04:00:1", date_excel: "2026-2-10 05:04:00", reading: "1", systolic_blood_pressure: {value: 102.0, unit: mmHg}, diastolic_blood_pressure: {value: 72.0, unit: mmHg}, effective_time_frame: {date_time: "2026-02-10T05:04:00+11:00"}, pulse: "68.0"}
+  - {type: health.blood-pressure, id: "2026-2-11 05:10:00:1", date_excel: "2026-2-11 05:10:00", reading: "1", systolic_blood_pressure: {value: 101.0, unit: mmHg}, diastolic_blood_pressure: {value: 72.0, unit: mmHg}, effective_time_frame: {date_time: "2026-02-11T05:10:00+11:00"}, pulse: "66.0"}
 `
 
 // ingestFixture is a real ledger, a real config and a readable records file of blood

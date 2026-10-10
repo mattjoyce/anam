@@ -2,6 +2,7 @@ package inspect_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -94,11 +95,16 @@ func TestDefinition_AnOlderVersionIsShownAsHeld(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = l.Close() })
 
+	current := bundledBody(t, "health.blood-pressure")
+	cur, err := def.Parse(current)
+	if err != nil {
+		t.Fatalf("def.Parse: %v", err)
+	}
 	held := func(context.Context) (map[facet.Type]map[int][]byte, map[facet.Type]string, error) {
 		return map[facet.Type]map[int][]byte{
 				"health.blood-pressure": {
-					1: []byte(`{"meta": {"facet_type": "health.blood-pressure", "definition_version": 1, "<b>": 1}}`),
-					2: bundledBody(t, "health.blood-pressure"),
+					1:           []byte(`{"meta": {"facet_type": "health.blood-pressure", "definition_version": 1, "<b>": 1}}`),
+					cur.Version: current,
 				},
 			}, map[facet.Type]string{"health.blood-pressure": "bundled"},
 			nil
@@ -110,7 +116,7 @@ func TestDefinition_AnOlderVersionIsShownAsHeld(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("GET v1 = %d", code)
 	}
-	for _, want := range []string{"v2 is current", "cannot parse this version", "&lt;b&gt;"} {
+	for _, want := range []string{fmt.Sprintf("v%d is current", cur.Version), "cannot parse this version", "&lt;b&gt;"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("v1 page lacks %q", want)
 		}
@@ -128,7 +134,7 @@ func TestFacet_LinksToItsAdmittedDefinition(t *testing.T) {
 	_, body := get(t, srv.URL+"/facet?id="+bp)
 	for _, want := range []string{
 		`href="/definition?type=health.blood-pressure&amp;v=1"`,
-		`v2 is current`,
+		` is current</a>`,
 		`<span class="j-key">&#34;systolic&#34;</span>`,
 		`<span class="j-str">&#34;No filodipine&#34;</span>`,
 	} {

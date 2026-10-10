@@ -153,6 +153,20 @@ func closed(at string, node any) error {
 			}
 		}
 		for k, v := range n {
+			if valueKeywords[k] {
+				continue // data, not a subschema
+			}
+			if namedSchemas[k] {
+				// A map of field name to subschema: the names are the payload's, so
+				// a field called "default" or "enum" is still walked.
+				fields, _ := v.(map[string]any)
+				for name, sub := range fields {
+					if err := closed(at+"/"+k+"/"+name, sub); err != nil {
+						return err
+					}
+				}
+				continue
+			}
 			if err := closed(at+"/"+k, v); err != nil {
 				return err
 			}
@@ -166,6 +180,14 @@ func closed(at string, node any) error {
 	}
 	return nil
 }
+
+// valueKeywords hold JSON values, never subschemas: an example payload, a default, an
+// enum or const member. The walk above does not descend into them, so an example whose
+// own data happens to read `"type": "object"` is not taken for an open object.
+var valueKeywords = map[string]bool{"examples": true, "default": true, "enum": true, "const": true}
+
+// namedSchemas map names to subschemas; their keys are names, not keywords.
+var namedSchemas = map[string]bool{"properties": true, "patternProperties": true, "$defs": true}
 
 func isObjectSchema(n map[string]any) bool {
 	for _, t := range typesOf(n) {

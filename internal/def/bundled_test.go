@@ -2,6 +2,7 @@ package def_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -224,5 +225,49 @@ func TestBundled_LabResultAdmitsAnUntimedDraw(t *testing.T) {
 	payload["time_unknown"] = "yes"
 	if err := d.Check(payload); err == nil {
 		t.Error("time_unknown as a string was admitted")
+	}
+}
+
+// Card 83: blood pressure v4 is the Open mHealth blood-pressure-4.0 body with the
+// source's own fields beside it. Its identity and fact time are v3's, so the guard
+// passes and the readings supersede in place; a v3-shaped payload is refused.
+func TestBundled_BloodPressureIsAnOMHBody(t *testing.T) {
+	t.Parallel()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, ok := reg.Lookup("health.blood-pressure")
+	if !ok {
+		t.Fatal("no bundled health.blood-pressure")
+	}
+	if d.Version != 4 || d.FactTime.Pointer != "/date_excel" || len(d.IdentityKey) != 2 {
+		t.Fatalf("v%d fact time %s identity %v", d.Version, d.FactTime.Pointer, d.IdentityKey)
+	}
+	decode := func(s string) map[string]any {
+		t.Helper()
+		var m map[string]any
+		if err := json.Unmarshal([]byte(s), &m); err != nil {
+			t.Fatal(err)
+		}
+		return m
+	}
+	v4 := `{"date_excel": "2026-1-24 06:30:00", "reading": "1",
+		"systolic_blood_pressure": {"value": 128.0, "unit": "mmHg"},
+		"diastolic_blood_pressure": {"value": 79.0, "unit": "mmHg"},
+		"effective_time_frame": {"date_time": "2026-01-24T06:30:00+11:00"},
+		"body_posture": "sitting", "pulse": "64.0", "location": "Left arm"}`
+	if err := d.Check(decode(v4)); err != nil {
+		t.Errorf("a v4 payload was refused: %v", err)
+	}
+	for name, payload := range map[string]string{
+		"v3 shape":  `{"date_excel": "2026-1-24 06:30:00", "reading": "1", "systolic": "128.0", "diastolic": "79.0"}`,
+		"kPa":       strings.Replace(v4, `"value": 128.0, "unit": "mmHg"`, `"value": 17.1, "unit": "kPa"`, 1),
+		"no frame":  strings.Replace(v4, `"effective_time_frame": {"date_time": "2026-01-24T06:30:00+11:00"},`, "", 1),
+		"a posture": strings.Replace(v4, `"sitting"`, `"Seated"`, 1),
+	} {
+		if err := d.Check(decode(payload)); err == nil {
+			t.Errorf("%s was admitted", name)
+		}
 	}
 }

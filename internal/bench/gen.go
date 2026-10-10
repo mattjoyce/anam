@@ -148,9 +148,12 @@ func readings(sh Shape, loc *time.Location) []reading {
 func envelope(r reading) facet.Envelope {
 	ts := r.at.Format(layout)
 	ord := strconv.Itoa(r.ordinal)
-	payload, _ := json.Marshal(map[string]string{ // a map of strings always marshals
+	mmHg := func(v int) map[string]any { return map[string]any{"value": v, "unit": "mmHg"} }
+	payload, _ := json.Marshal(map[string]any{ // plain values always marshal
 		"date_excel": ts, "reading": ord,
-		"systolic": strconv.Itoa(r.systolic), "diastolic": strconv.Itoa(60 + r.systolic%25),
+		"systolic_blood_pressure":  mmHg(r.systolic),
+		"diastolic_blood_pressure": mmHg(60 + r.systolic%25),
+		"effective_time_frame":     map[string]string{"date_time": r.at.Format(time.RFC3339)},
 	})
 	return facet.Envelope{
 		Type: factType, Source: source, Injector: source,

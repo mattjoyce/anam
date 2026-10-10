@@ -35,8 +35,8 @@ func TestBundled_HoldsTheHealthDBTypes(t *testing.T) {
 			t.Errorf("no bundled definition for %s", typ)
 			continue
 		}
-		if d.Version != 2 || d.Classification != facet.ClassificationSensitive {
-			t.Errorf("%s = v%d %s, want v2 Sensitive", typ, d.Version, d.Classification)
+		if d.Version != 3 || d.Classification != facet.ClassificationSensitive {
+			t.Errorf("%s = v%d %s, want v3 Sensitive", typ, d.Version, d.Classification)
 		}
 		// All four share the identity grain: one facet per (group, period_type,
 		// period_start). The worker composes source_ref on the same promise.

@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "travel.arrived",
-    "definition_version": 2,
+    "definition_version": 3,
     "classification": "Confidential",
     "validation_mode": "strict",
     "source_schema": "records/travel.arrived",
@@ -14,16 +14,17 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Arriving at one place during a trip, a leg within the trip, one row in a records file (source records). It does not close the trip; values are the row's own text.",
     "type": "object",
     "required": ["id", "date", "trip"],
     "properties": {
-      "basis": {"type": "string", "minLength": 1},
-      "by": {"type": "string", "minLength": 1},
-      "date": {"type": "string", "minLength": 1},
-      "id": {"type": "string", "minLength": 1},
-      "place": {"type": "string", "minLength": 1},
-      "stay": {"type": "string", "minLength": 1},
-      "trip": {"type": "string", "minLength": 1}
+      "basis": {"type": "string", "minLength": 1, "description": "The evidence the row rests on, free text as the extraction wrote it: a booking, an email, or a note that the date is inferred. Read it before trusting the date.", "examples": ["ZX441 QXA-QXB, 5 Mar"]},
+      "by": {"type": "string", "minLength": 1, "description": "How the place was reached when it was not by a flight, free text as written."},
+      "date": {"type": "string", "minLength": 1, "description": "The day of arrival at the place. Sydney local date, YYYY-MM-DD, as the records row writes it. This is the fact time. The records row does not carry the place's own zone.", "examples": ["2019-03-05"]},
+      "id": {"type": "string", "minLength": 1, "description": "The row id the records file assigns, chosen once. The travel history writes it as <origin>:<trip>/<kind>, with the date and a place or route appended where a trip has several rows of a kind. This is the identity.", "examples": ["travel:2019-03-westmere/arrived/2019-03-05/porthaven"]},
+      "place": {"type": "string", "minLength": 1, "description": "Where Matt arrived, usually \"city, country\", as written.", "examples": ["Porthaven, Westmere"]},
+      "stay": {"type": "string", "minLength": 1, "description": "Where Matt stayed and for which dates, free text as written.", "examples": ["Harbour View Hotel, 5 to 9 Mar"]},
+      "trip": {"type": "string", "minLength": 1, "description": "The trip key every row of one trip shares (departed, arrived, returned, flight), written by the extraction as the year and month of departure and a short slug. It names the travel.trip series.", "examples": ["2019-03-westmere"]}
     },
     "additionalProperties": false
   }

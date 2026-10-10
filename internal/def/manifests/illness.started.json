@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "illness.started",
-    "definition_version": 2,
+    "definition_version": 3,
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "records/illness.started",
@@ -14,13 +14,14 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The day an illness began, one row in a records file (source records). Opens an illness.episode series; values are the row's own text.",
     "type": "object",
     "required": ["id", "date", "episode"],
     "properties": {
-      "date": {"type": "string", "minLength": 1},
-      "episode": {"type": "string", "minLength": 1},
-      "id": {"type": "string", "minLength": 1},
-      "note": {"type": "string", "minLength": 1}
+      "date": {"type": "string", "minLength": 1, "description": "The day the illness began. Sydney local date, YYYY-MM-DD, as the records row writes it. This is the fact time.", "examples": ["2025-07-14"]},
+      "episode": {"type": "string", "minLength": 1, "description": "The episode key the rows of one illness share, written by hand; it names the illness.episode series this row belongs to. illness.ended with the same key closes it."},
+      "id": {"type": "string", "minLength": 1, "description": "The row id the records file assigns, chosen once and never derived from the content. This is the identity."},
+      "note": {"type": "string", "minLength": 1, "description": "Free text about the illness, as the row writes it.", "examples": ["sore throat and fever, stayed home"]}
     },
     "additionalProperties": false
   }

@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "condition.noted",
-    "definition_version": 2,
+    "definition_version": 3,
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "records/condition.noted",
@@ -13,17 +13,18 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "A condition named in a document, as a point fact on the document's date. Written by hand readings, so far from the clinical notes on pathology requests.",
     "type": "object",
     "required": ["id", "date", "condition"],
     "properties": {
-      "as_written": {"type": "string", "minLength": 1},
-      "clinical_notes": {"type": "string", "minLength": 1},
-      "condition": {"type": "string", "minLength": 1},
-      "context": {"type": "string", "minLength": 1},
-      "date": {"type": "string", "minLength": 1},
-      "id": {"type": "string", "minLength": 1},
-      "kind": {"type": "string", "minLength": 1},
-      "noted_by": {"type": "string", "minLength": 1}
+      "as_written": {"type": "string", "minLength": 1, "description": "The condition exactly as the document wrote it, abbreviations and case kept."},
+      "clinical_notes": {"type": "string", "minLength": 1, "description": "The whole clinical notes line the condition was taken from, verbatim."},
+      "condition": {"type": "string", "minLength": 1, "description": "The condition in the reader's words, lower case, abbreviations spelled out. The reader's normalisation of as_written, not the document's text."},
+      "context": {"type": "string", "minLength": 1, "description": "Where in the document the mention sits, in the reader's words."},
+      "date": {"type": "string", "minLength": 1, "description": "The date the reader took for the mention, YYYY-MM-DD; for a pathology request, the draw date. This is the fact time.", "examples": ["2026-03-04"]},
+      "id": {"type": "string", "minLength": 1, "description": "Identity, chosen by the reader: the lab's prefix, the lab number, \"clinical-note\", and the condition as a slug.", "examples": ["acl:12345678/clinical-note/example-condition"]},
+      "kind": {"type": "string", "minLength": 1, "description": "What sort of mention this is, in the reader's words."},
+      "noted_by": {"type": "string", "minLength": 1, "description": "Who wrote the mention, as the document names them; for a pathology request, the requesting doctor.", "examples": ["Dr Jane Example"]}
     },
     "additionalProperties": false
   }

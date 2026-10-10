@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "health.sleep",
-    "definition_version": 2,
+    "definition_version": 3,
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "health-db/summary-group",
@@ -12,28 +12,32 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One period's sleep metrics from healthdata.db, as the health ETL summarised them from Garmin: every sleep-group metric it holds for one day, week, month or year. Written by the health-db worker; values are the ETL's numbers as stored, never recomputed by Anam.",
     "type": "object",
     "required": ["group", "period_type", "period_start", "metrics"],
     "properties": {
-      "group": {"type": "string", "minLength": 1, "enum": ["sleep"]},
+      "group": {"type": "string", "minLength": 1, "enum": ["sleep"], "description": "The source's metric group id (metrics.group_id). Always \"sleep\" for this type.", "examples": ["sleep"]},
       "metrics": {
         "type": "object",
+        "description": "The period's sleep metrics, keyed by the ETL's metric id (summaries.metric_id): sleep_total, sleep_min, sleep_max and sleep_rem. The ETL converts GarminDB's HH:MM:SS durations to minutes, and writes no sleep metrics for a period where GarminDB recorded zero sleep.",
+        "examples": [{"sleep_total": {"unit": "min", "avg": 412, "min": 371, "max": 455, "samples": 1}}],
         "minProperties": 1,
         "additionalProperties": {
           "type": "object",
+          "description": "One metric's row in the source's summaries table for this period.",
           "properties": {
-            "avg": {"type": "number"},
-            "max": {"type": ["null", "number"]},
-            "min": {"type": ["null", "number"]},
-            "samples": {"type": "number"},
-            "unit": {"type": "string", "minLength": 1}
+            "avg": {"type": "number", "description": "summaries.avg_value. For a Garmin metric, GarminDB's own figure for the period; for a Withings metric, the mean of the period's measurements, computed by the ETL."},
+            "max": {"type": ["null", "number"], "description": "summaries.max_value. Null when the source has no range for the metric. Garmin ranges are GarminDB's own columns; Withings ranges are the ETL's maximum over the period."},
+            "min": {"type": ["null", "number"], "description": "summaries.min_value. Null when the source has no range for the metric. Garmin ranges are GarminDB's own columns; Withings ranges are the ETL's minimum over the period."},
+            "samples": {"type": "number", "description": "summaries.sample_count: how many Withings measurements the ETL aggregated, or 1 for every Garmin row."},
+            "unit": {"type": "string", "minLength": 1, "description": "metrics.unit for this metric id, as the ETL's metric table defines it.", "examples": ["min"]}
           },
           "required": ["avg", "max", "min", "samples", "unit"],
           "additionalProperties": false
         }
       },
-      "period_start": {"type": "string", "minLength": 1},
-      "period_type": {"type": "string", "minLength": 1, "enum": ["day", "week", "month", "year"]}
+      "period_start": {"type": "string", "minLength": 1, "description": "summaries.period_start as the source's own text: local midnight on the period's first day, no zone. Weeks start on Monday. This is the fact time.", "examples": ["2026-01-19T00:00:00"]},
+      "period_type": {"type": "string", "minLength": 1, "enum": ["day", "week", "month", "year"], "description": "summaries.period_type: the length of the period summarised.", "examples": ["week"]}
     },
     "additionalProperties": false
   }

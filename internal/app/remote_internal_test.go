@@ -39,7 +39,7 @@ func newRemoteFixture(t *testing.T) remoteFixture {
 func newRemoteFixtureIn(t *testing.T, zone string) remoteFixture {
 	t.Helper()
 	f := remoteFixture{ingestFixture: newIngestFixture(t)}
-	f.imports = fmt.Sprintf("imports:\n  - source: bp-csv\n    path: %s\n", f.bpPath)
+	f.imports = fmt.Sprintf("imports:\n  - source: records\n    path: %s\n", f.recordsDir)
 	if _, _, err := f.ingest(t, f.imports); err != nil {
 		t.Fatalf("seed the ledger: %v", err)
 	}
@@ -438,7 +438,7 @@ func TestIngest_AFailedRunOverTheDaemonFails(t *testing.T) {
 	t.Parallel()
 	f := newRemoteFixture(t)
 	missing := filepath.Join(f.dir, "unmounted", "healthdata.db")
-	decl := fmt.Sprintf("imports:\n  - source: bp-csv\n    path: %s\n  - source: health-db\n    path: %s\n", f.bpPath, missing)
+	decl := fmt.Sprintf("imports:\n  - source: records\n    path: %s\n  - source: health-db\n    path: %s\n", f.recordsDir, missing)
 	if err := os.WriteFile(filepath.Join(f.dir, "imports.yaml"), []byte(decl), 0o600); err != nil {
 		t.Fatal(err)
 	}

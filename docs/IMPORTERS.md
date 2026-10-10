@@ -5,8 +5,8 @@ every importer complies with. Importers now exist for Withings (card 54), blood 
 and the DreamStation (card 70), in `anam-importers`; the built-in `withings` worker is gone.
 
 Anam's capture workers for vendor sources (`healthdb`, `withings`, `bpcsv`) were compiled into the
-binary that owns the ledger. `withings` has left (card 54); `healthdb` and `bpcsv` remain until cards
-55 and 80 finish. This proposal moves them out: an importer is a ductile plugin that
+binary that owns the ledger. `withings` (card 54) and `bpcsv` (card 80) have left; `healthdb`
+remains until card 55 finishes. This proposal moves them out: an importer is a ductile plugin that
 shapes one source's data to a Facet Definition and submits it to the Anam service. Anam keeps the
 Definitions, the gate and the record, and knows nothing about any vendor.
 
@@ -140,7 +140,7 @@ Where log management stops applying: logs tolerate loss and sampling and have no
 6. One-off exports (Technogym, Strong, Fitbit) get no importer. Each is a document in the library,
    turned into a records file once by a script kept in `scripts/`, and reshaped by regenerating that
    file with the same ids (card 58). The blood pressure app turned out to be live, exported
-   periodically, so it has an importer (card 80) and `bpcsv` goes when that runs. `records`
+   periodically, so it has an importer (card 80), and the built-in `bpcsv` worker is gone. `records`
    and `documents` stay inside Anam: they are formats, not sources.
 
 ## 8. The importer contract

@@ -13,15 +13,24 @@ import (
 )
 
 // Three readings in the blood pressure export's own format.
-const bpFixture = "Date (Excel),\tDate,\tSystolic,\tDiastolic,\tPulse,\tIrregular heartbeat,\tMissed medication,\tDizzy / Light-headed,\tWeight [kg],\tTemperature [Celsius],\tBlood Glucose [mg/dL],\tOxygen Saturation [%],\tLocation,\tPosture,\tComment,\tTags,\t\r\n" +
-	"2026-1-24 06:36:00,\t 24 January 2026 6:36,\t 114.0,\t 80.0,\t 70.0,\t ,\t ,\t ,\t 96.3,\t ,\t ,\t ,\t \"Left Arm\",\t \"Seated\",\t ,\t ,\t \r\n" +
-	"2026-2-10 05:04:00,\t 10 February 2026 5:04,\t 102.0,\t 72.0,\t 68.0,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t \r\n" +
-	"2026-2-11 05:10:00,\t 11 February 2026 5:10,\t 101.0,\t 72.0,\t 66.0,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t \r\n"
+// bpFixture is a blood pressure diary read into a records file: three readings, ids
+// in the diary's form (date_excel and reading joined by a colon). The phone app's
+// exports have their own importer since card 80, so the ingest tests use the records
+// source, which still admits blood pressure. "114.0" appears once, so a test can
+// correct one reading by replacing it.
+const bpFixture = `document: {name: bp-diary.pdf, sha256: "0000000000000000000000000000000000000000000000000000000000000000"}
+extracted: {method: by hand, version: 1}
+records:
+  - {type: health.blood-pressure, id: "2026-1-24 06:36:00:1", date_excel: "2026-1-24 06:36:00", reading: "1", systolic: "114.0", diastolic: "80.0", pulse: "70.0"}
+  - {type: health.blood-pressure, id: "2026-2-10 05:04:00:1", date_excel: "2026-2-10 05:04:00", reading: "1", systolic: "102.0", diastolic: "72.0", pulse: "68.0"}
+  - {type: health.blood-pressure, id: "2026-2-11 05:10:00:1", date_excel: "2026-2-11 05:10:00", reading: "1", systolic: "101.0", diastolic: "72.0", pulse: "66.0"}
+`
 
-// ingestFixture is a real ledger, a real config and a readable blood pressure export,
-// all under the test's own directory.
+// ingestFixture is a real ledger, a real config and a readable records file of blood
+// pressure readings, all under the test's own directory. bpPath is the file;
+// recordsDir is the folder a records import names.
 type ingestFixture struct {
-	dir, cfgPath, ledgerPath, bpPath string
+	dir, cfgPath, ledgerPath, bpPath, recordsDir string
 }
 
 func newIngestFixture(t *testing.T) ingestFixture {
@@ -31,7 +40,11 @@ func newIngestFixture(t *testing.T) ingestFixture {
 		dir:        dir,
 		cfgPath:    filepath.Join(dir, "config.yaml"),
 		ledgerPath: filepath.Join(dir, "ledger.db"),
-		bpPath:     filepath.Join(dir, "bp.csv"),
+		bpPath:     filepath.Join(dir, "records", "bp-diary.yaml"),
+		recordsDir: filepath.Join(dir, "records"),
+	}
+	if err := os.MkdirAll(f.recordsDir, 0o750); err != nil {
+		t.Fatal(err)
 	}
 	cfg := fmt.Sprintf("person_id: matt\nledger_path: %s\ndb_path: %s\nartifact_dir: %s\n",
 		f.ledgerPath, filepath.Join(dir, "tracking.db"), filepath.Join(dir, "artifacts"))
@@ -97,7 +110,7 @@ func TestIngest_AnUnreadableSourceStopsTheRunBeforeAnythingIsAdmitted(t *testing
 		{
 			name: "every source readable",
 			imports: func(f ingestFixture) string {
-				return fmt.Sprintf("imports:\n  - source: bp-csv\n    path: %s\n", f.bpPath)
+				return fmt.Sprintf("imports:\n  - source: records\n    path: %s\n", f.recordsDir)
 			},
 			wantWritten: true,
 			wantOut:     "ledger changed: 3 facets admitted or superseded",
@@ -105,9 +118,9 @@ func TestIngest_AnUnreadableSourceStopsTheRunBeforeAnythingIsAdmitted(t *testing
 		{
 			name: "a later source is missing",
 			imports: func(f ingestFixture) string {
-				return fmt.Sprintf("imports:\n  - source: bp-csv\n    path: %s\n"+
+				return fmt.Sprintf("imports:\n  - source: records\n    path: %s\n"+
 					"  - source: health-db\n    path: %s\n",
-					f.bpPath, filepath.Join(f.dir, "unmounted", "healthdata.db"))
+					f.recordsDir, filepath.Join(f.dir, "unmounted", "healthdata.db"))
 			},
 			wantErr: "health-db",
 		},
@@ -146,7 +159,7 @@ func TestIngest_AnUnreadableSourceStopsTheRunBeforeAnythingIsAdmitted(t *testing
 func TestIngest_ARepeatedRunSaysTheLedgerIsUnchanged(t *testing.T) {
 	t.Parallel()
 	f := newIngestFixture(t)
-	imports := fmt.Sprintf("imports:\n  - source: bp-csv\n    path: %s\n", f.bpPath)
+	imports := fmt.Sprintf("imports:\n  - source: records\n    path: %s\n", f.recordsDir)
 
 	_, first, err := f.ingest(t, imports)
 	if err != nil {

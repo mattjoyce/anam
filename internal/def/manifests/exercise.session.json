@@ -17,7 +17,7 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "One session of exercise, shaped as an IEEE 1752 physical-activity-1.0 payload, from three sources. Two extractors write a records file: scripts/extract-technogym-json.py for Technogym mywellness indoor sessions (rower and stair climber) and scripts/extract-strong-csv.py for Strong workouts. The anam_garmin importer sends each session a Garmin watch recorded, read from its activity FIT file. Measures IEEE has no field for sit beside it in snake_case; values are the source's own, apart from the start time, activity name and Strong's capped duration, which the extractor or importer derives.",
+    "description": "One session of exercise, shaped as an IEEE 1752 physical-activity-1.0 payload, from three sources. Two extractors write a records file: scripts/extract-technogym-json.py for Technogym mywellness indoor sessions (rower and stair climber) and scripts/extract-strong-csv.py for Strong workouts. The anam_garmin importer sends each session a Garmin watch recorded, read from its activity FIT file. Sessions from different sources can overlap, each a device's own account: a Garmin Cardio session often spans the Technogym machine sessions done during it, and the watch and the rower each record a row, so a sum across sources counts that time twice. Measures IEEE has no field for sit beside it in snake_case; values are the source's own, apart from the start time, activity name and Strong's capped duration, which the extractor or importer derives.",
     "type": "object",
     "required": ["id", "activity_name", "effective_time_frame"],
     "properties": {

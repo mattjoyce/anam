@@ -80,7 +80,7 @@
 <h1>Health data pipeline</h1>
 <p class="lede">How a heartbeat on the watch and a step on the scale become facets in Anam, which machine does each part, and how to tell when a part has stopped.</p>
 <p class="meta">State as of 30 September 2026. Stages one to four were checked on 29 September, and stage five on 30 September.</p>
-<div class="note"><strong>Partly out of date.</strong> Since 9 October the record lives on unraid (card 46): ingest runs inside the anam container there, when the unraid gateway asks, not on the ThinkPad every hour. Withings now reaches Anam through the <code>anam_withings</code> importer (card 54), not a built-in worker. The Withings parts below are updated; the ThinkPad ingest parts are not.</div>
+<div class="note"><strong>Partly out of date.</strong> Since 9 October the record lives on unraid (card 46): ingest runs inside the anam container there, when the unraid gateway asks, not on the ThinkPad every hour. Withings and the blood pressure export now reach Anam through the <code>anam_withings</code> and <code>anam_bp_csv</code> importers (cards 54 and 80), not built-in workers. The Withings and blood pressure parts below are updated; the ThinkPad ingest parts are not.</div>
 
 <div class="scroll">
 <svg viewBox="0 0 916 372" role="img" aria-label="Pipeline from Garmin and Withings through collectors and the ETL into Anam">
@@ -150,7 +150,7 @@
   <text class="sub" x="843" y="72" text-anchor="middle">ThinkPad, every hour</text>
   <text class="sub" x="843" y="129" text-anchor="middle">health-db worker</text>
   <text class="sub" x="843" y="244" text-anchor="middle">withings importer</text>
-  <text class="sub" x="843" y="321" text-anchor="middle">bp-csv worker</text>
+  <text class="sub" x="843" y="321" text-anchor="middle">bp-csv importer</text>
   <text class="sub" x="843" y="344" text-anchor="middle">gate, then ledger.db</text>
 
   <!-- arrows -->
@@ -188,7 +188,7 @@
   <li><strong>Summarise</strong>
     Either event starts the health ETL. Ductile runs it as a one-shot container from the <code>ductile-healthdata</code> image. It reads both raw stores and writes day, week, month and year rows to <code>healthdata.db</code>.</li>
   <li><strong>Ingest into Anam</strong>
-    The ThinkPad ductile gateway runs <code>anam ingest</code> every hour. It reads <code>healthdata.db</code> over the Projects share. It also reads the blood pressure export directly. Withings no longer comes this way: its importer submits it at stage two. Every row passes the gate and lands in <code>ledger.db</code>.</li>
+    The ThinkPad ductile gateway runs <code>anam ingest</code> every hour. It reads <code>healthdata.db</code> over the Projects share. Withings and the blood pressure export no longer come this way: their importers, <code>anam_withings</code> and <code>anam_bp_csv</code> in the unraid gateway, submit them as envelopes (cards 54 and 80). Every row passes the gate and lands in <code>ledger.db</code>.</li>
 </ol>
 
 <div class="note"><strong>Stage five runs on a clock, not on an event.</strong> The ingest takes about two seconds and an unchanged row is a no-op, so an hourly run costs nothing when there is no news. New data reaches Anam within an hour of the ETL writing it.</div>

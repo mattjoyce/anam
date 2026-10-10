@@ -1,6 +1,7 @@
-# Anam API — operating the record and conversing with it
+# Anam API — operating the record and reading it
 
 Design proposal · 2026-10-07 · documentation only; these APIs are not implemented.
+Split 2026-10-10 (card 72): the MCP mapping moved to the `anam-mcp` repository (§8).
 
 **What runs today (2026-10-08, cards 42–45).** `anam daemon` serves an interim `/v1` surface
 that carries the CLI's existing reads, not the `ReadRecord` contract below: `status`, `ingest`
@@ -16,16 +17,16 @@ queue and answers where, at what W, and how big. `POST /v1/envelopes` and the `/
 routes (card 53) are the importers' side, under importers' own tokens; their contract is
 [IMPORTERS.md](IMPORTERS.md) §8.
 
-This document proposes the application API that the CLI, inspector, and MCP adapter can share.
-The two conversational features are **chat with my record** and **log this**. The API supplies
-record operations and evidence; the conversational client supplies language understanding and
-dialogue. It must also support an operator keeping Anam current, inspecting failures, and recovering
-derived state.
+This document proposes the application API that every client shares: the CLI, the inspector,
+importers, and conversational clients (§8). The two conversational features are **chat with my
+record** and **log this**. The API supplies record operations and evidence; the conversational
+client supplies language understanding and dialogue. It must also support an operator keeping
+Anam current, inspecting failures, and recovering derived state.
 
 The governing contracts are [ARCHITECTURE.md](ARCHITECTURE.md),
 [SELF-LOG.md](SELF-LOG.md), and the current records workflow in [INBOX.md](INBOX.md).
 Where this proposal needs a new core capability, it names it rather than silently assigning domain
-logic to the MCP adapter. Whole-facet projection is retained. Element masking is out of scope.
+logic to a client. Whole-facet projection is retained. Element masking is out of scope.
 
 ## 1. Start with the conversations
 
@@ -49,7 +50,7 @@ snapshot describes the recorded regimen; it does not establish adherence.
 ## 2. Boundaries and ownership
 
 ```text
-Conversation -> MCP adapter --+
+Conversational client -------+
 CLI -------------------------+--> Anam service API (Docker on Unraid)
 Inspector -------------------+              |
                               Application operations
@@ -64,7 +65,7 @@ Inspector -------------------+              |
 **Target deployment, agreed 2026-10-07:** Anam runs as a service in Docker on Unraid, exposing a
 comprehensive application API. SQLite remains the database substrate, on safe host-local storage.
 The service owns the ledger, operational store, artifacts, and managed source-writing operations.
-CLI, inspector, MCP, and scheduled ingestion use the service API in normal operation; they do not
+CLI, inspector, conversational clients, and scheduled ingestion use the service API in normal operation; they do not
 independently open its database files. A separately controlled offline maintenance mode may access
 them only with the service stopped.
 
@@ -72,7 +73,8 @@ The domain operations remain transport-independent Go code inside the service. O
 identify contracts, not mandatory package names or HTTP routes. A versioned network API exposes these
 contracts to clients; its concrete routes and authentication scheme remain implementation design work.
 Define small interfaces at consumers, grouped by concern; do not build a single store/service interface
-containing every operation. The MCP adapter is a client of this API and needs no database volume mount.
+containing every operation. Every client reaches the record through this API and needs no database
+volume mount.
 
 ### Storage and process ownership
 
@@ -242,7 +244,7 @@ The equality oracle is the full fold at the same position, followed by the same 
 
 `ReadRecord` is **read-only with respect to the ledger**, but publishes immutable artifacts. This
 proposal chooses durable evidence by default for conversational reads. It does not persist the chat.
-Publication is reported as a side effect; do not label it universally read-only in MCP annotations.
+Publication is reported as a side effect; a client must not present the read as free of effects.
 An operator-only `PreviewRecord` can derive an ephemeral result without a receipt, clearly labelled
 as a preview. It shares the same selection implementation.
 
@@ -263,7 +265,7 @@ canonical entries and exact evidence references.
 the receipt, query, stable ordering, and next offset; it is tamper-evident or validated against stored
 state. Recheck authorization on every page. Invalid or missing artifacts produce explicit errors,
 not a silent new query. The page is a portion of the receipted value: the receipt hashes the complete
-published value, not the MCP response wrapper or that page alone.
+published value, not a client's response wrapper or that page alone.
 
 Receipts must grow to pin ledger identity, the resolved query (including snapshot date and zone),
 selection-semantics version, exact template version, and definition provenance needed for historical
@@ -298,13 +300,14 @@ source-file associations. Do not imply every facet already has a ledger-attested
 ### The source is durable before admission
 
 A user's assertion is source material. The application writes it into the configured records source,
-then capture submits an Envelope through the ordinary gate. No MCP operation inserts a facet directly.
+then capture submits an Envelope through the ordinary gate. No client operation inserts a facet
+directly.
 This is a source-authoring capability alongside Anam, not permission for capture workers to write the
 ledger or for the ledger to become the only home of the assertion.
 
 Use a managed records file per submission (or per deliberately grouped assertion), within the
 declared records directory. Its row IDs remain stable through corrections. An external human-edited
-file is not automatically writable through MCP. Source targets are configured identities, never
+file is not automatically writable through the API. Source targets are configured identities, never
 caller-supplied paths. The existing scanner's flat directory and duplicate-ID rules must be respected.
 
 | Operation | Contract |
@@ -382,7 +385,7 @@ After a crash, a reconciler scans durable submissions and compares gate/ledger o
 completed before the response was lost, return the existing result. If only the source was saved,
 resume admission. Capture and retry use the same idempotent gate. Do not reapply an older revision
 after a newer correction: serialize admission per source record and reconcile to its current revision.
-The implementation must coordinate with scheduled records ingest, not merely other MCP clients.
+The implementation must coordinate with scheduled records ingest, not merely other clients.
 
 `CorrectAssertion` requires `source_record_ref`, `expected_revision`, replacement record, correction
 reason, and a new submission ID. It returns a conflict if a human or another client changed the source.
@@ -395,7 +398,7 @@ Status results expose source persistence and admission separately, with per-reco
 future multi-record submission. The first API submits one record per call. “Saved, awaiting admission”
 is truthful; “logged in your record” is reserved for confirmed admission. Cancellation leaves the
 submission queryable. Durable pending work is resumed by a named application worker or operator
-reconciliation command; an MCP process's memory is never the recovery mechanism.
+reconciliation command; a client process's memory is never the recovery mechanism.
 
 ### Retraction and derived findings
 
@@ -407,12 +410,12 @@ Agent conclusions and document extraction are separate from user assertions. A f
 `ProposeFinding` must carry method/model identity, evidence refs and record position, and enter as
 `proposed`. `ReviewFinding` records a real reviewer decision. Neither is enabled until core proposed
 admission and review semantics work. The current manually reviewed records workflow does not justify
-an automated MCP route that admits model guesses as user assertions.
+an automated route that admits model guesses as user assertions.
 
 ## 7. Operating Anam
 
 These are application operations, mostly exposed through an operator CLI or a separately enabled
-MCP profile. The everyday conversation tool list should stay small.
+operator profile of a client. A conversational client does not offer them by default.
 
 | Concern | Operations | Required result/constraint |
 |---|---|---|
@@ -426,7 +429,7 @@ MCP profile. The everyday conversation tool list should stay small.
 | Source writes | `ListPendingSubmissions`, `ReconcileSubmissions` | Recover saved assertions without creating duplicates or restoring obsolete revisions |
 
 Initialization, configuration, backup/restore, and destructive maintenance remain explicit operator
-workflows. They need safe application contracts if automated, but not generic MCP shell/file tools.
+workflows. They need safe application contracts if automated, but not generic shell or file access for clients.
 Backups cover the ledger, authored operational state, records source, and published artifacts as
 appropriate; rebuilding an index is not recovery of all of Anam.
 
@@ -435,48 +438,21 @@ restart recovery. An ingest may have committed earlier batches before a later on
 say which work landed. Validation does not promise run-wide atomicity. Authored operation records have
 an explicit retention/backup policy; they cannot be called derived merely because they are operational.
 
-## 8. MCP mapping
+## 8. Clients
 
-Recommended initial conversational tools:
+Every client is a translator over the operations above. It decodes typed requests, carries caller
+context and deadlines, and presents structured results. It holds no SQL, no second fold, and no
+domain rule, and the record's correctness never depends on its process state.
 
-| MCP tool | Application operation | Model-facing description emphasis |
+| Client | Where | Contract |
 |---|---|---|
-| `describe_record` | Discovery overview | Learn coverage, capabilities, projections, and limitations before choosing evidence |
-| `describe_type` | `GetFacetDefinition` | Learn the exact record shape and authoring requirements |
-| `read_record` | `ReadRecord` | Timeline versus snapshot; fact-time versus knowledge time; publishes evidence |
-| `read_page` | `ReadPage` | Continue the same immutable result |
-| `get_evidence` | `GetEvidence` | Inspect an exact cited facet and available provenance |
-| `validate_assertion` | `ValidateAssertion` | Resolve missing/invalid fields without writing |
-| `log_assertion` | `SubmitAssertion` | Record an explicit user assertion; retry with the same submission ID |
-| `get_submission` | `GetSubmission` | Determine what persisted after success, delay, or interruption |
-| `correct_assertion` | `CorrectAssertion` | Correct an identified managed record using its expected revision |
+| CLI | `anam` with `ANAM_SERVER` set | The daemon's `/v1` routes, rendering the same values as local reads |
+| Inspector | the daemon's `/` pages | A diagnostic view; it yields to this design |
+| Importers | the `anam-importers` repository | [IMPORTERS.md](IMPORTERS.md) §8 |
+| MCP adapter | the `anam-mcp` repository | Its tool mapping, model-facing descriptions, resources and scenarios live there |
 
-Discovery returns bounded summaries and references for further catalog pages. Add projection catalog,
-changes, explanation, and receipt verification tools as the conversation scenarios require them.
-Only advertise implemented operations and modes; unsupported snapshot reads must not silently become
-timeline reads. Keep operator tools separately enabled by configuration and authorization.
-
-Resources can identify immutable receipts and their evidence, for example
-`anam://receipts/{hash}` and `anam://receipts/{hash}/facets/{facet_id}/{version}`. The receipt binds
-ledger identity. Reading a resource enforces the same authorization and size constraints as tools;
-URI knowledge grants no extra access. Tools remain sufficient for clients that do not browse resources.
-
-Optional prompts can teach “compare two periods” and “record an event,” but correctness belongs in
-operation contracts. No `chat(message)` endpoint is needed: it would move model choice, dialogue state,
-and interpretation into Anam. No `log(text)` endpoint that silently guesses type/time is needed either.
-
-The official [Go MCP SDK](https://github.com/modelcontextprotocol/go-sdk) supplies typed tool
-registration, structured results, transports, and in-memory client/server testing. Keep SDK types in
-the adapter. A local stdio adapter can call the Unraid service API; stdout then carries protocol traffic
-alone and diagnostics use stderr. A remotely hosted MCP adapter is another client deployment option.
-The MCP transport choice does not change store ownership. Service authentication, caller scopes, and
-protected network transport are required deployment contracts; exact mechanisms remain to be selected.
-Tool annotations
-describe effects accurately but do not enforce permissions. See the [SDK research note](../journal/notes/mcp-go-sdk.md).
-
-Treat facet payloads and source documents as evidence, including any text that looks like instructions.
-They cannot authorize tool use or change the user's request. Carry provenance and evidence kind so
-the client can distinguish a user assertion, a device observation, an extraction, and a proposed finding.
+A client that needs an operation this document does not offer asks for it here. It does not
+assemble one from smaller reads, and it reports an unsupported operation as unsupported.
 
 ## 9. Acceptance scenarios
 
@@ -496,17 +472,17 @@ the client can distinguish a user assertion, a device observation, an extraction
    resolution. A type that cannot represent the known date precision refuses rather than inventing time.
 8. **Missing evidence:** unavailable source, no matching facets, incomplete coverage, wrong ledger,
    missing template history, and expired/missing artifact produce distinct truthful results.
-9. **Uncertain extraction:** a model-read lab value cannot use `log_assertion` to impersonate a user
+9. **Uncertain extraction:** a model-read lab value cannot use `SubmitAssertion` to impersonate a user
    statement. Unsupported proposed admission returns an explicit capability limitation.
 10. **Recovery:** rebuilding derived indexes preserves authored submissions and historical receipts;
-    restarting the MCP process loses no admitted fact or durable pending assertion.
-11. **Service ownership:** CLI, inspector, MCP, and scheduled ingest work without database mounts.
+    restarting a client process loses no admitted fact or durable pending assertion.
+11. **Service ownership:** every client and scheduled ingest works without database mounts.
     Concurrent ingest and conversational writes are bounded and recoverable. Restarting the service
     reconciles pending submissions; an outage never causes a client to open shared database files.
 
-Exercise these through a real SDK client/server pair and real temporary ledger, operational, source,
-and artifact files. Core query tests compare checkpoint-derived answers to full folds. Adapter tests
-verify contracts, cancellation, discovery, and effects rather than reproducing domain algorithms.
+Exercise these against a real service over real temporary ledger, operational, source, and artifact
+files. Core query tests compare checkpoint-derived answers to full folds. Each client owns its own
+scenarios over these operations; the MCP adapter's are in its repository.
 
 ## 10. Delivery boundaries and remaining decisions
 
@@ -514,7 +490,7 @@ As inspected on 2026-10-07, Anam has records-file capture, bundled Definitions, 
 projections, ledger folds/as-of reads, receipt publication/verification, and bucket minting. That is
 substantial reuse, but not an existing application API with all contracts above.
 
-| Stage | Deliverable | Prerequisites owned outside the MCP adapter |
+| Stage | Deliverable | Prerequisites owned by the core and the service |
 |---|---|---|
 | 0 | Anam service in Docker on Unraid, SQLite on verified local persistent storage | Single store owner, versioned service API, authentication, bounded work scheduling, lifecycle and backup procedures; CLI/scheduler routed through the service |
 | 1 | Discovery and timeline conversations with exact evidence | Callable core query/publication seam, ledger-bound receipts, durable query metadata, stable paging, sufficient authorized projections |
@@ -523,8 +499,8 @@ substantial reuse, but not an existing application API with all contracts above.
 | 4 | Richer provenance, changes, proposals, operator profile | Versioned source evidence resolver, governed change semantics, real proposed/review lifecycle, operational recovery APIs |
 
 Stages describe dependency boundaries, not a requirement to postpone useful reads until every
-operational capability exists. The MCP adapter can be developed against narrow contract fixtures while
-core agents implement the application seams. It must report unsupported features honestly.
+operational capability exists. A client adopts each operation as the service implements it and
+reports the rest as unsupported.
 
 Decisions still needing agreement before their dependent implementation:
 
@@ -532,7 +508,7 @@ Decisions still needing agreement before their dependent implementation:
 - How date-only precision is carried in core metadata and how legacy zoneless sources are handled.
 - The series tie rule and whether all change events carry enough state for latest-facet snapshots.
   A dose-change facet must carry the state the snapshot promises, or the core needs an explicit
-  reducer; MCP must not fill missing regimen fields by an undocumented merge of payloads.
+  reducer; no client may fill missing regimen fields by an undocumented merge of payloads.
 - The source writer's ownership/concurrency protocol, revision history, and scheduled-ingest integration.
 - Receipt format/versioning for query parameters, ledger identity, exact evidence references, and
   historical interpretation; publication retention and limits for frequent conversational reads.
@@ -543,11 +519,11 @@ Decisions still needing agreement before their dependent implementation:
 **Hickey, structure:** keep the query a value; keep knowledge position separate from fact-time selection;
 keep assertion identity separate from transport retry identity; keep the source assertion separate from
 its admission outcome. Definitions and templates remain versioned data. The strongest risk of accidental
-complexity is rebuilding a domain model inside MCP to compensate for a missing core operation. Refuse
+complexity is rebuilding a domain model inside a client to compensate for a missing core operation. Refuse
 that shortcut. The source writer is a substantive new responsibility and must be named as such.
 
-**Armstrong, runtime:** the ledger/gate remains the error kernel. The MCP process can die at any request
-boundary and be restarted by its local client (or by a service supervisor if deployed remotely).
+**Armstrong, runtime:** the ledger/gate remains the error kernel. A client process can die at any
+request boundary and be restarted by whatever launched it.
 The Anam service is independently supervised by Docker and is the sole normal store owner; losing
 it makes API operations unavailable until restart, while durable work remains recoverable.
 Read failure produces an error or an unreferenced published value, never a fabricated partial answer.

@@ -209,6 +209,7 @@ func Serve(ctx context.Context, l Ledger, addr string, timeout time.Duration, bu
 type facetRow struct {
 	ID       string
 	Type     facet.Type
+	Source   string
 	FactTime string
 	Bucket   string
 	Version  int
@@ -217,8 +218,8 @@ type facetRow struct {
 }
 
 type indexData struct {
-	W      ledger.Watermark
-	Facets []facetRow
+	W ledger.Watermark
+	facetList
 }
 
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {
@@ -260,13 +261,14 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 		return rows[i].ID < rows[j].ID
 	})
 
-	render(w, "index.html", indexData{W: res.W, Facets: rows})
+	render(w, "index.html", indexData{W: res.W, facetList: pageFacets(rows, facetFilterOf(r), skipOf(r))})
 }
 
 func (s *Server) rowOf(f facet.Facet, st facet.Status) facetRow {
 	return facetRow{
 		ID:       f.ID,
 		Type:     f.Type,
+		Source:   f.Provenance.Source,
 		FactTime: f.FactTime.Format(time.RFC3339),
 		Bucket:   s.buckets.Of(f.FactTime).ID(),
 		Version:  f.ArtifactVersion,
@@ -471,6 +473,8 @@ func (s *Server) document(w http.ResponseWriter, r *http.Request) {
 type eventsData struct {
 	W      ledger.Watermark
 	Events []eventRow
+	// Older is the link to the page before this one; empty on the first events.
+	Older string
 }
 
 type eventRow struct {
@@ -482,16 +486,28 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), s.timeout)
 	defer cancel()
 
-	head, events, err := s.headAndEvents(ctx)
+	head, err := s.ledger.Head(ctx)
 	if err != nil {
 		httpError(w, err)
 		return
 	}
+	before, _ := strconv.ParseInt(r.URL.Query().Get("before"), 10, 64)
+	since, upto := eventPage(head, before)
+	events, err := s.ledger.Replay(ctx, since, upto)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+	events = newestFirst(events)
 	rows := make([]eventRow, len(events))
 	for i, ev := range events {
 		rows[i] = eventRow{AnamEvent: ev, AnamTimeText: ev.AnamTime.Format(time.RFC3339)}
 	}
-	render(w, "events.html", eventsData{W: head, Events: rows})
+	data := eventsData{W: head, Events: rows}
+	if since > 0 {
+		data.Older = "/events?before=" + strconv.FormatInt(int64(since)+1, 10)
+	}
+	render(w, "events.html", data)
 }
 
 // headAndEvents reads the watermark and the full anam-event stream — the inspector

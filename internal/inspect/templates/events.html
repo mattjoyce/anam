@@ -11,7 +11,7 @@
   {{template "nav.html"}}
 </header>
 
-<p class="meta">watermark <strong>W = {{.W}}</strong> · every event advances it: W ≡ seq</p>
+<p class="meta">watermark <strong>W = {{.W}}</strong> · every event advances it: W ≡ seq · newest first, {{len .Events}} shown{{if .Older}} · <a href="{{.Older}}">older</a>{{end}}</p>
 
 <div class="scroll">
 <table>
@@ -23,7 +23,7 @@
       <td class="mono">{{.AnamTimeText}}</td>
       <td><span class="kind kind-{{.Kind}}">{{.Kind}}</span></td>
       <td class="mono"><a href="/facet?id={{.FacetID}}">{{.FacetID}}</a></td>
-      <td>{{.ArtifactVersion}}</td>
+      <td><a href="/facet?id={{.FacetID}}&v={{.ArtifactVersion}}">{{.ArtifactVersion}}</a></td>
     </tr>
     {{else}}
     <tr><td colspan="5" class="dim">no anam-events yet</td></tr>
@@ -31,5 +31,6 @@
   </tbody>
 </table>
 </div>
+{{if .Older}}<p class="meta"><a href="{{.Older}}">older events</a></p>{{end}}
 </body>
 </html>

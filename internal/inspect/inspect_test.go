@@ -241,7 +241,7 @@ func TestFacetPage_UnknownIDIs404(t *testing.T) {
 	}
 }
 
-func TestEvents_ListsTheStreamInSeqOrder(t *testing.T) {
+func TestEvents_ListsTheStreamNewestFirst(t *testing.T) {
 	t.Parallel()
 	srv, _, hrID := seededServer(t)
 
@@ -252,8 +252,11 @@ func TestEvents_ListsTheStreamInSeqOrder(t *testing.T) {
 	if !strings.Contains(body, "W = 3") || !strings.Contains(body, hrID) {
 		t.Error("events page missing watermark or facet link")
 	}
-	if strings.Index(body, ">1</td>") > strings.Index(body, ">3</td>") {
-		t.Error("events not in seq order")
+	if strings.Index(body, ">3</td>") > strings.Index(body, ">1</td>") {
+		t.Error("events not newest first")
+	}
+	if strings.Contains(body, "older events") {
+		t.Error("three events offered an older page")
 	}
 }
 
@@ -304,5 +307,18 @@ func TestTimeline_TypeFilterNarrowsBandAndStripAndRidesTheLinks(t *testing.T) {
 		if !strings.Contains(all, want) {
 			t.Errorf("legend missing %s", want)
 		}
+	}
+}
+
+// The facet list narrows by status (card 85): the tombstoned facet alone.
+func TestFacetList_FiltersByStatus(t *testing.T) {
+	t.Parallel()
+	srv, bpID, hrID := seededServer(t)
+	code, body := get(t, srv.URL+"/facets?status=tombstoned")
+	if code != http.StatusOK {
+		t.Fatalf("GET /facets?status=tombstoned = %d", code)
+	}
+	if !strings.Contains(body, hrID) || strings.Contains(body, bpID) || !strings.Contains(body, "1 facets match") {
+		t.Errorf("status filter did not narrow to the tombstoned facet")
 	}
 }

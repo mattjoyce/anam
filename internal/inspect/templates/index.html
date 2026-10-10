@@ -11,25 +11,33 @@
   {{template "nav.html"}}
 </header>
 
-<p class="meta">watermark <strong>W = {{.W}}</strong> · {{len .Facets}} facets, marked at their folded status</p>
+<p class="meta">watermark <strong>W = {{.W}}</strong> · {{.Matched}} facets match, newest first, marked at their folded status{{if .Rows}} · showing {{.From}} to {{.To}}{{end}}</p>
+<form class="meta" method="get" action="/facets">
+  <label>type <select name="type"><option value="">any</option>{{$f := .Filter}}{{range .Types}}<option{{if eq . $f.Type}} selected{{end}}>{{.}}</option>{{end}}</select></label>
+  <label>status <select name="status"><option value="">any</option>{{range .Statuses}}<option{{if eq . $f.Status}} selected{{end}}>{{.}}</option>{{end}}</select></label>
+  <label>source <select name="source"><option value="">any</option>{{range .Sources}}<option{{if eq . $f.Source}} selected{{end}}>{{.}}</option>{{end}}</select></label>
+  <button>filter</button>
+</form>
+{{if or .Newer .Older}}<p class="meta">{{if .Newer}}<a href="{{.Newer}}">newer</a>{{end}}{{if and .Newer .Older}} · {{end}}{{if .Older}}<a href="{{.Older}}">older</a>{{end}}</p>{{end}}
 
 <div class="scroll">
 <table>
   <thead>
-    <tr><th>fact time</th><th>bucket</th><th>type</th><th>facet</th><th>v</th><th>status</th></tr>
+    <tr><th>fact time</th><th>bucket</th><th>type</th><th>source</th><th>facet</th><th>v</th><th>status</th></tr>
   </thead>
   <tbody>
-    {{range .Facets}}
+    {{range .Rows}}
     <tr>
       <td class="mono">{{.FactTime}}</td>
       <td class="mono dim">{{.Bucket}}</td>
       <td>{{.Type}}</td>
+      <td>{{.Source}}</td>
       <td class="mono"><a href="/facet?id={{.ID}}">{{.ID}}</a></td>
       <td>{{.Version}}</td>
       <td><span class="kind kind-{{.Status}}">{{.Status}}</span></td>
     </tr>
     {{else}}
-    <tr><td colspan="6" class="dim">the ledger is empty — nothing has been admitted yet</td></tr>
+    <tr><td colspan="7" class="dim">no facet matches{{if not .Matched}} (the ledger may be empty){{end}}</td></tr>
     {{end}}
   </tbody>
 </table>

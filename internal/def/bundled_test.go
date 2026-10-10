@@ -230,7 +230,9 @@ func TestBundled_LabResultAdmitsAnUntimedDraw(t *testing.T) {
 
 // Card 83: blood pressure v4 is the Open mHealth blood-pressure-4.0 body with the
 // source's own fields beside it. Its identity and fact time are v3's, so the guard
-// passes and the readings supersede in place; a v3-shaped payload is refused.
+// passes and the readings supersede in place; a v3-shaped payload is refused. Card
+// 97: v5 names the six export columns v4 refused, as text, so one ticked checkbox
+// no longer stops the export. The bundled file is byte for byte the importer's.
 func TestBundled_BloodPressureIsAnOMHBody(t *testing.T) {
 	t.Parallel()
 	reg, err := def.Bundled()
@@ -241,7 +243,7 @@ func TestBundled_BloodPressureIsAnOMHBody(t *testing.T) {
 	if !ok {
 		t.Fatal("no bundled health.blood-pressure")
 	}
-	if d.Version != 4 || d.FactTime.Pointer != "/date_excel" || len(d.IdentityKey) != 2 {
+	if d.Version != 5 || d.FactTime.Pointer != "/date_excel" || len(d.IdentityKey) != 2 {
 		t.Fatalf("v%d fact time %s identity %v", d.Version, d.FactTime.Pointer, d.IdentityKey)
 	}
 	decode := func(s string) map[string]any {
@@ -259,6 +261,12 @@ func TestBundled_BloodPressureIsAnOMHBody(t *testing.T) {
 		"body_posture": "sitting", "pulse": "64.0", "location": "Left arm"}`
 	if err := d.Check(decode(v4)); err != nil {
 		t.Errorf("a v4 payload was refused: %v", err)
+	}
+	v5 := strings.Replace(v4, `"location": "Left arm"}`, `"location": "Left arm",
+		"irregular_heartbeat": "Yes", "dizzy_light_headed": "Yes", "temperature_celsius": "36.6",
+		"blood_glucose_mg_dl": "95", "oxygen_saturation_pct": "98", "tags": "morning;fasting"}`, 1)
+	if err := d.Check(decode(v5)); err != nil {
+		t.Errorf("a v5 payload with every export column was refused: %v", err)
 	}
 	for name, payload := range map[string]string{
 		"v3 shape":  `{"date_excel": "2026-1-24 06:30:00", "reading": "1", "systolic": "128.0", "diastolic": "79.0"}`,

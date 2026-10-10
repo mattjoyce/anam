@@ -50,7 +50,9 @@ func TestFieldsOf_AnnotationsAndRoles(t *testing.T) {
 	      "id": {"type": "string", "minLength": 1, "description": "the row's own id", "examples": ["r-1"]},
 	      "at": {"type": "string", "minLength": 1},
 	      "sets": {"type": "array", "items": {"type": "object", "additionalProperties": false,
-	        "properties": {"reps": {"type": "integer", "minimum": 1}}}}}}}`)
+	        "properties": {"reps": {"type": "integer", "minimum": 1}}}},
+	      "metrics": {"type": "object", "additionalProperties": {"type": "object", "additionalProperties": false,
+	        "properties": {"avg": {"type": "number", "description": "the mean"}}}}}}}`)
 	d, err := def.Parse(body)
 	if err != nil {
 		t.Fatalf("def.Parse: %v", err)
@@ -73,10 +75,16 @@ func TestFieldsOf_AnnotationsAndRoles(t *testing.T) {
 	if r, ok := byPtr["/sets[]/reps"]; !ok || r.Depth != 1 || r.Type != "integer" || len(r.Notes) != 1 {
 		t.Errorf("/sets[]/reps row = %+v (present %v)", r, ok)
 	}
+	if r, ok := byPtr["/metrics/*/avg"]; !ok || r.Description != "the mean" || r.Depth != 1 {
+		t.Errorf("/metrics/*/avg row = %+v (present %v)", r, ok)
+	}
+	if byPtr["/metrics"].Type != "map of object" {
+		t.Errorf("/metrics type = %q", byPtr["/metrics"].Type)
+	}
 	if byPtr["/sets"].Type != "array of object" {
 		t.Errorf("/sets type = %q", byPtr["/sets"].Type)
 	}
-	if n := described(rows); n != 1 {
-		t.Errorf("described = %d, want 1", n)
+	if n := described(rows); n != 2 {
+		t.Errorf("described = %d, want 2 (/id and /metrics/*/avg)", n)
 	}
 }

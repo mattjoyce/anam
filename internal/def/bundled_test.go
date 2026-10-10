@@ -1,6 +1,7 @@
 package def_test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -35,8 +36,8 @@ func TestBundled_HoldsTheHealthDBTypes(t *testing.T) {
 			t.Errorf("no bundled definition for %s", typ)
 			continue
 		}
-		if d.Version != 2 || d.Classification != facet.ClassificationSensitive {
-			t.Errorf("%s = v%d %s, want v2 Sensitive", typ, d.Version, d.Classification)
+		if d.Version != 3 || d.Classification != facet.ClassificationSensitive {
+			t.Errorf("%s = v%d %s, want v3 Sensitive", typ, d.Version, d.Classification)
 		}
 		// All four share the identity grain: one facet per (group, period_type,
 		// period_start). The worker composes source_ref on the same promise.
@@ -196,5 +197,32 @@ func TestRegistry_Identify(t *testing.T) {
 	}
 	if _, err := reg.Identify(facet.Envelope{Type: "no.such", Source: "documents", Payload: payload}); err == nil {
 		t.Error("Identify composed a ref for a type with no Definition")
+	}
+}
+
+// The lab extraction script writes time_unknown on a draw whose report printed no
+// time. The bundled lab.result must admit what its own extractor writes.
+func TestBundled_LabResultAdmitsAnUntimedDraw(t *testing.T) {
+	t.Parallel()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatalf("def.Bundled: %v", err)
+	}
+	d, ok := reg.Lookup("lab.result")
+	if !ok {
+		t.Fatal("no bundled lab.result")
+	}
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(`{"id": "acl:12345678/potassium", "collected": "2026-03-04 00:00",
+		"analyte": "Potassium", "value": "4.6", "lab_number": "12345678", "time_unknown": true}`), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Check(payload); err != nil {
+		t.Errorf("an untimed draw was refused: %v", err)
+	}
+	// The field is declared, not ignored: a value of the wrong type is still refused.
+	payload["time_unknown"] = "yes"
+	if err := d.Check(payload); err == nil {
+		t.Error("time_unknown as a string was admitted")
 	}
 }

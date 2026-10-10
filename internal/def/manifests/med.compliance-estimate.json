@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "med.compliance-estimate",
-    "definition_version": 2,
+    "definition_version": 3,
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "records/med.compliance-estimate",
@@ -13,18 +13,19 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The person's own estimate of how well they kept to one course over a period, stated on a date. Written by hand into a records file; Anam stores the figure and does not judge it.",
     "type": "object",
     "required": ["id", "date", "drug", "course", "period_start", "period_end", "estimate"],
     "properties": {
-      "course": {"type": "number"},
-      "date": {"type": "string", "minLength": 1},
-      "drug": {"type": "string", "minLength": 1},
-      "estimate": {"type": "number", "minimum": 0, "maximum": 1},
-      "id": {"type": "string", "minLength": 1},
-      "note": {"type": "string", "minLength": 1},
-      "period_end": {"type": "string", "minLength": 1},
-      "period_start": {"type": "string", "minLength": 1},
-      "source_note": {"type": "string", "minLength": 1}
+      "course": {"type": "number", "description": "Which course of the drug the estimate is about, as in the med.regimen series.", "examples": [1]},
+      "date": {"type": "string", "minLength": 1, "description": "The day the estimate was made, YYYY-MM-DD. This is the fact time, not the period.", "examples": ["2026-02-01"]},
+      "drug": {"type": "string", "minLength": 1, "description": "The generic drug name in lower case, matching the drug of the course's med.started row.", "examples": ["examplazole"]},
+      "estimate": {"type": "number", "minimum": 0, "maximum": 1, "description": "The share of doses the person reckons they took over the period, as a fraction (0.95 for 95%). Their figure, not computed.", "examples": [0.95]},
+      "id": {"type": "string", "minLength": 1, "description": "Identity, chosen by the writer."},
+      "note": {"type": "string", "minLength": 1, "description": "Anything the person said alongside the figure."},
+      "period_end": {"type": "string", "minLength": 1, "description": "The last day the estimate covers, YYYY-MM-DD, inclusive.", "examples": ["2026-01-31"]},
+      "period_start": {"type": "string", "minLength": 1, "description": "The first day the estimate covers, YYYY-MM-DD, inclusive.", "examples": ["2026-01-01"]},
+      "source_note": {"type": "string", "minLength": 1, "description": "Where the estimate was recorded and in what words. Writer's text."}
     },
     "additionalProperties": false
   }

@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "health.blood-pressure",
-    "definition_version": 2,
+    "definition_version": 3,
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "bp-csv/reading",
@@ -13,24 +13,25 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One blood pressure reading, as the source wrote it. Two sources write this type: the phone app's CSV export (source bp-csv, one row per reading) and the blood pressure diary read into a records file. Values are the source's own text, never converted; a field the source left blank is absent, not zero.",
     "type": "object",
     "required": ["date_excel", "reading", "systolic", "diastolic"],
     "properties": {
-      "comment": {"type": "string", "minLength": 1},
-      "date": {"type": "string", "minLength": 1},
-      "date_excel": {"type": "string", "minLength": 1},
-      "diastolic": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$"},
-      "id": {"type": "string", "minLength": 1},
-      "location": {"type": "string", "minLength": 1},
-      "map": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$"},
-      "missed_medication": {"type": "string", "minLength": 1},
-      "note": {"type": "string", "minLength": 1},
-      "posture": {"type": "string", "minLength": 1},
-      "pp": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$"},
-      "pulse": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$"},
-      "reading": {"type": "string", "minLength": 1},
-      "systolic": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$"},
-      "weight_kg": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$"}
+      "comment": {"type": "string", "minLength": 1, "description": "Free-text comment typed in the app, verbatim, typos included.", "examples": ["after coffee"]},
+      "date": {"type": "string", "minLength": 1, "description": "The same moment in the app's display form, \"Date\" column, kept as written. Not used to place the reading.", "examples": ["24 January 2026 6:30"]},
+      "date_excel": {"type": "string", "minLength": 1, "description": "When the reading was taken, as the export's \"Date (Excel)\" column writes it: local wall-clock time in Sydney, no zero padding on month or day. This is the fact time.", "examples": ["2026-1-24 06:30:00"]},
+      "diastolic": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$", "description": "Diastolic pressure as the source printed it, in mmHg.", "examples": ["79.0"]},
+      "id": {"type": "string", "minLength": 1, "description": "The records row's id, which the diary rows write as date_excel and reading joined by a colon. Diary rows only; bp-csv rows have none.", "examples": ["2026-1-24 06:30:00:1"]},
+      "location": {"type": "string", "minLength": 1, "description": "Where the cuff was, as written in the \"Location\" column.", "examples": ["Left arm"]},
+      "map": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$", "description": "Mean arterial pressure in mmHg, as the diary printed it. Computed by the diary's app, not by Anam. Diary rows only.", "examples": ["95"]},
+      "missed_medication": {"type": "string", "minLength": 1, "description": "The export's \"Missed medication\" column, as written. Present only when the app recorded it."},
+      "note": {"type": "string", "minLength": 1, "description": "A note printed beside the reading in the diary. Diary rows only.", "examples": ["before medication"]},
+      "posture": {"type": "string", "minLength": 1, "description": "Body position during the reading, \"Posture\" column, as written.", "examples": ["Seated"]},
+      "pp": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$", "description": "Pulse pressure (systolic minus diastolic) in mmHg, as the diary printed it. Diary rows only.", "examples": ["49"]},
+      "pulse": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$", "description": "Pulse as the source printed it, in beats per minute.", "examples": ["64.0"]},
+      "reading": {"type": "string", "minLength": 1, "description": "Which reading this is among those taken at the same date_excel, counting from 1 in file order. Not in the source: the bp-csv worker adds it, because the device can take several readings in one minute and the export gives them no id. With date_excel it is the identity.", "examples": ["1"]},
+      "systolic": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$", "description": "Systolic pressure as the source printed it, in mmHg (the device's unit; Anam does not check it).", "examples": ["128.0"]},
+      "weight_kg": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$", "description": "Body weight entered alongside the reading, \"Weight [kg]\" column, in kilograms as written.", "examples": ["82.4"]}
     },
     "additionalProperties": false
   }

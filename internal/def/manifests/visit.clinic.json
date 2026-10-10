@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "visit.clinic",
-    "definition_version": 2,
+    "definition_version": 3,
     "classification": "Confidential",
     "validation_mode": "strict",
     "source_schema": "records/visit.clinic",
@@ -13,19 +13,20 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One appointment with a clinic or practitioner. Written by hand readings of appointment emails, letters and reports.",
     "type": "object",
     "required": ["id", "date", "provider"],
     "properties": {
-      "date": {"type": "string", "minLength": 1},
-      "id": {"type": "string", "minLength": 1},
-      "kind": {"type": "string", "minLength": 1},
-      "location": {"type": "string", "minLength": 1},
-      "note": {"type": "string", "minLength": 1},
-      "outcome": {"type": "string", "minLength": 1},
-      "provider": {"type": "string", "minLength": 1},
-      "purpose": {"type": "string", "minLength": 1},
-      "specialty": {"type": "string", "minLength": 1},
-      "time_unknown": {"type": "boolean"}
+      "date": {"type": "string", "minLength": 1, "description": "The appointment's date and time, YYYY-MM-DD HH:MM in Sydney local time; 00:00 when time_unknown is true. This is the fact time.", "examples": ["2026-03-04 09:45"]},
+      "id": {"type": "string", "minLength": 1, "description": "Identity, chosen by the reader: a slug for the provider and the date.", "examples": ["example-clinic:2026-03-04"]},
+      "kind": {"type": "string", "minLength": 1, "description": "What sort of appointment the source called it, as written."},
+      "location": {"type": "string", "minLength": 1, "description": "The address as the source gave it."},
+      "note": {"type": "string", "minLength": 1, "description": "Anything else the reader took from the source about this visit."},
+      "outcome": {"type": "string", "minLength": 1, "description": "What came of the visit, in the reader's words from the source."},
+      "provider": {"type": "string", "minLength": 1, "description": "The practitioner or practice as the source named them.", "examples": ["Dr Jane Example"]},
+      "purpose": {"type": "string", "minLength": 1, "description": "Why the visit was booked, as the source put it."},
+      "specialty": {"type": "string", "minLength": 1, "description": "The provider's field, in the reader's words, lower case.", "examples": ["general practice"]},
+      "time_unknown": {"type": "boolean", "description": "True when the source gives the day but no time, so the 00:00 in date is a placeholder. Absent otherwise.", "examples": [true]}
     },
     "additionalProperties": false
   }

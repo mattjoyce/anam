@@ -167,8 +167,9 @@ func (s *Server) definitionPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // fieldRow is one field of a Definition's payload schema, keyed by its JSON Pointer.
-// A field inside an array's items is written with "[]" after the array's name, a
-// display form: no meta pointer reaches into an array.
+// A field inside an array's items is written with "[]" after the array's name, and a
+// field inside each value of a map with "/*" after the map's name: display forms, as
+// no meta pointer reaches into either.
 type fieldRow struct {
 	Pointer     string
 	Depth       int
@@ -260,6 +261,11 @@ func walkFields(node map[string]any, at string, depth int, roles map[string][]st
 		if items, ok := sub["items"].(map[string]any); ok {
 			if _, ok := items["properties"].(map[string]any); ok {
 				walkFields(items, ptr+"[]", depth+1, roles, rows)
+			}
+		}
+		if values, ok := sub["additionalProperties"].(map[string]any); ok {
+			if _, ok := values["properties"].(map[string]any); ok {
+				walkFields(values, ptr+"/*", depth+1, roles, rows)
 			}
 		}
 	}

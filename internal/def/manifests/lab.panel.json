@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "lab.panel",
-    "definition_version": 2,
+    "definition_version": 3,
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "records/lab.panel",
@@ -13,26 +13,27 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One pathology request as a lab reported it: the header facts of one draw's report section, read into a records file. Written by scripts/extract-acl-pathology.py for Australian Clinical Labs PDFs and by hand readings of other reports. Text is as printed unless a field says the extraction reformatted it.",
     "type": "object",
     "required": ["id", "collected", "panel", "lab_number"],
     "properties": {
-      "clinical_notes": {"type": "string", "minLength": 1},
-      "collected": {"type": "string", "minLength": 1},
-      "comment": {"type": "string", "minLength": 1},
-      "fasting": {"type": "boolean"},
-      "id": {"type": "string", "minLength": 1},
-      "lab": {"type": "string", "minLength": 1},
-      "lab_number": {"type": "string", "minLength": 1},
-      "lab_ref": {"type": "string", "minLength": 1},
-      "note": {"type": "string", "minLength": 1},
-      "panel": {"type": "string", "minLength": 1},
-      "reported": {"type": "string", "minLength": 1},
-      "reported_by": {"type": "string", "minLength": 1},
-      "requested": {"type": "string", "minLength": 1},
-      "requested_by": {"type": "string", "minLength": 1},
-      "section": {"type": "string", "minLength": 1},
-      "specimen": {"type": "string", "minLength": 1},
-      "your_reference": {"type": "string", "minLength": 1}
+      "clinical_notes": {"type": "string", "minLength": 1, "description": "The request's clinical notes as printed on the report, verbatim. Hand readings only; the script does not read it."},
+      "collected": {"type": "string", "minLength": 1, "description": "When the sample was drawn, the report's COLLECTED field, reformatted by the extraction from DD/MM/YY to YYYY-MM-DD HH:MM in Sydney local time. A draw with no printed time takes one from the extractor's --known-times, or 00:00. This is the fact time.", "examples": ["2026-03-04 08:15"]},
+      "comment": {"type": "string", "minLength": 1, "description": "The lab's comment for this draw, as printed below the results, with line breaks and runs of spaces collapsed to single spaces by the extraction.", "examples": ["Fasting specimen."]},
+      "fasting": {"type": "boolean", "description": "Whether the report says the patient fasted. Derived by the extraction from the printed \"Fasting status\" line (the script) or read from the report (hand readings); absent when the report says nothing.", "examples": [true]},
+      "id": {"type": "string", "minLength": 1, "description": "Identity, chosen at extraction and deterministic from the content: the lab's prefix, the lab number, \"panel\", and the panel name as a slug.", "examples": ["acl:12345678/panel/lipid-studies"]},
+      "lab": {"type": "string", "minLength": 1, "description": "The lab that did the work. The script writes \"Australian Clinical Labs\" for every record, a constant rather than text read from the report; hand readings write the lab's name as the report gives it.", "examples": ["Example Pathology"]},
+      "lab_number": {"type": "string", "minLength": 1, "description": "The lab's number for this draw, as printed (7 or 8 digits), kept as text. One draw is one collection event, shared by the panel and its results.", "examples": ["12345678"]},
+      "lab_ref": {"type": "string", "minLength": 1, "description": "The report's \"Lab REF\" header field, as printed. The script takes the lab number from its second part."},
+      "note": {"type": "string", "minLength": 1, "description": "A note by whoever read the report, saying what the reading settled or doubted (a misprinted date, which page decided it). Not report text."},
+      "panel": {"type": "string", "minLength": 1, "description": "The panel heading as printed above the result table, in the report's capitals.", "examples": ["LIPID STUDIES"]},
+      "reported": {"type": "string", "minLength": 1, "description": "When the lab reported, the report's REPORTED field, reformatted by the extraction to YYYY-MM-DD HH:MM.", "examples": ["2026-03-05 14:20"]},
+      "reported_by": {"type": "string", "minLength": 1, "description": "The person the report names as reporting, as printed. Hand readings only."},
+      "requested": {"type": "string", "minLength": 1, "description": "The date the test was requested, the report's REFERRED field, reformatted by the extraction to YYYY-MM-DD.", "examples": ["2026-03-02"]},
+      "requested_by": {"type": "string", "minLength": 1, "description": "The requesting doctor as printed on the report. Hand readings only.", "examples": ["Dr Jane Example"]},
+      "section": {"type": "string", "minLength": 1, "description": "The report's section heading for this panel (such as BIOCHEMISTRY), as printed. Hand readings only, and rare."},
+      "specimen": {"type": "string", "minLength": 1, "description": "The specimen as printed after \"SPECIMEN:\", in the report's capitals.", "examples": ["SERUM"]},
+      "your_reference": {"type": "string", "minLength": 1, "description": "A reference number printed on the report under \"Your reference\" or similar, as written. Hand readings of older reports only."}
     },
     "additionalProperties": false
   }

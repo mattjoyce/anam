@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "travel.flight",
-    "definition_version": 2,
+    "definition_version": 3,
     "classification": "Confidential",
     "validation_mode": "strict",
     "source_schema": "records/travel.flight",
@@ -13,20 +13,21 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One flight leg, one row in a records file (source records), written from itineraries and booking emails. A point beside its trip, outside the travel.trip series; values are the row's own text.",
     "type": "object",
     "required": ["id", "date", "trip", "from", "to"],
     "properties": {
-      "airline": {"type": "string", "minLength": 1},
-      "arrives": {"type": "string", "minLength": 1},
-      "booking": {"type": "string", "minLength": 1},
-      "date": {"type": "string", "minLength": 1},
-      "flight": {"type": "string", "minLength": 1},
-      "from": {"type": "string", "minLength": 1, "pattern": "^[A-Z]{3}$"},
-      "id": {"type": "string", "minLength": 1},
-      "note": {"type": "string", "minLength": 1},
-      "to": {"type": "string", "minLength": 1, "pattern": "^[A-Z]{3}$"},
-      "trip": {"type": "string", "minLength": 1},
-      "via": {"type": "string", "minLength": 1}
+      "airline": {"type": "string", "minLength": 1, "description": "The airline's name as written, where the row names it."},
+      "arrives": {"type": "string", "minLength": 1, "description": "When the flight landed or was due to land, free text as written: usually YYYY-MM-DD, sometimes a phrase. Its zone is not stated.", "examples": ["2019-03-05"]},
+      "booking": {"type": "string", "minLength": 1, "description": "The booking reference as written; two references joined by \" / \" when the leg was on two bookings.", "examples": ["K7QXZB"]},
+      "date": {"type": "string", "minLength": 1, "description": "The day the flight left, in the departure airport's local time, written as YYYY-MM-DD and that airport's UTC offset. The offset is part of the value, so a leg is placed where it left. This is the fact time.", "examples": ["2019-03-04 +08:00"]},
+      "flight": {"type": "string", "minLength": 1, "description": "The flight number as written; a connection on one ticket may be two numbers joined by \" / \".", "examples": ["ZX441"]},
+      "from": {"type": "string", "minLength": 1, "pattern": "^[A-Z]{3}$", "description": "The departure airport's IATA code, three upper-case letters.", "examples": ["QXA"]},
+      "id": {"type": "string", "minLength": 1, "description": "The row id the records file assigns, chosen once, written as <origin>:<trip>/flight/<departure date>/<from>-<to>. This is the identity.", "examples": ["travel:2019-03-westmere/flight/2019-03-04/QXA-QXB"]},
+      "note": {"type": "string", "minLength": 1, "description": "Free text about the leg, as written.", "examples": ["delayed 3 hours"]},
+      "to": {"type": "string", "minLength": 1, "pattern": "^[A-Z]{3}$", "description": "The arrival airport's IATA code, three upper-case letters.", "examples": ["QXB"]},
+      "trip": {"type": "string", "minLength": 1, "description": "The trip key of the trip this leg belongs to, the same text the trip's departed, arrived and returned rows carry. It groups the leg with the trip but does not place it in the series.", "examples": ["2019-03-westmere"]},
+      "via": {"type": "string", "minLength": 1, "description": "The IATA code of an airport the leg stopped at on the way, as written.", "examples": ["QXC"]}
     },
     "additionalProperties": false
   }

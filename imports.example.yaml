@@ -3,11 +3,18 @@
 # ~/.config/anam/imports.yaml), or point at it with --imports / $ANAM_IMPORTS.
 #
 # Paths are expanded on load: ~ and $VARs work. At ingest time each path must
-# resolve (symlinks followed) to an existing regular file.
+# resolve (symlinks followed) to an existing file or, for records and documents,
+# a directory.
+#
+# Three sources are built in: health-db (the ETL's healthdata.db), records
+# (hand-written YAML records) and documents (a folder of files with sidecars).
+# Everything else reaches Anam through an importer in the anam-importers
+# repository, under its own token (docs/IMPORTERS.md §8): Withings and the blood
+# pressure export went that way on 2026-10-10 (cards 54 and 80).
 imports:
   - source: health-db
     path: /mnt/Projects/healthdata/healthdata.db
-  - source: bp-csv
-    path: ~/exports/BloodPressure.csv
-  - source: withings
-    path: ~/exports/withings.db
+  - source: records
+    path: ~/anam/records
+  - source: documents
+    path: ~/anam/documents

@@ -100,9 +100,12 @@ func Timeline(ctx context.Context, src Source, q api.TimelineQuery) (api.Timelin
 		src.Checkpoints = nil
 	}
 	var v view
-	if narrow(src, q, b) {
+	switch {
+	case narrow(src, q, b):
 		v, err = readWindow(ctx, src, asOf, b)
-	} else {
+	case snapshotPrefix(src, q):
+		v, err = readSnapshotPrefix(ctx, src, asOf, at)
+	default:
 		v, err = readView(ctx, src, asOf, q.Projection, at)
 	}
 	if err != nil {
@@ -228,6 +231,36 @@ func readView(ctx context.Context, src Source, asOfTime time.Time, projName, at 
 func narrow(src Source, q api.TimelineQuery, b bounds) bool {
 	return src.Checkpoints != nil && src.Artifacts != nil &&
 		q.Projection == "" && q.At == "" && !q.Explain && (b.from != "" || b.toX != "")
+}
+
+// snapshotPrefix reports whether q is a snapshot that can be read from the buckets up
+// to its fact-time alone: one with no projection (a projection's served hash is over
+// its whole value). A snapshot at D looks only at entries at or before D, and the
+// prefix from the first bucket to D's holds every series' history up to D, the start
+// of a series begun years earlier and any closing event included (card 64).
+func snapshotPrefix(src Source, q api.TimelineQuery) bool {
+	return src.Checkpoints != nil && src.Artifacts != nil && q.At != "" && q.Projection == "" && !q.Explain
+}
+
+// readSnapshotPrefix reads the snapshot at fact-time at from the buckets up to at's,
+// composed from checkpoints, with the whole value's size and hash for the header. It
+// is fold.Snapshot over the prefix, which is fold.Snapshot over the whole value,
+// because nothing after at can change what the snapshot keeps.
+func readSnapshotPrefix(ctx context.Context, src Source, asOfTime time.Time, at string) (view, error) {
+	t, err := clock.Parse(at)
+	if err != nil {
+		return view{}, err
+	}
+	v, err := readWindow(ctx, src, asOfTime, bounds{toX: clock.Format(t.Add(time.Nanosecond))})
+	if err != nil {
+		return view{}, err
+	}
+	snap, err := fold.Snapshot(v.shown, at, v.defs.Closes)
+	if err != nil {
+		return view{}, err
+	}
+	v.at, v.shown = at, snap
+	return v, nil
 }
 
 // readWindow reads the buckets b overlaps, and the whole value's size and hash, at the

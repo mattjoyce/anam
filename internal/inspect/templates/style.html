@@ -28,7 +28,8 @@
   .role { display: inline-block; padding: 0 .4rem; margin-right: .25rem; border-radius: 4px; font-size: .75rem; border: 1px solid currentColor; opacity: .85; }
   .undescribed { opacity: .55; font-style: italic; }
   .scroll { overflow-x: auto; }
-  td.mono, td .mono { overflow-wrap: anywhere; }
+  /* long pointers wrap in the two tables that hold them; wide lists scroll sideways instead */
+  table.kv td.mono, table.kv td .mono, table.fields td.mono, table.fields td .mono { overflow-wrap: anywhere; }
   .role { font-family: system-ui, sans-serif; }
   @media (max-width: 40rem) {
     body { margin: 1rem auto; font-size: 14px; }

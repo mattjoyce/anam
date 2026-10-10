@@ -39,7 +39,7 @@ func TestSnapshot_CompletesWhenEveryPartIsAdmitted(t *testing.T) {
 		t.Fatalf("after part 3: %+v, %v", s, err)
 	}
 	got, ok, err := db.NewestCompleteSnapshot(ctx, "withings")
-	if err != nil || !ok || got.ID != "run-1" || got.CompletedW != 9 {
+	if err != nil || !ok || got.ID != "run-1" || got.StartedW != 1 || got.CompletedW != 9 {
 		t.Fatalf("newest complete = %+v %v %v", got, ok, err)
 	}
 	carried, err := db.SnapshotFacets(ctx, "run-1")

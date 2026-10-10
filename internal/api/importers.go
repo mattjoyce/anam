@@ -32,14 +32,15 @@ type SnapshotProgress struct {
 
 // SnapshotReport is what Anam makes of a snapshot. Live and Absent are set once it is
 // complete: the source's live facets of its types, and those it did not carry and
-// that nothing has touched since it completed. Nothing is tombstoned by it; that is
-// an operator's anam retract --yes.
+// that nothing has touched since it began (started_w). Nothing is tombstoned by it;
+// that is an operator's anam retract --yes.
 type SnapshotReport struct {
 	SnapshotProgress
 	Source      string   `json:"source"`
 	Types       []string `json:"types"`
 	Carried     int      `json:"carried"`
 	StartedAt   string   `json:"started_at"`
+	StartedW    int64    `json:"started_w"`
 	CompletedAt string   `json:"completed_at,omitempty"`
 	CompletedW  int64    `json:"completed_w,omitempty"`
 	Live        *int     `json:"live,omitempty"`

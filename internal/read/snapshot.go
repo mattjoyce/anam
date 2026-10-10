@@ -17,19 +17,21 @@ type FacetHistory interface {
 }
 
 // SnapshotScope is what a complete snapshot speaks for: one source's facets of some
-// types, as they stood when its last part was admitted.
+// types, as they stood when the run began. StartedW is the watermark just after its
+// first part was admitted.
 type SnapshotScope struct {
-	Source     string
-	Types      []string
-	Carried    map[string]bool
-	CompletedW ledger.Watermark
+	Source   string
+	Types    []string
+	Carried  map[string]bool
+	StartedW ledger.Watermark
 }
 
 // Absent is what a complete snapshot says the record holds and its source no longer
 // does: the live facets of the snapshot's source and types that it did not carry, and
-// whose last event is at or before the snapshot completed. A facet touched after that
-// may have come from a later incremental run, so it is never called absent. live is
-// how many facets of the source and types are live now. Entries are in timeline order.
+// whose last event is at or before the run began. A facet touched after that was sent
+// by the run itself or by an incremental run beside it (card 94), so it is never
+// called absent. live is how many facets of the source and types are live now.
+// Entries are in timeline order.
 //
 // It reports and nothing else: a tombstone is an operator's deliberate step (card 17,
 // card 78).
@@ -58,8 +60,8 @@ func Absent(ctx context.Context, src Source, hist FacetHistory, scope SnapshotSc
 		if err != nil {
 			return nil, 0, err
 		}
-		if n := len(events); n > 0 && ledger.Watermark(events[n-1].Seq) > scope.CompletedW {
-			continue // touched since the snapshot: not its to judge
+		if n := len(events); n > 0 && ledger.Watermark(events[n-1].Seq) > scope.StartedW {
+			continue // touched since the run began: not its to judge
 		}
 		absent = append(absent, e)
 	}

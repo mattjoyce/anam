@@ -43,7 +43,7 @@ import (
 // registered_definition (card 53) and the snapshot tables (card 78) do not bump it. Open creates the table and its
 // triggers in a version-6 file as in a new one, and a build that predates it never
 // reads it, so neither build can misread the other's file.
-const schemaVersion = 6
+const schemaVersion = 7
 
 // ErrSchemaVersion is returned by Open for a database written by a different schema.
 var ErrSchemaVersion = errors.New("ops: schema version mismatch")
@@ -207,6 +207,7 @@ CREATE TABLE IF NOT EXISTS snapshot (
   types        TEXT NOT NULL,
   parts        INTEGER NOT NULL CHECK (parts >= 1),
   started_at   TEXT NOT NULL,
+  started_w    INTEGER NOT NULL,
   completed_at TEXT,
   completed_w  INTEGER
 );

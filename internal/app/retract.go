@@ -315,13 +315,13 @@ func planFromSnapshot(ctx context.Context, cmd *cobra.Command, cfg config.Config
 		return nil, 0, 0, fmt.Errorf("retract: the ledger cannot read one facet's events")
 	}
 	entries, live, err := read.Absent(ctx, src, hist, read.SnapshotScope{
-		Source: source, Types: snap.Types, Carried: carried, CompletedW: ledger.Watermark(snap.CompletedW),
+		Source: source, Types: snap.Types, Carried: carried, StartedW: ledger.Watermark(snap.StartedW),
 	})
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s: planned from snapshot %s (%s), completed %s at W=%d\n",
-		source, snap.ID, strings.Join(snap.Types, ", "), clock.Format(snap.CompletedAt), snap.CompletedW)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s: planned from snapshot %s (%s), begun at W=%d, completed %s at W=%d\n",
+		source, snap.ID, strings.Join(snap.Types, ", "), snap.StartedW, clock.Format(snap.CompletedAt), snap.CompletedW)
 	facets, err := facetsOf(ctx, src.Ledger, entries)
 	return facets, live, len(carried), err
 }

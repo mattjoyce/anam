@@ -128,7 +128,7 @@ func (d *Daemon) getSnapshot(w http.ResponseWriter, r *http.Request) {
 	}
 	rep := api.SnapshotReport{
 		SnapshotProgress: api.SnapshotProgress{ID: s.ID, Parts: s.Parts, PartsAdmitted: s.PartsAdmitted, Complete: s.Complete()},
-		Source:           s.Source, Types: s.Types, Carried: s.Carried, StartedAt: clock.Format(s.StartedAt),
+		Source:           s.Source, Types: s.Types, Carried: s.Carried, StartedAt: clock.Format(s.StartedAt), StartedW: s.StartedW,
 	}
 	if s.Complete() {
 		rep.CompletedAt, rep.CompletedW = clock.Format(s.CompletedAt), s.CompletedW
@@ -139,7 +139,7 @@ func (d *Daemon) getSnapshot(w http.ResponseWriter, r *http.Request) {
 		}
 		src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts, Definitions: d.defs.current.Load()}
 		absent, live, err := read.Absent(ctx, src, d.read, read.SnapshotScope{
-			Source: s.Source, Types: s.Types, Carried: carried, CompletedW: ledger.Watermark(s.CompletedW),
+			Source: s.Source, Types: s.Types, Carried: carried, StartedW: ledger.Watermark(s.StartedW),
 		})
 		if err != nil {
 			writeReadError(w, err)

@@ -128,3 +128,38 @@ func TestSnapshotReportAccess(t *testing.T) {
 	call(t, "GET", url+"/v1/snapshots/nope", importerToken, "", http.StatusNotFound, nil)
 	call(t, "GET", url+"/v1/snapshots/mine", "", "", http.StatusUnauthorized, nil)
 }
+
+// Card 94: a facet an incremental run admits while a resend is in flight is not the
+// resend's to call absent, even though it landed before the resend completed. Absence
+// is judged from the run's start (started_w), not its end.
+func TestSnapshotLeavesAloneWhatLandedWhileItRan(t *testing.T) {
+	cfg := importerConfig(t)
+	d, url, stop := serveImporters(t, cfg)
+	defer func() { _ = stop() }()
+	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	v := weight.Version
+
+	// Before the run: w-1 and w-2 are live; the run will carry only w-1.
+	call(t, "POST", url+"/v1/envelopes", importerToken, batch(weighIn("w-1", 80, v), weighIn("w-2", 80.5, v)), http.StatusOK, nil)
+
+	var a api.Admission
+	call(t, "POST", url+"/v1/envelopes", importerToken, snapBatch("run", 1, 2, weighIn("w-1", 80, v)), http.StatusOK, &a)
+	started := head(t, d)
+	// An incremental run lands w-3 between the parts.
+	call(t, "POST", url+"/v1/envelopes", importerToken, batch(weighIn("w-3", 81, v)), http.StatusOK, nil)
+	call(t, "POST", url+"/v1/envelopes", importerToken, snapBatch("run", 2, 2, weighIn("w-1", 80, v)), http.StatusOK, &a)
+	if !a.Snapshot.Complete {
+		t.Fatalf("after both parts: %+v", a.Snapshot)
+	}
+
+	var rep api.SnapshotReport
+	call(t, "GET", url+"/v1/snapshots/run", importerToken, "", http.StatusOK, &rep)
+	if rep.StartedW != int64(started) {
+		t.Errorf("started_w = %d, want %d, the watermark after the first part", rep.StartedW, started)
+	}
+	// w-2 was there when the run began and the run did not carry it: absent. w-3
+	// landed while the run was in flight: not its to judge.
+	if *rep.Live != 3 || *rep.Absent != 1 || len(rep.AbsentIDs) != 1 {
+		t.Fatalf("live %v absent %v ids %v", *rep.Live, *rep.Absent, rep.AbsentIDs)
+	}
+}

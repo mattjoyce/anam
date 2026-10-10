@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -12,6 +13,7 @@ import (
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/read"
+	"github.com/mattjoyce/anam/internal/receipt"
 	"github.com/mattjoyce/anam/internal/serve"
 	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ops"
@@ -202,7 +204,11 @@ func writeReceipt(cmd *cobra.Command, shown api.ReceiptShown, asJSON bool) error
 	_, _ = fmt.Fprintf(out, "  %d facets, span %s\n", len(r.FacetIDs), r.Span)
 	_, _ = fmt.Fprintf(out, "  served     %s  [intact]\n", r.ServedHash)
 	_, _ = fmt.Fprintf(out, "  definitions %s\n", r.DefinitionSetVersion)
-	_, _ = fmt.Fprintf(out, "  ledger     %s\n\n", ledgerOrUnnamed(r.LedgerID))
+	_, _ = fmt.Fprintf(out, "  ledger     %s\n", ledgerOrUnnamed(r.LedgerID))
+	if r.Query != nil {
+		_, _ = fmt.Fprintf(out, "  query      %s\n", queryLine(*r.Query))
+	}
+	_, _ = fmt.Fprintln(out)
 
 	w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintln(w, "FACT TIME\tTYPE\tSTATUS\tPAYLOAD")
@@ -273,8 +279,12 @@ func writeVerified(cmd *cobra.Command, v api.ReceiptVerified) error {
 	r, res := v.Receipt, v.Result
 	w := cmd.OutOrStdout()
 	_, _ = fmt.Fprintf(w, "receipt %s\n", v.Hash)
-	_, _ = fmt.Fprintf(w, "  served %s v%d at W=%d on %s — %d facets, span %s, ledger %s\n\n",
+	_, _ = fmt.Fprintf(w, "  served %s v%d at W=%d on %s — %d facets, span %s, ledger %s\n",
 		r.Template, r.TemplateVersion, r.Watermark, r.ServedAt, len(r.FacetIDs), r.Span, ledgerOrUnnamed(r.LedgerID))
+	if r.Query != nil {
+		_, _ = fmt.Fprintf(w, "  narrowed by %s\n", queryLine(*r.Query))
+	}
+	_, _ = fmt.Fprintln(w)
 	_, _ = fmt.Fprint(w, res.Summary())
 	if !res.OK() {
 		return fmt.Errorf("receipt %s did not verify", v.Hash)
@@ -324,6 +334,19 @@ func joinStatuses(t projection.Template) string {
 		return "(none)"
 	}
 	return out
+}
+
+// queryLine renders the narrowing a receipt records, in its own resolved instants.
+func queryLine(q receipt.Query) string {
+	var parts []string
+	for _, p := range []struct{ name, val string }{
+		{"at", q.At}, {"from", q.From}, {"before", q.Before}, {"type", q.Type},
+	} {
+		if p.val != "" {
+			parts = append(parts, p.name+" "+p.val)
+		}
+	}
+	return strings.Join(parts, ", ")
 }
 
 // ledgerOrUnnamed renders a receipt's ledger id, or says a receipt predates them.

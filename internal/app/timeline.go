@@ -19,7 +19,8 @@ import (
 
 func timelineCmd(cfgPath *string) *cobra.Command {
 	var from, to, at, typeFilter, projName, asOf string
-	var asJSON, explain bool
+	var w int64
+	var asJSON, explain, publish bool
 
 	cmd := &cobra.Command{
 		Use:   "timeline",
@@ -47,7 +48,11 @@ Four lenses compose over that read:
   --explain     show every facet with the verdict on it rather than only the ones
                 that survived — including the artifact versions since superseded.
                 This is the same decision procedure the projection applies, not a
-                second account of it.`,
+                second account of it.
+  --w           read at this watermark instead of an anam-time: the W a receipt
+                names, so a follow-up stands on the same knowledge as a citation.
+  --publish     file what is shown with a receipt, as serve does, narrowed as
+                asked (needs --projection). Verify it with anam receipt verify.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := loadRoutedConfig(*cfgPath, cmd)
 			if err != nil {
@@ -58,8 +63,21 @@ Four lenses compose over that read:
 				return err
 			}
 			q := api.TimelineQuery{
-				From: from, To: to, At: at, AsOf: asOf, Type: typeFilter, Projection: projName,
+				From: from, To: to, At: at, AsOf: asOf, W: w, Type: typeFilter, Projection: projName,
 				Explain: explain,
+			}
+			if publish {
+				p, err := publishTimeline(cmd.Context(), cfg, q)
+				if err != nil {
+					return err
+				}
+				if err := writeTimeline(cmd, p.Timeline, loc, asJSON); err != nil {
+					return err
+				}
+				r := p.Receipt
+				_, err = fmt.Fprintf(cmd.ErrOrStderr(), "published %s v%d at W=%d: receipt %s\n",
+					r.Template, r.TemplateVersion, r.Watermark, p.ReceiptHash)
+				return err
 			}
 			t, err := readTimeline(cmd.Context(), cfg, q)
 			if err != nil {
@@ -78,6 +96,8 @@ Four lenses compose over that read:
 	cmd.Flags().StringVar(&projName, "projection", "", "read through a bundled projection instead of the canonical (see: anam serve)")
 	cmd.Flags().StringVar(&asOf, "as-of", "", "read what Anam knew at this anam-time (2006-01-02 or RFC 3339)")
 	cmd.Flags().StringVar(&at, "at", "", "the snapshot at this fact-time: latest per series at or before it (2006-01-02 or RFC 3339); excludes --to")
+	cmd.Flags().Int64Var(&w, "w", 0, "read at this watermark (a receipt's W) instead of the head; excludes --as-of")
+	cmd.Flags().BoolVar(&publish, "publish", false, "publish what is shown with a receipt (needs --projection)")
 	cmd.Flags().BoolVar(&explain, "explain", false, "show every facet with its verdict, superseded versions included")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit the narrowed entries as JSON, in the canonical serialisation")
 	return cmd
@@ -107,6 +127,37 @@ func readTimeline(ctx context.Context, cfg config.Config, q api.TimelineQuery) (
 	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()
 	return read.Timeline(ctx, src, q)
+}
+
+// publishTimeline publishes the read q describes, through the daemon when a server
+// is configured and into the local artifact directory when not.
+func publishTimeline(ctx context.Context, cfg config.Config, q api.TimelineQuery) (api.Published, error) {
+	if cfg.Server != "" {
+		zone, err := cfg.ZoneName()
+		if err != nil {
+			return api.Published{}, err
+		}
+		q.Zone = zone
+		c, err := newClient(cfg)
+		if err != nil {
+			return api.Published{}, err
+		}
+		return c.Publish(ctx, q)
+	}
+	q.Zone = cfg.Zone
+	src, closeSrc, err := readSource(ctx, cfg)
+	if err != nil {
+		return api.Published{}, err
+	}
+	defer closeSrc()
+	deps, closeDeps, err := serveDeps(ctx, cfg)
+	if err != nil {
+		return api.Published{}, err
+	}
+	defer closeDeps()
+	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+	defer cancel()
+	return read.Publish(ctx, src, deps, q)
 }
 
 // readSource opens what a local read is taken from: the ledger read-only, and the

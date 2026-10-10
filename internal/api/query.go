@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/url"
 	"strconv"
 )
@@ -14,6 +15,9 @@ func (q TimelineQuery) Values() url.Values {
 	set(v, "to", q.To)
 	set(v, "at", q.At)
 	set(v, "as_of", q.AsOf)
+	if q.W != 0 {
+		v.Set("w", strconv.FormatInt(q.W, 10))
+	}
 	set(v, "type", q.Type)
 	set(v, "projection", q.Projection)
 	if q.Explain {
@@ -29,12 +33,20 @@ func TimelineQueryOf(v url.Values) (TimelineQuery, error) {
 	if s := v.Get("explain"); s != "" {
 		b, err := strconv.ParseBool(s)
 		if err != nil {
-			return TimelineQuery{}, err
+			return TimelineQuery{}, fmt.Errorf("explain: %w", err)
 		}
 		explain = b
 	}
+	var w int64
+	if s := v.Get("w"); s != "" {
+		n, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return TimelineQuery{}, fmt.Errorf("w %q: %w", s, err)
+		}
+		w = n
+	}
 	return TimelineQuery{
-		From: v.Get("from"), To: v.Get("to"), At: v.Get("at"), AsOf: v.Get("as_of"),
+		From: v.Get("from"), To: v.Get("to"), At: v.Get("at"), AsOf: v.Get("as_of"), W: w,
 		Type: v.Get("type"), Projection: v.Get("projection"), Explain: explain, Zone: v.Get("zone"),
 	}, nil
 }

@@ -2,6 +2,7 @@ package read
 
 import (
 	"context"
+	"errors"
 
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/clock"
@@ -9,6 +10,7 @@ import (
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
+	"github.com/mattjoyce/anam/internal/receipt"
 	"github.com/mattjoyce/anam/internal/serve"
 )
 
@@ -78,4 +80,67 @@ func VerifyReceipt(ctx context.Context, d serve.Deps, hash string) (api.ReceiptV
 		return api.ReceiptVerified{}, err
 	}
 	return api.ReceiptVerified{Hash: hash, Receipt: r, Result: res}, nil
+}
+
+// Publish performs the read q describes and files what it shows with a receipt (card
+// 87). It reads as Timeline reads, at the head, an anam-time or a named W, through q's
+// projection, then narrows by q's snapshot, window and type with serve.Narrow, the
+// function serve.Verify replays. The receipt records W and the resolved query, never
+// the zone or as_of: they only located the instants and the W it already holds.
+//
+// A published read names a projection, because a receipt is what a projection served
+// and access is decided by projections; explain publishes nothing. Both are refused
+// as bad queries. Publishing writes artifacts and nothing on the ledger.
+func Publish(ctx context.Context, src Source, d serve.Deps, q api.TimelineQuery) (api.Published, error) {
+	if q.Projection == "" {
+		return api.Published{}, badQuery(errors.New("a published read names a projection: a receipt is what a projection served"))
+	}
+	if q.Explain {
+		return api.Published{}, badQuery(errors.New("explain shows verdicts and publishes nothing; drop it to publish"))
+	}
+	loc, err := Location(q.Zone)
+	if err != nil {
+		return api.Published{}, err
+	}
+	b, at, err := parseBoundsAt(q.From, q.To, q.At, false, loc)
+	if err != nil {
+		return api.Published{}, badQuery(err)
+	}
+	know, err := knowledgeOf(q, loc)
+	if err != nil {
+		return api.Published{}, err
+	}
+	// The view is the timeline read's own, snapshot included, so the header a reader
+	// sees is the one they would see without publishing. Narrow then takes the
+	// snapshot again, which keeps the same value (a snapshot of a snapshot is itself),
+	// so the published value is Narrow over the template's: the one Verify replays.
+	v, err := readView(ctx, src, know, q.Projection, at)
+	if err != nil {
+		return api.Published{}, err
+	}
+
+	rq := &receipt.Query{From: b.from, Before: b.toX, At: at, Type: q.Type}
+	if rq.IsZero() {
+		rq = nil
+	}
+	value, err := serve.Narrow(v.shown, rq, v.defs)
+	if err != nil {
+		return api.Published{}, err
+	}
+	served, err := serve.Publish(ctx, d, *v.tmpl, v.res.W, rq, value, false)
+	if err != nil {
+		return api.Published{}, err
+	}
+
+	t := v.describe()
+	t.Entries = value.Entries()
+	ids := make([]string, 0, len(t.Entries))
+	for _, e := range t.Entries {
+		ids = append(ids, e.FacetID)
+	}
+	if t.Versions, err = v.versionsOf(ctx, src.Ledger, ids); err != nil {
+		return api.Published{}, err
+	}
+	t.Shown = len(t.Entries)
+	return api.Published{Timeline: t, ReceiptHash: served.ReceiptHash, Receipt: served.Receipt}, nil
 }

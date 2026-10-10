@@ -34,6 +34,7 @@ It serves on the configured address (listen, ANAM_LISTEN):
     GET  /v1/timeline                   the timeline read, with the reader's zone
     GET  /v1/changes                    anam-events in a window of anam-time
     GET  /v1/receipts[/{hash}[/verify]] receipts: list, show, prove
+    POST /v1/receipts                   publish a timeline read through a projection, with a receipt
     GET  /v1/checkpoints                the checkpoint log
     POST /v1/checkpoints                mint (?dry_run=true to derive only)
     POST /v1/backups                    back up the record into backup_dir

@@ -34,3 +34,13 @@ type ReceiptVerified struct {
 	Receipt receipt.Receipt `json:"receipt"`
 	Result  receipt.Result  `json:"result"`
 }
+
+// Published is a read filed with its receipt (POST /v1/receipts): the timeline the
+// reader sees, narrowed as asked, and the receipt that names exactly those entries at
+// W. The receipt's served hash is the hash of Entries, so the answer and its citation
+// cannot drift apart.
+type Published struct {
+	Timeline
+	ReceiptHash string          `json:"receipt_hash"`
+	Receipt     receipt.Receipt `json:"receipt"`
+}

@@ -6,10 +6,12 @@ import "github.com/mattjoyce/anam/internal/fold"
 // and the zone the reader stands in. Resolving a bare date to an instant is a
 // function of the two, and it runs where the read runs, so there is one parser.
 type TimelineQuery struct {
-	From       string `json:"from,omitempty"`
-	To         string `json:"to,omitempty"`
-	At         string `json:"at,omitempty"`
-	AsOf       string `json:"as_of,omitempty"`
+	From string `json:"from,omitempty"`
+	To   string `json:"to,omitempty"`
+	At   string `json:"at,omitempty"`
+	AsOf string `json:"as_of,omitempty"`
+	// W reads at this watermark instead of the head; it excludes AsOf. Zero is the head.
+	W          int64  `json:"w,omitempty"`
 	Type       string `json:"type,omitempty"`
 	Projection string `json:"projection,omitempty"`
 	Explain    bool   `json:"explain,omitempty"`

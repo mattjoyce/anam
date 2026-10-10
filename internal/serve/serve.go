@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
@@ -142,11 +143,6 @@ func Run(ctx context.Context, d Deps, name string, dryRun bool) (Served, error) 
 	if err != nil {
 		return Served{}, err
 	}
-
-	ledgerID, err := d.Ledger.ID(ctx)
-	if err != nil {
-		return Served{}, err
-	}
 	head, err := d.Ledger.Head(ctx)
 	if err != nil {
 		return Served{}, err
@@ -159,17 +155,39 @@ func Run(ctx context.Context, d Deps, name string, dryRun bool) (Served, error) 
 	if err != nil {
 		return Served{}, err
 	}
+	out, err := Publish(ctx, d, t, res.W, nil, value, dryRun)
+	if err != nil {
+		return Served{}, err
+	}
+	out.CanonicalHash, out.CanonicalLen = res.Value.Hash(), res.Value.Len()
+	out.Run, out.Tail = res.Run, res.Tail
+	return out, nil
+}
 
+// Publish files value as what template t served at w, narrowed by q (nil when the
+// whole projection was served), with the receipt that says so. The caller derived
+// value; Verify derives it again from the receipt alone, through Narrow, so a caller
+// that narrowed any other way publishes a receipt that will not reproduce. The served
+// value is filed first and the receipt second: a crash between them leaves a value
+// no receipt names, never a receipt without its value. With dryRun set nothing is
+// written.
+func Publish(ctx context.Context, d Deps, t projection.Template, w ledger.Watermark, q *receipt.Query,
+	value fold.Value, dryRun bool) (Served, error) {
+	ledgerID, err := d.Ledger.ID(ctx)
+	if err != nil {
+		return Served{}, err
+	}
 	r := receipt.Receipt{
 		LedgerID:             ledgerID,
 		ServedHash:           value.Hash(),
 		FacetIDs:             idsOf(value),
-		Watermark:            int64(res.W),
+		Watermark:            int64(w),
 		Template:             t.Name,
 		TemplateVersion:      t.Version,
 		DefinitionSetVersion: d.DefinitionSetVersion,
 		ServedAt:             clock.Format(d.Clock.Now()),
 		Span:                 t.Span(),
+		Query:                q,
 	}
 	if err := r.Validate(); err != nil {
 		return Served{}, err
@@ -179,22 +197,10 @@ func Run(ctx context.Context, d Deps, name string, dryRun bool) (Served, error) 
 		return Served{}, err
 	}
 
-	out := Served{
-		Receipt:       r,
-		ReceiptHash:   artifact.Digest(receiptBytes),
-		CanonicalHash: res.Value.Hash(),
-		CanonicalLen:  res.Value.Len(),
-		Run:           res.Run,
-		Tail:          res.Tail,
-	}
+	out := Served{Receipt: r, ReceiptHash: artifact.Digest(receiptBytes)}
 	if dryRun {
 		return out, nil
 	}
-
-	// The value first, then the receipt: a receipt is a pointer to a served artifact,
-	// and a crash between the two should leave an unreferenced value rather than a
-	// receipt naming a file that was never written. Both are content-addressed, so the
-	// re-run overwrites neither and completes the pair.
 	if _, err := d.Artifacts.Put(receipt.ServedKind, value.Bytes()); err != nil {
 		return Served{}, err
 	}
@@ -203,6 +209,45 @@ func Run(ctx context.Context, d Deps, name string, dryRun bool) (Served, error) 
 	}
 	out.Written = true
 	return out, nil
+}
+
+// Narrow is how a read narrows a template's value before publishing it, and how
+// Verify narrows it again: the snapshot at q.At first, then the fact-time window
+// [q.From, q.Before) and the type. The order is the timeline read's, so a published
+// read is the one the reader saw. A nil q narrows nothing; an empty or contradictory
+// one is malformed, the same refusal a receipt carrying it would meet.
+func Narrow(v fold.Value, q *receipt.Query, s projection.Series) (fold.Value, error) {
+	if q == nil {
+		return v, nil
+	}
+	if q.IsZero() {
+		return fold.Value{}, fmt.Errorf("%w: query narrows nothing; omit it", receipt.ErrMalformed)
+	}
+	if q.At != "" && q.Before != "" {
+		return fold.Value{}, fmt.Errorf("%w: query has both at and before; a snapshot has one upper bound", receipt.ErrMalformed)
+	}
+	if q.At != "" {
+		closes := func(facet.Type) bool { return false }
+		if s != nil {
+			closes = s.Closes
+		}
+		snap, err := fold.Snapshot(v, q.At, closes)
+		if err != nil {
+			return fold.Value{}, err
+		}
+		v = snap
+	}
+	if q.From == "" && q.Before == "" && q.Type == "" {
+		return v, nil
+	}
+	var kept []fold.Entry
+	for _, e := range v.Entries() {
+		if (q.From == "" || e.FactTime >= q.From) && (q.Before == "" || e.FactTime < q.Before) &&
+			(q.Type == "" || string(e.Type) == q.Type) {
+			kept = append(kept, e)
+		}
+	}
+	return fold.NewValue(kept)
 }
 
 // Verify honours a receipt: re-derive at its watermark, and re-hash the artifact on
@@ -246,6 +291,9 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 	}
 	value, err := projection.Apply(res.Value, t, d.Gate, d.Series)
 	if err != nil {
+		return r, receipt.Result{}, err
+	}
+	if value, err = Narrow(value, r.Query, d.Series); err != nil {
 		return r, receipt.Result{}, err
 	}
 

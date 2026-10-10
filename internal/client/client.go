@@ -174,6 +174,14 @@ func (c *Client) Timeline(ctx context.Context, q api.TimelineQuery) (api.Timelin
 	return t, err
 }
 
+// Publish asks the daemon to publish the timeline read q describes, through its
+// projection, and answers with the entries and their receipt.
+func (c *Client) Publish(ctx context.Context, q api.TimelineQuery) (api.Published, error) {
+	var p api.Published
+	_, err := c.do(ctx, c.timeout, http.MethodPost, "/v1/receipts", q.Values(), nil, &p)
+	return p, err
+}
+
 // Changes asks what Anam learned in a window of anam-time.
 func (c *Client) Changes(ctx context.Context, q api.ChangesQuery) (api.Changes, error) {
 	var ch api.Changes

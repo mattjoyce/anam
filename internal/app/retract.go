@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -16,6 +17,7 @@ import (
 	"github.com/mattjoyce/anam/internal/gate"
 	"github.com/mattjoyce/anam/internal/read"
 	"github.com/mattjoyce/anam/internal/store/ledger"
+	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
 // Ingest admits and supersedes; it never retracts, because a row's absence from a
@@ -45,6 +47,11 @@ written unless --yes is given; then each listed facet is tombstoned through
 the gate, one anam-event each, and the watermark moves. The artifacts stay in
 the ledger, marked.
 
+For an importer's source, which no import declares, the plan comes from the
+importer's newest complete snapshot instead of a scan: the live facets of its
+types that the run did not carry and that nothing has touched since it
+completed. An importer never tombstones; this command, with --yes, does.
+
 A scan that fails writes nothing. A scan that holds nothing is refused: an
 empty source and an unreadable one look the same, and neither is a reason to
 forget a record. --max-fraction bounds how much of a source may be retracted in
@@ -61,29 +68,37 @@ one run; raise it deliberately when the source really has shrunk that far.`,
 				return err
 			}
 			imports = filterImports(withLibrary(imports, cfg), source)
-			if len(imports) == 0 {
-				return fmt.Errorf("no import declares source %q", source)
-			}
-			scanned, err := scanAll(cmd.Context(), imports, cfg)
-			if err != nil {
-				return err
-			}
-			held, err := heldIDs(scanned)
-			if err != nil {
-				return err
-			}
-
 			ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
 			defer cancel()
-			absent, total, err := planFromRecord(ctx, cfg, source, held)
-			if err != nil {
-				return err
+
+			var absent []facet.Facet
+			var total, heldN int
+			if len(imports) == 0 {
+				// No import declares it, so it is an importer's source: plan from what
+				// the importer last said is everything (card 78).
+				absent, total, heldN, err = planFromSnapshot(ctx, cmd, cfg, source)
+				if err != nil {
+					return err
+				}
+			} else {
+				scanned, err := scanAll(cmd.Context(), imports, cfg)
+				if err != nil {
+					return err
+				}
+				held, err := heldIDs(scanned)
+				if err != nil {
+					return err
+				}
+				heldN = len(held)
+				if absent, total, err = planFromRecord(ctx, cfg, source, held); err != nil {
+					return err
+				}
 			}
-			writeRetractionReport(cmd, source, absent, total, len(held))
+			writeRetractionReport(cmd, source, absent, total, heldN)
 			if len(absent) == 0 {
 				return nil
 			}
-			if err := guardRetraction(len(absent), total, len(held), maxFraction); err != nil {
+			if err := guardRetraction(len(absent), total, heldN, maxFraction); err != nil {
 				return err
 			}
 			if !yes {
@@ -265,4 +280,48 @@ func heldIDs(scanned []scanned) (map[string]bool, error) {
 		}
 	}
 	return held, nil
+}
+
+// planFromSnapshot plans an importer's source from its newest complete snapshot: the
+// live facets of the snapshot's types that the run did not carry and that nothing has
+// touched since it completed (read.Absent, the same answer GET /v1/snapshots/{id}
+// gives). held is how many facets the run carried, for the guard against an empty
+// "now". With no complete snapshot there is nothing to plan from, which is an error,
+// not an empty plan.
+func planFromSnapshot(ctx context.Context, cmd *cobra.Command, cfg config.Config, source string,
+) (absent []facet.Facet, total, held int, err error) {
+	src, closeAll, err := readSource(ctx, cfg)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	defer closeAll()
+	db, ok := src.Checkpoints.(*ops.DB)
+	if !ok {
+		return nil, 0, 0, fmt.Errorf("retract: the operational store is not open")
+	}
+	snap, ok, err := db.NewestCompleteSnapshot(ctx, source)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	if !ok {
+		return nil, 0, 0, fmt.Errorf("no import declares source %q, and it has sent no complete snapshot to plan from", source)
+	}
+	carried, err := db.SnapshotFacets(ctx, snap.ID)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	hist, ok := src.Ledger.(read.FacetHistory)
+	if !ok {
+		return nil, 0, 0, fmt.Errorf("retract: the ledger cannot read one facet's events")
+	}
+	entries, live, err := read.Absent(ctx, src, hist, read.SnapshotScope{
+		Source: source, Types: snap.Types, Carried: carried, CompletedW: ledger.Watermark(snap.CompletedW),
+	})
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s: planned from snapshot %s (%s), completed %s at W=%d\n",
+		source, snap.ID, strings.Join(snap.Types, ", "), clock.Format(snap.CompletedAt), snap.CompletedW)
+	facets, err := facetsOf(ctx, src.Ledger, entries)
+	return facets, live, len(carried), err
 }

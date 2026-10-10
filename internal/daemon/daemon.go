@@ -255,6 +255,7 @@ func (d *Daemon) Handler() http.Handler {
 	mux.Handle("GET /v1/definitions", d.asReader(d.getDefinitions))
 	mux.Handle("GET /v1/definitions/{type}", d.asReader(d.getDefinition))
 	mux.Handle("GET /v1/definitions/{type}/{version}", d.asReader(d.getDefinition))
+	mux.Handle("GET /v1/snapshots/{id}", d.asReader(d.getSnapshot))
 	mux.Handle("/", d.authorize(inner))
 	return mux
 }

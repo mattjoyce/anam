@@ -64,7 +64,7 @@ is provenance that evaporates with the shell history. Copy `imports.example.yaml
 
 ```sh
 ./anam ingest                 # every declared source
-./anam ingest bp-csv          # just one
+./anam ingest health-db       # just one
 ```
 
 **Read.** The whole-person timeline is the default; everything else is a lens over it.

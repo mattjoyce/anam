@@ -21,7 +21,7 @@ func TestDaemonIngestAdmitsThenFindsNothingNew(t *testing.T) {
 	t.Parallel()
 	f := newIngestFixture(t)
 	importsPath := filepath.Join(f.dir, "imports.yaml")
-	decl := fmt.Sprintf("imports:\n  - source: bp-csv\n    path: %s\n", f.bpPath)
+	decl := fmt.Sprintf("imports:\n  - source: records\n    path: %s\n", f.recordsDir)
 	if err := os.WriteFile(importsPath, []byte(decl), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestDaemonIngestSucceedsWhenItsMintFails(t *testing.T) {
 	t.Parallel()
 	f := newIngestFixture(t)
 	importsPath := filepath.Join(f.dir, "imports.yaml")
-	decl := fmt.Sprintf("imports:\n  - source: bp-csv\n    path: %s\n", f.bpPath)
+	decl := fmt.Sprintf("imports:\n  - source: records\n    path: %s\n", f.recordsDir)
 	if err := os.WriteFile(importsPath, []byte(decl), 0o600); err != nil {
 		t.Fatal(err)
 	}

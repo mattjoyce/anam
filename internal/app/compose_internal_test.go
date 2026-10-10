@@ -20,7 +20,7 @@ import (
 func TestTimeline_ComposedIsTheFullFold(t *testing.T) {
 	t.Parallel()
 	f := newIngestFixture(t)
-	imports := fmt.Sprintf("imports:\n  - source: bp-csv\n    path: %s\n", f.bpPath)
+	imports := fmt.Sprintf("imports:\n  - source: records\n    path: %s\n", f.recordsDir)
 	if _, _, err := f.ingest(t, imports); err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,8 @@ func TestTimeline_ComposedIsTheFullFold(t *testing.T) {
 	same("at the mint")
 
 	// A tail: a correction of one reading and a new one, after the mint.
-	more := bpFixture + "2026-3-01 07:00:00,\t 1 March 2026 7:00,\t 111.0,\t 70.0,\t 60.0,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t ,\t \r\n"
+	more := bpFixture + `  - {type: health.blood-pressure, id: "2026-3-01 07:00:00:1", date_excel: "2026-3-01 07:00:00", reading: "1", systolic: "111.0", diastolic: "70.0", pulse: "60.0"}
+`
 	more = strings.Replace(more, "114.0", "115.0", 1)
 	if err := os.WriteFile(f.bpPath, []byte(more), 0o600); err != nil {
 		t.Fatal(err)

@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mattjoyce/anam/internal/api"
-	"github.com/mattjoyce/anam/internal/capture/bpcsv"
 	"github.com/mattjoyce/anam/internal/capture/documents"
 	"github.com/mattjoyce/anam/internal/capture/healthdb"
 	"github.com/mattjoyce/anam/internal/capture/records"
@@ -32,18 +31,18 @@ var mvpScopes = gate.StaticScopes{
 		"health.sleep", "health.body-composition", "health.heart-rate", "health.metric-group",
 		healthdb.AlertType,
 	},
-	bpcsv.Source: {bpcsv.Type},
 	// records carries what is written down about the person: lab reports, the
 	// self-log, notes made from email. Each type has a Definition whose identity is
 	// the record's own id (docs/SELF-LOG.md). The one exception is blood pressure,
 	// whose Definition composes identity from the reading's time and ordinal, so a
-	// diary record's id is exactly that composition.
+	// diary record's id is exactly that composition. The phone app's exports reach
+	// the record through the anam_bp_csv importer, not here (card 80).
 	records.Source: {
 		"lab.result", "lab.panel", "condition.noted", "donation.blood", "health.weight",
 		"med.missed-dose", "med.started", "med.dose-changed", "med.stopped", "med.compliance-estimate",
 		"illness.started", "illness.ended", "illness.hangover",
 		"travel.departed", "travel.arrived", "travel.returned", "travel.flight",
-		"visit.clinic", "gym.visit", "exercise.session", bpcsv.Type,
+		"visit.clinic", "gym.visit", "exercise.session", "health.blood-pressure",
 	},
 	// documents is a folder of files whose bytes stay there: each becomes a
 	// doc.reference whose payload is the path, the hash and the sidecar's date.
@@ -259,15 +258,13 @@ func scanImport(ctx context.Context, imp config.Import, cfg config.Config, defs 
 		scanCtx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 		defer cancel()
 		return healthdb.Scan(scanCtx, imp.Path, cfg.PersonID)
-	case bpcsv.Source:
-		return bounded(ctx, func() ([]facet.Envelope, error) { return bpcsv.Scan(imp.Path, cfg.PersonID) })
 	case records.Source:
 		return bounded(ctx, func() ([]facet.Envelope, error) { return records.Scan(imp.Path, cfg.PersonID, defs) })
 	case documents.Source:
 		return bounded(ctx, func() ([]facet.Envelope, error) { return documents.Scan(imp.Path, cfg.PersonID) })
 	default:
-		return nil, fmt.Errorf("import names unknown source %q (have: %s, %s, %s, %s)",
-			imp.Source, healthdb.Source, bpcsv.Source, records.Source, documents.Source)
+		return nil, fmt.Errorf("import names unknown source %q (have: %s, %s, %s)",
+			imp.Source, healthdb.Source, records.Source, documents.Source)
 	}
 }
 

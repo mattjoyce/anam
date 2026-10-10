@@ -113,7 +113,10 @@ var typeStyles = map[facet.Type]typeStyle{
 	"illness.ended":    {"clinical", shapeTriDown, kindEvent},
 	"illness.hangover": {"clinical", shapeCross, kindEvent},
 
-	"doc.reference":   {"documents", shapeSquare, kindEvent},
+	"doc.reference": {"documents", shapeSquare, kindEvent},
+	// A note the person wrote about one facet: drawn with what is written down,
+	// at the moment it is about.
+	"note.annotation": {"documents", shapeDiamond, kindEvent},
 	"travel.departed": {"travel", shapeTriUp, kindEvent},
 	"travel.arrived":  {"travel", shapeTriDown, kindEvent},
 	"travel.returned": {"travel", shapeDiamond, kindEvent},

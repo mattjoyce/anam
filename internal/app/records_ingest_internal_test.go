@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/facet"
@@ -163,5 +164,65 @@ func TestRecords_BloodPressureIdentityComposes(t *testing.T) {
 		if _, _, err := g.Commit(ctx, env, b); err != nil {
 			t.Fatalf("record %d refused: %v", i, err)
 		}
+	}
+}
+
+// A note about a facet is a records row like any other: it admits through the gate
+// as its own facet, keyed on its own id, and the facet it is about is untouched. A
+// re-run is a no-op; an edited note supersedes the note alone.
+func TestRecords_ANoteAboutAFacetIsItsOwnFacet(t *testing.T) {
+	ctx := context.Background()
+	l, err := ledger.Create(ctx, filepath.Join(t.TempDir(), "ledger.db"), "matt")
+	if err != nil {
+		t.Fatalf("ledger.Create: %v", err)
+	}
+	t.Cleanup(func() { _ = l.Close() })
+	defs, err := def.Bundled()
+	if err != nil {
+		t.Fatalf("def.Bundled: %v", err)
+	}
+	g := gate.New(l, defs, mvpScopes, clock.Real{}, "matt")
+
+	dir := t.TempDir()
+	const note = `extracted: {method: typed by the person, version: 1}
+records:
+  - type: note.annotation
+    id: note:2c6f38a3:1
+    at: 2026-10-09 11:29
+    about: 2c6f38a3-3db7-5e65-b933-9c59980e1c6c
+    about_version: 1
+    text: During a large work meeting, presenting.
+`
+	write(t, dir, "notes.yaml", note)
+	admit := func() []gate.Result {
+		t.Helper()
+		envs, err := records.Scan(dir, "matt", defs)
+		if err != nil {
+			t.Fatalf("Scan: %v", err)
+		}
+		var out []gate.Result
+		for i, env := range envs {
+			b, _ := g.Resolve(env)
+			res, _, err := g.Commit(ctx, env, b)
+			if err != nil {
+				t.Fatalf("record %d refused: %v", i, err)
+			}
+			out = append(out, res)
+		}
+		return out
+	}
+	first := admit()
+	if len(first) != 1 || first[0].Outcome != gate.OutcomeAdmitted {
+		t.Fatalf("first run: %+v", first)
+	}
+	if first[0].FacetID == "2c6f38a3-3db7-5e65-b933-9c59980e1c6c" {
+		t.Fatal("the note took the facet's own id")
+	}
+	if again := admit(); again[0].Outcome != gate.OutcomeNoOp {
+		t.Fatalf("re-run: %+v", again)
+	}
+	write(t, dir, "notes.yaml", strings.Replace(note, "presenting.", "presenting to the board.", 1))
+	if edited := admit(); edited[0].Outcome != gate.OutcomeSuperseded || edited[0].FacetID != first[0].FacetID {
+		t.Fatalf("edited note: %+v, first %s", edited, first[0].FacetID)
 	}
 }

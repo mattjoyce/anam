@@ -156,13 +156,16 @@
     };
     const toTime = x => new Date(from + (x - left) / (right - left) * (to - from));
 
+    // Capture waits for a real drag: captured at pointerdown, the click on a mark
+    // would be retargeted to the band and its link to the facet would never open.
     band.addEventListener('pointerdown', e => {
       x0 = toX(e);
-      band.setPointerCapture(e.pointerId);
     });
     band.addEventListener('pointermove', e => {
       if (x0 === null) return;
       const x1 = toX(e);
+      if (Math.abs(x1 - x0) <= 4) return;
+      if (!band.hasPointerCapture(e.pointerId)) band.setPointerCapture(e.pointerId);
       sel.setAttribute('x', Math.min(x0, x1));
       sel.setAttribute('width', Math.abs(x1 - x0));
       sel.setAttribute('visibility', 'visible');

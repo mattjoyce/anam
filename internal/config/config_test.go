@@ -48,6 +48,7 @@ func TestLoadDefaults(t *testing.T) {
 		BackupKeep:       14,
 		BucketWidth:      span.Default,
 		CheckpointBudget: config.DefaultCheckpointBudget,
+		MaxReadBytes:     config.DefaultMaxReadBytes,
 	}
 	if got != want {
 		t.Errorf("Load() = %+v, want %+v", got, want)
@@ -116,6 +117,7 @@ bucket_width: weekly
 		BackupKeep:       14,
 		BucketWidth:      span.Weekly,
 		CheckpointBudget: config.DefaultCheckpointBudget,
+		MaxReadBytes:     config.DefaultMaxReadBytes,
 	}
 	if got != want {
 		t.Errorf("Load() = %+v, want %+v", got, want)

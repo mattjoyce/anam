@@ -91,6 +91,12 @@ type Config struct {
 	// Timeout bounds every call to a store. Anam fails fast rather than hanging (§8).
 	Timeout time.Duration `mapstructure:"timeout"`
 
+	// MaxReadBytes bounds what one read over the daemon answers with: the entries as
+	// the API encodes them, whole facets only, never cut to fit (card 88). A read over
+	// it is refused with the size, the count and which narrowings are left. Zero is no
+	// bound. A local read, the operator at their own files, is never bounded.
+	MaxReadBytes int `mapstructure:"max_read_bytes"`
+
 	// BucketWidth is how much fact-time one checkpoint bucket covers (§4, §7). It is a
 	// tuning knob and changes nothing a read returns — but it is stamped into every
 	// bucket id the operational index persists, so the ops store pins it and refuses a
@@ -147,6 +153,7 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 	v.SetDefault("ingest_timeout", 15*time.Minute)
 	v.SetDefault("backup_dir", "")
 	v.SetDefault("backup_keep", 14)
+	v.SetDefault("max_read_bytes", DefaultMaxReadBytes)
 
 	if path != "" {
 		v.SetConfigFile(path)
@@ -227,6 +234,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("%w: backup_keep must be at least 1, got %d", ErrInvalid, c.BackupKeep)
 	case c.CheckpointBudget < 0:
 		return fmt.Errorf("%w: checkpoint_budget must be 0 or more bytes, got %d", ErrInvalid, c.CheckpointBudget)
+	case c.MaxReadBytes < 0:
+		return fmt.Errorf("%w: max_read_bytes must be 0 or more bytes, got %d", ErrInvalid, c.MaxReadBytes)
 	}
 	if c.Server != "" {
 		if err := checkServer(c.Server); err != nil {
@@ -311,6 +320,11 @@ func (c Config) Buckets() (span.Buckets, error) { return span.New(c.BucketWidth)
 
 // DefaultCheckpointBudget is checkpoint_budget's default: 1 MiB.
 const DefaultCheckpointBudget = 1 << 20
+
+// DefaultMaxReadBytes is max_read_bytes's default: 512 KiB, the response budget
+// docs/API.md §3 proposes. A month of every type is under it; the whole record, at
+// 12.8 MB on 2026-10-11, is not.
+const DefaultMaxReadBytes = 512 << 10
 
 // DefaultListen is the daemon's address when none is configured: loopback, on the
 // port the inspector has always used.

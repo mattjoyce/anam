@@ -91,7 +91,10 @@ func VerifyReceipt(ctx context.Context, d serve.Deps, hash string) (api.ReceiptV
 // A published read names a projection, because a receipt is what a projection served
 // and access is decided by projections; explain publishes nothing. Both are refused
 // as bad queries. Publishing writes artifacts and nothing on the ledger.
-func Publish(ctx context.Context, src Source, d serve.Deps, q api.TimelineQuery) (api.Published, error) {
+//
+// limit bounds what the publish answers with, as Fit measures it; it is checked
+// before anything is filed, so a refused publish leaves no artifact. Zero is no bound.
+func Publish(ctx context.Context, src Source, d serve.Deps, q api.TimelineQuery, limit int) (api.Published, error) {
 	if q.Projection == "" {
 		return api.Published{}, badQuery(errors.New("a published read names a projection: a receipt is what a projection served"))
 	}
@@ -125,6 +128,9 @@ func Publish(ctx context.Context, src Source, d serve.Deps, q api.TimelineQuery)
 	}
 	value, err := serve.Narrow(v.shown, rq, v.defs)
 	if err != nil {
+		return api.Published{}, err
+	}
+	if err := fitQuery(value.Entries(), limit, q); err != nil {
 		return api.Published{}, err
 	}
 	served, err := serve.Publish(ctx, d, *v.tmpl, v.res.W, rq, value, false)

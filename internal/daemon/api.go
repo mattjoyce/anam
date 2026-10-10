@@ -124,6 +124,13 @@ func (d *Daemon) getReceipt(w http.ResponseWriter, r *http.Request) {
 		writeReadError(w, err)
 		return
 	}
+	// A receipt published locally, or before the bound, can be too large to show
+	// here; it is still on disk and still verifies.
+	if err := read.Fit(shown.Entries, d.cfg.MaxReadBytes,
+		"show it locally with anam receipt show, or publish a narrower read; verify needs no entries"); err != nil {
+		writeReadError(w, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, shown)
 }
 
@@ -167,7 +174,7 @@ func (d *Daemon) postReceipt(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
 	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts, Definitions: defs}
-	p, err := read.Publish(ctx, src, deps, q)
+	p, err := read.Publish(ctx, src, deps, q, d.cfg.MaxReadBytes)
 	if err != nil {
 		writeReadError(w, err)
 		return
@@ -192,6 +199,12 @@ func (d *Daemon) getTimeline(w http.ResponseWriter, r *http.Request) {
 	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts, Definitions: d.defs.current.Load()}
 	t, err := read.Timeline(ctx, src, q)
 	if err != nil {
+		writeReadError(w, err)
+		return
+	}
+	// The read is done either way; what is bounded is the answer, and with it a
+	// client's context (card 88). The refusal says what is left to narrow by.
+	if err := read.FitTimeline(t, q, d.cfg.MaxReadBytes); err != nil {
 		writeReadError(w, err)
 		return
 	}
@@ -262,11 +275,16 @@ func namedZone(zone string) error {
 
 // writeReadError answers a failed read: 400 for a query that cannot be read as asked,
 // 404 for an artifact that is not there, 409 for a receipt this daemon cannot honour,
-// 504 for a read that ran out of time, 500 for anything else.
+// 413 for an answer over max_read_bytes, with its measure, 504 for a read that ran
+// out of time, 500 for anything else.
 func writeReadError(w http.ResponseWriter, err error) {
+	var tooLarge *read.TooLarge
 	switch {
 	case errors.Is(err, read.ErrQuery), errors.Is(err, artifact.ErrInvalid):
 		writeError(w, http.StatusBadRequest, err)
+	case errors.As(err, &tooLarge):
+		writeJSON(w, http.StatusRequestEntityTooLarge,
+			api.Error{Error: err.Error(), Code: api.CodeTooLarge, TooLarge: &tooLarge.TooLarge})
 	case errors.Is(err, artifact.ErrNotFound):
 		writeError(w, http.StatusNotFound, err)
 	case errors.Is(err, serve.ErrTemplateMoved), errors.Is(err, serve.ErrOtherLedger):

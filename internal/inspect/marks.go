@@ -85,7 +85,8 @@ var typeStyles = map[facet.Type]typeStyle{
 
 	"health.body-composition": {"body", shapeCircle, kindMeasure},
 	"health.weight":           {"body", shapeSquare, kindReading},
-	"health.measurement":      {"body", shapeDiamond, kindReading},
+	// Registered by the Withings importer since card 86, not bundled.
+	"health.measurement": {"body", shapeDiamond, kindReading},
 
 	"health.sleep": {"sleep", shapeCircle, kindMeasure},
 	// One facet per CPAP session (card 70), registered by the DreamStation importer

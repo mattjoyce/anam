@@ -80,6 +80,7 @@
 <h1>Health data pipeline</h1>
 <p class="lede">How a heartbeat on the watch and a step on the scale become facets in Anam, which machine does each part, and how to tell when a part has stopped.</p>
 <p class="meta">State as of 30 September 2026. Stages one to four were checked on 29 September, and stage five on 30 September.</p>
+<div class="note"><strong>Partly out of date.</strong> Since 9 October the record lives on unraid (card 46): ingest runs inside the anam container there, when the unraid gateway asks, not on the ThinkPad every hour. Withings now reaches Anam through the <code>anam_withings</code> importer (card 54), not a built-in worker. The Withings parts below are updated; the ThinkPad ingest parts are not.</div>
 
 <div class="scroll">
 <svg viewBox="0 0 916 372" role="img" aria-label="Pipeline from Garmin and Withings through collectors and the ETL into Anam">
@@ -148,7 +149,7 @@
   <text class="ttl" x="843" y="56" text-anchor="middle">anam ingest</text>
   <text class="sub" x="843" y="72" text-anchor="middle">ThinkPad, every hour</text>
   <text class="sub" x="843" y="129" text-anchor="middle">health-db worker</text>
-  <text class="sub" x="843" y="244" text-anchor="middle">withings worker</text>
+  <text class="sub" x="843" y="244" text-anchor="middle">withings importer</text>
   <text class="sub" x="843" y="321" text-anchor="middle">bp-csv worker</text>
   <text class="sub" x="843" y="344" text-anchor="middle">gate, then ledger.db</text>
 
@@ -164,7 +165,7 @@
   <path class="arrow" marker-end="url(#a)" d="M446,205 L458,205 L458,240 L776,240"/>
   <path class="arrow" marker-end="url(#a)" d="M138,317 L776,317"/>
 
-  <text class="lbl" x="610" y="234">every measurement, read directly</text>
+  <text class="lbl" x="610" y="234">every measurement, as envelopes</text>
   <text class="lbl" x="458" y="311" text-anchor="middle">every reading, read directly</text>
 </svg>
 </div>
@@ -181,13 +182,13 @@
   <li><strong>Collect from Garmin</strong>
     The <code>garmindb</code> container on unraid runs its own cron. It downloads from Garmin Connect, imports, then analyses. The analyse step writes <code>garmin_summary.db</code>, which holds one row per day with Garmin's own min and max. Nothing in ductile runs this container.</li>
   <li><strong>Collect from Withings</strong>
-    The <code>withings</code> plugin in the unraid ductile gateway polls every six hours and writes <code>withings.db</code>. It raises one event per new weigh-in.</li>
+    The <code>withings</code> plugin in the unraid ductile gateway polls every six hours and writes <code>withings.db</code>. It raises one event per new weigh-in. The <code>anam_withings</code> importer, in the same gateway, handles that event and submits the measure group to Anam as envelopes (card 54).</li>
   <li><strong>Notice that something changed</strong>
     The <code>garmin</code> plugin checks the modification time of <code>garmin.db</code> every 30 minutes. When it moves, the plugin raises <code>health.new_data</code> with the days that changed. Withings needs no watcher, because its plugin raises <code>withings.measurement_recorded</code> itself.</li>
   <li><strong>Summarise</strong>
     Either event starts the health ETL. Ductile runs it as a one-shot container from the <code>ductile-healthdata</code> image. It reads both raw stores and writes day, week, month and year rows to <code>healthdata.db</code>.</li>
   <li><strong>Ingest into Anam</strong>
-    The ThinkPad ductile gateway runs <code>anam ingest</code> every hour. It reads <code>healthdata.db</code> over the Projects share. It also reads <code>withings.db</code> and the blood pressure export directly. Every row passes the gate and lands in <code>ledger.db</code>.</li>
+    The ThinkPad ductile gateway runs <code>anam ingest</code> every hour. It reads <code>healthdata.db</code> over the Projects share. It also reads the blood pressure export directly. Withings no longer comes this way: its importer submits it at stage two. Every row passes the gate and lands in <code>ledger.db</code>.</li>
 </ol>
 
 <div class="note"><strong>Stage five runs on a clock, not on an event.</strong> The ingest takes about two seconds and an unchanged row is a no-op, so an hourly run costs nothing when there is no news. New data reaches Anam within an hour of the ETL writing it.</div>

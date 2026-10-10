@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "lab.panel",
-    "definition_version": 3,
+    "definition_version": 4,
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "records/lab.panel",
@@ -24,16 +24,16 @@
       "id": {"type": "string", "minLength": 1, "description": "Identity, chosen at extraction and deterministic from the content: the lab's prefix, the lab number, \"panel\", and the panel name as a slug.", "examples": ["acl:12345678/panel/lipid-studies"]},
       "lab": {"type": "string", "minLength": 1, "description": "The lab that did the work. The script writes \"Australian Clinical Labs\" for every record, a constant rather than text read from the report; hand readings write the lab's name as the report gives it.", "examples": ["Example Pathology"]},
       "lab_number": {"type": "string", "minLength": 1, "description": "The lab's number for this draw, as printed (7 or 8 digits), kept as text. One draw is one collection event, shared by the panel and its results.", "examples": ["12345678"]},
-      "lab_ref": {"type": "string", "minLength": 1, "description": "The report's \"Lab REF\" header field, as printed. The script takes the lab number from its second part."},
+      "lab_ref": {"type": "string", "minLength": 1, "description": "The report's lab reference header field, as printed (\"Lab REF\" on current Australian Clinical Labs reports, \"Lab Reference\" on older ones): two-digit year, lab number, the lab's code for the test (the same codes as the report's test-status line) and a trailing digit whose meaning the report does not state. The script takes the lab number from its second part.", "examples": ["26-12345678-LS-0"]},
       "note": {"type": "string", "minLength": 1, "description": "A note by whoever read the report, saying what the reading settled or doubted (a misprinted date, which page decided it). Not report text."},
       "panel": {"type": "string", "minLength": 1, "description": "The panel heading as printed above the result table, in the report's capitals.", "examples": ["LIPID STUDIES"]},
       "reported": {"type": "string", "minLength": 1, "description": "When the lab reported, the report's REPORTED field, reformatted by the extraction to YYYY-MM-DD HH:MM.", "examples": ["2026-03-05 14:20"]},
-      "reported_by": {"type": "string", "minLength": 1, "description": "The person the report names as reporting, as printed. Hand readings only."},
+      "reported_by": {"type": "string", "minLength": 1, "description": "The doctor named on the report's \"REPORTED BY\" line at the end of a section, as printed with \"Dr.\" written \"Dr\". Seen on an ECG section; hand readings only.", "examples": ["Dr Jane Example"]},
       "requested": {"type": "string", "minLength": 1, "description": "The date the test was requested, the report's REFERRED field, reformatted by the extraction to YYYY-MM-DD.", "examples": ["2026-03-02"]},
       "requested_by": {"type": "string", "minLength": 1, "description": "The requesting doctor as printed on the report. Hand readings only.", "examples": ["Dr Jane Example"]},
-      "section": {"type": "string", "minLength": 1, "description": "The report's section heading for this panel (such as BIOCHEMISTRY), as printed. Hand readings only, and rare."},
+      "section": {"type": "string", "minLength": 1, "description": "The discipline heading printed above the panel heading (such as BIOCHEMISTRY or CARDIOLOGY), as printed. The script reads past these words and never writes it; hand readings have written it once, though reports print it above most panels."},
       "specimen": {"type": "string", "minLength": 1, "description": "The specimen as printed after \"SPECIMEN:\", in the report's capitals.", "examples": ["SERUM"]},
-      "your_reference": {"type": "string", "minLength": 1, "description": "A reference number printed on the report under \"Your reference\" or similar, as written. Hand readings of older reports only."}
+      "your_reference": {"type": "string", "minLength": 1, "description": "The report's \"Your Reference\" header field, as printed: the addressee's own reference for the request, the same on every panel of a draw. The report does not say what it numbers. Hand readings only, and only where a reader took it; many reports print it blank.", "examples": ["12345"]}
     },
     "additionalProperties": false
   }

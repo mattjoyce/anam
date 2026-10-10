@@ -1,0 +1,17 @@
+{"id": "concept2:session:121286166", "activity_name": "rowing.machine",
+ "effective_time_frame": {"time_interval": {"start_date_time": "2026-10-04T03:48:42Z", "duration": {"value": 1938, "unit": "sec"}}},
+ "duration": {"value": 1938, "unit": "sec"}, "distance": {"value": 6828, "unit": "m"},
+ "kcal_burned": {"value": 396, "unit": "kcal"}, "base_movement_quantity": {"value": 753, "unit": "strokes"},
+ "average_cadence": {"value": 23, "unit": "strokes/min"}, "avg_hr_bpm": 169, "ending_hr_bpm": 169,
+ "drag_factor": 107, "watt_minutes": 4092,
+ "source": "Concept2 Logbook", "logbook_source": "ErgData Android", "erg_type": "rower", "workout_type": "JustRow",
+ "logbook_date": "2026-10-04 15:21:00", "logbook_timezone": "Australia/Sydney", "start_time_known": true,
+ "verified": true, "ranked": false, "weight_class": "H",
+ "splits": [
+  {"position": 1, "duration_sec": 300, "distance_m": 1079, "kcal": 64, "watt_minutes": 682, "avg_spm": 23, "avg_hr_bpm": 142, "min_hr_bpm": 93, "max_hr_bpm": 162, "ending_hr_bpm": 161},
+  {"position": 2, "duration_sec": 138, "distance_m": 355, "kcal": 18, "watt_minutes": 115, "avg_spm": 23, "avg_hr_bpm": 159, "min_hr_bpm": 150, "max_hr_bpm": 188, "ending_hr_bpm": 150}
+ ],
+ "stroke_series": [
+  {"time_sec": 3.6, "distance_m": 6.5, "pace_500m_sec": 282.2, "spm": 23, "hr_bpm": 94},
+  {"time_sec": 6.1, "distance_m": 13.4, "pace_500m_sec": 190.5, "spm": 24, "hr_bpm": 96}
+ ]}

@@ -80,13 +80,54 @@ different question, and one the author of the card already answered.
 
 By the sorting test in the earlier note this is case 3, not case 2: ordering the board means
 reconciling an open history, and the bounded version loses what matters. Two cheap things
-would be fair to try before concluding more: supply the dependency graph in the state (the
-whole board is about 40k tokens, under the 64k limit), and ask a Noul per card for "another open
-card waits on this", which the frontmatter can check. Neither was run.
+were fair to try before concluding more: supply the dependency graph in the state, and ask a
+Noul per card for "another open card waits on this", which the frontmatter can check. Both
+were run the same day; the follow-up section below has them.
 
 What this does support, cheaply: a lint that flags a card whose text argues High while its
 frontmatter says Low, so the owner looks at it once. Card 79 is the example. That is a
 reviewer's prompt, not a priority.
+
+## Follow-up: the whole board as state
+
+Same day, same criteria. State is the context plus every open card in full, about 30k tokens,
+with each card's status and `blocked_by` in its header. Six calls of six cards each, one Choice
+and one Noul per card. 181,287 input tokens, $0.008, each call back in about half a second.
+
+Priority agreement moves from 20 to 21 of 33. Six answers changed, three toward the board and
+three away:
+
+| Card | Board | Alone | Whole board |
+|---|---|---|---|
+| 87 | High | Normal | High (0.97), now sees 91 and 92 wait on it |
+| 92 | Normal | High | Normal |
+| 41 | Low | Normal | Low |
+| 50 | High | High | Normal (0.51) |
+| 82 | Normal | Normal | Low |
+| 32 | Medium | Normal | High (0.58) |
+
+Card 87 is the case the first run predicted: the dependants' frontmatter is what makes it High,
+and with that visible Jev says so at 0.97. The other five are noise-sized moves on answers that
+were near a coin toss either way. The confident disagreements (55, 79, 93, 102) do not move.
+Seeing the whole board does not teach Jev the owner's sequencing; it only lets it read the
+dependency lines.
+
+The Noul, "does another open card list this one in its `blocked_by`", is the check on that. The
+frontmatter says six cards are waited on (47, 55, 58, 87, 88, 102).
+
+| State | True positives | False positives | Misses |
+|---|---|---|---|
+| Whole board | 6 of 6 | 1 (card 32 at 0.73; card 47 scraped in at 0.55) | 0 |
+| One card alone | 1 of 6 | 2 | 5 |
+
+With the board in front of it Jev finds every dependant and invents one. Alone it is guessing,
+as it should be, since a card's own text cannot say who waits on it. This is a case 1 question
+by the sorting test, three lines of code over the frontmatter, so the point is calibration, not
+use: a lookup Jev can be checked on, it gets nearly right from 30k tokens of state.
+
+One leak to note. Cards 100 and 101 carry "low findings" in their titles and both came back
+Low in every run. The `priority:` line itself was stripped from every card before it went in,
+so the board's label was never in the state.
 
 ## What was not measured
 

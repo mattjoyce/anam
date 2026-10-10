@@ -279,3 +279,46 @@ func TestBundled_BloodPressureIsAnOMHBody(t *testing.T) {
 		}
 	}
 }
+
+// A note is a fact about facts: it names the facets it is about by id, one or more,
+// carries the person's words, and stands on the timeline at the moment it is about.
+// The facets it names are never touched by it. A note that names no facet, or one
+// that is not a facet id, is refused.
+func TestBundled_NoteAnnotationIsAFactAboutAFacet(t *testing.T) {
+	t.Parallel()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, ok := reg.Lookup("note.annotation")
+	if !ok {
+		t.Fatal("no bundled note.annotation")
+	}
+	if d.Version != 1 || d.FactTime.Pointer != "/at" || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" {
+		t.Fatalf("v%d fact time %s identity %v", d.Version, d.FactTime.Pointer, d.IdentityKey)
+	}
+	decode := func(s string) map[string]any {
+		t.Helper()
+		var m map[string]any
+		if err := json.Unmarshal([]byte(s), &m); err != nil {
+			t.Fatal(err)
+		}
+		return m
+	}
+	note := `{"id": "note:2c6f38a3:1", "at": "2026-10-09 11:29",
+		"about": ["2c6f38a3-3db7-5e65-b933-9c59980e1c6c", "fe61ec2a-6d8b-56b0-8930-e3270f4ad44c"],
+		"text": "During a large work meeting, presenting."}`
+	if err := d.Check(decode(note)); err != nil {
+		t.Errorf("a note was refused: %v", err)
+	}
+	for name, payload := range map[string]string{
+		"no about":           strings.Replace(note, `"about": "2c6f38a3-3db7-5e65-b933-9c59980e1c6c",`, "", 1),
+		"not a facet id":     strings.Replace(note, `2c6f38a3-3db7-5e65-b933-9c59980e1c6c`, `the heart rate alert`, 1),
+		"empty text":         strings.Replace(note, `"During a large work meeting, presenting."`, `""`, 1),
+		"a field of its own": strings.Replace(note, `"text":`, `"mood": "tense", "text":`, 1),
+	} {
+		if err := d.Check(decode(payload)); err == nil {
+			t.Errorf("%s was admitted", name)
+		}
+	}
+}

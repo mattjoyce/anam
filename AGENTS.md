@@ -179,11 +179,13 @@ Work is tracked on the kanban board at `~/kanban/anam/cards`, outside this repo.
 Several agents work on Anam at once. Each has its own stream; the agent board
 (`~/agent-board`, the `board` CLI) is how they reach each other.
 
-**Branches and worktrees.** Work on a branch named for the card (`card-88-read-bound`), in a git
-worktree of your own (`git worktree add ../anam-<stream> -b card-<n>-<slug>`). Never edit, check
-out or switch branches in another agent's tree. `~/Projects/anam` is the card curator's tree on
-master; code work does not happen there. Merge to master with a `merge: card <n>, …` commit once
-`scripts/check.sh` is green, push, and say so on the board.
+**Branches and worktrees.** Card work goes on a branch named for the card (`card-88-read-bound`).
+Take a git worktree of your own (`git worktree add ../anam-<stream> -b card-<n>-<slug>`) when a
+collision is likely: another agent is live in the tree you would use, or its stream touches the
+same files or the same branch. A small change, in files no other stream is touching, can be made
+in place, once `board who` and `board claims` show the tree and files are clear. Never edit, check
+out or switch branches in a tree another agent is working in. Merge to master with a
+`merge: card <n>, …` commit once `scripts/check.sh` is green, push, and say so on the board.
 
 **The board.** Run `board iam` at the start, and keep your presence line saying what you are doing
 now. Check the board at the start of a task, before a merge or deploy, and whenever you are

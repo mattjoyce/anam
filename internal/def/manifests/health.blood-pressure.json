@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "health.blood-pressure",
-    "definition_version": 4,
+    "definition_version": 5,
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "bp-csv/reading",
@@ -32,7 +32,13 @@
       "pp": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$", "description": "Pulse pressure (systolic minus diastolic) in mmHg, as the diary printed it. Diary rows only.", "examples": ["49"]},
       "pulse": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$", "description": "Pulse as the source printed it, in beats per minute.", "examples": ["64.0"]},
       "reading": {"type": "string", "minLength": 1, "description": "Which reading this is among those taken at the same date_excel, counting from 1 in file order. Not in the source: the bp-csv worker adds it, because the device can take several readings in one minute and the export gives them no id. With date_excel it is the identity.", "examples": ["1"]},
-      "weight_kg": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$", "description": "Body weight entered alongside the reading, \"Weight [kg]\" column, in kilograms as written.", "examples": ["82.4"]}
+      "weight_kg": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$", "description": "Body weight entered alongside the reading, \"Weight [kg]\" column, in kilograms as written.", "examples": ["82.4"]},
+      "irregular_heartbeat": {"type": "string", "minLength": 1, "description": "The export's \"Irregular heartbeat\" column, as written. Present only when the app recorded it."},
+      "dizzy_light_headed": {"type": "string", "minLength": 1, "description": "The export's \"Dizzy / Light-headed\" column, as written. Present only when the app recorded it."},
+      "temperature_celsius": {"type": "string", "minLength": 1, "description": "The export's \"Temperature [Celsius]\" column, body temperature in degrees Celsius as written. Kept as text, so no print of the app's stops a reading."},
+      "blood_glucose_mg_dl": {"type": "string", "minLength": 1, "description": "The export's \"Blood Glucose [mg/dL]\" column, in mg/dL as written. Kept as text, like temperature_celsius."},
+      "oxygen_saturation_pct": {"type": "string", "minLength": 1, "description": "The export's \"Oxygen Saturation [%]\" column, in percent as written. Kept as text, like temperature_celsius."},
+      "tags": {"type": "string", "minLength": 1, "description": "The export's \"Tags\" column, as written, separators included."}
     },
     "additionalProperties": false
   }

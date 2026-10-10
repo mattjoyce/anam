@@ -284,6 +284,15 @@ it no longer does (card 78; Matt, 2026-10-10).
   snapshot, with the same guards as a scan: an empty run is refused, `--max-fraction` bounds a run,
   and nothing is written without `--yes`. There is no automatic retraction: a tombstone cannot be
   undone (a resend of the same row is a no-op), and an importer is outside the error kernel.
+- **Retiring a source.** When an importer replaces a source under another name (card 55: `garmin`
+  for `health-db`), the old source is neither empty nor unreadable; it is gone by decision, and
+  nothing scans it again. `anam retract <old-source> --retired` plans every live facet of the old
+  source, reports the count by type, and with `--yes --max-fraction 1` tombstones them all, one
+  anam-event each. It refuses a source that an import or an importer still declares, so the
+  declaration is removed first and a live source cannot be retired by mistake. The artifacts stay,
+  and a read as of before the retirement still shows every facet (card 120). The order of a
+  cut-over is therefore: the new importer's complete snapshot admits and reports 0 absent, the old
+  source's declaration comes out, then `--retired`.
 - **The alert.** An importer whose complete snapshot reports `absent` above zero raises a ductile
   event so the gateway tells the operator; Anam sends nothing itself.
 

@@ -16,7 +16,6 @@ import (
 	"github.com/mattjoyce/anam/internal/capture/documents"
 	"github.com/mattjoyce/anam/internal/capture/healthdb"
 	"github.com/mattjoyce/anam/internal/capture/records"
-	"github.com/mattjoyce/anam/internal/capture/withings"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
@@ -33,8 +32,7 @@ var mvpScopes = gate.StaticScopes{
 		"health.sleep", "health.body-composition", "health.heart-rate", "health.metric-group",
 		healthdb.AlertType,
 	},
-	bpcsv.Source:    {bpcsv.Type},
-	withings.Source: {withings.Type},
+	bpcsv.Source: {bpcsv.Type},
 	// records carries what is written down about the person: lab reports, the
 	// self-log, notes made from email. Each type has a Definition whose identity is
 	// the record's own id (docs/SELF-LOG.md). The one exception is blood pressure,
@@ -263,17 +261,13 @@ func scanImport(ctx context.Context, imp config.Import, cfg config.Config, defs 
 		return healthdb.Scan(scanCtx, imp.Path, cfg.PersonID)
 	case bpcsv.Source:
 		return bounded(ctx, func() ([]facet.Envelope, error) { return bpcsv.Scan(imp.Path, cfg.PersonID) })
-	case withings.Source:
-		scanCtx, cancel := context.WithTimeout(ctx, cfg.Timeout)
-		defer cancel()
-		return withings.Scan(scanCtx, imp.Path, cfg.PersonID)
 	case records.Source:
 		return bounded(ctx, func() ([]facet.Envelope, error) { return records.Scan(imp.Path, cfg.PersonID, defs) })
 	case documents.Source:
 		return bounded(ctx, func() ([]facet.Envelope, error) { return documents.Scan(imp.Path, cfg.PersonID) })
 	default:
-		return nil, fmt.Errorf("import names unknown source %q (have: %s, %s, %s, %s, %s)",
-			imp.Source, healthdb.Source, bpcsv.Source, withings.Source, records.Source, documents.Source)
+		return nil, fmt.Errorf("import names unknown source %q (have: %s, %s, %s, %s)",
+			imp.Source, healthdb.Source, bpcsv.Source, records.Source, documents.Source)
 	}
 }
 

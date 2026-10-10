@@ -1,10 +1,12 @@
 # Importers — sources outside Anam
 
 Design proposal · 2026-10-08. The service's side is built (cards 51, 52, 53); §8 is the contract
-every importer complies with. No importer exists yet.
+every importer complies with. Importers now exist for Withings (card 54), blood pressure (card 80)
+and the DreamStation (card 70), in `anam-importers`; the built-in `withings` worker is gone.
 
-Anam's capture workers for vendor sources (`healthdb`, `withings`, `bpcsv`) are compiled into the
-binary that owns the ledger. This proposal moves them out: an importer is a ductile plugin that
+Anam's capture workers for vendor sources (`healthdb`, `withings`, `bpcsv`) were compiled into the
+binary that owns the ledger. `withings` has left (card 54); `healthdb` and `bpcsv` remain until cards
+55 and 80 finish. This proposal moves them out: an importer is a ductile plugin that
 shapes one source's data to a Facet Definition and submits it to the Anam service. Anam keeps the
 Definitions, the gate and the record, and knows nothing about any vendor.
 
@@ -130,14 +132,15 @@ Where log management stops applying: logs tolerate loss and sampling and have no
 1. The service owns the record (cards 45, 46).
 2. Prerequisites 1 to 3: identity composed by the gate, JSON Schema, real validation.
 3. The endpoints (prerequisites 4 and 5).
-4. **Withings importer.** A webhook trigger, fetch the new measure group, shape it, `anam_submit`. A
-   weigh-in reaches the ledger in seconds, with no ETL and no hourly scan. It replaces the built-in
-   `withings` worker once it matches it facet for facet.
+4. **Withings importer.** Done (card 54). A webhook trigger, fetch the new measure group, shape it,
+   `anam_submit`. A weigh-in reaches the ledger in seconds, with no ETL and no hourly scan. It matched
+   the built-in `withings` worker facet for facet, and that worker has been removed.
 5. **Garmin importer**, daily observations from `garmin.db`; then retire `healthdb`, the ETL and
    healthdata.db.
-6. One-off exports (the blood pressure app, Technogym, Strong, Fitbit) get no importer. Each is a
-   document in the library, turned into a records file once by a script kept in `scripts/`, and
-   reshaped by regenerating that file with the same ids (card 58). `bpcsv` goes that way. `records`
+6. One-off exports (Technogym, Strong, Fitbit) get no importer. Each is a document in the library,
+   turned into a records file once by a script kept in `scripts/`, and reshaped by regenerating that
+   file with the same ids (card 58). The blood pressure app turned out to be live, exported
+   periodically, so it has an importer (card 80) and `bpcsv` goes when that runs. `records`
    and `documents` stay inside Anam: they are formats, not sources.
 
 ## 8. The importer contract

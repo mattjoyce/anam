@@ -1,10 +1,12 @@
 package artifact_test
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/store/artifact"
@@ -252,5 +254,60 @@ func TestList_ReturnsStoredDigests(t *testing.T) {
 		if got[i-1] >= got[i] {
 			t.Errorf("List is not sorted: %s before %s", got[i-1], got[i])
 		}
+	}
+}
+
+// Card 95: publishing runs off the write queue, so two receipts of one read can Put
+// the same bytes at once while a verify reads them. A reader sees nothing or a whole
+// file, never a short one.
+func TestPut_ConcurrentWritersAndReadersSeeWholeFiles(t *testing.T) {
+	t.Parallel()
+	s, dir := newStore(t)
+	body := bytes.Repeat([]byte(`{"k":"0123456789abcdef"}`+"\n"), 1<<14) // 400 KB
+	digest := artifact.Digest(body)
+
+	const writers, readers = 8, 8
+	var wg sync.WaitGroup
+	errs := make(chan error, writers+readers)
+	for range writers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 20 {
+				if _, err := s.Put("served", body); err != nil {
+					errs <- err
+					return
+				}
+			}
+		}()
+	}
+	for range readers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 200 {
+				_, err := s.Get("served", digest)
+				if err != nil && !errors.Is(err, artifact.ErrNotFound) {
+					errs <- err
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Errorf("under concurrent Put and Get: %v", err)
+	}
+	if got, err := s.Get("served", digest); err != nil || !bytes.Equal(got, body) {
+		t.Fatalf("after the race: %v", err)
+	}
+	// Nothing temporary is left, and List sees one entry.
+	entries, _ := os.ReadDir(filepath.Join(dir, "served"))
+	if len(entries) != 1 {
+		t.Errorf("served/ holds %d entries, want 1", len(entries))
+	}
+	if list, _ := s.List("served"); len(list) != 1 || list[0] != digest {
+		t.Errorf("List = %v", list)
 	}
 }

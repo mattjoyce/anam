@@ -22,6 +22,7 @@ package artifact
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -107,6 +108,12 @@ func Digest(b []byte) string {
 // re-put finds the file already there and writes nothing. A file that exists holding
 // *different* bytes is a corruption of the tier, not an update, and is refused —
 // content addressing means the name could only match if the bytes did.
+//
+// The write is atomic: the bytes go to a temporary name beside the entry and are
+// renamed into place, so a reader sees no file or a whole one, never a short one.
+// Two Puts of the same bytes at once (two receipts of one read, card 95) each rename
+// a whole file onto the same name; the last rename wins and nothing differs. A Put
+// that dies mid-write leaves a .tmp file List ignores.
 func (s *Store) Put(kind string, b []byte) (string, error) {
 	digest := Digest(b)
 	name, err := entryName(kind, digest)
@@ -130,10 +137,45 @@ func (s *Store) Put(kind string, b []byte) (string, error) {
 	if err := root.MkdirAll(kind, dirMode); err != nil {
 		return "", fmt.Errorf("artifact: create %s dir: %w", kind, err)
 	}
-	if err := root.WriteFile(name, b, fileMode); err != nil {
-		return "", fmt.Errorf("artifact: write %s: %w", name, err)
+	if err := writeAtomic(root, name, b); err != nil {
+		return "", err
 	}
 	return digest, nil
+}
+
+// writeAtomic writes b to a fresh temporary name beside name, syncs it, and renames
+// it into place. The temporary name is unique to this call, so concurrent writers
+// never share one; rename replaces atomically, so name is never half-written.
+func writeAtomic(root *os.Root, name string, b []byte) (err error) {
+	var nonce [8]byte
+	if _, err := rand.Read(nonce[:]); err != nil {
+		return fmt.Errorf("artifact: write %s: %w", name, err)
+	}
+	tmp := name + "." + hex.EncodeToString(nonce[:]) + ".tmp"
+	f, err := root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, fileMode)
+	if err != nil {
+		return fmt.Errorf("artifact: write %s: %w", name, err)
+	}
+	defer func() {
+		if err != nil {
+			_ = root.Remove(tmp) // best effort; a leftover .tmp is ignored by List
+		}
+	}()
+	if _, err = f.Write(b); err != nil {
+		_ = f.Close()
+		return fmt.Errorf("artifact: write %s: %w", name, err)
+	}
+	if err = f.Sync(); err != nil {
+		_ = f.Close()
+		return fmt.Errorf("artifact: sync %s: %w", name, err)
+	}
+	if err = f.Close(); err != nil {
+		return fmt.Errorf("artifact: write %s: %w", name, err)
+	}
+	if err = root.Rename(tmp, name); err != nil {
+		return fmt.Errorf("artifact: rename %s: %w", name, err)
+	}
+	return nil
 }
 
 // Get returns the bytes stored under kind at digest, verifying on the way out that

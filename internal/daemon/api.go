@@ -146,7 +146,8 @@ func (d *Daemon) verifyReceipt(w http.ResponseWriter, r *http.Request) {
 // postReceipt publishes a read: the timeline read the query describes, through its
 // projection, filed with a receipt (card 87). The query is the timeline's, in the
 // same parameters. Publishing writes artifacts only, so it takes no turn on the write
-// queue and never waits on an ingest.
+// queue and never waits on an ingest; the artifact store's writes are atomic (card
+// 95), so two publishes of one value at once each leave a whole file.
 func (d *Daemon) postReceipt(w http.ResponseWriter, r *http.Request) {
 	q, err := api.TimelineQueryOf(r.URL.Query())
 	if err != nil {

@@ -212,9 +212,15 @@ CREATE TABLE IF NOT EXISTS snapshot (
   completed_w  INTEGER
 );
 CREATE INDEX IF NOT EXISTS snapshot_by_source ON snapshot (source, completed_at);
+-- A part is a value: digest is the content identity of the envelopes it was recorded
+-- with (card 107), so a resend of the part number with other envelopes is refused and
+-- a snapshot's membership, the union of its parts, cannot change once a part is in.
+-- Added in place by bindSnapshotParts rather than by a schema version: the tier is
+-- disposable, and a version bump rebuilds the provisioned tier too (card 111).
 CREATE TABLE IF NOT EXISTS snapshot_part (
-  id   TEXT NOT NULL,
-  part INTEGER NOT NULL,
+  id     TEXT NOT NULL,
+  part   INTEGER NOT NULL,
+  digest TEXT NOT NULL,
   PRIMARY KEY (id, part)
 );
 CREATE TABLE IF NOT EXISTS snapshot_facet (
@@ -255,6 +261,10 @@ func Open(ctx context.Context, path string, buckets span.Buckets) (*DB, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("ops: apply schema: %w", err)
 	}
+	if err := bindSnapshotParts(ctx, db); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	if err := pinSchemaVersion(ctx, db); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -280,6 +290,38 @@ func OpenReadOnly(ctx context.Context, path string) (*DB, error) {
 		return nil, fmt.Errorf("ops: open %q read-only: %w", path, err)
 	}
 	return &DB{db: db}, nil
+}
+
+// bindSnapshotParts gives a store written before card 107 the digest column on
+// snapshot_part. A part recorded without one cannot be told from a changed one, so
+// the snapshot tables are cleared with it: the tier is disposable, and the next
+// resend remakes them. A store that has the column is left alone.
+func bindSnapshotParts(ctx context.Context, db *sql.DB) error {
+	var n int
+	if err := db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM pragma_table_info('snapshot_part') WHERE name = 'digest'`).Scan(&n); err != nil {
+		return fmt.Errorf("ops: snapshot_part columns: %w", err)
+	}
+	if n > 0 {
+		return nil
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("ops: bind snapshot parts: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }() // no-op after Commit
+	for _, q := range []string{
+		`DELETE FROM snapshot_facet`, `DELETE FROM snapshot_part`, `DELETE FROM snapshot`,
+		`ALTER TABLE snapshot_part ADD COLUMN digest TEXT NOT NULL DEFAULT ''`,
+	} {
+		if _, err := tx.ExecContext(ctx, q); err != nil {
+			return fmt.Errorf("ops: bind snapshot parts: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("ops: bind snapshot parts: %w", err)
+	}
+	return nil
 }
 
 // pinSchemaVersion records the version on first open and refuses a mismatch after.

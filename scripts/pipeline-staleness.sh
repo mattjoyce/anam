@@ -18,13 +18,15 @@
 set -uo pipefail
 
 MAX_LAG_DAYS="${MAX_LAG_DAYS:-2}"
-GARMIN_DB="${GARMIN_DB:-/mnt/Projects/healthdata/garmin/DBs/garmin_summary.db}"
+GARMIN_DB="${GARMIN_DB:-/mnt/Projects/healthdata/garmin/DBs/garmin.db}"
 WITHINGS_DB="${WITHINGS_DB:-/mnt/Projects/healthdata/withings/withings.db}"
-HEALTH_DB="${HEALTH_DB:-/mnt/Projects/healthdata/healthdata.db}"
 LEDGER_DB="${LEDGER_DB:-$HOME/.local/share/anam/ledger.db}"
 ANAM_SERVER="${ANAM_SERVER:-}"
 ANAM_TOKEN_FILE="${ANAM_TOKEN_FILE:-$HOME/.config/anam/token}"
 TODAY="${TODAY:-$(date +%F)}"
+# DAY_ZONE is the zone whose calendar the sources' days are in, so an Anam fact time
+# (an instant) is compared as the date it falls on there.
+DAY_ZONE="${DAY_ZONE:-Australia/Sydney}"
 
 # newest <label> <db> <sql>: prints the first 10 characters of the scalar (a date),
 # or exits 2 naming the stage that could not be read on stderr, which is what the
@@ -71,7 +73,7 @@ newest_anam() {
     echo "CHECK FAILED: $label: no rows since $from" >&2
     exit 2
   fi
-  printf '%s' "${out:0:10}"
+  TZ="$DAY_ZONE" date -d "$out" +%F
 }
 
 # days_between <earlier> <later>: whole days from one calendar date to another.
@@ -79,14 +81,13 @@ days_between() {
   echo $(( ( $(date -d "$2" +%s) - $(date -d "$1" +%s) ) / 86400 ))
 }
 
-garmin=$(newest "Garmin collected" "$GARMIN_DB" "SELECT MAX(day) FROM days_summary") || exit $?
+garmin=$(newest "Garmin collected" "$GARMIN_DB" "SELECT MAX(day) FROM daily_summary") || exit $?
 withings=$(newest "Withings collected" "$WITHINGS_DB" "SELECT MAX(date) FROM measurements") || exit $?
-etl=$(newest "ETL summarised" "$HEALTH_DB" "SELECT MAX(period_start) FROM summaries WHERE period_type='day'") || exit $?
-anam_day=$(newest_anam "Anam ingested (daily)" health.metric-group) || exit $?
+anam_day=$(newest_anam "Anam admitted (Garmin days)" garmin.day) || exit $?
 anam_meas=$(newest_anam "Anam ingested (Withings)" health.measurement) || exit $?
 
-printf 'Garmin collected      %s\nWithings collected    %s\nETL summarised        %s\nAnam, daily rows      %s\nAnam, Withings rows   %s\n' \
-  "$garmin" "$withings" "$etl" "$anam_day" "$anam_meas"
+printf 'Garmin collected      %s\nWithings collected    %s\nAnam, Garmin days     %s\nAnam, Withings rows   %s\n' \
+  "$garmin" "$withings" "$anam_day" "$anam_meas"
 
 stale=0
 # lag <what> <earlier> <later>: reports when <later> is more than MAX_LAG_DAYS behind
@@ -100,8 +101,7 @@ lag() {
   fi
 }
 lag "Garmin collection (against today)" "$TODAY" "$garmin"
-lag "ETL summary (against Garmin)" "$garmin" "$etl"
-lag "Anam ingest of daily rows (against the ETL)" "$etl" "$anam_day"
+lag "Anam's Garmin days (against GarminDB)" "$garmin" "$anam_day"
 lag "Anam ingest of Withings rows (against Withings)" "$withings" "$anam_meas"
 
 if [ "$stale" -eq 0 ]; then

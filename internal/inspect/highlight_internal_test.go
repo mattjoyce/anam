@@ -88,3 +88,27 @@ func TestFieldsOf_AnnotationsAndRoles(t *testing.T) {
 		t.Errorf("described = %d, want 2 (/id and /metrics/*/avg)", n)
 	}
 }
+
+func TestChangedFields(t *testing.T) {
+	t.Parallel()
+	got := changedFields(
+		[]byte(`{"a": "1", "n": {"x": 1, "y": 2}, "list": [1, 2], "gone": true}`),
+		[]byte(`{"a": "1", "n": {"x": 1, "y": 3}, "list": [1, 3], "new": "z"}`))
+	want := []changeRow{
+		{Pointer: "/gone", Prior: "true"},
+		{Pointer: "/list", Prior: "[1,2]", Value: "[1,3]"},
+		{Pointer: "/n/y", Prior: "2", Value: "3"},
+		{Pointer: "/new", Value: `"z"`},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("changedFields = %+v", got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("row %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+	if v, ok := atPointer(map[string]any{"a/b": map[string]any{"c": 1.0}}, "/a~1b/c"); !ok || v != 1.0 {
+		t.Errorf("atPointer escaped = %v %v", v, ok)
+	}
+}

@@ -27,6 +27,42 @@
   <tr><th>payload</th><td>{{.Facet.Descriptor.PayloadKind}} · {{.Facet.Descriptor.MediaType}} · schema {{.Facet.Descriptor.SourceSchema}} v{{.Facet.Descriptor.SchemaVersion}}</td></tr>
 </table>
 
+{{if gt .Latest 1}}<p class="meta">artifact versions: {{$id := .Facet.ID}}{{$v := .Facet.ArtifactVersion}}{{$latest := .Latest}}{{range $i, $n := .Versions}}{{if $i}} · {{end}}{{if eq $n $v}}<strong>v{{$n}}</strong>{{else}}<a href="/facet?id={{$id}}&v={{$n}}">v{{$n}}</a>{{end}}{{if eq $n $latest}} <span class="dim">(newest)</span>{{end}}{{end}}</p>{{end}}
+
+{{if .Changes}}
+<h2>changed from v{{.Prior}}</h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>field</th><th>v{{.Prior}}</th><th>v{{.Facet.ArtifactVersion}}</th></tr></thead>
+  <tbody>
+    {{range .Changes}}
+    <tr><td class="mono">{{.Pointer}}</td><td class="mono">{{if .Prior}}{{.Prior}}{{else}}<span class="dim">absent</span>{{end}}</td><td class="mono">{{if .Value}}{{.Value}}{{else}}<span class="dim">absent</span>{{end}}</td></tr>
+    {{end}}
+  </tbody>
+</table>
+</div>
+{{else if gt .Facet.ArtifactVersion 1}}
+<p class="meta">This version's payload is the same as v{{.Prior}}'s.</p>
+{{end}}
+
+{{if .Rows}}
+<h2>fields <span class="dim">read through definition v{{.Facet.DefinitionVersion}}</span></h2>
+<div class="scroll">
+<table class="fields">
+  <thead><tr><th>field</th><th>value</th><th>what it means</th></tr></thead>
+  <tbody>
+    {{range .Rows}}
+    <tr{{if not .Present}} class="dim"{{end}}>
+      <td class="mono" style="padding-left: {{.Depth}}.2rem">{{if .Depth}}<span class="dim">└ </span>{{end}}{{.Name}}{{range .Roles}} <span class="role">{{.}}</span>{{end}}</td>
+      <td class="mono">{{if .Value}}{{.Value}}{{else if .Present}}<span class="dim">object, below</span>{{else}}<span class="dim">absent</span>{{end}}</td>
+      <td>{{if .Description}}{{.Description}}{{else}}<span class="undescribed">not described</span>{{end}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}
+
 <h2>payload <span class="dim">{{if eq (print .Facet.Descriptor.PayloadKind) "reference"}}(a reference: the bytes stay in the library, at this path and hash){{else}}(verbatim, canonical bytes){{end}}</span></h2>
 {{if .DocumentURL}}<p><a href="{{.DocumentURL}}">open the document</a> <span class="dim">served from the default library, bytes as they are</span></p>{{end}}
 <pre class="json mono">{{template "json.html" .Payload}}</pre>
@@ -40,8 +76,8 @@
       <td>{{.Seq}}</td>
       <td class="mono">{{.AnamTime.Format "2006-01-02T15:04:05Z07:00"}}</td>
       <td><span class="kind kind-{{.Kind}}">{{.Kind}}</span></td>
-      <td>{{.ArtifactVersion}}</td>
-      <td>{{if .PriorArtifactVersion}}{{.PriorArtifactVersion}}{{else}}—{{end}}</td>
+      <td><a href="/facet?id={{.FacetID}}&v={{.ArtifactVersion}}">{{.ArtifactVersion}}</a></td>
+      <td>{{if .PriorArtifactVersion}}<a href="/facet?id={{.FacetID}}&v={{.PriorArtifactVersion}}">{{.PriorArtifactVersion}}</a>{{else}}—{{end}}</td>
     </tr>
     {{end}}
   </tbody>

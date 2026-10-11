@@ -36,7 +36,9 @@ func TestTypeStyles_CoverEveryBundledType(t *testing.T) {
 
 // The legend reads the shapes as a key: a filled circle is a measure, and an event
 // is never a circle. (A reading may be one; it is drawn hollow.) Within a row no
-// two types share a shape.
+// two types share a shape, except measures: a row may carry the same measurement
+// from two eras (health.heart-rate from health-db, health.heart-rate-daily from
+// Garmin), both circles, told apart by the legend's name and the row's sub-lanes.
 func TestTypeStyles_ShapesMeanWhatTheLegendSays(t *testing.T) {
 	t.Parallel()
 	known := map[string]bool{}
@@ -54,11 +56,42 @@ func TestTypeStyles_ShapesMeanWhatTheLegendSays(t *testing.T) {
 		if st.Kind == kindMeasure && st.Shape != shapeCircle {
 			t.Errorf("%s: a measure must be a circle, got %s", typ, st.Shape)
 		}
+		if st.Kind == kindMeasure {
+			continue
+		}
 		key := [2]string{st.Family, string(st.Shape)}
 		if other, dup := inRow[key]; dup {
 			t.Errorf("%s and %s share the %s shape in the %s row", typ, other, st.Shape, st.Family)
 		}
 		inRow[key] = typ
+	}
+}
+
+// The types the Garmin importer registers when health-db retired (card 55) sit in
+// the rows of the types they replaced, not in "other": the live record is read
+// in the rows, and the retired types still draw there in a read as_of an
+// earlier watermark.
+func TestTypeStyles_GarminTypesTakeTheRowsTheyReplaced(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		typ, replaced facet.Type
+	}{
+		{"health.heart-rate-daily", "health.heart-rate"},
+		{"sleep.episode", "health.sleep"},
+		{"health.step-count", "health.metric-group"},
+		{"garmin.day", "health.metric-group"},
+	}
+	for _, c := range cases {
+		got, old := styleOf(c.typ), styleOf(c.replaced)
+		if got.Family == otherFamilyID {
+			t.Errorf("%s falls into the other row", c.typ)
+		}
+		if got.Family != old.Family {
+			t.Errorf("%s is in the %s row, %s in %s", c.typ, got.Family, c.replaced, old.Family)
+		}
+		if got.Kind != kindMeasure || got.Shape != shapeCircle {
+			t.Errorf("%s: want a measure drawn as a circle, got %s/%d", c.typ, got.Shape, got.Kind)
+		}
 	}
 }
 

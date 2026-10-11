@@ -130,6 +130,43 @@ func TestOpenRefusesAnImporterWithTheOperatorsToken(t *testing.T) {
 	}
 }
 
+// Card 122: a bundled type may be named by two importers, since no importer can
+// register a version of it, and each submits under its own source, so the same id
+// from both is two facets. A type no binary bundles still has one owner.
+func TestImportersShareABundledType(t *testing.T) {
+	cfg := importerConfig(t)
+	const secondToken = "second-importer-token-0123456789abcdef01"
+	first, second := sha256.Sum256([]byte(importerToken)), sha256.Sum256([]byte(secondToken))
+	write := func(types string) {
+		t.Helper()
+		body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [health.weight, test.reading]\n"+
+			"  - source: second-import\n    token_sha256: %s\n    types: [%s]\n",
+			hex.EncodeToString(first[:]), hex.EncodeToString(second[:]), types)
+		if err := os.WriteFile(cfg.ImportersFile, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	write("health.weight, test.reading")
+	if _, err := Open(context.Background(), cfg, Options{}); !errors.Is(err, config.ErrInvalidImporters) {
+		t.Fatalf("Open with an unbundled type named twice: got %v, want ErrInvalidImporters", err)
+	}
+
+	write("health.weight")
+	d, url, _ := serveImporters(t, cfg)
+	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	var a api.Admission
+	for _, token := range []string{importerToken, secondToken} {
+		call(t, "POST", url+"/v1/envelopes", token, batch(weighIn("w-1", 80.5, weight.Version)), http.StatusOK, &a)
+		if a.Changed != 1 || a.Results[0].Outcome != "admitted" {
+			t.Fatalf("submission under %s: %+v", token[:6], a)
+		}
+	}
+	if got := head(t, d); got != 2 {
+		t.Fatalf("W = %d, want 2: one facet per source", got)
+	}
+}
+
 // Card 53: an importer's token opens the importer routes and nothing else, and the
 // operator's token submits nothing.
 func TestImporterRoutesAuthorize(t *testing.T) {

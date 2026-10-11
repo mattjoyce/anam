@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mattjoyce/anam/internal/config"
+	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/read"
 )
@@ -73,7 +74,11 @@ func refuseDeclared(cmd *cobra.Command, cfg config.Config, source, importsPath s
 		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "importers: no importers file configured, so no importer declares the source")
 		return nil
 	}
-	importers, err := config.LoadImporters(cfg.ImportersFile)
+	reg, err := def.Bundled()
+	if err != nil {
+		return err
+	}
+	importers, err := config.LoadImporters(cfg.ImportersFile, reg.Has)
 	if err != nil {
 		return err
 	}

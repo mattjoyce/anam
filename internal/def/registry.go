@@ -61,6 +61,12 @@ func (r *Registry) Identify(env facet.Envelope) (string, error) {
 	return d.SourceRef(env.Source, doc)
 }
 
+// Has reports whether the registry holds a Definition for a type.
+func (r *Registry) Has(t facet.Type) bool {
+	_, ok := r.byType[t]
+	return ok
+}
+
 // Lookup returns the Definition for a type.
 func (r *Registry) Lookup(t facet.Type) (Definition, bool) {
 	d, ok := r.byType[t]

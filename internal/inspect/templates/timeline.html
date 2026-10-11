@@ -33,6 +33,16 @@
   .band .pt path { stroke: var(--ring); stroke-width: 1; }
   .band .pt:hover path { stroke: currentColor; stroke-width: 1.5; }
   .band .dead path { opacity: .3; }
+  .band .pt.selected path { stroke: currentColor; stroke-width: 2.5; opacity: 1; }
+  .band .sel.box { fill: rgba(237,161,0,0.12); stroke: var(--h3); }
+  .selection { margin-top: .8rem; padding-top: .6rem; border-top: 1px solid color-mix(in srgb, currentColor 20%, transparent); font-size: .9rem; }
+  .selection .row { display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
+  .selection button { font: inherit; font-size: .85rem; }
+  .sel-list { margin: .4rem 0; padding-left: 1.2rem; max-height: 9rem; overflow-y: auto; }
+  .sel-list li a { text-decoration: none; }
+  .note label { display: flex; gap: .6rem; align-items: flex-start; margin: .4rem 0; }
+  .note textarea { font: inherit; flex: 1; max-width: 48rem; padding: .3rem .4rem; }
+  .note pre { margin: .5rem 0 0; }
   .band .baseline { stroke: var(--axis); stroke-width: 1; }
   .band .tick { stroke: var(--gridline); }
   .band text { fill: var(--ink-muted); font: 11px system-ui, sans-serif; }
@@ -60,7 +70,8 @@
   .fam label { display: flex; align-items: center; gap: .35rem; cursor: pointer; }
   .fam label.off { opacity: .5; }
   .sw { width: 16px; height: 16px; flex: none; }
-  .presets a { margin-right: .6rem; }
+  .presets a, .presets span { margin-right: .6rem; }
+  .presets span { font-weight: 600; }
   .surface { border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 10px; padding: .8rem 1rem; margin-top: 1rem; }
   .surface h2 { margin: 0 0 .35rem; }
   .strip { display: flex; flex-wrap: wrap; gap: 3px; padding: .5rem .2rem .2rem; max-height: 12rem; overflow-y: auto; }
@@ -93,11 +104,11 @@
     {{range .Ticks}}<line class="tick" x1="{{.X}}" y1="20" x2="{{.X}}" y2="{{$.Baseline}}"/>
     <text x="{{.X}}" y="{{$.Baseline}}" dy="16" text-anchor="middle">{{.Label}}</text>{{end}}
     <line class="baseline" x1="{{.PlotLeft}}" y1="{{.Baseline}}" x2="{{.PlotRight}}" y2="{{.Baseline}}"/>
-    {{range .Points}}<a class="pt{{if not .Live}} dead{{end}}" href="/facet?id={{.ID}}"><path class="{{.Hue}}" d="{{.Path}}"><title>{{.Title}}</title></path></a>
+    {{range .Points}}<a class="pt{{if not .Live}} dead{{end}}" href="/facet?id={{.ID}}" data-x="{{.X}}" data-y="{{.Y}}" data-t="{{.MS}}" data-title="{{.Title}}"><path class="{{.Hue}}" d="{{.Path}}"><title>{{.Title}}</title></path></a>
     {{end}}
     <rect class="sel" id="sel" x="0" y="20" width="0" height="{{.Baseline}}" visibility="hidden" pointer-events="none"/>
   </svg>
-  <p class="dim hint">{{.Shown}} mark{{if ne .Shown 1}}s{{end}} in this window{{if .Filtered}}, filtered by type{{end}} · filled circles are periodic measures, hollow marks are readings, filled shapes are things that happened · faded marks are tombstoned or rejected</p>
+  <p class="dim hint">{{.Shown}} mark{{if ne .Shown 1}}s{{end}} in this window{{if .Filtered}}, filtered by type{{end}}{{if eq .Status "live"}}, live only{{else if eq .Status "dead"}}, tombstoned and rejected only{{end}} · filled circles are periodic measures, hollow marks are readings, filled shapes are things that happened · faded marks are tombstoned or rejected</p>
 
   <form class="controls" method="get" action="/">
     <div class="row">
@@ -111,13 +122,18 @@
         <a href="{{.Nav.Right}}" id="nav-right" title="pan right (→)">▶</a>
       </span>
       {{if .Zoomed}}<a href="/">whole person</a>{{end}}
-      <span class="dim hint">drag a span on the band · arrows pan, + − zoom · wheel zooms at the cursor</span>
+      <span class="dim hint">drag a span on the band · arrows pan, + − zoom · wheel zooms at the cursor · shift-drag selects marks, ctrl-click toggles one</span>
     </div>
     <div class="row presets">
       <strong>show</strong>
       <a href="{{.Nav.AllTypes}}" id="show-all">all types</a>
       <a href="{{.Nav.EventsOnly}}" id="show-events">events only</a>
       <span class="dim hint">or tick types below</span>
+      <strong>status</strong>
+      {{if eq .Status ""}}<span id="status-all">all</span>{{else}}<a href="{{.Nav.AllStatus}}" id="status-all">all</a>{{end}}
+      {{if eq .Status "live"}}<span id="status-live">live only</span>{{else}}<a href="{{.Nav.LiveOnly}}" id="status-live">live only</a>{{end}}
+      {{if eq .Status "dead"}}<span id="status-dead">tombstoned only</span>{{else}}<a href="{{.Nav.DeadOnly}}" id="status-dead">tombstoned only</a>{{end}}
+      {{if ne .Status ""}}<input type="hidden" name="status" value="{{.Status}}">{{end}}
     </div>
     <div class="legend">
       {{range $g := .Legend}}<fieldset class="fam">
@@ -129,6 +145,25 @@
       {{end}}
     </div>
   </form>
+
+  <div class="selection" id="selection" hidden>
+    <div class="row">
+      <strong><span id="sel-count">0</span> selected</strong>
+      <button type="button" id="sel-clear">clear</button>
+      <button type="button" id="sel-annotate">annotate</button>
+      <span class="dim hint">shift-drag a box or ctrl-click marks · a note is a fact about these facets, appended beside them (card 104)</span>
+    </div>
+    <ul class="sel-list mono" id="sel-list"></ul>
+    <div class="note" id="note" hidden>
+      <label>note <textarea id="note-text" rows="3" placeholder="What was going on, in your words."></textarea></label>
+      <div class="row">
+        <button type="button" id="note-draft">draft the note</button>
+        <button type="button" id="note-copy" hidden>copy</button>
+        <span class="dim hint">drafted as a records file for <span class="mono">private/records/notes.yaml</span>; the next ingest admits it. Writing it from here waits on card 93.</span>
+      </div>
+      <pre class="mono" id="note-yaml" hidden></pre>
+    </div>
+  </div>
 </div>
 
 <div class="surface">
@@ -154,37 +189,113 @@
       const vx = (e.clientX - r.left) * (band.viewBox.baseVal.width / r.width);
       return Math.min(Math.max(vx, left), right);
     };
+    const toY = e => {
+      const r = band.getBoundingClientRect();
+      return (e.clientY - r.top) * (band.viewBox.baseVal.height / r.height);
+    };
     const toTime = x => new Date(from + (x - left) / (right - left) * (to - from));
+
+    // Selection (card 132): a shift-drag box selects the marks inside it, a
+    // ctrl-click (cmd on a Mac) toggles one. It lives in the page alone: every
+    // pan or zoom is a new read, and the selection is a gesture, not state.
+    const marks = [...band.querySelectorAll('a.pt')];
+    const selected = new Map();
+    const panel = document.getElementById('selection'), list = document.getElementById('sel-list');
+    const note = document.getElementById('note'), yamlOut = document.getElementById('note-yaml');
+    const copyBtn = document.getElementById('note-copy');
+    const render = () => {
+      marks.forEach(a => a.classList.toggle('selected', selected.has(a.dataset.t + a.getAttribute('href'))));
+      panel.hidden = selected.size === 0;
+      document.getElementById('sel-count').textContent = selected.size;
+      list.innerHTML = '';
+      [...selected.values()].sort((a, b) => a.t - b.t).forEach(m => {
+        const li = document.createElement('li'), a = document.createElement('a');
+        a.href = m.href; a.textContent = m.title; li.appendChild(a); list.appendChild(li);
+      });
+      if (selected.size === 0) { note.hidden = true; yamlOut.hidden = true; copyBtn.hidden = true; }
+    };
+    const keyOf = a => a.dataset.t + a.getAttribute('href');
+    const entryOf = a => ({ id: a.getAttribute('href').replace('/facet?id=', ''), href: a.getAttribute('href'),
+                            t: Number(a.dataset.t), title: a.dataset.title });
+    const toggle = a => { const k = keyOf(a); selected.has(k) ? selected.delete(k) : selected.set(k, entryOf(a)); render(); };
+    let suppressClick = false;
+    band.addEventListener('click', e => {
+      const a = e.target.closest('a.pt');
+      if (suppressClick) { e.preventDefault(); suppressClick = false; return; }
+      if (!a) return;
+      if (e.ctrlKey || e.metaKey) { e.preventDefault(); toggle(a); }
+      else if (e.shiftKey) { e.preventDefault(); }
+    });
+    document.getElementById('sel-clear').addEventListener('click', () => { selected.clear(); render(); });
+    document.getElementById('sel-annotate').addEventListener('click', () => {
+      note.hidden = false; document.getElementById('note-text').focus();
+    });
+
+    // The note is a note.annotation (card 104) drafted as the records file the
+    // person installs: `at` is the earliest selected fact time in the Definition's
+    // zone, `about` every selected id, the text verbatim. Submitting it from here
+    // is card 93's decision.
+    const sydney = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+    const atOf = ms => { const p = {}; sydney.formatToParts(new Date(ms)).forEach(x => { p[x.type] = x.value; });
+                         return `${p.year}-${p.month}-${p.day} ${p.hour === '24' ? '00' : p.hour}:${p.minute}`; };
+    document.getElementById('note-draft').addEventListener('click', () => {
+      const text = document.getElementById('note-text').value.trim();
+      if (!text || selected.size === 0) { document.getElementById('note-text').focus(); return; }
+      const ms = [...selected.values()].sort((a, b) => a.t - b.t);
+      const lines = ['records:', '  - type: note.annotation', `    id: note:${ms[0].id.slice(0, 8)}:1`,
+                     `    at: "${atOf(ms[0].t)}"`, '    about:'];
+      ms.forEach(m => lines.push(`      - ${m.id}`));
+      lines.push(`    text: ${JSON.stringify(text)}`);
+      yamlOut.textContent = lines.join('\n') + '\n';
+      yamlOut.hidden = false; copyBtn.hidden = false;
+    });
+    copyBtn.addEventListener('click', () => {
+      const t = yamlOut.textContent;
+      if (navigator.clipboard) navigator.clipboard.writeText(t).then(() => { copyBtn.textContent = 'copied'; setTimeout(() => { copyBtn.textContent = 'copy'; }, 1500); });
+    });
 
     // Capture waits for a real drag: captured at pointerdown, the click on a mark
     // would be retargeted to the band and its link to the facet would never open.
+    let y0 = null, boxing = false;
     band.addEventListener('pointerdown', e => {
-      x0 = toX(e);
+      x0 = toX(e); y0 = toY(e); boxing = e.shiftKey;
+      sel.classList.toggle('box', boxing);
     });
     band.addEventListener('pointermove', e => {
       if (x0 === null) return;
-      const x1 = toX(e);
-      if (Math.abs(x1 - x0) <= 4) return;
+      const x1 = toX(e), y1 = toY(e);
+      if (Math.abs(x1 - x0) <= 4 && !(boxing && Math.abs(y1 - y0) > 4)) return;
       if (!band.hasPointerCapture(e.pointerId)) band.setPointerCapture(e.pointerId);
       sel.setAttribute('x', Math.min(x0, x1));
       sel.setAttribute('width', Math.abs(x1 - x0));
+      if (boxing) { sel.setAttribute('y', Math.min(y0, y1)); sel.setAttribute('height', Math.abs(y1 - y0)); }
+      else { sel.setAttribute('y', 20); sel.setAttribute('height', {{.Baseline}}); }
       sel.setAttribute('visibility', 'visible');
     });
     band.addEventListener('pointerup', e => {
       if (x0 === null) return;
-      const x1 = toX(e);
-      if (Math.abs(x1 - x0) > 4) {
+      const x1 = toX(e), y1 = toY(e);
+      const dragged = Math.abs(x1 - x0) > 4 || (boxing && Math.abs(y1 - y0) > 4);
+      if (dragged && boxing) {
+        const [xa, xb] = [Math.min(x0, x1), Math.max(x0, x1)], [ya, yb] = [Math.min(y0, y1), Math.max(y0, y1)];
+        marks.forEach(a => {
+          const mx = Number(a.dataset.x), my = Number(a.dataset.y);
+          if (mx >= xa && mx <= xb && my >= ya && my <= yb) selected.set(keyOf(a), entryOf(a));
+        });
+        render();
+        suppressClick = true;
+      } else if (dragged) {
         document.getElementById('from').value = toTime(Math.min(x0, x1)).toISOString();
         document.getElementById('to').value = toTime(Math.max(x0, x1)).toISOString();
         document.querySelector('.controls').submit();
       }
-      x0 = null;
+      x0 = null; y0 = null; boxing = false;
       sel.setAttribute('visibility', 'hidden');
     });
     // A vertical swipe on a phone is the page scrolling (touch-action: pan-y): the
     // browser cancels the pointer, and the half-drawn selection goes with it.
     band.addEventListener('pointercancel', () => {
-      x0 = null;
+      x0 = null; y0 = null; boxing = false;
       sel.setAttribute('visibility', 'hidden');
     });
 

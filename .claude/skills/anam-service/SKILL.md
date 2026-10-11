@@ -39,13 +39,26 @@ runs, nothing else may open those files. Ask it over HTTP instead.
 | `POST /v1/backups` | yes | Back up the record into `backup_dir` (`/mnt/disk1/backup/anam/daily`), keeping 14. Waits behind a running ingest. The gateway's `anam_backup` asks nightly at 02:30. 503 without a `backup_dir`. |
 | `GET /v1/definitions[/{type}[/{version}]]` | yes, or an importer's | The published Definitions: list, current manifest, one version. |
 | `POST /v1/definitions` | an importer's | Register a Definition the importer emits. 201 new, 200 same body, 409 immutable or re-keyed. |
-| `POST /v1/envelopes` | an importer's | A batch of up to 49 envelopes, admitted whole (200, per-envelope outcomes) or refused whole (422, every reason). 503 with `Retry-After` while a write runs. The operator's token gets 403. Contract: `docs/IMPORTERS.md` §8. |
+| `POST /v1/envelopes` | an importer's | A batch of up to 49 envelopes, admitted whole (200, per-envelope outcomes) or refused whole (422, every reason). 503 with `Retry-After` while a write runs. The operator's token gets 403. A resend-everything run labels its batches as parts of one `snapshot`. Contract: `docs/IMPORTERS.md` §8. |
+| `GET /v1/snapshots/{id}` | yes, or the importer whose run it is | A complete resend's report: parts admitted, whether it is complete, and what the source no longer holds (`absent`, judged from the snapshot's start). 404 unknown, or another importer's. |
 | `GET /` and below | yes | The inspector (timeline, facets, events, documents). Browser: basic auth, any user name, the token as password. |
 
-Importers' tokens live in `importers_file` (`ANAM_IMPORTERS_FILE`) as SHA-256 hashes beside each
-importer's source and types; an importer's token opens only the three importer routes. There is no
-API for retraction or for writing a record; those are local maintenance or design
-(`docs/API.md`).
+Any request may carry an `Anam-Timeout` header, the caller's own deadline as a Go duration
+(`25s`); the daemon works to the shorter of it and its configured timeout, and a read that runs
+out is 504. Importers' tokens live in `importers_file` (`ANAM_IMPORTERS_FILE`) as SHA-256
+hashes beside each importer's source and types; an importer's token opens only the importer
+routes (envelopes, definitions, its own snapshots). There is no API for retraction or for writing
+a record; those are local maintenance or design (`docs/API.md`).
+
+## The MCP adapter
+
+`~/Projects/anam-mcp` (card 72) is a client of this API for a model, nothing more. It uses six
+routes: `/v1/status`, `/v1/definitions` (list and one type), `/v1/timeline`, `POST /v1/receipts`,
+and receipt show and verify. Its four tools are `describe_record`, `describe_type`,
+`read_record` (a receipted read when it names a projection, otherwise unreceipted and it says so)
+and `verify_receipt`, plus the resource `anam://receipts/{hash}`. It writes nothing: ingest,
+checkpoints, backups, envelopes and the inspector stay with this skill and the CLI. Configure it
+with `ANAM_SERVER`, `ANAM_TOKEN_FILE`, `ANAM_ZONE` and `ANAM_MCP_TIMEOUT`.
 
 ## The CLI against the daemon
 
@@ -59,8 +72,10 @@ anam status
 anam timeline --from 2026-06-01 --to 2026-06-30 --type health.blood-pressure
 ```
 
-- With a server set, `init`, `serve`, `retract` and `daemon` refuse: they open local files the
-  daemon owns. Unset `ANAM_SERVER` to run them as maintenance, with the daemon stopped.
+- With a server set, `init`, `serve <projection>`, `retract` and `daemon` refuse: they open local
+  files the daemon owns. Unset `ANAM_SERVER` to run them as maintenance, with the daemon stopped.
+  A bare `anam serve` only lists the bundled projections and needs neither. To publish a read
+  against the daemon, `POST /v1/receipts`; the CLI has no command for it yet.
 - An unreachable server is an error that names it. There is no fallback to local files.
 - The reader's zone travels with each read. `zone: Local` is resolved to its IANA name from
   `$TZ` or `/etc/localtime` before it is sent; if neither names it, set `ANAM_ZONE`.
@@ -131,4 +146,5 @@ ingest holds the write queue, or when the ledger cannot be read, 504 a read that
 - The gateway job `anam_ingest` (unraid ductile, hourly and on `healthdata.etl.completed`)
   calls `?wait=10m`. Its failures post to Discord through `anam-ingest-failed`.
 - Layout, mounts and history: vault page `unraid_admin/vault/Anam Service Container.md`.
-  Code: `internal/daemon` (routes in `api.go`), wiring in `internal/app/daemon.go`.
+  Code: `internal/daemon` (operator routes in `api.go`, importer and reader routes in
+  `daemon.go`), wiring in `internal/app/daemon.go`.

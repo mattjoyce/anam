@@ -1,0 +1,185 @@
+/* Explainer stylesheet. All presentation lives here; render.py inlines it.
+   Colour means one thing: concept type. The --type-* tokens below are the
+   single source for text, labels and diagrams (render.py reads them). */
+
+:root {
+  --type-purpose: #5b5b5b;
+  --type-term: #6b5b95;
+  --type-component: #1f6f8b;
+  --type-workflow: #b8651b;
+  --type-data-structure: #2e7d4f;
+  --type-decision: #a0356b;
+  --type-invariant: #b02a2a;
+  --type-change-path: #7a6a12;
+  --type-gap: #8a4b00;
+
+  --fg: #1a1a1a;
+  --muted: #5a5a5a;
+  --bg: #ffffff;
+  --rule: #dddddd;
+  --soft: #f5f5f5;
+  --small: 13px;
+  --measure: 70ch;
+  --nav-width: 15rem;
+}
+
+* { box-sizing: border-box; }
+
+html { font-size: 16px; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+main {
+  padding: 1.5rem 16px 4rem;
+  max-width: calc(var(--measure) + 32px);
+  overflow-wrap: anywhere;
+}
+
+h1, h2, h3, h4 { line-height: 1.25; font-weight: 600; }
+h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
+h2 { font-size: 1.3rem; margin: 2.5rem 0 .75rem; padding-bottom: .25rem; border-bottom: 1px solid var(--rule); }
+h3 { font-size: 1.1rem; margin: 1.5rem 0 .5rem; }
+h4 { font-size: 1rem; margin: 1.25rem 0 .4rem; }
+h2 small { font-weight: 400; color: var(--muted); font-size: var(--small); }
+
+p { margin: .6rem 0; }
+ul, ol { padding-left: 1.4rem; margin: .5rem 0; }
+li { margin: .2rem 0; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; background: var(--soft); padding: 0 .25em; border-radius: 2px; }
+pre { background: var(--soft); padding: .75rem; overflow-x: auto; font-size: var(--small); line-height: 1.4; }
+pre code { background: none; padding: 0; font-size: inherit; }
+blockquote { margin: .75rem 0; padding: .25rem .75rem; border-left: 3px solid var(--rule); color: var(--muted); }
+a { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { text-decoration-thickness: 2px; }
+
+table { border-collapse: collapse; font-size: var(--small); margin: .5rem 0; }
+th, td { text-align: left; vertical-align: top; padding: .3rem .5rem; border-bottom: 1px solid var(--rule); }
+th { background: var(--soft); font-weight: 600; }
+
+.scroll { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+
+/* Concept references: coloured by type, everywhere. */
+.ref { text-decoration-color: currentColor; }
+.ref-purpose { color: var(--type-purpose); }
+.ref-term { color: var(--type-term); }
+.ref-component { color: var(--type-component); }
+.ref-workflow { color: var(--type-workflow); }
+.ref-data-structure { color: var(--type-data-structure); }
+.ref-decision { color: var(--type-decision); }
+.ref-invariant { color: var(--type-invariant); }
+.ref-change-path { color: var(--type-change-path); }
+.ref-gap { color: var(--type-gap); }
+
+/* Small labels */
+.label {
+  display: inline-block;
+  font-size: var(--small);
+  line-height: 1.3;
+  padding: .05rem .4rem;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  color: var(--muted);
+  background: var(--bg);
+  margin: .1rem .1rem .1rem 0;
+  max-width: 100%;
+}
+.label code { background: none; padding: 0; }
+.label-type { color: #fff; border-color: transparent; }
+.label-type.type-purpose { background: var(--type-purpose); }
+.label-type.type-term { background: var(--type-term); }
+.label-type.type-component { background: var(--type-component); }
+.label-type.type-workflow { background: var(--type-workflow); }
+.label-type.type-data-structure { background: var(--type-data-structure); }
+.label-type.type-decision { background: var(--type-decision); }
+.label-type.type-invariant { background: var(--type-invariant); }
+.label-type.type-change-path { background: var(--type-change-path); }
+.label-type.type-gap { background: var(--type-gap); }
+.label-flag, .flag {
+  color: #111;
+  background: #fff3c4;
+  border-color: #e0c060;
+  font-size: var(--small);
+  padding: 0 .35rem;
+  border: 1px solid #e0c060;
+  border-radius: 3px;
+}
+.labels { margin: .25rem 0 .75rem; }
+.meta, .desc, .diagram-note { color: var(--muted); }
+.meta { font-size: var(--small); margin: 0 0 .5rem; }
+.legend { font-size: var(--small); margin: .5rem 0 1rem; }
+.legend button { font: inherit; font-size: var(--small); padding: .1rem .5rem; margin-left: .5rem; cursor: pointer; }
+
+/* Map */
+.map .purpose-desc { font-size: 1.05rem; }
+.core-list, .gap-list { list-style: none; padding-left: 0; }
+.core-list li { padding: .2rem 0; border-bottom: 1px dotted var(--rule); font-size: 15px; line-height: 1.4; }
+.gap-list { columns: 2; column-gap: 2rem; font-size: 15px; }
+.gap-list li { padding: .1rem 0; break-inside: avoid; }
+.map .not-do { font-size: 15px; }
+.core-list .ref, .gap-list .ref { font-weight: 600; }
+.not-do { margin: .5rem 0 1rem; }
+
+/* Concepts */
+details.concept { margin: .5rem 0; border-left: 3px solid var(--rule); padding-left: .75rem; }
+details.concept.type-term { border-left-color: var(--type-term); }
+details.concept.type-component { border-left-color: var(--type-component); }
+details.concept.type-workflow { border-left-color: var(--type-workflow); }
+details.concept.type-data-structure { border-left-color: var(--type-data-structure); }
+details.concept.type-decision { border-left-color: var(--type-decision); }
+details.concept.type-invariant { border-left-color: var(--type-invariant); }
+details.concept.type-change-path { border-left-color: var(--type-change-path); }
+details.concept.type-gap { border-left-color: var(--type-gap); }
+details.concept.type-purpose { border-left-color: var(--type-purpose); }
+details.concept > summary { cursor: pointer; padding: .3rem 0; list-style-position: outside; }
+details.concept > summary .title { font-weight: 600; }
+details.concept > summary .desc { display: inline; }
+details.concept[open] > summary { margin-bottom: .25rem; }
+.concept-body { padding: 0 0 1rem; }
+.concept-body > p:first-child { margin-top: 0; }
+.used { margin-top: 1rem; padding-top: .5rem; border-top: 1px dotted var(--rule); font-size: var(--small); }
+.used h4 { margin: 0 0 .25rem; font-size: var(--small); color: var(--muted); }
+.used ul { margin: 0; }
+
+/* Diagrams: never scaled down; they scroll inside their own box. */
+figure.diagram { margin: 1rem 0; }
+figure.diagram figcaption { font-size: var(--small); color: var(--muted); margin-bottom: .25rem; }
+figure.diagram .scroll { border: 1px solid var(--rule); padding: .5rem; }
+pre.mermaid { background: none; padding: 0; font-size: 14px; overflow: visible; }
+pre.mermaid svg { max-width: none !important; height: auto; }
+
+/* Side navigation: fixed on wide screens, in flow on narrow ones. */
+nav.side { padding: 1rem 16px; font-size: var(--small); border-bottom: 1px solid var(--rule); }
+nav.side ul { list-style: none; padding-left: 0; margin: 0 0 .75rem; }
+nav.side li { margin: .15rem 0; }
+nav.side a { text-decoration: none; }
+nav.side a:hover { text-decoration: underline; }
+.nav-title { font-weight: 600; color: var(--muted); margin: .25rem 0; text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
+
+@media (max-width: 1099px) {
+  nav.side li { display: inline-block; margin-right: .9rem; }
+}
+
+@media (min-width: 1100px) {
+  nav.side {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: var(--nav-width);
+    overflow-y: auto;
+    border-bottom: none;
+    border-right: 1px solid var(--rule);
+  }
+  main { margin-left: var(--nav-width); padding-left: 2.5rem; padding-right: 2rem; max-width: calc(var(--nav-width) + var(--measure) + 4.5rem); }
+  figure.diagram, .scroll { max-width: 100%; }
+}
+
+/* Wide diagrams and tables may exceed the measure on a wide screen, but never the viewport. */
+@media (min-width: 1100px) {
+  main { max-width: none; }
+  main > section > *:not(figure):not(.scroll):not(details), .concept-body > *:not(figure):not(.scroll) { max-width: var(--measure); }
+  .concept-body, details.concept { max-width: min(100%, 110ch); }
+}

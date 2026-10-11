@@ -75,13 +75,17 @@ type typeStyle struct {
 	Kind   kind
 }
 
-// typeStyles is every bundled type's place on the band. A type not listed goes to
+// typeStyles is every bundled or registered type's place on the band. A type not listed goes to
 // the "other" row as a grey circle, so a new Definition shows up before anyone
 // styles it.
 var typeStyles = map[facet.Type]typeStyle{
 	"health.heart-rate":       {"heart", shapeCircle, kindMeasure},
 	"health.blood-pressure":   {"heart", shapeSquare, kindReading},
 	"health.heart-rate-alert": {"heart", shapeAlert, kindEvent},
+	// Registered by the Garmin importer since card 55, which retired health-db:
+	// the day's heart rate that health.heart-rate was. Both are measures and both
+	// are circles; the retired one draws only in a read as_of an earlier W.
+	"health.heart-rate-daily": {"heart", shapeCircle, kindMeasure},
 
 	"health.body-composition": {"body", shapeCircle, kindMeasure},
 	"health.weight":           {"body", shapeSquare, kindReading},
@@ -92,10 +96,17 @@ var typeStyles = map[facet.Type]typeStyle{
 	// One facet per CPAP session (card 70), registered by the DreamStation importer
 	// rather than bundled: a session, drawn as the activity row draws one.
 	"sleep.cpap-session": {"sleep", shapeDiamond, kindEvent},
+	// A night of sleep from the Garmin importer (card 55), the successor of
+	// health.sleep.
+	"sleep.episode": {"sleep", shapeCircle, kindMeasure},
 
 	"health.metric-group": {"activity", shapeCircle, kindMeasure},
-	"gym.visit":           {"activity", shapeSquare, kindEvent},
-	"exercise.session":    {"activity", shapeDiamond, kindEvent},
+	// The Garmin importer's day (card 55): a day's steps, and the day's summary
+	// of floors, distance and calories. Successors of health.metric-group.
+	"health.step-count": {"activity", shapeCircle, kindMeasure},
+	"garmin.day":        {"activity", shapeCircle, kindMeasure},
+	"gym.visit":         {"activity", shapeSquare, kindEvent},
+	"exercise.session":  {"activity", shapeDiamond, kindEvent},
 
 	"lab.result": {"labs", shapeCircle, kindReading},
 	"lab.panel":  {"labs", shapeSquare, kindEvent},

@@ -322,3 +322,61 @@ func TestFacetList_FiltersByStatus(t *testing.T) {
 		t.Errorf("status filter did not narrow to the tombstoned facet")
 	}
 }
+
+// The status filter is a lens over the ledger surface (card 131): live only hides
+// the tombstoned facet, dead only hides the live one, and the choice rides every
+// link. An unknown status is the caller's error.
+func TestTimeline_StatusFilterNarrowsTheBandAndRidesTheLinks(t *testing.T) {
+	t.Parallel()
+	srv, bpID, hrID := seededServer(t)
+
+	code, live := get(t, srv.URL+"/?status=live")
+	if code != http.StatusOK {
+		t.Fatalf("GET /?status=live = %d", code)
+	}
+	if strings.Contains(live, "/facet?id="+hrID) {
+		t.Error("tombstoned facet drawn under status=live")
+	}
+	if !strings.Contains(live, "/facet?id="+bpID) {
+		t.Error("live facet missing under status=live")
+	}
+	if !strings.Contains(live, "status=live") || !strings.Contains(live, ", live only") {
+		t.Error("nav links or caption lost the status filter")
+	}
+
+	_, dead := get(t, srv.URL+"/?status=dead")
+	if strings.Contains(dead, "/facet?id="+bpID) {
+		t.Error("live facet drawn under status=dead")
+	}
+	if !strings.Contains(dead, `class="pt dead" href="/facet?id=`+hrID) {
+		t.Error("tombstoned facet missing under status=dead")
+	}
+
+	// Combined with a type filter, both ride the links.
+	_, both := get(t, srv.URL+"/?status=live&type=health.blood-pressure")
+	at := strings.Index(both, `id="nav-left"`)
+	left := both[strings.LastIndex(both[:at], "<a href="):at]
+	if !strings.Contains(left, "status=live") || !strings.Contains(left, "type=health.blood-pressure") {
+		t.Errorf("pan-left link dropped the status or the type filter: %s", left)
+	}
+
+	if code, _ := get(t, srv.URL+"/?status=superseded"); code != http.StatusBadRequest {
+		t.Errorf("GET /?status=superseded = %d, want 400", code)
+	}
+}
+
+// Full width is a toggle on every page, remembered by the browser alone (card 131).
+func TestEveryPage_OffersTheWidthToggle(t *testing.T) {
+	t.Parallel()
+	srv, bpID, _ := seededServer(t)
+	for _, path := range []string{"/", "/facets", "/events", "/facet?id=" + bpID, "/definitions"} {
+		code, body := get(t, srv.URL+path)
+		if code != http.StatusOK {
+			t.Errorf("GET %s = %d", path, code)
+			continue
+		}
+		if !strings.Contains(body, `id="wide-toggle"`) || !strings.Contains(body, "anam.wide") {
+			t.Errorf("%s has no width toggle", path)
+		}
+	}
+}

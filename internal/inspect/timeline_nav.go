@@ -1,6 +1,7 @@
 package inspect
 
 import (
+	"fmt"
 	"net/url"
 	"sort"
 	"time"
@@ -8,13 +9,64 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
-// A timeline view is a URL: the window and the type filter ride in the query, so
-// every move is a link and a view can be shared or reloaded as it stands.
+// A timeline view is a URL: the window, the type filter and the status filter ride
+// in the query, so every move is a link and a view can be shared or reloaded as it
+// stands.
+
+// statusFilter narrows the band by folded status (card 131). The band is the ledger
+// surface and draws everything by default; a retired source leaves thousands of
+// tombstones under the live record, and this is the lens that hides them, or shows
+// them alone.
+type statusFilter string
+
+const (
+	statusAll  statusFilter = ""     // every facet, the dead faded
+	statusLive statusFilter = "live" // the live alone: what the canonical composes
+	statusDead statusFilter = "dead" // the tombstoned and rejected alone
+)
+
+// parseStatus reads the status query; an unknown value is the caller's error.
+func parseStatus(q string) (statusFilter, error) {
+	switch s := statusFilter(q); s {
+	case statusAll, statusLive, statusDead:
+		return s, nil
+	default:
+		return "", fmt.Errorf("status: %q is not live, dead or empty", q)
+	}
+}
+
+// admits says whether a facet in the given liveness is drawn under the filter.
+func (s statusFilter) admits(live bool) bool {
+	switch s {
+	case statusLive:
+		return live
+	case statusDead:
+		return !live
+	default:
+		return true
+	}
+}
+
+// tlView is what every timeline link carries besides the window: the type filter
+// (nil for all) and the status filter.
+type tlView struct {
+	Types  []facet.Type
+	Status statusFilter
+}
+
+func (v tlView) addTo(q url.Values) {
+	for _, t := range v.Types {
+		q.Add("type", string(t))
+	}
+	if v.Status != statusAll {
+		q.Set("status", string(v.Status))
+	}
+}
 
 // navLinks derives the four moves from the window: pan by a quarter of its width,
-// zoom in to half and out to double, both centred. The window and the type filter
-// stay in the URL, so a view is a link.
-func navLinks(from, to time.Time, types []facet.Type) tlNav {
+// zoom in to half and out to double, both centred. The window and the filters stay
+// in the URL, so a view is a link.
+func navLinks(from, to time.Time, view tlView) tlNav {
 	width := to.Sub(from)
 	quarter := width / 4
 	centre := from.Add(width / 2)
@@ -22,9 +74,7 @@ func navLinks(from, to time.Time, types []facet.Type) tlNav {
 		q := url.Values{}
 		q.Set("from", f.UTC().Format(time.RFC3339))
 		q.Set("to", t.UTC().Format(time.RFC3339))
-		for _, typ := range types {
-			q.Add("type", string(typ))
-		}
+		view.addTo(q)
 		return "/?" + q.Encode()
 	}
 	return tlNav{
@@ -60,16 +110,14 @@ func typeFilter(typeQ []string, types []facet.Type) (show map[facet.Type]bool, s
 	return show, selected
 }
 
-// windowLink is the current window with a different type filter.
-func windowLink(from, to time.Time, zoomed bool, types []facet.Type) string {
+// windowLink is the current window under a different view.
+func windowLink(from, to time.Time, zoomed bool, view tlView) string {
 	q := url.Values{}
 	if zoomed {
 		q.Set("from", from.UTC().Format(time.RFC3339))
 		q.Set("to", to.UTC().Format(time.RFC3339))
 	}
-	for _, t := range types {
-		q.Add("type", string(t))
-	}
+	view.addTo(q)
 	if len(q) == 0 {
 		return "/"
 	}

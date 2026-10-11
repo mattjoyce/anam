@@ -1,8 +1,15 @@
 {{define "style.html"}}
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  // Full width is a per-viewer preference, applied before first paint so the page
+  // does not jump; the browser remembers it, Anam does not (card 131).
+  try { if (localStorage.getItem('anam.wide') === '1') document.documentElement.classList.add('wide'); } catch (e) {}
+</script>
 <style>
   :root { color-scheme: light dark; }
   body { font: 15px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 72rem; padding: 0 1rem; }
+  html.wide body { max-width: none; }
+  nav button { font: inherit; font-size: .85rem; margin-left: .75rem; padding: 0 .4rem; cursor: pointer; }
   header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid currentColor; padding-bottom: .5rem; }
   h1 { font-size: 1.3rem; margin: 0; }
   h2 { font-size: 1.05rem; margin-top: 2rem; }

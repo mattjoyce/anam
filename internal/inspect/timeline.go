@@ -88,9 +88,10 @@ type timelineData struct {
 	StripCount int
 	Zoomed     bool
 
-	// Filtered is true when the type filter hides something. Shown counts the
-	// marks drawn in the window.
+	// Filtered is true when the type filter hides something; Status is the
+	// status filter in force. Shown counts the marks drawn in the window.
 	Filtered bool
+	Status   statusFilter
 	Shown    int
 
 	// Nav is the window moved: the same read at another from/to, each a link, so
@@ -101,8 +102,9 @@ type timelineData struct {
 
 // tlNav holds the moves a window can make, and the filter presets, as URLs.
 type tlNav struct {
-	Left, Right, In, Out string
-	AllTypes, EventsOnly string
+	Left, Right, In, Out          string
+	AllTypes, EventsOnly          string
+	AllStatus, LiveOnly, DeadOnly string
 }
 
 func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
@@ -136,8 +138,13 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	status, err := parseStatus(r.URL.Query().Get("status"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	data := buildTimeline(res, all, from, to, zoomed, r.URL.Query()["type"])
+	data := buildTimeline(res, all, from, to, zoomed, r.URL.Query()["type"], status)
 	render(w, "timeline.html", data)
 }
 
@@ -200,7 +207,7 @@ func parseInstant(s string) (t time.Time, dateOnly bool, err error) {
 	return t, false, nil
 }
 
-func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoomed bool, typeQ []string) timelineData {
+func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoomed bool, typeQ []string, status statusFilter) timelineData {
 	x := func(t time.Time) float64 {
 		frac := float64(t.Sub(from)) / float64(to.Sub(from))
 		return bandLeft + frac*(bandW-bandLeft-bandRight)
@@ -213,15 +220,23 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 		return all[i].ID < all[j].ID
 	})
 
+	// Rows and the legend come from every type in the ledger; the counts say how
+	// many of each the status filter lets through, so the legend tells what the
+	// band draws.
 	counts := map[facet.Type]int{}
+	seen := map[facet.Type]bool{}
 	var types []facet.Type
 	for _, f := range all {
-		if counts[f.Type] == 0 {
+		if !seen[f.Type] {
+			seen[f.Type] = true
 			types = append(types, f.Type)
 		}
-		counts[f.Type]++
+		if status.admits(res.States[f.ID].Live()) {
+			counts[f.Type]++
+		}
 	}
 	show, selected := typeFilter(typeQ, types)
+	view := tlView{Types: selected, Status: status}
 
 	// Rows come from every type in the ledger, not the filtered few, so a filter
 	// hides marks without moving the rows that are left.
@@ -235,8 +250,8 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 		PlotLeft: bandLeft, PlotRight: bandW - bandRight,
 		WindowFromMS: from.UnixMilli(), WindowToMS: to.UnixMilli(),
 		Zoomed: zoomed, Rows: rows,
-		Filtered: selected != nil,
-		Nav:      navLinks(from, to, selected),
+		Filtered: selected != nil, Status: status,
+		Nav: navLinks(from, to, view),
 	}
 	if zoomed {
 		data.From = from.UTC().Format(time.RFC3339)
@@ -249,14 +264,20 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 		}
 	}
 	sort.Slice(events, func(i, j int) bool { return events[i] < events[j] })
-	data.Nav.AllTypes = windowLink(from, to, zoomed, nil)
-	data.Nav.EventsOnly = windowLink(from, to, zoomed, events)
+	data.Nav.AllTypes = windowLink(from, to, zoomed, tlView{Status: status})
+	data.Nav.EventsOnly = windowLink(from, to, zoomed, tlView{Types: events, Status: status})
+	data.Nav.AllStatus = windowLink(from, to, zoomed, tlView{Types: selected})
+	data.Nav.LiveOnly = windowLink(from, to, zoomed, tlView{Types: selected, Status: statusLive})
+	data.Nav.DeadOnly = windowLink(from, to, zoomed, tlView{Types: selected, Status: statusDead})
 
 	for _, f := range all {
 		if !show[f.Type] || f.FactTime.Before(from) || f.FactTime.After(to) {
 			continue
 		}
 		st := res.States[f.ID]
+		if !status.admits(st.Live()) {
+			continue
+		}
 		style := styleOf(f.Type)
 		hue := hueClass(style.Family)
 		mark := markClass(f.Type)

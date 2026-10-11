@@ -41,6 +41,11 @@ type tlPoint struct {
 	ID        string
 	Live      bool
 	Title     string
+	// X and Y are the mark's centre in viewBox units and MS its fact time as epoch
+	// milliseconds: what the browser's selection needs (card 132) without
+	// re-deriving the layout.
+	X, Y float64
+	MS   int64
 }
 
 type tlTick struct {
@@ -282,11 +287,13 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 		hue := hueClass(style.Family)
 		mark := markClass(f.Type)
 		when := f.FactTime.UTC().Format("2006-01-02 15:04Z")
+		px, py := x(f.FactTime), yOf[f.Type]
 		data.Points = append(data.Points, tlPoint{
-			Path: markPath(style.Shape, x(f.FactTime), yOf[f.Type]),
+			Path: markPath(style.Shape, px, py),
 			Hue:  mark, ID: f.ID, Live: st.Live(),
 			Title: fmt.Sprintf("%s · %s · v%d %s · %s",
 				when, f.Type, f.ArtifactVersion, st.Status, f.Provenance.SourceRef),
+			X: px, Y: py, MS: f.FactTime.UnixMilli(),
 		})
 		if st.Live() {
 			data.Strip = append(data.Strip, tlStripEntry{

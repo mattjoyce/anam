@@ -380,3 +380,27 @@ func TestEveryPage_OffersTheWidthToggle(t *testing.T) {
 		}
 	}
 }
+
+// Selection is a gesture in the page (card 132): each mark carries what the
+// browser needs to box-select it and to draft a note about it (its centre and
+// fact time), and the page holds the selection panel and the note draft.
+func TestTimeline_MarksCarryWhatSelectionNeeds(t *testing.T) {
+	t.Parallel()
+	srv, bpID, _ := seededServer(t)
+	_, body := get(t, srv.URL+"/")
+	at := strings.Index(body, `href="/facet?id=`+bpID+`"`)
+	if at < 0 {
+		t.Fatal("live facet not on the band")
+	}
+	mark := body[at : strings.Index(body[at:], ">")+at]
+	for _, want := range []string{`data-x="`, `data-y="`, `data-t="1783233000000"`, `data-title="2026-07-05`} {
+		if !strings.Contains(mark, want) {
+			t.Errorf("mark lacks %s: %s", want, mark)
+		}
+	}
+	for _, want := range []string{`id="selection"`, `id="sel-annotate"`, `id="note-draft"`, "note.annotation", "private/records/notes.yaml"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("timeline missing %q", want)
+		}
+	}
+}

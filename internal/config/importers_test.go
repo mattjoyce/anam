@@ -25,7 +25,7 @@ importers:
 `
 	t.Run("a valid file", func(t *testing.T) {
 		t.Parallel()
-		got, err := config.LoadImporters(writeImports(t, valid))
+		got, err := config.LoadImporters(writeImports(t, valid), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -46,10 +46,20 @@ importers:
 		{"no types", strings.Replace(valid, "types: [health.weight]", "types: []", 1)},
 		{"a type that is not namespaced", strings.Replace(valid, "types: [health.weight]", "types: [weight]", 1)},
 	}
+	t.Run("a bundled type two importers name", func(t *testing.T) {
+		t.Parallel()
+		body := strings.Replace(valid, "types: [health.sleep, exercise.session]", "types: [health.weight]", 1)
+		bundled := func(ty facet.Type) bool { return ty == "health.weight" }
+		got, err := config.LoadImporters(writeImports(t, body), bundled)
+		if err != nil || len(got) != 2 {
+			t.Fatalf("got %v, %v; want both importers", got, err)
+		}
+	})
+
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			_, err := config.LoadImporters(writeImports(t, c.body))
+			_, err := config.LoadImporters(writeImports(t, c.body), nil)
 			if !errors.Is(err, config.ErrInvalidImporters) {
 				t.Fatalf("got %v, want ErrInvalidImporters", err)
 			}

@@ -171,7 +171,11 @@ place. While Anam's binary bundles a type, no importer may register it; an impor
 when a release drops it from the binary, registering the same body at the same version. The other
 direction works too: a release that bundles a type an importer registered admits it against the
 bundled Definition from then on, keeps the registered rows for the facets admitted under them, and
-says so in its log. No two importers may name the same type.
+says so in its log. No two importers may name the same type unless the binary bundles it: a bundled
+type's Definitions come from Anam, so no importer can register a version that refuses another's
+envelopes, and any number may submit it, each under its own source (`exercise.session` from Garmin
+and Concept2). A release that drops a type two importers share refuses to start until one of them
+gives it up.
 
 ### 8.2 Tokens
 

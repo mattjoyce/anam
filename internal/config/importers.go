@@ -40,8 +40,11 @@ type importersFile struct {
 // in Load. A source or a token named twice is refused: either would make one
 // importer's envelopes indistinguishable from another's. So is a type named by two
 // importers: a type's Definitions come from one place, and a second importer could
-// register a version that refuses every envelope of the first.
-func LoadImporters(path string) ([]Importer, error) {
+// register a version that refuses every envelope of the first. A type bundled
+// reports true for is the exception: its Definitions come from the binary, no
+// importer can register one, so any number of importers may submit it. A nil
+// bundled shares nothing.
+func LoadImporters(path string, bundled func(facet.Type) bool) ([]Importer, error) {
 	v := viper.New()
 	v.SetConfigFile(path)
 	v.SetConfigType("yaml")
@@ -75,6 +78,9 @@ func LoadImporters(path string) ([]Importer, error) {
 		for _, t := range imp.Types {
 			if !t.Valid() {
 				return nil, bad("type %q is not a valid namespaced facet type", t)
+			}
+			if bundled != nil && bundled(t) {
+				continue
 			}
 			if owner, taken := owners[t]; taken {
 				return nil, bad("type %s is %s's", t, owner)

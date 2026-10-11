@@ -27,7 +27,11 @@ func loadImporters(path string, operator []byte) (importers, error) {
 	if path == "" {
 		return out, nil
 	}
-	list, err := config.LoadImporters(path)
+	reg, err := def.Bundled()
+	if err != nil {
+		return nil, fmt.Errorf("daemon: %w", err)
+	}
+	list, err := config.LoadImporters(path, reg.Has)
 	if err != nil {
 		return nil, fmt.Errorf("daemon: %w", err)
 	}

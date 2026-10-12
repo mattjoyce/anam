@@ -298,7 +298,8 @@ Every first-page response contains:
 - `receipt_ref`, `served_hash`, `served_at`, `total_count`, `returned_count`, and `next_cursor`;
 - facet entries with exact `facet_ref`, fact-time/precision, folded status, classification,
   source identity, content hash, definition version, payload kind, media type, and the verbatim
-  payload, or under a mask the verbatim values at the masked pointers and nothing else. The content
+  payload, or under a mask the payload in its own shape pruned to the masked pointers, nesting kept,
+  and nothing else. The content
   hash is always the whole payload's, so a masked entry still names the fact it came from;
 - evidence links available to this caller and explicit limitations such as legacy timezone handling;
 - an unambiguous empty-result description when `total_count` is zero.

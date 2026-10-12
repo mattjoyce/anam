@@ -136,9 +136,11 @@ func Publish(ctx context.Context, src Source, d serve.Deps, q api.TimelineQuery,
 	// The bound is measured over what is answered: the frame's rows when fields
 	// were named, else the whole entries. Cut once here for the measure; Publish
 	// cuts again for the receipt, and the two are the same value.
-	if fr, err := serve.Cut(value, rq); err != nil {
+	fr, err := serve.Cut(value, rq)
+	if err != nil {
 		return api.Published{}, badQuery(err)
-	} else if fr != nil {
+	}
+	if fr != nil {
 		err = fitQuery(fr.Rows, limit, q)
 	} else {
 		err = fitQuery(value.Entries(), limit, q)

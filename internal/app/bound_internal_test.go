@@ -50,10 +50,10 @@ func TestTimeline_OverTheBoundIsRefusedWithWhatToNarrowBy(t *testing.T) {
 	if refused.TooLarge.Matched != 3 || refused.TooLarge.Bytes <= refused.TooLarge.MaxBytes {
 		t.Errorf("measure = %+v, want 3 matched and bytes over max", refused.TooLarge)
 	}
-	if got := strings.Join(refused.TooLarge.Narrow, " "); got != "type from to at projection" {
+	if got := strings.Join(refused.TooLarge.Narrow, " "); got != "type from to at projection fields" {
 		t.Errorf("narrow = %q, want every narrowing open on an unnarrowed read", got)
 	}
-	for _, want := range []string{"result too large", "3 entries", "narrow it by type, from, to, at, projection"} {
+	for _, want := range []string{"result too large", "3 entries", "narrow it by type, from, to, at, projection, fields"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("the refusal %q does not say %q", err, want)
 		}
@@ -61,7 +61,7 @@ func TestTimeline_OverTheBoundIsRefusedWithWhatToNarrowBy(t *testing.T) {
 
 	// Narrowed by type alone it is still every reading; the refusal says what is left.
 	_, _, err = cli(t, f.remoteCfg, "timeline", "--type", "health.blood-pressure")
-	if got := strings.Join(tooLarge(t, err, "narrowed by type").TooLarge.Narrow, " "); got != "from to at projection" {
+	if got := strings.Join(tooLarge(t, err, "narrowed by type").TooLarge.Narrow, " "); got != "from to at projection fields" {
 		t.Errorf("narrow after a type = %q, want the window, snapshot and projection", got)
 	}
 
@@ -84,7 +84,7 @@ func TestPublish_OverTheBoundFilesNothing(t *testing.T) {
 
 	_, _, err := cli(t, f.remoteCfg, "timeline", "--projection", "bp", "--publish")
 	refused := tooLarge(t, err, "the whole publish")
-	if got := strings.Join(refused.TooLarge.Narrow, " "); got != "type from to at" {
+	if got := strings.Join(refused.TooLarge.Narrow, " "); got != "type from to at fields" {
 		t.Errorf("narrow = %q, want what a projected read can still add", got)
 	}
 	if out, _, err := cli(t, f.remoteCfg, "receipt", "list"); err != nil || strings.Contains(out, "sha256:") {

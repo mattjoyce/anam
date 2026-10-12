@@ -107,6 +107,7 @@ func Handler(l Ledger, timeout time.Duration, buckets span.Buckets, library stri
 	mux.HandleFunc("GET /{$}", s.timeline)
 	mux.HandleFunc("GET /facets", s.index)
 	mux.HandleFunc("GET /facet", s.facetPage)
+	mux.HandleFunc("GET /location", s.location)
 	mux.HandleFunc("GET /events", s.events)
 	mux.HandleFunc("GET /projection", s.projectionPage)
 	mux.HandleFunc("GET /document", s.document)
@@ -307,6 +308,9 @@ type facetData struct {
 	Payload []jsonToken
 	Events  []facet.AnamEvent
 
+	// Track is a location.track facet's hour drawn (card 133); nil otherwise.
+	Track *trackView
+
 	// DefinitionURL is the Definition the facet was admitted under; CurrentDefinition
 	// is the version in force now, so the page can say when they differ.
 	DefinitionURL     string
@@ -412,6 +416,7 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 		Bucket:            s.buckets.Of(f.FactTime).ID(),
 		Payload:           highlightJSON(f.Payload.Bytes()),
 		Events:            mine,
+		Track:             facetTrack(f),
 	})
 }
 

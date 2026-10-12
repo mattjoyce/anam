@@ -63,6 +63,11 @@
 </div>
 {{end}}
 
+{{if .Track}}
+<h2>track <span class="dim">the hour's fixes, drawn without a map</span></h2>
+{{template "track.html" .Track}}
+{{end}}
+
 <h2>payload <span class="dim">{{if eq (print .Facet.Descriptor.PayloadKind) "reference"}}(a reference: the bytes stay in the library, at this path and hash){{else}}(verbatim, canonical bytes){{end}}</span></h2>
 {{if .DocumentURL}}<p><a href="{{.DocumentURL}}">open the document</a> <span class="dim">served from the default library, bytes as they are</span></p>{{end}}
 <pre class="json mono">{{template "json.html" .Payload}}</pre>

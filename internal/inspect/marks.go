@@ -128,6 +128,9 @@ var typeStyles = map[facet.Type]typeStyle{
 	// A note the person wrote about one facet: drawn with what is written down,
 	// at the moment it is about.
 	"note.annotation": {"documents", shapeDiamond, kindEvent},
+	// An hour of the phone's positions (card 130): a measure in the travel row,
+	// which is where the person was; the eight hues are spent (card 133).
+	"location.track":  {"travel", shapeCircle, kindMeasure},
 	"travel.departed": {"travel", shapeTriUp, kindEvent},
 	"travel.arrived":  {"travel", shapeTriDown, kindEvent},
 	"travel.returned": {"travel", shapeDiamond, kindEvent},

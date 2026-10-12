@@ -1,0 +1,25 @@
+{{define "track.html"}}<style>
+  .track { width: 100%; max-width: 56rem; height: auto; display: block; border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 8px; background: color-mix(in srgb, currentColor 3%, transparent); }
+  .track .line { fill: none; stroke: currentColor; stroke-width: 1.2; opacity: .55; }
+  .track .ring { fill: currentColor; fill-opacity: .06; stroke: currentColor; stroke-opacity: .2; stroke-width: .6; }
+  .track .fix { stroke: color-mix(in srgb, currentColor 10%, transparent); stroke-width: .6; }
+  .track .fix:hover { stroke: currentColor; stroke-width: 1.5; }
+  .track .first { fill: none; stroke: #008300; stroke-width: 2; }
+  .track .last { fill: none; stroke: #e34948; stroke-width: 2; }
+  .track .scale { stroke: currentColor; stroke-width: 2; }
+  .track text { fill: currentColor; font: 11px system-ui, sans-serif; opacity: .75; }
+  .track .h0 { fill: #2a78d6; } .track .h1 { fill: #eb6834; } .track .h2 { fill: #1baf7a; } .track .h3 { fill: #eda100; }
+  .track .h4 { fill: #e87ba4; } .track .h5 { fill: #008300; } .track .h6 { fill: #4a3aa7; } .track .h7 { fill: #e34948; }
+</style>
+<svg class="track" viewBox="0 0 {{.W}} {{.H}}" role="img" aria-label="track of {{.Count}} fixes">
+  {{range .Fixes}}{{if gt .R 0.0}}<circle class="ring" cx="{{.X}}" cy="{{.Y}}" r="{{.R}}"/>{{end}}{{end}}
+  {{range .Paths}}<path class="line" d="{{.}}"/>{{end}}
+  {{range .Fixes}}<a href="/facet?id={{.FacetID}}"><circle class="fix {{.Hue}}" cx="{{.X}}" cy="{{.Y}}" r="3"><title>{{.Title}}</title></circle></a>
+  {{end}}
+  <circle class="first" cx="{{.First.X}}" cy="{{.First.Y}}" r="6"><title>first · {{.First.Title}}</title></circle>
+  <circle class="last" cx="{{.Last.X}}" cy="{{.Last.Y}}" r="6"><title>last · {{.Last.Title}}</title></circle>
+  <line class="scale" x1="{{.ScaleX}}" y1="{{.ScaleY}}" x2="{{.ScaleEnd}}" y2="{{.ScaleY}}"/>
+  <text x="{{.ScaleX}}" y="{{.ScaleY}}" dy="-5">{{.ScaleLabel}}</text>
+  <text x="{{.NorthX}}" y="{{.ScaleY}}" dy="4" text-anchor="end">N ↑</text>
+</svg>
+<p class="dim hint">{{.Count}} fix{{if ne .Count 1}}es{{end}} over {{.Hours}} hour{{if ne .Hours 1}}s{{end}}, {{.FromT}} to {{.ToT}}{{if .Device}} · device {{.Device}}{{end}} · extent {{.Span}} · green ring first, red ring last · faint rings are each fix's accuracy · no map: metres east and north of the track's centre, nothing fetched from outside this page</p>{{end}}

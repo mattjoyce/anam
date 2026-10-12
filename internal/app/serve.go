@@ -192,6 +192,10 @@ func writeReceipt(cmd *cobra.Command, shown api.ReceiptShown, asJSON bool) error
 	if asJSON {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s v%d at W=%d, served %s\n",
 			r.Template, r.TemplateVersion, r.Watermark, r.ServedAt)
+		if shown.Frame != nil {
+			_, err := fmt.Fprintf(out, "%s\n", shown.Frame.Bytes())
+			return err
+		}
 		b, err := json.Marshal(entries)
 		if err != nil {
 			return fmt.Errorf("receipt show: marshal: %w", err)
@@ -209,6 +213,11 @@ func writeReceipt(cmd *cobra.Command, shown api.ReceiptShown, asJSON bool) error
 		_, _ = fmt.Fprintf(out, "  query      %s\n", queryLine(*r.Query))
 	}
 	_, _ = fmt.Fprintln(out)
+	if shown.Frame != nil {
+		// The served frame holds fact times as stored; show renders from the
+		// artifact alone and names no zone, so they stay as served.
+		return writeFrame(out, shown.Frame, nil)
+	}
 
 	w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintln(w, "FACT TIME\tTYPE\tSTATUS\tPAYLOAD")
@@ -345,6 +354,9 @@ func queryLine(q receipt.Query) string {
 		if p.val != "" {
 			parts = append(parts, p.name+" "+p.val)
 		}
+	}
+	if len(q.Fields) > 0 {
+		parts = append(parts, "fields "+strings.Join(q.Fields, " "))
 	}
 	return strings.Join(parts, ", ")
 }

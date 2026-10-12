@@ -3,6 +3,7 @@ package serve_test
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/consent"
@@ -57,7 +58,7 @@ func TestPublish_ANarrowedReadVerifiesAfterACorrection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}
-	if out.Receipt.Query == nil || *out.Receipt.Query != *q {
+	if out.Receipt.Query == nil || !reflect.DeepEqual(*out.Receipt.Query, *q) {
 		t.Errorf("the receipt's query is %+v, want %+v", out.Receipt.Query, q)
 	}
 	if out.Receipt.ServedHash != value.Hash() || len(out.Receipt.FacetIDs) != 2 {

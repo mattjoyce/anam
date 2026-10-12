@@ -102,12 +102,12 @@ func TestNarrowings(t *testing.T) {
 		q    api.TimelineQuery
 		want string
 	}{
-		{"nothing narrowed", api.TimelineQuery{}, "type from to at projection"},
-		{"a type", api.TimelineQuery{Type: "health.blood-pressure"}, "from to at projection"},
-		{"a window", api.TimelineQuery{From: "2026-06-01", To: "2026-06-30"}, "type projection"},
-		{"a snapshot", api.TimelineQuery{At: "2026-06-15"}, "type from projection"},
-		{"a projection and a window", api.TimelineQuery{Projection: "bp", From: "2026-06-01", To: "2026-06-30"}, "type"},
-		{"everything", api.TimelineQuery{Projection: "bp", Type: "t", From: "a", At: "b"}, ""},
+		{"nothing narrowed", api.TimelineQuery{}, "type from to at projection fields"},
+		{"a type", api.TimelineQuery{Type: "health.blood-pressure"}, "from to at projection fields"},
+		{"a window", api.TimelineQuery{From: "2026-06-01", To: "2026-06-30"}, "type projection fields"},
+		{"a snapshot", api.TimelineQuery{At: "2026-06-15"}, "type from projection fields"},
+		{"a projection and a window", api.TimelineQuery{Projection: "bp", From: "2026-06-01", To: "2026-06-30"}, "type fields"},
+		{"everything", api.TimelineQuery{Projection: "bp", Type: "t", From: "a", At: "b"}, "fields"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -132,8 +132,8 @@ func TestFitTimeline(t *testing.T) {
 		t.Fatal("two entries over the bound should be refused")
 	} else {
 		var got *read.TooLarge
-		if !errors.As(err, &got) || strings.Join(got.Narrow, " ") != "from to at projection" {
-			t.Errorf("refusal = %v, want narrow [from to at projection]", err)
+		if !errors.As(err, &got) || strings.Join(got.Narrow, " ") != "from to at projection fields" {
+			t.Errorf("refusal = %v, want narrow [from to at projection fields]", err)
 		}
 	}
 	// Explained, the small verdicts are what is measured, not the entries.

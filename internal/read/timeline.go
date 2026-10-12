@@ -15,6 +15,7 @@ import (
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
+	"github.com/mattjoyce/anam/internal/frame"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
 )
@@ -110,6 +111,9 @@ func Timeline(ctx context.Context, src Source, q api.TimelineQuery) (api.Timelin
 	if err != nil {
 		return api.Timeline{}, err
 	}
+	if err := v.checkFields(q); err != nil {
+		return api.Timeline{}, err
+	}
 	t := v.describe()
 	if q.Explain {
 		return explain(ctx, src.Ledger, v, b, q.Type, t)
@@ -122,11 +126,58 @@ func Timeline(ctx context.Context, src Source, q api.TimelineQuery) (api.Timelin
 			ids = append(ids, e.FacetID)
 		}
 	}
+	if len(q.Fields) > 0 {
+		// Fields only take away: the cut runs over the entries every lens above
+		// admitted, and the answer is their frame (card 138).
+		fr, err := frame.Of(t.Entries, q.Fields)
+		if err != nil {
+			return api.Timeline{}, badQuery(err)
+		}
+		t.Frame, t.Entries, t.Shown = &fr, nil, fr.Len()
+		return t, nil
+	}
 	if t.Versions, err = v.versionsOf(ctx, src.Ledger, ids); err != nil {
 		return api.Timeline{}, err
 	}
 	t.Shown = len(t.Entries)
 	return t, nil
+}
+
+// checkFields refuses a query whose fields the read cannot cut: with explain, which
+// shows verdicts and no payloads, or naming a field that the schema of a type the
+// read can serve does not declare. The types the read can serve are the one it
+// named, else the projection's allow-list, else every type with a Definition: the
+// check depends on the query alone, never on what the record happens to hold.
+func (v view) checkFields(q api.TimelineQuery) error {
+	if len(q.Fields) == 0 {
+		return nil
+	}
+	if q.Explain {
+		return badQuery(errors.New("explain shows verdicts, not payloads; drop it to name fields"))
+	}
+	var types []facet.Type
+	switch {
+	case q.Type != "":
+		types = []facet.Type{facet.Type(q.Type)}
+	case v.tmpl != nil:
+		types = v.tmpl.Types
+	default:
+		for _, d := range v.defs.All() {
+			types = append(types, d.Type)
+		}
+	}
+	for _, t := range types {
+		d, ok := v.defs.Lookup(t)
+		if !ok {
+			return badQuery(fmt.Errorf("fields: no definition for type %s, so its fields cannot be named", t))
+		}
+		for _, p := range q.Fields {
+			if err := d.HasPointer(p); err != nil {
+				return badQuery(fmt.Errorf("fields: %w", err))
+			}
+		}
+	}
+	return nil
 }
 
 // view is one read of the person, optionally wound back, optionally pruned, and

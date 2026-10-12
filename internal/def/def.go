@@ -96,8 +96,10 @@ type Definition struct {
 	// Series is nil for a type whose facets stand alone. See Series.
 	Series *Series
 
-	// schema is the compiled schema half; nil in verbatim mode.
+	// schema is the compiled schema half; nil in verbatim mode. tree is the same
+	// schema as decoded JSON, walked to answer whether a field exists (HasPointer).
 	schema *jsonschema.Schema
+	tree   map[string]any
 
 	// loc is FactTime.Zone loaded, once, at Parse.
 	loc *time.Location
@@ -174,6 +176,8 @@ func Parse(raw []byte) (Definition, error) {
 			return Definition{}, err
 		}
 		d.schema = s
+		// compileSchema has just decoded the same bytes, so this cannot fail.
+		_ = json.Unmarshal(m.Schema, &d.tree)
 	}
 	loc, err := time.LoadLocation(d.FactTime.Zone)
 	if err != nil {

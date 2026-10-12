@@ -35,7 +35,7 @@ and shows locally. A local read, the operator at their own files, has no bound. 
 whole before the refusal: the bound protects the answer and the client's context, not the daemon's
 work.
 
-**Fields (2026-10-12, card 138; decided, not yet built).** A read may name its **fields**: a
+**Fields (2026-10-12, card 138; built the same day).** A read may name its **fields**: a
 temporary subset of the type's schema, as JSON pointers, and nothing else of the payload comes
 back. The envelope (type, fact-time, status, provenance, hash) is always whole. Fields only narrow:
 they are applied after the projection and the narrowing above, to what those already admitted, so a
@@ -258,8 +258,10 @@ client cannot broaden a template through a filter or supply arbitrary payload pr
   pointer must resolve in the schema of every type the read can serve, or the read fails explicitly,
   as an unknown filter does. Fields take away and never add: no field outside the verbatim payload,
   no computed value, no field of a facet the projection would not have served. The envelope is
-  always whole. A type whose payload is not JSON (a reference, a non-JSON media type) has no fields
-  to name and says so. No fields means the whole facet, as before.
+  always whole. A type whose Definition declares no schema (verbatim mode) has no fields to name
+  and says so. No fields means the whole facet, as before. On the wire: `fields`, repeated, on
+  `GET /v1/timeline` and `POST /v1/receipts`; `anam timeline --field`, repeated. The answer carries
+  `frame` (`columns`, `rows`) in place of `entries`; a 413's `narrow` names `fields`.
 
 Type descriptions and projection descriptions support discovery by topic;
 full-text or semantic payload search is a separate future capability with its own evidence and

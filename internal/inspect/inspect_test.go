@@ -161,16 +161,16 @@ func TestFacetList_ShowsFoldedStatus(t *testing.T) {
 }
 
 // The landing page draws both surfaces under their own names (§7): the capture
-// band is the ledger — everything, the dead ghosted — and the composed strip is
-// the canonical, live-only. The tombstoned facet must appear in the first and be
-// absent from the second.
+// band is the ledger — everything under status=all, the dead ghosted — and the
+// composed strip is the canonical, live-only. The tombstoned facet must appear in
+// the first and be absent from the second.
 func TestTimeline_DrawsLedgerBandAndCanonicalStrip(t *testing.T) {
 	t.Parallel()
 	srv, bpID, hrID := seededServer(t)
 
-	code, body := get(t, srv.URL+"/")
+	code, body := get(t, srv.URL+"/?status=all")
 	if code != http.StatusOK {
-		t.Fatalf("GET / = %d", code)
+		t.Fatalf("GET /?status=all = %d", code)
 	}
 	for _, want := range []string{"<svg", `class="pt dead"`, "canonical sha256:", "W = 3", bpID, hrID} {
 		if !strings.Contains(body, want) {
@@ -287,7 +287,7 @@ func TestTimeline_TypeFilterNarrowsBandAndStripAndRidesTheLinks(t *testing.T) {
 	t.Parallel()
 	srv, bpID, hrID := seededServer(t)
 
-	code, body := get(t, srv.URL+"/?type=health.heart-rate")
+	code, body := get(t, srv.URL+"/?status=all&type=health.heart-rate")
 	if code != http.StatusOK {
 		t.Fatalf("GET /?type = %d", code)
 	}
@@ -302,7 +302,7 @@ func TestTimeline_TypeFilterNarrowsBandAndStripAndRidesTheLinks(t *testing.T) {
 	}
 
 	// Unfiltered, both types are in the legend with a checkbox each.
-	_, all := get(t, srv.URL+"/")
+	_, all := get(t, srv.URL+"/?status=all")
 	for _, want := range []string{`value="health.blood-pressure" checked`, `value="health.heart-rate" checked`} {
 		if !strings.Contains(all, want) {
 			t.Errorf("legend missing %s", want)
@@ -340,8 +340,8 @@ func TestTimeline_StatusFilterNarrowsTheBandAndRidesTheLinks(t *testing.T) {
 	if !strings.Contains(live, "/facet?id="+bpID) {
 		t.Error("live facet missing under status=live")
 	}
-	if !strings.Contains(live, "status=live") || !strings.Contains(live, ", live only") {
-		t.Error("nav links or caption lost the status filter")
+	if !strings.Contains(live, ", live only") || !strings.Contains(live, `id="status-live">live only</span>`) {
+		t.Error("caption or presets lost the status filter")
 	}
 
 	_, dead := get(t, srv.URL+"/?status=dead")
@@ -352,12 +352,17 @@ func TestTimeline_StatusFilterNarrowsTheBandAndRidesTheLinks(t *testing.T) {
 		t.Error("tombstoned facet missing under status=dead")
 	}
 
-	// Combined with a type filter, both ride the links.
-	_, both := get(t, srv.URL+"/?status=live&type=health.blood-pressure")
+	// Combined with a type filter, both ride the links; the default status rides
+	// as nothing.
+	_, both := get(t, srv.URL+"/?status=all&type=health.blood-pressure")
 	at := strings.Index(both, `id="nav-left"`)
 	left := both[strings.LastIndex(both[:at], "<a href="):at]
-	if !strings.Contains(left, "status=live") || !strings.Contains(left, "type=health.blood-pressure") {
+	if !strings.Contains(left, "status=all") || !strings.Contains(left, "type=health.blood-pressure") {
 		t.Errorf("pan-left link dropped the status or the type filter: %s", left)
+	}
+	at = strings.Index(live, `id="nav-left"`)
+	if left := live[strings.LastIndex(live[:at], "<a href="):at]; strings.Contains(left, "status=") {
+		t.Errorf("pan-left link carries the default status: %s", left)
 	}
 
 	if code, _ := get(t, srv.URL+"/?status=superseded"); code != http.StatusBadRequest {

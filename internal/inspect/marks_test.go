@@ -174,17 +174,23 @@ func TestTypeFilter(t *testing.T) {
 		q        []string
 		show     []facet.Type
 		selected int
+		none     bool
 	}{
-		{"none named shows all", nil, held, 0},
-		{"one named", []string{"health.heart-rate-alert"}, []facet.Type{"health.heart-rate-alert"}, 1},
-		{"unknown names are dropped", []string{"no.such", "lab.result"}, []facet.Type{"lab.result"}, 1},
-		{"only unknown names shows all", []string{"no.such"}, held, 0},
-		{"all named is no filter", []string{"lab.result", "health.heart-rate", "health.heart-rate-alert"}, held, 0},
+		{"none named shows all", nil, held, 0, false},
+		{"one named", []string{"health.heart-rate-alert"}, []facet.Type{"health.heart-rate-alert"}, 1, false},
+		{"unknown names are dropped", []string{"no.such", "lab.result"}, []facet.Type{"lab.result"}, 1, false},
+		{"only unknown names shows all", []string{"no.such"}, held, 0, false},
+		{"all named is no filter", []string{"lab.result", "health.heart-rate", "health.heart-rate-alert"}, held, 0, false},
+		{"none alone shows none", []string{"none"}, nil, 0, true},
+		{"none beside a type shows the type", []string{"none", "lab.result"}, []facet.Type{"lab.result"}, 1, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			show, selected := typeFilter(tc.q, held)
+			show, selected, none := typeFilter(tc.q, held)
+			if none != tc.none {
+				t.Errorf("none = %v, want %v", none, tc.none)
+			}
 			if len(show) != len(tc.show) {
 				t.Errorf("show = %v, want %v", show, tc.show)
 			}

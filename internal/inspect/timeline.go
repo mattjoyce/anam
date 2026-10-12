@@ -14,9 +14,11 @@ import (
 
 // The landing page draws the capture→compose picture over the live ledger
 // (docs/assets/capture-compose-use.png): the capture band is the LEDGER surface —
-// every facet at its fact-time, marked at its folded status, the dead ghosted —
-// and the composed strip below it is the CANONICAL — the live-only value at W.
-// Two surfaces, two names (§7), one screen.
+// every facet at its fact-time, marked at its folded status — and the composed
+// strip below it is the CANONICAL — the live-only value at W. Two surfaces, two
+// names (§7), one screen. Since card 135 the band draws the live by default and
+// the dead, ghosted, on request (?status=all or dead): the dead outnumber the live
+// once a source is retired, and reading them costs a ledger fetch each.
 
 // Band geometry, in viewBox units. Each family is a row (marks.go); the plot
 // starts right of the row labels.
@@ -68,9 +70,23 @@ type tlLegendGroup struct {
 
 type tlStripEntry struct {
 	ID    string
+	Type  facet.Type
 	Hue   string
 	Title string
 }
+
+// tlTally is one type's share of a strip too large to draw square by square; its
+// link is the window narrowed to that type.
+type tlTally struct {
+	Type  facet.Type
+	Hue   string
+	Count int
+	Href  string
+}
+
+// stripMax is the most squares the strip draws; beyond it the page would grow with
+// the record, so the strip tallies by type instead.
+const stripMax = 1500
 
 type timelineData struct {
 	W        ledger.Watermark
@@ -86,18 +102,33 @@ type timelineData struct {
 
 	Rows   []tlRow
 	Points []tlPoint
+	Runs   []tlRun // dense stretches drawn as two ends and a line (card 135)
 	Ticks  []tlTick
 	Legend []tlLegendGroup
 
 	Strip      []tlStripEntry
 	StripCount int
-	Zoomed     bool
+	// Past stripMax live facets the strip tallies by type instead of drawing a
+	// square each (card 135): Tally holds the counts, Strip is empty.
+	Tally  []tlTally
+	Zoomed bool
 
-	// Filtered is true when the type filter hides something; Status is the
-	// status filter in force. Shown counts the marks drawn in the window.
-	Filtered bool
-	Status   statusFilter
-	Shown    int
+	// Filtered is true when the type filter hides something, None when it hides
+	// everything; Status is the status filter in force. Shown counts the facets
+	// drawn in the window, as marks or inside runs. Dead counts the ledger's dead
+	// facets; DeadHidden says the status filter left them unread.
+	Filtered   bool
+	None       bool
+	Status     statusFilter
+	Shown      int
+	Dead       int
+	DeadHidden bool
+
+	// Query is this view as a query string, what "make this my default" stores;
+	// HasDefault says a default is set, IsDefault that this view is it.
+	Query      string
+	HasDefault bool
+	IsDefault  bool
 
 	// Nav is the window moved: the same read at another from/to, each a link, so
 	// every gesture is a round trip and the band stays honest to the fold at W.
@@ -108,34 +139,36 @@ type timelineData struct {
 // tlNav holds the moves a window can make, and the filter presets, as URLs.
 type tlNav struct {
 	Left, Right, In, Out          string
-	AllTypes, EventsOnly          string
+	AllTypes, EventsOnly, NoTypes string
 	AllStatus, LiveOnly, DeadOnly string
 }
 
 func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
+	// A bare "/" opens the default view when one is kept (card 135); the redirect
+	// keeps the URL honest about what is drawn.
+	stored := defaultView(r)
+	if r.URL.RawQuery == "" && stored != "" {
+		http.Redirect(w, r, "/?"+stored, http.StatusSeeOther)
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), s.timeout)
 	defer cancel()
 
+	status, err := parseStatus(r.URL.Query().Get("status"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	res, err := s.read(ctx)
 	if err != nil {
 		httpError(w, err)
 		return
 	}
-
-	// The band needs the dead too — it is the ledger surface. Fetch them (few;
-	// the live majority is already in hand).
-	all := make([]facet.Facet, 0, len(res.States))
-	all = append(all, res.Live...)
-	for id, st := range res.States {
-		if st.Live() {
-			continue
-		}
-		f, err := s.ledger.Version(ctx, id, st.Version)
-		if err != nil {
-			httpError(w, err)
-			return
-		}
-		all = append(all, f)
+	all, err := s.bandFacets(ctx, res, status)
+	if err != nil {
+		httpError(w, err)
+		return
 	}
 
 	from, to, zoomed, err := parseWindow(r.URL.Query().Get("from"), r.URL.Query().Get("to"), all)
@@ -143,14 +176,40 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	status, err := parseStatus(r.URL.Query().Get("status"))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
 
 	data := buildTimeline(res, all, from, to, zoomed, r.URL.Query()["type"], status)
+	data.Query = cleanView(r.URL.RawQuery)
+	data.HasDefault = stored != ""
+	data.IsDefault = stored != "" && stored == data.Query
 	render(w, "timeline.html", data)
+}
+
+// bandFacets is what the band may draw under the status filter: the live (already
+// in hand from the fold) and, only when the filter admits them, the dead, fetched
+// from the ledger in one batch.
+func (s *Server) bandFacets(ctx context.Context, res fold.Result, status statusFilter) ([]facet.Facet, error) {
+	all := make([]facet.Facet, 0, len(res.States))
+	if status != statusDead {
+		all = append(all, res.Live...)
+	}
+	if !status.wantsDead() {
+		return all, nil
+	}
+	var refs []ledger.VersionRef
+	for id, st := range res.States {
+		if st.Live() {
+			continue
+		}
+		refs = append(refs, ledger.VersionRef{FacetID: id, Version: st.Version})
+	}
+	if len(refs) == 0 {
+		return all, nil
+	}
+	dead, err := s.ledger.Versions(ctx, refs)
+	if err != nil {
+		return nil, fmt.Errorf("dead facets: %w", err)
+	}
+	return append(all, dead...), nil
 }
 
 // parseWindow resolves the visible window: the caller's from/to when given (a bare
@@ -240,12 +299,18 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 			counts[f.Type]++
 		}
 	}
-	show, selected := typeFilter(typeQ, types)
-	view := tlView{Types: selected, Status: status}
+	show, selected, none := typeFilter(typeQ, types)
+	view := tlView{Types: selected, None: none, Status: status}
 
 	// Rows come from every type in the ledger, not the filtered few, so a filter
 	// hides marks without moving the rows that are left.
 	rows, yOf := layoutRows(types)
+	rowY := map[facet.Type]float64{}
+	for _, row := range rows {
+		for _, t := range row.Types {
+			rowY[t] = row.Y
+		}
+	}
 	baseline := rowTop + float64(len(rows))*rowH
 
 	data := timelineData{
@@ -255,7 +320,8 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 		PlotLeft: bandLeft, PlotRight: bandW - bandRight,
 		WindowFromMS: from.UnixMilli(), WindowToMS: to.UnixMilli(),
 		Zoomed: zoomed, Rows: rows,
-		Filtered: selected != nil, Status: status,
+		Filtered: selected != nil || none, None: none, Status: status,
+		Dead: len(res.States) - len(res.Live), DeadHidden: !status.wantsDead() && len(res.States) > len(res.Live),
 		Nav: navLinks(from, to, view),
 	}
 	if zoomed {
@@ -271,10 +337,19 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 	sort.Slice(events, func(i, j int) bool { return events[i] < events[j] })
 	data.Nav.AllTypes = windowLink(from, to, zoomed, tlView{Status: status})
 	data.Nav.EventsOnly = windowLink(from, to, zoomed, tlView{Types: events, Status: status})
-	data.Nav.AllStatus = windowLink(from, to, zoomed, tlView{Types: selected})
-	data.Nav.LiveOnly = windowLink(from, to, zoomed, tlView{Types: selected, Status: statusLive})
-	data.Nav.DeadOnly = windowLink(from, to, zoomed, tlView{Types: selected, Status: statusDead})
+	data.Nav.NoTypes = windowLink(from, to, zoomed, tlView{None: true, Status: status})
+	data.Nav.AllStatus = windowLink(from, to, zoomed, tlView{Types: selected, None: none, Status: statusAll})
+	data.Nav.LiveOnly = windowLink(from, to, zoomed, tlView{Types: selected, None: none})
+	data.Nav.DeadOnly = windowLink(from, to, zoomed, tlView{Types: selected, None: none, Status: statusDead})
 
+	// Each lane (a type, live or dead) collects its marks in time order; runs are
+	// found per lane, so a dead stretch never hides inside a live one.
+	type laneKey struct {
+		typ  facet.Type
+		live bool
+	}
+	lanes := map[laneKey][]laneMark{}
+	var laneOrder []laneKey
 	for _, f := range all {
 		if !show[f.Type] || f.FactTime.Before(from) || f.FactTime.After(to) {
 			continue
@@ -288,21 +363,34 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 		mark := markClass(f.Type)
 		when := f.FactTime.UTC().Format("2006-01-02 15:04Z")
 		px, py := x(f.FactTime), yOf[f.Type]
-		data.Points = append(data.Points, tlPoint{
+		key := laneKey{f.Type, st.Live()}
+		if _, ok := lanes[key]; !ok {
+			laneOrder = append(laneOrder, key)
+		}
+		lanes[key] = append(lanes[key], laneMark{at: f.FactTime, typ: f.Type, below: py > rowY[f.Type], point: tlPoint{
 			Path: markPath(style.Shape, px, py),
 			Hue:  mark, ID: f.ID, Live: st.Live(),
 			Title: fmt.Sprintf("%s · %s · v%d %s · %s",
 				when, f.Type, f.ArtifactVersion, st.Status, f.Provenance.SourceRef),
 			X: px, Y: py, MS: f.FactTime.UnixMilli(),
-		})
+		}})
+		data.Shown++
 		if st.Live() {
 			data.Strip = append(data.Strip, tlStripEntry{
-				ID: f.ID, Hue: hue, Title: when + " · " + string(f.Type),
+				ID: f.ID, Type: f.Type, Hue: hue, Title: when + " · " + string(f.Type),
 			})
 		}
 	}
-	data.Shown = len(data.Points)
+	for _, key := range laneOrder {
+		points, runs := laneRuns(lanes[key], view)
+		data.Points = append(data.Points, points...)
+		data.Runs = append(data.Runs, runs...)
+	}
 	data.StripCount = len(data.Strip)
+	if data.StripCount > stripMax {
+		data.Tally = tallyStrip(data.Strip, types, from, to, zoomed, view)
+		data.Strip = nil
+	}
 
 	for _, row := range rows {
 		g := tlLegendGroup{Family: row.Family, Label: row.Label, Hue: row.Hue}
@@ -365,4 +453,25 @@ func monthTicks(from, to time.Time, x func(time.Time) float64) []tlTick {
 		ticks = append(ticks, tlTick{X: x(t), Label: label})
 	}
 	return ticks
+}
+
+// tallyStrip counts a strip by type, in the legend's order, each count linking to
+// the window narrowed to its type.
+func tallyStrip(strip []tlStripEntry, types []facet.Type, from, to time.Time, zoomed bool, view tlView) []tlTally {
+	counts := map[facet.Type]int{}
+	for _, e := range strip {
+		counts[e.Type]++
+	}
+	var tally []tlTally
+	for _, t := range types {
+		n := counts[t]
+		if n == 0 {
+			continue
+		}
+		tally = append(tally, tlTally{
+			Type: t, Hue: hueClass(styleOf(t).Family), Count: n,
+			Href: windowLink(from, to, zoomed, tlView{Types: []facet.Type{t}, Status: view.Status}),
+		})
+	}
+	return tally
 }

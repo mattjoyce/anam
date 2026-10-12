@@ -105,6 +105,7 @@ func Handler(l Ledger, timeout time.Duration, buckets span.Buckets, library stri
 	s := &Server{ledger: l, timeout: timeout, buckets: buckets, library: library, defs: defs, heldDefs: held}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.timeline)
+	mux.HandleFunc("POST /view", s.setDefaultView)
 	mux.HandleFunc("GET /facets", s.index)
 	mux.HandleFunc("GET /facet", s.facetPage)
 	mux.HandleFunc("GET /location", s.location)

@@ -200,11 +200,19 @@ must stay provably derived (`ARCHITECTURE.md` §8). See *Ledger*, *Sync cursor*.
 **Person** — The storage **substrate**: all facets partitioned onto one **timeline**, in a ledger
 file pinned to that person's id. In Anam there is exactly one person and **no identity graph, no merge**. See *Timeline*.
 
+**Mask** — The reader's stencil over a *Projection*'s stencil (decided 2026-10-12, card 138): the payload
+fields a read wants, as JSON pointers into the type's schema, so only those shine through. A mask only
+**takes away**: it is applied after the projection and narrowing, to whole facets they already admitted,
+so it can neither resurrect nor exclude a facet, and never shows a field a projection would not have
+served. The envelope is never masked; the stored payload stays opaque bytes, read at serve time. The
+*Receipt* pins the mask. Blending projections and computing over fields are not a mask. See *Projection*.
+
 **Projection** *(variant)* — A versioned template that **prunes** the *Canonical* for a purpose: metadata
 filters only (type allow-list, datetime, endorsement status, max classification); whole-Facet
 include/exclude; **never reshapes, never generates**. Materialised as a content-addressed file. A consumer
-*selects*, never defines. Tombstone visibility is **not** a knob — the Canonical is live-only; a reader
-wanting tombstones queries the *Ledger*. See *Receipt*, *Canonical*.
+*selects*, never defines; it may lay a *Mask* over what the projection serves, which only narrows.
+Tombstone visibility is **not** a knob — the Canonical is live-only; a reader wanting tombstones queries
+the *Ledger*. See *Mask*, *Receipt*, *Canonical*.
 
 **Provenance** — The recorded origin of a Facet: source and injector identity, plus (for derived facets)
 the method/model and the canonical watermark it was computed from.

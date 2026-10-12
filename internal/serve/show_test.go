@@ -37,7 +37,8 @@ func TestShow_ReadsThePublishedArtifactOnly(t *testing.T) {
 
 	// Deps carrying nothing but the store — no ledger, no templates, no gate. If Show
 	// reached for any of them this would panic rather than quietly pass.
-	r, entries, err := serve.Show(serve.Deps{Artifacts: h.store}, out.ReceiptHash)
+	r, shown, err := serve.Show(serve.Deps{Artifacts: h.store}, out.ReceiptHash)
+	entries := shown.Entries
 	if err != nil {
 		t.Fatalf("Show: %v", err)
 	}

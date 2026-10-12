@@ -75,10 +75,27 @@ type Query struct {
 	Before string `json:"before,omitempty"`
 	At     string `json:"at,omitempty"`
 	Type   string `json:"type,omitempty"`
+	// Fields are the payload pointers the read was cut to (card 138). With any, the
+	// served value is a frame, and ServedHash is the frame's. Last, and omitted
+	// when empty, so receipts without fields keep their bytes.
+	Fields []string `json:"fields,omitempty"`
 }
 
 // IsZero reports whether q narrows nothing.
-func (q Query) IsZero() bool { return q == Query{} }
+func (q Query) IsZero() bool {
+	return q.From == "" && q.Before == "" && q.At == "" && q.Type == "" && len(q.Fields) == 0
+}
+
+// checkFields refuses a field that is not a JSON pointer: a receipt naming one
+// could not be replayed.
+func (q Query) checkFields() error {
+	for _, f := range q.Fields {
+		if f == "" || !strings.HasPrefix(f, "/") {
+			return fmt.Errorf("%w: query field %q is not a JSON pointer", ErrMalformed, f)
+		}
+	}
+	return nil
+}
 
 // Bytes is the receipt's one serialisation, and the bytes its own content address is
 // taken over. Field order is the struct's, which is fixed, so the same receipt always
@@ -115,6 +132,8 @@ func (r Receipt) Validate() error {
 		return fmt.Errorf("%w: query narrows nothing; omit it", ErrMalformed)
 	case r.Query != nil && r.Query.At != "" && r.Query.Before != "":
 		return fmt.Errorf("%w: query has both at and before; a snapshot has one upper bound", ErrMalformed)
+	case r.Query != nil:
+		return r.Query.checkFields()
 	}
 	return nil
 }

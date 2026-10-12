@@ -24,6 +24,7 @@ import (
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
+	"github.com/mattjoyce/anam/internal/frame"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/receipt"
@@ -91,6 +92,11 @@ type Deps struct {
 type Served struct {
 	Receipt     receipt.Receipt
 	ReceiptHash string
+
+	// Frame is the served value when the query named fields (card 138): what the
+	// receipt's ServedHash is over, and what the reader is answered with. Nil for a
+	// whole serve.
+	Frame *frame.Frame
 
 	// CanonicalHash and CanonicalLen describe what was pruned *from*, so the operator
 	// can see the ratio rather than only the result.
@@ -177,9 +183,17 @@ func Publish(ctx context.Context, d Deps, t projection.Template, w ledger.Waterm
 	if err != nil {
 		return Served{}, err
 	}
+	fr, err := Cut(value, q)
+	if err != nil {
+		return Served{}, err
+	}
+	servedHash, servedBytes := value.Hash(), value.Bytes()
+	if fr != nil {
+		servedHash, servedBytes = fr.Hash(), fr.Bytes()
+	}
 	r := receipt.Receipt{
 		LedgerID:             ledgerID,
-		ServedHash:           value.Hash(),
+		ServedHash:           servedHash,
 		FacetIDs:             idsOf(value),
 		Watermark:            int64(w),
 		Template:             t.Name,
@@ -197,11 +211,11 @@ func Publish(ctx context.Context, d Deps, t projection.Template, w ledger.Waterm
 		return Served{}, err
 	}
 
-	out := Served{Receipt: r, ReceiptHash: artifact.Digest(receiptBytes)}
+	out := Served{Receipt: r, ReceiptHash: artifact.Digest(receiptBytes), Frame: fr}
 	if dryRun {
 		return out, nil
 	}
-	if _, err := d.Artifacts.Put(receipt.ServedKind, value.Bytes()); err != nil {
+	if _, err := d.Artifacts.Put(receipt.ServedKind, servedBytes); err != nil {
 		return Served{}, err
 	}
 	if _, err := d.Artifacts.Put(receipt.Kind, receiptBytes); err != nil {
@@ -250,6 +264,20 @@ func Narrow(v fold.Value, q *receipt.Query, s projection.Series) (fold.Value, er
 	return fold.NewValue(kept)
 }
 
+// Cut is how a read that named fields shapes a narrowed value before publishing it,
+// and how Verify shapes it again: the frame of q's fields over v's entries (card
+// 138). Nil when q names no fields: the value is served whole.
+func Cut(v fold.Value, q *receipt.Query) (*frame.Frame, error) {
+	if q == nil || len(q.Fields) == 0 {
+		return nil, nil
+	}
+	f, err := frame.Of(v.Entries(), q.Fields)
+	if err != nil {
+		return nil, err
+	}
+	return &f, nil
+}
+
 // Verify honours a receipt: re-derive at its watermark, and re-hash the artifact on
 // disk. The two proofs are independent (see receipt.Result).
 func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, receipt.Result, error) {
@@ -296,6 +324,12 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 	if value, err = Narrow(value, r.Query, d.Series); err != nil {
 		return r, receipt.Result{}, err
 	}
+	derivedHash := value.Hash()
+	if fr, err := Cut(value, r.Query); err != nil {
+		return r, receipt.Result{}, err
+	} else if fr != nil {
+		derivedHash = fr.Hash()
+	}
 
 	// Raw, not Get: the verifier wants the bytes as they are so it can say what they
 	// hash to. Get would refuse a tampered artifact and report only that it refused.
@@ -304,7 +338,7 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 		return r, receipt.Result{}, err
 	}
 
-	out := receipt.Compare(r, value.Hash(), idsOf(value), stored, artifact.Digest)
+	out := receipt.Compare(r, derivedHash, idsOf(value), stored, artifact.Digest)
 	out.Notes = append(out.Notes, notes...)
 	if r.DefinitionSetVersion != d.DefinitionSetVersion {
 		note := "definitions govern capture, not the fold, so this does not affect reproduction"
@@ -326,25 +360,42 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 // answer when the ledger is gone, unreachable, or exactly what you doubt. The bytes are
 // checked against their own content address on the way out, so a tampered artifact is
 // reported rather than displayed as though it were what was served.
-func Show(d Deps, receiptHash string) (receipt.Receipt, []fold.Entry, error) {
+//
+// A receipt whose query named fields names a frame, not a list of entries (card
+// 138); Show returns it as Shown.Frame, with Entries empty.
+func Show(d Deps, receiptHash string) (receipt.Receipt, Shown, error) {
 	raw, err := d.Artifacts.Get(receipt.Kind, receiptHash)
 	if err != nil {
-		return receipt.Receipt{}, nil, err
+		return receipt.Receipt{}, Shown{}, err
 	}
 	r, err := receipt.Parse(raw)
 	if err != nil {
-		return receipt.Receipt{}, nil, err
+		return receipt.Receipt{}, Shown{}, err
 	}
 
 	served, err := d.Artifacts.Get(receipt.ServedKind, r.ServedHash)
 	if err != nil {
-		return r, nil, err
+		return r, Shown{}, err
+	}
+	if r.Query != nil && len(r.Query.Fields) > 0 {
+		f, err := frame.Parse(served)
+		if err != nil {
+			return r, Shown{}, fmt.Errorf("serve: parse served value %s: %w", r.ServedHash, err)
+		}
+		return r, Shown{Frame: &f}, nil
 	}
 	var entries []fold.Entry
 	if err := json.Unmarshal(served, &entries); err != nil {
-		return r, nil, fmt.Errorf("serve: parse served value %s: %w", r.ServedHash, err)
+		return r, Shown{}, fmt.Errorf("serve: parse served value %s: %w", r.ServedHash, err)
 	}
-	return r, entries, nil
+	return r, Shown{Entries: entries}, nil
+}
+
+// Shown is a served value read back from the artifact tier: the entries of a whole
+// serve, or the frame of one that named fields.
+type Shown struct {
+	Entries []fold.Entry
+	Frame   *frame.Frame
 }
 
 // List returns the receipts in the store, newest serve first.

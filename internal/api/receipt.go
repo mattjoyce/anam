@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/mattjoyce/anam/internal/fold"
+	"github.com/mattjoyce/anam/internal/frame"
 	"github.com/mattjoyce/anam/internal/receipt"
 )
 
@@ -25,6 +26,9 @@ type ReceiptShown struct {
 	Hash    string          `json:"hash"`
 	Receipt receipt.Receipt `json:"receipt"`
 	Entries []fold.Entry    `json:"entries"`
+	// Frame is the served value when the receipt's query named fields; Entries is
+	// then empty.
+	Frame *frame.Frame `json:"frame,omitempty"`
 }
 
 // ReceiptVerified is a receipt and the two proofs of it: re-derived from the ledger,

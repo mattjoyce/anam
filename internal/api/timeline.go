@@ -1,6 +1,9 @@
 package api
 
-import "github.com/mattjoyce/anam/internal/fold"
+import (
+	"github.com/mattjoyce/anam/internal/fold"
+	"github.com/mattjoyce/anam/internal/frame"
+)
 
 // TimelineQuery is a timeline read as the reader asked for it: the flags as typed,
 // and the zone the reader stands in. Resolving a bare date to an instant is a
@@ -15,6 +18,11 @@ type TimelineQuery struct {
 	Type       string `json:"type,omitempty"`
 	Projection string `json:"projection,omitempty"`
 	Explain    bool   `json:"explain,omitempty"`
+	// Fields names the payload fields the read wants, as JSON pointers into the
+	// type's schema (card 138): a temporary subset of the schema. With any, the
+	// read answers with a Frame in place of Entries. Each must be declared by the
+	// schema of every type the read can serve, or the read is refused.
+	Fields []string `json:"fields,omitempty"`
 	// Zone is the reader's zone, an IANA name. A bare date is a day in it.
 	Zone string `json:"zone"`
 }
@@ -40,6 +48,9 @@ type Timeline struct {
 	Entries []fold.Entry `json:"entries,omitempty"`
 	// Versions is each shown entry's artifact version, by facet id.
 	Versions map[string]int `json:"versions,omitempty"`
+	// Frame is the answer when the query named Fields: the entries cut to those
+	// fields, as columns and rows. Entries and Versions are then empty.
+	Frame *frame.Frame `json:"frame,omitempty"`
 
 	Verdicts []VerdictRow  `json:"verdicts,omitempty"`
 	Counts   VerdictCounts `json:"counts,omitzero"`

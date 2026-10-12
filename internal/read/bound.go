@@ -81,8 +81,8 @@ func (c *counter) Write(p []byte) (int, error) {
 }
 
 // Narrowings lists the query parameters q has not used that would narrow a read:
-// type, a fact-time window (from, to), a snapshot (at), and a projection. to and at
-// exclude each other, so a read with either is offered neither.
+// type, a fact-time window (from, to), a snapshot (at), a projection, and fields.
+// to and at exclude each other, so a read with either is offered neither.
 func Narrowings(q api.TimelineQuery) []string {
 	var out []string
 	if q.Type == "" {
@@ -96,6 +96,9 @@ func Narrowings(q api.TimelineQuery) []string {
 	}
 	if q.Projection == "" {
 		out = append(out, "projection")
+	}
+	if len(q.Fields) == 0 {
+		out = append(out, "fields")
 	}
 	return out
 }
@@ -123,8 +126,11 @@ func fitQuery[E any](entries []E, limit int, q api.TimelineQuery) error {
 // verdicts, with the narrowings q leaves open. The daemon calls it on a timeline it
 // is about to answer; a local read never does.
 func FitTimeline(t api.Timeline, q api.TimelineQuery, limit int) error {
-	if q.Explain {
+	switch {
+	case q.Explain:
 		return fitQuery(t.Verdicts, limit, q)
+	case t.Frame != nil:
+		return fitQuery(t.Frame.Rows, limit, q)
 	}
 	return fitQuery(t.Entries, limit, q)
 }

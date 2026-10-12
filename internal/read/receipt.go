@@ -66,11 +66,11 @@ func Receipts(d serve.Deps, dir string) (api.Receipts, error) {
 
 // Receipt reads one receipt and the served value it names from the artifacts alone.
 func Receipt(d serve.Deps, hash string) (api.ReceiptShown, error) {
-	r, entries, err := serve.Show(d, hash)
+	r, shown, err := serve.Show(d, hash)
 	if err != nil {
 		return api.ReceiptShown{}, err
 	}
-	return api.ReceiptShown{Hash: hash, Receipt: r, Entries: entries}, nil
+	return api.ReceiptShown{Hash: hash, Receipt: r, Entries: shown.Entries, Frame: shown.Frame}, nil
 }
 
 // VerifyReceipt proves one receipt against the ledger and the artifact on disk.
@@ -121,8 +121,11 @@ func Publish(ctx context.Context, src Source, d serve.Deps, q api.TimelineQuery,
 	if err != nil {
 		return api.Published{}, err
 	}
+	if err := v.checkFields(q); err != nil {
+		return api.Published{}, err
+	}
 
-	rq := &receipt.Query{From: b.from, Before: b.toX, At: at, Type: q.Type}
+	rq := &receipt.Query{From: b.from, Before: b.toX, At: at, Type: q.Type, Fields: q.Fields}
 	if rq.IsZero() {
 		rq = nil
 	}
@@ -130,7 +133,17 @@ func Publish(ctx context.Context, src Source, d serve.Deps, q api.TimelineQuery,
 	if err != nil {
 		return api.Published{}, err
 	}
-	if err := fitQuery(value.Entries(), limit, q); err != nil {
+	// The bound is measured over what is answered: the frame's rows when fields
+	// were named, else the whole entries. Cut once here for the measure; Publish
+	// cuts again for the receipt, and the two are the same value.
+	if fr, err := serve.Cut(value, rq); err != nil {
+		return api.Published{}, badQuery(err)
+	} else if fr != nil {
+		err = fitQuery(fr.Rows, limit, q)
+	} else {
+		err = fitQuery(value.Entries(), limit, q)
+	}
+	if err != nil {
 		return api.Published{}, err
 	}
 	served, err := serve.Publish(ctx, d, *v.tmpl, v.res.W, rq, value, false)
@@ -139,6 +152,11 @@ func Publish(ctx context.Context, src Source, d serve.Deps, q api.TimelineQuery,
 	}
 
 	t := v.describe()
+	if served.Frame != nil {
+		t.Frame = served.Frame
+		t.Shown = served.Frame.Len()
+		return api.Published{Timeline: t, ReceiptHash: served.ReceiptHash, Receipt: served.Receipt}, nil
+	}
 	t.Entries = value.Entries()
 	ids := make([]string, 0, len(t.Entries))
 	for _, e := range t.Entries {

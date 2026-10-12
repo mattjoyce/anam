@@ -758,8 +758,8 @@ the payload**; a projection includes or excludes **whole Facets**. A consumer **
 it never defines one — which is why shape is a template knob and not a read-time flag. (`timeline --at`
 is the person's own un-published view of the same read; `serve meds` is the published one.)
 
-A consumer may name the **fields** it wants of a projection (decided 2026-10-12, card 138, not yet
-built): a temporary subset of the type's schema, as JSON pointers, validated against the Definition. Fields
+A consumer may name the **fields** it wants of a projection (decided and built 2026-10-12, card
+138): a temporary subset of the type's schema, as JSON pointers, validated against the Definition. Fields
 run after every projection knob, over the whole facets they admitted, and only cut: they cannot resurrect
 or exclude a facet, cannot show a field the projection would not have served whole, and never touch the
 envelope. The stored payload stays opaque; the cut is made on the served copy. The answer is a **frame**,

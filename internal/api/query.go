@@ -23,6 +23,9 @@ func (q TimelineQuery) Values() url.Values {
 	if q.Explain {
 		v.Set("explain", "true")
 	}
+	for _, f := range q.Fields {
+		v.Add("fields", f)
+	}
 	set(v, "zone", q.Zone)
 	return v
 }
@@ -47,7 +50,8 @@ func TimelineQueryOf(v url.Values) (TimelineQuery, error) {
 	}
 	return TimelineQuery{
 		From: v.Get("from"), To: v.Get("to"), At: v.Get("at"), AsOf: v.Get("as_of"), W: w,
-		Type: v.Get("type"), Projection: v.Get("projection"), Explain: explain, Zone: v.Get("zone"),
+		Type: v.Get("type"), Projection: v.Get("projection"), Explain: explain, Fields: v["fields"],
+		Zone: v.Get("zone"),
 	}, nil
 }
 

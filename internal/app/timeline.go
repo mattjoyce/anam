@@ -19,6 +19,7 @@ import (
 
 func timelineCmd(cfgPath *string) *cobra.Command {
 	var from, to, at, typeFilter, projName, asOf string
+	var fields []string
 	var w int64
 	var asJSON, explain, publish bool
 
@@ -52,7 +53,12 @@ Four lenses compose over that read:
   --w           read at this watermark instead of an anam-time: the W a receipt
                 names, so a follow-up stands on the same knowledge as a citation.
   --publish     file what is shown with a receipt, as serve does, narrowed as
-                asked (needs --projection). Verify it with anam receipt verify.`,
+                asked (needs --projection). Verify it with anam receipt verify.
+  --field       name the payload fields wanted, as JSON pointers into the type's
+                schema (--field /distance --field /erg_type). Only those come
+                back, as a frame: columns, then one row per facet. Fields only
+                take away; the envelope is always whole. Needs the schema of
+                every type the read can serve to declare them, so name a --type.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := loadRoutedConfig(*cfgPath, cmd)
 			if err != nil {
@@ -64,7 +70,7 @@ Four lenses compose over that read:
 			}
 			q := api.TimelineQuery{
 				From: from, To: to, At: at, AsOf: asOf, W: w, Type: typeFilter, Projection: projName,
-				Explain: explain,
+				Explain: explain, Fields: fields,
 			}
 			if publish {
 				p, err := publishTimeline(cmd.Context(), cfg, q)
@@ -100,6 +106,7 @@ Four lenses compose over that read:
 	cmd.Flags().BoolVar(&publish, "publish", false, "publish what is shown with a receipt (needs --projection)")
 	cmd.Flags().BoolVar(&explain, "explain", false, "show every facet with its verdict, superseded versions included")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit the narrowed entries as JSON, in the canonical serialisation")
+	cmd.Flags().StringArrayVar(&fields, "field", nil, "a payload field to answer with, as a JSON pointer (repeatable); the answer is then a frame")
 	return cmd
 }
 
@@ -235,6 +242,10 @@ func writeTimeline(cmd *cobra.Command, t api.Timeline, loc *time.Location, asJSO
 	if asJSON {
 		// Entries to stdout, bookkeeping to stderr, so the output pipes clean.
 		_, _ = fmt.Fprint(cmd.ErrOrStderr(), header)
+		if t.Frame != nil {
+			_, err := fmt.Fprintf(cmd.OutOrStdout(), "%s\n", t.Frame.Bytes())
+			return err
+		}
 		out, err := json.Marshal(t.Entries)
 		if err != nil {
 			return fmt.Errorf("timeline: marshal entries: %w", err)
@@ -244,6 +255,9 @@ func writeTimeline(cmd *cobra.Command, t api.Timeline, loc *time.Location, asJSO
 	}
 
 	_, _ = fmt.Fprint(cmd.OutOrStdout(), header)
+	if t.Frame != nil {
+		return writeFrame(cmd.OutOrStdout(), t.Frame, loc)
+	}
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 2, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintln(w, "FACT TIME\tTYPE\tV\tSTATUS\tSOURCE REF\tID")
 	for _, e := range t.Entries {

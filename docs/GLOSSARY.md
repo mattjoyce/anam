@@ -200,19 +200,24 @@ must stay provably derived (`ARCHITECTURE.md` §8). See *Ledger*, *Sync cursor*.
 **Person** — The storage **substrate**: all facets partitioned onto one **timeline**, in a ledger
 file pinned to that person's id. In Anam there is exactly one person and **no identity graph, no merge**. See *Timeline*.
 
-**Mask** — The reader's stencil over a *Projection*'s stencil (decided 2026-10-12, card 138): the payload
-fields a read wants, as JSON pointers into the type's schema, so only those shine through. A mask only
-**takes away**: it is applied after the projection and narrowing, to whole facets they already admitted,
-so it can neither resurrect nor exclude a facet, and never shows a field a projection would not have
-served. The envelope is never masked; the stored payload stays opaque bytes, read at serve time. The
-*Receipt* pins the mask. Blending projections and computing over fields are not a mask. See *Projection*.
+**Fields** — A temporary subset of a type's schema that a read names (decided 2026-10-12, card 138): JSON
+pointers into the payload, so only those come back. Fields only **take away**: they are applied after the
+projection and narrowing, to whole facets those already admitted, so they can neither resurrect nor exclude
+a facet, and never show a field a projection would not have served. The envelope is always whole; the
+stored payload stays opaque bytes, read at serve time. The answer is a *Frame*. The *Receipt* pins the
+fields. Blending projections and computing over fields are not fields. See *Frame*, *Projection*.
+
+**Frame** — The shape a read with *Fields* answers in: `columns`, the envelope's attributes then the
+pointers, and `rows`, one array per facet in timeline order, a null where a row lacks a pointer. A
+relation, as a query returns one, rather than a list of facets; it reads straight into a DataFrame. A read
+without fields answers in whole facets as before. See *Fields*.
 
 **Projection** *(variant)* — A versioned template that **prunes** the *Canonical* for a purpose: metadata
 filters only (type allow-list, datetime, endorsement status, max classification); whole-Facet
 include/exclude; **never reshapes, never generates**. Materialised as a content-addressed file. A consumer
-*selects*, never defines; it may lay a *Mask* over what the projection serves, which only narrows.
-Tombstone visibility is **not** a knob — the Canonical is live-only; a reader wanting tombstones queries
-the *Ledger*. See *Mask*, *Receipt*, *Canonical*.
+*selects*, never defines; it may name the *Fields* it wants of what the projection serves, which only
+narrows. Tombstone visibility is **not** a knob — the Canonical is live-only; a reader wanting tombstones
+queries the *Ledger*. See *Fields*, *Receipt*, *Canonical*.
 
 **Provenance** — The recorded origin of a Facet: source and injector identity, plus (for derived facets)
 the method/model and the canonical watermark it was computed from.

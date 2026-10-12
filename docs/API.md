@@ -35,18 +35,19 @@ and shows locally. A local read, the operator at their own files, has no bound. 
 whole before the refusal: the bound protects the answer and the client's context, not the daemon's
 work.
 
-**Masked reads (2026-10-12, card 138; decided, not yet built).** A read may carry a **mask**: the
-payload fields it wants, as JSON pointers into the type's schema, and nothing else of the payload
-comes back. The envelope (type, fact-time, status, provenance, hash) is always whole. A mask only
-narrows: it is applied after the projection and the narrowing above, to what they already admitted,
-so a reader sees no facet and no field a projection without the mask would not have served. It is
-the reader's stencil over the projection's stencil. Measured on the live daemon, a month of
-`exercise.session` is 184 KB whole and 4.6 KB masked to distance, duration and erg type; the largest
-row, 752 strokes, is 72 KB whole and 472 bytes masked. The receipt pins the mask beside `query`, the
-served hash is over the masked bytes, and `narrow` names `mask` when a read is refused as too large.
-This amends the sentence below, §5's "cannot request selected payload fields", and ARCHITECTURE.md
-§9. Blending projections and computing over fields (aggregates, windows) are not this: they come
-after, as their own contract.
+**Fields (2026-10-12, card 138; decided, not yet built).** A read may name its **fields**: a
+temporary subset of the type's schema, as JSON pointers, and nothing else of the payload comes
+back. The envelope (type, fact-time, status, provenance, hash) is always whole. Fields only narrow:
+they are applied after the projection and the narrowing above, to what those already admitted, so a
+reader sees no facet and no field a projection without them would not have served. The answer is a
+**frame**: `columns`, the envelope's columns then the pointers, and `rows`, one array per facet in
+timeline order, in place of `entries`. A pointer a row lacks is null. Measured on the live daemon, a
+month of `exercise.session` is 184 KB whole and 2.7 KB as a frame of distance, duration and erg
+type; the largest row, 752 strokes, is 72 KB whole and under 500 bytes in the frame. The receipt pins
+the fields beside `query`, the served hash is over the frame's bytes, and `narrow` names `fields`
+when a read is refused as too large. This amends the sentence below, §5's "cannot request selected
+payload fields", and ARCHITECTURE.md §9. Blending projections and computing over fields (aggregates,
+windows) are not this: they come after, as their own contract.
 
 This document proposes the application API that every client shares: the CLI, the inspector,
 importers, and conversational clients (§8). The two conversational features are **chat with my
@@ -57,8 +58,8 @@ Anam current, inspecting failures, and recovering derived state.
 The governing contracts are [ARCHITECTURE.md](ARCHITECTURE.md),
 [SELF-LOG.md](SELF-LOG.md), and the current records workflow in [INBOX.md](INBOX.md).
 Where this proposal needs a new core capability, it names it rather than silently assigning domain
-logic to a client. Whole-facet projection is retained; a reader may lay a mask over it (above,
-2026-10-12). Before that date element masking was out of scope.
+logic to a client. Whole-facet projection is retained; a reader may name the fields it wants of
+it (above, 2026-10-12). Before that date element masking was out of scope.
 
 ## 1. Start with the conversations
 
@@ -218,7 +219,7 @@ freshness. Discovery itself is scoped: disallowed types and counts must not leak
 narrowing, and pagination bounds. The operator can configure a default whole-person projection;
 the client may omit a projection only when that default is advertised. The client selects templates
 and supplies permitted parameters; it never sends a new projection or changes classification
-ceilings. It may send a mask, which only takes away.
+ceilings. It may name fields, which only take away.
 
 ```json
 {
@@ -228,7 +229,7 @@ ceilings. It may send a mask, which only takes away.
     "at": {"date": "2026-06-15", "zone": "Australia/Sydney"}
   },
   "knowledge": {"position": {"ledger_id": "ledger-example", "watermark": 11381}},
-  "mask": ["/name", "/dose"],
+  "fields": ["/name", "/dose"],
   "page_size": 50
 }
 ```
@@ -252,13 +253,13 @@ state of Anam's knowledge. A request for a position in another ledger fails expl
 Permitted narrowing is an intersection with the template: `types`, `sources`, and `series_refs`
 where the template advertises them, plus the temporal selection above. Unknown filters fail. A
 client cannot broaden a template through a filter or supply arbitrary payload predicates.
-- **Mask** (2026-10-12): a client may request selected payload fields, as JSON pointers into the
+- **Fields** (2026-10-12): a client may request selected payload fields, as JSON pointers into the
   type's schema, the same pointer vocabulary a Definition uses for its fact-time and identity. Each
   pointer must resolve in the schema of every type the read can serve, or the read fails explicitly,
-  as an unknown filter does. The mask takes away and never adds: no field outside the verbatim
-  payload, no computed value, no field of a facet the projection would not have served. The envelope
-  is never masked. A type whose payload is not JSON (a reference, a non-JSON media type) cannot be
-  masked and says so. No mask means the whole facet, as before.
+  as an unknown filter does. Fields take away and never add: no field outside the verbatim payload,
+  no computed value, no field of a facet the projection would not have served. The envelope is
+  always whole. A type whose payload is not JSON (a reference, a non-JSON media type) has no fields
+  to name and says so. No fields means the whole facet, as before.
 
 Type descriptions and projection descriptions support discovery by topic;
 full-text or semantic payload search is a separate future capability with its own evidence and
@@ -269,8 +270,9 @@ governance contract. Never describe a metadata query as having searched every wo
 1. Resolve the knowledge position and reconstruct the canonical at that position.
 2. For a snapshot, resolve series over the necessary fact-time prefix, including closing events.
 3. Apply the authorized projection and permitted narrowing to the resulting whole facets.
-4. Apply the mask, if any, to each admitted facet's payload. Nothing after this step sees a whole
-   payload, and nothing before it sees the mask: the mask can neither resurrect nor exclude a facet.
+4. Cut each admitted facet's payload to the named fields, if any, into a row of the frame. Nothing
+   after this step sees a whole payload, and nothing before it sees the fields: fields can neither
+   resurrect nor exclude a facet.
 5. Publish the selected value and receipt; deliver bounded pages of that value.
 
 A filter that removes `med.stopped` before series resolution could resurrect a stopped course.
@@ -298,9 +300,9 @@ Every first-page response contains:
 - `receipt_ref`, `served_hash`, `served_at`, `total_count`, `returned_count`, and `next_cursor`;
 - facet entries with exact `facet_ref`, fact-time/precision, folded status, classification,
   source identity, content hash, definition version, payload kind, media type, and the verbatim
-  payload, or under a mask the payload in its own shape pruned to the masked pointers, nesting kept,
-  and nothing else. The content
-  hash is always the whole payload's, so a masked entry still names the fact it came from;
+  payload; or, when fields were named, a frame whose columns are those envelope attributes then the
+  pointers, one row per facet, and nothing else. The content hash is always the whole payload's, so
+  a row still names the fact it came from;
 - evidence links available to this caller and explicit limitations such as legacy timezone handling;
 - an unambiguous empty-result description when `total_count` is zero.
 
@@ -315,7 +317,7 @@ not a silent new query. The page is a portion of the receipted value: the receip
 published value, not a client's response wrapper or that page alone.
 
 Receipts must grow to pin ledger identity, the resolved query (including snapshot date and zone),
-the mask, selection-semantics version, exact template version, and definition provenance needed for historical
+the fields, selection-semantics version, exact template version, and definition provenance needed for historical
 series interpretation. Preserve older receipts under their declared format; never reinterpret one
 using whatever template or definition happens to be current. Template history must be available for
 reproduction, or verification must report it unavailable. These are core extensions.
@@ -509,7 +511,7 @@ assemble one from smaller reads, and it reports an unsupported operation as unsu
    pinned; a second query using the same position excludes the newly arrived knowledge.
 3. **Medication at a reading:** a start before the queried month, dose change, stop, and new course
    yield the hand-computed snapshot. A late stop is absent under an earlier `as_of`.
-4. **Closing event and mask:** excluding a closing type from visible output never resurrects its
+4. **Closing event and exclusion:** excluding a closing type from visible output never resurrects its
    series. Unauthorized history and supporting documents cannot be fetched through evidence links.
 5. **Log and retry:** the connection drops after source publication, then after ledger admission.
    Retrying each with the same ID creates one source identity and one admitted version.

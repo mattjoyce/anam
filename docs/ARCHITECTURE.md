@@ -549,10 +549,10 @@ the shape and a handful of fixed query forms.
 > is never decomposed into per-field triples. What *is* attribute-shaped and queryable is Anam's
 > **envelope** — type, fact-time, classification, provenance, content-hash — which is exactly what
 > projections filter on. The payload beneath it is one opaque, content-addressed value. A reader who
-> wants a field lays a **mask** over the read (§9, 2026-10-12) and gets that field of each whole reading
-> the projection served, cut from the verbatim payload at serve time; the store never decomposes it, and
-> nothing is indexed by field. What a reader still cannot do is ask the ledger *for* every `systolic`:
-> a mask narrows what a projection serves, it does not select by payload.
+> wants a field names it as one of the read's **fields** (§9, 2026-10-12) and gets that field of each
+> whole reading the projection served, cut from the verbatim payload at serve time; the store never
+> decomposes it, and nothing is indexed by field. What a reader still cannot do is ask the ledger *for*
+> every `systolic`: fields narrow what a projection serves, they do not select by payload.
 >
 > The accurate description is **an entity, a governed envelope, an opaque payload, and two clocks**
 > (§5) — a datom with a fat, opaque value. Bare "EAVT" is one letter-string standing in for a design it
@@ -758,14 +758,14 @@ the payload**; a projection includes or excludes **whole Facets**. A consumer **
 it never defines one — which is why shape is a template knob and not a read-time flag. (`timeline --at`
 is the person's own un-published view of the same read; `serve meds` is the published one.)
 
-A consumer may lay a **mask** over a projection (decided 2026-10-12, card 138, not yet built): the
-payload fields it wants, as JSON pointers into the type's schema, validated against the Definition. The
-mask runs after every projection knob, over the whole facets they admitted, and only cuts: it cannot
-resurrect or exclude a facet, cannot show a field the projection would not have served whole, and never
-touches the envelope. The stored payload stays opaque; the mask parses the served copy. This is the
-reader's stencil over the projection's stencil, and it is why a model can ask about a year of rowing
-without a stroke of it in its context. The receipt pins the mask and hashes the masked bytes. Blending
-projections and computing over fields (aggregates, windows) are a later contract, not a mask.
+A consumer may name the **fields** it wants of a projection (decided 2026-10-12, card 138, not yet
+built): a temporary subset of the type's schema, as JSON pointers, validated against the Definition. Fields
+run after every projection knob, over the whole facets they admitted, and only cut: they cannot resurrect
+or exclude a facet, cannot show a field the projection would not have served whole, and never touch the
+envelope. The stored payload stays opaque; the cut is made on the served copy. The answer is a **frame**,
+columns and rows, a relation rather than a list of facets, which is why a model can ask about a year of
+rowing without a stroke of it in its context. The receipt pins the fields and hashes the frame. Blending
+projections and computing over fields (aggregates, windows) are a later contract, not fields.
 
 > *Tombstone visibility* is no longer a projection knob. It was one only while "canonical" named the
 > append-everything surface. A projection over the canonical sees live facets by construction; a reader
@@ -853,8 +853,8 @@ Anam later as an ordinary source fact.
   into a canonical schema.
 - **Three-pillar admission through the one gate**; **`commit` is idempotent and atomic** — artifact,
   anam-event and watermark in one transaction, in one substrate (crash-clean).
-- Projections **prune, never reshape or generate**; a consumer selects, never defines. A consumer's
-  **mask** only takes away (§9).
+- Projections **prune, never reshape or generate**; a consumer selects, never defines. The **fields** a
+  consumer names only take away (§9).
 - Agent findings are derived Facets admitted as `proposed`; **endorsement never writes back**.
 - **The Envelope is the only ingress**; every external call is timed and fails fast.
 

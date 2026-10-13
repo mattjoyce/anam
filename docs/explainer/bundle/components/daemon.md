@@ -34,6 +34,8 @@ depends_on:
 | `POST /v1/envelopes` | importer token | admit a batch through the gate; see [admit a batch](/workflows/admit-a-batch.md) |
 | `POST /v1/definitions`, `GET /v1/definitions[/{type}[/{v}]]` | importer or operator | register and publish Definitions; see [register a Definition](/workflows/register-a-definition.md) |
 | `POST /v1/projections`, `GET /v1/projections[/{name}[/{v}]]` | operator | register and publish projection templates (card 125); a registered version is immutable and every version stays readable for receipts |
+
+Every unsafe request passes `browserGuard` first (card 108): a foreign `Origin`, a `Sec-Fetch-Site` other than `same-origin` or `none`, or on a tokenless daemon a `Host` that is not a loopback name, is 403 before the token is read and before any work is queued. A cached basic-auth token is exactly the credential a page on another site would spend, so the guard runs ahead of `authorize`.
 | `GET /v1/snapshots/{id}` | importer (own) or operator | the resend report: live, absent, carried |
 | `POST /v1/ingest`, `GET /v1/operations/{id}` | operator | run declared imports as an operation |
 | `GET /v1/timeline`, `GET /v1/changes`, `GET /v1/status` | operator | reads, bounded by `max_read_bytes` |

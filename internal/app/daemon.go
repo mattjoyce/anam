@@ -50,6 +50,11 @@ and to importers, each under its own token (importers_file, docs/IMPORTERS.md §
 
 The CLI asks these when server is set (ANAM_SERVER, --server); see anam --help.
 
+A browser on another site cannot make the daemon write: a POST that carries a foreign
+Origin or a Sec-Fetch-Site other than same-origin is refused with 403 before any work,
+whatever credential it carries, and a tokenless daemon also refuses a POST whose Host is
+not a loopback name. The CLI, importers and the inspector's own forms are unaffected.
+
 With token_file set, everything but /healthz and the importer routes needs the token, as a bearer token or
 as a basic-auth password, and the daemon may listen on any address. Without it the
 daemon listens on loopback only.

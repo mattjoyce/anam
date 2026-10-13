@@ -75,7 +75,11 @@ never kept between requests, or it becomes a stale place. Soft equals hard by ha
 *sealed*; soft differs means the bucket is *behind* (still a correct floor, costing replay); no hard
 means *never minted*. A soft checkpoint bounds no replay and is not what the doctrine means by
 "checkpoint". Distinct from a *Derived span*, which composes either kind over a range the person
-names. See *Checkpoint, hard*, *Mint*, *Span*.
+names. The inspector's strip under the timeline band draws every leaf bucket of the mint's layout in
+one of the three states, computed for the page and dropped (card 21, 2026-10-13); its header line
+counts them and names the last mint run. "Sealed" is also said of the *mint log* as a whole: every
+checkpoint belongs to a recorded run; an unsealed log means a mint did not finish, and reads fold in
+full until the next one. See *Checkpoint, hard*, *Mint*, *Span*.
 
 **Classification** — A governance level on the Facet Definition and each Facet:
 `Normal` / `Confidential` / `Sensitive`. Present and carried; **gating on it is deferred** (§10). See
@@ -179,7 +183,8 @@ the world (the sources are). See *Canonical*, *Tombstone*.
 
 **Mint** — Adaptive checkpointing, **per minted span**, whose only job is to **bound read-time replay
 depth** — not freshness (the Ledger is always current, so a read replays to the head). Cadence is
-time-OR-size-OR-rate; a quiet bucket mints nothing. Manual in the MVP. See *Checkpoint*, *Bucket span*.
+time-OR-size-OR-rate; a quiet bucket mints nothing. Automatic after every ingest that moves W since
+2026-10-09 (card 61), and `POST /v1/checkpoints` by hand. See *Checkpoint*, *Bucket span*.
 
 **Library** — A folder root whose rows are files, read by the `documents` worker: each file is a
 `doc.reference` Facet whose payload is its **library-relative path**, sha256, size, media type and the

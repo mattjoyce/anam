@@ -71,6 +71,10 @@ type Server struct {
 	// facet's link to the version it was admitted under; nil means the bundled ones.
 	heldDefs HeldDefinitions
 
+	// checkpoints is the checkpoint log, read-only, for the bucket strip under the
+	// timeline (card 21); nil means there is none to show.
+	checkpoints Checkpoints
+
 	// The fold cache, keyed by watermark: a whole-person read is one replay plus
 	// one fetch per live facet, too dear to repeat per page view. Every request
 	// still reads the head (one cheap call), so a moved W is never served stale —
@@ -98,11 +102,12 @@ const asOfCacheSize = 4
 // defs answers the Definitions the record's facets were admitted against, asked at
 // each page so a registration shows at once; nil means the bundled ones alone. held
 // answers every version held of each, for the Definitions pages; nil means the
-// bundled manifests.
+// bundled manifests. checkpoints is the checkpoint log for the bucket strip under
+// the timeline; nil draws no strip.
 func Handler(l Ledger, timeout time.Duration, buckets span.Buckets, library string, defs func() *def.Registry,
-	held HeldDefinitions,
+	held HeldDefinitions, checkpoints Checkpoints,
 ) http.Handler {
-	s := &Server{ledger: l, timeout: timeout, buckets: buckets, library: library, defs: defs, heldDefs: held}
+	s := &Server{ledger: l, timeout: timeout, buckets: buckets, library: library, defs: defs, heldDefs: held, checkpoints: checkpoints}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.timeline)
 	mux.HandleFunc("POST /view", s.setDefaultView)
@@ -185,7 +190,7 @@ func (s *Server) readAt(ctx context.Context, w ledger.Watermark) (fold.Result, e
 func Serve(ctx context.Context, l Ledger, addr string, timeout time.Duration, buckets span.Buckets, library string) error {
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           Handler(l, timeout, buckets, library, nil, nil),
+		Handler:           Handler(l, timeout, buckets, library, nil, nil, nil),
 		ReadHeaderTimeout: 5 * time.Second,
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}

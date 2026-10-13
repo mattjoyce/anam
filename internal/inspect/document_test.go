@@ -49,7 +49,7 @@ func TestDocument_ServedFromTheLibraryAndConfinedToIt(t *testing.T) {
 	if err := l.Admit(ctx, 0, ref, event(facet.EventAdmitted, ref, 1)); err != nil {
 		t.Fatalf("Admit: %v", err)
 	}
-	srv := httptest.NewServer(inspect.Handler(l, 30*time.Second, defaultBuckets, library, nil, nil))
+	srv := httptest.NewServer(inspect.Handler(l, 30*time.Second, defaultBuckets, library, nil, nil, nil))
 	t.Cleanup(srv.Close)
 
 	code, body := get(t, srv.URL+"/facet?id="+ref.ID)
@@ -77,7 +77,7 @@ func TestDocument_ServedFromTheLibraryAndConfinedToIt(t *testing.T) {
 	}
 
 	// No library configured: the page carries no link and the route serves nothing.
-	bare := httptest.NewServer(inspect.Handler(l, 30*time.Second, defaultBuckets, "", nil, nil))
+	bare := httptest.NewServer(inspect.Handler(l, 30*time.Second, defaultBuckets, "", nil, nil, nil))
 	t.Cleanup(bare.Close)
 	if _, body := get(t, bare.URL+"/facet?id="+ref.ID); strings.Contains(body, "/document?path=") {
 		t.Errorf("facet page links a document with no library configured")

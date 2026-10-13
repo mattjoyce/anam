@@ -45,7 +45,7 @@ func supersededServer(t *testing.T) (*httptest.Server, string) {
 	if err := l.Admit(ctx, 1, v2, sup); err != nil {
 		t.Fatalf("Admit v2: %v", err)
 	}
-	srv := httptest.NewServer(inspect.Handler(l, 30*time.Second, defaultBuckets, "", nil, nil))
+	srv := httptest.NewServer(inspect.Handler(l, 30*time.Second, defaultBuckets, "", nil, nil, nil))
 	t.Cleanup(srv.Close)
 	return srv, v1.ID
 }

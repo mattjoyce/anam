@@ -257,7 +257,11 @@ func TestIngestWaitRefusesANonsenseDuration(t *testing.T) {
 	t.Cleanup(func() { _ = d.closeStores() })
 	for _, q := range []string{"?wait=soon", "?wait=-1s", "?wait=0s"} {
 		rec := httptest.NewRecorder()
-		d.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/ingest"+q, nil))
+		req := httptest.NewRequest(http.MethodPost, "/v1/ingest"+q, nil)
+		// httptest names example.com as the host; a tokenless daemon takes a POST
+		// only from a loopback name (card 108), and the wait is what is under test.
+		req.Host = "127.0.0.1:8787"
+		d.Handler().ServeHTTP(rec, req)
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("POST /v1/ingest%s: %d, want 400", q, rec.Code)
 		}

@@ -161,9 +161,12 @@ CREATE TABLE IF NOT EXISTS replay_cursor (
   last_seq INTEGER NOT NULL
 );
 
--- tier: provisioned — Facet Definitions, every version, loaded from embedded JSON.
--- Not in the ledger: a definition is not something Anam knew, it is how Anam
--- interprets. Old artifacts stay interpretable because old versions stay loadable.
+-- tier: provisioned — Facet Definitions, every version, loaded from embedded JSON:
+-- each type's current manifest and the earlier versions the binary keeps under
+-- manifests/history (card 111), so a rebuilt store holds every version a facet was
+-- admitted under. Not in the ledger: a definition is not something Anam knew, it is
+-- how Anam interprets. Old artifacts stay interpretable because old versions stay
+-- loadable.
 CREATE TABLE IF NOT EXISTS definition (
   type    TEXT NOT NULL,
   version INTEGER NOT NULL,

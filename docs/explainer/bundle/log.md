@@ -34,3 +34,8 @@ Card 50 closes the importers move, at anam master after 3b97178.
 - Code: `browserGuard` refuses cross-site unsafe requests before the token; the daemon's help and the service skill say so.
 - Bundle: the daemon component notes the guard.
 
+## 2026-10-13, cards 100 and 111
+
+- Code: the day audit's low findings cleared (inspect.go split into facet, document and events files; read.Absent bounded over the API); the Definition history is provisioned from `manifests/history`.
+- Bundle: the def component names the history; the inspector component's anchor is unchanged.
+

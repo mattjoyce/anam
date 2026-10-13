@@ -1,0 +1,37 @@
+{
+  "meta": {
+    "facet_type": "health.blood-pressure",
+    "definition_version": 2,
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "bp-csv/reading",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date_excel", "layout": "2006-1-2 15:04:05", "zone": "Australia/Sydney"}
+    },
+    "identity_key": ["/date_excel", "/reading"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["date_excel", "reading", "systolic", "diastolic"],
+    "properties": {
+      "comment": {"type": "string", "minLength": 1},
+      "date": {"type": "string", "minLength": 1},
+      "date_excel": {"type": "string", "minLength": 1},
+      "diastolic": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$"},
+      "id": {"type": "string", "minLength": 1},
+      "location": {"type": "string", "minLength": 1},
+      "map": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$"},
+      "missed_medication": {"type": "string", "minLength": 1},
+      "note": {"type": "string", "minLength": 1},
+      "posture": {"type": "string", "minLength": 1},
+      "pp": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$"},
+      "pulse": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$"},
+      "reading": {"type": "string", "minLength": 1},
+      "systolic": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$"},
+      "weight_kg": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$"}
+    },
+    "additionalProperties": false
+  }
+}

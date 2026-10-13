@@ -86,8 +86,19 @@ func TestGuard_RefusesAChangedKeyingAndNothingElse(t *testing.T) {
 	if err := def.Guard(manifests, bundled); err != nil {
 		t.Errorf("Guard refused the bundled set against itself: %v", err)
 	}
-	if len(manifests) != len(bundled.All()) || manifests[0].Type == facet.Type("") {
-		t.Errorf("Manifests() lists %d, Bundled() holds %d", len(manifests), len(bundled.All()))
+	// Manifests carries the current body of every bundled type plus the history
+	// (card 111); the current ones match Bundled one for one.
+	current := 0
+	for _, m := range manifests {
+		if m.Type == facet.Type("") {
+			t.Errorf("a manifest with no type: %+v", m)
+		}
+		if d, ok := bundled.Lookup(m.Type); ok && d.Version == m.Version {
+			current++
+		}
+	}
+	if current != len(bundled.All()) {
+		t.Errorf("Manifests() lists %d current bodies, Bundled() holds %d", current, len(bundled.All()))
 	}
 }
 

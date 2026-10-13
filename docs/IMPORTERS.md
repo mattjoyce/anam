@@ -211,6 +211,12 @@ importers:
 | `GET /v1/definitions/{type}/{version}` | That version's manifest. 404 if not held. |
 | `POST /v1/definitions` | Body: one manifest. 201 registered; 200 already registered, same body; 409 a different body at that version, an older version than one held, a changed `identity_key` or `fact_time`, or a type the binary bundles; 422 not a valid manifest; 403 a type outside the token's `types`. |
 
+Every version is held, and a rebuilt operational store holds them again: the versions Anam's own
+bundle ever carried are provisioned from the binary (`internal/def/manifests/history`, card 111),
+and an importer's versions come back because the importer keeps every version it has ever emitted
+in its Definitions folder and registers them all at start (§8.5 rule 1); a folder that drops an old
+version loses the words its facets were admitted under.
+
 A registered version is immutable, and "same body" compares canonical JSON, so reformatting the file
 is harmless. A change is a new version, which may change the schema, classification or series freely
 but not what keys or places a facet. An importer registers its Definitions every time it starts:

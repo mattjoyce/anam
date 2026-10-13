@@ -270,7 +270,9 @@ func (d *Daemon) Handler() http.Handler {
 	mux.Handle("GET /v1/definitions/{type}/{version}", d.asReader(d.getDefinition))
 	mux.Handle("GET /v1/snapshots/{id}", d.asReader(d.getSnapshot))
 	mux.Handle("/", d.authorize(inner))
-	return mux
+	// Before the token: a browser on another site is refused whatever credential it
+	// carries, since a cached one is exactly what it would spend (card 108).
+	return d.browserGuard(mux)
 }
 
 // healthz is ready when the ledger's head can be read within the deadline. The ledger's

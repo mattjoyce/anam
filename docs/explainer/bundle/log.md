@@ -29,3 +29,8 @@ Card 50 closes the importers move, at anam master after 3b97178.
 - Code: the gate refuses a facet changing type (`ErrTypeChanged`); library documents are sandboxed and active kinds are downloads; `note.annotation` v2 times a note by its writing.
 - Bundle: the inspector component notes the sandbox.
 
+## 2026-10-13, card 108
+
+- Code: `browserGuard` refuses cross-site unsafe requests before the token; the daemon's help and the service skill say so.
+- Bundle: the daemon component notes the guard.
+

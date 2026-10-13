@@ -43,6 +43,11 @@ runs, nothing else may open those files. Ask it over HTTP instead.
 | `GET /v1/snapshots/{id}` | yes, or the importer whose run it is | A complete resend's report: parts admitted, whether it is complete, and what the source no longer holds (`absent`, judged from the snapshot's start). 404 unknown, or another importer's. |
 | `GET /` and below | yes | The inspector (timeline, facets, events, documents). Browser: basic auth, any user name, the token as password. |
 
+A POST from a browser on another site (a foreign `Origin`, or `Sec-Fetch-Site` other than
+`same-origin`) is 403 before any work, whatever credential it carries (card 108); the CLI and the
+importers send neither header and are unaffected. Library documents are served sandboxed, and HTML
+or SVG ones download rather than render (card 106).
+
 Any request may carry an `Anam-Timeout` header, the caller's own deadline as a Go duration
 (`25s`); the daemon works to the shorter of it and its configured timeout, and a read that runs
 out is 504. Importers' tokens live in `importers_file` (`ANAM_IMPORTERS_FILE`) as SHA-256

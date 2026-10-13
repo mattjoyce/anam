@@ -137,3 +137,14 @@ type Registered struct {
 	// New is false when the same body was already registered at this version.
 	New bool `json:"new"`
 }
+
+// StoredDocument is the answer to POST /v1/documents: what a doc.reference names for
+// the bytes the library now holds (card 102).
+type StoredDocument struct {
+	Path      string `json:"path"`
+	SHA256    string `json:"sha256"`
+	Bytes     int64  `json:"bytes"`
+	MediaType string `json:"media_type"`
+	// New is false when the library already held these bytes at this path.
+	New bool `json:"new"`
+}

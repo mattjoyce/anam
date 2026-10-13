@@ -146,7 +146,9 @@ Where log management stops applying: logs tolerate loss and sampling and have no
    turned into a records file once by a script kept in `scripts/`, and reshaped by regenerating that
    file with the same ids (card 58). The blood pressure app turned out to be live, exported
    periodically, so it has an importer (card 80), and the built-in `bpcsv` worker is gone. `records`
-   and `documents` stay inside Anam: they are formats, not sources.
+   and `documents` were kept inside as formats until Matt's word of 2026-10-11 that they leave too:
+   records by `anam_records` (card 118), documents by `anam_documents` posting bytes to
+   `POST /v1/documents` (cards 102, 103), and then the in-process workers go (card 119).
 
 ## 8. The importer contract
 
@@ -258,6 +260,20 @@ again.
 
 The daemon mints once batches stop arriving for 2 s, in the background, so neither the answer nor the
 next batch waits on it.
+
+### 8.4a Documents
+
+A document's bytes reach the library through Anam, never by an importer writing into Anam's
+directory (card 102). `POST /v1/documents?path=<library-relative path>`, body the raw bytes (at
+most 64 MiB), under an importer token whose `types` include `doc.reference`. The answer is what a
+`doc.reference` names: `path`, `sha256` (hex), `bytes`, `media_type`, and `new`. 201 stored; 200
+the same bytes already at that path; 409 other bytes at that path, since a stored document is a
+value and a changed one takes a new path; 400 a path that is absolute, climbs out, names a dot-file
+or a `.meta.yaml` sidecar; 403 a token that may not submit `doc.reference`.
+
+Then the importer submits the `doc.reference` envelope as any other. An envelope naming a path the
+library does not hold, or a `sha256` other than the bytes held there, is refused with the batch
+(422), before the gate, and nothing of the batch is admitted.
 
 ### 8.5 What an importer must do
 

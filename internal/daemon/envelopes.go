@@ -60,6 +60,11 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 		if err := checkSnapshot(ctx, s.Ops, imp.Source, snap, digest); err != nil {
 			return err
 		}
+		// A reference to a document the library does not hold is refused before the
+		// gate sees the batch, and nothing of it is admitted (card 102).
+		if err := checkReferences(d.cfg.LibraryDir, envs); err != nil {
+			return err
+		}
 		// Inside the write, where a registration cannot land between this and the
 		// admission.
 		reg := d.defs.current.Load()

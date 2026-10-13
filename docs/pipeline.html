@@ -78,12 +78,11 @@
 <main>
 
 <h1>Health data pipeline</h1>
-<p class="lede">How a heartbeat on the watch and a step on the scale become facets in Anam, which machine does each part, and how to tell when a part has stopped.</p>
-<p class="meta">State as of 30 September 2026. Stages one to four were checked on 29 September, and stage five on 30 September.</p>
-<div class="note"><strong>Partly out of date.</strong> Since 9 October the record lives on unraid (card 46): ingest runs inside the anam container there, when the unraid gateway asks, not on the ThinkPad every hour. Withings and the blood pressure export now reach Anam through the <code>anam_withings</code> and <code>anam_bp_csv</code> importers (cards 54 and 80), not built-in workers. The Withings and blood pressure parts below are updated; the ThinkPad ingest parts are not.</div>
+<p class="lede">How a heartbeat on the watch, a step on the scale, a night on the CPAP and a position from the phone become facets in Anam, which machine does each part, and how to tell when a part has stopped.</p>
+<p class="meta">State as of 13 October 2026. The health ETL and <code>healthdata.db</code> that this page used to draw retired on 11 October (card 55); they appear below only as history.</p>
 
 <div class="scroll">
-<svg viewBox="0 0 916 372" role="img" aria-label="Pipeline from Garmin and Withings through collectors and the ETL into Anam">
+<svg viewBox="0 0 916 452" role="img" aria-label="Pipeline from each source through its importer on the unraid gateway into the Anam service">
   <defs>
     <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
       <path class="head" d="M0,0 L10,5 L0,10 z"/>
@@ -92,211 +91,227 @@
 
   <!-- column headings -->
   <text class="lbl" x="73" y="16" text-anchor="middle">SOURCE</text>
-  <text class="lbl" x="227" y="16" text-anchor="middle">COLLECTOR</text>
-  <text class="lbl" x="381" y="16" text-anchor="middle">RAW STORE</text>
-  <text class="lbl" x="535" y="16" text-anchor="middle">ETL</text>
-  <text class="lbl" x="689" y="16" text-anchor="middle">SUMMARIES</text>
-  <text class="lbl" x="843" y="16" text-anchor="middle">ANAM</text>
+  <text class="lbl" x="265" y="16" text-anchor="middle">COLLECTOR AND RAW STORE</text>
+  <text class="lbl" x="535" y="16" text-anchor="middle">IMPORTER (ductile, unraid)</text>
+  <text class="lbl" x="800" y="16" text-anchor="middle">ANAM (container, unraid)</text>
 
-  <!-- Garmin row -->
-  <rect class="box" x="8" y="30" width="130" height="70" rx="8" fill="var(--source)"/>
-  <text class="ttl" x="73" y="60" text-anchor="middle">Garmin Connect</text>
-  <text class="sub" x="73" y="78" text-anchor="middle">watch, via phone</text>
+  <!-- Garmin -->
+  <rect class="box" x="8" y="30" width="130" height="56" rx="8" fill="var(--source)"/>
+  <text class="ttl" x="73" y="54" text-anchor="middle">Garmin Connect</text>
+  <text class="sub" x="73" y="72" text-anchor="middle">watch, via phone</text>
+  <rect class="box" x="162" y="30" width="206" height="56" rx="8" fill="var(--store)"/>
+  <text class="ttl" x="265" y="50" text-anchor="middle">garmindb container</text>
+  <text class="sub" x="265" y="65" text-anchor="middle">own cron, 4 a day → garmin.db, FIT files</text>
+  <text class="sub" x="265" y="79" text-anchor="middle">garmin plugin raises health.new_data</text>
+  <rect class="box" x="392" y="30" width="286" height="56" rx="8" fill="var(--work)"/>
+  <text class="ttl" x="535" y="50" text-anchor="middle">anam_garmin</text>
+  <text class="sub" x="535" y="65" text-anchor="middle">handle: the changed days · poll: everything, weekly</text>
+  <text class="sub" x="535" y="79" text-anchor="middle">sleep.episode · heart-rate-daily · step-count · garmin.day · session · alert</text>
 
-  <rect class="box" x="162" y="30" width="130" height="70" rx="8" fill="var(--work)"/>
-  <text class="ttl" x="227" y="56" text-anchor="middle">garmindb</text>
-  <text class="sub" x="227" y="72" text-anchor="middle">container on unraid</text>
-  <text class="sub" x="227" y="87" text-anchor="middle">own cron, 4 a day</text>
+  <!-- Withings -->
+  <rect class="box" x="8" y="100" width="130" height="56" rx="8" fill="var(--source)"/>
+  <text class="ttl" x="73" y="124" text-anchor="middle">Withings cloud</text>
+  <text class="sub" x="73" y="142" text-anchor="middle">scale, cuff</text>
+  <rect class="box" x="162" y="100" width="206" height="56" rx="8" fill="var(--store)"/>
+  <text class="ttl" x="265" y="120" text-anchor="middle">withings plugin</text>
+  <text class="sub" x="265" y="135" text-anchor="middle">polls every 6 hours → withings.db</text>
+  <text class="sub" x="265" y="149" text-anchor="middle">one event per new measurement</text>
+  <rect class="box" x="392" y="100" width="286" height="56" rx="8" fill="var(--work)"/>
+  <text class="ttl" x="535" y="120" text-anchor="middle">anam_withings</text>
+  <text class="sub" x="535" y="135" text-anchor="middle">on the event, or poll</text>
+  <text class="sub" x="535" y="149" text-anchor="middle">health.measurement, every measurement</text>
 
-  <rect class="box" x="316" y="30" width="130" height="70" rx="8" fill="var(--store)"/>
-  <text class="ttl" x="381" y="56" text-anchor="middle" style="font-size:11.5px">garmin_summary.db</text>
-  <text class="sub" x="381" y="72" text-anchor="middle">one row per day</text>
-  <text class="sub" x="381" y="87" text-anchor="middle">with min and max</text>
+  <!-- Blood pressure -->
+  <rect class="box" x="8" y="170" width="130" height="56" rx="8" fill="var(--source)"/>
+  <text class="ttl" x="73" y="194" text-anchor="middle">Blood pressure</text>
+  <text class="sub" x="73" y="212" text-anchor="middle">CSV export, by hand</text>
+  <rect class="box" x="162" y="170" width="206" height="56" rx="8" fill="var(--store)"/>
+  <text class="ttl" x="265" y="190" text-anchor="middle">watched folder</text>
+  <text class="sub" x="265" y="205" text-anchor="middle">bp_export_watch, on the share</text>
+  <text class="sub" x="265" y="219" text-anchor="middle">every export stays there</text>
+  <rect class="box" x="392" y="170" width="286" height="56" rx="8" fill="var(--work)"/>
+  <text class="ttl" x="535" y="190" text-anchor="middle">anam_bp_csv</text>
+  <text class="sub" x="535" y="205" text-anchor="middle">on a new export, or poll</text>
+  <text class="sub" x="535" y="219" text-anchor="middle">health.blood-pressure, every reading</text>
 
-  <!-- Withings row -->
-  <rect class="box" x="8" y="150" width="130" height="70" rx="8" fill="var(--source)"/>
-  <text class="ttl" x="73" y="180" text-anchor="middle">Withings cloud</text>
-  <text class="sub" x="73" y="198" text-anchor="middle">scale, cuff</text>
+  <!-- DreamStation -->
+  <rect class="box" x="8" y="240" width="130" height="56" rx="8" fill="var(--source)"/>
+  <text class="ttl" x="73" y="264" text-anchor="middle">DreamStation</text>
+  <text class="sub" x="73" y="282" text-anchor="middle">CPAP SD card, copied</text>
+  <rect class="box" x="162" y="240" width="206" height="56" rx="8" fill="var(--store)"/>
+  <text class="ttl" x="265" y="260" text-anchor="middle">card copy on the share</text>
+  <text class="sub" x="265" y="275" text-anchor="middle">healthdata/dreamstation/P-SERIES</text>
+  <text class="sub" x="265" y="289" text-anchor="middle">dreamstation_card_watch on LAST.TXT, 15 min</text>
+  <rect class="box" x="392" y="240" width="286" height="56" rx="8" fill="var(--work)"/>
+  <text class="ttl" x="535" y="260" text-anchor="middle">anam_dreamstation</text>
+  <text class="sub" x="535" y="275" text-anchor="middle">decodes the card, resends everything</text>
+  <text class="sub" x="535" y="289" text-anchor="middle">sleep.cpap-session, every session</text>
 
-  <rect class="box" x="162" y="150" width="130" height="70" rx="8" fill="var(--work)"/>
-  <text class="ttl" x="227" y="176" text-anchor="middle">withings plugin</text>
-  <text class="sub" x="227" y="192" text-anchor="middle">ductile on unraid</text>
-  <text class="sub" x="227" y="207" text-anchor="middle">polls every 6 hours</text>
+  <!-- OwnTracks -->
+  <rect class="box" x="8" y="310" width="130" height="56" rx="8" fill="var(--source)"/>
+  <text class="ttl" x="73" y="334" text-anchor="middle">OwnTracks</text>
+  <text class="sub" x="73" y="352" text-anchor="middle">phone positions</text>
+  <rect class="box" x="162" y="310" width="206" height="56" rx="8" fill="var(--store)"/>
+  <text class="ttl" x="265" y="330" text-anchor="middle">webhooks.ductile.run</text>
+  <text class="sub" x="265" y="345" text-anchor="middle">Cloudflare worker spools the posts</text>
+  <text class="sub" x="265" y="359" text-anchor="middle">the gateway pulls them</text>
+  <rect class="box" x="392" y="310" width="286" height="56" rx="8" fill="var(--work)"/>
+  <text class="ttl" x="535" y="330" text-anchor="middle">anam_owntracks</text>
+  <text class="sub" x="535" y="345" text-anchor="middle">on each pull</text>
+  <text class="sub" x="535" y="359" text-anchor="middle">location.track, an hour of positions each</text>
 
-  <rect class="box" x="316" y="150" width="130" height="70" rx="8" fill="var(--store)"/>
-  <text class="ttl" x="381" y="176" text-anchor="middle">withings.db</text>
-  <text class="sub" x="381" y="192" text-anchor="middle">one row per</text>
-  <text class="sub" x="381" y="207" text-anchor="middle">measurement</text>
-
-  <!-- BP row -->
-  <rect class="box" x="8" y="282" width="130" height="70" rx="8" fill="var(--source)"/>
-  <text class="ttl" x="73" y="312" text-anchor="middle">Blood pressure</text>
-  <text class="sub" x="73" y="330" text-anchor="middle">CSV export, by hand</text>
-
-  <!-- ETL and summaries -->
-  <rect class="box" x="470" y="90" width="130" height="70" rx="8" fill="var(--work)"/>
-  <text class="ttl" x="535" y="116" text-anchor="middle">Health ETL</text>
-  <text class="sub" x="535" y="132" text-anchor="middle">run by ductile</text>
-  <text class="sub" x="535" y="147" text-anchor="middle">on unraid, per event</text>
-
-  <rect class="box" x="624" y="90" width="130" height="70" rx="8" fill="var(--store)"/>
-  <text class="ttl" x="689" y="116" text-anchor="middle">healthdata.db</text>
-  <text class="sub" x="689" y="132" text-anchor="middle">day, week, month,</text>
-  <text class="sub" x="689" y="147" text-anchor="middle">year per metric</text>
+  <!-- Records and documents -->
+  <rect class="box" x="8" y="380" width="130" height="56" rx="8" fill="var(--source)"/>
+  <text class="ttl" x="73" y="404" text-anchor="middle">Records, documents</text>
+  <text class="sub" x="73" y="422" text-anchor="middle">YAML files, a library folder</text>
+  <rect class="box" x="162" y="380" width="206" height="56" rx="8" fill="var(--store)"/>
+  <text class="ttl" x="265" y="400" text-anchor="middle">anam/private on the share</text>
+  <text class="sub" x="265" y="415" text-anchor="middle">records/*.yaml, documents with sidecars</text>
+  <text class="sub" x="265" y="429" text-anchor="middle">edited by hand or by a script</text>
+  <rect class="box" x="392" y="380" width="286" height="56" rx="8" fill="var(--work)"/>
+  <text class="ttl" x="535" y="400" text-anchor="middle">anam_ingest (gateway job)</text>
+  <text class="sub" x="535" y="415" text-anchor="middle">asks the daemon hourly: POST /v1/ingest</text>
+  <text class="sub" x="535" y="429" text-anchor="middle">the daemon reads both folders itself (card 119 moves this out)</text>
 
   <!-- Anam -->
-  <rect class="box" x="778" y="30" width="130" height="322" rx="8" fill="var(--anam)"/>
-  <text class="ttl" x="843" y="56" text-anchor="middle">anam ingest</text>
-  <text class="sub" x="843" y="72" text-anchor="middle">ThinkPad, every hour</text>
-  <text class="sub" x="843" y="129" text-anchor="middle">health-db worker</text>
-  <text class="sub" x="843" y="244" text-anchor="middle">withings importer</text>
-  <text class="sub" x="843" y="321" text-anchor="middle">bp-csv importer</text>
-  <text class="sub" x="843" y="344" text-anchor="middle">gate, then ledger.db</text>
+  <rect class="box" x="702" y="30" width="206" height="406" rx="8" fill="var(--anam)"/>
+  <text class="ttl" x="805" y="56" text-anchor="middle">anam daemon</text>
+  <text class="sub" x="805" y="72" text-anchor="middle">192.168.20.4:8787</text>
+  <text class="sub" x="805" y="110" text-anchor="middle">POST /v1/envelopes</text>
+  <text class="sub" x="805" y="125" text-anchor="middle">one token per importer</text>
+  <text class="sub" x="805" y="170" text-anchor="middle">gate: three pillars,</text>
+  <text class="sub" x="805" y="185" text-anchor="middle">idempotent commit</text>
+  <text class="sub" x="805" y="230" text-anchor="middle">append-only ledger</text>
+  <text class="sub" x="805" y="245" text-anchor="middle">/mnt/disk2/appdata/anam/data</text>
+  <text class="sub" x="805" y="290" text-anchor="middle">mint after every ingest</text>
+  <text class="sub" x="805" y="305" text-anchor="middle">checkpoints, receipts</text>
+  <text class="sub" x="805" y="350" text-anchor="middle">backup nightly 02:30</text>
+  <text class="sub" x="805" y="365" text-anchor="middle">/mnt/disk1/backup/anam/daily</text>
+  <text class="sub" x="805" y="410" text-anchor="middle">inspector, API, MCP</text>
 
   <!-- arrows -->
-  <path class="arrow" marker-end="url(#a)" d="M138,65 L160,65"/>
-  <path class="arrow" marker-end="url(#a)" d="M292,65 L314,65"/>
-  <path class="arrow" marker-end="url(#a)" d="M138,185 L160,185"/>
-  <path class="arrow" marker-end="url(#a)" d="M292,185 L314,185"/>
-  <path class="arrow" marker-end="url(#a)" d="M446,72 L468,108"/>
-  <path class="arrow" marker-end="url(#a)" d="M446,172 L468,142"/>
-  <path class="arrow" marker-end="url(#a)" d="M600,125 L622,125"/>
-  <path class="arrow" marker-end="url(#a)" d="M754,125 L776,125"/>
-  <path class="arrow" marker-end="url(#a)" d="M446,205 L458,205 L458,240 L776,240"/>
-  <path class="arrow" marker-end="url(#a)" d="M138,317 L776,317"/>
-
-  <text class="lbl" x="610" y="234">every measurement, as envelopes</text>
-  <text class="lbl" x="458" y="311" text-anchor="middle">every reading, read directly</text>
+  <path class="arrow" marker-end="url(#a)" d="M138,58 L160,58"/>
+  <path class="arrow" marker-end="url(#a)" d="M368,58 L390,58"/>
+  <path class="arrow" marker-end="url(#a)" d="M678,58 L700,58"/>
+  <path class="arrow" marker-end="url(#a)" d="M138,128 L160,128"/>
+  <path class="arrow" marker-end="url(#a)" d="M368,128 L390,128"/>
+  <path class="arrow" marker-end="url(#a)" d="M678,128 L700,128"/>
+  <path class="arrow" marker-end="url(#a)" d="M138,198 L160,198"/>
+  <path class="arrow" marker-end="url(#a)" d="M368,198 L390,198"/>
+  <path class="arrow" marker-end="url(#a)" d="M678,198 L700,198"/>
+  <path class="arrow" marker-end="url(#a)" d="M138,268 L160,268"/>
+  <path class="arrow" marker-end="url(#a)" d="M368,268 L390,268"/>
+  <path class="arrow" marker-end="url(#a)" d="M678,268 L700,268"/>
+  <path class="arrow" marker-end="url(#a)" d="M138,338 L160,338"/>
+  <path class="arrow" marker-end="url(#a)" d="M368,338 L390,338"/>
+  <path class="arrow" marker-end="url(#a)" d="M678,338 L700,338"/>
+  <path class="arrow" marker-end="url(#a)" d="M138,408 L160,408"/>
+  <path class="arrow" marker-end="url(#a)" d="M368,408 L390,408"/>
+  <path class="arrow" marker-end="url(#a)" d="M678,408 L700,408"/>
 </svg>
 </div>
 <div class="legend">
   <span class="l-source">where the data starts</span>
-  <span class="l-work">a process that runs</span>
-  <span class="l-store">a SQLite file</span>
+  <span class="l-store">a collector and the file it writes</span>
+  <span class="l-work">an importer, a ductile plugin</span>
   <span class="l-anam">Anam</span>
 </div>
 
-<h2>The five stages</h2>
+<h2>The shape</h2>
+<p>Every vendor source reaches Anam the same way (<code>docs/IMPORTERS.md</code>). A collector keeps the source's own data in its own format on the Projects share. A ductile plugin on the unraid gateway, from the <code>anam-importers</code> repository, reads that format, shapes each row to a Facet Definition and posts envelopes to the Anam daemon in batches of 49, under a token that is good for its source and its types alone. Anam knows no vendor: the gate checks each envelope against the Definition, admits what is new, supersedes what changed and answers <code>no-op</code> for what it already holds, so every importer can resend everything and nothing doubles.</p>
+<p>Two formats are still read in process. The gateway job <code>anam_ingest</code> asks the daemon hourly (<code>POST /v1/ingest?wait=10m</code>) and the daemon itself reads the records folder and the document library. Card 119 moves those out too, and then the envelope route is the only way in.</p>
 
+<h2>The stages</h2>
 <ol class="steps">
   <li><strong>Collect from Garmin</strong>
-    The <code>garmindb</code> container on unraid runs its own cron. It downloads from Garmin Connect, imports, then analyses. The analyse step writes <code>garmin_summary.db</code>, which holds one row per day with Garmin's own min and max. Nothing in ductile runs this container.</li>
-  <li><strong>Collect from Withings</strong>
-    The <code>withings</code> plugin in the unraid ductile gateway polls every six hours and writes <code>withings.db</code>. It raises one event per new weigh-in. The <code>anam_withings</code> importer, in the same gateway, handles that event and submits the measure group to Anam as envelopes (card 54).</li>
-  <li><strong>Notice that something changed</strong>
-    The <code>garmin</code> plugin checks the modification time of <code>garmin.db</code> every 30 minutes. When it moves, the plugin raises <code>health.new_data</code> with the days that changed. Withings needs no watcher, because its plugin raises <code>withings.measurement_recorded</code> itself.</li>
-  <li><strong>Summarise</strong>
-    Either event starts the health ETL. Ductile runs it as a one-shot container from the <code>ductile-healthdata</code> image. It reads both raw stores and writes day, week, month and year rows to <code>healthdata.db</code>.</li>
-  <li><strong>Ingest into Anam</strong>
-    The ThinkPad ductile gateway runs <code>anam ingest</code> every hour. It reads <code>healthdata.db</code> over the Projects share. Withings and the blood pressure export no longer come this way: their importers, <code>anam_withings</code> and <code>anam_bp_csv</code> in the unraid gateway, submit them as envelopes (cards 54 and 80). Every row passes the gate and lands in <code>ledger.db</code>.</li>
+    The <code>garmindb</code> container on unraid runs its own cron, four times a day. It downloads from Garmin Connect into <code>healthdata/garmin/DBs/</code> (<code>garmin.db</code>, <code>garmin_summary.db</code>, the activity databases) and keeps every FIT file. The <code>garmin</code> plugin in the gateway checks <code>garmin.db</code>'s modification time every 30 minutes and raises <code>health.new_data</code> with the days that changed.</li>
+  <li><strong>Import from Garmin</strong>
+    Pipeline <code>anam-garmin-sync</code> runs <code>anam_garmin</code> on that event (<code>handle</code>, the changed days) and weekly by cron (<code>poll</code>, everything, labelled a snapshot so Anam knows the resend finished). It shapes nights to <code>sleep.episode</code>, daily heart rate to <code>health.heart-rate-daily</code>, steps to <code>health.step-count</code>, the rest of the day to <code>garmin.day</code>, activities to <code>exercise.session</code>, and reads the FIT files for <code>health.heart-rate-alert</code>. Live since 11 October (card 55).</li>
+  <li><strong>Withings</strong>
+    The <code>withings</code> plugin polls the Withings cloud every six hours into <code>withings.db</code> and raises one event per new measurement. <code>anam_withings</code> shapes each to <code>health.measurement</code> and posts it; a weigh-in reaches the ledger in seconds. Live since 10 October (card 54).</li>
+  <li><strong>Blood pressure</strong>
+    The phone app's CSV export is dropped into a watched folder on the share. <code>bp_export_watch</code> sees the new file and <code>anam_bp_csv</code> shapes every reading to <code>health.blood-pressure</code>. Exports are never moved, so a <code>poll</code> resends them all (card 80).</li>
+  <li><strong>DreamStation</strong>
+    The CPAP's SD card is copied to <code>healthdata/dreamstation/P-SERIES</code> every few months. <code>dreamstation_card_watch</code> watches its <code>LAST.TXT</code> every 15 minutes, and <code>anam_dreamstation</code> decodes the card and resends every session as <code>sleep.cpap-session</code> (card 70).</li>
+  <li><strong>OwnTracks</strong>
+    The phone posts its positions to <code>webhooks.ductile.run/owntracks</code>, a Cloudflare worker that spools them. The gateway pulls the spool and <code>anam_owntracks</code> posts an hour of positions as one <code>location.track</code> facet (card 130).</li>
+  <li><strong>Records and documents</strong>
+    Hand-written YAML records (labs, medicines, travel, notes) and the document library live under <code>anam/private</code> on the share. The daemon reads them when the gateway's <code>anam_ingest</code> asks, hourly. An unchanged row is a no-op, so the hourly run costs nothing when there is no news.</li>
+  <li><strong>Anam</strong>
+    The <code>anam</code> container on unraid holds the record at <code>/mnt/disk2/appdata/anam/data</code>: the ledger, the operational store, checkpoints and receipts, the library. It mints after every ingest that moves W, backs the record up nightly at 02:30 into <code>/mnt/disk1/backup/anam/daily</code> (14 kept), and serves the API, the inspector and the MCP adapter. Nothing else opens its files (<code>.claude/skills/anam-service/SKILL.md</code>).</li>
 </ol>
-
-<div class="note"><strong>Stage five runs on a clock, not on an event.</strong> The ingest takes about two seconds and an unchanged row is a no-op, so an hourly run costs nothing when there is no news. New data reaches Anam within an hour of the ETL writing it.</div>
 
 <h2>Where each part lives</h2>
 <div class="tablewrap">
 <table>
   <thead><tr><th>Part</th><th>Machine</th><th>Runs</th><th>Writes</th></tr></thead>
   <tbody>
-    <tr><td><code>garmindb</code> container</td><td>unraid</td><td>00:02, 06:02, 12:02, 18:02 UTC</td><td><code>healthdata/garmin/DBs/</code></td></tr>
-    <tr><td><code>withings</code> plugin</td><td>unraid, in ductile</td><td>every 6 hours</td><td><code>healthdata/withings/withings.db</code></td></tr>
+    <tr><td><code>garmindb</code> container</td><td>unraid</td><td>00:02, 06:02, 12:02, 18:02 UTC</td><td><code>healthdata/garmin/DBs/</code>, FIT files</td></tr>
     <tr><td><code>garmin</code> plugin</td><td>unraid, in ductile</td><td>every 30 minutes</td><td>an event, no file</td></tr>
-    <tr><td>Health ETL</td><td>unraid, one-shot container</td><td>on each event</td><td><code>healthdata/healthdata.db</code></td></tr>
-    <tr><td><code>anam ingest</code></td><td>ThinkPad, in ductile</td><td>every hour</td><td><code>~/.local/share/anam/ledger.db</code></td></tr>
+    <tr><td><code>anam_garmin</code></td><td>unraid, in ductile</td><td>on <code>health.new_data</code>; weekly poll</td><td>envelopes to Anam</td></tr>
+    <tr><td><code>withings</code> plugin</td><td>unraid, in ductile</td><td>every 6 hours</td><td><code>healthdata/withings/withings.db</code>, an event</td></tr>
+    <tr><td><code>anam_withings</code>, <code>anam_bp_csv</code>, <code>anam_dreamstation</code>, <code>anam_owntracks</code></td><td>unraid, in ductile</td><td>on their events; poll on demand</td><td>envelopes to Anam</td></tr>
+    <tr><td><code>anam_ingest</code> job</td><td>unraid, in ductile</td><td>every hour</td><td>asks the daemon; records and documents</td></tr>
+    <tr><td><code>anam</code> container</td><td>unraid</td><td>always</td><td><code>/mnt/disk2/appdata/anam/data</code></td></tr>
+    <tr><td><code>anam_backup</code> job</td><td>unraid, in ductile</td><td>02:30 Sydney</td><td><code>/mnt/disk1/backup/anam/daily</code></td></tr>
+    <tr><td><code>health_staleness</code> job</td><td>ThinkPad, in ductile</td><td>daily</td><td>a Discord message when a stage is behind</td></tr>
   </tbody>
 </table>
 </div>
-<p>All unraid paths are under the Projects share. On unraid that is <code>/mnt/user/Projects</code>. On the ThinkPad it is mounted at <code>/mnt/Projects</code>.</p>
-
-<h2>What a day looks like</h2>
-<p>The ETL writes one row per metric per period. Each row has a value, and a min and a max where Garmin supplies them. Anam groups the rows for one period into six facets, one per metric group. This is 27 September 2026.</p>
-<div class="tablewrap">
-<table>
-  <thead><tr><th>Metric</th><th>Group</th><th class="num">Value</th><th class="num">Min</th><th class="num">Max</th></tr></thead>
-  <tbody>
-    <tr><td>Heart rate, bpm</td><td>heart</td><td class="num">78.2</td><td class="num">58</td><td class="num">127</td></tr>
-    <tr><td>Resting heart rate, bpm</td><td>heart</td><td class="num">60</td><td class="num">60</td><td class="num">60</td></tr>
-    <tr><td>Respiration, per minute</td><td>breath</td><td class="num">14</td><td class="num">12</td><td class="num">25</td></tr>
-    <tr><td>Body battery</td><td>stress</td><td class="num">none</td><td class="num">5</td><td class="num">62</td></tr>
-    <tr><td>Sleep, minutes</td><td>sleep</td><td class="num">371</td><td class="num">371</td><td class="num">371</td></tr>
-    <tr><td>Steps</td><td>activity</td><td class="num">2088</td><td class="num">none</td><td class="num">none</td></tr>
-    <tr><td>Weight, kg</td><td>body</td><td class="num">88.65</td><td class="num">88.65</td><td class="num">88.65</td></tr>
-  </tbody>
-</table>
-</div>
-<p>Body battery has a range and no single value, because Garmin reports it that way. Steps are a count, so they have no range. A day's sleep has one night in it, so its min and max equal its value. For a month they differ.</p>
+<p>All unraid paths are under the Projects share. On unraid that is <code>/mnt/user/Projects</code>. On the ThinkPad it is mounted at <code>/mnt/Projects</code>. The gateway's plugins and pipelines are in <code>unraid_admin/ductile/config</code>; each importer's wiring is in its README in <code>anam-importers</code>.</p>
 
 <h2>What reaches Anam</h2>
 <div class="tablewrap">
 <table>
-  <thead><tr><th>Source</th><th>Grain in Anam</th><th class="num">Facets</th><th>Covers</th></tr></thead>
+  <thead><tr><th>Source</th><th>Types</th><th>Grain</th><th>Trigger</th></tr></thead>
   <tbody>
-    <tr><td>Withings</td><td>every measurement</td><td class="num">5,481</td><td>Jan 2024 to 27 Sept 2026</td></tr>
-    <tr><td>Garmin and Withings summaries</td><td>day, week, month, year</td><td class="num">5,419</td><td>Jan 2024 to 27 Sept 2026</td></tr>
-    <tr><td>Blood pressure export</td><td>every reading</td><td class="num">234</td><td>May 2025 to 11 July 2026</td></tr>
-    <tr><td><strong>Total</strong></td><td></td><td class="num"><strong>11,134</strong></td><td></td></tr>
+    <tr><td>Garmin</td><td><code>sleep.episode</code>, <code>health.heart-rate-daily</code>, <code>health.step-count</code>, <code>garmin.day</code>, <code>exercise.session</code>, <code>health.heart-rate-alert</code></td><td>a night, a day's figure, a day, a session, an alert</td><td>event, weekly poll</td></tr>
+    <tr><td>Withings</td><td><code>health.measurement</code></td><td>every measurement</td><td>event</td></tr>
+    <tr><td>Blood pressure export</td><td><code>health.blood-pressure</code></td><td>every reading</td><td>a new file</td></tr>
+    <tr><td>DreamStation</td><td><code>sleep.cpap-session</code></td><td>every device session</td><td>the card copy's <code>LAST.TXT</code></td></tr>
+    <tr><td>OwnTracks</td><td><code>location.track</code></td><td>an hour of positions</td><td>each pull</td></tr>
+    <tr><td>Records</td><td>labs, medicines, travel, visits, notes, one-off exports as records</td><td>one record each</td><td>hourly ingest</td></tr>
+    <tr><td>Documents</td><td><code>doc.reference</code></td><td>one file each</td><td>hourly ingest</td></tr>
   </tbody>
 </table>
 </div>
 <h3>What does not</h3>
 <ul>
-  <li><strong>Garmin samples.</strong> About 2.7 million minute-level rows for heart rate, stress, respiration and blood oxygen. Daily summaries were chosen instead.</li>
-  <li><strong>Garmin activities.</strong> 198 activities and their track records. No worker reads them.</li>
-  <li><strong>Garmin weeks after 2024.</strong> GarminDB counts weeks in seven-day blocks from 1 January. The ETL looks them up by Monday, so they match only in a year that starts on a Monday.</li>
-  <li><strong>Nights with no recording.</strong> GarminDB writes zero minutes when the watch recorded no sleep. The ETL writes no sleep row for that period, so Anam does not claim a sleepless night.</li>
+  <li><strong>Garmin minute samples.</strong> Millions of minute-level rows for heart rate, stress, respiration and blood oxygen. Daily figures were chosen instead; heart rate by the minute is card 129.</li>
+  <li><strong>Weekly and monthly summaries.</strong> The ETL's weekly, monthly and yearly rows were retired with it. A weekly average is a computation over the record, a projection or a derived facet, not something that happened.</li>
 </ul>
 
 <h2>How to tell a stage has stopped</h2>
 <p>Every stage can stop without any error. The process stays up and the gateway stays healthy. The only reliable sign is that its output stops moving. Check the newest date each stage holds.</p>
-<p>Since 30 September the ThinkPad gateway does this once a day, as job <code>health_staleness</code>, by running <code>scripts/pipeline-staleness.sh</code> from the Anam repository. It compares each stage with the one before it. When a stage is more than two days behind, a message from Anam names it. When a stage cannot be read, the job fails and Ductile Ops says so. When all is well, nothing is sent. To run it by hand:</p>
-<pre><code>~/Projects/anam/scripts/pipeline-staleness.sh</code></pre>
-<p>The queries it runs:</p>
+<p>The ThinkPad gateway does this once a day, as job <code>health_staleness</code>, by running <code>scripts/pipeline-staleness.sh</code> from the Anam repository. It compares each stage with the one before it, and posts to Discord when one is more than two days behind.</p>
+<pre><code>ANAM_SERVER=http://192.168.20.4:8787 ~/Projects/anam/scripts/pipeline-staleness.sh</code></pre>
+<p>The queries it runs (as of 9b35e37; the script is the reference, not this page):</p>
 <pre><code># 1. Garmin collected: newest day in GarminDB
-sqlite3 "file:/mnt/Projects/healthdata/garmin/DBs/garmin_summary.db?mode=ro" \
-  "SELECT MAX(day) FROM days_summary"
+sqlite3 "file:/mnt/Projects/healthdata/garmin/DBs/garmin.db?mode=ro" \
+  "SELECT MAX(day) FROM daily_summary"
 
 # 2. Withings collected: newest measurement
 sqlite3 "file:/mnt/Projects/healthdata/withings/withings.db?mode=ro" \
   "SELECT MAX(date) FROM measurements"
 
-# 3 and 4. ETL ran: newest summarised day, and when each source last ran
-sqlite3 "file:/mnt/Projects/healthdata/healthdata.db?mode=ro" \
-  "SELECT MAX(period_start) FROM summaries WHERE period_type='day';
-   SELECT source, last_sync FROM sync_status"
+# 3. Anam admitted Garmin days: the newest garmin.day fact time, from the daemon
+curl -H "Authorization: Bearer $(cat ~/.config/anam/token)" \
+  "http://192.168.20.4:8787/v1/timeline?zone=UTC&amp;type=garmin.day&amp;from=$(date -d '-90 days' +%F)" \
+  | jq -r '.entries[-1].fact_time'
 
-# 5. Anam ingested: newest fact-time per type
-sqlite3 "file:$HOME/.local/share/anam/ledger.db?mode=ro" \
-  "SELECT type, MAX(fact_time) FROM facet GROUP BY type"</code></pre>
-<p>A healthy pipeline has the first three within a day of each other. The ETL's run history is in the unraid gateway:</p>
+# 4. Anam ingested Withings: the same for health.measurement</code></pre>
+<p>A healthy pipeline has Garmin collected within two days of today, Anam's Garmin days within two days of GarminDB, and Anam's Withings rows within two days of Withings. Withings is not compared with today: a scale is stepped on when it is. Each importer's run history is in the unraid gateway:</p>
 <pre><code>/mnt/Projects/unraid_admin/unraid_cmd.sh \
-  'docker exec ductile /app/ductile job logs --plugin health_data_summary --limit 5 \
+  'docker exec ductile /app/ductile job logs --plugin anam_garmin --limit 5 \
    --config /app/config/config.yaml'</code></pre>
+<p>And what each source last sent Anam is in the daemon's status, since its last restart:</p>
+<pre><code>ANAM_SERVER=http://192.168.20.4:8787 ANAM_TOKEN_FILE=~/.config/anam/token anam status</code></pre>
 
-<h2>How Anam stays up to date</h2>
-<p>The ThinkPad gateway has a scheduled job, <code>anam_ingest</code>, declared in <code>/etc/ductile/anam.plugins.yaml</code>. It runs the installed binary as matt.</p>
-<pre><code>/usr/bin/timeout -k 10 300 /home/matt/go/bin/anam ingest</code></pre>
-<div class="tablewrap">
-<table>
-  <thead><tr><th>What happened</th><th>What you see in Discord</th></tr></thead>
-  <tbody>
-    <tr><td>New or revised rows were admitted</td><td>A message from Anam with the count per source</td></tr>
-    <tr><td>Nothing was new</td><td>Nothing</td></tr>
-    <tr><td>The run failed</td><td>A message from Ductile Ops naming <code>anam_ingest</code> and the error</td></tr>
-  </tbody>
-</table>
-</div>
-<p>An ingest reads every source before it admits anything. If the Projects share is not mounted, the run fails at the first source it cannot read and the ledger is not opened for writing.</p>
-<p>The job runs the binary in <code>~/go/bin</code>, not the one in the repository. After a change to Anam, install it:</p>
-<pre><code>cd ~/Projects/anam
-make install</code></pre>
-<p>To run an ingest by hand:</p>
-<pre><code>ANAM_PERSON_ID=matt ~/go/bin/anam ingest</code></pre>
-<p>An ingest is safe to repeat. Rows that have not changed are skipped. A row whose summary moved is written as a new version, and the old one is kept.</p>
-<p>Its run history is in the ThinkPad gateway:</p>
-<pre><code>sudo -u ductile ductile job logs --plugin anam_ingest --limit 5 \
-  --config /etc/ductile/config.yaml</code></pre>
+<h2>How the record is kept</h2>
+<p>An envelope batch is admitted whole or refused whole. A resend-everything run (<code>poll</code>) labels its batches as parts of one snapshot, and <code>GET /v1/snapshots/{id}</code> says when it is complete and what the source no longer holds; nothing is retracted by an ingest, only reported. Retraction is an operator's command (<code>anam retract</code>, <code>anam retire</code>). After every ingest that moves W the daemon mints, so a read composes from checkpoints and replays only the tail. The nightly backup takes both databases in one write and copies the artifacts; a failure reaches Discord.</p>
 
-<h2>Why it had stopped</h2>
+<h2>History: the ETL, and why it had stopped</h2>
+<p>Until 11 October 2026 Garmin and Withings reached Anam through a health ETL (<code>ductile-healthdata</code>, a one-shot container on unraid) that summarised both into <code>healthdata.db</code> by day, week, month and year, which a built-in <code>health-db</code> worker in Anam read hourly from the ThinkPad. Card 55 replaced it with the Garmin importer: 5,818 summary facets were retired, the ETL pipelines removed, and <code>healthdata.db</code> left as an archive nobody reads. The Anam worker was deleted on 13 October (card 50).</p>
 <p>On 28 September 2026 Anam's Garmin data ended at 16 July. The ETL had been moved twice and neither move was finished.</p>
 <div class="tablewrap">
 <table>
@@ -304,17 +319,17 @@ make install</code></pre>
   <tbody>
     <tr><td>Senechal</td><td>unraid, hourly cron</td><td>Kept running on Garmin files that stopped changing on 22 March. Switched off 29 September.</td></tr>
     <tr><td>ThinkPad gateway</td><td>ThinkPad</td><td>The working stopgap from March. Its ETL step was dropped in July when the gateway moved to the privileged setup.</td></tr>
-    <tr><td>Unraid gateway</td><td>unraid</td><td>Registered in April and never ran. It had no trigger for either source, and its image was not on the server. Live since 29 September.</td></tr>
+    <tr><td>Unraid gateway</td><td>unraid</td><td>Registered in April and never ran. It had no trigger for either source, and its image was not on the server. Live 29 September to 11 October, then retired with the ETL.</td></tr>
   </tbody>
 </table>
 </div>
-<div class="note">Nothing alerted at any point. A pipeline that nothing triggers leaves an empty job log, and an empty log reads the same as a quiet day.</div>
+<div class="note">Nothing alerted at any point. A pipeline that nothing triggers leaves an empty job log, and an empty log reads the same as a quiet day. That is why <code>health_staleness</code> compares outputs rather than watching jobs.</div>
 
 <h2>Still open</h2>
 <ul>
-  <li><strong>A gateway job can stall without failing.</strong> On 27 September the ThinkPad gateway could not record that a job had finished, because its state database was locked. The job stayed marked as running and the scheduler skipped it 6,840 times over three days. That is not a failure, so nothing is sent. A restart clears it. The daily staleness check is what catches it, a day late.</li>
-  <li><strong>A real Withings weigh-in has not yet passed through the new trigger.</strong> A synthetic event did.</li>
-  <li><strong>Day boundaries are UTC.</strong> Garmin's day is a local calendar day. Anam reads its start as midnight UTC, about ten hours early for Sydney.</li>
+  <li><strong>Garmin data the same day</strong> (card 128): four syncs a day and a weekly poll leave a day's figures up to a day behind. Card 126 adds a pull on demand from the gateway.</li>
+  <li><strong>A rebuild from every source</strong> has not been drilled (card 141).</li>
+  <li><strong>Records and documents</strong> are still read in process (card 119).</li>
 </ul>
 
 </main>

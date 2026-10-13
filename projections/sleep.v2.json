@@ -1,0 +1,11 @@
+{
+  "name": "sleep",
+  "version": 2,
+  "description": "Sleep only: each night as Garmin scored it (sleep.episode), without the rest of the health record. v1 named health.sleep, which only the retired health ETL wrote.",
+  "types": ["sleep.episode"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

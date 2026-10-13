@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -248,4 +249,31 @@ func (c *Client) Ingest(ctx context.Context, wait time.Duration) (api.Operation,
 		return op, nil
 	}
 	return op, err
+}
+
+// Projections lists the templates the daemon holds, bundled and registered.
+func (c *Client) Projections(ctx context.Context) (api.Projections, error) {
+	var p api.Projections
+	_, err := c.do(ctx, c.timeout, http.MethodGet, "/v1/projections", nil, nil, &p)
+	return p, err
+}
+
+// Projection reads one template's manifest as the daemon holds it: the newest
+// version when version is 0, else exactly that one.
+func (c *Client) Projection(ctx context.Context, name string, version int) (json.RawMessage, error) {
+	path := "/v1/projections/" + url.PathEscape(name)
+	if version > 0 {
+		path += "/" + strconv.Itoa(version)
+	}
+	var raw json.RawMessage
+	_, err := c.do(ctx, c.timeout, http.MethodGet, path, nil, nil, &raw)
+	return raw, err
+}
+
+// RegisterProjection registers a template manifest under the operator's token. The
+// same body again is not new; a different body at a held version is refused.
+func (c *Client) RegisterProjection(ctx context.Context, manifest []byte) (api.RegisteredProjection, error) {
+	var reg api.RegisteredProjection
+	_, err := c.do(ctx, c.timeout, http.MethodPost, "/v1/projections", nil, json.RawMessage(manifest), &reg)
+	return reg, err
 }

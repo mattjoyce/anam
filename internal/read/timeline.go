@@ -67,6 +67,17 @@ type Source struct {
 	// Definitions are the ones the record's facets were admitted against: the
 	// bundled ones and those importers registered. Nil means the bundled ones alone.
 	Definitions *def.Registry
+	// Projections are the templates a read may select: the bundled ones and those
+	// the operator registered (card 125). Nil means the bundled ones alone.
+	Projections *projection.Registry
+}
+
+// projections is src's templates, or the bundled ones when it names none.
+func (src Source) projections() (*projection.Registry, error) {
+	if src.Projections != nil {
+		return src.Projections, nil
+	}
+	return projection.Bundled()
 }
 
 // definitions is src's Definitions, or the bundled ones when it names none.
@@ -246,7 +257,7 @@ func readView(ctx context.Context, src Source, know knowledge, projName, at stri
 	v.res, v.shown = res, res.Value
 
 	if projName != "" {
-		templates, err := projection.Bundled()
+		templates, err := src.projections()
 		if err != nil {
 			return view{}, err
 		}

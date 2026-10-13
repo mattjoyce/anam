@@ -32,6 +32,10 @@ func (d *Daemon) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/receipts", d.postReceipt)
 	mux.HandleFunc("GET /v1/receipts/{hash}", d.getReceipt)
 	mux.HandleFunc("GET /v1/receipts/{hash}/verify", d.verifyReceipt)
+	mux.HandleFunc("GET /v1/projections", d.getProjections)
+	mux.HandleFunc("GET /v1/projections/{name}", d.getProjection)
+	mux.HandleFunc("GET /v1/projections/{name}/{version}", d.getProjection)
+	mux.HandleFunc("POST /v1/projections", d.postProjections)
 	mux.HandleFunc("GET /v1/checkpoints", d.getCheckpoints)
 	mux.HandleFunc("POST /v1/checkpoints", d.postCheckpoints)
 	mux.HandleFunc("POST /v1/backups", d.postBackups)
@@ -100,7 +104,7 @@ func (d *Daemon) postCheckpoints(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Daemon) getReceipts(w http.ResponseWriter, _ *http.Request) {
-	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, d.defs.current.Load())
+	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -114,7 +118,7 @@ func (d *Daemon) getReceipts(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (d *Daemon) getReceipt(w http.ResponseWriter, r *http.Request) {
-	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, d.defs.current.Load())
+	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -135,7 +139,7 @@ func (d *Daemon) getReceipt(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Daemon) verifyReceipt(w http.ResponseWriter, r *http.Request) {
-	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, d.defs.current.Load())
+	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -166,14 +170,14 @@ func (d *Daemon) postReceipt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defs := d.defs.current.Load()
-	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, defs)
+	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, defs, d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
-	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts, Definitions: defs}
+	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts, Definitions: defs, Projections: d.projections.current.Load()}
 	p, err := read.Publish(ctx, src, deps, q, d.cfg.MaxReadBytes)
 	if err != nil {
 		writeReadError(w, err)
@@ -196,7 +200,7 @@ func (d *Daemon) getTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
-	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts, Definitions: d.defs.current.Load()}
+	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts, Definitions: d.defs.current.Load(), Projections: d.projections.current.Load()}
 	t, err := read.Timeline(ctx, src, q)
 	if err != nil {
 		writeReadError(w, err)

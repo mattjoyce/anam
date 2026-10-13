@@ -64,6 +64,11 @@ type Receipt struct {
 	Span                 string   `json:"span"`
 	LedgerID             string   `json:"ledger_id,omitempty"`
 	Query                *Query   `json:"query,omitempty"`
+	// TemplateHash is the content hash of the template version that pruned the
+	// value (card 125), so verify can tell a body swapped under the same version
+	// from the one that served. Receipts before 2026-10-13 have none; it is last
+	// and omitted when empty, so their bytes are unchanged.
+	TemplateHash string `json:"template_hash,omitempty"`
 }
 
 // Query is how a read narrowed the template's value before it was served, resolved to

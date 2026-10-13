@@ -355,3 +355,31 @@ func TestRegisteredDefinitions_AreImmutable(t *testing.T) {
 		t.Fatalf("RegisteredDefinitions = %+v, want [%+v]", got, row)
 	}
 }
+
+func TestRegisteredProjections_AreImmutable(t *testing.T) {
+	t.Parallel()
+	d, _ := open(t)
+	ctx := context.Background()
+	row := ops.ProjectionRow{Name: "heart", Version: 1, Body: `{"name":"heart"}`}
+	if err := d.RegisterProjection(ctx, row, "2026-10-13T00:00:00.000000000Z"); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.RegisterProjection(ctx, row, "2026-10-13T00:00:01.000000000Z"); err == nil {
+		t.Error("a second registration at v1 was accepted")
+	}
+	for _, stmt := range []string{
+		`UPDATE registered_projection SET body = '{}'`,
+		`DELETE FROM registered_projection`,
+	} {
+		if _, err := d.SQL().Exec(stmt); err == nil {
+			t.Errorf("%s was accepted", stmt)
+		}
+	}
+	got, err := d.RegisteredProjections(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != row {
+		t.Fatalf("RegisteredProjections = %+v, want [%+v]", got, row)
+	}
+}

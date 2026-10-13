@@ -33,6 +33,7 @@ depends_on:
 |---|---|---|
 | `POST /v1/envelopes` | importer token | admit a batch through the gate; see [admit a batch](/workflows/admit-a-batch.md) |
 | `POST /v1/definitions`, `GET /v1/definitions[/{type}[/{v}]]` | importer or operator | register and publish Definitions; see [register a Definition](/workflows/register-a-definition.md) |
+| `POST /v1/projections`, `GET /v1/projections[/{name}[/{v}]]` | operator | register and publish projection templates (card 125); a registered version is immutable and every version stays readable for receipts |
 | `GET /v1/snapshots/{id}` | importer (own) or operator | the resend report: live, absent, carried |
 | `POST /v1/ingest`, `GET /v1/operations/{id}` | operator | run declared imports as an operation |
 | `GET /v1/timeline`, `GET /v1/changes`, `GET /v1/status` | operator | reads, bounded by `max_read_bytes` |

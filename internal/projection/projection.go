@@ -21,8 +21,11 @@
 //   - The consent gate (§10) is a parameter of Apply, so a serve path cannot be
 //     written that forgets to pass through it.
 //
-// Templates ship bundled with the binary. A consumer selects one by name; it never
-// defines one.
+// Templates are bundled with the binary, the floor, or registered by the operator over
+// the API (card 125, 2026-10-13) and kept in the operational store. A consumer selects
+// one by name and never defines one; defining is the operator's act, not a release.
+// Every version ever held stays readable, because a receipt names a version and
+// verify re-prunes through exactly that one.
 package projection
 
 import (
@@ -99,6 +102,12 @@ type Template struct {
 	// with one, the last-known value at or before then — the coordinate was already
 	// there (journal: two-clocks).
 	Shape Shape
+
+	// Hash is the content hash of the manifest as canonical JSON, "sha256:…": what a
+	// receipt pins beside the version, so a body swapped under the same version
+	// cannot pass as it. Body is that canonical JSON, what the API publishes.
+	Hash string
+	Body []byte
 
 	// typeSet and statusSet are the allow-lists as sets, built once at parse.
 	typeSet   map[facet.Type]bool

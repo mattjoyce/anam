@@ -31,6 +31,7 @@ import (
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
+	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/span"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
@@ -75,6 +76,10 @@ type Server struct {
 	// timeline (card 21); nil means there is none to show.
 	checkpoints Checkpoints
 
+	// projections answers the templates held, bundled and registered (card 125), for
+	// the projection page; nil means the bundled ones.
+	projections func() *projection.Registry
+
 	// The fold cache, keyed by watermark: a whole-person read is one replay plus
 	// one fetch per live facet, too dear to repeat per page view. Every request
 	// still reads the head (one cheap call), so a moved W is never served stale —
@@ -96,18 +101,31 @@ type Server struct {
 // through a year of timestamps cannot grow the process without bound.
 const asOfCacheSize = 4
 
-// Handler returns the inspector's routes on a fresh mux. library is the default
-// library's root, or "" for none.
-//
-// defs answers the Definitions the record's facets were admitted against, asked at
-// each page so a registration shows at once; nil means the bundled ones alone. held
-// answers every version held of each, for the Definitions pages; nil means the
-// bundled manifests. checkpoints is the checkpoint log for the bucket strip under
-// the timeline; nil draws no strip.
-func Handler(l Ledger, timeout time.Duration, buckets span.Buckets, library string, defs func() *def.Registry,
-	held HeldDefinitions, checkpoints Checkpoints,
-) http.Handler {
-	s := &Server{ledger: l, timeout: timeout, buckets: buckets, library: library, defs: defs, heldDefs: held, checkpoints: checkpoints}
+// Deps is what the inspector reads from. Ledger and Timeout are required; the rest
+// widen what the pages can show. Library is the default library's root, or "" for
+// none. Definitions answers the Definitions the record's facets were admitted
+// against, asked at each page so a registration shows at once; nil means the bundled
+// ones alone. Held answers every version held of each, for the Definitions pages; nil
+// means the bundled manifests. Checkpoints is the checkpoint log for the bucket strip
+// under the timeline; nil draws no strip. Projections answers the templates held; nil
+// means the bundled ones.
+type Deps struct {
+	Ledger      Ledger
+	Timeout     time.Duration
+	Buckets     span.Buckets
+	Library     string
+	Definitions func() *def.Registry
+	Held        HeldDefinitions
+	Checkpoints Checkpoints
+	Projections func() *projection.Registry
+}
+
+// Handler returns the inspector's routes on a fresh mux.
+func Handler(d Deps) http.Handler {
+	s := &Server{
+		ledger: d.Ledger, timeout: d.Timeout, buckets: d.Buckets, library: d.Library,
+		defs: d.Definitions, heldDefs: d.Held, checkpoints: d.Checkpoints, projections: d.Projections,
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.timeline)
 	mux.HandleFunc("POST /view", s.setDefaultView)
@@ -128,6 +146,14 @@ func (s *Server) definitions() (*def.Registry, error) {
 		return s.defs(), nil
 	}
 	return def.Bundled()
+}
+
+// templates is the projections held, or the bundled ones when none are given.
+func (s *Server) templates() (*projection.Registry, error) {
+	if s.projections != nil {
+		return s.projections(), nil
+	}
+	return projection.Bundled()
 }
 
 // read returns the whole person at the current head, from cache when the
@@ -190,7 +216,7 @@ func (s *Server) readAt(ctx context.Context, w ledger.Watermark) (fold.Result, e
 func Serve(ctx context.Context, l Ledger, addr string, timeout time.Duration, buckets span.Buckets, library string) error {
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           Handler(l, timeout, buckets, library, nil, nil, nil),
+		Handler:           Handler(Deps{Ledger: l, Timeout: timeout, Buckets: buckets, Library: library}),
 		ReadHeaderTimeout: 5 * time.Second,
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}

@@ -1,7 +1,7 @@
 ---
 type: component
 title: Projection
-description: Applies a bundled template to a canonical value, metadata filters only, and explains each facet's verdict by the knob that decided it.
+description: Applies a template, bundled or registered, to a canonical value, metadata filters only, and explains each facet's verdict by the knob that decided it.
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/projection/projection.go#Explain
 anchor: "func Explain(v fold.Value, t Template, g Gate, s Series) ([]Verdict, error) {"
@@ -13,4 +13,4 @@ depends_on:
   - /components/facet.md
 ---
 
-Knobs, applied in this order so the first failing one names the reason: type allow-list, status filter, classification ceiling, fact-time window, then the consent gate (`consent.Open` returns allow today; a nil gate is refused), then the shape. Shape `snapshot` runs over what the other knobs admitted and demotes entries to displaced-by or closed-by using `fold.Fates`. The payload is never read. Templates are the three embedded [projection templates](/data-structures/projection-template.md): `bp`, `sleep`, `meds`.
+Knobs, applied in this order so the first failing one names the reason: type allow-list, status filter, classification ceiling, fact-time window, then the consent gate (`consent.Open` returns allow today; a nil gate is refused), then the shape. Shape `snapshot` runs over what the other knobs admitted and demotes entries to displaced-by or closed-by using `fold.Fates`. The payload is never read. Templates are the three embedded [projection templates](/data-structures/projection-template.md), `bp`, `sleep` and `meds`, the floor, plus those the operator registers over `POST /v1/projections` (card 125, 2026-10-13): the `Registry` holds every version of each by name, `Lookup` answers the newest and `Version` the one a receipt names, and `Register` refuses a changed body at a held version, a version behind, or a type with no Definition.

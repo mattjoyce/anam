@@ -531,8 +531,8 @@ rebuild has to know what it may drop:
 | Tier | Tables | Recovery |
 |---|---|---|
 | **Derived** | facet index, anam-event index, checkpoint index, `span_head`, sync cursors | replay the ledger |
-| **Provisioned** | Facet Definitions (bundled and registered), projection templates, token scopes | the embedded assets, config, and each importer registering its Definitions again — i.e. git |
-| **Authored** | saved span bookmarks, GC state, the operational log | nowhere. Back it up |
+| **Provisioned** | Facet Definitions (bundled and registered), bundled projection templates, token scopes | the embedded assets, config, and each importer registering its Definitions again — i.e. git |
+| **Authored** | registered projection templates (card 125), saved span bookmarks, GC state, the operational log | nowhere Anam can reach. Back it up; a registered template also comes back by registering it again from wherever the operator keeps the file |
 
 The tier belongs in the schema beside each table, because it is the only thing that tells a later reader
 whether dropping it is survivable.
@@ -761,6 +761,17 @@ the payload**; a projection includes or excludes **whole Facets**. A consumer **
 it never defines one — which is why shape is a template knob and not a read-time flag. (`timeline --at`
 is the person's own un-published view of the same read; `serve meds` is the published one.)
 
+Defining is the **operator's** act, not a release's (decided 2026-10-11, built 2026-10-13, card 125).
+Templates are **bundled or registered**: the bundled ones ship with the binary as the floor, and the
+operator registers others over `POST /v1/projections`, kept in the operational store beside the
+registered Definitions. A template version is a **value**: the same name and version is the same
+canonical bytes or it is refused, versions only go forward, and every version ever held stays readable,
+because a receipt names the version (and, since card 125, its content hash) that pruned it, and
+`receipt verify` re-prunes through exactly that one. Every type a template names must have a Definition
+in force when it is registered, so a template naming a typo is refused at the door rather than serving
+nothing quietly; a type whose Definition is later retired stays nameable, since its past facets are
+still servable.
+
 A consumer may name the **fields** it wants of a projection (decided and built 2026-10-12, card
 138): a temporary subset of the type's schema, as JSON pointers, validated against the Definition. Fields
 run after every projection knob, over the whole facets they admitted, and only cut: they cannot resurrect
@@ -783,7 +794,7 @@ the fold.
 
 Projections are **materialised as files**, content-addressed. **Receipts** make a served projection
 reproducible: `served_hash = sha256(served bytes)` plus the exact facet-id set, the watermark, the
-template version, the definition-set version, the `served_at` time, the span, and the `ledger_id` the
+template version and its content hash, the definition-set version, the `served_at` time, the span, and the `ledger_id` the
 watermark counts in (since 2026-10-07; a watermark means nothing against another ledger, so `receipt
 verify` on a rebuilt ledger reports *other ledger*, never a failed reproduction, and a receipt from
 before the field is verified with a note). (Arch's consent-version and linkage-version drop out — no

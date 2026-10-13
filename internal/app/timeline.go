@@ -99,7 +99,7 @@ Four lenses compose over that read:
 	cmd.Flags().StringVar(&from, "from", "", "narrow to fact-times at or after this instant (2006-01-02 or RFC 3339)")
 	cmd.Flags().StringVar(&to, "to", "", "narrow to fact-times at or before this instant; a bare date includes its whole day")
 	cmd.Flags().StringVar(&typeFilter, "type", "", "narrow to one facet type (e.g. health.blood-pressure)")
-	cmd.Flags().StringVar(&projName, "projection", "", "read through a bundled projection instead of the canonical (see: anam serve)")
+	cmd.Flags().StringVar(&projName, "projection", "", "read through a projection instead of the canonical (see: anam projection list)")
 	cmd.Flags().StringVar(&asOf, "as-of", "", "read what Anam knew at this anam-time (2006-01-02 or RFC 3339)")
 	cmd.Flags().StringVar(&at, "at", "", "the snapshot at this fact-time: latest per series at or before it (2006-01-02 or RFC 3339); excludes --to")
 	cmd.Flags().Int64Var(&w, "w", 0, "read at this watermark (a receipt's W) instead of the head; excludes --as-of")
@@ -198,7 +198,12 @@ func readSource(ctx context.Context, cfg config.Config) (read.Source, func(), er
 		closeAll()
 		return read.Source{}, nil, err
 	}
-	return read.Source{Ledger: l, Checkpoints: db, Artifacts: store, Definitions: defs}, closeAll, nil
+	templates, err := projectionsOf(ctx, db)
+	if err != nil {
+		closeAll()
+		return read.Source{}, nil, err
+	}
+	return read.Source{Ledger: l, Checkpoints: db, Artifacts: store, Definitions: defs, Projections: templates}, closeAll, nil
 }
 
 // timelineHeader describes the read: which watermark, which lens, and the hash that

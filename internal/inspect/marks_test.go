@@ -24,6 +24,9 @@ func TestTypeStyles_CoverEveryBundledType(t *testing.T) {
 		t.Fatalf("read manifests: %v", err)
 	}
 	for _, e := range entries {
+		if e.IsDir() {
+			continue // manifests/history holds earlier versions, not types (card 111)
+		}
 		typ := facet.Type(strings.TrimSuffix(e.Name(), ".json"))
 		if _, ok := reg.Lookup(typ); !ok {
 			t.Fatalf("%s is not a bundled type", typ)

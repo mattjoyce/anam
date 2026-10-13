@@ -128,8 +128,10 @@ func (r *Registry) All() []Definition {
 	return out
 }
 
-// Manifests returns every bundled manifest's type, version and raw bytes, which is
-// what the operational store keeps for Guard to compare against next time.
+// Manifests returns every bundled manifest's type, version and raw bytes, the current
+// ones and the history (card 111), which is what the operational store keeps: Guard
+// compares the newest stored against the current, and the inspector and the API read
+// an old facet against the version it was admitted under.
 func Manifests() ([]Stored, error) {
 	entries, err := manifestFS.ReadDir("manifests")
 	if err != nil {
@@ -137,6 +139,9 @@ func Manifests() ([]Stored, error) {
 	}
 	out := make([]Stored, 0, len(entries))
 	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
 		raw, err := manifestFS.ReadFile("manifests/" + e.Name())
 		if err != nil {
 			return nil, fmt.Errorf("def: read bundled manifest %s: %w", e.Name(), err)
@@ -146,6 +151,44 @@ func Manifests() ([]Stored, error) {
 			return nil, fmt.Errorf("def: bundled manifest %s: %w", e.Name(), err)
 		}
 		out = append(out, Stored{Type: d.Type, Version: d.Version, Body: raw})
+	}
+	history, err := History()
+	if err != nil {
+		return nil, err
+	}
+	return append(out, history...), nil
+}
+
+// History returns every earlier Definition version the binary carries under
+// manifests/history, as manifests/history/<type>.v<n>.json. A history body is the
+// words a facet was admitted under, kept verbatim: it is checked to be JSON whose
+// meta names the type and version its file name says, and not parsed as a contract,
+// since the lint of today need not have held then.
+func History() ([]Stored, error) {
+	entries, err := manifestFS.ReadDir("manifests/history")
+	if err != nil {
+		return nil, fmt.Errorf("def: read definition history: %w", err)
+	}
+	out := make([]Stored, 0, len(entries))
+	for _, e := range entries {
+		raw, err := manifestFS.ReadFile("manifests/history/" + e.Name())
+		if err != nil {
+			return nil, fmt.Errorf("def: read definition history %s: %w", e.Name(), err)
+		}
+		var m struct {
+			Meta struct {
+				Type    facet.Type `json:"facet_type"`
+				Version int        `json:"definition_version"`
+			} `json:"meta"`
+		}
+		if err := json.Unmarshal(raw, &m); err != nil {
+			return nil, fmt.Errorf("%w: history %s: %v", ErrBadManifest, e.Name(), err)
+		}
+		if want := fmt.Sprintf("%s.v%d.json", m.Meta.Type, m.Meta.Version); e.Name() != want || m.Meta.Version < 1 {
+			return nil, fmt.Errorf("%w: history %s declares %s v%d (file must be named %s)",
+				ErrBadManifest, e.Name(), m.Meta.Type, m.Meta.Version, want)
+		}
+		out = append(out, Stored{Type: m.Meta.Type, Version: m.Meta.Version, Body: raw})
 	}
 	return out, nil
 }

@@ -27,6 +27,9 @@ func SetVersion() (string, error) {
 
 	files := make(map[string][]byte, len(entries))
 	for _, e := range entries {
+		if e.IsDir() {
+			continue // history does not move the set version: it governs no admission
+		}
 		raw, err := manifestFS.ReadFile("manifests/" + e.Name())
 		if err != nil {
 			return "", fmt.Errorf("def: read bundled manifest %s: %w", e.Name(), err)

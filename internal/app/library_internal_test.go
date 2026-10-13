@@ -63,15 +63,22 @@ func TestGuardDefinitions_StoresThenRefusesAChangedKeying(t *testing.T) {
 		t.Fatalf("ops.Open: %v", err)
 	}
 	defer func() { _ = db.Close() }()
+	// The store holds the current body of every bundled type and the history the
+	// binary carries (card 111).
+	manifests, err := def.Manifests()
+	if err != nil {
+		t.Fatal(err)
+	}
 	rows, err := db.Definitions(ctx)
-	if err != nil || len(rows) != len(reg.All()) {
-		t.Fatalf("stored %d definitions, %v; want %d", len(rows), err, len(reg.All()))
+	if err != nil || len(rows) != len(manifests) {
+		t.Fatalf("stored %d definitions, %v; want %d", len(rows), err, len(manifests))
 	}
 
-	// Pretend the store last saw blood pressure keyed another way.
+	// Pretend the store last saw blood pressure keyed another way, at its newest
+	// version: the guard compares the newest stored body with the current one.
 	var bp ops.DefinitionRow
 	for _, r := range rows {
-		if r.Type == "health.blood-pressure" {
+		if r.Type == "health.blood-pressure" && r.Version > bp.Version {
 			bp = r
 		}
 	}

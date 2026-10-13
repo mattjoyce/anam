@@ -9,7 +9,14 @@ import (
 // Embedded assets). A definition is not something Anam knew — it is how Anam
 // interprets — so it ships with the interpreter, not in the ledger.
 //
-//go:embed manifests/*.json
+// manifests/<type>.json is each type's current Definition, the contract envelopes are
+// admitted against. manifests/history/<type>.v<n>.json is every earlier version a
+// facet in the ledger may have been admitted under (card 111): provisioned into the
+// operational store at start so an old facet still reads against its own words after
+// a rebuild, and so an importer registering an older version finds it held. History
+// is words, not a contract: it is not parsed as one, and Bundled never loads it.
+//
+//go:embed manifests/*.json manifests/history/*.json
 var manifestFS embed.FS
 
 // Bundled parses every embedded manifest into a Registry. It fails on any bad
@@ -24,6 +31,9 @@ func Bundled() (*Registry, error) {
 
 	defs := make([]Definition, 0, len(entries))
 	for _, e := range entries {
+		if e.IsDir() {
+			continue // history: words, not contracts
+		}
 		raw, err := manifestFS.ReadFile("manifests/" + e.Name())
 		if err != nil {
 			return nil, fmt.Errorf("def: read bundled manifest %s: %w", e.Name(), err)

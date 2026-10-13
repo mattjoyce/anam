@@ -23,3 +23,5 @@ depends_on:
 | `Registry.Closes` | whether a type closes its series, for the snapshot read |
 
 A type lives in one place: while the binary bundles it no importer may register it, and a registered row for a bundled type is shadowed with a log line.
+
+Since 2026-10-13 (card 111) `manifests/history/<type>.v<n>.json` carries every earlier version a facet may have been admitted under; `Manifests()` returns them with the current bodies so the start-up upsert provisions the whole history into the operational store, while `Bundled()` and `SetVersion()` skip them. A history body is words, not a contract: checked to be JSON naming its type and version, never parsed as one.

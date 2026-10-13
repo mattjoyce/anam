@@ -265,6 +265,7 @@ func (d *Daemon) Handler() http.Handler {
 	// opens these and nothing else.
 	mux.Handle("POST /v1/envelopes", d.asImporter(d.postEnvelopes))
 	mux.Handle("POST /v1/definitions", d.asImporter(d.postDefinitions))
+	mux.Handle("POST /v1/documents", d.asImporter(d.postDocument))
 	mux.Handle("GET /v1/definitions", d.asReader(d.getDefinitions))
 	mux.Handle("GET /v1/definitions/{type}", d.asReader(d.getDefinition))
 	mux.Handle("GET /v1/definitions/{type}/{version}", d.asReader(d.getDefinition))

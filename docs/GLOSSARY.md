@@ -55,8 +55,10 @@ Superseded and tombstoned Facets are **excluded from the value** (they remain in
 *Canonical* names this value and nothing else. Earlier Anam drafts used the word for the Ledger surface;
 that is corrected (Arch ADR 0032, MC5). See *Ledger*, *Fold*, *Checkpoint*.
 
-**Capture worker** — An external, pluggable client that reads a source and submits envelopes to the
-ingest gate. In the MVP: `health-db` and `bp-csv`. **Out of the kernel.** See *Source*, *Envelope*.
+**Capture worker** — The MVP's name for what is now an *importer*: an external, pluggable client that
+reads a source and submits envelopes to the ingest gate. In the MVP: `health-db` and `bp-csv`, compiled
+in; since 2026-10-11 every vendor source is an importer outside the binary (`docs/IMPORTERS.md`).
+**Out of the kernel.** See *Source*, *Envelope*.
 
 **Checkpoint** — An immutable, content-addressed value of the canonical (live-only) fold over **one
 minted span's** members at an anam-time *watermark*. Produced by the mint solely to bound replay depth.
@@ -255,7 +257,7 @@ the ledger move under a published artifact) rather than a *history* one — hist
 Anam-time becomes historically meaningful only when ingest is incremental. Contrast *Fact-time*; see
 *As-of*, *Bitemporal*, *Watermark*.
 
-**Source** — A capture origin, named **lower-case hyphenated**: `health-db`, `bp-csv`. The identity that
+**Source** — A capture origin, named **lower-case hyphenated**: `garmin`, `bp-csv`. The identity that
 appears in provenance and cursors. See *Capture worker*.
 
 **Source ref** — The deterministic natural key identifying **which** source row this is — composed from

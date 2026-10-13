@@ -23,10 +23,10 @@ func TestLoadImports_ExpandsDeclaredPaths(t *testing.T) {
 	t.Parallel()
 	path := writeImports(t, `
 imports:
-  - source: health-db
-    path: ~/admin/data/healthdata.db
-  - source: bp-csv
-    path: $HOME/exports/bp.csv
+  - source: records
+    path: ~/anam/records
+  - source: documents
+    path: $HOME/anam/documents
 `)
 	imports, err := config.LoadImports(path)
 	if err != nil {
@@ -36,10 +36,10 @@ imports:
 		t.Fatalf("loaded %d imports, want 2", len(imports))
 	}
 	home, _ := os.UserHomeDir()
-	if imports[0].Source != "health-db" || imports[0].Path != filepath.Join(home, "admin/data/healthdata.db") {
+	if imports[0].Source != "records" || imports[0].Path != filepath.Join(home, "anam/records") {
 		t.Errorf("import 0 = %+v — tilde not expanded", imports[0])
 	}
-	if imports[1].Path != filepath.Join(home, "exports/bp.csv") {
+	if imports[1].Path != filepath.Join(home, "anam/documents") {
 		t.Errorf("import 1 = %+v — $HOME not expanded", imports[1])
 	}
 }

@@ -21,7 +21,6 @@ depends_on:
   - /components/store-ops.md
   - /components/capture-records.md
   - /components/capture-documents.md
-  - /components/capture-healthdb.md
   - /components/inspect.md
 ---
 

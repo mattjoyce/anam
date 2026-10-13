@@ -449,13 +449,13 @@ func TestIngest_SameOverTheDaemon(t *testing.T) {
 func TestIngest_AFailedRunOverTheDaemonFails(t *testing.T) {
 	t.Parallel()
 	f := newRemoteFixture(t)
-	missing := filepath.Join(f.dir, "unmounted", "healthdata.db")
-	decl := fmt.Sprintf("imports:\n  - source: records\n    path: %s\n  - source: health-db\n    path: %s\n", f.recordsDir, missing)
+	missing := filepath.Join(f.dir, "unmounted", "documents")
+	decl := fmt.Sprintf("imports:\n  - source: records\n    path: %s\n  - source: documents\n    path: %s\n", f.recordsDir, missing)
 	if err := os.WriteFile(filepath.Join(f.dir, "imports.yaml"), []byte(decl), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	_, _, err := cli(t, f.remoteCfg, "ingest")
-	if err == nil || !strings.Contains(err.Error(), "health-db") || !strings.Contains(err.Error(), f.server) {
+	if err == nil || !strings.Contains(err.Error(), "documents") || !strings.Contains(err.Error(), f.server) {
 		t.Fatalf("remote ingest of a missing source: %v", err)
 	}
 }

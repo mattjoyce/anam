@@ -119,10 +119,10 @@ func TestIngest_AnUnreadableSourceStopsTheRunBeforeAnythingIsAdmitted(t *testing
 			name: "a later source is missing",
 			imports: func(f ingestFixture) string {
 				return fmt.Sprintf("imports:\n  - source: records\n    path: %s\n"+
-					"  - source: health-db\n    path: %s\n",
-					f.recordsDir, filepath.Join(f.dir, "unmounted", "healthdata.db"))
+					"  - source: documents\n    path: %s\n",
+					f.recordsDir, filepath.Join(f.dir, "unmounted", "documents"))
 			},
-			wantErr: "health-db",
+			wantErr: "documents",
 		},
 	}
 

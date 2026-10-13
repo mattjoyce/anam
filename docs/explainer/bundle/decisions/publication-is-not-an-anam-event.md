@@ -4,7 +4,7 @@ title: Publication is not an anam-event
 description: Serving changes nothing Anam knows, so there is no published event; a receipt records what was shown, and a facet's published time is the earliest served_at over the receipts naming it.
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/serve/serve.go#Publish
-anchor: "if _, err := d.Artifacts.Put(receipt.ServedKind, value.Bytes()); err != nil {"
+anchor: "if _, err := d.Artifacts.Put(receipt.ServedKind, servedBytes); err != nil {"
 basis: docs
 tier: supporting
 tested_by:

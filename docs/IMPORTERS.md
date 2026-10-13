@@ -1,14 +1,16 @@
 # Importers — sources outside Anam
 
-Design proposal · 2026-10-08. The service's side is built (cards 51, 52, 53); §8 is the contract
-every importer complies with. Importers now exist for Withings (card 54), blood pressure (card 80)
-and the DreamStation (card 70), in `anam-importers`; the built-in `withings` worker is gone.
+Design proposal · 2026-10-08, built by 2026-10-13 (card 50). The service's side is built (cards 51,
+52, 53); §8 is the contract every importer complies with. Importers exist for Withings (card 54),
+blood pressure (card 80), the DreamStation (card 70), Garmin (card 55) and OwnTracks (card 130), in
+`anam-importers`.
 
 Anam's capture workers for vendor sources (`healthdb`, `withings`, `bpcsv`) were compiled into the
-binary that owns the ledger. `withings` (card 54) and `bpcsv` (card 80) have left; `healthdb`
-remains until card 55 finishes. This proposal moves them out: an importer is a ductile plugin that
-shapes one source's data to a Facet Definition and submits it to the Anam service. Anam keeps the
-Definitions, the gate and the record, and knows nothing about any vendor.
+binary that owns the ledger. All three have left: `withings` (card 54), `bpcsv` (card 80) and
+`healthdb` (card 55, its facets retired on 2026-10-11, the package deleted on 2026-10-13). An
+importer is a ductile plugin that shapes one source's data to a Facet Definition and submits it to the
+Anam service. Anam keeps the Definitions, the gate and the record, and knows nothing about any vendor.
+The two formats still read in process, `records` and `documents`, leave with card 119.
 
 ## 1. Where this comes from
 
@@ -107,14 +109,15 @@ Where log management stops applying: logs tolerate loss and sampling and have no
 - **New Definitions for health data.** `health.sleep` today is one row per `(group, period_type,
   period_start)` in the ETL's schema. Per-night sleep from Garmin is a different shape and identity:
   new types or versions, not the old ones reworded.
-- **The ledger retires the summary facets.** About 5,800 `health-db` facets, every weekly, monthly
-  and yearly one among them, are retracted as their source goes, with daily observations admitted
-  alongside. The fold handles it; it is a visible event in the record, and it comes after the move to
-  unraid (card 46), never during it.
+- **The ledger retires the summary facets.** Done 2026-10-11 (card 55): 5,818 `health-db` facets,
+  every weekly, monthly and yearly one among them, tombstoned by `anam retract health-db --retired`
+  at W 32988, with the Garmin importer's daily observations admitted first. The fold handled it; it
+  is a visible event in the record.
 - **The ETL's cleaning moves into importers.** Whatever ductile-healthdata learned about Garmin (FIT
   events, seven-day week blocks) goes to the Garmin importer.
-- **Rebuild.** Today one `anam ingest` rescans every source. With importers, each needs a "send
-  everything again" mode, idempotent because commit is, and Anam needs a way to ask for it.
+- **Rebuild.** Each importer has a "send everything again" mode (`poll`), idempotent because commit
+  is, and labels it a snapshot (§8.6) so Anam knows when one has finished. What is not yet written or
+  drilled is the whole: a fresh ledger rebuilt from every source in turn (card 141).
 - **Run atomicity.** Today a dead share stops the whole run before anything is written. With push,
   each source succeeds or fails on its own.
 
@@ -135,8 +138,10 @@ Where log management stops applying: logs tolerate loss and sampling and have no
 4. **Withings importer.** Done (card 54). A webhook trigger, fetch the new measure group, shape it,
    `anam_submit`. A weigh-in reaches the ledger in seconds, with no ETL and no hourly scan. It matched
    the built-in `withings` worker facet for facet, and that worker has been removed.
-5. **Garmin importer**, daily observations from `garmin.db`; then retire `healthdb`, the ETL and
-   healthdata.db.
+5. **Garmin importer.** Done (card 55, 2026-10-11): sleep, daily heart rate, steps, the day and the
+   sessions from `garmin.db`, the heart rate alerts from the FIT files. `health-db` left the imports,
+   its 5,818 summary facets were retired, the ETL pipelines were removed and healthdata.db stays as an
+   archive. The built-in `healthdb` worker was deleted on 2026-10-13.
 6. One-off exports (Technogym, Strong, Fitbit) get no importer. Each is a document in the library,
    turned into a records file once by a script kept in `scripts/`, and reshaped by regenerating that
    file with the same ids (card 58). The blood pressure app turned out to be live, exported

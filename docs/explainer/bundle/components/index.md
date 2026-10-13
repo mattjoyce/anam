@@ -17,7 +17,6 @@
 * [Documents worker (internal/capture/documents)](capture-documents.md) - Reads a library folder and emits one doc.reference per file: library-relative path, sha256, size, media type and the date its sidecar gives it.
 * [Facet domain values (internal/facet)](facet.md) - The value types everything else speaks in: Facet, AnamEvent, Envelope, the five event kinds, and SourceRef, the one function that composes identity.
 * [Fold](fold.md) - Derives each facet's current status from its anam-events in seq order and builds the canonical value, sorted and hashed.
-* [Health-db worker (internal/capture/healthdb)](capture-healthdb.md) - The built-in reader of the retired health ETL's SQLite file; still compiled in and declared in the scope map after its source was retired.
 * [Importer base (anam_importer)](importer-base.md) - The shared Python package every importer starts from: the ductile protocol, Definitions and local validation, envelopes and batches, and the HTTP client.
 * [Inspector (internal/inspect)](inspect.md) - The read-only web harness over the full fold: timeline, facets, events, projections and definitions, plus the default library's bytes confined to its root.
 * [Ledger store (internal/store/ledger)](store-ledger.md) - The append-only SQLite file: facet artifacts, anam-events and ledger_meta, with triggers that refuse update and delete for every writer.

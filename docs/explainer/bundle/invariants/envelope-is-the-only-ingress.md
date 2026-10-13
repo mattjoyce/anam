@@ -13,7 +13,6 @@ applies_to:
   - /components/gate.md
   - /components/capture-records.md
   - /components/capture-documents.md
-  - /components/capture-healthdb.md
   - /components/importer-base.md
   - /terms/envelope.md
 ---

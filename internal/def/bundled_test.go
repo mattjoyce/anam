@@ -10,8 +10,8 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
-// The bundled set is the MVP's health-db contract surface: every type the capture
-// worker can emit must resolve, or ingest dies at the first envelope of that type.
+// The bundled set still holds the retired health-db source's types (card 55): every
+// tombstoned facet of those types must still resolve for the fold and the inspector.
 func TestBundled_HoldsTheHealthDBTypes(t *testing.T) {
 	t.Parallel()
 

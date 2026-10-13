@@ -13,7 +13,6 @@ import (
 
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/capture/documents"
-	"github.com/mattjoyce/anam/internal/capture/healthdb"
 	"github.com/mattjoyce/anam/internal/capture/records"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
@@ -24,13 +23,11 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
-// mvpScopes is the MVP's one static source → types token map (§6, authenticated
-// pillar).
+// mvpScopes is the static source → types token map (§6, authenticated pillar) for
+// the two sources Anam still reads in process. Every vendor source reaches the
+// record through an importer under its own token (docs/IMPORTERS.md §8); health-db,
+// the last built-in vendor worker, retired with card 55 on 2026-10-11.
 var mvpScopes = gate.StaticScopes{
-	healthdb.Source: {
-		"health.sleep", "health.body-composition", "health.heart-rate", "health.metric-group",
-		healthdb.AlertType,
-	},
 	// records carries what is written down about the person: lab reports, the
 	// self-log, notes made from email. Each type has a Definition whose identity is
 	// the record's own id (docs/SELF-LOG.md). The one exception is blood pressure,
@@ -106,10 +103,10 @@ func ingestCmd(cfgPath *string) *cobra.Command {
 --imports, then $ANAM_IMPORTS, then <user config dir>/anam/imports.yaml:
 
     imports:
-      - source: health-db
-        path: ~/admin/data/healthdata.db
-      - source: bp-csv
-        path: ~/exports/BloodPressure.csv
+      - source: records
+        path: ~/anam/records
+      - source: documents
+        path: ~/anam/documents
 
 With no argument every declared import runs, in order; with a source name, the
 declarations for that source. A path typed ad hoc is provenance that evaporates
@@ -257,17 +254,13 @@ func scanAll(ctx context.Context, imports []config.Import, cfg config.Config) ([
 // scanImport dispatches one declared import to its capture worker.
 func scanImport(ctx context.Context, imp config.Import, cfg config.Config, defs *def.Registry) ([]facet.Envelope, error) {
 	switch imp.Source {
-	case healthdb.Source:
-		scanCtx, cancel := context.WithTimeout(ctx, cfg.Timeout)
-		defer cancel()
-		return healthdb.Scan(scanCtx, imp.Path, cfg.PersonID)
 	case records.Source:
 		return bounded(ctx, func() ([]facet.Envelope, error) { return records.Scan(imp.Path, cfg.PersonID, defs) })
 	case documents.Source:
 		return bounded(ctx, func() ([]facet.Envelope, error) { return documents.Scan(imp.Path, cfg.PersonID) })
 	default:
-		return nil, fmt.Errorf("import names unknown source %q (have: %s, %s, %s)",
-			imp.Source, healthdb.Source, records.Source, documents.Source)
+		return nil, fmt.Errorf("import names unknown source %q (have: %s, %s)",
+			imp.Source, records.Source, documents.Source)
 	}
 }
 

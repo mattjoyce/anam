@@ -13,7 +13,6 @@ alternatives:
 affects:
   - /components/store-ledger.md
   - /components/store-ops.md
-  - /components/capture-healthdb.md
   - /components/facet.md
 ---
 

@@ -108,8 +108,8 @@ An operation:
  "requested_at":"…Z","started_at":"…Z","finished_at":"…Z",
  "w_before":0,"w_after":13958,"changed":13958,
  "summary":"ledger changed: 13958 facets admitted or superseded",
- "sources":[{"source":"health-db","offered":5801,"admitted":5801,"superseded":0,
-             "unchanged":0,"committed":5801}]}
+ "sources":[{"source":"records","offered":2900,"admitted":2900,"superseded":0,
+             "unchanged":0,"committed":2900}]}
 ```
 
 - `state`: `pending`, `running`, `succeeded`, `failed`. A failed run carries `error` and keeps
@@ -143,8 +143,9 @@ ingest holds the write queue, or when the ledger cannot be read, 504 a read that
   (2026-10-09, card 56). The version is in `GET /v1/status`.
   `cd /mnt/user/appdata/anam && export ANAM_VERSION=<v0.N-hash> && docker compose stop && docker compose run --rm -T anam <cmd> && docker compose up -d`.
   Never open the data directory's SQLite files from the host while `anam` runs.
-- The gateway job `anam_ingest` (unraid ductile, hourly and on `healthdata.etl.completed`)
-  calls `?wait=10m`. Its failures post to Discord through `anam-ingest-failed`.
+- The gateway job `anam_ingest` (unraid ductile, hourly; the health ETL and its event went with
+  card 55) calls `?wait=10m`. It runs only the in-process sources, records and documents; every
+  vendor source posts envelopes from its own importer. Its failures post to Discord through `anam-ingest-failed`.
 - Layout, mounts and history: vault page `unraid_admin/vault/Anam Service Container.md`.
   Code: `internal/daemon` (operator routes in `api.go`, importer and reader routes in
   `daemon.go`), wiring in `internal/app/daemon.go`.

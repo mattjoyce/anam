@@ -135,7 +135,7 @@ ledger or the operational store, and Anam itself stays Go.
 | Surface | Shape | Example |
 |---|---|---|
 | **Facet type** | lower-case **dotted**, namespaced | `health.blood-pressure`, `calendar.event` |
-| Source / operator identity | lower-case **hyphenated** | `health-db`, `bp-csv` |
+| Source / operator identity | lower-case **hyphenated** | `garmin`, `bp-csv` |
 | CLI command | lower-case hyphenated | `ingest`, `def load` |
 | Config / payload / data key | **snake_case** | `db_path`, `ledger_path`, `period_start` |
 | SQL column | snake_case | `fact_time`, `content_hash` |

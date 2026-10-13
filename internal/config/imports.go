@@ -31,7 +31,7 @@ var ErrInvalidImports = errors.New("invalid imports file")
 
 // Import declares one capture: which source, from which file.
 type Import struct {
-	// Source is the capture worker's identity: health-db, bp-csv.
+	// Source is the import's identity: records, documents.
 	Source string `mapstructure:"source"`
 
 	// Path is the source file, expanded on load (~ and $VARs) and resolved to a

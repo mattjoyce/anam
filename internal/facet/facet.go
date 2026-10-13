@@ -168,7 +168,7 @@ type Binding struct {
 // has the latter. Nesting Derivation keeps them unbraided — a captured facet with a
 // model, or a derived one without a watermark, is not representable.
 type Provenance struct {
-	// Source is the capture origin, lower-case hyphenated: health-db, bp-csv.
+	// Source is the capture origin, lower-case hyphenated: garmin, bp-csv.
 	Source string
 
 	// Injector is the identity that submitted the envelope, from the gate's

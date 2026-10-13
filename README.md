@@ -20,15 +20,19 @@ clocks (fact-time / anam-time), a resolve→commit **admission gate**, **mint**/
 Prototype. First slice proves the vertical path end-to-end against real data:
 
 ```
-capture (health-db / bp-csv) → ingest (gate) → append-only ledger (SQLite)
+importers (envelopes, one token per source) → ingest (gate) → append-only ledger (SQLite)
     → mint → canonical fold → projection + CLI viewer → receipt
 ```
 
 ## Sources
 
-- **`health-db`** — Garmin + Withings, unified into `healthdata.db` (an existing ETL). Facets:
-  `health.sleep`, `health.body-composition`, `health.heart-rate`, `health.metric-group`.
-- **`bp-csv`** — a blood-pressure export. Facet: `health.blood-pressure`.
+Every vendor source reaches Anam through an importer in the sibling `anam-importers` repository,
+a ductile plugin that shapes one source to a Facet Definition and posts envelopes under its own
+token (`docs/IMPORTERS.md`): Garmin, Withings, the blood pressure export, the DreamStation card and
+OwnTracks. Two formats are still read in process by `anam ingest`:
+
+- **`records`** — hand-written YAML records: labs, medicines, travel, notes.
+- **`documents`** — a folder of files with sidecars, each a `doc.reference`.
 
 Extensible to "all sorts of facets" later — `calendar.event`, `mail.thread`, `note.zettel`, …
 
@@ -64,7 +68,7 @@ is provenance that evaporates with the shell history. Copy `imports.example.yaml
 
 ```sh
 ./anam ingest                 # every declared source
-./anam ingest health-db       # just one
+./anam ingest records         # just one
 ```
 
 **Read.** The whole-person timeline is the default; everything else is a lens over it.

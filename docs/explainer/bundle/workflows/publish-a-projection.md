@@ -52,7 +52,7 @@ steps:
     action: "`Publish` takes the served bytes (the value's one serialisation), hashes them, and builds the receipt: served hash, facet ids in served order, watermark, ledger id, template name and version, definition-set version, served_at, span, and no query for a whole serve."
     writes: [/data-structures/receipt.md]
     resource: internal/serve/serve.go#Publish
-    anchor: "ServedHash:           value.Hash(),"
+    anchor: "ServedHash:           servedHash,"
   - actor: /components/store-artifact.md
     caller: /components/serve.md
     label: put the value, then the receipt

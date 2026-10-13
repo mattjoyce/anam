@@ -89,14 +89,17 @@ middle, the person and their agents consuming it at the top.
  │    Ingest gate   (the only ingress; resolve → commit)   ▲ ingest  │
  └─────────────────────────────────────────────────────────────────┘
                                   ▲
-                                  │  source fragments
-                                  │  (via capture workers)
-            Your source systems  —  health-db · bp-csv · (later: calendar, mail, notes)
+                                  │  envelopes, one token per source
+                                  │  (via importers on the gateway; docs/IMPORTERS.md)
+            Your source systems  —  garmin · withings · bp-csv · dreamstation · owntracks
+                                    · records · documents · (later: calendar, mail, notes)
 ```
 
 Anam's **upstream boundary is the ingest gate.** Everything between a source and that gate — SQLite
-readers, CSV parsers, future API pollers — is a **capture worker**: a pluggable client, not part of the
-kernel. The gate owns the admission contract and everything served upward.
+readers, CSV parsers, API pollers — is an **importer**: a pluggable client outside the binary, not part
+of the kernel, posting envelopes under its own token. Two formats, `records` and `documents`, are still
+read in process until their importers go live (card 119). The gate owns the admission contract and
+everything served upward.
 
 ---
 

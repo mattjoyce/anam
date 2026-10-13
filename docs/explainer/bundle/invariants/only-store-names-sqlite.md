@@ -12,7 +12,6 @@ enforced_anchor: "FAILED: the store substrate is named outside internal/store:"
 applies_to:
   - /components/store-ledger.md
   - /components/store-ops.md
-  - /components/capture-healthdb.md
   - /components/facet.md
 ---
 

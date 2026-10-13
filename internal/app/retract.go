@@ -171,6 +171,14 @@ func planRetraction(live []fold.Entry, source string, held map[string]bool) (abs
 	return absent, total
 }
 
+// snapshotStore is what planning from a snapshot asks of the operational store: the
+// newest complete resend of a source and the facet ids it carried. *ops.DB satisfies
+// it; the interface is here, where it is used, so the plan names what it needs.
+type snapshotStore interface {
+	NewestCompleteSnapshot(ctx context.Context, source string) (ops.Snapshot, bool, error)
+	SnapshotFacets(ctx context.Context, id string) (map[string]bool, error)
+}
+
 // planLedger is what facetsOf asks of the ledger.
 type planLedger interface {
 	LatestVersions(ctx context.Context, ids []string) (map[string]int, error)
@@ -306,9 +314,9 @@ func planFromSnapshot(ctx context.Context, cmd *cobra.Command, cfg config.Config
 		return nil, 0, 0, err
 	}
 	defer closeAll()
-	db, ok := src.Checkpoints.(*ops.DB)
+	db, ok := src.Checkpoints.(snapshotStore)
 	if !ok {
-		return nil, 0, 0, fmt.Errorf("retract: the operational store is not open")
+		return nil, 0, 0, fmt.Errorf("retract: planning from a snapshot needs the operational store's snapshot log (NewestCompleteSnapshot, SnapshotFacets); the read source holds a %T", src.Checkpoints)
 	}
 	snap, ok, err := db.NewestCompleteSnapshot(ctx, source)
 	if err != nil {
@@ -323,7 +331,7 @@ func planFromSnapshot(ctx context.Context, cmd *cobra.Command, cfg config.Config
 	}
 	hist, ok := src.Ledger.(read.FacetHistory)
 	if !ok {
-		return nil, 0, 0, fmt.Errorf("retract: the ledger cannot read one facet's events")
+		return nil, 0, 0, fmt.Errorf("retract: judging absence needs a ledger that answers one facet's events (FacetEvents); the read source holds a %T", src.Ledger)
 	}
 	entries, live, err := read.Absent(ctx, src, hist, read.SnapshotScope{
 		Source: source, Types: snap.Types, Carried: carried, StartedW: ledger.Watermark(snap.StartedW),

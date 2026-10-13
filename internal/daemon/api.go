@@ -291,6 +291,8 @@ func writeReadError(w http.ResponseWriter, err error) {
 			api.Error{Error: err.Error(), Code: api.CodeTooLarge, TooLarge: &tooLarge.TooLarge})
 	case errors.Is(err, artifact.ErrNotFound):
 		writeError(w, http.StatusNotFound, err)
+	case errors.Is(err, read.ErrTooManyAbsent):
+		writeError(w, http.StatusRequestEntityTooLarge, err)
 	case errors.Is(err, serve.ErrTemplateMoved), errors.Is(err, serve.ErrOtherLedger):
 		writeError(w, http.StatusConflict, err)
 	case errors.Is(err, context.DeadlineExceeded):

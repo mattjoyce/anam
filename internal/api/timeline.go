@@ -60,8 +60,11 @@ type Timeline struct {
 type ProjectionRead struct {
 	Name    string `json:"name"`
 	Version int    `json:"version"`
-	// Served is how many facets the projection served, and Hash their value's hash:
-	// the one a receipt would record.
+	// Served is how many facets the projection served, and Hash their value's hash,
+	// before any narrowing the query adds (a window, a type, a snapshot, fields). A
+	// receipt's served_hash is over the narrowed value, or the frame, so the two name
+	// different values when a query narrows; Hash is the projection's, the receipt's
+	// is the read's.
 	Served int    `json:"served"`
 	Hash   string `json:"hash"`
 }

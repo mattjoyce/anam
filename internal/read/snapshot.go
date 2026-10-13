@@ -2,6 +2,8 @@ package read
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sort"
 
 	"github.com/mattjoyce/anam/internal/facet"
@@ -24,7 +26,17 @@ type SnapshotScope struct {
 	Types    []string
 	Carried  map[string]bool
 	StartedW ledger.Watermark
+	// MaxJudged bounds how many uncarried live facets Absent will judge, each one a
+	// query for that facet's events; past it Absent stops with ErrTooManyAbsent. Zero
+	// is unbounded, which the CLI accepts because --max-fraction bounds what follows;
+	// the API sets it so one request cannot run thousands of queries (card 100).
+	MaxJudged int
 }
+
+// ErrTooManyAbsent is returned when a snapshot leaves more live facets uncarried than
+// the scope allows judging in one read. The count is still answered; which ones is
+// a question for the CLI, which runs it locally and unbounded.
+var ErrTooManyAbsent = errors.New("read: too many uncarried facets to judge in one read")
 
 // Absent is what a complete snapshot says the record holds and its source no longer
 // does: the live facets of the snapshot's source and types that it did not carry, and
@@ -48,6 +60,7 @@ func Absent(ctx context.Context, src Source, hist FacetHistory, scope SnapshotSc
 	for _, t := range scope.Types {
 		types[facet.Type(t)] = true
 	}
+	judged := 0
 	for _, e := range res.Value.Entries() {
 		if e.Source != scope.Source || !types[e.Type] {
 			continue
@@ -55,6 +68,11 @@ func Absent(ctx context.Context, src Source, hist FacetHistory, scope SnapshotSc
 		live++
 		if scope.Carried[e.FacetID] {
 			continue
+		}
+		judged++
+		if scope.MaxJudged > 0 && judged > scope.MaxJudged {
+			return nil, live, fmt.Errorf("%w: more than %d of %s's %d live facets were not carried; run anam retract %s locally to list them",
+				ErrTooManyAbsent, scope.MaxJudged, scope.Source, live, scope.Source)
 		}
 		events, err := hist.FacetEvents(ctx, e.FacetID, head)
 		if err != nil {

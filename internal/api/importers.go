@@ -52,6 +52,11 @@ type SnapshotReport struct {
 // AbsentIDsMax bounds the absent ids a report lists; Absent still counts them all.
 const AbsentIDsMax = 1000
 
+// AbsentJudgeMax bounds how many uncarried live facets one GET /v1/snapshots/{id}
+// will judge, each a query for that facet's events; past it the report is 413 and
+// the CLI, unbounded and local, lists them (card 100).
+const AbsentJudgeMax = 5000
+
 // SubmittedEnvelope is one observation, shaped to a Definition. It names no source:
 // the token it arrives under does.
 type SubmittedEnvelope struct {

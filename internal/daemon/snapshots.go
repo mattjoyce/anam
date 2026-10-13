@@ -179,6 +179,7 @@ func (d *Daemon) getSnapshot(w http.ResponseWriter, r *http.Request) {
 		src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts, Definitions: d.defs.current.Load(), Projections: d.projections.current.Load()}
 		absent, live, err := read.Absent(ctx, src, d.read, read.SnapshotScope{
 			Source: s.Source, Types: s.Types, Carried: carried, StartedW: ledger.Watermark(s.StartedW),
+			MaxJudged: api.AbsentJudgeMax,
 		})
 		if err != nil {
 			writeReadError(w, err)

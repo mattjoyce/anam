@@ -3,6 +3,7 @@ package inspect
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -26,30 +27,34 @@ type payloadRow struct {
 
 // payloadRows lays a facet's payload over the field rows of the Definition it was
 // admitted under. Rows inside an array's items or a map's values have no single
-// value, so they show the words only. It returns nil when that Definition is not
-// held or not readable: the raw payload is still on the page.
-func (s *Server) payloadRows(ctx context.Context, f facet.Facet) []payloadRow {
+// value, so they show the words only. When the rows cannot be built, the note says
+// why, in place of the table, so a Definition that fails to parse is seen rather than
+// silently losing the fields (card 100); the raw payload is still on the page.
+func (s *Server) payloadRows(ctx context.Context, f facet.Facet) (rows []payloadRow, note string) {
 	bodies, _, err := s.held(ctx)
 	if err != nil {
-		return nil
+		return nil, "the Definitions held could not be read: " + err.Error()
 	}
 	body, ok := bodies[f.Type][f.DefinitionVersion]
 	if !ok {
-		return nil
+		return nil, fmt.Sprintf("definition %s v%d, which this facet was admitted under, is not held", f.Type, f.DefinitionVersion)
 	}
 	d, err := def.Parse(body)
 	if err != nil {
-		return nil
+		return nil, fmt.Sprintf("definition %s v%d does not parse: %v", f.Type, f.DefinitionVersion, err)
 	}
 	fields, err := fieldsOf(body, d)
-	if err != nil || len(fields) == 0 {
-		return nil
+	if err != nil {
+		return nil, fmt.Sprintf("definition %s v%d's fields could not be read: %v", f.Type, f.DefinitionVersion, err)
+	}
+	if len(fields) == 0 {
+		return nil, ""
 	}
 	var doc any
 	if err := json.Unmarshal(f.Payload.Bytes(), &doc); err != nil {
-		return nil
+		return nil, "the payload is not JSON: " + err.Error()
 	}
-	rows := make([]payloadRow, 0, len(fields))
+	rows = make([]payloadRow, 0, len(fields))
 	for _, fr := range fields {
 		row := payloadRow{fieldRow: fr}
 		if !strings.Contains(fr.Pointer, "[]") && !strings.Contains(fr.Pointer, "/*") {
@@ -63,7 +68,7 @@ func (s *Server) payloadRows(ctx context.Context, f facet.Facet) []payloadRow {
 		}
 		rows = append(rows, row)
 	}
-	return rows
+	return rows, ""
 }
 
 // atPointer resolves a JSON Pointer (RFC 6901) of object keys in a decoded document.

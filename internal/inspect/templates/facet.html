@@ -45,6 +45,10 @@
 <p class="meta">This version's payload is the same as v{{.Prior}}'s.</p>
 {{end}}
 
+{{if .RowsNote}}
+<h2>fields</h2>
+<p class="meta">no field table: {{.RowsNote}}. The raw payload is below.</p>
+{{end}}
 {{if .Rows}}
 <h2>fields <span class="dim">read through definition v{{.Facet.DefinitionVersion}}</span></h2>
 <div class="scroll">

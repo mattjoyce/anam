@@ -1,0 +1,17 @@
+# gitleaks configuration (card 142). Three lines in the history read as keys to the
+# generic rule and are not: the service skill's example names a token *file* beside
+# the zone, and two test files hold a fixed, published test token of hex digits that
+# opens nothing outside a test's own daemon.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "an example naming a token file path and an IANA zone"
+regexTarget = "line"
+regexes = ['''ANAM_TOKEN_FILE=\S+ (-e )?ANAM_ZONE=''']
+
+[[allowlists]]
+description = "the fixed test token in the daemon and CLI tests"
+regexTarget = "line"
+regexes = ['''testToken\s*=\s*"0123456789abcdef0123456789abcdef"''']
+paths = ['''_test\.go$''']

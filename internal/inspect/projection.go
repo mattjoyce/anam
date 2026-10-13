@@ -123,6 +123,15 @@ func (s *Server) projectionPage(w http.ResponseWriter, r *http.Request) {
 // as a malformed request.
 var errBadAsOf = errors.New("bad as-of")
 
+// parseLocalAsOf reads a datetime-local value, with or without seconds, as UTC.
+func parseLocalAsOf(asof string) (time.Time, error) {
+	t, err := time.ParseInLocation("2006-01-02T15:04:05", asof, time.UTC)
+	if err == nil {
+		return t, nil
+	}
+	return time.ParseInLocation("2006-01-02T15:04", asof, time.UTC)
+}
+
 // readForQuery reads at head, or at the watermark in force at an as-of anam-time.
 func (s *Server) readForQuery(ctx context.Context, asof string, data *projectionData) (fold.Result, error) {
 	if asof == "" {
@@ -130,11 +139,12 @@ func (s *Server) readForQuery(ctx context.Context, asof string, data *projection
 	}
 	t, err := time.Parse(time.RFC3339, asof)
 	if err != nil {
-		// The form submits datetime-local, which omits the zone; read it as UTC,
-		// because Anam's own clock is UTC.
-		t, err = time.ParseInLocation("2006-01-02T15:04", asof, time.UTC)
+		// The form submits datetime-local, which omits the zone and carries seconds
+		// when the browser shows them (the input's step is one second); read it as
+		// UTC, because Anam's own clock is UTC.
+		t, err = parseLocalAsOf(asof)
 		if err != nil {
-			return fold.Result{}, fmt.Errorf("%w: %q is neither RFC 3339 nor YYYY-MM-DDTHH:MM", errBadAsOf, asof)
+			return fold.Result{}, fmt.Errorf("%w: %q is neither RFC 3339 nor YYYY-MM-DDTHH:MM[:SS]", errBadAsOf, asof)
 		}
 	}
 	data.AsOf, data.AsOfSet = asof, true

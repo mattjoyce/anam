@@ -232,6 +232,17 @@ func TestProjectionPage_RejectsBadInput(t *testing.T) {
 	if code, _ := get(t, srv.URL+"/projection?p=bloodpressure"); code != 404 {
 		t.Errorf("unknown projection = %d, want 404", code)
 	}
+	// The form's datetime-local value carries seconds and no zone; each spelling
+	// reads the same instant as the RFC 3339 one, so the page is the same apart
+	// from the value echoed back into the input.
+	same := func(body, asof string) string { return strings.ReplaceAll(body, `value="`+asof+`"`, "") }
+	_, ref := get(t, srv.URL+"/projection?p=bp&asof=2026-07-11T00:00:00Z")
+	for _, local := range []string{"2026-07-11T00:00:00", "2026-07-11T00:00"} {
+		code, body := get(t, srv.URL+"/projection?p=bp&asof="+local)
+		if code != 200 || same(body, local) != same(ref, "2026-07-11T00:00:00Z") {
+			t.Errorf("asof=%s: %d, and differs from the RFC 3339 spelling", local, code)
+		}
+	}
 	if code, _ := get(t, srv.URL+"/projection?asof=last-tuesday"); code != 400 {
 		t.Errorf("unparseable as-of = %d, want 400", code)
 	}

@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "note.annotation",
-    "definition_version": 1,
+    "definition_version": 2,
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "records/note.annotation",
@@ -19,7 +19,7 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "A note the person writes about one or more facets already in the record: what was going on, in their words. A fact about facts. The facets it names are never changed by it; the note is appended beside them, carries its own provenance (the person, typed), and is retracted or edited on its own. Its fact time is the moment the note is about, usually the facets' own, so it sits beside them on the timeline; when it was written is the anam-time of its admission, and which version of each facet was current then is read from the ledger at that watermark, not stored here.",
+    "description": "A note the person writes about one or more facets already in the record: what was going on, in their words. A fact about facts. The facets it names are never changed by it; the note is appended beside them, carries its own provenance (the person, typed), and is retracted or edited on its own. Its fact time is the moment the note was written (v2, 2026-10-13): the one time nothing else holds, since each facet it names carries its own fact time, and anam-time is the ingest, not the writing. Which version of each facet was current when the note landed is read from the ledger at that watermark, not stored here. v1 said `at` was the moment the note is about; the mechanism is unchanged and v1 values remain valid, only the meaning moved.",
     "type": "object",
     "required": [
       "id",
@@ -39,9 +39,9 @@
       "at": {
         "type": "string",
         "minLength": 1,
-        "description": "The moment the note is about, YYYY-MM-DD HH:MM in Australia/Sydney. Usually the facet's own fact time, written out so the note stands on the timeline beside it. This is the fact time.",
+        "description": "The moment the note was written, YYYY-MM-DD HH:MM in Australia/Sydney. This is the fact time: an observation made at the time and one made a week later are told apart by it, and the facets the note is about are reached through `about`, each at its own fact time.",
         "examples": [
-          "2026-10-09 11:29"
+          "2026-10-12 22:14"
         ]
       },
       "about": {

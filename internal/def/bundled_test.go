@@ -294,7 +294,7 @@ func TestBundled_NoteAnnotationIsAFactAboutAFacet(t *testing.T) {
 	if !ok {
 		t.Fatal("no bundled note.annotation")
 	}
-	if d.Version != 1 || d.FactTime.Pointer != "/at" || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" {
+	if d.Version != 2 || d.FactTime.Pointer != "/at" || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" {
 		t.Fatalf("v%d fact time %s identity %v", d.Version, d.FactTime.Pointer, d.IdentityKey)
 	}
 	decode := func(s string) map[string]any {

@@ -49,6 +49,14 @@ var (
 	// transaction, and one facet takes one version per transaction.
 	ErrSameFacet = errors.New("gate: two envelopes in one batch are the same facet")
 
+	// ErrTypeChanged: the envelope's facet id is held by a facet of another type. A
+	// facet's id is its source and identity values, not its type (§6a), so two types
+	// from one source whose identity values coincide are one id; admitting the
+	// second would write a fact of another kind over the first (card 105). The
+	// importer keeps its types' identities apart; the gate makes a collision
+	// impossible to miss.
+	ErrTypeChanged = errors.New("gate: facet id is held by a facet of another type")
+
 	// ErrContention: the bounded retry gave up. The worker may simply re-run;
 	// commit is idempotent.
 	ErrContention = errors.New("gate: watermark contention not resolved within retry budget")

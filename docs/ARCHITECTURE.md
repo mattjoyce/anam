@@ -338,7 +338,10 @@ The gate is exposed as two calls:
   natural key would give a corrected reading a *different* `facet_id`, so it would enter as a **new
   facet** and orphan the original instead of superseding it — silently disabling the entire
   idempotency-and-supersession mechanism for that source. Identity decides *which fact*; `content_hash`
-  decides *whether it changed*. Keep them unbraided.
+  decides *whether it changed*. Keep them unbraided. The type is not in the identity either, so two
+  types from one source whose identity values coincide are one `facet_id`; the gate refuses the second
+  (`ErrTypeChanged`, card 105), naming both types and the `source_ref`, rather than writing a fact of
+  another kind over the first. An importer that emits several types keeps their identities apart.
 - `commit` writes the artifact, its `admitted` anam-event, and the watermark bump `W` in **one atomic
   transaction** (§8). Idempotency is enforced on `(source_ref, content_hash)`.
   - Same `source_ref` **and** same hash → **no-op** (safe re-ingest).

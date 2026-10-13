@@ -259,6 +259,11 @@ next batch waits on it.
 2. Validate each payload locally against its Definition's `schema` with a stock JSON Schema library,
    so a refusal at the gate means the importer and Anam disagree, not that a row was malformed.
 3. Shape payloads only. Compose no identity, join nothing, summarise nothing (§2).
+   A facet's identity is its source and its identity values, **not its type**, so an importer that
+   emits several types keeps their identities apart: a `sleep.episode` and a `health.step-count`
+   from `garmin` for the same day must not both be keyed on the bare date (the Garmin ids are
+   `sleep:<day>`, `steps:<day>`, `day:<day>`). The gate refuses an envelope whose facet id is held
+   by a facet of another type, naming both types and the source_ref, and writes nothing (card 105).
 4. Submit in batches of at most 49, resubmit on 503, and report a 422's reasons as a failed run.
 5. Offer a resend-everything mode. It is a rebuild's first step, and idempotent by construction.
    Label its batches as the parts of one snapshot (§8.6), so the operator can see what the source

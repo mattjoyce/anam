@@ -278,9 +278,10 @@
     });
 
     // The note is a note.annotation (card 104) drafted as the records file the
-    // person installs: `at` is the earliest selected fact time in the Definition's
-    // zone, `about` every selected id, the text verbatim. Submitting it from here
-    // is card 93's decision.
+    // person installs: `at` is the moment of drafting in the Definition's zone (card
+    // 136: a note's fact time is when it was written; the facets it is about carry
+    // their own), `about` every selected id, the text verbatim. Submitting it from
+    // here is card 93's decision.
     const sydney = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
     const atOf = ms => { const p = {}; sydney.formatToParts(new Date(ms)).forEach(x => { p[x.type] = x.value; });
                          return `${p.year}-${p.month}-${p.day} ${p.hour === '24' ? '00' : p.hour}:${p.minute}`; };
@@ -289,7 +290,7 @@
       if (!text || selected.size === 0) { document.getElementById('note-text').focus(); return; }
       const ms = [...selected.values()].sort((a, b) => a.t - b.t);
       const lines = ['records:', '  - type: note.annotation', `    id: note:${ms[0].id.slice(0, 8)}:1`,
-                     `    at: "${atOf(ms[0].t)}"`, '    about:'];
+                     `    at: "${atOf(Date.now())}"`, '    about:'];
       ms.forEach(m => lines.push(`      - ${m.id}`));
       lines.push(`    text: ${JSON.stringify(text)}`);
       yamlOut.textContent = lines.join('\n') + '\n';

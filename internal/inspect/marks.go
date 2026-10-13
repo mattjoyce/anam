@@ -125,8 +125,9 @@ var typeStyles = map[facet.Type]typeStyle{
 	"illness.hangover": {"clinical", shapeCross, kindEvent},
 
 	"doc.reference": {"documents", shapeSquare, kindEvent},
-	// A note the person wrote about one facet: drawn with what is written down,
-	// at the moment it is about.
+	// A note the person wrote about one or more facets: drawn with what is written
+	// down, at the moment it was written (card 136); the facets it is about are
+	// reached through its payload.
 	"note.annotation": {"documents", shapeDiamond, kindEvent},
 	// An hour of the phone's positions (card 130): a measure in the travel row,
 	// which is where the person was; the eight hues are spent (card 133).

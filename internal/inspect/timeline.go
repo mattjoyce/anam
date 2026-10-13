@@ -134,6 +134,36 @@ type timelineData struct {
 	// every gesture is a round trip and the band stays honest to the fold at W.
 	// The type filter rides along on every link.
 	Nav tlNav
+
+	// Checkpoints is the bucket strip under the band and its header line (card
+	// 21): every leaf bucket of the checkpoint layout at its state against the
+	// log. Have is false when the inspector was given no log.
+	Checkpoints tlCheckpoints
+}
+
+// tlCheckpoints summarises the checkpoint log at W and carries the buckets that
+// fall in the window, each as a segment of the strip.
+type tlCheckpoints struct {
+	Have    bool
+	Buckets []tlBucket
+
+	Total, Sealed, Behind, Never int
+
+	// Run is the last mint run at or below W, when there is one. LogSealed is
+	// false when a mint crashed after writing, or no run was ever sealed: then
+	// reads fold in full, and the strip says so.
+	Run       int64
+	HasRun    bool
+	LogSealed bool
+}
+
+// tlBucket is one bucket as the strip draws it, clipped to the window.
+type tlBucket struct {
+	ID       string
+	X, Width float64
+	State    string
+	Title    string
+	Href     string
 }
 
 // tlNav holds the moves a window can make, and the filter presets, as URLs.
@@ -178,6 +208,14 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := buildTimeline(res, all, from, to, zoomed, r.URL.Query()["type"], status)
+	if s.checkpoints != nil {
+		states, summary, err := checkpointStates(ctx, s.checkpoints, res, s.buckets)
+		if err != nil {
+			httpError(w, err)
+			return
+		}
+		data.Checkpoints = bucketStrip(states, summary, res, from, to, data)
+	}
 	data.Query = cleanView(r.URL.RawQuery)
 	data.HasDefault = stored != ""
 	data.IsDefault = stored != "" && stored == data.Query
@@ -405,6 +443,38 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 
 	data.Ticks = monthTicks(from, to, x)
 	return data
+}
+
+// bucketStrip places the buckets that overlap the window on the band's x scale,
+// each a link that zooms the band to the bucket, and carries the summary through.
+func bucketStrip(states []bucketState, summary tlCheckpoints, res fold.Result, from, to time.Time, data timelineData) tlCheckpoints {
+	x := func(t time.Time) float64 {
+		frac := float64(t.Sub(from)) / float64(to.Sub(from))
+		return data.PlotLeft + frac*(data.PlotRight-data.PlotLeft)
+	}
+	view := tlView{Status: data.Status}
+	for _, st := range states {
+		lo, hi := st.Bucket.From(), st.Bucket.To()
+		if lo.Before(from) {
+			lo = from
+		}
+		if hi.After(to) {
+			hi = to
+		}
+		if !lo.Before(hi) {
+			continue
+		}
+		width := x(hi) - x(lo)
+		if width < 1 {
+			width = 1
+		}
+		summary.Buckets = append(summary.Buckets, tlBucket{
+			ID: st.Bucket.ID(), X: x(lo), Width: width, State: st.State,
+			Title: bucketTitle(st, int64(res.W)),
+			Href:  windowLink(st.Bucket.From(), st.Bucket.To(), true, view),
+		})
+	}
+	return summary
 }
 
 // layoutRows places each family's row and each type's sub-lane within it. Types

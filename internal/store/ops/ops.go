@@ -189,6 +189,25 @@ CREATE TRIGGER IF NOT EXISTS registered_definition_no_delete
 BEFORE DELETE ON registered_definition
 BEGIN SELECT RAISE(ABORT, 'registered_definition is immutable'); END;
 
+-- tier: authored — projection templates the operator registered (POST /v1/projections),
+-- every version (card 125). The bundled templates are the floor and come back with the
+-- binary; a registered one comes back from a backup, or by registering it again from
+-- wherever the operator keeps the file. A registered version is immutable: the
+-- triggers refuse a change or a removal, for every writer.
+CREATE TABLE IF NOT EXISTS registered_projection (
+  name          TEXT NOT NULL,
+  version       INTEGER NOT NULL,
+  body          TEXT NOT NULL,
+  registered_at TEXT NOT NULL,
+  PRIMARY KEY (name, version)
+);
+CREATE TRIGGER IF NOT EXISTS registered_projection_no_update
+BEFORE UPDATE ON registered_projection
+BEGIN SELECT RAISE(ABORT, 'registered_projection is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS registered_projection_no_delete
+BEFORE DELETE ON registered_projection
+BEGIN SELECT RAISE(ABORT, 'registered_projection is immutable'); END;
+
 -- tier: provisioned — the static source -> facet-type token map (the gate's
 -- authenticated pillar). One row per grant.
 CREATE TABLE IF NOT EXISTS token_scope (

@@ -22,12 +22,16 @@ import (
 // checkpoints is the mint's log, so a serve or a verify composes from the last mint
 // run rather than folding the ledger from the beginning; nil folds in full. defs are
 // the Definitions the record's facets were admitted against; nil means the bundled
-// ones alone.
+// ones alone. templates are the projections held, bundled and registered (card 125);
+// nil means the bundled ones alone.
 func ServeDeps(l serve.Ledger, artifacts serve.Store, checkpoints mint.CheckpointLog, defs *def.Registry,
+	templates *projection.Registry,
 ) (serve.Deps, error) {
-	templates, err := projection.Bundled()
-	if err != nil {
-		return serve.Deps{}, err
+	var err error
+	if templates == nil {
+		if templates, err = projection.Bundled(); err != nil {
+			return serve.Deps{}, err
+		}
 	}
 	defSet, err := def.SetVersion()
 	if err != nil {

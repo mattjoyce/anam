@@ -2,7 +2,9 @@ package projection
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -13,9 +15,8 @@ import (
 )
 
 // The bundled templates: small, static, versioned with the binary (AGENTS.md,
-// Embedded assets). A consumer selects a projection and never defines one (§9), so
-// there is nowhere for a template to come from at runtime — and that is the point,
-// not a limitation waiting to be lifted.
+// Embedded assets). They are the floor; the operator registers others over the API
+// (Register, WithRegistered), and a consumer still only selects (§9).
 //
 //go:embed manifests/*.json
 var manifestFS embed.FS
@@ -53,8 +54,15 @@ func Parse(raw []byte) (Template, error) {
 	if m.Shape == "" {
 		m.Shape = string(ShapeLog)
 	}
+	canon, err := facet.Canonicalize(raw)
+	if err != nil {
+		return Template{}, fmt.Errorf("%w: %v", ErrBadTemplate, err)
+	}
+	sum := sha256.Sum256(canon.Bytes())
 
 	t := Template{
+		Hash:              "sha256:" + hex.EncodeToString(sum[:]),
+		Body:              canon.Bytes(),
 		Name:              *m.Name,
 		Version:           *m.Version,
 		Description:       m.Description,
@@ -138,27 +146,43 @@ func (t Template) checkWindow() error {
 	return nil
 }
 
-// Registry holds the loaded templates a consumer selects from.
+// Registry holds every template version held, by name: the bundled ones and those
+// the operator registered. A consumer selects by name and is answered with the newest
+// version; a receipt names a version and is answered with exactly that one.
 type Registry struct {
-	byName map[string]Template
+	held map[string][]Template // by name, versions ascending
 }
 
-// NewRegistry collects templates, rejecting duplicate names: two templates called the
-// same thing is a configuration error, not a precedence question. Bundled is the only
-// caller in production; this exists so a test can stand up an alternative set — for
-// instance, one whose bp is a later version — without reaching into the package.
+// NewRegistry collects templates. Two versions of one name are the same template at
+// two points in time and both are held; the same name and version twice is one
+// template when the bodies agree and a configuration error when they do not.
 func NewRegistry(templates ...Template) (*Registry, error) {
-	r := &Registry{byName: make(map[string]Template, len(templates))}
+	r := &Registry{held: make(map[string][]Template, len(templates))}
 	for _, t := range templates {
-		if t.Name == "" {
-			return nil, fmt.Errorf("%w: a template must be named", ErrBadTemplate)
+		if err := r.add(t); err != nil {
+			return nil, err
 		}
-		if _, dup := r.byName[t.Name]; dup {
-			return nil, fmt.Errorf("%w: duplicate template %q", ErrBadTemplate, t.Name)
-		}
-		r.byName[t.Name] = t
 	}
 	return r, nil
+}
+
+func (r *Registry) add(t Template) error {
+	if t.Name == "" {
+		return fmt.Errorf("%w: a template must be named", ErrBadTemplate)
+	}
+	for _, h := range r.held[t.Name] {
+		if h.Version != t.Version {
+			continue
+		}
+		if h.Hash == t.Hash {
+			return nil
+		}
+		return fmt.Errorf("%w: two bodies for template %s v%d", ErrBadTemplate, t.Name, t.Version)
+	}
+	held := append(r.held[t.Name], t)
+	sort.Slice(held, func(i, j int) bool { return held[i].Version < held[j].Version })
+	r.held[t.Name] = held
+	return nil
 }
 
 // Bundled parses every embedded manifest into a Registry. Like the definition set, it
@@ -171,7 +195,7 @@ func Bundled() (*Registry, error) {
 		return nil, fmt.Errorf("projection: read bundled manifests: %w", err)
 	}
 
-	r := &Registry{byName: make(map[string]Template, len(entries))}
+	r := &Registry{held: make(map[string][]Template, len(entries))}
 	for _, e := range entries {
 		raw, err := manifestFS.ReadFile("manifests/" + e.Name())
 		if err != nil {
@@ -185,43 +209,80 @@ func Bundled() (*Registry, error) {
 			return nil, fmt.Errorf("%w: manifest %s declares name %q (file must be named %s)",
 				ErrBadTemplate, e.Name(), t.Name, want)
 		}
-		if _, dup := r.byName[t.Name]; dup {
+		if _, dup := r.held[t.Name]; dup {
 			return nil, fmt.Errorf("%w: duplicate template %q", ErrBadTemplate, t.Name)
 		}
-		r.byName[t.Name] = t
+		r.held[t.Name] = []Template{t}
 	}
 	return r, nil
 }
 
-// Lookup returns the template a consumer selected. An unknown name lists what is
-// available: the set is small, closed and shipped with the binary, so the answer to
-// "which ones are there?" is always in hand and there is no reason to make the
-// operator go looking.
+// Lookup returns the newest version of the template a consumer selected. An unknown
+// name lists what is available: the set is small and in hand, so there is no reason
+// to make the operator go looking.
 func (r *Registry) Lookup(name string) (Template, error) {
-	t, ok := r.byName[name]
+	held, ok := r.held[name]
 	if !ok {
 		return Template{}, fmt.Errorf("%w: %q (available: %s)", ErrUnknown, name, strings.Join(r.Names(), ", "))
 	}
-	return t, nil
+	return held[len(held)-1], nil
+}
+
+// Version returns one held version of a template, the one a receipt names.
+func (r *Registry) Version(name string, version int) (Template, error) {
+	held, ok := r.held[name]
+	if !ok {
+		return Template{}, fmt.Errorf("%w: %q (available: %s)", ErrUnknown, name, strings.Join(r.Names(), ", "))
+	}
+	for _, t := range held {
+		if t.Version == version {
+			return t, nil
+		}
+	}
+	return Template{}, fmt.Errorf("%w: %s v%d (held: %s)", ErrUnknown, name, version, versionsOf(held))
+}
+
+// Versions returns every held version of a template, oldest first; nil for an
+// unknown name.
+func (r *Registry) Versions(name string) []Template {
+	return append([]Template(nil), r.held[name]...)
 }
 
 // Names lists the available template names, sorted.
 func (r *Registry) Names() []string {
-	names := make([]string, 0, len(r.byName))
-	for n := range r.byName {
+	names := make([]string, 0, len(r.held))
+	for n := range r.held {
 		names = append(names, n)
 	}
 	sort.Strings(names)
 	return names
 }
 
-// All returns every template, in name order.
+// All returns the newest version of every template, in name order.
 func (r *Registry) All() []Template {
-	all := make([]Template, 0, len(r.byName))
+	all := make([]Template, 0, len(r.held))
 	for _, n := range r.Names() {
-		all = append(all, r.byName[n])
+		held := r.held[n]
+		all = append(all, held[len(held)-1])
 	}
 	return all
+}
+
+// Held returns every version of every template, in name then version order.
+func (r *Registry) Held() []Template {
+	var all []Template
+	for _, n := range r.Names() {
+		all = append(all, r.held[n]...)
+	}
+	return all
+}
+
+func versionsOf(held []Template) string {
+	parts := make([]string, len(held))
+	for i, t := range held {
+		parts[i] = fmt.Sprintf("v%d", t.Version)
+	}
+	return strings.Join(parts, ", ")
 }
 
 func deref(s *string) string {

@@ -1,0 +1,11 @@
+{
+  "name": "heart",
+  "version": 1,
+  "description": "The heart: Garmin's daily resting, minimum and maximum heart rate, and every alert the watch raised, without the rest of the health record.",
+  "types": ["health.heart-rate-daily", "health.heart-rate-alert"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

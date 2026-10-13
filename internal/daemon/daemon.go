@@ -100,6 +100,9 @@ type Daemon struct {
 	// envelopes are admitted against.
 	importers importers
 	defs      *definitions
+	// projections are the templates reads select from and receipts verify against:
+	// bundled, and those the operator registered (card 125).
+	projections *projections
 	// mints asks the mint worker to mint at the head. It holds one request, so any
 	// number of batches landing during a mint cost one more mint, not one each.
 	mints chan struct{}
@@ -164,6 +167,11 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		closeAll()
 		return nil, err
 	}
+	projs, err := loadProjections(ctx, db)
+	if err != nil {
+		closeAll()
+		return nil, err
+	}
 	readOps, err := ops.OpenReadOnly(ctx, cfg.DBPath)
 	if err != nil {
 		closeAll()
@@ -176,20 +184,21 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		return nil, err
 	}
 	return &Daemon{
-		cfg:       cfg,
-		opts:      opts,
-		token:     tok,
-		started:   clock.Format(time.Now()),
-		writes:    Stores{Ledger: w, Ops: db},
-		read:      r,
-		readOps:   readOps,
-		artifacts: artifacts,
-		ingests:   newIngests(),
-		importers: imps,
-		defs:      defs,
-		mints:     make(chan struct{}, 1),
-		jobs:      make(chan job),
-		quit:      make(chan struct{}),
+		cfg:         cfg,
+		opts:        opts,
+		token:       tok,
+		started:     clock.Format(time.Now()),
+		writes:      Stores{Ledger: w, Ops: db},
+		read:        r,
+		readOps:     readOps,
+		artifacts:   artifacts,
+		ingests:     newIngests(),
+		importers:   imps,
+		defs:        defs,
+		projections: projs,
+		mints:       make(chan struct{}, 1),
+		jobs:        make(chan job),
+		quit:        make(chan struct{}),
 	}, nil
 }
 
@@ -244,7 +253,11 @@ func (d *Daemon) Handler() http.Handler {
 	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
 	inner := http.NewServeMux()
 	d.routes(inner)
-	inner.Handle("/", inspect.Handler(d.read, d.cfg.Timeout, buckets, d.cfg.LibraryDir, d.defs.current.Load, d.heldDefinitions, d.readOps))
+	inner.Handle("/", inspect.Handler(inspect.Deps{
+		Ledger: d.read, Timeout: d.cfg.Timeout, Buckets: buckets, Library: d.cfg.LibraryDir,
+		Definitions: d.defs.current.Load, Held: d.heldDefinitions, Checkpoints: d.readOps,
+		Projections: d.projections.current.Load,
+	}))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", d.healthz)

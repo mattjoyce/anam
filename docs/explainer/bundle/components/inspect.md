@@ -4,7 +4,7 @@ title: Inspector (internal/inspect)
 description: "The read-only web harness over the full fold: timeline, facets, events, projections and definitions, plus the default library's bytes confined to its root."
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/inspect/inspect.go#Handler
-anchor: "func Handler(l Ledger, timeout time.Duration, buckets span.Buckets, library string, defs func() *def.Registry,"
+anchor: "func Handler(d Deps) http.Handler {"
 basis: code
 tier: detail
 group: tools

@@ -32,10 +32,10 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
-// ErrTemplateMoved is returned when a receipt names a template version this binary no
-// longer carries. The template is exactly what produced the pruning, so a different
-// version cannot re-derive the same value and reporting "not reproduced" would blame
-// the ledger for a change in the code.
+// ErrTemplateMoved is returned when a receipt names a template version this record
+// does not hold, or holds with another body. The template is exactly what produced
+// the pruning, so a different one cannot re-derive the same value and reporting "not
+// reproduced" would blame the ledger for a change in the template.
 var ErrTemplateMoved = errors.New("serve: template version has moved since this receipt")
 
 // ErrOtherLedger is returned when a receipt names a ledger other than the one open.
@@ -198,6 +198,7 @@ func Publish(ctx context.Context, d Deps, t projection.Template, w ledger.Waterm
 		Watermark:            int64(w),
 		Template:             t.Name,
 		TemplateVersion:      t.Version,
+		TemplateHash:         t.Hash,
 		DefinitionSetVersion: d.DefinitionSetVersion,
 		ServedAt:             clock.Format(d.Clock.Now()),
 		Span:                 t.Span(),
@@ -290,20 +291,31 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 		return receipt.Receipt{}, receipt.Result{}, err
 	}
 
-	t, err := d.Templates.Lookup(r.Template)
+	// The exact version the receipt names, not the newest: every version ever held
+	// stays readable (card 125), so a receipt served under v1 verifies after v2 is
+	// registered. A version this record does not hold cannot re-derive the value.
+	t, err := d.Templates.Version(r.Template, r.TemplateVersion)
 	if err != nil {
+		if errors.Is(err, projection.ErrUnknown) {
+			return r, receipt.Result{}, fmt.Errorf("%w: the receipt was served under %s v%d: %v",
+				ErrTemplateMoved, r.Template, r.TemplateVersion, err)
+		}
 		return r, receipt.Result{}, err
 	}
-	if t.Version != r.TemplateVersion {
-		return r, receipt.Result{}, fmt.Errorf("%w: %s is v%d, the receipt was served under v%d",
-			ErrTemplateMoved, t.Name, t.Version, r.TemplateVersion)
+	var notes []string
+	switch r.TemplateHash {
+	case t.Hash:
+	case "":
+		notes = append(notes, "receipt names no template hash (served before template hashes were recorded); the version held is taken to be the one that served")
+	default:
+		return r, receipt.Result{}, fmt.Errorf("%w: %s v%d is %s here, the receipt was served under %s",
+			ErrTemplateMoved, t.Name, t.Version, t.Hash, r.TemplateHash)
 	}
 
 	ledgerID, err := d.Ledger.ID(ctx)
 	if err != nil {
 		return r, receipt.Result{}, err
 	}
-	var notes []string
 	switch r.LedgerID {
 	case ledgerID:
 	case "":

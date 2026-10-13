@@ -58,7 +58,7 @@ func seededServer(t *testing.T) (*httptest.Server, string, string) {
 	}
 
 	// A generous request timeout: latency is not under test here.
-	srv := httptest.NewServer(inspect.Handler(l, 30*time.Second, defaultBuckets, "", nil, nil, nil))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 	return srv, bp.ID, hr.ID
 }

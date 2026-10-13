@@ -223,7 +223,9 @@ without fields answers in whole facets as before. See *Fields*.
 filters only (type allow-list, datetime, endorsement status, max classification); whole-Facet
 include/exclude; **never reshapes, never generates**. Materialised as a content-addressed file. A consumer
 *selects*, never defines; it may name the *Fields* it wants of what the projection serves, which only
-narrows. Tombstone visibility is **not** a knob — the Canonical is live-only; a reader wanting tombstones
+narrows. The operator defines: templates are **bundled** with the binary (the floor) or **registered**
+over the API (card 125, 2026-10-13), each version immutable and every version held readable, since a
+receipt names the version and its hash. Tombstone visibility is **not** a knob — the Canonical is live-only; a reader wanting tombstones
 queries the *Ledger*. See *Fields*, *Receipt*, *Canonical*.
 
 **Provenance** — The recorded origin of a Facet: source and injector identity, plus (for derived facets)

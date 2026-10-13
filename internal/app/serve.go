@@ -25,30 +25,30 @@ func serveCmd(cfgPath *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve [projection]",
 		Short: "publish a projection of the canonical, with a receipt",
-		Long: `Serve prunes the whole-person canonical through a bundled projection template
-and publishes the result: the served value and its receipt, each written to the
+		Long: `Serve prunes the whole-person canonical through a projection template and
+publishes the result: the served value and its receipt, each written to the
 artifact directory under the SHA-256 of its own bytes.
 
 A projection prunes and nothing else — it never reshapes a facet, never generates
-one, and filters only on metadata. You select a template by name; you cannot define
-one. Run with no name to see what is available.
+one, and filters only on metadata. You select a template by name; a consumer never
+defines one. Templates are bundled with the binary or registered by the operator
+(anam projection register). Run with no name to see what is available.
 
 Serving writes nothing to the ledger. Being shown is not something Anam learned
 about a fact, so no anam-event is appended and the watermark does not move; the
 receipt is the record of the serve.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			templates, err := projection.Bundled()
+			cfg, err := loadConfig(*cfgPath, cmd)
 			if err != nil {
 				return err
 			}
 			if len(args) == 0 {
+				templates, err := localProjections(cmd.Context(), cfg)
+				if err != nil {
+					return err
+				}
 				return listProjections(cmd, templates)
-			}
-
-			cfg, err := loadConfig(*cfgPath, cmd)
-			if err != nil {
-				return err
 			}
 			deps, closeLedger, err := serveDeps(cmd.Context(), cfg)
 			if err != nil {
@@ -301,14 +301,15 @@ func writeVerified(cmd *cobra.Command, v api.ReceiptVerified) error {
 	return nil
 }
 
-// listProjections prints the bundled templates. A consumer selects one; this is the
-// menu, and there is no way to add to it at runtime (§9).
+// listProjections prints the templates held, newest version of each. A consumer
+// selects one; this is the menu, and the operator adds to it with anam projection
+// register (card 125).
 func listProjections(cmd *cobra.Command, templates *projection.Registry) error {
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 2, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "PROJECTION\tV\tTYPES\tSTATUSES\tMAX CLASS\tSPAN")
+	_, _ = fmt.Fprintln(w, "PROJECTION\tV\tSHAPE\tTYPES\tSTATUSES\tMAX CLASS\tSPAN")
 	for _, t := range templates.All() {
-		_, _ = fmt.Fprintf(w, "%s\t%d\t%s\t%s\t%s\t%s\n",
-			t.Name, t.Version, joinTypes(t), joinStatuses(t), t.MaxClassification, t.Span())
+		_, _ = fmt.Fprintf(w, "%s\t%d\t%s\t%s\t%s\t%s\t%s\n",
+			t.Name, t.Version, t.Shape, joinTypes(t), joinStatuses(t), t.MaxClassification, t.Span())
 	}
 	if err := w.Flush(); err != nil {
 		return err
@@ -400,7 +401,12 @@ func serveDeps(ctx context.Context, cfg config.Config) (serve.Deps, func(), erro
 		closeAll()
 		return serve.Deps{}, nil, err
 	}
-	deps, err := read.ServeDeps(l, store, db, defs)
+	templates, err := projectionsOf(ctx, db)
+	if err != nil {
+		closeAll()
+		return serve.Deps{}, nil, err
+	}
+	deps, err := read.ServeDeps(l, store, db, defs, templates)
 	if err != nil {
 		closeAll()
 		return serve.Deps{}, nil, err

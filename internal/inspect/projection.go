@@ -66,7 +66,7 @@ func (s *Server) projectionPage(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), s.timeout)
 	defer cancel()
 
-	templates, err := projection.Bundled()
+	templates, err := s.templates()
 	if err != nil {
 		httpError(w, err)
 		return

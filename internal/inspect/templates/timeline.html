@@ -27,7 +27,9 @@
       --select: rgba(57,135,229,0.18);
     }
   }
-  .band { width: 100%; height: auto; display: block; touch-action: pan-y; cursor: crosshair; }
+  /* a drag on the band is a gesture, not a text selection: the row labels and
+     tick labels would otherwise highlight as the box is drawn. */
+  .band { width: 100%; height: auto; display: block; touch-action: pan-y; cursor: crosshair; user-select: none; -webkit-user-select: none; }
   .band .rowbg { fill: var(--row); }
   .band .rowlabel { font-weight: 600; }
   .band .pt path { stroke: var(--ring); stroke-width: 1; }

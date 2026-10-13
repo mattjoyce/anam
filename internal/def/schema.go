@@ -100,7 +100,7 @@ func filledSchema(sub map[string]any) error {
 		}
 		return nil
 	}
-	types := typesOf(sub)
+	types := TypesOf(sub)
 	if len(types) == 0 {
 		return fmt.Errorf("names no type, so null would pass")
 	}
@@ -117,15 +117,17 @@ func filledSchema(sub map[string]any) error {
 	return nil
 }
 
-func typesOf(sub map[string]any) []string {
+// TypesOf is a subschema's declared JSON types: one, several, or none.
+func TypesOf(sub map[string]any) []string {
 	switch t := sub["type"].(type) {
 	case string:
 		return []string{t}
 	case []any:
 		out := make([]string, 0, len(t))
 		for _, v := range t {
-			s, _ := v.(string)
-			out = append(out, s)
+			if s, ok := v.(string); ok {
+				out = append(out, s)
+			}
 		}
 		return out
 	}
@@ -190,7 +192,7 @@ var valueKeywords = map[string]bool{"examples": true, "default": true, "enum": t
 var namedSchemas = map[string]bool{"properties": true, "patternProperties": true, "$defs": true}
 
 func isObjectSchema(n map[string]any) bool {
-	for _, t := range typesOf(n) {
+	for _, t := range TypesOf(n) {
 		if t == "object" {
 			return true
 		}

@@ -273,7 +273,7 @@ func walkFields(node map[string]any, at string, depth int, roles map[string][]st
 
 // typeOf names a field's type the way a reader says it.
 func typeOf(sub map[string]any) string {
-	types := typesOf(sub)
+	types := def.TypesOf(sub)
 	if len(types) == 0 {
 		if _, ok := sub["enum"]; ok {
 			return "enum"
@@ -306,22 +306,6 @@ func typeOf(sub map[string]any) string {
 		}
 	}
 	return strings.Join(out, " or ")
-}
-
-func typesOf(sub map[string]any) []string {
-	switch t := sub["type"].(type) {
-	case string:
-		return []string{t}
-	case []any:
-		out := make([]string, 0, len(t))
-		for _, v := range t {
-			if s, ok := v.(string); ok {
-				out = append(out, s)
-			}
-		}
-		return out
-	}
-	return nil
 }
 
 // notesOf states the constraints a field carries beyond its type, leaving out the two

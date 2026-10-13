@@ -343,6 +343,11 @@ func guardWith(ctx context.Context, db *ops.DB, reg *def.Registry) error {
 	if err != nil {
 		return err
 	}
+	// An upsert of what this build carries, never a sweep: a bundled type the build
+	// has dropped stays as a provisioned row at its last version. Its facets were
+	// admitted under that body and the inspector still reads them through it, and an
+	// importer that takes the type over keeps the version (the takeover test leans
+	// on exactly this).
 	put := make([]ops.DefinitionRow, len(current))
 	for i, m := range current {
 		put[i] = ops.DefinitionRow{Type: string(m.Type), Version: m.Version, Body: string(m.Body)}

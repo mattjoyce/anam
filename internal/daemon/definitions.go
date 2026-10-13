@@ -111,13 +111,11 @@ func (d *Daemon) heldDefinitions(ctx context.Context) (map[facet.Type]map[int][]
 			origin[t] = from
 		}
 	}
-	current, err := def.Manifests()
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, m := range current {
-		put(m.Type, m.Version, m.Body, api.OriginBundled)
-	}
+	// The stored body wins over the build's for the same type and version: it is
+	// what was in force when the facets were admitted, and the page says "as it was
+	// in force". The two differ only if a bundled manifest was edited without a
+	// version bump, which is the one thing an edit must not do; the start-up upsert
+	// then overwrites the stored row, so the rule is the guard, not this order.
 	registered, err := d.readOps.RegisteredDefinitions(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -131,6 +129,13 @@ func (d *Daemon) heldDefinitions(ctx context.Context) (map[facet.Type]map[int][]
 	}
 	for _, r := range stored {
 		put(facet.Type(r.Type), r.Version, []byte(r.Body), api.OriginBundled)
+	}
+	current, err := def.Manifests()
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, m := range current {
+		put(m.Type, m.Version, m.Body, api.OriginBundled)
 	}
 	return bodies, origin, nil
 }

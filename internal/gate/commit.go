@@ -237,16 +237,26 @@ func (g *Gate) batchDisposition(ctx context.Context, ps []prepared, pending []in
 	}
 
 	out := make(map[int]disposition, len(pending))
+	var refused Refused
 	for _, i := range pending {
 		if !known[ps[i].facetID] {
 			out[i] = disposition{version: 1, kind: facet.EventAdmitted}
 			continue
 		}
-		d, err := g.disposition(ctx, ps[i].facetID, ps[i].hash)
-		if err != nil {
+		d, err := g.disposition(ctx, ps[i])
+		switch {
+		case errors.Is(err, ErrTypeChanged):
+			// A refusal, not a failure: the batch is sent back whole with every
+			// envelope that would change a facet's type, and nothing is written.
+			refused.Envelopes = append(refused.Envelopes, RefusedEnvelope{Index: i, Type: ps[i].env.Type, Err: err})
+			continue
+		case err != nil:
 			return nil, err
 		}
 		out[i] = d
+	}
+	if len(refused.Envelopes) > 0 {
+		return nil, &refused
 	}
 	return out, nil
 }
@@ -298,15 +308,21 @@ func (g *Gate) admitChecks(env facet.Envelope, binding facet.Binding) (def.Defin
 }
 
 // disposition decides what this commit is by asking the ledger for the facet's
-// current version.
-func (g *Gate) disposition(ctx context.Context, facetID, hash string) (disposition, error) {
-	current, err := g.ledger.CurrentVersion(ctx, facetID)
+// current version. A current version of another type is refused (card 105): the id
+// is the source and the identity values, so this is a second type whose identity
+// values coincide with the first's, and a new version would change what kind of
+// fact the facet is.
+func (g *Gate) disposition(ctx context.Context, p prepared) (disposition, error) {
+	current, err := g.ledger.CurrentVersion(ctx, p.facetID)
 	switch {
 	case errors.Is(err, ledger.ErrNotFound):
 		return disposition{version: 1, kind: facet.EventAdmitted}, nil
 	case err != nil:
 		return disposition{}, err
-	case current.Descriptor.ContentHash == hash:
+	case current.Type != p.env.Type:
+		return disposition{}, fmt.Errorf("%w: %s is a %s (v%d), the envelope is a %s; the two types share identity values under source %s",
+			ErrTypeChanged, p.env.SourceRef, current.Type, current.ArtifactVersion, p.env.Type, p.env.Source)
+	case current.Descriptor.ContentHash == p.hash:
 		return disposition{version: current.ArtifactVersion, noop: true}, nil
 	default:
 		return disposition{

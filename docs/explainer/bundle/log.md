@@ -24,3 +24,8 @@ Card 50 closes the importers move, at anam master after 3b97178.
 - Code: projection templates are bundled or registered. `projection.Registry` holds every version by name; `Register` and `WithRegistered` mirror the Definitions' rules; the daemon keeps a `registered_projection` table (authored tier, immutable) and serves `GET`/`POST /v1/projections`; receipts carry `template_hash` and verify re-prunes through the exact version named; `anam projection list|show|register`.
 - Bundle: the projection component and the daemon's route table say so. The term and invariant pages still read "a consumer selects, never defines", which stays true.
 
+## 2026-10-13, cards 105, 106, 136
+
+- Code: the gate refuses a facet changing type (`ErrTypeChanged`); library documents are sandboxed and active kinds are downloads; `note.annotation` v2 times a note by its writing.
+- Bundle: the inspector component notes the sandbox.
+

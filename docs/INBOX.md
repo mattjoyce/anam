@@ -8,11 +8,14 @@ is `SELF-LOG.md`; this is the runbook. Written 2026-10-06, the night the first d
 ```
 /mnt/Projects/anam/private/            Windows: \\192.168.20.4\Projects\anam\private\   — the INBOX
 ├── <documents>                        dropped here; pending until processed
-├── records/                           a SOURCE: one YAML per document, read by anam_records
-├── documents/                         a SOURCE: every processed primary document, read by
-│   ├── <document>                     anam_documents; each with a sidecar, each a
-│   └── <document>.meta.yaml           doc.reference facet; `date:` the document's own date
 └── README-processing.md               status, for Matt, kept current by whoever processes
+
+/mnt/Library/anam/                     the SOURCES, on the Library share, which the gateway reads
+│                                      (/mnt/user/Library/anam, at /app/data/anam read-only)
+├── records/                           one YAML per document, read by anam_records
+└── documents/                         every processed primary document, read by anam_documents;
+    ├── <document>                     each with a sidecar, each a doc.reference facet;
+    └── <document>.meta.yaml           `date:` the document's own date
 
 <the daemon's data directory>          the RECORD, and the backup unit
 ├── ledger.db                          the ledger
@@ -23,12 +26,13 @@ is `SELF-LOG.md`; this is the runbook. Written 2026-10-06, the night the first d
 ```
 
 The two sources reach the record through their importers on the gateway, `anam_records` and
-`anam_documents` (card 119; the share folder `documents/` is set at that cut-over). Anam reads no
-folder itself.
+`anam_documents` (card 119). The sources sit on the Library share because the gateway cannot read
+`anam/private` (Matt, 2026-10-14). Anam reads no folder itself.
 
 The clone of this repo on the share ignores `private/`. Nothing in it is ever committed. The library
-is the primary source: a records file is an extraction from a document that is in the library, under
-the path its `document.name` names, with the hash its `document.sha256` records.
+is the primary source: a records file is an extraction from a document that is in the library, with
+the hash its `document.sha256` records; its `document.name` is the document's path under
+`documents/`, its name and identity. The library itself names each file by its sha256 (card 150).
 
 ## Records: the one shape every document becomes
 
@@ -120,7 +124,7 @@ card 119). Run them from that repo.
 **ACL pathology PDFs** (Australian Clinical Labs, PDFsharp e-results) are deterministic:
 
 ```sh
-python3 -I records/extract/acl_pathology.py --out-dir /mnt/Projects/anam/private/records \
+python3 -I records/extract/acl_pathology.py --out-dir /mnt/Library/anam/records \
   --history-labs 81225920 --known-times 81225920=07:56,22200789=07:46 <report.pdf>...
 ```
 
@@ -164,11 +168,11 @@ its own report, or a draw whose report is lost) is emitted from that later repor
 1. `sha256sum` the file. If a records file with that sha exists, the document is a duplicate: delete
    the drop and stop (the library already holds it).
 2. ACL PDF: run the extractor into `records/`. Anything else: read it, write the records file. Its
-   `document.name` is the path the document will have in the library.
+   `document.name` is the path the document will have under `documents/`.
 3. Validate before touching the live record: run `anam_records`' health check on the folder, or
    send it to the security lab daemon (`anam-lab`, synthetic data only, so a scratch copy of the
    one file). The gate is the validator; a records file that fails there fails identically live.
-4. Move the document into the share's `documents/` folder and write its sidecar.
+4. Move the document into `/mnt/Library/anam/documents/` and write its sidecar.
 5. The importers send both on their next poll, the records file and the document's bytes and
    reference. The daemon mints after the batches.
 6. Update `README-processing.md` on the share.

@@ -20,6 +20,7 @@
 * [Importer base (anam_importer)](importer-base.md) - The shared Python package every importer starts from: the ductile protocol, Definitions and local validation, envelopes and batches, and the HTTP client.
 * [Inspector (internal/inspect)](inspect.md) - The read-only web harness over the full fold: timeline, facets, events, projections and definitions, plus the default library's bytes confined to its root.
 * [Ledger store (internal/store/ledger)](store-ledger.md) - The append-only SQLite file: facet artifacts, anam-events and ledger_meta, with triggers that refuse update and delete for every writer.
+* [Library (internal/library)](library.md) - Anam's store of document bytes: files named <sha256>.<ext>, written only by Anam, placed by a folder limit and found again by a walk for the name.
 * [Mint](mint.md) - Writes bucket checkpoints after each change, starting from the last run and touching only the buckets the tail dirtied; also the composed reads that start from those checkpoints.
 * [Operational store (internal/store/ops)](store-ops.md) - The tracking.db SQLite file: Definitions, the facet and event indexes, the checkpoint log, mint runs and seals, snapshot parts, and the pins that refuse a mismatched ledger or width.
 * [Projection](projection.md) - Applies a bundled template to a canonical value, metadata filters only, and explains each facet's verdict by the knob that decided it.

@@ -21,6 +21,7 @@ depends_on:
   - /components/config.md
   - /components/backup.md
   - /components/inspect.md
+  - /components/library.md
 ---
 
 ## Start
@@ -33,7 +34,7 @@ depends_on:
 |---|---|---|
 | `POST /v1/envelopes` | importer token | admit a batch through the gate; see [admit a batch](/workflows/admit-a-batch.md) |
 | `POST /v1/definitions`, `GET /v1/definitions[/{type}[/{v}]]` | importer or operator | register and publish Definitions; see [register a Definition](/workflows/register-a-definition.md) |
-| `POST /v1/documents?path=` | importer token with `doc.reference` | store one document's bytes in the library (card 102); see [hand Anam a document](/workflows/hand-anam-a-document.md) |
+| `POST /v1/documents?ext=` | importer token with `doc.reference` | store one document's bytes in the [library](/components/library.md) as `<sha256>.<ext>` (cards 102, 150): 201 stored, 200 already held, 400 a bad extension, 403 a token without `doc.reference`; see [hand Anam a document](/workflows/hand-anam-a-document.md) |
 | `POST /v1/projections`, `GET /v1/projections[/{name}[/{v}]]` | operator | register and publish projection templates (card 125); a registered version is immutable and every version stays readable for receipts |
 | `GET /v1/snapshots/{id}` | importer (own) or operator | the resend report: live, absent, carried |
 | `GET /v1/timeline`, `GET /v1/changes`, `GET /v1/status` | operator | reads, bounded by `max_read_bytes` |

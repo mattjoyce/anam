@@ -59,7 +59,7 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 	if snap != nil {
 		digest = partDigest(envs)
 	}
-	err = d.tryWriteWithin(d.cfg.ImporterWait, d.timeout(r), func(ctx context.Context, s Stores) error {
+	err = d.tryWriteWithin(r.Context(), d.cfg.ImporterWait, d.timeout(r), func(ctx context.Context, s Stores) error {
 		// A part that does not belong to the run its id names, or that was already
 		// recorded with other envelopes, is refused before anything is admitted.
 		if err := checkSnapshot(ctx, s.Ops, imp.Source, snap, digest); err != nil {

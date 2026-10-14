@@ -62,7 +62,7 @@ func (d *Daemon) postDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	// Through the write queue, so one writer counts and places, and a backup copying
 	// the library never sees half a file.
-	err = d.tryWriteWithin(d.cfg.ImporterWait, d.timeout(r), func(context.Context, Stores) error {
+	err = d.tryWriteWithin(r.Context(), d.cfg.ImporterWait, d.timeout(r), func(context.Context, Stores) error {
 		var err error
 		stored.New, err = library.Store(d.cfg.LibraryDir, d.cfg.LibraryFolderLimit, stored.SHA256, ext, body)
 		return err

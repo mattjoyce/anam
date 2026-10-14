@@ -17,15 +17,12 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
-// maxManifest bounds a registered manifest. The largest bundled one is a few KB.
-const maxManifest = 1 << 20
-
 // postDefinitions registers a Definition an importer emits. The importer may register
 // only types it may submit. A registered version is immutable: the same body again is
 // unchanged, and anything else at that version is refused.
 func (d *Daemon) postDefinitions(w http.ResponseWriter, r *http.Request) {
 	imp := importerOf(r)
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxManifest))
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, int64(d.cfg.MaxManifestBytes)))
 	if err != nil {
 		writeError(w, http.StatusRequestEntityTooLarge, err)
 		return
@@ -41,7 +38,7 @@ func (d *Daemon) postDefinitions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var reg def.Registration
-	err = d.tryWriteWithin(importerWait, d.timeout(r), func(ctx context.Context, s Stores) error {
+	err = d.tryWriteWithin(d.cfg.ImporterWait, d.timeout(r), func(ctx context.Context, s Stores) error {
 		var err error
 		reg, err = d.register(ctx, s.Ops, body)
 		return err
@@ -53,7 +50,7 @@ func (d *Daemon) postDefinitions(w http.ResponseWriter, r *http.Request) {
 		errors.Is(err, def.ErrVersionBehind), errors.Is(err, def.ErrKeyed):
 		writeError(w, http.StatusConflict, err)
 	case errors.Is(err, ErrBusy), errors.Is(err, ErrStopped):
-		w.Header().Set("Retry-After", retryAfter)
+		w.Header().Set("Retry-After", d.retryAfter())
 		writeError(w, http.StatusServiceUnavailable, err)
 	case err != nil:
 		writeError(w, http.StatusInternalServerError, err)

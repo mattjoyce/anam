@@ -19,12 +19,9 @@ import (
 )
 
 // docType is the facet type a stored document is referenced by; an importer may post
-// documents only if it may submit references to them.
+// documents only if it may submit references to them. It names a bundled type, so it
+// is not configurable.
 const docType facet.Type = "doc.reference"
-
-// maxDocument bounds one posted document. A scanned letter or a lab report is a few
-// MB; a bound keeps one request from filling the disk.
-const maxDocument = 64 << 20
 
 // The ways a document post or a reference to one is refused.
 var (
@@ -54,7 +51,7 @@ func (d *Daemon) postDocument(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxDocument))
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, int64(d.cfg.MaxDocumentBytes)))
 	if err != nil {
 		writeError(w, http.StatusRequestEntityTooLarge, err)
 		return
@@ -65,14 +62,14 @@ func (d *Daemon) postDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	// Through the write queue, so one writer counts and places, and a backup copying
 	// the library never sees half a file.
-	err = d.tryWriteWithin(importerWait, d.timeout(r), func(context.Context, Stores) error {
+	err = d.tryWriteWithin(d.cfg.ImporterWait, d.timeout(r), func(context.Context, Stores) error {
 		var err error
 		stored.New, err = library.Store(d.cfg.LibraryDir, d.cfg.LibraryFolderLimit, stored.SHA256, ext, body)
 		return err
 	})
 	switch {
 	case errors.Is(err, ErrBusy), errors.Is(err, ErrStopped):
-		w.Header().Set("Retry-After", retryAfter)
+		w.Header().Set("Retry-After", d.retryAfter())
 		writeError(w, http.StatusServiceUnavailable, err)
 	case err != nil:
 		writeError(w, http.StatusInternalServerError, err)

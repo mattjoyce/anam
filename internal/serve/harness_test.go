@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/consent"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
@@ -127,7 +128,7 @@ func newHarness(t *testing.T) *harness {
 	t.Cleanup(func() { _ = db.Close() })
 
 	return &harness{
-		gate:  gate.New(l, defs, scopes, clock.Real{}, person),
+		gate:  gate.New(l, defs, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}),
 		l:     l,
 		dir:   dir,
 		store: store,

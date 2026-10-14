@@ -116,28 +116,36 @@ type Gate struct {
 	clock    Clock
 	personID string
 
-	maxPayloadBytes int
-	maxRetries      int
+	limits Limits
+}
+
+// Limits are the gate's two opinionated defaults, given by whoever builds it from the
+// loaded config (max_payload_bytes, commit_retries).
+type Limits struct {
+	// MaxPayloadBytes is the size policy for one payload.
+	MaxPayloadBytes int
+	// MaxRetries bounds the watermark race: how many times a batch that lost it is
+	// tried again before the gate reports contention.
+	MaxRetries int
 }
 
 // MaxBatch is the most envelopes one CommitBatch may carry.
 //
-// It is policy, and it lives here because the ledger has no limit of its own. A batch
-// is one transaction, so its events share one anam-time and a stale watermark costs
-// the whole block. The number is inherited: 49 was the most the ledger's previous
-// substrate could write in one transaction. It is kept so that the move to SQLite
-// changes where facts are stored and not which events share an instant. It can now be
-// raised; doing so coarsens the anam-time resolution of an import.
+// It is an invariant, not a config key (card 151). Every importer splits its source
+// into batches of this size (docs/IMPORTERS.md §8), so a daemon set lower would refuse
+// their full batches. A batch is one transaction, so its events share one anam-time
+// and a stale watermark costs the whole block: the size decides which events share an
+// instant, which is part of what the record says, not how it is run. It lives here
+// because the ledger has no limit of its own. The number is inherited: 49 was the most
+// the ledger's previous substrate could write in one transaction, kept so that the
+// move to SQLite changed where facts are stored and not which events share an
+// instant. Raising it coarsens the anam-time resolution of an import, so it is a
+// change to the contract, made here and in the importers together.
 const MaxBatch = 49
 
-// New builds a Gate. maxPayloadBytes is the size policy for one payload; maxRetries
-// bounds the watermark race.
-func New(l Ledger, defs Definitions, scopes TokenScopes, clock Clock, personID string) *Gate {
-	return &Gate{
-		ledger: l, defs: defs, scopes: scopes, clock: clock, personID: personID,
-		maxPayloadBytes: 300 * 1024,
-		maxRetries:      5,
-	}
+// New builds a Gate under limits.
+func New(l Ledger, defs Definitions, scopes TokenScopes, clock Clock, personID string, limits Limits) *Gate {
+	return &Gate{ledger: l, defs: defs, scopes: scopes, clock: clock, personID: personID, limits: limits}
 }
 
 // Outcome says what a commit or retract actually did.

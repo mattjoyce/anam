@@ -17,7 +17,8 @@ import (
 )
 
 // maxDepth bounds how deep placement goes: a sha256 has 64 characters, so no folder
-// name along its path is longer.
+// name along its path is longer. It follows from the name, so it is not a choice
+// (card 151); library_folder_limit is.
 const maxDepth = 64
 
 // Store writes body as <sum><ext> in the library, confined to it (os.Root),

@@ -26,7 +26,7 @@ const Layout = "2006-01-02T15:04:05.000000000Z07:00"
 
 // Width is the number of bytes Format always returns. Fixed width is what makes the
 // lexical comparison total: a shorter string can never sort against a longer one on a
-// prefix.
+// prefix. It follows from Layout and orders the record, so it is never configurable.
 const Width = 30
 
 // Format renders t as a fixed-width UTC timestamp.

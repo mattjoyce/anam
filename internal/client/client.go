@@ -20,17 +20,8 @@ import (
 	"github.com/mattjoyce/anam/internal/token"
 )
 
-// maxBody bounds a response the client will read. The whole-person timeline is the
-// largest answer, about 5 MB today; this leaves it room to grow tenfold.
-const maxBody = 64 << 20
-
-// networkMargin is how much longer the client waits for an answer than the daemon is
-// asked to take. The daemon bounds each request by the timeout the client sends; this
-// covers the trip.
-const networkMargin = 10 * time.Second
-
 // timeoutHeader is the daemon's daemon.TimeoutHeader, spelled here so the client does
-// not import the daemon.
+// not import the daemon. It is an invariant: both ends of the wire must spell it alike.
 const timeoutHeader = "Anam-Timeout"
 
 // Client is one daemon, and the token to present to it.
@@ -38,14 +29,23 @@ type Client struct {
 	server  string
 	token   []byte
 	timeout time.Duration
+	// margin is how much longer the client waits for an answer than the daemon is
+	// asked to take: the trip (network_margin).
+	margin time.Duration
+	// maxBody bounds a response the client will read (max_response_bytes).
+	maxBody int
 	http    *http.Client
 }
 
 // New returns a client of the daemon at server. tokenFile may be empty for a daemon
 // on loopback without a token. timeout is what the daemon is asked to answer within,
-// for each call that does not set its own; the client waits that plus a margin.
-func New(server, tokenFile string, timeout time.Duration) (*Client, error) {
-	c := &Client{server: strings.TrimSuffix(server, "/"), timeout: timeout, http: &http.Client{}}
+// for each call that does not set its own; the client waits that plus margin. maxBody
+// bounds what it reads of one answer.
+func New(server, tokenFile string, timeout, margin time.Duration, maxBody int) (*Client, error) {
+	c := &Client{
+		server: strings.TrimSuffix(server, "/"), timeout: timeout, margin: margin, maxBody: maxBody,
+		http: &http.Client{},
+	}
 	if tokenFile != "" {
 		t, err := token.Read(tokenFile)
 		if err != nil {
@@ -72,7 +72,7 @@ func (c *Client) Status(ctx context.Context) (api.Status, error) {
 func (c *Client) do(ctx context.Context, timeout time.Duration, method, path string, q url.Values,
 	body any, out any,
 ) (int, error) {
-	ctx, cancel := context.WithTimeout(ctx, timeout+networkMargin)
+	ctx, cancel := context.WithTimeout(ctx, timeout+c.margin)
 	defer cancel()
 
 	target := c.server + path
@@ -102,7 +102,7 @@ func (c *Client) do(ctx context.Context, timeout time.Duration, method, path str
 	resp, err := c.http.Do(req)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return 0, fmt.Errorf("server %s: no answer within %s", c.server, timeout+networkMargin)
+			return 0, fmt.Errorf("server %s: no answer within %s", c.server, timeout+c.margin)
 		}
 		// The url.Error repeats the method and URL; the server is already named.
 		var ue *url.Error
@@ -112,13 +112,13 @@ func (c *Client) do(ctx context.Context, timeout time.Duration, method, path str
 		return 0, fmt.Errorf("server %s unreachable: %w", c.server, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-	b, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
+	b, err := io.ReadAll(io.LimitReader(resp.Body, int64(c.maxBody)+1))
 	if err != nil {
 		return resp.StatusCode, fmt.Errorf("server %s: read response: %w", c.server, err)
 	}
-	if len(b) > maxBody {
+	if len(b) > c.maxBody {
 		return resp.StatusCode, fmt.Errorf("server %s: %s answered more than %d MB; narrow the read",
-			c.server, path, maxBody>>20)
+			c.server, path, c.maxBody>>20)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {

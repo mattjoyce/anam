@@ -111,7 +111,8 @@ type VersionRef struct {
 }
 
 // versionsBatch bounds the refs one Versions query carries: two parameters each, well
-// inside SQLite's limit on bound parameters.
+// inside SQLite's limit on bound parameters. Not a config key (card 151): it changes
+// no result and no limit a person meets, only how the store asks.
 const versionsBatch = 500
 
 // Versions returns the artifact at each ref, in no particular order. It is Version for
@@ -186,7 +187,8 @@ func missing(refs []VersionRef, found []facet.Facet) error {
 
 // latestScanAt is the number of facets above which LatestVersions reads the whole
 // primary key once instead of asking in batches: past it, one scan of a narrow index
-// is cheaper than the lookups.
+// is cheaper than the lookups. Not a config key (card 151), for the same reason as
+// versionsBatch: the answer is the same on either side of it.
 const latestScanAt = 20000
 
 // LatestVersions returns the newest artifact version of each facet in ids that the

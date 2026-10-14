@@ -17,6 +17,8 @@ package ledger
 //	   the fact-time zone changed what a facet's id and fact_time are. A schema 2
 //	   file holds rows keyed by the old rules and cannot be carried forward; it is
 //	   refused with the remedy, a new ledger from the same sources.
+//
+// It names the file's layout, so it is never configurable (card 151).
 const schemaVersion = 3
 
 // The ledger's schema. Three tables, and every one of them is append-only.

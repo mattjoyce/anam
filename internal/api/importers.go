@@ -45,17 +45,9 @@ type SnapshotReport struct {
 	CompletedW  int64    `json:"completed_w,omitempty"`
 	Live        *int     `json:"live,omitempty"`
 	Absent      *int     `json:"absent,omitempty"`
-	// AbsentIDs lists the absent facets, at most AbsentIDsMax of them.
+	// AbsentIDs lists the absent facets, at most the daemon's max_absent_ids of them.
 	AbsentIDs []string `json:"absent_ids,omitempty"`
 }
-
-// AbsentIDsMax bounds the absent ids a report lists; Absent still counts them all.
-const AbsentIDsMax = 1000
-
-// AbsentJudgeMax bounds how many uncarried live facets one GET /v1/snapshots/{id}
-// will judge, each a query for that facet's events; past it the report is 413 and
-// the CLI, unbounded and local, lists them (card 100).
-const AbsentJudgeMax = 5000
 
 // SubmittedEnvelope is one observation, shaped to a Definition. It names no source:
 // the token it arrives under does.

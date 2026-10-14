@@ -48,14 +48,6 @@ var ErrBusy = errors.New("daemon: a write is running")
 // network without a token.
 var ErrNotLoopback = errors.New("daemon: listen address is not loopback")
 
-// writeTimeout bounds writing one response. The inspector's whole-record page is about
-// 5 MB and renders in about a second, so this leaves a slow link plenty.
-const writeTimeout = 2 * time.Minute
-
-// shutdownGrace bounds how long shutdown waits for in-flight HTTP requests. Each
-// request is already bounded by the configured timeout, so this only has to cover it.
-const shutdownGrace = 10 * time.Second
-
 // Stores are the write handles a write is given. They are the daemon's and stay open
 // for its life: a write uses them and never closes them.
 type Stores struct {
@@ -120,6 +112,11 @@ type Daemon struct {
 // With a token file configured every request but /healthz must carry the token, and
 // the daemon may listen on any address. Without one it listens on loopback only.
 func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error) {
+	// Load has checked the limits; a Config built another way is checked here, so a
+	// zero wait or bound never reaches a request.
+	if err := cfg.Limits.Validate(); err != nil {
+		return nil, fmt.Errorf("daemon: %w", err)
+	}
 	var tok []byte
 	if cfg.TokenFile != "" {
 		t, err := token.Read(cfg.TokenFile)
@@ -272,7 +269,7 @@ func (d *Daemon) Handler() http.Handler {
 	inner.Handle("/", inspect.Handler(inspect.Deps{
 		Ledger: d.read, Timeout: d.cfg.Timeout, Buckets: buckets, Library: d.cfg.LibraryDir,
 		Definitions: d.defs.current.Load, Held: d.heldDefinitions, Checkpoints: d.readOps,
-		Projections: d.projections.current.Load,
+		Projections: d.projections.current.Load, CachedReads: d.cfg.InspectCachedReads,
 	}))
 
 	mux := http.NewServeMux()
@@ -323,11 +320,11 @@ func (d *Daemon) Run(ctx context.Context) error {
 func (d *Daemon) Serve(ctx context.Context, ln net.Listener) error {
 	srv := &http.Server{
 		Handler:           d.Handler(),
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       30 * time.Second,
+		ReadHeaderTimeout: d.cfg.HTTPReadHeaderTimeout,
+		ReadTimeout:       d.cfg.HTTPReadTimeout,
 		// A response that cannot be written in this long is a client that has gone.
-		WriteTimeout: writeTimeout,
-		IdleTimeout:  2 * time.Minute,
+		WriteTimeout: d.cfg.HTTPWriteTimeout,
+		IdleTimeout:  d.cfg.HTTPIdleTimeout,
 	}
 
 	var worker sync.WaitGroup
@@ -369,7 +366,7 @@ func (d *Daemon) Serve(ctx context.Context, ln net.Listener) error {
 	// Stop taking writes first: callers waiting on a run are answered now rather than
 	// holding Shutdown up, and the worker leaves once the running write returns.
 	d.stop.Do(func() { close(d.quit) })
-	shutCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownGrace)
+	shutCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), d.cfg.ShutdownGrace)
 	defer cancel()
 	if err := srv.Shutdown(shutCtx); err != nil {
 		serveErr = errors.Join(serveErr, fmt.Errorf("daemon: shutdown: %w", err))

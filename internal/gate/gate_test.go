@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
@@ -56,7 +57,7 @@ func newGate(t *testing.T) (*gate.Gate, *ledger.Ledger) {
 		t.Fatalf("NewRegistry: %v", err)
 	}
 	scopes := gate.StaticScopes{"bp-csv": {"health.blood-pressure"}}
-	return gate.New(l, reg, scopes, clock.Real{}, person), l
+	return gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}), l
 }
 
 func bpEnvelope(payload string) facet.Envelope {
@@ -261,7 +262,7 @@ func TestCommit_TypedRejections(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		g2 := gate.New(nil, reg, gate.StaticScopes{"bp-csv": {"health.sleep"}}, clock.Real{}, person)
+		g2 := gate.New(nil, reg, gate.StaticScopes{"bp-csv": {"health.sleep"}}, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 		env := bpEnvelope(bpPayload)
 		env.Type = "health.sleep"
 		if _, _, err := g2.Commit(ctx, env, binding); !errors.Is(err, gate.ErrNoDefinition) {

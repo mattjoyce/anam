@@ -48,7 +48,9 @@ var ErrCorrupt = errors.New("artifact: stored bytes do not match their content a
 
 // The file and directory modes. These are one person's published health facts, so the
 // files are owner-only and the directories owner-plus-group, matching what the
-// operational store already creates.
+// operational store already creates. They are not config keys (card 151): the record
+// is one person's health data, and widening who may read it is a security decision
+// made in code and review, not at deploy time.
 const (
 	fileMode = 0o600
 	dirMode  = 0o750

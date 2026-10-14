@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/client"
+	"github.com/mattjoyce/anam/internal/config"
 )
 
 // The daemon is stood in for here: these are the answers the client must turn into
@@ -50,7 +51,7 @@ func TestClientErrors(t *testing.T) {
 			t.Parallel()
 			srv := httptest.NewServer(tt.handler)
 			defer srv.Close()
-			c, err := client.New(srv.URL, tt.token, 3*time.Second)
+			c, err := client.New(srv.URL, tt.token, 3*time.Second, config.DefaultNetworkMargin, config.DefaultMaxResponseBytes)
 			if err != nil {
 				t.Fatal(err)
 			}

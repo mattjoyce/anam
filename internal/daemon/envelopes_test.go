@@ -264,7 +264,7 @@ func TestPostEnvelopesReadTheWholeBody(t *testing.T) {
 		"a second value":      {one + ` 1`, http.StatusBadRequest},
 		"garbage":             {one + ` garbage`, http.StatusBadRequest},
 		"whitespace past the bound": {
-			one + strings.Repeat(" ", maxSubmission-len(one)+1), http.StatusRequestEntityTooLarge},
+			one + strings.Repeat(" ", int(maxSubmission(config.DefaultMaxPayloadBytes))-len(one)+1), http.StatusRequestEntityTooLarge},
 		"a snapshot part with garbage": {
 			snapBatch("torn", 1, 1, weighIn("w-1", 80.5, weight.Version)) + ` garbage`, http.StatusBadRequest},
 	} {
@@ -285,7 +285,7 @@ func TestPostEnvelopesReadTheWholeBody(t *testing.T) {
 	if a.Changed != 1 || a.W != 1 {
 		t.Fatalf("batch with trailing whitespace: %+v", a)
 	}
-	call(t, "POST", url+"/v1/envelopes", importerToken, one+strings.Repeat(" ", maxSubmission-len(one)), http.StatusOK, &a)
+	call(t, "POST", url+"/v1/envelopes", importerToken, one+strings.Repeat(" ", int(maxSubmission(config.DefaultMaxPayloadBytes))-len(one)), http.StatusOK, &a)
 	if a.Changed != 0 || a.W != 1 || a.Results[0].Outcome != "no-op" {
 		t.Fatalf("batch padded to the bound: %+v", a)
 	}

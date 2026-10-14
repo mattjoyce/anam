@@ -252,8 +252,8 @@ The batch is admitted whole or not at all:
 | 422 | `error`, `refused[]` (`index`, `type`, `reason`) | Nothing written. Every envelope that failed is named. Fix or drop them and send the batch again. |
 | 400 | `error` | The body is not one submission: bad JSON, an unknown field, no version, 0 or more than 49 envelopes, or anything but whitespace after the submission. Nothing written. |
 | 401 / 403 | `error` | No importer's token, or the operator's. |
-| 413 | `error` | The body is over 16 MB, counting whatever follows the submission. Nothing written. The whole body is read before the batch is queued, and the daemon cuts off a body that takes more than 30 s to arrive. |
-| 503 | `error`, `Retry-After` | Another write held the ledger for more than 5 s, usually an ingest. Wait and send the same batch again. |
+| 413 | `error` | The body is over 49 payloads at `max_payload_bytes` plus 1 MiB (about 16 MB at the 300 KiB default), counting whatever follows the submission. Nothing written. The whole body is read before the batch is queued, and the daemon cuts off a body that takes longer than `http_read_timeout` (30 s) to arrive. |
+| 503 | `error`, `Retry-After` | Another write held the ledger for more than `importer_wait` (5 s), usually a backup or a full mint. Wait as long as `Retry-After` says and send the same batch again. |
 
 Sending a batch again is always safe. The same payload under the same identity is a `no-op`; a
 changed payload supersedes, keeping the old version. That is the whole retry and resend protocol: an
@@ -266,7 +266,7 @@ next batch waits on it.
 ### 8.4a Documents
 
 A document's bytes reach the library through Anam, never by an importer writing into Anam's
-directory (card 102). `POST /v1/documents?ext=<extension>`, body the raw bytes (at most 64 MiB),
+directory (card 102). `POST /v1/documents?ext=<extension>`, body the raw bytes (at most `max_document_bytes`, 64 MiB by default),
 under an importer token whose `types` include `doc.reference`. The answer is `sha256` (hex),
 `bytes`, `media_type` (from the extension) and `new`. 201 stored; 200 the library already held
 these bytes; 400 an extension that is not letters and digits, at most 16; 403 a token that may not
@@ -317,11 +317,11 @@ it no longer does (card 78; Matt, 2026-10-10).
   is a new run, with a new id. A part naming an id begun with other types or another part count is
   likewise a 409. An incremental run carries no snapshot.
 - **What Anam keeps.** The admitted parts and the facet ids they carried, `no-op` included, in the
-  operational store. It is disposable: an incomplete snapshot is dropped after a day, a source keeps
-  its two newest complete ones, and a lost table comes back with the next resend.
+  operational store. It is disposable: an incomplete snapshot is dropped after `snapshot_ttl` (a day), a
+  source keeps its `snapshot_keep` (two) newest complete ones, and a lost table comes back with the next resend.
 - **The report.** `GET /v1/snapshots/{id}`, under the importer's token (its own snapshots only) or
   the operator's: `complete`, `parts_admitted`, `carried`, and once complete `live` (the source's live
-  facets of the types now), `absent` and up to 1,000 `absent_ids`. Absent means live, not carried,
+  facets of the types now), `absent` and up to `max_absent_ids` (1,000) `absent_ids`. Absent means live, not carried,
   and untouched since the run began (`started_w`, the watermark after its first part): a facet an
   incremental run sent beside or after the run is never called absent (card 94). The one gap Anam
   cannot see is the importer's own: a facet admitted between the importer reading its source and

@@ -26,17 +26,12 @@ func (d *Daemon) Write(ctx context.Context, deadline time.Duration, fn WriteFunc
 	}
 }
 
-// acceptWait is how long TryWrite waits for the worker to take a write. The worker
-// is back at the queue microseconds after a write ends; a write still running after
-// this long is one worth refusing for, not waiting on.
-const acceptWait = 250 * time.Millisecond
-
-// TryWrite runs fn alone, under deadline, if the queue takes it within acceptWait,
+// TryWrite runs fn alone, under deadline, if the queue takes it within accept_wait,
 // and returns ErrBusy if another write holds it longer. Once fn is accepted it is
 // waited for: its own deadline bounds it, and an answer given before it ended would
 // misreport a write that went on to happen.
 func (d *Daemon) TryWrite(deadline time.Duration, fn WriteFunc) error {
-	return d.tryWriteWithin(acceptWait, deadline, fn)
+	return d.tryWriteWithin(d.cfg.AcceptWait, deadline, fn)
 }
 
 // tryWriteWithin is TryWrite waiting up to wait for the queue. An importer's batch

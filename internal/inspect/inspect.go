@@ -89,12 +89,10 @@ type Server struct {
 	// read is a deliberate act, not a page refresh.
 	asOf     map[ledger.Watermark]fold.Result
 	asOfRing []ledger.Watermark
+	// cachedReads bounds the ring, so a person clicking through a year of timestamps
+	// cannot grow the process without bound.
+	cachedReads int
 }
-
-// asOfCacheSize bounds the historical-read cache. Four is enough to flick between a
-// couple of instants without re-folding, and small enough that a person clicking
-// through a year of timestamps cannot grow the process without bound.
-const asOfCacheSize = 4
 
 // Deps is what the inspector reads from. Ledger and Timeout are required; the rest
 // widen what the pages can show. Library is the default library's root, or "" for
@@ -113,6 +111,9 @@ type Deps struct {
 	Held        HeldDefinitions
 	Checkpoints Checkpoints
 	Projections func() *projection.Registry
+	// CachedReads is how many historical folds the inspector keeps
+	// (inspect_cached_reads); zero keeps none.
+	CachedReads int
 }
 
 // Handler returns the inspector's routes on a fresh mux.
@@ -120,6 +121,7 @@ func Handler(d Deps) http.Handler {
 	s := &Server{
 		ledger: d.Ledger, timeout: d.Timeout, buckets: d.Buckets, library: d.Library,
 		defs: d.Definitions, heldDefs: d.Held, checkpoints: d.Checkpoints, projections: d.Projections,
+		cachedReads: d.CachedReads,
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.timeline)
@@ -196,9 +198,12 @@ func (s *Server) readAt(ctx context.Context, w ledger.Watermark) (fold.Result, e
 	if s.asOf == nil {
 		s.asOf = map[ledger.Watermark]fold.Result{}
 	}
+	if s.cachedReads < 1 {
+		return res, nil
+	}
 	if _, seen := s.asOf[w]; !seen {
 		s.asOfRing = append(s.asOfRing, w)
-		for len(s.asOfRing) > asOfCacheSize {
+		for len(s.asOfRing) > s.cachedReads {
 			delete(s.asOf, s.asOfRing[0])
 			s.asOfRing = s.asOfRing[1:]
 		}
@@ -207,12 +212,13 @@ func (s *Server) readAt(ctx context.Context, w ledger.Watermark) (fold.Result, e
 	return res, nil
 }
 
-// Serve runs the inspector at addr until ctx is cancelled.
-func Serve(ctx context.Context, l Ledger, addr string, timeout time.Duration, buckets span.Buckets, library string) error {
+// Serve runs the inspector over d at addr until ctx is cancelled. readHeaderTimeout
+// and shutdownGrace are the daemon's (http_read_header_timeout, shutdown_grace).
+func Serve(ctx context.Context, addr string, d Deps, readHeaderTimeout, shutdownGrace time.Duration) error {
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           Handler(Deps{Ledger: l, Timeout: timeout, Buckets: buckets, Library: library}),
-		ReadHeaderTimeout: 5 * time.Second,
+		Handler:           Handler(d),
+		ReadHeaderTimeout: readHeaderTimeout,
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}
 
@@ -221,7 +227,7 @@ func Serve(ctx context.Context, l Ledger, addr string, timeout time.Duration, bu
 
 	select {
 	case <-ctx.Done():
-		shutCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		shutCtx, cancel := context.WithTimeout(context.Background(), shutdownGrace)
 		defer cancel()
 		return srv.Shutdown(shutCtx)
 	case err := <-errc:

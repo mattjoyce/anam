@@ -535,7 +535,7 @@ rebuild has to know what it may drop:
 | **Derived** | facet index, anam-event index, checkpoint index, `span_head`, sync cursors | replay the ledger |
 | **Provisioned** | Facet Definitions (bundled and registered), bundled projection templates, token scopes | the embedded assets, config, and each importer registering its Definitions again — i.e. git |
 | **Authored** | registered projection templates (card 125), saved span bookmarks, GC state, the operational log | nowhere Anam can reach. Back it up; a registered template also comes back by registering it again from wherever the operator keeps the file |
-| **Disposable** | importers' complete-resend snapshots (card 78): which parts of a run were admitted and which facet ids they carried | the next resend makes another; nothing is tombstoned from here without an operator's `anam retract --yes`, and an incomplete snapshot is dropped after a day |
+| **Disposable** | importers' complete-resend snapshots (card 78): which parts of a run were admitted and which facet ids they carried | the next resend makes another; nothing is tombstoned from here without an operator's `anam retract --yes`, and an incomplete snapshot is dropped after `snapshot_ttl`, a day by default |
 
 The tier belongs in the schema beside each table, because it is the only thing that tells a later reader
 whether dropping it is survivable.

@@ -26,12 +26,15 @@ var ErrSnapshotMismatch = errors.New("ops: snapshot already begun with a differe
 // label, not a retry. A run that reads its source again is a new run with a new id.
 var ErrSnapshotPartChanged = errors.New("ops: snapshot part already recorded with other envelopes")
 
-// snapshotTTL is how long an incomplete snapshot is kept before it is dropped.
-const snapshotTTL = 24 * time.Hour
-
-// keepComplete is how many complete snapshots are kept per source: the newest is the
-// one retraction plans from; the one before it is kept to compare against.
-const keepComplete = 2
+// SnapshotRetention is how long snapshots are kept, given by the caller from the
+// loaded config (snapshot_ttl, snapshot_keep).
+type SnapshotRetention struct {
+	// Incomplete is how long an incomplete snapshot is kept before it is dropped.
+	Incomplete time.Duration
+	// Complete is how many complete snapshots are kept per source: the newest is the
+	// one retraction plans from.
+	Complete int
+}
 
 // SnapshotPart is one admitted batch of a snapshot. Digest is the content identity of
 // the batch's envelopes, as the caller computes it; the store holds it beside the part
@@ -70,13 +73,13 @@ type Snapshot struct {
 func (s Snapshot) Complete() bool { return !s.CompletedAt.IsZero() }
 
 // RecordSnapshotPart records an admitted part, in one transaction: incomplete
-// snapshots older than a day are dropped first; the snapshot is begun on its first
+// snapshots older than keep.Incomplete are dropped first; the snapshot is begun on its first
 // part; a part already recorded with the same digest adds nothing, and one recorded
 // with another digest is ErrSnapshotPartChanged; a new part and its facet ids are
 // added; and the snapshot is marked complete when its last missing part lands. w is
 // the ledger's watermark just after this part was admitted; the first part's is kept
-// as the run's start.
-func (d *DB) RecordSnapshotPart(ctx context.Context, p SnapshotPart, at time.Time, w int64) (Snapshot, error) {
+// as the run's start. Complete snapshots beyond the newest keep.Complete are dropped.
+func (d *DB) RecordSnapshotPart(ctx context.Context, p SnapshotPart, at time.Time, w int64, keep SnapshotRetention) (Snapshot, error) {
 	types := typesKey(p.Types)
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -84,7 +87,7 @@ func (d *DB) RecordSnapshotPart(ctx context.Context, p SnapshotPart, at time.Tim
 	}
 	defer func() { _ = tx.Rollback() }() // no-op after Commit
 
-	if err := dropStale(ctx, tx, at); err != nil {
+	if err := dropStale(ctx, tx, at, keep.Incomplete); err != nil {
 		return Snapshot{}, err
 	}
 	var source, held string
@@ -105,7 +108,7 @@ func (d *DB) RecordSnapshotPart(ctx context.Context, p SnapshotPart, at time.Tim
 	err = tx.QueryRowContext(ctx, `SELECT digest FROM snapshot_part WHERE id = ? AND part = ?`, p.ID, p.Part).Scan(&recorded)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		if err := addPart(ctx, tx, p, at, w); err != nil {
+		if err := addPart(ctx, tx, p, at, w, keep.Complete); err != nil {
 			return Snapshot{}, err
 		}
 	case err != nil:
@@ -127,7 +130,7 @@ func (d *DB) RecordSnapshotPart(ctx context.Context, p SnapshotPart, at time.Tim
 
 // addPart records a part not yet held, with its facet ids, and completes the snapshot
 // when it was the last missing one.
-func addPart(ctx context.Context, tx *sql.Tx, p SnapshotPart, at time.Time, w int64) error {
+func addPart(ctx context.Context, tx *sql.Tx, p SnapshotPart, at time.Time, w int64, keepComplete int) error {
 	if _, err := tx.ExecContext(ctx, `INSERT INTO snapshot_part (id, part, digest) VALUES (?, ?, ?)`, p.ID, p.Part, p.Digest); err != nil {
 		return fmt.Errorf("ops: snapshot %s part %d: %w", p.ID, p.Part, err)
 	}
@@ -152,7 +155,7 @@ func addPart(ctx context.Context, tx *sql.Tx, p SnapshotPart, at time.Time, w in
 		clock.Format(at), w, p.ID); err != nil {
 		return fmt.Errorf("ops: snapshot %s: %w", p.ID, err)
 	}
-	return keepNewest(ctx, tx, p.Source)
+	return keepNewest(ctx, tx, p.Source, keepComplete)
 }
 
 // Snapshot returns one snapshot, or ok false when it is not held.
@@ -244,14 +247,14 @@ func snapshotOf(ctx context.Context, q queryer, id string) (Snapshot, bool, erro
 	return s, true, nil
 }
 
-// dropStale removes incomplete snapshots begun more than a day before at.
-func dropStale(ctx context.Context, tx execer, at time.Time) error {
-	cut := clock.Format(at.Add(-snapshotTTL))
+// dropStale removes incomplete snapshots begun more than ttl before at.
+func dropStale(ctx context.Context, tx execer, at time.Time, ttl time.Duration) error {
+	cut := clock.Format(at.Add(-ttl))
 	return dropWhere(ctx, tx, `completed_at IS NULL AND started_at < ?`, cut)
 }
 
 // keepNewest drops a source's complete snapshots beyond the newest keepComplete.
-func keepNewest(ctx context.Context, tx execer, source string) error {
+func keepNewest(ctx context.Context, tx execer, source string, keepComplete int) error {
 	return dropWhere(ctx, tx, `source = ? AND completed_at IS NOT NULL AND id NOT IN
 		(SELECT id FROM snapshot WHERE source = ? AND completed_at IS NOT NULL
 		 ORDER BY completed_at DESC, id DESC LIMIT ?)`, source, source, keepComplete)

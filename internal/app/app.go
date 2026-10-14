@@ -116,7 +116,10 @@ func inspectCmd(cfgPath *string) *cobra.Command {
 
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "inspecting ledger %s (person %s), read-only\nhttp://%s/\n",
 				cfg.LedgerPath, cfg.PersonID, listen)
-			return inspect.Serve(cmd.Context(), l, listen, cfg.Timeout, buckets, cfg.LibraryDir)
+			return inspect.Serve(cmd.Context(), listen, inspect.Deps{
+				Ledger: l, Timeout: cfg.Timeout, Buckets: buckets, Library: cfg.LibraryDir,
+				CachedReads: cfg.InspectCachedReads,
+			}, cfg.HTTPReadHeaderTimeout, cfg.ShutdownGrace)
 		},
 	}
 	// Loopback by default: the inspector is a local diagnostic tool, not a service.
@@ -175,5 +178,5 @@ func loadRoutedConfig(explicit string, cmd *cobra.Command) (config.Config, error
 
 // newClient is the client of cfg's server, presenting cfg's token.
 func newClient(cfg config.Config) (*client.Client, error) {
-	return client.New(cfg.Server, cfg.TokenFile, cfg.Timeout)
+	return client.New(cfg.Server, cfg.TokenFile, cfg.Timeout, cfg.NetworkMargin, cfg.MaxResponseBytes)
 }

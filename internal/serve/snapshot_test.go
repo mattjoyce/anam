@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
@@ -49,7 +50,7 @@ func medHarness(t *testing.T) *harness {
 		"bp-csv": {"health.blood-pressure"}, "health-db": {"health.sleep"},
 		"self-log": {"med.started", "med.dose-changed", "med.stopped"},
 	}
-	h.gate = gate.New(h.l, reg, scopes, clock.Real{}, person)
+	h.gate = gate.New(h.l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	h.deps.Series = reg
 	return h
 }

@@ -100,7 +100,7 @@ func newRemoteFixtureWith(t *testing.T, zone string, tweak func(t *testing.T, f 
 // ledger, so a test of changes compares like with like.
 func (f remoteFixture) awaitIndex(t *testing.T, tokenPath string) {
 	t.Helper()
-	c, err := client.New(f.server, tokenPath, 5*time.Second)
+	c, err := client.New(f.server, tokenPath, 5*time.Second, config.DefaultNetworkMargin, config.DefaultMaxResponseBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +326,7 @@ func TestChanges_SameOverTheDaemon(t *testing.T) {
 func TestTheDaemonRefusesALocalZone(t *testing.T) {
 	t.Parallel()
 	f := newRemoteFixture(t)
-	c, err := client.New(f.server, filepath.Join(f.dir, "token"), 5*time.Second)
+	c, err := client.New(f.server, filepath.Join(f.dir, "token"), 5*time.Second, config.DefaultNetworkMargin, config.DefaultMaxResponseBytes)
 	if err != nil {
 		t.Fatal(err)
 	}

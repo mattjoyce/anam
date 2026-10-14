@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
@@ -45,7 +46,7 @@ func newMedGate(t *testing.T) (*gate.Gate, *ledger.Ledger) {
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
 	}
-	return gate.New(l, reg, gate.StaticScopes{"self-log": {"med.started"}}, clock.Real{}, person), l
+	return gate.New(l, reg, gate.StaticScopes{"self-log": {"med.started"}}, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}), l
 }
 
 func medEnvelope(payload string) facet.Envelope {

@@ -39,6 +39,16 @@ Two kinds of note:
   - [[2026-10-06-r8-the-mint]] — R8: `anam checkpoint` mints one value per bucket; dirtiness is the value's hash, not a watermark, so no second index.
   - [[2026-10-06-what-meds-was-i-on]] — the self-log, documents as references, and the snapshot read; an interval is a series of point facts, and probable doses are not stored.
   - [[2026-10-06-the-inbox-and-the-first-documents]] — the records worker, the ACL parser, the runbook; 194 facts from the first documents, and the record now starts in 2023.
+  - [[2026-10-07-series-snapshots-and-the-rest-of-the-board]] — nine cards to done in eleven commits: the series key, snapshots, reference payloads and the rest of the board.
+  - [[2026-10-07-evening-the-rebuild-and-the-library]] — the blood pressure medicine named, the ledger rebuilt from source with a zone on every Definition, and the documents moved in beside it as a library.
+  - [[2026-10-07-night-the-heart-rate-alarm-and-the-timeline]] — Garmin's heart rate alarm found in the raw FIT files, 301 times since January 2025, and a timeline rebuilt so an alarm looks like one.
+  - [[2026-10-08-the-daemon-and-the-importers-proposal]] — `anam daemon` owns the stores behind a token and serves the CLI; Withings says how firmly a reading is tied to Matt; late that night the importers proposal moves the sources out of Anam.
+  - [[2026-10-09-the-record-moves-and-reads-start-from-checkpoints]] — reads compose from checkpoints and buckets split by bytes along the calendar (975 ms to 62 ms); the record moves to unraid; nightly backups, closed JSON Schema, the importer door, a clean-room DreamStation decoder.
+  - [[2026-10-10-the-importers-take-the-sources]] — Withings and the blood pressure exports arrive only through importers, DreamStation goes live with 1,317 nights, one owner per Definition, retraction by complete resend kept report-only, receipted reads over the API.
+  - [[2026-10-11-health-db-retires-and-the-importers-take-over]] — eleven blue-team cards before breakfast; health-db retracted whole (5,818), Garmin and Concept2 live through importers sharing a bundled type, a read gets a size bound.
+  - [[2026-10-12-the-phone-the-page-and-the-fields]] — OwnTracks positions as `location.track` with no map tiles; the timeline page from 1.84 MB to 100 KB; a read names its `fields` and gets a frame; the extractors leave for anam-importers.
+  - [[2026-10-13-ten-cards-and-a-gate-misread]] — ten cards while Matt was away: checkpoints made visible, projections registered like Definitions, the gate refuses a type change, two browser holes closed, and card 108 merged on a misread gate.
+  - [[2026-10-14-anam-reads-no-source-itself]] — records and documents move to their importers (2,901 resent, all no-op), the library names a document by sha256, every opinionated default gets a config key, queue wait spends the deadline, and a rebuild drill matches 2,939 facets but cannot bring back anam-time.
 - Decision notes
   - [[the-inversion]] · [[person-substrate-grain]] · [[mint-unit-whole-timeline]]
   - [[facet-types-dotted-namespaced]] · [[facet-definition-format]]

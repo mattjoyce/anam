@@ -187,12 +187,12 @@ depth** — not freshness (the Ledger is always current, so a read replays to th
 time-OR-size-OR-rate; a quiet bucket mints nothing. Automatic after every ingest that moves W since
 2026-10-09 (card 61), and `POST /v1/checkpoints` by hand. See *Checkpoint*, *Bucket span*.
 
-**Library** — A folder root whose rows are files, read by the `documents` worker: each file is a
-`doc.reference` Facet whose payload is its **library-relative path**, sha256, size, media type and the
-date its sidecar gives it. The **default library** is `documents/` beside the ledger and needs no
-declaration; a named library is a `documents` import with its own root. The root is a place and never
-enters a fact. The share's private folder is the **inbox**, not a library: documents move from it into
-the library once their records are written. See *Native reference*.
+**Library** — The folder beside the ledger (`documents/`, `library_dir`) that holds document bytes.
+Only Anam writes it (`POST /v1/documents`, card 102), and it names each file by its sha256 (card 150),
+in subfolders of the sha256's first characters once a folder holds `library_folder_limit` files. A
+`doc.reference` Facet's payload is the document's **name** (its `path`, the identity), sha256, size,
+media type and the date its sidecar gives it; the sha256 finds the bytes. The folder never enters a
+fact. The share's private folder is the **inbox**, not a library. See *Native reference*.
 
 **Native reference** — A reference Facet's payload: a pointer to a document in its *Library*, resolved
 live by the inspector from the library root. Built in card 24 as `doc.reference`.

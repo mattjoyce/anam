@@ -266,16 +266,24 @@ next batch waits on it.
 ### 8.4a Documents
 
 A document's bytes reach the library through Anam, never by an importer writing into Anam's
-directory (card 102). `POST /v1/documents?path=<library-relative path>`, body the raw bytes (at
-most 64 MiB), under an importer token whose `types` include `doc.reference`. The answer is what a
-`doc.reference` names: `path`, `sha256` (hex), `bytes`, `media_type`, and `new`. 201 stored; 200
-the same bytes already at that path; 409 other bytes at that path, since a stored document is a
-value and a changed one takes a new path; 400 a path that is absolute, climbs out, names a dot-file
-or a `.meta.yaml` sidecar; 403 a token that may not submit `doc.reference`.
+directory (card 102). `POST /v1/documents?ext=<extension>`, body the raw bytes (at most 64 MiB),
+under an importer token whose `types` include `doc.reference`. The answer is `sha256` (hex),
+`bytes`, `media_type` (from the extension) and `new`. 201 stored; 200 the library already held
+these bytes; 400 an extension that is not letters and digits, at most 16; 403 a token that may not
+submit `doc.reference`. There is no conflict: Anam names the stored file by its sha256 (card 150),
+so other bytes are another file and nothing is overwritten. The extension only labels that file for
+a person browsing the library.
 
-Then the importer submits the `doc.reference` envelope as any other. An envelope naming a path the
-library does not hold, or a `sha256` other than the bytes held there, is refused with the batch
-(422), before the gate, and nothing of the batch is admitted.
+Then the importer submits the `doc.reference` envelope as any other. Its `path` is the document's
+name and identity, whatever the importer files it under; its `sha256` is how Anam finds the bytes.
+The same `path` with another `sha256`, a rescan, supersedes the facet, and the first scan's bytes
+stay for the facet version that names them. An envelope naming a `sha256` the library holds no
+bytes for is refused with the batch (422), before the gate, and nothing of the batch is admitted.
+
+Where in the library a file sits is the library's own business and never enters a fact. A file
+goes in the library root until that holds `library_folder_limit` files (default 1000), then into
+a subfolder named by the first character of its sha256, then the first two inside that, and so on.
+A stored file never moves; a lookup finds it by its name.
 
 ### 8.5 What an importer must do
 

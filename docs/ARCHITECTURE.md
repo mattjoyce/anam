@@ -619,12 +619,13 @@ running.
 
 **The ledger's directory is the record, and the backup unit.** Beside `ledger.db` sit the published
 artifacts (`artifacts/`) and the **default library** (`documents/`): the primary source documents the
-facts were extracted from, each admitted as a `doc.reference` by its library-relative path and hash.
-A library is a folder root whose rows are files; the default one needs no declaration because its
-place is derived from the ledger's, and a named one is a `documents` import with its own root. The root
-is a *place* and never enters a fact: the facet carries the relative path and the sha256, so a library
-that moves is a config change and a document that changes supersedes. The inspector serves the default
-library's bytes itself (`/document?path=`), confined to the root.
+facts were extracted from, each referenced by a `doc.reference` that names it and its sha256. Anam
+alone writes the library (`POST /v1/documents`, card 102) and names each file by its sha256 (card 150),
+so a stored file is a value: never overwritten, never renamed, found by its name. Where a file sits
+is the library's business, and neither the root nor the folder enters a fact: the facet carries the
+document's name, its identity, and the sha256, so a library that moves is a config change and a
+document rescanned under the same name supersedes, its first bytes kept. The inspector serves the
+library's bytes itself (`/document?sha256=`), confined to the root.
 
 ### Keys are identity-first, and integers are typed
 

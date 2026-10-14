@@ -36,19 +36,20 @@ func TestLoadDefaults(t *testing.T) {
 	}
 
 	want := config.Config{
-		PersonID:         "matt",
-		LedgerPath:       "/data/anam/ledger.db",
-		DBPath:           "/data/anam/tracking.db",
-		ArtifactDir:      "/data/anam/artifacts",
-		LibraryDir:       "/data/anam/documents",
-		Zone:             "Local",
-		Listen:           config.DefaultListen,
-		Timeout:          5 * time.Second,
-		IngestTimeout:    15 * time.Minute,
-		BackupKeep:       14,
-		BucketWidth:      span.Default,
-		CheckpointBudget: config.DefaultCheckpointBudget,
-		MaxReadBytes:     config.DefaultMaxReadBytes,
+		PersonID:           "matt",
+		LedgerPath:         "/data/anam/ledger.db",
+		DBPath:             "/data/anam/tracking.db",
+		ArtifactDir:        "/data/anam/artifacts",
+		LibraryDir:         "/data/anam/documents",
+		Zone:               "Local",
+		Listen:             config.DefaultListen,
+		Timeout:            5 * time.Second,
+		IngestTimeout:      15 * time.Minute,
+		BackupKeep:         14,
+		BucketWidth:        span.Default,
+		CheckpointBudget:   config.DefaultCheckpointBudget,
+		MaxReadBytes:       config.DefaultMaxReadBytes,
+		LibraryFolderLimit: config.DefaultLibraryFolderLimit,
 	}
 	if got != want {
 		t.Errorf("Load() = %+v, want %+v", got, want)
@@ -105,19 +106,20 @@ bucket_width: weekly
 	}
 
 	want := config.Config{
-		PersonID:         "matt",
-		LedgerPath:       "/srv/anam/ledger.db",
-		DBPath:           "/srv/anam/tracking.db",
-		ArtifactDir:      "/srv/anam/artifacts",
-		LibraryDir:       "/srv/anam/documents",
-		Zone:             "Local",
-		Listen:           config.DefaultListen,
-		Timeout:          12 * time.Second,
-		IngestTimeout:    15 * time.Minute,
-		BackupKeep:       14,
-		BucketWidth:      span.Weekly,
-		CheckpointBudget: config.DefaultCheckpointBudget,
-		MaxReadBytes:     config.DefaultMaxReadBytes,
+		PersonID:           "matt",
+		LedgerPath:         "/srv/anam/ledger.db",
+		DBPath:             "/srv/anam/tracking.db",
+		ArtifactDir:        "/srv/anam/artifacts",
+		LibraryDir:         "/srv/anam/documents",
+		Zone:               "Local",
+		Listen:             config.DefaultListen,
+		Timeout:            12 * time.Second,
+		IngestTimeout:      15 * time.Minute,
+		BackupKeep:         14,
+		BucketWidth:        span.Weekly,
+		CheckpointBudget:   config.DefaultCheckpointBudget,
+		MaxReadBytes:       config.DefaultMaxReadBytes,
+		LibraryFolderLimit: config.DefaultLibraryFolderLimit,
 	}
 	if got != want {
 		t.Errorf("Load() = %+v, want %+v", got, want)
@@ -151,6 +153,7 @@ func TestEnvOverridesFileAndDefaults(t *testing.T) {
 
 	t.Setenv("ANAM_LEDGER_PATH", "/from-env/ledger.db")
 	t.Setenv("ANAM_TIMEOUT", "30s")
+	t.Setenv("ANAM_LIBRARY_FOLDER_LIMIT", "250")
 
 	got, err := config.Load(path)
 	if err != nil {
@@ -165,6 +168,9 @@ func TestEnvOverridesFileAndDefaults(t *testing.T) {
 	}
 	if got.PersonID != "from-file" {
 		t.Errorf("PersonID = %q, want the file value where the environment is silent", got.PersonID)
+	}
+	if got.LibraryFolderLimit != 250 {
+		t.Errorf("LibraryFolderLimit = %d, want the environment to override the default", got.LibraryFolderLimit)
 	}
 }
 
@@ -230,15 +236,16 @@ func TestValidate(t *testing.T) {
 	t.Parallel()
 
 	valid := config.Config{
-		PersonID:      "matt",
-		LedgerPath:    "/srv/ledger.db",
-		DBPath:        "/srv/tracking.db",
-		ArtifactDir:   "/srv/artifacts",
-		LibraryDir:    "/srv/documents",
-		Zone:          "Australia/Sydney",
-		Timeout:       5 * time.Second,
-		IngestTimeout: time.Minute,
-		BucketWidth:   span.Default,
+		PersonID:           "matt",
+		LedgerPath:         "/srv/ledger.db",
+		DBPath:             "/srv/tracking.db",
+		ArtifactDir:        "/srv/artifacts",
+		LibraryDir:         "/srv/documents",
+		Zone:               "Australia/Sydney",
+		Timeout:            5 * time.Second,
+		IngestTimeout:      time.Minute,
+		BucketWidth:        span.Default,
+		LibraryFolderLimit: config.DefaultLibraryFolderLimit,
 	}
 
 	tests := []struct {
@@ -269,6 +276,8 @@ func TestValidate(t *testing.T) {
 		{"weekly bucket_width", func(c *config.Config) { c.BucketWidth = span.Weekly }, false},
 		{"unknown bucket_width", func(c *config.Config) { c.BucketWidth = "fortnightly" }, true},
 		{"empty bucket_width", func(c *config.Config) { c.BucketWidth = "" }, true},
+		{"zero library_folder_limit", func(c *config.Config) { c.LibraryFolderLimit = 0 }, true},
+		{"library_folder_limit of one", func(c *config.Config) { c.LibraryFolderLimit = 1 }, false},
 	}
 
 	for _, tt := range tests {

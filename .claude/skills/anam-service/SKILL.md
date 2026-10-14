@@ -37,7 +37,7 @@ runs, nothing else may open those files. Ask it over HTTP instead.
 | `GET /v1/definitions[/{type}[/{version}]]` | yes, or an importer's | The published Definitions: list, current manifest, one version. |
 | `POST /v1/definitions` | an importer's | Register a Definition the importer emits. 201 new, 200 same body, 409 immutable or re-keyed. |
 | `POST /v1/envelopes` | an importer's | A batch of up to 49 envelopes, admitted whole (200, per-envelope outcomes) or refused whole (422, every reason). 503 with `Retry-After` while a write runs. The operator's token gets 403. A resend-everything run labels its batches as parts of one `snapshot`. Contract: `docs/IMPORTERS.md` §8. |
-| `POST /v1/documents?path=` | an importer's, with `doc.reference` | Store a document's bytes in the library (card 102). 201 stored, 200 same bytes, 409 other bytes at that path. A `doc.reference` envelope naming bytes the library does not hold is refused. |
+| `POST /v1/documents?ext=` | an importer's, with `doc.reference` | Store a document's bytes in the library, named by their sha256 (cards 102, 150). 201 stored, 200 already held; never a conflict. A `doc.reference` envelope naming a sha256 the library does not hold is refused. |
 | `GET /v1/snapshots/{id}` | yes, or the importer whose run it is | A complete resend's report: parts admitted, whether it is complete, and what the source no longer holds (`absent`, judged from the snapshot's start). 404 unknown, or another importer's. |
 | `GET /` and below | yes | The inspector (timeline, facets, events, documents). Browser: basic auth, any user name, the token as password. |
 

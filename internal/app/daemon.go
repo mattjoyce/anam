@@ -36,7 +36,7 @@ and to importers, each under its own token (importers_file, docs/IMPORTERS.md §
 
     POST /v1/envelopes                  a batch of envelopes, admitted whole or refused whole
     POST /v1/definitions                register a Definition the importer emits
-    POST /v1/documents?path=            store a document's bytes in the library
+    POST /v1/documents?ext=             store a document's bytes in the library
     GET  /v1/definitions[/{type}[/{v}]] the published Definitions (the operator may read too)
 
 The CLI asks these when server is set (ANAM_SERVER, --server); see anam --help.

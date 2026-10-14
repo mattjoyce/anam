@@ -42,11 +42,18 @@ type Config struct {
 	ArtifactDir string `mapstructure:"artifact_dir"`
 
 	// LibraryDir is the default library: the folder of primary source documents the
-	// facts were extracted from, each admitted as a doc.reference by its
-	// library-relative path and hash. It defaults to `documents` beside the ledger,
-	// so the ledger's directory is the whole record and the backup unit. A folder
-	// that does not exist is an empty library, not an error.
+	// facts were extracted from. Anam alone writes it, each document's bytes named by
+	// their sha256 (card 150), and a doc.reference finds them by that name. It
+	// defaults to `documents` beside the ledger, so the ledger's directory is the whole
+	// record and the backup unit. A folder that does not exist is an empty library,
+	// not an error.
 	LibraryDir string `mapstructure:"library_dir"`
+
+	// LibraryFolderLimit is how many files one library folder holds before a new
+	// document goes a level deeper, into a subfolder named by the start of its sha256
+	// (card 150). It places new files only: a stored file never moves, and a lookup
+	// finds a document by its name wherever it is, so changing it strands nothing.
+	LibraryFolderLimit int `mapstructure:"library_folder_limit"`
 
 	// Zone is the reader's zone: the one a bare date on the command line is taken in
 	// and fact-times are shown in. It is not a fact-time rule — each Definition
@@ -156,6 +163,7 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 	v.SetDefault("backup_dir", "")
 	v.SetDefault("backup_keep", 14)
 	v.SetDefault("max_read_bytes", DefaultMaxReadBytes)
+	v.SetDefault("library_folder_limit", DefaultLibraryFolderLimit)
 
 	if path != "" {
 		v.SetConfigFile(path)
@@ -238,6 +246,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("%w: checkpoint_budget must be 0 or more bytes, got %d", ErrInvalid, c.CheckpointBudget)
 	case c.MaxReadBytes < 0:
 		return fmt.Errorf("%w: max_read_bytes must be 0 or more bytes, got %d", ErrInvalid, c.MaxReadBytes)
+	case c.LibraryFolderLimit < 1:
+		return fmt.Errorf("%w: library_folder_limit must be at least 1, got %d", ErrInvalid, c.LibraryFolderLimit)
 	}
 	if c.Server != "" {
 		if err := checkServer(c.Server); err != nil {
@@ -327,6 +337,10 @@ const DefaultCheckpointBudget = 1 << 20
 // docs/API.md §3 proposes. A month of every type is under it; the whole record, at
 // 12.8 MB on 2026-10-11, is not.
 const DefaultMaxReadBytes = 512 << 10
+
+// DefaultLibraryFolderLimit is library_folder_limit's default: 1000 files, few
+// enough that a person listing a folder by hand still reads it.
+const DefaultLibraryFolderLimit = 1000
 
 // DefaultListen is the daemon's address when none is configured: loopback, on the
 // port the inspector has always used.

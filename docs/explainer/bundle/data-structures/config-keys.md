@@ -18,6 +18,7 @@ references: []
 | `db_path` | `ANAM_DB_PATH` | `~/.local/share/anam/tracking.db`; must differ from the ledger |
 | `artifact_dir` | `ANAM_ARTIFACT_DIR` | `~/.local/share/anam/artifacts` |
 | `library_dir` | `ANAM_LIBRARY_DIR` | `documents/` beside the ledger |
+| `library_folder_limit` | `ANAM_LIBRARY_FOLDER_LIMIT` | 1000 files a library folder holds before a new one goes a level deeper (card 150) |
 | `zone` | `ANAM_ZONE` | `Local`; the daemon refuses it for reads |
 | `listen` | `ANAM_LISTEN` | `127.0.0.1:8787` |
 | `token_file` | `ANAM_TOKEN_FILE` | none; required to listen off loopback; at least 32 characters |

@@ -88,12 +88,13 @@ was I on"; `anam serve meds` publishes the current regimen with a receipt.
 
 ## Documents as facts of their own
 
-Every processed document is a facet: `doc.reference`, whose payload is the library-relative path, the
-sha256, the media type and size, and the date from a sidecar. `anam_documents` reads the share's
-`documents/` folder, and `anam_submit` posts each file's bytes to `POST /v1/documents` before its
-reference, so the **library** beside the ledger holds them and Anam refuses a reference to bytes it
-does not hold. A stored document is a value: other bytes at a path the library holds are refused, so a
-changed document takes a new file name. Every file in the source folder has a sidecar beside it,
+Every processed document is a facet: `doc.reference`, whose payload is the document's path in the
+source folder, the sha256, the media type and size, and the date from a sidecar. `anam_documents`
+reads the share's `documents/` folder, and `anam_submit` posts each file's bytes to
+`POST /v1/documents` before its reference, so the **library** beside the ledger holds them and Anam
+refuses a reference to bytes it does not hold. The library names each stored file by its sha256, so
+a document rescanned under the same name is new bytes, and its facet supersedes the old one, whose
+bytes stay. Every file in the source folder has a sidecar beside it,
 `<file>.meta.yaml`:
 
 ```yaml
@@ -104,9 +105,9 @@ title: Lipid studies      # anything else worth saying stays in the payload too
 A file with no sidecar stops the importer's run and names the sidecar to write, so write the
 sidecar before the file goes in. Identity is the relative path, so a renamed file is a new facet and the old one
 stands until `anam retract documents --yes` plans it from the importer's next whole resend; changed
-bytes at the same path are refused, so a changed document takes a new name. `.meta.yaml` files, dot-files and
-dot-folders are skipped. The inspector links a reference facet to its bytes (`/document?path=…`),
-served from the library and confined to it.
+bytes at the same path supersede. `.meta.yaml` files, dot-files and dot-folders are skipped. The
+inspector links a reference facet to its bytes (`/document?sha256=…`), served from the library and
+confined to it, under the document's own file name.
 
 A second documents folder is a second `anam_documents` instance with its own `documents_dir`; the
 folder is config and never enters a fact, and every path is relative to it.

@@ -50,6 +50,16 @@ db_path: ~/.local/share/anam/tracking.db
 # authored, not rebuildable — back them up.
 artifact_dir: ~/.local/share/anam/artifacts
 
+# --- the library: document bytes ------------------------------------------------
+# Only Anam writes it (POST /v1/documents), naming each file by its sha256.
+# Defaults to documents/ beside the ledger. Back it up with the ledger.
+# library_dir: ~/.local/share/anam/documents
+
+# How many files one library folder holds before a new one goes into a subfolder
+# named by the start of its sha256. It places new files only; a stored file never
+# moves and is found by its name, so changing it strands nothing.
+library_folder_limit: 1000
+
 # Bounds every call to a store. Anam fails fast rather than hanging.
 timeout: 5s
 

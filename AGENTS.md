@@ -19,16 +19,15 @@ Every design review and code audit runs through **Hickey × Armstrong** (*struct
     store a fact's current status as mutable place — derive it.
   - The **substrate is accidental**, not essential — the problem is a personal longitudinal record, not a
     store. Only `internal/store` may name SQLite or `database/sql`; `scripts/check.sh` enforces
-    it. One carve-out: `internal/capture` may read a **source** in its native format (a source that is a
-    SQLite file needs `database/sql` to be read) — that is the source's substrate, not Anam's, and
-    capture never imports `internal/store`. The ledger is the record, in a SQLite file of its own; files
+    it. Anam reads no source itself: every source reaches it through an importer, over the envelope
+    API (card 119). The ledger is the record, in a SQLite file of its own; files
     hold published artifacts; a second SQLite file is the **operational store**, authoritative for what
     Anam authors. Each of its tables says where it comes back from (§8) — the *derived* tier by replaying
     the ledger, and that tier must stay provably derived.
 - **Armstrong (runtime).** For each component, name its failure and its recovery. What is the **error
   kernel** — the small trusted core that must not corrupt? What crashes, and what restarts it clean?
   - Anam's **error kernel** is the *append-only ledger + admission-gate invariants* (three pillars,
-    idempotency, immutability). Everything else — capture workers, fold, projection, CLI — is
+    idempotency, immutability). Everything else — importers, fold, projection, CLI — is
     **disposable and rebuildable from source** (Anam owns no facts).
   - `commit` is **idempotent**; the artifact and its anam-event are one SQLite transaction, and the
     watermark `W` is the newest event's `seq`. **There is no transaction across the two files** — the
@@ -117,9 +116,10 @@ go test -race -count=1 -shuffle=on -vet=all ./...
 
 ## Python
 
-Python is for one-off extraction and reshaping scripts in `scripts/` (`extract-*.py`,
-`reshape-*.py`), which turn a source export into something an import can read. It never touches the
-ledger or the operational store, and Anam itself stays Go.
+Anam holds no Python since card 119: the one-off extraction and reshaping scripts, which turn a
+source export into a records file, live in `anam-importers` under `records/extract` (card 58). A
+script that comes back here never touches the ledger or the operational store, Anam itself stays
+Go, and these rules hold:
 
 - `#!/usr/bin/env python3`, stdlib only, `argparse` for flags. PyYAML is the one third-party module
   in use; a second one follows the dependency rule above.

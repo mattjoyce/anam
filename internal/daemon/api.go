@@ -20,11 +20,8 @@ import (
 )
 
 // The /v1 routes. Every handler is bounded by the configured timeout, and none waits
-// on the write queue, so a busy ledger never holds a request. The one exception is a
-// POST /v1/ingest that asks to wait, bounded by the wait it asked for.
+// on the write queue, so a busy ledger never holds a request.
 func (d *Daemon) routes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /v1/ingest", d.postIngest)
-	mux.HandleFunc("GET /v1/operations/{id}", d.getOperation)
 	mux.HandleFunc("GET /v1/status", d.getStatus)
 	mux.HandleFunc("GET /v1/timeline", d.getTimeline)
 	mux.HandleFunc("GET /v1/changes", d.getChanges)
@@ -68,8 +65,8 @@ func (d *Daemon) mintDeps(s Stores) mint.Deps {
 // postCheckpoints mints, or with ?dry_run=true derives without publishing; ?full=true
 // folds the whole ledger instead of starting from the last run. Minting
 // writes the operational store and the artifacts, so it runs on the write queue. While
-// another write holds the queue it answers 503 at once, naming the ingest if one is
-// running, rather than wait out a run that may take minutes. Once accepted, the mint
+// another write holds the queue it answers 503 at once, rather than wait out a write
+// that may take minutes. Once accepted, the mint
 // is answered whenever it ends, so a 2xx or an error always says what happened.
 func (d *Daemon) postCheckpoints(w http.ResponseWriter, r *http.Request) {
 	var q api.MintQuery
@@ -88,11 +85,6 @@ func (d *Daemon) postCheckpoints(w http.ResponseWriter, r *http.Request) {
 		m, err = mint.Report(ctx, d.mintDeps(s), q)
 		return err
 	})
-	if errors.Is(err, ErrBusy) {
-		if running, _ := d.ingests.ids(); running != "" {
-			err = fmt.Errorf("%w: ingest %s; ask again when it has finished", err, running)
-		}
-	}
 	switch {
 	case errors.Is(err, ErrStopped), errors.Is(err, ErrBusy):
 		writeError(w, http.StatusServiceUnavailable, err)
@@ -157,7 +149,7 @@ func (d *Daemon) verifyReceipt(w http.ResponseWriter, r *http.Request) {
 // postReceipt publishes a read: the timeline read the query describes, through its
 // projection, filed with a receipt (card 87). The query is the timeline's, in the
 // same parameters. Publishing writes artifacts only, so it takes no turn on the write
-// queue and never waits on an ingest; the artifact store's writes are atomic (card
+// queue and never waits on a write; the artifact store's writes are atomic (card
 // 95), so two publishes of one value at once each leave a whole file.
 func (d *Daemon) postReceipt(w http.ResponseWriter, r *http.Request) {
 	q, err := api.TimelineQueryOf(r.URL.Query())
@@ -216,7 +208,7 @@ func (d *Daemon) getTimeline(w http.ResponseWriter, r *http.Request) {
 }
 
 // getChanges reads the anam-event index as it stands. The daemon catches the index
-// up inside each ingest's write, so a read never writes and never waits on a write;
+// up inside each batch's write, so a read never writes and never waits on a write;
 // the answer carries W, which says when the index is behind.
 func (d *Daemon) getChanges(w http.ResponseWriter, r *http.Request) {
 	q := api.ChangesQueryOf(r.URL.Query())
@@ -302,68 +294,6 @@ func writeReadError(w http.ResponseWriter, err error) {
 	}
 }
 
-// postIngest asks for an ingest and answers 202 with the run that will take in what
-// the sources hold now.
-//
-// With ?wait=<duration> it holds the response until that run finishes, for at most
-// that long and never past ingest_timeout, and then answers 200 for a run that
-// succeeded and 500 for one that failed, with the operation either way. A run still
-// going when the wait ends answers 202 as without it. This is for a scheduler that
-// judges a job by how it ends: the run itself is the same either way.
-func (d *Daemon) postIngest(w http.ResponseWriter, r *http.Request) {
-	var wait time.Duration
-	if v := r.URL.Query().Get("wait"); v != "" {
-		var err error
-		if wait, err = time.ParseDuration(v); err != nil || wait <= 0 {
-			writeError(w, http.StatusBadRequest, fmt.Errorf("wait %q: want a positive duration such as 300s", v))
-			return
-		}
-		wait = min(wait, d.cfg.IngestTimeout)
-	}
-
-	id, err := d.RequestIngest()
-	if errors.Is(err, ErrStopped) {
-		writeError(w, http.StatusServiceUnavailable, err)
-		return
-	}
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
-	w.Header().Set("Location", "/v1/operations/"+id)
-	if wait == 0 {
-		op, _ := d.Operation(id)
-		writeJSON(w, http.StatusAccepted, op)
-		return
-	}
-	// The server's write deadline is shorter than a long wait; this response is
-	// allowed the wait plus the usual margin.
-	if err := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(wait + writeTimeout)); err != nil {
-		slog.Warn("daemon: extend write deadline", "err", err)
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), wait)
-	defer cancel()
-	op, _ := d.WaitOperation(ctx, id)
-	switch op.State {
-	case api.StateSucceeded:
-		writeJSON(w, http.StatusOK, op)
-	case api.StateFailed:
-		writeJSON(w, http.StatusInternalServerError, op)
-	default:
-		writeJSON(w, http.StatusAccepted, op)
-	}
-}
-
-func (d *Daemon) getOperation(w http.ResponseWriter, r *http.Request) {
-	op, ok := d.Operation(r.PathValue("id"))
-	if !ok {
-		writeError(w, http.StatusNotFound,
-			errors.New("no such operation here; operations are forgotten on restart, so read the ledger"))
-		return
-	}
-	writeJSON(w, http.StatusOK, op)
-}
-
 func (d *Daemon) getStatus(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
@@ -379,9 +309,8 @@ func (d *Daemon) getStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	s := api.Status{
 		Version: d.opts.Version, Person: d.cfg.PersonID, LedgerID: id, W: int64(head),
-		Since: d.started, Sources: d.ingests.sourceStatuses(),
+		Since: d.started, Sources: d.sources.statuses(),
 	}
-	s.Ingest.Running, s.Ingest.Pending = d.ingests.ids()
 	writeJSON(w, http.StatusOK, s)
 }
 

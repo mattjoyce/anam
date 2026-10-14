@@ -8,17 +8,23 @@ is `SELF-LOG.md`; this is the runbook. Written 2026-10-06, the night the first d
 ```
 /mnt/Projects/anam/private/            Windows: \\192.168.20.4\Projects\anam\private\   — the INBOX
 ├── <documents>                        dropped here; pending until processed
-├── records/                           the SOURCE Anam ingests: one YAML per document
+├── records/                           a SOURCE: one YAML per document, read by anam_records
+├── documents/                         a SOURCE: every processed primary document, read by
+│   ├── <document>                     anam_documents; each with a sidecar, each a
+│   └── <document>.meta.yaml           doc.reference facet; `date:` the document's own date
 └── README-processing.md               status, for Matt, kept current by whoever processes
 
-~/.local/share/anam/                   the ThinkPad: the RECORD, and the backup unit
+<the daemon's data directory>          the RECORD, and the backup unit
 ├── ledger.db                          the ledger
 ├── tracking.db                        the operational store
 ├── artifacts/                         checkpoints and receipts
-└── documents/                         the DEFAULT LIBRARY: every processed primary document,
-    ├── <document>                     each with a sidecar, each a doc.reference facet
-    └── <document>.meta.yaml           `date:` the document's own date
+└── documents/                         the LIBRARY: the bytes of every referenced document,
+                                       written by Anam alone from what anam_documents posts
 ```
+
+The two sources reach the record through their importers on the gateway, `anam_records` and
+`anam_documents` (card 119; the share folder `documents/` is set at that cut-over). Anam reads no
+folder itself.
 
 The clone of this repo on the share ignores `private/`. Nothing in it is ever committed. The library
 is the primary source: a records file is an extraction from a document that is in the library, under
@@ -26,11 +32,11 @@ the path its `document.name` names, with the hash its `document.sha256` records.
 
 ## Records: the one shape every document becomes
 
-`internal/capture/records` reads every `*.yaml` and `*.json` under `records/`:
+`anam_records` reads every `*.yaml` and `*.json` under `records/`:
 
 ```yaml
 document:  {name: 2026-01-30_pathology_lipid_studies.pdf, sha256: a2716a1e…}
-extracted: {method: scripts/extract-acl-pathology.py, version: 1}
+extracted: {method: records/extract/acl_pathology.py, version: 1}
 records:
   - type: lab.result                   # a bundled Definition with identity_key ["/id"]
     id: acl:39986323/total-chol        # identity, chosen once, deterministic from the content
@@ -83,9 +89,11 @@ was I on"; `anam serve meds` publishes the current regimen with a receipt.
 ## Documents as facts of their own
 
 Every processed document is a facet: `doc.reference`, whose payload is the library-relative path, the
-sha256, the media type and size, and the date from a sidecar. The bytes stay in the **default
-library**, `documents/` beside the ledger, which needs no declaration: `anam ingest` and `anam retract`
-add it as the `documents` source whenever the folder exists. Every file in it has a sidecar beside it,
+sha256, the media type and size, and the date from a sidecar. `anam_documents` reads the share's
+`documents/` folder, and `anam_submit` posts each file's bytes to `POST /v1/documents` before its
+reference, so the **library** beside the ledger holds them and Anam refuses a reference to bytes it
+does not hold. A stored document is a value: other bytes at a path the library holds are refused, so a
+changed document takes a new file name. Every file in the source folder has a sidecar beside it,
 `<file>.meta.yaml`:
 
 ```yaml
@@ -93,21 +101,25 @@ date: 2026-01-30          # the document's own date, not the day it was scanned
 title: Lipid studies      # anything else worth saying stays in the payload too
 ```
 
-A file with no sidecar refuses the whole scan, and the hourly ingest with it, so write the sidecar
-before the file goes in. Identity is the relative path, so a renamed file is a new facet and the old one
-stands until `anam retract documents --yes`; changed bytes supersede. `.meta.yaml` files, dot-files and
+A file with no sidecar stops the importer's run and names the sidecar to write, so write the
+sidecar before the file goes in. Identity is the relative path, so a renamed file is a new facet and the old one
+stands until `anam retract documents --yes` plans it from the importer's next whole resend; changed
+bytes at the same path are refused, so a changed document takes a new name. `.meta.yaml` files, dot-files and
 dot-folders are skipped. The inspector links a reference facet to its bytes (`/document?path=…`),
 served from the library and confined to it.
 
-A second library is a declared `documents` import with its own root; a declared one replaces the
-default rather than adding to it. The root is config and never enters a fact.
+A second documents folder is a second `anam_documents` instance with its own `documents_dir`; the
+folder is config and never enters a fact, and every path is relative to it.
 
 ## Extractors
+
+The extractors live in `anam-importers` under `records/extract` (card 58; Anam's copies went with
+card 119). Run them from that repo.
 
 **ACL pathology PDFs** (Australian Clinical Labs, PDFsharp e-results) are deterministic:
 
 ```sh
-python3 -I scripts/extract-acl-pathology.py --out-dir /mnt/Projects/anam/private/records \
+python3 -I records/extract/acl_pathology.py --out-dir /mnt/Projects/anam/private/records \
   --history-labs 81225920 --known-times 81225920=07:56,22200789=07:46 <report.pdf>...
 ```
 
@@ -124,9 +136,9 @@ analyte per draw and one `lab.panel` for the report's draw (`acl:<lab>/panel/<sl
 - **Ids.** `acl:<lab_number>/<analyte-slug>`; a non-blood specimen prefixes the slug
   (`urine-albumin`), so urine and serum albumin do not collide.
 
-**Fitbit weight logs** (Google Takeout `Weight Logs.xlsx`): `scripts/extract-fitbit-weight.py`,
+**Fitbit weight logs** (Google Takeout `Weight Logs.xlsx`): `records/extract/fitbit_weight.py`,
 stdlib only, one `health.weight` per log, id `fitbit:<ISO minute>` with an ordinal when two logs
-share a minute. **Strong workouts** (the app's CSV, semicolon-separated): `scripts/extract-strong-csv.py`,
+share a minute. **Strong workouts** (the app's CSV, semicolon-separated): `records/extract/strong_csv.py`,
 one `gym.visit` per workout keyed by its start time (the export's "Workout #" is renumbered per export),
 every set kept verbatim under `sets`.
 
@@ -152,15 +164,13 @@ its own report, or a draw whose report is lost) is emitted from that later repor
    the drop and stop (the library already holds it).
 2. ACL PDF: run the extractor into `records/`. Anything else: read it, write the records file. Its
    `document.name` is the path the document will have in the library.
-3. Validate before touching the live ledger: build, `anam init` against a scratch ledger via
-   `ANAM_LEDGER_PATH`, `ANAM_DB_PATH`, `ANAM_ARTIFACT_DIR`, `anam ingest --imports <scratch>`. The
-   gate is the validator; a records file that fails here fails identically live.
-4. Move the document into the library, `~/.local/share/anam/documents/`, and write its sidecar.
-5. `ANAM_PERSON_ID=matt ~/go/bin/anam ingest` (back up `ledger.db` and `tracking.db` beside the data
-   first, by convention `*.pre-<event>-<date>`). The records and the document go in together; the
-   hourly gateway ingest reads both, `records/` as a declared import and the library implicitly.
-6. `anam checkpoint` re-mints the buckets the new facts touched.
-7. Update `README-processing.md` on the share.
+3. Validate before touching the live record: run `anam_records`' health check on the folder, or
+   send it to the security lab daemon (`anam-lab`, synthetic data only, so a scratch copy of the
+   one file). The gate is the validator; a records file that fails there fails identically live.
+4. Move the document into the share's `documents/` folder and write its sidecar.
+5. The importers send both on their next poll, the records file and the document's bytes and
+   reference. The daemon mints after the batches.
+6. Update `README-processing.md` on the share.
 
 ## What the first night taught
 

@@ -132,8 +132,8 @@ func (c *Client) do(ctx context.Context, timeout time.Duration, method, path str
 	return resp.StatusCode, nil
 }
 
-// failure turns a non-2xx response into an error. A 500 for an ingest still carries
-// the operation, so the body is decoded into out as well when it is one.
+// failure turns a non-2xx response into an error. The body is decoded into out as
+// well, best effort, for a refusal that carries an answer.
 func (c *Client) failure(resp *http.Response, b []byte, out any) error {
 	switch resp.StatusCode {
 	case http.StatusUnauthorized:
@@ -235,20 +235,6 @@ func (c *Client) Mint(ctx context.Context, mq api.MintQuery) (api.Mint, error) {
 	}
 	_, err := c.do(ctx, c.timeout, http.MethodPost, "/v1/checkpoints", q, nil, &m)
 	return m, err
-}
-
-// Ingest asks the daemon to run its imports and waits up to wait for the run to
-// finish. It returns the operation as it stands: succeeded, failed, or still going
-// when the wait ran out. A run that failed is an answer, not an error.
-func (c *Client) Ingest(ctx context.Context, wait time.Duration) (api.Operation, error) {
-	var op api.Operation
-	q := url.Values{"wait": {wait.String()}}
-	_, err := c.do(ctx, wait, http.MethodPost, "/v1/ingest", q, nil, &op)
-	var refused *Error
-	if errors.As(err, &refused) && refused.Status == http.StatusInternalServerError && op.ID != "" {
-		return op, nil
-	}
-	return op, err
 }
 
 // Projections lists the templates the daemon holds, bundled and registered.

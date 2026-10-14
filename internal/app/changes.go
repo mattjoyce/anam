@@ -26,7 +26,7 @@ or tombstoned after a given instant — Anam's own clock, not the events' fact-t
 
 The query runs over the operational store's derived index. Read locally, the index
 is first caught up to the ledger's head by replay. The daemon catches it up after
-every ingest, so its answer is as fresh as the last one; while an ingest runs the
+every batch, so its answer is as fresh as the last one; while a replay runs the
 header says how far the index is behind W.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := loadRoutedConfig(*cfgPath, cmd)

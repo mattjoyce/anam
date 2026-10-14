@@ -26,13 +26,16 @@ importers (envelopes, one token per source) → ingest (gate) → append-only le
 
 ## Sources
 
-Every vendor source reaches Anam through an importer in the sibling `anam-importers` repository,
-a ductile plugin that shapes one source to a Facet Definition and posts envelopes under its own
-token (`docs/IMPORTERS.md`): Garmin, Withings, the blood pressure export, the DreamStation card and
-OwnTracks. Two formats are still read in process by `anam ingest`:
+Every source reaches Anam through an importer in the sibling `anam-importers` repository, a
+ductile plugin that shapes one source to a Facet Definition and posts envelopes under its own
+token (`docs/IMPORTERS.md`): Garmin, Withings, the blood pressure export, the DreamStation card,
+OwnTracks, and two formats of Anam's own:
 
-- **`records`** — hand-written YAML records: labs, medicines, travel, notes.
-- **`documents`** — a folder of files with sidecars, each a `doc.reference`.
+- **`records`** — hand-written YAML records: labs, medicines, travel, notes (`anam_records`).
+- **`documents`** — a folder of files with sidecars, each a `doc.reference`; the importer posts
+  the bytes and Anam keeps them in its library (`anam_documents`).
+
+Anam reads no source itself.
 
 Extensible to "all sorts of facets" later — `calendar.event`, `mail.thread`, `note.zettel`, …
 
@@ -62,14 +65,8 @@ export ANAM_PERSON_ID=matt
 ./anam init
 ```
 
-**Ingest.** Imports are *declared*, not passed on the command line — a path typed ad hoc
-is provenance that evaporates with the shell history. Copy `imports.example.yaml` to
-`~/.config/anam/imports.yaml`, name each source and its file, then:
-
-```sh
-./anam ingest                 # every declared source
-./anam ingest records         # just one
-```
+**Admit.** Facts arrive through `anam daemon`, from importers posting to `POST /v1/envelopes`,
+each under its own token (`importers_file`, `docs/IMPORTERS.md` §8).
 
 **Read.** The whole-person timeline is the default; everything else is a lens over it.
 

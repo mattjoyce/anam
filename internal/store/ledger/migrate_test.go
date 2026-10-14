@@ -88,7 +88,7 @@ func TestCreate_RefusesToCarryAnOldLedgerForward(t *testing.T) {
 	if !errors.Is(err, ledger.ErrSchemaMismatch) {
 		t.Fatalf("Create on a v1 ledger = %v, want ErrSchemaMismatch", err)
 	}
-	for _, want := range []string{"anam init", "anam ingest", "stays the record"} {
+	for _, want := range []string{"anam init", "resend its source whole", "stays the record"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("refusal %q does not say %q", err, want)
 		}

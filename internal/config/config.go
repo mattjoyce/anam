@@ -84,8 +84,10 @@ type Config struct {
 	// oldest beyond it.
 	BackupKeep int `mapstructure:"backup_keep"`
 
-	// IngestTimeout bounds one whole ingest run inside the daemon: every scan and
-	// every batch. Timeout still bounds each call within it.
+	// IngestTimeout bounds one long write inside the daemon: a replay of the ledger
+	// into the index, a backup, the mint at start. Timeout still bounds each call
+	// within it. The name is from when it bounded an ingest run; deployments set it
+	// as ANAM_INGEST_TIMEOUT, so it stays.
 	IngestTimeout time.Duration `mapstructure:"ingest_timeout"`
 
 	// Timeout bounds every call to a store. Anam fails fast rather than hanging (§8).

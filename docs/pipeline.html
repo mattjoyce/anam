@@ -169,9 +169,9 @@
   <text class="sub" x="265" y="415" text-anchor="middle">records/*.yaml, documents with sidecars</text>
   <text class="sub" x="265" y="429" text-anchor="middle">edited by hand or by a script</text>
   <rect class="box" x="392" y="380" width="286" height="56" rx="8" fill="var(--work)"/>
-  <text class="ttl" x="535" y="400" text-anchor="middle">anam_ingest (gateway job)</text>
-  <text class="sub" x="535" y="415" text-anchor="middle">asks the daemon hourly: POST /v1/ingest</text>
-  <text class="sub" x="535" y="429" text-anchor="middle">the daemon reads both folders itself (card 119 moves this out)</text>
+  <text class="ttl" x="535" y="400" text-anchor="middle">anam_records, anam_documents</text>
+  <text class="sub" x="535" y="415" text-anchor="middle">gateway plugins, as for any importer</text>
+  <text class="sub" x="535" y="429" text-anchor="middle">documents' bytes go to POST /v1/documents</text>
 
   <!-- Anam -->
   <rect class="box" x="702" y="30" width="206" height="406" rx="8" fill="var(--anam)"/>
@@ -219,7 +219,7 @@
 
 <h2>The shape</h2>
 <p>Every vendor source reaches Anam the same way (<code>docs/IMPORTERS.md</code>). A collector keeps the source's own data in its own format on the Projects share. A ductile plugin on the unraid gateway, from the <code>anam-importers</code> repository, reads that format, shapes each row to a Facet Definition and posts envelopes to the Anam daemon in batches of 49, under a token that is good for its source and its types alone. Anam knows no vendor: the gate checks each envelope against the Definition, admits what is new, supersedes what changed and answers <code>no-op</code> for what it already holds, so every importer can resend everything and nothing doubles.</p>
-<p>Two formats are still read in process. The gateway job <code>anam_ingest</code> asks the daemon hourly (<code>POST /v1/ingest?wait=10m</code>) and the daemon itself reads the records folder and the document library. Card 119 moves those out too, and then the envelope route is the only way in.</p>
+<p>Anam's own two formats arrive the same way. <code>anam_records</code> reads the records folder and <code>anam_documents</code> the documents folder with its sidecars; for each document, <code>anam_submit</code> posts the bytes to <code>POST /v1/documents</code> before its reference, and Anam keeps them in its library. Since card 119 the daemon reads no source itself, and the envelope route is the only way in.</p>
 
 <h2>The stages</h2>
 <ol class="steps">

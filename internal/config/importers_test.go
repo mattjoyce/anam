@@ -2,6 +2,8 @@ package config_test
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -11,6 +13,15 @@ import (
 
 const hashA = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
 const hashB = "60303ae22b998861bce3b28f33eec1be758a213c86c93c076dbe9f558c11c752"
+
+func writeImporters(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "importers.yaml")
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
 
 func TestLoadImporters(t *testing.T) {
 	t.Parallel()
@@ -25,7 +36,7 @@ importers:
 `
 	t.Run("a valid file", func(t *testing.T) {
 		t.Parallel()
-		got, err := config.LoadImporters(writeImports(t, valid), nil)
+		got, err := config.LoadImporters(writeImporters(t, valid), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -50,7 +61,7 @@ importers:
 		t.Parallel()
 		body := strings.Replace(valid, "types: [health.sleep, exercise.session]", "types: [health.weight]", 1)
 		bundled := func(ty facet.Type) bool { return ty == "health.weight" }
-		got, err := config.LoadImporters(writeImports(t, body), bundled)
+		got, err := config.LoadImporters(writeImporters(t, body), bundled)
 		if err != nil || len(got) != 2 {
 			t.Fatalf("got %v, %v; want both importers", got, err)
 		}
@@ -59,7 +70,7 @@ importers:
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			_, err := config.LoadImporters(writeImports(t, c.body), nil)
+			_, err := config.LoadImporters(writeImporters(t, c.body), nil)
 			if !errors.Is(err, config.ErrInvalidImporters) {
 				t.Fatalf("got %v, want ErrInvalidImporters", err)
 			}

@@ -20,21 +20,20 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
-// Ingest admits and supersedes; it never retracts, because a row's absence from a
-// scan and a source's absence look alike from inside one envelope. Retraction is
+// Admission admits and supersedes; it never retracts, because a row's absence from a
+// batch and a source's absence look alike from inside one envelope. Retraction is
 // therefore its own command, in two parts that stay apart: the report is a set
 // comparison (live facets of the source, minus the ids the source holds now), and
-// the tombstones are a deliberate step the operator asks for (card 17).
+// the tombstones are a deliberate step the operator asks for (card 17). What the
+// source holds now is its importer's newest complete snapshot (card 78).
 //
-// Two guards stand between a bad read and a mass retraction. A scan that fails ends
-// the run with nothing written, as it does for ingest. A scan that succeeds but
-// holds nothing is refused outright: a source that forgot everything is
+// Two guards stand between a bad read and a mass retraction. A snapshot that
+// carried nothing is refused outright: a source that forgot everything is
 // indistinguishable from one that was not there, and no one means to tombstone a
 // whole source by accident. Beyond that, a fraction bounds how much of a source may
 // go in one run, and the operator raises it on purpose.
 
 func retractCmd(cfgPath *string) *cobra.Command {
-	var importsPath string
 	var yes, retired bool
 	var maxFraction float64
 
@@ -47,21 +46,21 @@ written unless --yes is given; then each listed facet is tombstoned through
 the gate, one anam-event each, and the watermark moves. The artifacts stay in
 the ledger, marked.
 
-For an importer's source, which no import declares, the plan comes from the
-importer's newest complete snapshot instead of a scan: the live facets of its
-types that the run did not carry and that nothing has touched since it
-completed. An importer never tombstones; this command, with --yes, does.
+What the source holds now is its importer's newest complete snapshot: the plan
+is the live facets of the snapshot's types that the run did not carry and that
+nothing has touched since it completed. An importer never tombstones; this
+command, with --yes, does.
 
-A scan that fails writes nothing. A scan that holds nothing is refused: an
-empty source and an unreadable one look the same, and neither is a reason to
-forget a record. --max-fraction bounds how much of a source may be retracted in
-one run; raise it deliberately when the source really has shrunk that far.
+A snapshot that carried nothing is refused: an empty source and an unreadable
+one look the same, and neither is a reason to forget a record. --max-fraction
+bounds how much of a source may be retracted in one run; raise it deliberately
+when the source really has shrunk that far.
 
-A source replaced by an importer under another name is retired, not rescanned:
---retired plans every live facet of the source, by type, and tombstones them
-all with --yes. It refuses a source an import or an importer still declares,
-and asks for --max-fraction 1, so the whole source goes only on purpose. The
-artifacts stay; a read --at a time before the retirement still shows them.`,
+A source replaced by an importer under another name is retired: --retired plans
+every live facet of the source, by type, and tombstones them all with --yes. It
+refuses a source an importer still declares, and asks for --max-fraction 1, so
+the whole source goes only on purpose. The artifacts stay; a read --at a time
+before the retirement still shows them.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			source := args[0]
@@ -70,38 +69,14 @@ artifacts stay; a read --at a time before the retirement still shows them.`,
 				return err
 			}
 			if retired {
-				return runRetirement(cmd, cfg, source, importsPath, yes, maxFraction)
+				return runRetirement(cmd, cfg, source, yes, maxFraction)
 			}
-			imports, err := loadImports(importsPath, cmd)
-			if err != nil {
-				return err
-			}
-			imports = filterImports(withLibrary(imports, cfg), source)
 			ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
 			defer cancel()
 
-			var absent []facet.Facet
-			var total, heldN int
-			if len(imports) == 0 {
-				// No import declares it, so it is an importer's source: plan from what
-				// the importer last said is everything (card 78).
-				absent, total, heldN, err = planFromSnapshot(ctx, cmd, cfg, source)
-				if err != nil {
-					return err
-				}
-			} else {
-				scanned, err := scanAll(cmd.Context(), imports, cfg)
-				if err != nil {
-					return err
-				}
-				held, err := heldIDs(scanned)
-				if err != nil {
-					return err
-				}
-				heldN = len(held)
-				if absent, total, err = planFromRecord(ctx, cfg, source, held); err != nil {
-					return err
-				}
+			absent, total, heldN, err := planFromSnapshot(ctx, cmd, cfg, source)
+			if err != nil {
+				return err
 			}
 			writeRetractionReport(cmd, source, absent, total, heldN)
 			if len(absent) == 0 {
@@ -117,34 +92,12 @@ artifacts stay; a read --at a time before the retirement still shows them.`,
 			return retractAll(cmd, cfg, absent)
 		},
 	}
-	cmd.Flags().StringVar(&importsPath, "imports", "",
-		"imports file (default: $ANAM_IMPORTS, then <user config dir>/anam/imports.yaml)")
 	cmd.Flags().BoolVar(&yes, "yes", false, "write the tombstones; without it the command only reports")
 	cmd.Flags().Float64Var(&maxFraction, "max-fraction", 0.1,
 		"refuse to retract more than this fraction of the source's live facets in one run")
 	cmd.Flags().BoolVar(&retired, "retired", false,
 		"the source is retired, not rescanned: plan every live facet it holds (needs --max-fraction 1 to write)")
 	return cmd
-}
-
-// planFromRecord plans against the live value at the head, read the way the timeline
-// reads it: from the last mint run and its tail, not a fold of the whole ledger
-// (card 65). Only the facets the plan names are then fetched from the ledger, at the
-// version in force, for the report and the tombstones.
-func planFromRecord(ctx context.Context, cfg config.Config, source string, held map[string]bool,
-) ([]facet.Facet, int, error) {
-	src, closeAll, err := readSource(ctx, cfg)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer closeAll()
-	res, err := read.Canonical(ctx, src)
-	if err != nil {
-		return nil, 0, err
-	}
-	absent, total := planRetraction(res.Value.Entries(), source, held)
-	facets, err := facetsOf(ctx, src.Ledger, absent)
-	return facets, total, err
 }
 
 // planRetraction is the report as a value: the live entries of the source whose ids
@@ -186,7 +139,7 @@ type planLedger interface {
 }
 
 // facetsOf fetches each planned entry's facet at its newest version, in the plan's
-// order. A live facet's newest version is the one in force, unless an ingest
+// order. A live facet's newest version is the one in force, unless a batch
 // superseded it since the read; then the report shows the newer one, and the gate,
 // which tombstones whatever version is current, is unaffected.
 func facetsOf(ctx context.Context, l planLedger, entries []fold.Entry) ([]facet.Facet, error) {
@@ -262,7 +215,8 @@ func retractAll(cmd *cobra.Command, cfg config.Config, absent []facet.Facet) err
 		return err
 	}
 	defer func() { _ = l.Close() }()
-	g := gate.New(l, reg, mvpScopes, clock.Real{}, cfg.PersonID)
+	// A tombstone admits nothing, so the gate needs no scopes for it.
+	g := gate.New(l, reg, gate.StaticScopes{}, clock.Real{}, cfg.PersonID)
 
 	done := 0
 	for _, f := range absent {
@@ -278,27 +232,6 @@ func retractAll(cmd *cobra.Command, cfg config.Config, absent []facet.Facet) err
 	}
 	_, err = fmt.Fprintf(cmd.OutOrStdout(), "tombstoned %d facets; the ledger moved\n", done)
 	return err
-}
-
-// heldIDs is the facet id of every envelope a scan returned, under the identity the
-// gate would admit it with. A worker may leave source_ref to the gate, so it is
-// composed from the Definition here too, never read off the envelope.
-func heldIDs(scanned []scanned) (map[string]bool, error) {
-	reg, err := def.Bundled()
-	if err != nil {
-		return nil, err
-	}
-	held := map[string]bool{}
-	for _, sc := range scanned {
-		for _, env := range sc.envs {
-			ref, err := reg.Identify(env)
-			if err != nil {
-				return nil, fmt.Errorf("source %s: %w", sc.source, err)
-			}
-			held[facet.NewID(ref)] = true
-		}
-	}
-	return held, nil
 }
 
 // planFromSnapshot plans an importer's source from its newest complete snapshot: the
@@ -323,7 +256,7 @@ func planFromSnapshot(ctx context.Context, cmd *cobra.Command, cfg config.Config
 		return nil, 0, 0, err
 	}
 	if !ok {
-		return nil, 0, 0, fmt.Errorf("no import declares source %q, and it has sent no complete snapshot to plan from", source)
+		return nil, 0, 0, fmt.Errorf("source %q has sent no complete snapshot to plan from; a source replaced by another is retired with --retired", source)
 	}
 	carried, err := db.SnapshotFacets(ctx, snap.ID)
 	if err != nil {

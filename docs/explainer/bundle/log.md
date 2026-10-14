@@ -39,3 +39,8 @@ Card 50 closes the importers move, at anam master after 3b97178.
 - Code: the day audit's low findings cleared (inspect.go split into facet, document and events files; read.Absent bounded over the API); the Definition history is provisioned from `manifests/history`.
 - Bundle: the def component names the history; the inspector component's anchor is unchanged.
 
+
+## 2026-10-14, card 119
+
+- Code: `internal/capture` deleted; `records` and `documents` reach Anam only through `anam_records` and `anam_documents`, which keep those source names. `anam ingest`, `POST /v1/ingest`, `GET /v1/operations/{id}`, the imports file and its example, the library's auto-import, `mvpScopes` and the `ingest` field of `GET /v1/status` are gone. `check.sh` has no `internal/capture` carve-out. The daemon runs `guardBundled` at `Open`; its ingest file became `minting.go` (`mintAtHead`, `mintOnRequest`, `mintIfBehind`, `catchUp`, the `sources` view behind `last_scan_at`). `anam retract` plans only from a snapshot or `--retired`, with a gate of empty scopes. `internal/app/ingest.go` became `init.go`.
+- Bundle: the components `capture-records` and `capture-documents` removed; the component `importer-documents` and the workflow `hand-anam-a-document` added, which also puts `POST /v1/documents` (card 102) in the daemon's route table. The ingress and substrate invariants, the mint cadence decision and the mint-failure, token_scope and API-doc gaps say what the code does now; pages that named the built-in workers say so as history.

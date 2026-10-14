@@ -2,7 +2,7 @@
 type: workflow
 title: Retract from a snapshot
 description: anam retract bp-csv --yes plans what the importer's newest complete resend did not carry, guards the plan, and tombstones each facet through the gate as one anam-event.
-timestamp: 2026-10-11T00:00:00Z
+timestamp: 2026-10-14T00:00:00Z
 resource: internal/app/retract.go#planFromSnapshot
 anchor: "snap, ok, err := db.NewestCompleteSnapshot(ctx, source)"
 basis: code
@@ -12,7 +12,7 @@ steps:
   - actor: /components/cli.md
     caller: outside
     label: retractCmd reads its flags
-    action: "`--yes`, `--max-fraction` (a tenth by default), `--retired`, `--imports`."
+    action: "`--yes`, `--max-fraction` (a tenth by default), `--retired`."
     resource: internal/app/retract.go#retractCmd
     anchor: 'cmd.Flags().Float64Var(&maxFraction, "max-fraction", 0.1,'
   - actor: /components/cli.md
@@ -22,10 +22,10 @@ steps:
     resource: internal/app/app.go#loadConfig
     anchor: "opens local files, and with server %s configured the daemon owns them"
   - actor: /components/cli.md
-    label: declared import or importer source?
-    action: A source named in the imports file is re-scanned and compared with the live set; a source no import declares is an importer's, planned from its snapshot. `--retired` instead plans every live facet of the source and refuses one still declared anywhere.
+    label: snapshot plan, or retired?
+    action: Every source is an importer's, planned from its newest complete snapshot. `--retired` instead plans every live facet of the source and refuses one the importers file still declares. The rescan of a declared import went with the imports file in card 119.
     resource: internal/app/retract.go#retractCmd
-    anchor: "// No import declares it, so it is an importer's source"
+    anchor: "return runRetirement(cmd, cfg, source, yes, maxFraction)"
   - actor: /components/store-ops.md
     caller: /components/cli.md
     label: find the newest complete snapshot
@@ -39,7 +39,7 @@ steps:
     action: The error names the source and says it has sent no complete snapshot to plan from.
     ends: true
     resource: internal/app/retract.go#planFromSnapshot
-    anchor: "no import declares source %q, and it has sent no complete snapshot to plan from"
+    anchor: "has sent no complete snapshot to plan from; a source replaced by another is retired with --retired"
   - actor: /components/read.md
     caller: /components/cli.md
     branch: a complete snapshot exists
@@ -63,7 +63,7 @@ steps:
   - actor: /components/cli.md
     branch: with --yes
     label: open the ledger for writing, one gate
-    action: "`retractAll` opens the ledger read-write, builds a gate with the built-in scopes, and calls `Retract` per facet under the configured timeout; a failure part-way says how many landed and to re-run, since a tombstoned facet drops out of the next plan."
+    action: "`retractAll` opens the ledger read-write, builds a gate with empty scopes, since a tombstone admits nothing and consults none, and calls `Retract` per facet under the configured timeout; a failure part-way says how many landed and to re-run, since a tombstoned facet drops out of the next plan."
     resource: internal/app/retract.go#retractAll
     anchor: "res, _, err := g.Retract(ctx, f.ID)"
   - actor: /components/gate.md

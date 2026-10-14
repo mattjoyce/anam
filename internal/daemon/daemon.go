@@ -27,6 +27,7 @@ import (
 	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
+	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -74,8 +75,6 @@ type job struct {
 
 // Options are what the daemon is given rather than configured with.
 type Options struct {
-	// Ingest is the ingest the API runs. Nil means POST /v1/ingest fails.
-	Ingest IngestFunc
 	// Version is the build, reported by /v1/status.
 	Version string
 }
@@ -94,8 +93,9 @@ type Daemon struct {
 	// artifacts is the published-artifact tier: checkpoint values and receipts.
 	artifacts *artifact.Store
 	// index is whether the operational index is wrong rather than merely behind.
-	index   indexState
-	ingests *ingests
+	index indexState
+	// sources is what the daemon has seen of each importer since it started.
+	sources *sources
 	// importers are who may post envelopes and Definitions; defs is what their
 	// envelopes are admitted against.
 	importers importers
@@ -112,10 +112,10 @@ type Daemon struct {
 	stop sync.Once
 }
 
-// Open opens both stores for writing and the ledger once more for reading, with the
-// same checks ingest makes: the ledger must exist, belong to cfg's person and hold this
-// build's schema, and the operational store must match its schema and bucket width.
-// Any mismatch refuses to start.
+// Open opens both stores for writing and the ledger once more for reading. The ledger
+// must exist, belong to cfg's person and hold this build's schema; the operational
+// store must match its schema and bucket width; and this build's bundled Definitions
+// must not re-key what the store last saw. Any mismatch refuses to start.
 //
 // With a token file configured every request but /healthz must carry the token, and
 // the daemon may listen on any address. Without one it listens on loopback only.
@@ -139,7 +139,17 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+	// Parsed once, before any deadline: it is the binary's own, and the guard and the
+	// registry both read it.
+	bundled, err := def.Bundled()
+	if err != nil {
+		return nil, err
+	}
+
+	// Each phase of the opening has a deadline of its own, so one that runs long under
+	// load does not spend the next one's.
+	parent := ctx
+	ctx, cancel := context.WithTimeout(parent, cfg.Timeout)
 	defer cancel()
 
 	w, err := ledger.Open(ctx, cfg.LedgerPath, cfg.PersonID)
@@ -162,7 +172,13 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		closeAll()
 		return nil, err
 	}
-	defs, err := loadDefinitions(ctx, db)
+	ctx, cancel = context.WithTimeout(parent, cfg.Timeout)
+	defer cancel()
+	if err := guardBundled(ctx, db, bundled); err != nil {
+		closeAll()
+		return nil, err
+	}
+	defs, err := loadDefinitions(ctx, db, bundled)
 	if err != nil {
 		closeAll()
 		return nil, err
@@ -192,7 +208,7 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		read:        r,
 		readOps:     readOps,
 		artifacts:   artifacts,
-		ingests:     newIngests(),
+		sources:     newSources(),
 		importers:   imps,
 		defs:        defs,
 		projections: projs,
@@ -310,8 +326,6 @@ func (d *Daemon) Serve(ctx context.Context, ln net.Listener) error {
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		// A response that cannot be written in this long is a client that has gone.
-		// The one handler that holds a response longer, a POST /v1/ingest that asks
-		// to wait, extends its own deadline by the wait it asked for.
 		WriteTimeout: writeTimeout,
 		IdleTimeout:  2 * time.Minute,
 	}

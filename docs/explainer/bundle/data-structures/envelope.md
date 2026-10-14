@@ -17,7 +17,7 @@ references:
 | Field | Type | Set from | Checked by |
 |---|---|---|---|
 | `Type` | facet.Type | the submitted envelope | dotted namespaced regexp |
-| `Source` | string | the importer's source (token), or the built-in worker's constant | non-empty |
+| `Source` | string | the importer's source, named by its token | non-empty |
 | `Injector` | string | same as source | non-empty |
 | `SourceRef` | string | optional | the gate composes it, or refuses a mismatch |
 | `Payload` | []byte | raw JSON | non-empty, at most 300 KiB, canonicalisable, passes the schema |

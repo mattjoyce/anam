@@ -5,9 +5,11 @@ Design proposal · 2026-10-08, built by 2026-10-13 (card 50). The service's side
 blood pressure (card 80), the DreamStation (card 70), Garmin (card 55) and OwnTracks (card 130), in
 `anam-importers`.
 
-Anam's capture workers for vendor sources (`healthdb`, `withings`, `bpcsv`) were compiled into the
-binary that owns the ledger. All three have left: `withings` (card 54), `bpcsv` (card 80) and
-`healthdb` (card 55, its facets retired on 2026-10-11, the package deleted on 2026-10-13). An
+Anam's capture workers (`healthdb`, `withings`, `bpcsv`, `records`, `documents`) were compiled into
+the binary that owns the ledger. All five have left: `withings` (card 54), `bpcsv` (card 80),
+`healthdb` (card 55, its facets retired on 2026-10-11, the package deleted on 2026-10-13), and
+`records` and `documents` (card 119, to `anam_records` and `anam_documents`). `anam ingest` and
+`POST /v1/ingest` went with them. An
 importer is a ductile plugin that shapes one source's data to a Facet Definition and submits it to the
 Anam service. Anam keeps the Definitions, the gate and the record, and knows nothing about any vendor.
 The two formats still read in process, `records` and `documents`, leave with card 119.
@@ -64,7 +66,6 @@ These make an importer correct in any language, without importing Anam's code.
 1. **The gate composes identity.** Done (card 51). The gate composes `source_ref` from the
    Definition's `identity_key`; an envelope may leave it out, and one that carries it is refused on a
    mismatch. The identity rule lives once, in the Definition, and importers only shape payload fields.
-   The built-in workers no longer compose it.
 2. **A Definition's schema is standard JSON Schema.** Done (card 52). The `schema` block is JSON
    Schema draft 2020-12, so an importer validates locally with a stock library (Python's
    `jsonschema`: `jsonschema.validate(payload, manifest["schema"])`) before sending, and the gate
@@ -143,12 +144,12 @@ Where log management stops applying: logs tolerate loss and sampling and have no
    its 5,818 summary facets were retired, the ETL pipelines were removed and healthdata.db stays as an
    archive. The built-in `healthdb` worker was deleted on 2026-10-13.
 6. One-off exports (Technogym, Strong, Fitbit) get no importer. Each is a document in the library,
-   turned into a records file once by a script kept in `scripts/`, and reshaped by regenerating that
+   turned into a records file once by a script in `anam-importers` `records/extract`, and reshaped by regenerating that
    file with the same ids (card 58). The blood pressure app turned out to be live, exported
    periodically, so it has an importer (card 80), and the built-in `bpcsv` worker is gone. `records`
    and `documents` were kept inside as formats until Matt's word of 2026-10-11 that they leave too:
    records by `anam_records` (card 118), documents by `anam_documents` posting bytes to
-   `POST /v1/documents` (cards 102, 103), and then the in-process workers go (card 119).
+   `POST /v1/documents` (cards 102, 103), and the in-process workers went (card 119).
 
 ## 8. The importer contract
 
@@ -197,7 +198,8 @@ importers:
 ```
 
 - `source` is the source every envelope it submits is admitted as. A facet's identity includes its
-  source, so an importer that takes over a built-in worker's facets uses that worker's source name.
+  source, so an importer that takes over another's facets uses that source's name, as `anam_records` and
+  `anam_documents` kept `records` and `documents`.
 - `types` are the types it may submit, and the only types it may register Definitions for.
 - An importer's token opens `POST /v1/envelopes`, `POST /v1/definitions` and
   `GET /v1/definitions...`, and nothing else: it cannot read the record. The operator's token

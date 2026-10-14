@@ -6,7 +6,7 @@
 * [Canonical](canonical.md) - The live-only value of the fold at a watermark; superseded and tombstoned facets are excluded from it.
 * [Checkpoint](checkpoint.md) - An immutable, content-addressed value of the live-only fold over one bucket at a watermark, there only to bound replay.
 * [Derived span](derived-span.md) - A lens the person names over the timeline, composed on demand from bucket values and never minted.
-* [Envelope](envelope.md) - The one message a capture worker or importer hands the gate; the only way anything enters the ledger.
+* [Envelope](envelope.md) - The one message an importer hands the gate; the only way anything enters the ledger.
 * [Error kernel](error-kernel.md) - The small trusted core that must not corrupt: the append-only ledger plus the gate's admission invariants.
 * [Facet](facet.md) - The atomic unit Anam keeps, a source fragment held verbatim plus the metadata that governs it.
 * [Facet Definition](facet-definition.md) - The versioned contract for one facet type, from its closed JSON Schema to how identity and fact-time are read from a payload.
@@ -15,7 +15,7 @@
 * [Idempotency](idempotency.md) - Re-ingesting the same source row is a no-op; what makes ingest crash-clean and a resend always safe.
 * [Importer](importer.md) - A ductile plugin outside Anam that reads one source, shapes rows to a Definition, and submits them under its own token.
 * [Ledger](ledger.md) - Anam's append-only record of everything it admitted, every facet kept and marked at its current status.
-* [Mint](mint.md) - Checkpointing per bucket after each ingest that moved W, rebuilding only the buckets the tail touched.
+* [Mint](mint.md) - Checkpointing per bucket after the importer batches that moved W, rebuilding only the buckets the tail touched.
 * [Operational store](operational-store.md) - The second SQLite file, authoritative for what Anam authors, with each table annotated by where it comes back from.
 * [Projection](projection.md) - A versioned template that prunes the canonical by metadata only; a consumer selects one and never defines one.
 * [Receipt](receipt.md) - Proof of exactly what a projection served at a watermark, verifiable from the artifact alone or against the ledger.

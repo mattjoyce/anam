@@ -1,9 +1,9 @@
 ---
 type: decision
 title: Mint cadence follows the ledger
-description: "The daemon mints after every write that moved W, as its own write on the queue: at once after a declared ingest, and after 2 s of quiet following importer batches."
-timestamp: 2026-10-11T00:00:00Z
-resource: internal/daemon/ingest.go#mintOnRequest
+description: "The daemon mints after importer batches that moved W, once 2 s pass with no batch, as its own write on the queue; at start it mints if the last run is behind the head."
+timestamp: 2026-10-14T00:00:00Z
+resource: internal/daemon/minting.go#mintOnRequest
 anchor: "const mintQuiet = 2 * time.Second"
 basis: code
 tier: supporting
@@ -11,7 +11,8 @@ tested_by:
   - internal/daemon/envelopes_test.go#TestPostEnvelopesMints
 alternatives:
   - A size, time or rate trigger (deferred in MVP.md; refused in card 61 because a mint from the last run is 60 ms on the NAS, so no trigger earns its complexity)
-  - Mint inside the ingest's transaction (refused; the mint is not part of what the ingest admitted, and its failure must fail nothing)
+  - Mint inside the batch's transaction (refused; the mint is not part of what the batch admitted, and its failure must fail nothing)
+  - Mint before answering a declared ingest, so a caller waiting on it read from checkpoints with no tail (built, and gone with `POST /v1/ingest` in card 119)
 affects:
   - /components/daemon.md
   - /components/mint.md
@@ -20,8 +21,8 @@ affects:
 
 **Context.** Card 61. Freshness comes from the ledger; a mint exists to bound replay, so it should follow the writes rather than a clock.
 
-**Choice.** Two triggers, one mint. A declared ingest (`POST /v1/ingest`) mints before its operation finishes, so a caller waiting on it reads from checkpoints with no tail, and the result lands on the operation as `mint.error` when it failed. An importer batch that changed W requests a mint on a one-slot channel; the worker waits until no batch has arrived for 2 s and then mints once. A local `anam ingest` with the daemon stopped does not mint.
+**Choice.** One trigger, one mint. An importer batch that changed W requests a mint on a one-slot channel; `mintOnRequest` waits until no batch has arrived for 2 s and then `mintAtHead` mints once, as its own write. At start, `mintIfBehind` requests a mint when the last run is behind the head, so a batch admitted just before a shutdown is minted. The operator can also mint by hand, `anam checkpoint` (`POST /v1/checkpoints`).
 
 **Why.** Importers send batches of 49 in bursts; minting after each would cost a rebuild per batch for nothing.
 
-**What it costs.** ARCHITECTURE §7 describes only the first trigger and IMPORTERS §8.4 only the second, and a mint that fails after an importer batch is reported only in the daemon log (see [mint failure after a batch is only logged](/gaps/mint-failure-after-batch-only-logged.md)).
+**What it costs.** A mint that fails after an importer batch is reported only in the daemon log (see [mint failure after a batch is only logged](/gaps/mint-failure-after-batch-only-logged.md)).

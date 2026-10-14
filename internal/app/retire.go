@@ -18,14 +18,14 @@ import (
 // by an importer under another name, and nothing will scan it again. Retract's plan
 // is a set comparison, the live facets of a source minus what the source holds now;
 // retirement is the same plan with "holds now" declared empty by the operator rather
-// than read from a scan or a snapshot. Two guards replace the empty-scan refusal: no
-// import and no importer may still name the source, and the operator must ask for
+// than read from a snapshot. Two guards replace the empty-snapshot refusal: no
+// importer may still name the source, and the operator must ask for
 // the whole fraction. Each tombstone is then one anam-event through the gate, as for
 // any retraction (card 120).
 
 // runRetirement plans and, with yes, tombstones every live facet of a retired source.
-func runRetirement(cmd *cobra.Command, cfg config.Config, source, importsPath string, yes bool, maxFraction float64) error {
-	if err := refuseDeclared(cmd, cfg, source, importsPath); err != nil {
+func runRetirement(cmd *cobra.Command, cfg config.Config, source string, yes bool, maxFraction float64) error {
+	if err := refuseDeclared(cmd, cfg, source); err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
@@ -48,28 +48,11 @@ func runRetirement(cmd *cobra.Command, cfg config.Config, source, importsPath st
 	return retractAll(cmd, cfg, live)
 }
 
-// refuseDeclared refuses to retire a source that an import or an importer still
-// declares: a live source is retired by removing its declaration first, so the two
-// steps cannot be confused. With no imports file found there are no imports, and
-// with no importers file configured there are no importers; each is said on stderr,
-// so the operator sees what was checked.
-func refuseDeclared(cmd *cobra.Command, cfg config.Config, source, importsPath string) error {
-	path, origin, err := config.ResolveImports(importsPath)
-	if err != nil {
-		return err
-	}
-	if path == "" {
-		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "imports: none found, so no import declares the source")
-	} else {
-		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "imports: %s (%s)\n", path, origin)
-		imports, err := config.LoadImports(path)
-		if err != nil {
-			return err
-		}
-		if len(filterImports(withLibrary(imports, cfg), source)) > 0 {
-			return fmt.Errorf("%s is still declared as an import; remove it from %s before retiring it", source, path)
-		}
-	}
+// refuseDeclared refuses to retire a source that an importer still declares: a live
+// source is retired by removing its declaration first, so the two steps cannot be
+// confused. With no importers file configured there are no importers; that is said
+// on stderr, so the operator sees what was checked.
+func refuseDeclared(cmd *cobra.Command, cfg config.Config, source string) error {
 	if cfg.ImportersFile == "" {
 		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "importers: no importers file configured, so no importer declares the source")
 		return nil

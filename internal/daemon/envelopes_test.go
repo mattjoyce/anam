@@ -240,7 +240,7 @@ func TestPostEnvelopes(t *testing.T) {
 		})
 	}
 
-	st := d.ingests.sourceStatuses()
+	st := d.sources.statuses()
 	if len(st) != 1 || st[0].Source != "test-import" || st[0].LastAdmissionAt == "" {
 		t.Fatalf("source status = %+v", st)
 	}
@@ -276,7 +276,7 @@ func TestPostEnvelopesReadTheWholeBody(t *testing.T) {
 		t.Fatalf("W = %d after refused bodies, want 0", got)
 	}
 	call(t, "GET", url+"/v1/snapshots/torn", importerToken, "", http.StatusNotFound, nil)
-	if st := d.ingests.sourceStatuses(); len(st) != 0 {
+	if st := d.sources.statuses(); len(st) != 0 {
 		t.Fatalf("a refused body marked the source as seen: %+v", st)
 	}
 

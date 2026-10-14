@@ -261,8 +261,8 @@ type AnamEvent struct {
 	PriorArtifactVersion int
 }
 
-// Envelope is the message a capture worker hands the admission gate. It is the only
-// ingress: capture workers share nothing with the ledger except through it (§6).
+// Envelope is the message an importer hands the admission gate. It is the only
+// ingress: importers share nothing with the ledger except through it (§6).
 type Envelope struct {
 	Type     Type
 	Source   string

@@ -70,7 +70,8 @@ listen: 127.0.0.1:8787
 #       types: [health.weight]
 # importers_file: ~/.config/anam/importers.yaml
 
-# Bounds one whole ingest run inside the daemon.
+# Bounds one long write inside the daemon: an index replay, a backup, the mint at
+# start. Named for the ingest run it once bounded.
 ingest_timeout: 15m
 
 # --- bucketing ----------------------------------------------------------------

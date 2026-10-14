@@ -22,9 +22,9 @@ references: []
 | `listen` | `ANAM_LISTEN` | `127.0.0.1:8787` |
 | `token_file` | `ANAM_TOKEN_FILE` | none; required to listen off loopback; at least 32 characters |
 | `importers_file` | `ANAM_IMPORTERS_FILE` | none; read once at daemon start |
-| `server` | `ANAM_SERVER` | none; routes reads and ingest to the daemon |
+| `server` | `ANAM_SERVER` | none; routes the CLI's reads, mints and receipts to the daemon |
 | `backup_dir`, `backup_keep` | `ANAM_BACKUP_DIR`, `ANAM_BACKUP_KEEP` | none, 14 |
-| `ingest_timeout`, `timeout` | `ANAM_INGEST_TIMEOUT`, `ANAM_TIMEOUT` | 15 m, 5 s |
+| `ingest_timeout`, `timeout` | `ANAM_INGEST_TIMEOUT`, `ANAM_TIMEOUT` | 15 m, 5 s; `ingest_timeout` bounds one long write in the daemon (index replay, backup, the mint at start) and keeps its old name |
 | `max_read_bytes` | `ANAM_MAX_READ_BYTES` | 512 KiB; 0 is unbounded |
 | `bucket_width` | `ANAM_BUCKET_WIDTH` | `Monthly`; `Weekly` also accepted |
 | `checkpoint_budget` | `ANAM_CHECKPOINT_BUDGET` | 1 MiB; 0 keeps the fixed width |

@@ -35,7 +35,7 @@ var migrations = []migration{
 	{to: 3, rebuild: "schema 3 changed how a facet's id is composed from its source row and the zone " +
 		"its fact-time is read in; the rows in a schema 2 file were keyed and placed by the old rules. " +
 		"Move this file aside (it stays the record of what Anam knew until now), run `anam init` at " +
-		"the same path, and `anam ingest`: every source still holds its rows"},
+		"the same path, and have each importer resend its source whole: every source still holds its rows"},
 }
 
 // effectiveVersion derives the file's schema version from its pins: the created-at

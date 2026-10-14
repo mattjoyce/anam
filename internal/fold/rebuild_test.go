@@ -59,7 +59,7 @@ func newHarness(t *testing.T) (*gate.Gate, *ledger.Ledger) {
 }
 
 // source stands in for the system of record: measured_at → the row's reading.
-// Ingesting it captures every row it currently holds, exactly as a capture worker
+// Ingesting it captures every row it currently holds, exactly as an importer
 // re-scanning the real CSV would.
 type source map[string]string
 

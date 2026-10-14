@@ -97,8 +97,7 @@ middle, the person and their agents consuming it at the top.
 
 Anam's **upstream boundary is the ingest gate.** Everything between a source and that gate — SQLite
 readers, CSV parsers, API pollers — is an **importer**: a pluggable client outside the binary, not part
-of the kernel, posting envelopes under its own token. Two formats, `records` and `documents`, are still
-read in process until their importers go live (card 119). The gate owns the admission contract and
+of the kernel, posting envelopes under its own token. Anam reads no source itself (card 119). The gate owns the admission contract and
 everything served upward.
 
 ---
@@ -308,10 +307,10 @@ simplified for a single person but kept in shape:
 1. **Facet-compliant** — the payload meets its Facet Definition (schema, envelope, time semantics,
    validation bar). *This is where "validate all external input" lives* — source rows are external
    input, checked before admission.
-2. **Authenticated** — the capture worker's `source` identity and its token scope: a token may inject
+2. **Authenticated** — the importer's `source` identity and its token scope: a token may inject
    only the facet type(s) it is scoped for (least privilege); the injector identity becomes part of the
-   facet's provenance. For an importer the scope is real credentials: its own token, held by the
-   daemon as a hash beside its source and types (`importers_file`, docs/IMPORTERS.md §8).
+   facet's provenance. The scope is real credentials: each importer's own token, held by the daemon
+   as a hash beside its source and types (`importers_file`, docs/IMPORTERS.md §8).
 3. **Associated** — the facet **binds** to the person. With one person this is near-trivial, but the
    shape holds: assurance is *high* when the source explicitly scopes to the person, *medium* when
    defaulted, *review* when a carried identity element contradicts. A `span_hint` may be recorded if a
@@ -333,7 +332,7 @@ The gate is exposed as two calls:
   `facet.SourceRef`: the source name, then each identity value **length-prefixed** (`<bytes>:<value>`),
   so that two different tuples can never compose one string however many colons the values carry (a
   timestamp does; a lab's id prefix does). The gate composes it from the Definition. An envelope
-  may leave `source_ref` out, and the built-in workers do; one that carries it is refused if it
+  may leave `source_ref` out; one that carries it is refused if it
   disagrees (`ErrIdentityMismatch`). Braiding the values into the
   natural key would give a corrected reading a *different* `facet_id`, so it would enter as a **new
   facet** and orphan the original instead of superseding it — silently disabling the entire
@@ -355,7 +354,7 @@ The gate is exposed as two calls:
   > nowhere to put one — a Facet has no status field of any kind. The status transition *is* the whole
   > event. Corrected once code had to write one.
 
-> **Design note (Armstrong).** Because `commit` is idempotent and atomic, a capture worker may **crash
+> **Design note (Armstrong).** Because `commit` is idempotent and atomic, an importer may **crash
 > mid-batch and simply be re-run to known-good**. There is no partial facet and no corruption. This — the
 > ledger plus these gate invariants — is Anam's **error kernel**: the small trusted core that must not
 > fail. Everything above it is disposable and rebuildable.
@@ -451,13 +450,13 @@ read, paid by a range-scan; it is not bought by a periodic tick.
   are its buckets' bytes in time order, joined. Projections, snapshots and explain still read the whole
   value; explain, the inspector and retract read the full fold. Whether the whole hash should instead
   be a hash of the bucket hashes is card 60.
-- **Cadence follows the ledger** (card 61, 2026-10-09). The daemon mints after every ingest that moved
-  `W`, as its own write on the write queue, before the ingest's operation finishes, so a caller that
-  waited on the ingest reads from checkpoints with no tail. A mint from the last run costs the buckets
-  the ingest touched (60 ms on the NAS at 19,631 events), so no size or time trigger earns its
-  complexity; a quiet bucket still mints nothing. The mint is not part of what the ingest admitted: its
-  failure is reported on the operation (`mint.error`) and fails nothing, and the next changing ingest,
-  or `anam checkpoint`, catches up. A local `anam ingest` (maintenance, daemon stopped) does not mint.
+- **Cadence follows the ledger** (card 61, 2026-10-09). The daemon mints once importer batches stop
+  arriving for two seconds, as its own write on the write queue, so an importer's hundred batches cost
+  one mint. A mint from the last run costs the buckets the batches touched (60 ms on the NAS at
+  19,631 events), so no size or time trigger earns its complexity; a quiet bucket still mints nothing.
+  The mint is not part of what a batch admitted: its failure is logged and fails nothing, and the next
+  changing batch, a restart (which mints when the last run is behind the head), or `anam checkpoint`
+  catches up.
 
 ### The watermark and the head
 
@@ -646,7 +645,7 @@ metadata/payload separation (§3) is enforced.
 **Facet Definitions are not in the ledger.** A Definition is not something Anam *knew*; it is how Anam
 *interprets* — governance, not record. It lives in the operational store, every version, so an
 artifact's `definition_version` still resolves. It is provisioned from one of two places, never both
-for one type: the JSON embedded in the binary, for the types Anam's own workers capture, or the
+for one type: the JSON embedded in the binary, for the standard types Anam bundles, or the
 importer that emits it, which registers it from its repo (`POST /v1/definitions`, docs/IMPORTERS.md
 §8). A registered version is immutable, and the store's triggers hold it so. The error kernel is
 smaller for it.
@@ -693,7 +692,7 @@ returns its whole window and takes no row limit. A caller paging on the last `an
 step over the rest of that instant's batch and be told nothing changed. A row limit here would mean
 carrying `seq` in the cursor too — the absence of one is load-bearing, not incidental.
 
-The retry loop belongs to the **gate**, not the store. A capture worker may already crash mid-batch and be
+The retry loop belongs to the **gate**, not the store. An importer may already crash mid-batch and be
 re-run to known-good, so the recovery is free; putting a loop, a bound and a give-up path inside the one
 component that must not fail buys nothing.
 
@@ -719,10 +718,8 @@ ledger file is `ErrNotInitialised` on open; nothing is created by reading or ing
 substrate can be a re-ingest: the payloads come back from their sources. The anam-times do not. A
 re-ingest stamps new ones, so a ledger whose history of learning matters is moved by copying its rows.
 
-The one carve-out: `internal/capture` may read a **source** in its native format — a source that happens
-to be a SQLite file needs `database/sql` to be read at all. That is the *source's* substrate, not Anam's:
-a capture worker sits outside the gate, is disposable, and speaks whatever its source speaks. It never
-imports `internal/store`, and `check.sh` enforces that too.
+There is no carve-out. A source that is a SQLite file is read by its importer, outside the binary, and
+what reaches Anam is envelopes (card 119).
 
 ---
 

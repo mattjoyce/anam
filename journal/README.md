@@ -49,6 +49,7 @@ Two kinds of note:
   - [[2026-10-12-the-phone-the-page-and-the-fields]] — OwnTracks positions as `location.track` with no map tiles; the timeline page from 1.84 MB to 100 KB; a read names its `fields` and gets a frame; the extractors leave for anam-importers.
   - [[2026-10-13-ten-cards-and-a-gate-misread]] — ten cards while Matt was away: checkpoints made visible, projections registered like Definitions, the gate refuses a type change, two browser holes closed, and card 108 merged on a misread gate.
   - [[2026-10-14-anam-reads-no-source-itself]] — records and documents move to their importers (2,901 resent, all no-op), the library names a document by sha256, every opinionated default gets a config key, queue wait spends the deadline, and a rebuild drill matches 2,939 facets but cannot bring back anam-time.
+  - [[2026-10-15-words-first-then-what-a-model-makes-of-them]] — the sorting reviewed in four questions, the journal and its decision notes caught up, card 93 designed by Matt (words as a note, a model's reading as endorsed drafts), and card 157 lets an assistant save his words.
 - Decision notes
   - [[the-inversion]] · [[person-substrate-grain]] · [[mint-unit-whole-timeline]]
   - [[facet-types-dotted-namespaced]] · [[facet-definition-format]]
@@ -75,6 +76,7 @@ Two kinds of note:
   - [[the-type-is-not-in-the-identity-so-the-gate-refuses-a-type-change]]
   - [[the-library-names-a-document-by-its-sha256]] · [[a-hard-coded-value-is-a-default-an-invariant-or-presentation]]
   - [[queue-wait-spends-the-callers-deadline-up-to-acceptance]]
+  - [[a-persons-words-are-a-note-and-a-models-reading-is-a-draft]]
 - Open decisions
   - [[a-rebuild-from-source-restores-the-facts-not-anams-knowledge]] — the drill's finding; whether the loss is acceptable is Matt's call (`docs/IMPORTERS.md` §6).
 - Retracted

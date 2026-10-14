@@ -66,7 +66,8 @@ should not show, and the API document already used "element masking" for redacti
 would have carried both signs. The parameter is `fields`, JSON pointers into the type's schema, a
 temporary subset of it. The answer is a frame, columns and rows in place of entries. The columns
 are the envelope's attributes and then the pointers, nothing nested, null where a row lacks a
-field, so it reads straight into a DataFrame.
+field, so it reads straight into a DataFrame
+([[a-read-names-its-fields-and-gets-back-a-frame]]).
 
 Fields only take away. They are cut after the projection and the narrowing, from facets those
 admitted, so they can neither bring back a facet nor exclude one, and the rule that a projection

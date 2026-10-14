@@ -44,7 +44,7 @@ A fixed monthly bucket is wrong at both ends of a personal record: dozens of nea
 the sparse early years, and one late correction reopening a dense month whole. Splitting by count
 would fix the sizes and break the property composition relies on, that a fact-time sits in exactly
 one bucket. Matt's resolution was that performance decides when to split and calendar time decides
-where. A bucket starts as a year and splits into months, then days, once its value passes
+where ([[buckets-split-on-cost-and-cleave-on-the-calendar]]). A bucket starts as a year and splits into months, then days, once its value passes
 `checkpoint_budget`, 1 MiB by default. Bytes, not a timing taken at mint, so the NAS and the
 ThinkPad cut the same layout. The budget came from the bench: about 46 ms/MB to re-derive on the
 NAS, so 1 MiB keeps one dirtied bucket near 50 ms.
@@ -102,7 +102,8 @@ settled what the carry-everything principle could not. The live move retracted e
 
 Card 53 closed the night. `POST /v1/envelopes` takes a batch from an importer under its own token,
 admitted whole or refused whole with every failing envelope named, and `POST /v1/definitions`
-registers the types it emits. A registered version is immutable. Within minutes `anam-importers`
+registers the types it emits. A registered version is immutable, and from here every source reaches
+Anam this way ([[sources-reach-anam-only-through-importers]]). Within minutes `anam-importers`
 had its first commit, a shared Python base, `anam_submit`, and the Withings importer (card 54).
 
 ## The CPAP machine

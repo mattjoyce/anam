@@ -89,7 +89,8 @@ At 22:42 the importers proposal went into `docs/IMPORTERS.md`. Anam's vendor cap
 move out into ductile plugins, each shaping one source to a Facet Definition and submitting
 envelopes. It recorded the lineage, Senechal cleaved into ductile and `healthdata.db`, with Anam
 succeeding the latter, and what Anam needs first: gate-composed identity, JSON Schema, real
-validation, definitions and envelopes endpoints, registration. Matt then decided that where an Open
+validation, definitions and envelopes endpoints, registration
+([[sources-reach-anam-only-through-importers]]). Matt then decided that where an Open
 mHealth schema exists, a health payload is the OMH body at a pinned version
 ([[open-mhealth-is-the-payload-vocabulary-for-health-measures]]). Type names stay Anam's.
 

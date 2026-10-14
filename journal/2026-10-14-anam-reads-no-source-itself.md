@@ -40,7 +40,7 @@ no bytes ride in a ductile event. Everything the built-in worker had admitted re
 That morning's design named a stored document by its path and answered 409 when other bytes arrived
 at a held path. Matt redesigned it in the afternoon as card 150, and the redesign is simpler. The
 library stores a file as `<sha256>.<ext>`, so other bytes are another file and there is no conflict to
-report. A `doc.reference` keeps the path as the document's name and identity, and its sha256 finds the
+report. A `doc.reference` keeps the path as the document's name and identity, and its sha256 ([[the-library-names-a-document-by-its-sha256]]) finds the
 bytes. A rescan under the same name supersedes, and the first bytes stay. A folder fills to
 `library_folder_limit` files (1,000 by default) and then spills into `sha[:1]/`, then `sha[:1]/sha[:2]/`.
 Nothing records where a file went, because lookup walks the library for the name.
@@ -64,7 +64,7 @@ decoder against DreamMapper).
 
 ## A config key overrides every opinionated default
 
-Card 151 came from one sentence of Matt's: a config key overrides every opinionated default. Every
+Card 151 ([[a-hard-coded-value-is-a-default-an-invariant-or-presentation]]) came from one sentence of Matt's: a config key overrides every opinionated default. Every
 literal in core was sorted. A default is a value someone could reasonably want different, such as a
 timeout, a byte cap, a retry count or a retention. Anam ended with 21, in `internal/config/limits.go`,
 each with a `Default` constant equal to the old value, range-checked at load, and passed down as a
@@ -96,7 +96,8 @@ tests, with `importer_wait` set to a minute so that a pass proves the caller's c
 
 ## Hickey × Armstrong
 
-**Armstrong.** Card 110 draws one line, acceptance, the moment the worker starts the job. Before it,
+**Armstrong.** Card 110 draws one line, acceptance
+([[queue-wait-spends-the-callers-deadline-up-to-acceptance]]), the moment the worker starts the job. Before it,
 the job belongs to the caller and dies with the caller. After it, the job belongs to the ledger and
 runs to the end, reporting its real outcome even if nobody is listening. Abandoning a write half way
 buys nothing when the write is one transaction, and an idempotent commit makes the retry harmless. A
@@ -108,7 +109,8 @@ result with live, type by type, on facet id, content hash and status. It only re
 and documents, 2,939 facets in 18 types matched exactly, in about 17 seconds. That proves the first
 half of the note: identity and hash are values computed from the source, so Anam owns no fact.
 
-The second half is what the drill could not rebuild. A rebuild loses each fact's anam-time, stamping
+The second half is what the drill could not rebuild
+([[a-rebuild-from-source-restores-the-facts-not-anams-knowledge]]). A rebuild loses each fact's anam-time, stamping
 today instead. It loses superseded versions the source no longer holds. It loses operator retractions
 of a fact the source still holds, because the importer sends it again and it comes back live. Those
 are the continuity, and Anam authored them. Ledger backups are therefore not redundant with the

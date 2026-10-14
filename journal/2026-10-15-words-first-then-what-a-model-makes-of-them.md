@@ -45,9 +45,9 @@ lines, four needed a person.
 
 The card had been overtaken in part already: its records-file route predates importers, and a
 conversation is just one more importer posting envelopes. What was left were the questions that make
-it trustworthy, and Matt answered the biggest one before it was asked. He wants a model to interpret
-his words, but the words stored as a note and every inferred fact linked back to them as its source,
-landing as a draft he later endorses, superseding it.
+it trustworthy, and Matt answered the biggest one before it was asked. Matt wants a model to interpret
+the words, but the words stored as a note and every inferred fact linked back to them as its source,
+landing as a draft Matt later endorses, superseding it.
 
 That fits the doctrine better than either half alone. A facet holds what its source said, so the words
 are the note's payload, verbatim. A model's reading is a different source, `interpretation`, so the

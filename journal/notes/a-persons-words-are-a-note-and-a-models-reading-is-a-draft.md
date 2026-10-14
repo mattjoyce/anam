@@ -11,7 +11,7 @@ related: ["[[sources-reach-anam-only-through-importers]]", "[[verbatim-payload-m
 
 # A person's words are a note, and a model's reading of them is a draft the person endorses
 
-**Decision (Matt, 2026-10-15, card 93).** When Matt tells an assistant something about his day, his
+**Decision (Matt, 2026-10-15, card 93).** When Matt tells an assistant something about the day, the
 words are saved at once, verbatim, as a note under source `conversation`. A model may read the words
 into ordinary typed facts, but those facts are a second source, `interpretation`, each linked to the
 exact note version it came from, and each lands as a draft. Matt endorses or rejects a draft by a new
@@ -61,7 +61,7 @@ their standing. A reader can always tell what Matt said from what was concluded 
   Overtaken once importers posted envelopes: a conversation is an importer like any other.
 - Endorsement as a separate fact pointing at the draft's hash. Purer, but a correction then needs two
   facts and every read joins them; standing on the version gives the same history with one fact.
-- Hiding drafts by default. Safer for sharing, but the assistant could not use what Matt said until he
+- Hiding drafts by default. Safer for sharing, but the assistant could not use what Matt said until Matt
   endorsed it, which defeats saying it.
 
 Slices: cards 157 (built) to 161.

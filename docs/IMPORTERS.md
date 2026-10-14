@@ -128,7 +128,10 @@ Where log management stops applying: logs tolerate loss and sampling and have no
   is an as-of read. Admitting each Definition as a fact would let every facet's admission point at a
   Definition in the record. It changes doctrine (Definitions live in the operational store, under
   what Anam authors), so it is decided deliberately, not drifted into.
-- **The rebuild protocol:** how Anam asks an importer to resend, and how it knows one has finished.
+- **What a rebuild keeps.** The rebuild protocol is §8.8: each importer's `poll` resends its source
+  whole, and its snapshot says when it has finished. Still open: whether a rebuild should keep the
+  old ledger's anam-times and superseded versions (card 140's migration importer would), and
+  whether an operator's retraction of a fact its source still holds should replay.
 - **CloudEvents verbatim or Anam's `Envelope` with CloudEvents field names.**
 
 ## 7. Order
@@ -354,3 +357,48 @@ it no longer does (card 78; Matt, 2026-10-10).
 - **Receipts.** A receipt pins the bundled Definition set's version (`def.SetVersion`); registered
   Definitions are not in it.
 
+### 8.8 Rebuilding the record from its sources
+
+Anam owns no facts, so a ledger can be started again from nothing (a re-keyed Definition, a new
+schema, a corrupted file) by having every importer resend its source whole (card 141). The drill
+proves it without touching the record: `scripts/rebuild-drill.py` in anam-importers runs each
+importer's `poll` and `anam_submit` into a scratch daemon on a new ledger and compares the result
+with the live one, type by type, by facet id, content hash and status.
+
+**The drill.** Run it first, every time, with a plan naming each live importer and its instance
+config (anam-importers `docs/rebuild-drill.md`). Clean is zero `only-live`, `only-scratch` and
+`differ` for every type, or a difference named and explained. The scratch ledger it leaves is a
+rebuilt record, built by the same path a live rebuild takes.
+
+**A rebuild of the live record.**
+
+1. Back up (`POST /v1/backups`) and note W.
+2. Stop the daemon. Move `ledger.db` and `tracking.db` aside, never delete them: they are the
+   record of what Anam knew until now, and the receipts published from it verify only against
+   that file.
+3. `anam init` at the same paths, start the daemon. Bundled Definitions are there at once; an
+   importer's registered Definition comes back with its first batch.
+4. Run each importer's `poll` through the gateway (`POST /plugin/<instance>/poll`): `anam_records`,
+   `anam_documents`, `anam_withings`, `anam_bp_csv`, `anam_dreamstation`, `anam_garmin`,
+   `anam_concept2`, `anam_owntracks`. Each is a complete snapshot.
+5. Check each: its last submit reports `snapshot complete, 0 of N live absent`, and
+   `GET /v1/snapshots/{id}` says `complete`. Mint (`POST /v1/checkpoints`), then compare counts by
+   type with the drill's report.
+
+**What a rebuild cannot bring back.** What only the ledger held:
+
+- anam-times. Every fact is admitted at the time of the rebuild, so an as-of read before it, and
+  every receipt naming the old ledger's W, has nothing to read in the new file. The old file keeps
+  them.
+- Superseded versions. A source resends what it holds now, so the new ledger has each fact's
+  current payload and none of its history.
+- Retractions. A fact retracted because its source dropped it stays gone, since the source no
+  longer sends it. A fact an operator retracted while its source still holds it comes back live:
+  fix it at the source first. A retired source (`--retired`) sends nothing, so its facets do not
+  return at all, as neither live nor tombstoned.
+- Facts from a source that no longer exists. Every source the record holds today has an importer
+  (card 119), so there are none; the drill's `only-live` lists any that appear.
+
+**The drill's record.** 2026-10-14, from the ThinkPad, records and documents from the Library share
+against v0.308-775ffb9: 2,939 facets in 18 types, every facet id, content hash and status equal to
+the live record's, in about 17 seconds of polls and submits. The six importers on unraid are the morning's run.

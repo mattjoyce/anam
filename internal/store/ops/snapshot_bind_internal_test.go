@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/span"
 )
 
@@ -56,7 +57,7 @@ func TestOpen_BindsSnapshotPartsOfAnOlderStore(t *testing.T) {
 	}
 	// The column is there to use, and a second open leaves what it holds.
 	if _, err := db.RecordSnapshotPart(ctx, SnapshotPart{ID: "new", Source: "withings", Types: []string{"health.measurement"},
-		Part: 1, Parts: 1, Digest: "d", FacetIDs: []string{"f2"}}, time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC), 2); err != nil {
+		Part: 1, Parts: 1, Digest: "d", FacetIDs: []string{"f2"}}, time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC), 2, SnapshotRetention{Incomplete: config.DefaultSnapshotTTL, Complete: config.DefaultSnapshotKeep}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.Close(); err != nil {

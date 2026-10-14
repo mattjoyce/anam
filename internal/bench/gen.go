@@ -14,6 +14,7 @@ import (
 
 	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
@@ -104,7 +105,7 @@ func Generate(ctx context.Context, dir string, sh Shape, progress func(string)) 
 		return err
 	}
 	clk := &stepClock{}
-	g := gate.New(l, defs, gate.StaticScopes{source: {factType}}, clk, Person)
+	g := gate.New(l, defs, gate.StaticScopes{source: {factType}}, clk, Person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	loc, err := time.LoadLocation(zone)
 	if err != nil {
 		return err

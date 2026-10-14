@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/span"
@@ -127,7 +128,10 @@ func TestServe_ShutsDownOnContextCancel(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = l.Close() })
 
-	go func() { done <- inspect.Serve(ctx, l, "127.0.0.1:0", time.Second, defaultBuckets, "") }()
+	go func() {
+		done <- inspect.Serve(ctx, "127.0.0.1:0", inspect.Deps{Ledger: l, Timeout: time.Second, Buckets: defaultBuckets},
+			config.DefaultHTTPReadHeaderTimeout, config.DefaultShutdownGrace)
+	}()
 	time.Sleep(200 * time.Millisecond) // let ListenAndServe bind
 	cancel()
 

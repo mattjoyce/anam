@@ -50,6 +50,7 @@ func TestLoadDefaults(t *testing.T) {
 		CheckpointBudget:   config.DefaultCheckpointBudget,
 		MaxReadBytes:       config.DefaultMaxReadBytes,
 		LibraryFolderLimit: config.DefaultLibraryFolderLimit,
+		Limits:             config.DefaultLimits(),
 	}
 	if got != want {
 		t.Errorf("Load() = %+v, want %+v", got, want)
@@ -120,6 +121,7 @@ bucket_width: weekly
 		CheckpointBudget:   config.DefaultCheckpointBudget,
 		MaxReadBytes:       config.DefaultMaxReadBytes,
 		LibraryFolderLimit: config.DefaultLibraryFolderLimit,
+		Limits:             config.DefaultLimits(),
 	}
 	if got != want {
 		t.Errorf("Load() = %+v, want %+v", got, want)
@@ -246,6 +248,7 @@ func TestValidate(t *testing.T) {
 		IngestTimeout:      time.Minute,
 		BucketWidth:        span.Default,
 		LibraryFolderLimit: config.DefaultLibraryFolderLimit,
+		Limits:             config.DefaultLimits(),
 	}
 
 	tests := []struct {

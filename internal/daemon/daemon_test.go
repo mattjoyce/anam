@@ -35,6 +35,7 @@ func newConfig(t *testing.T) config.Config {
 		IngestTimeout:      time.Minute,
 		BucketWidth:        span.Default,
 		Listen:             "127.0.0.1:0",
+		Limits:             config.DefaultLimits(),
 	}
 	l, err := ledger.Create(context.Background(), cfg.LedgerPath, cfg.PersonID)
 	if err != nil {

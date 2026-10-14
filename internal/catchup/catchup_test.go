@@ -10,6 +10,7 @@ import (
 
 	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
@@ -77,7 +78,7 @@ func newHarness(t *testing.T) (*gate.Gate, *ledger.Ledger, *ops.DB) {
 		t.Fatalf("NewRegistry: %v", err)
 	}
 	scopes := gate.StaticScopes{"bp-csv": {"health.blood-pressure"}}
-	return gate.New(l, reg, scopes, clock.Real{}, person), l, db
+	return gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}), l, db
 }
 
 func commit(t *testing.T, g *gate.Gate, measuredAt, reading string) gate.Result {

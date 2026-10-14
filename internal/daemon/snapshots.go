@@ -28,21 +28,22 @@ import (
 // and reports what a complete snapshot leaves absent. It tombstones nothing: Matt
 // decided that retraction stays an operator's anam retract --yes.
 
-// maxSnapshotParts bounds a run: at the gate's batch size it is far beyond any source.
-const maxSnapshotParts = 100000
-
+// snapshotID is the shape of a snapshot's label. It is an invariant (card 151): the
+// importers mint labels to it, and a looser one here would admit ids they cannot read
+// back in a report's URL.
 var snapshotID = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,128}$`)
 
-// validSnapshot checks a part's label against the importer and the batch it labels.
-func validSnapshot(s *api.SnapshotPart, imp config.Importer, envs []api.SubmittedEnvelope) error {
+// validSnapshot checks a part's label against the importer and the batch it labels,
+// and its declared parts against maxParts (max_snapshot_parts).
+func validSnapshot(s *api.SnapshotPart, imp config.Importer, envs []api.SubmittedEnvelope, maxParts int) error {
 	if s == nil {
 		return nil
 	}
 	switch {
 	case !snapshotID.MatchString(s.ID):
 		return fmt.Errorf("snapshot id %q: 1 to 128 of letters, digits and . _ : -", s.ID)
-	case s.Parts < 1 || s.Parts > maxSnapshotParts:
-		return fmt.Errorf("snapshot parts %d: want 1 to %d", s.Parts, maxSnapshotParts)
+	case s.Parts < 1 || s.Parts > maxParts:
+		return fmt.Errorf("snapshot parts %d: want 1 to %d", s.Parts, maxParts)
 	case s.Part < 1 || s.Part > s.Parts:
 		return fmt.Errorf("snapshot part %d of %d", s.Part, s.Parts)
 	case len(s.Types) == 0:
@@ -132,7 +133,7 @@ func sameTypes(a, b []string) bool {
 // results carried, every outcome counted, no-op included: a no-op is a facet the
 // source still holds.
 func recordSnapshotPart(ctx context.Context, db *ops.DB, source string, s *api.SnapshotPart, digest string,
-	results []gate.Result, head ledger.Watermark, at time.Time,
+	results []gate.Result, head ledger.Watermark, at time.Time, keep ops.SnapshotRetention,
 ) (*api.SnapshotProgress, error) {
 	ids := make([]string, len(results))
 	for i, r := range results {
@@ -140,7 +141,7 @@ func recordSnapshotPart(ctx context.Context, db *ops.DB, source string, s *api.S
 	}
 	rec, err := db.RecordSnapshotPart(ctx, ops.SnapshotPart{
 		ID: s.ID, Source: source, Types: s.Types, Part: s.Part, Parts: s.Parts, Digest: digest, FacetIDs: ids,
-	}, at, int64(head))
+	}, at, int64(head), keep)
 	if err != nil {
 		return nil, fmt.Errorf("batch admitted, snapshot part not recorded; resend the part: %w", err)
 	}
@@ -179,7 +180,7 @@ func (d *Daemon) getSnapshot(w http.ResponseWriter, r *http.Request) {
 		src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts, Definitions: d.defs.current.Load(), Projections: d.projections.current.Load()}
 		absent, live, err := read.Absent(ctx, src, d.read, read.SnapshotScope{
 			Source: s.Source, Types: s.Types, Carried: carried, StartedW: ledger.Watermark(s.StartedW),
-			MaxJudged: api.AbsentJudgeMax,
+			MaxJudged: d.cfg.MaxAbsentJudged,
 		})
 		if err != nil {
 			writeReadError(w, err)
@@ -187,7 +188,7 @@ func (d *Daemon) getSnapshot(w http.ResponseWriter, r *http.Request) {
 		}
 		n := len(absent)
 		rep.Live, rep.Absent = &live, &n
-		for _, e := range absent[:min(n, api.AbsentIDsMax)] {
+		for _, e := range absent[:min(n, d.cfg.MaxAbsentIDs)] {
 			rep.AbsentIDs = append(rep.AbsentIDs, e.FacetID)
 		}
 	}

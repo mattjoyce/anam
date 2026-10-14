@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
@@ -76,7 +77,7 @@ func TestRetract_PlansOnlyWhatTheSourceDropped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := gate.New(l, defs, gate.StaticScopes{}, clock.Real{}, "matt")
+	g := gate.New(l, defs, gate.StaticScopes{}, clock.Real{}, "matt", gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	out, _, err := g.Retract(ctx, absent[0].FacetID)
 	if err != nil || out.Outcome != gate.OutcomeTombstoned {
 		t.Fatalf("Retract = %v %v", out.Outcome, err)

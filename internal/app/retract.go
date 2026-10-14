@@ -216,7 +216,7 @@ func retractAll(cmd *cobra.Command, cfg config.Config, absent []facet.Facet) err
 	}
 	defer func() { _ = l.Close() }()
 	// A tombstone admits nothing, so the gate needs no scopes for it.
-	g := gate.New(l, reg, gate.StaticScopes{}, clock.Real{}, cfg.PersonID)
+	g := gate.New(l, reg, gate.StaticScopes{}, clock.Real{}, cfg.PersonID, gate.Limits{MaxPayloadBytes: cfg.MaxPayloadBytes, MaxRetries: cfg.CommitRetries})
 
 	done := 0
 	for _, f := range absent {

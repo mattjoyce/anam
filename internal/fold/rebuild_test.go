@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
@@ -55,7 +56,7 @@ func newHarness(t *testing.T) (*gate.Gate, *ledger.Ledger) {
 		t.Fatalf("NewRegistry: %v", err)
 	}
 	scopes := gate.StaticScopes{"bp-csv": {"health.blood-pressure"}}
-	return gate.New(l, reg, scopes, clock.Real{}, person), l
+	return gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}), l
 }
 
 // source stands in for the system of record: measured_at → the row's reading.

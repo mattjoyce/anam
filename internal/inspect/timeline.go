@@ -85,7 +85,7 @@ type tlTally struct {
 }
 
 // stripMax is the most squares the strip draws; beyond it the page would grow with
-// the record, so the strip tallies by type instead.
+// the record, so the strip tallies by type instead. Presentation (card 151).
 const stripMax = 1500
 
 type timelineData struct {

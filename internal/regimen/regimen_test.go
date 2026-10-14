@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
@@ -67,7 +68,7 @@ func TestExpected_LeavesTheLedgerUntouched(t *testing.T) {
 	if err != nil {
 		t.Fatalf("def.Bundled: %v", err)
 	}
-	g := gate.New(l, defs, gate.StaticScopes{"records": {"med.compliance-estimate"}}, clock.Real{}, "matt")
+	g := gate.New(l, defs, gate.StaticScopes{"records": {"med.compliance-estimate"}}, clock.Real{}, "matt", gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 
 	env := facet.Envelope{
 		Type: "med.compliance-estimate", Source: "records", Injector: "records",

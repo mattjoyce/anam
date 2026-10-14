@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
@@ -61,7 +62,7 @@ func admitRecords(ctx context.Context, l *ledger.Ledger, recs []record) (ledger.
 			Payload: []byte(r.payload), AssertedPerson: "matt",
 		}
 	}
-	g := gate.New(l, defs, gate.StaticScopes{"records": types}, clock.Real{}, "matt")
+	g := gate.New(l, defs, gate.StaticScopes{"records": types}, clock.Real{}, "matt", gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	for i, env := range envs {
 		if bindings[i], err = g.Resolve(env); err != nil {
 			return 0, fmt.Errorf("resolve record %d (%s): %w", i, env.Type, err)

@@ -18,7 +18,8 @@ import (
 // inspector already caches, and the events page asks the ledger for a seq range, its
 // ordinary replay.
 
-// listPage is how many rows a list page shows.
+// listPage is how many rows a list page shows. Like the band's geometry and the
+// marks, it is presentation, changed by changing the page (card 151).
 const listPage = 300
 
 // facetFilter is what the facet list is narrowed by; empty fields admit everything.

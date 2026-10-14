@@ -118,6 +118,10 @@ type Config struct {
 	// and re-derived whole. Zero mints at the fixed bucket_width instead. The default,
 	// 1 MiB, re-derives in about 50 ms on the NAS (card 59's bench).
 	CheckpointBudget int `mapstructure:"checkpoint_budget"`
+
+	// Limits are the daemon's and the client's bounds and waits, each a key with a
+	// default (limits.go). Squashed, so their keys sit at the top level beside these.
+	Limits `mapstructure:",squash"`
 }
 
 // Load resolves configuration, reading the YAML file at path when it is non-empty.
@@ -150,7 +154,7 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 	v.SetDefault("ledger_path", DefaultLedgerPath())
 	v.SetDefault("db_path", DefaultDBPath())
 	v.SetDefault("artifact_dir", DefaultArtifactDir())
-	v.SetDefault("timeout", 5*time.Second)
+	v.SetDefault("timeout", DefaultTimeout)
 	v.SetDefault("bucket_width", string(span.Default))
 	v.SetDefault("library_dir", "")
 	v.SetDefault("zone", "Local")
@@ -159,11 +163,12 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 	v.SetDefault("importers_file", "")
 	v.SetDefault("server", "")
 	v.SetDefault("checkpoint_budget", DefaultCheckpointBudget)
-	v.SetDefault("ingest_timeout", 15*time.Minute)
+	v.SetDefault("ingest_timeout", DefaultIngestTimeout)
 	v.SetDefault("backup_dir", "")
-	v.SetDefault("backup_keep", 14)
+	v.SetDefault("backup_keep", DefaultBackupKeep)
 	v.SetDefault("max_read_bytes", DefaultMaxReadBytes)
 	v.SetDefault("library_folder_limit", DefaultLibraryFolderLimit)
+	setLimitDefaults(v)
 
 	if path != "" {
 		v.SetConfigFile(path)
@@ -249,6 +254,9 @@ func (c Config) Validate() error {
 	case c.LibraryFolderLimit < 1:
 		return fmt.Errorf("%w: library_folder_limit must be at least 1, got %d", ErrInvalid, c.LibraryFolderLimit)
 	}
+	if err := c.Limits.Validate(); err != nil {
+		return err
+	}
 	if c.Server != "" {
 		if err := checkServer(c.Server); err != nil {
 			return fmt.Errorf("%w: server: %v", ErrInvalid, err)
@@ -329,6 +337,17 @@ func (c Config) ZoneName() (string, error) {
 // Buckets is the bucketing this configuration selects. Validate has already rejected
 // an unknown width, so a config that loaded yields one here.
 func (c Config) Buckets() (span.Buckets, error) { return span.New(c.BucketWidth) }
+
+// DefaultTimeout is timeout's default: a call to a store on local disk takes
+// milliseconds, so five seconds is a store that is stuck, not slow.
+const DefaultTimeout = 5 * time.Second
+
+// DefaultIngestTimeout is ingest_timeout's default: a full replay of the record into
+// the index takes a few minutes on the NAS.
+const DefaultIngestTimeout = 15 * time.Minute
+
+// DefaultBackupKeep is backup_keep's default: two weeks of nightly backups.
+const DefaultBackupKeep = 14
 
 // DefaultCheckpointBudget is checkpoint_budget's default: 1 MiB.
 const DefaultCheckpointBudget = 1 << 20

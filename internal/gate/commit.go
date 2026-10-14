@@ -75,7 +75,7 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 		pending[i] = i
 	}
 
-	for attempt := 0; attempt < g.maxRetries; attempt++ {
+	for attempt := 0; attempt < g.limits.MaxRetries; attempt++ {
 		head, err := g.ledger.Head(ctx)
 		if err != nil {
 			return nil, 0, err
@@ -165,7 +165,7 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 			return nil, 0, err
 		}
 	}
-	return nil, 0, fmt.Errorf("%w: after %d attempts", ErrContention, g.maxRetries)
+	return nil, 0, fmt.Errorf("%w: after %d attempts", ErrContention, g.limits.MaxRetries)
 }
 
 // prepare runs every pillar that needs no ledger read and derives identity and
@@ -294,8 +294,8 @@ func (g *Gate) admitChecks(env facet.Envelope, binding facet.Binding) (def.Defin
 	if assuranceRank(binding.Assurance) < assuranceRank(d.MinAssurance) {
 		return def.Definition{}, nil, fmt.Errorf("%w: %s < %s", ErrAssuranceBelowFloor, binding.Assurance, d.MinAssurance)
 	}
-	if len(env.Payload) > g.maxPayloadBytes {
-		return def.Definition{}, nil, fmt.Errorf("%w: %d bytes > %d", ErrPayloadTooLarge, len(env.Payload), g.maxPayloadBytes)
+	if len(env.Payload) > g.limits.MaxPayloadBytes {
+		return def.Definition{}, nil, fmt.Errorf("%w: %d bytes > %d", ErrPayloadTooLarge, len(env.Payload), g.limits.MaxPayloadBytes)
 	}
 	doc, err := def.Decode(env.Payload)
 	if err != nil {
@@ -350,7 +350,7 @@ func (g *Gate) Retract(ctx context.Context, facetID string) (Result, ledger.Wate
 		return Result{}, 0, err
 	}
 
-	for attempt := 0; attempt < g.maxRetries; attempt++ {
+	for attempt := 0; attempt < g.limits.MaxRetries; attempt++ {
 		head, err := g.ledger.Head(ctx)
 		if err != nil {
 			return Result{}, 0, err
@@ -383,7 +383,7 @@ func (g *Gate) Retract(ctx context.Context, facetID string) (Result, ledger.Wate
 			return Result{}, 0, err
 		}
 	}
-	return Result{}, 0, fmt.Errorf("%w: after %d attempts", ErrContention, g.maxRetries)
+	return Result{}, 0, fmt.Errorf("%w: after %d attempts", ErrContention, g.limits.MaxRetries)
 }
 
 // assuranceRank orders the assurance levels: review < medium < high.

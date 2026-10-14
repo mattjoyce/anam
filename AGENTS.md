@@ -114,6 +114,34 @@ go test -race -count=1 -shuffle=on -vet=all ./...
 
 ---
 
+## Defaults and invariants (card 151)
+
+Someone running Anam can make their own choices; Anam ships opinionated defaults. So every
+hard-coded value is one of two kinds, and a new value is sorted when it is written.
+
+- **A default** is a choice someone could reasonably make differently: a timeout, a wait, a size
+  bound, a retention, a retry count. It is a config key (snake_case, with its `ANAM_` variable)
+  whose default is a `Default…` constant in `internal/config`, with a comment saying why that
+  number. Load range-checks it, so a bad value fails at start. It reaches the code as a parameter
+  from the one `Config` loaded at start, never read from a global, a file or the environment deep
+  in the code. It is listed in `config.example.yaml`.
+- **An invariant** is a value whose change breaks correctness, data or a contract, not taste: what
+  both ends of a wire must agree on (`gate.MaxBatch`, the `Anam-Timeout` header, the snapshot id's
+  shape), what the stored files mean (schema versions, `clock.Width`), a security floor (the
+  token's length, file modes), or arithmetic (days in a week). It stays a constant, with a comment
+  saying why it is not configurable. A value that is part of what the data means belongs in the
+  Definition or the type, not as a loose constant.
+
+Two kinds of constant are neither. Presentation (the inspector's geometry and page sizes, a
+terminal line's clip) is changed by changing the page. A store's internal tuning that changes no
+result and no limit a person meets (`versionsBatch`, `latestScanAt`, a busy timeout bounded by
+`timeout`) stays in the store with a comment saying so.
+
+No test hooks. A value a test needs to change is a default, and the test sets it the way a person
+would. A value a test must not change is an invariant. No package variable is set from a test.
+
+---
+
 ## Python
 
 Anam holds no Python since card 119: the one-off extraction and reshaping scripts, which turn a

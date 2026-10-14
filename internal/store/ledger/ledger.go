@@ -100,6 +100,10 @@ const (
 // reporting ErrBusy. It sits below the default call timeout (config: 5s) so that
 // contention is reported as ErrBusy and not as the caller's deadline expiring, which
 // names nothing. The caller's context still bounds the wait from above.
+//
+// It is not a config key (card 151). The choice a person makes is timeout, which
+// bounds every call from above; this only decides which error a long wait reports,
+// and the daemon, the one writer, never waits on itself.
 const busyTimeoutMS = 3000
 
 // Create opens the ledger at path for writing, creating the file and its parent

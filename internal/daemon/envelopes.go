@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
@@ -19,24 +20,28 @@ import (
 )
 
 // maxSubmission bounds one batch's body: a full batch of the largest payloads the
-// gate admits, with room for the envelopes around them.
-const maxSubmission = gate.MaxBatch*300*1024 + 1<<20
+// gate admits (max_payload_bytes), with room for the envelopes around them.
+func maxSubmission(maxPayloadBytes int) int64 {
+	return int64(gate.MaxBatch)*int64(maxPayloadBytes) + 1<<20
+}
 
-// retryAfter is what a 503 asks an importer to wait, in seconds. A batch has already
-// waited importerWait for the queue, so what holds it is a long write (a backup, a
-// full mint, a replay into the index), which takes tens of seconds.
-const retryAfter = "15"
+// gateLimits is the gate's share of the loaded config.
+func gateLimits(cfg config.Config) gate.Limits {
+	return gate.Limits{MaxPayloadBytes: cfg.MaxPayloadBytes, MaxRetries: cfg.CommitRetries}
+}
 
-// importerWait is how long an importer's write waits for the queue: long enough to
-// wait out a mint after the batch before it, short of a long write.
-const importerWait = 5 * time.Second
+// retryAfter is what a 503 asks its caller to wait (retry_after), in whole seconds as
+// the header carries it.
+func (d *Daemon) retryAfter() string {
+	return strconv.Itoa(int(d.cfg.RetryAfter / time.Second))
+}
 
 // postEnvelopes admits one batch from an importer, whole or not at all. The importer
 // is the source of every envelope and may submit only its own types: the gate's
 // authenticated pillar holds it to them.
 func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 	imp := importerOf(r)
-	envs, snap, err := decodeSubmission(w, r, imp)
+	envs, snap, err := decodeSubmission(w, r, imp, d.cfg.Limits)
 	if err != nil {
 		var tooLarge *http.MaxBytesError
 		if errors.As(err, &tooLarge) {
@@ -54,7 +59,7 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 	if snap != nil {
 		digest = partDigest(envs)
 	}
-	err = d.tryWriteWithin(importerWait, d.timeout(r), func(ctx context.Context, s Stores) error {
+	err = d.tryWriteWithin(d.cfg.ImporterWait, d.timeout(r), func(ctx context.Context, s Stores) error {
 		// A part that does not belong to the run its id names, or that was already
 		// recorded with other envelopes, is refused before anything is admitted.
 		if err := checkSnapshot(ctx, s.Ops, imp.Source, snap, digest); err != nil {
@@ -68,7 +73,7 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 		// Inside the write, where a registration cannot land between this and the
 		// admission.
 		reg := d.defs.current.Load()
-		g := gate.New(s.Ledger, reg, gate.StaticScopes{imp.Source: imp.Types}, clock.Real{}, d.cfg.PersonID)
+		g := gate.New(s.Ledger, reg, gate.StaticScopes{imp.Source: imp.Types}, clock.Real{}, d.cfg.PersonID, gateLimits(d.cfg))
 		bindings := make([]facet.Binding, len(envs))
 		for i, env := range envs {
 			// A malformed envelope binds to nothing; the gate's first check refuses it
@@ -88,7 +93,8 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 			// was recorded to compare it to: the protocol fixes a part's envelopes for
 			// the life of its run id, and a run that reads its source again is a new
 			// run (card 107).
-			progress, err = recordSnapshotPart(ctx, s.Ops, imp.Source, snap, digest, results, head, time.Now())
+			progress, err = recordSnapshotPart(ctx, s.Ops, imp.Source, snap, digest, results, head, time.Now(),
+				ops.SnapshotRetention{Incomplete: d.cfg.SnapshotTTL, Complete: d.cfg.SnapshotKeep})
 		}
 		return err
 	})
@@ -100,7 +106,7 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 	case errors.As(err, &refused):
 		writeJSON(w, http.StatusUnprocessableEntity, refusalOf(refused))
 	case errors.Is(err, ErrBusy), errors.Is(err, ErrStopped), errors.Is(err, gate.ErrContention):
-		w.Header().Set("Retry-After", retryAfter)
+		w.Header().Set("Retry-After", d.retryAfter())
 		writeError(w, http.StatusServiceUnavailable, err)
 	case errors.Is(err, context.DeadlineExceeded):
 		writeError(w, http.StatusGatewayTimeout, err)
@@ -125,10 +131,10 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 // value or garbage behind a valid batch is refused (400) and a body over
 // maxSubmission is refused (413) however the excess is spread. The server's
 // ReadTimeout bounds the read; a client that stalls is cut off there (card 109).
-func decodeSubmission(w http.ResponseWriter, r *http.Request, imp config.Importer,
+func decodeSubmission(w http.ResponseWriter, r *http.Request, imp config.Importer, limits config.Limits,
 ) ([]facet.Envelope, *api.SnapshotPart, error) {
 	source := imp.Source
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxSubmission))
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxSubmission(limits.MaxPayloadBytes)))
 	dec.DisallowUnknownFields()
 	var sub api.Submission
 	if err := dec.Decode(&sub); err != nil {
@@ -143,7 +149,7 @@ func decodeSubmission(w http.ResponseWriter, r *http.Request, imp config.Importe
 	case n > gate.MaxBatch:
 		return nil, nil, fmt.Errorf("submission holds %d envelopes; a batch is at most %d", n, gate.MaxBatch)
 	}
-	if err := validSnapshot(sub.Snapshot, imp, sub.Envelopes); err != nil {
+	if err := validSnapshot(sub.Snapshot, imp, sub.Envelopes, limits.MaxSnapshotParts); err != nil {
 		return nil, nil, err
 	}
 	envs := make([]facet.Envelope, len(sub.Envelopes))

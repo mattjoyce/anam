@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
@@ -23,7 +24,7 @@ func (h *harness) useRegistry(t *testing.T, reg *def.Registry, extra map[string]
 	for source, types := range extra {
 		scopes[source] = types
 	}
-	h.gate = gate.New(h.l, reg, scopes, clock.Real{}, person)
+	h.gate = gate.New(h.l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 }
 
 func medManifest(typ string, closes bool) string {

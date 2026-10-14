@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
@@ -22,20 +23,20 @@ func TestSnapshot_CompletesWhenEveryPartIsAdmitted(t *testing.T) {
 	db, _ := open(t)
 	ctx := context.Background()
 
-	s, err := db.RecordSnapshotPart(ctx, part("run-1", 2, 3, "b", "c"), t0, 1)
+	s, err := db.RecordSnapshotPart(ctx, part("run-1", 2, 3, "b", "c"), t0, 1, ops.SnapshotRetention{Incomplete: config.DefaultSnapshotTTL, Complete: config.DefaultSnapshotKeep})
 	if err != nil || s.Complete() || s.PartsAdmitted != 1 || s.Carried != 2 {
 		t.Fatalf("after part 2: %+v, %v", s, err)
 	}
-	if s, err = db.RecordSnapshotPart(ctx, part("run-1", 2, 3, "b", "c"), t0, 1); err != nil || s.PartsAdmitted != 1 || s.Carried != 2 {
+	if s, err = db.RecordSnapshotPart(ctx, part("run-1", 2, 3, "b", "c"), t0, 1, ops.SnapshotRetention{Incomplete: config.DefaultSnapshotTTL, Complete: config.DefaultSnapshotKeep}); err != nil || s.PartsAdmitted != 1 || s.Carried != 2 {
 		t.Fatalf("part 2 again: %+v, %v", s, err)
 	}
-	if s, err = db.RecordSnapshotPart(ctx, part("run-1", 1, 3, "a", "b"), t0, 1); err != nil || s.Complete() {
+	if s, err = db.RecordSnapshotPart(ctx, part("run-1", 1, 3, "a", "b"), t0, 1, ops.SnapshotRetention{Incomplete: config.DefaultSnapshotTTL, Complete: config.DefaultSnapshotKeep}); err != nil || s.Complete() {
 		t.Fatalf("after part 1: %+v, %v", s, err)
 	}
 	if _, ok, _ := db.NewestCompleteSnapshot(ctx, "withings"); ok {
 		t.Fatal("an incomplete snapshot was offered as complete")
 	}
-	if s, err = db.RecordSnapshotPart(ctx, part("run-1", 3, 3, "d"), t0.Add(time.Minute), 9); err != nil || !s.Complete() || s.Carried != 4 {
+	if s, err = db.RecordSnapshotPart(ctx, part("run-1", 3, 3, "d"), t0.Add(time.Minute), 9, ops.SnapshotRetention{Incomplete: config.DefaultSnapshotTTL, Complete: config.DefaultSnapshotKeep}); err != nil || !s.Complete() || s.Carried != 4 {
 		t.Fatalf("after part 3: %+v, %v", s, err)
 	}
 	got, ok, err := db.NewestCompleteSnapshot(ctx, "withings")
@@ -54,16 +55,16 @@ func TestSnapshot_RefusesAMismatchedPart(t *testing.T) {
 	t.Parallel()
 	db, _ := open(t)
 	ctx := context.Background()
-	if _, err := db.RecordSnapshotPart(ctx, part("run-1", 1, 2), t0, 1); err != nil {
+	if _, err := db.RecordSnapshotPart(ctx, part("run-1", 1, 2), t0, 1, ops.SnapshotRetention{Incomplete: config.DefaultSnapshotTTL, Complete: config.DefaultSnapshotKeep}); err != nil {
 		t.Fatal(err)
 	}
 	other := part("run-1", 2, 3)
-	if _, err := db.RecordSnapshotPart(ctx, other, t0, 1); !errors.Is(err, ops.ErrSnapshotMismatch) {
+	if _, err := db.RecordSnapshotPart(ctx, other, t0, 1, ops.SnapshotRetention{Incomplete: config.DefaultSnapshotTTL, Complete: config.DefaultSnapshotKeep}); !errors.Is(err, ops.ErrSnapshotMismatch) {
 		t.Errorf("another part count = %v, want ErrSnapshotMismatch", err)
 	}
 	other = part("run-1", 2, 2)
 	other.Source = "bp-csv"
-	if _, err := db.RecordSnapshotPart(ctx, other, t0, 1); !errors.Is(err, ops.ErrSnapshotMismatch) {
+	if _, err := db.RecordSnapshotPart(ctx, other, t0, 1, ops.SnapshotRetention{Incomplete: config.DefaultSnapshotTTL, Complete: config.DefaultSnapshotKeep}); !errors.Is(err, ops.ErrSnapshotMismatch) {
 		t.Errorf("another source = %v, want ErrSnapshotMismatch", err)
 	}
 }
@@ -74,11 +75,11 @@ func TestSnapshot_StaleAndOldAreDropped(t *testing.T) {
 	t.Parallel()
 	db, _ := open(t)
 	ctx := context.Background()
-	if _, err := db.RecordSnapshotPart(ctx, part("stale", 1, 2, "x"), t0, 1); err != nil {
+	if _, err := db.RecordSnapshotPart(ctx, part("stale", 1, 2, "x"), t0, 1, ops.SnapshotRetention{Incomplete: config.DefaultSnapshotTTL, Complete: config.DefaultSnapshotKeep}); err != nil {
 		t.Fatal(err)
 	}
 	for i, id := range []string{"c1", "c2", "c3"} {
-		if _, err := db.RecordSnapshotPart(ctx, part(id, 1, 1, "y"), t0.Add(25*time.Hour+time.Duration(i)*time.Minute), 1); err != nil {
+		if _, err := db.RecordSnapshotPart(ctx, part(id, 1, 1, "y"), t0.Add(25*time.Hour+time.Duration(i)*time.Minute), 1, ops.SnapshotRetention{Incomplete: config.DefaultSnapshotTTL, Complete: config.DefaultSnapshotKeep}); err != nil {
 			t.Fatal(err)
 		}
 	}

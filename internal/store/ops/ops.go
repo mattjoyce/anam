@@ -42,7 +42,8 @@ import (
 //
 // registered_definition (card 53) and the snapshot tables (card 78) do not bump it. Open creates the table and its
 // triggers in a version-6 file as in a new one, and a build that predates it never
-// reads it, so neither build can misread the other's file.
+// reads it, so neither build can misread the other's file. It names the file's
+// layout, so it is never configurable (card 151).
 const schemaVersion = 7
 
 // ErrSchemaVersion is returned by Open for a database written by a different schema.
@@ -274,6 +275,8 @@ func Open(ctx context.Context, path string, buckets span.Buckets) (*DB, error) {
 		}
 	}
 
+	// busy_timeout is not a config key (card 151): the caller's context, from
+	// timeout, bounds every call, and the daemon is the store's one writer.
 	db, err := sql.Open("sqlite", path+"?_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
 	if err != nil {
 		return nil, fmt.Errorf("ops: open %q: %w", path, err)

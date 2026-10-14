@@ -31,7 +31,7 @@ func TestRetract_PlansAnImportersSourceFromItsSnapshot(t *testing.T) {
 	cfg := config.Config{
 		LedgerPath: filepath.Join(dir, "ledger.db"), DBPath: filepath.Join(dir, "tracking.db"),
 		ArtifactDir: filepath.Join(dir, "artifacts"), PersonID: "matt",
-		BucketWidth: span.Default, Timeout: 5 * time.Second,
+		BucketWidth: span.Default, Timeout: 5 * time.Second, Limits: config.DefaultLimits(),
 	}
 	l, err := ledger.Create(ctx, cfg.LedgerPath, cfg.PersonID)
 	if err != nil {
@@ -42,7 +42,7 @@ func TestRetract_PlansAnImportersSourceFromItsSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := gate.New(l, defs, gate.StaticScopes{"scale-import": {"health.weight"}}, clock.Real{}, cfg.PersonID)
+	g := gate.New(l, defs, gate.StaticScopes{"scale-import": {"health.weight"}}, clock.Real{}, cfg.PersonID, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	admit := func(id string) string {
 		t.Helper()
 		env := facet.Envelope{Type: "health.weight", Source: "scale-import", Injector: "scale-import",
@@ -75,7 +75,7 @@ func TestRetract_PlansAnImportersSourceFromItsSnapshot(t *testing.T) {
 
 	w, _ := l.Head(ctx)
 	if _, err := db.RecordSnapshotPart(ctx, ops.SnapshotPart{ID: "run", Source: "scale-import",
-		Types: []string{"health.weight"}, Part: 1, Parts: 1, FacetIDs: []string{a, c}}, time.Now(), int64(w)); err != nil {
+		Types: []string{"health.weight"}, Part: 1, Parts: 1, FacetIDs: []string{a, c}}, time.Now(), int64(w), ops.SnapshotRetention{Incomplete: config.DefaultSnapshotTTL, Complete: config.DefaultSnapshotKeep}); err != nil {
 		t.Fatal(err)
 	}
 	_ = db.Close()

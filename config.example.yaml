@@ -98,3 +98,87 @@ ingest_timeout: 15m
 # and the fix is to delete tracking.db (never ledger.db) and re-run `anam init`.
 # The derived tier replays from the ledger, so that costs time, not facts.
 bucket_width: monthly
+
+# The most bytes one checkpoint's value holds before the mint splits its bucket
+# along the calendar, a year into months and a month into days. 0 mints at the
+# fixed bucket_width. The default re-derives in about 50 ms on the NAS.
+checkpoint_budget: 1048576
+
+# --- the reader ---------------------------------------------------------------
+# The zone a bare date on the command line is read in and fact-times are shown in.
+# Local is this machine's; a read sent to a daemon carries its IANA name.
+# zone: Australia/Sydney
+
+# A running daemon to ask instead of opening the files (scheme and host only).
+# server: http://192.168.20.4:8787
+
+# The most one read over the daemon answers with, in bytes; past it the read is
+# refused with what narrows it. 0 is no bound. A month of every type is under the
+# default; the whole record is not.
+max_read_bytes: 524288
+
+# --- backups ------------------------------------------------------------------
+# Where POST /v1/backups writes, one directory per backup, on another disk from
+# the record. Unset, the daemon takes none.
+# backup_dir: /mnt/backup/anam
+# How many backups to keep: two weeks of nightly ones.
+backup_keep: 14
+
+# --- limits (card 151) ----------------------------------------------------------
+# Every value below is Anam's opinionated default and a choice you can make
+# differently. Each is range-checked at start, so a bad one stops the daemon or the
+# CLI there and not at the first request that uses it. Durations are Go durations
+# (250ms, 5s, 2m, 24h). Values Anam does not offer here are invariants, and the code
+# says beside each why it cannot change (AGENTS.md, "Defaults and invariants").
+
+# The daemon's HTTP server. Headers are a few hundred bytes; a 64 MiB document
+# crosses the home network well inside the read timeout; the inspector's
+# whole-record page (about 5 MB) writes in seconds; importers' batches arrive
+# seconds apart.
+http_read_header_timeout: 5s
+http_read_timeout: 30s
+http_write_timeout: 2m
+http_idle_timeout: 2m
+# How long shutdown waits for requests in flight; each is already bounded by
+# timeout, so this only has to cover one.
+shutdown_grace: 10s
+
+# The write queue. One write runs at a time. An operator's write (a mint) waits
+# accept_wait for it and is then refused as busy; an importer's batch waits
+# importer_wait, long enough to wait out the mint after the batch before it. A
+# busy answer (503) asks the caller to wait retry_after, in whole seconds, since
+# what holds the queue that long is a backup or a full mint.
+accept_wait: 250ms
+importer_wait: 5s
+retry_after: 15s
+# How long the mint worker waits for batches to stop arriving before it mints, so
+# an importer's hundred batches get one mint and not a hundred.
+mint_quiet: 2s
+
+# Admission. The most one payload, one registered Definition and one posted
+# document may hold, in bytes. A batch's body is bounded by 49 payloads plus
+# 1 MiB. commit_retries is how often a batch that lost the race for the watermark
+# is tried again before the gate reports contention.
+max_payload_bytes: 307200
+max_manifest_bytes: 1048576
+max_document_bytes: 67108864
+commit_retries: 5
+
+# Complete resends (snapshots). An incomplete one is dropped after snapshot_ttl;
+# a source keeps its snapshot_keep newest complete ones (the newest is what
+# retraction plans from). A report lists at most max_absent_ids ids and judges at
+# most max_absent_judged live facets before it is 413 and the CLI lists them.
+snapshot_ttl: 24h
+snapshot_keep: 2
+max_snapshot_parts: 100000
+max_absent_ids: 1000
+max_absent_judged: 5000
+
+# The CLI as a client of a daemon. It reads at most max_response_bytes of one
+# answer (the whole-person timeline is about 5 MB) and waits network_margin longer
+# than it asks the daemon to take.
+max_response_bytes: 67108864
+network_margin: 10s
+
+# How many historical (as-of) reads the inspector keeps folded; 0 keeps none.
+inspect_cached_reads: 4

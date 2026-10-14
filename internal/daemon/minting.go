@@ -42,12 +42,7 @@ func (d *Daemon) requestMint() {
 	}
 }
 
-// mintQuiet is how long the mint worker waits for batches to stop arriving before it
-// mints. An importer sending a hundred batches gets one mint at the end, not one
-// between each, each holding the write queue.
-const mintQuiet = 2 * time.Second
-
-// mintOnRequest is the mint worker: once requests stop arriving for mintQuiet, it
+// mintOnRequest is the mint worker: once requests stop arriving for mint_quiet, it
 // mints, until shutdown. An importer's batch is answered when it is admitted, not
 // when it is minted, so its mint runs here rather than in the request.
 func (d *Daemon) mintOnRequest() {
@@ -57,14 +52,14 @@ func (d *Daemon) mintOnRequest() {
 			return
 		case <-d.mints:
 		}
-		quiet := time.NewTimer(mintQuiet)
+		quiet := time.NewTimer(d.cfg.MintQuiet)
 		for waiting := true; waiting; {
 			select {
 			case <-d.quit:
 				quiet.Stop()
 				return
 			case <-d.mints:
-				quiet.Reset(mintQuiet)
+				quiet.Reset(d.cfg.MintQuiet)
 			case <-quiet.C:
 				waiting = false
 			}

@@ -30,7 +30,7 @@ Blood pressure followed the same path (card 80). `anam_bp_csv` had been live sin
 Then the question underneath both. Documenting `health.blood-pressure` bumped it to v3, and the gate
 admits only at the current version, so the importer's own copy at v2 was refused. The words had
 changed and the contract had not, and still both sides had to ship together. The fix chosen was not
-to make the gate cleverer but to give each Definition one owner (Matt, card 86). `health.measurement`
+to make the gate cleverer but to give each Definition one owner (Matt, card 86, [[one-owner-per-definition]]). `health.measurement`
 left the bundle for the Withings importer. The deploy proved the takeover as predicted. The type
 read 404 until one Withings poll, the importer registered its byte-identical copy, adopted at v3,
 and 5,531 facets resent as no-op.
@@ -76,7 +76,7 @@ hash alone, so when a wrongly tombstoned row is sent again, the resend is a no-o
 dead ([[tombstone-is-a-record-event]]). No event reverses a tombstone. A bug that labels a partial
 resend complete would delete everything it forgot to send, while a fact that stays live a few days
 until someone confirms costs almost nothing. So it is report-only, and `anam retract` plans from the
-newest complete snapshot.
+newest complete snapshot ([[retraction-by-resend-reports-and-never-tombstones-itself]]).
 
 The audit found the hole the same evening (card 94). Absence was judged from the snapshot's end, so
 an incremental run admitting beside a multi-part resend could put a held facet on the retract plan.

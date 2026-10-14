@@ -40,7 +40,8 @@ floor and let the operator register more over `POST /v1/projections`, with the s
 only go forward, and every type a template names needs a Definition in force.
 
 The question was who decides what a read looks like. The consumer selects a projection by name. The
-operator defines it, and every version stays held, because a receipt names one. Receipts now carry
+operator defines it, and every version stays held, because a receipt names one
+([[a-consumer-selects-a-projection-the-operator-registers-it]]). Receipts now carry
 `template_hash`, and verify looks up the exact version and compares it. Another body at that version
 is `ErrTemplateMoved`, which is the point of [[published-is-a-receipt-not-a-record-event]]. A receipt
 that could be satisfied by a template edited later would prove nothing.
@@ -65,7 +66,7 @@ resent as a no-op.
 id, and the second would have been admitted as a new version of the first, an overwrite in
 everything but name. The gate now compares the current version's type with the envelope's and
 refuses a change as `ErrTypeChanged`, joining the same 422 the other pillars use. A dimension left
-out of the identity needs a check at admission, or it becomes a place where a value can be
+out of the identity ([[the-type-is-not-in-the-identity-so-the-gate-refuses-a-type-change]]) needs a check at admission, or it becomes a place where a value can be
 replaced. A scan of the live ledger for any facet that had already changed type was asked of
 ThinkPad.unraid.
 

@@ -48,7 +48,7 @@ Card 120 added `anam retract <source> --retired`. It plans every live facet of t
 the count by type, and only tombstones with `--yes --max-fraction 1`. It refuses a source any import
 or importer still declares, so the declaration has to come out first. The empty-scan guard was left
 alone, because weakening it to fit a case it was never meant for would have cost the reconciling
-path its safety. Rehearsed on a copy of the pre-move ledger, it tombstoned 5,808 facets across five
+path its safety ([[retiring-a-source-is-a-separate-verb-from-reconciling-it]]). Rehearsed on a copy of the pre-move ledger, it tombstoned 5,808 facets across five
 types in 20 seconds, and a rerun had nothing to plan. The artifacts stay, so a read as of before
 still shows them ([[tombstone-is-a-record-event]]).
 

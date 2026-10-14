@@ -43,7 +43,7 @@ Two kinds of note:
   - [[2026-10-07-evening-the-rebuild-and-the-library]] — the blood pressure medicine named, the ledger rebuilt from source with a zone on every Definition, and the documents moved in beside it as a library.
   - [[2026-10-07-night-the-heart-rate-alarm-and-the-timeline]] — Garmin's heart rate alarm found in the raw FIT files, 301 times since January 2025, and a timeline rebuilt so an alarm looks like one.
   - [[2026-10-08-the-daemon-and-the-importers-proposal]] — `anam daemon` owns the stores behind a token and serves the CLI; Withings says how firmly a reading is tied to Matt; late that night the importers proposal moves the sources out of Anam.
-  - [[2026-10-09-the-record-moves-and-reads-start-from-checkpoints]] — reads compose from checkpoints and buckets split by bytes along the calendar (975 ms to 62 ms); the record moves to unraid; nightly backups, closed JSON Schema, the importer door, a clean-room DreamStation decoder.
+  - [[2026-10-09-the-record-moves-and-reads-start-from-checkpoints]] — reads compose from checkpoints and buckets split by bytes along the calendar (980 ms to 62 ms); the record moves to unraid; nightly backups, closed JSON Schema, the importer door, a clean-room DreamStation decoder.
   - [[2026-10-10-the-importers-take-the-sources]] — Withings and the blood pressure exports arrive only through importers, DreamStation goes live with 1,317 nights, one owner per Definition, retraction by complete resend kept report-only, receipted reads over the API.
   - [[2026-10-11-health-db-retires-and-the-importers-take-over]] — eleven blue-team cards before breakfast; health-db retracted whole (5,818), Garmin and Concept2 live through importers sharing a bundled type, a read gets a size bound.
   - [[2026-10-12-the-phone-the-page-and-the-fields]] — OwnTracks positions as `location.track` with no map tiles; the timeline page from 1.84 MB to 100 KB; a read names its `fields` and gets a frame; the extractors leave for anam-importers.
@@ -68,6 +68,15 @@ Two kinds of note:
   - [[one-decision-procedure-per-decision]]
   - [[ledger-is-a-sqlite-file-of-its-own]]
   - [[hard-and-soft-checkpoints]]
+  - [[sources-reach-anam-only-through-importers]] · [[buckets-split-on-cost-and-cleave-on-the-calendar]]
+  - [[one-owner-per-definition]] · [[retraction-by-resend-reports-and-never-tombstones-itself]]
+  - [[retiring-a-source-is-a-separate-verb-from-reconciling-it]]
+  - [[a-read-names-its-fields-and-gets-back-a-frame]] · [[a-consumer-selects-a-projection-the-operator-registers-it]]
+  - [[the-type-is-not-in-the-identity-so-the-gate-refuses-a-type-change]]
+  - [[the-library-names-a-document-by-its-sha256]] · [[a-hard-coded-value-is-a-default-an-invariant-or-presentation]]
+  - [[queue-wait-spends-the-callers-deadline-up-to-acceptance]]
+- Open decisions
+  - [[a-rebuild-from-source-restores-the-facts-not-anams-knowledge]] — the drill's finding; whether the loss is acceptable is Matt's call (`docs/IMPORTERS.md` §6).
 - Retracted
   - [[mint-unit-whole-timeline]] — superseded by [[span-is-the-mint-unit-not-the-read-filter]]
 - Reference notes

@@ -11,7 +11,7 @@ is `SELF-LOG.md`; this is the runbook. Written 2026-10-06, the night the first d
 └── README-processing.md               status, for Matt, kept current by whoever processes
 
 /mnt/Library/anam/                     the SOURCES, on the Library share, which the gateway reads
-│                                      (/mnt/user/Library/anam, at /app/data/anam read-only)
+│                                      (/mnt/user/Library/anam, at /app/anam-library read-only)
 ├── records/                           one YAML per document, read by anam_records
 └── documents/                         every processed primary document, read by anam_documents;
     ├── <document>                     each with a sidecar, each a doc.reference facet;

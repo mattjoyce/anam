@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "note.annotation",
-    "definition_version": 2,
+    "definition_version": 3,
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "records/note.annotation",
@@ -19,21 +19,21 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "A note the person writes about one or more facets already in the record: what was going on, in their words. A fact about facts. The facets it names are never changed by it; the note is appended beside them, carries its own provenance (the person, typed), and is retracted or edited on its own. Its fact time is the moment the note was written (v2, 2026-10-13): the one time nothing else holds, since each facet it names carries its own fact time, and anam-time is the ingest, not the writing. Which version of each facet was current when the note landed is read from the ledger at that watermark, not stored here. v1 said `at` was the moment the note is about; the mechanism is unchanged and v1 values remain valid, only the meaning moved.",
+    "description": "A note in the person's own words: what was going on, what they did or felt, written in the inspector or said to an assistant. Usually about facets already in the record, which it names; it may name none, since an account can come before the observation it describes (v3, card 157), and a later version of the same note can name them. The facets it names are never changed by it; the note is appended beside them, carries its own provenance (the person, typed, or the conversation that took it down), and is retracted or edited on its own. Its fact time is the moment the note was written (v2, 2026-10-13): the one time nothing else holds, since each facet it names carries its own fact time, and anam-time is the ingest, not the writing. Which version of each facet was current when the note landed is read from the ledger at that watermark, not stored here. v1 said `at` was the moment the note is about; v2 moved the meaning, and v3 only made `about` optional, so v1 and v2 values remain valid.",
     "type": "object",
     "required": [
       "id",
       "at",
-      "about",
       "text"
     ],
     "properties": {
       "id": {
         "type": "string",
         "minLength": 1,
-        "description": "The note's own id, chosen once in the records file. The convention is note:<first 8 of the first facet id>:<n>, n counting the person's notes that start there from 1, so a second note is a second fact and not an edit of the first.",
+        "description": "The note's own id, chosen once by whoever writes it, and kept for every later version. In a records file the convention is note:<first 8 of the first facet id>:<n>, n counting the person's notes that start there from 1, so a second note is a second fact and not an edit of the first. A conversation writer derives it from the moment and the words, conversation:<16 hex of their sha256>, so the same words said once are one note however often they are sent.",
         "examples": [
-          "note:2c6f38a3:1"
+          "note:2c6f38a3:1",
+          "conversation:9f86d081884c7d65"
         ]
       },
       "at": {
@@ -53,7 +53,7 @@
           "minLength": 36,
           "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
         },
-        "description": "The facet ids the note is about, as the inspector shows them: one or more. A facet id is stable across the facet's versions, so the note follows each facet through supersession. Anam does not check that an id is live when the note is admitted: a note about a facet later tombstoned is still what the person said.",
+        "description": "The facet ids the note is about, as the inspector shows them: one or more, or absent when the note names none yet. A facet id is stable across the facet's versions, so the note follows each facet through supersession. Anam does not check that an id is live when the note is admitted: a note about a facet later tombstoned is still what the person said.",
         "examples": [
           [
             "2c6f38a3-3db7-5e65-b933-9c59980e1c6c"
@@ -63,7 +63,7 @@
       "text": {
         "type": "string",
         "minLength": 1,
-        "description": "The note, verbatim, as the person typed it.",
+        "description": "The note, verbatim, as the person typed or said it.",
         "examples": [
           "During a large work meeting, presenting."
         ]

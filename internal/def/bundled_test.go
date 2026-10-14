@@ -280,11 +280,12 @@ func TestBundled_BloodPressureIsAnOMHBody(t *testing.T) {
 	}
 }
 
-// A note is a fact about facts: it names the facets it is about by id, one or more,
-// carries the person's words, and stands on the timeline at the moment it is about.
-// The facets it names are never touched by it. A note that names no facet, or one
-// that is not a facet id, is refused.
-func TestBundled_NoteAnnotationIsAFactAboutAFacet(t *testing.T) {
+// A note is the person's words: it names the facets it is about by id, when there
+// are any, and stands on the timeline at the moment it was written. The facets it
+// names are never touched by it. Since v3 (card 157) a note may name none, since an
+// account can come before what it describes; an empty list, or a name that is not a
+// facet id, is still refused.
+func TestBundled_NoteAnnotationIsThePersonsWords(t *testing.T) {
 	t.Parallel()
 	reg, err := def.Bundled()
 	if err != nil {
@@ -294,7 +295,7 @@ func TestBundled_NoteAnnotationIsAFactAboutAFacet(t *testing.T) {
 	if !ok {
 		t.Fatal("no bundled note.annotation")
 	}
-	if d.Version != 2 || d.FactTime.Pointer != "/at" || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" {
+	if d.Version != 3 || d.FactTime.Pointer != "/at" || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" {
 		t.Fatalf("v%d fact time %s identity %v", d.Version, d.FactTime.Pointer, d.IdentityKey)
 	}
 	decode := func(s string) map[string]any {
@@ -311,8 +312,11 @@ func TestBundled_NoteAnnotationIsAFactAboutAFacet(t *testing.T) {
 	if err := d.Check(decode(note)); err != nil {
 		t.Errorf("a note was refused: %v", err)
 	}
+	unbound := strings.Replace(note, `"about": ["2c6f38a3-3db7-5e65-b933-9c59980e1c6c", "fe61ec2a-6d8b-56b0-8930-e3270f4ad44c"],`, "", 1)
+	if err := d.Check(decode(unbound)); err != nil {
+		t.Errorf("a note that names no facet was refused: %v", err)
+	}
 	for name, payload := range map[string]string{
-		"no about":           strings.Replace(note, `"about": ["2c6f38a3-3db7-5e65-b933-9c59980e1c6c", "fe61ec2a-6d8b-56b0-8930-e3270f4ad44c"],`, "", 1),
 		"about nothing":      strings.Replace(note, `["2c6f38a3-3db7-5e65-b933-9c59980e1c6c", "fe61ec2a-6d8b-56b0-8930-e3270f4ad44c"]`, `[]`, 1),
 		"not a facet id":     strings.Replace(note, `2c6f38a3-3db7-5e65-b933-9c59980e1c6c`, `the heart rate alert`, 1),
 		"the same id twice":  strings.Replace(note, `fe61ec2a-6d8b-56b0-8930-e3270f4ad44c`, `2c6f38a3-3db7-5e65-b933-9c59980e1c6c`, 1),

@@ -59,10 +59,13 @@ type Stores struct {
 // returns.
 type WriteFunc func(ctx context.Context, s Stores) error
 
+// job is one write offered to the queue. caller is the context of whoever offered it;
+// until gives the deadline the write runs to from the moment the worker takes it.
 type job struct {
-	fn       WriteFunc
-	deadline time.Duration
-	done     chan error
+	fn     WriteFunc
+	caller context.Context
+	until  func(started time.Time) time.Time
+	done   chan error
 }
 
 // Options are what the daemon is given rather than configured with.

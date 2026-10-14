@@ -80,7 +80,7 @@ func (d *Daemon) postCheckpoints(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var m api.Mint
-	err := d.TryWrite(d.timeout(r), func(ctx context.Context, s Stores) error {
+	err := d.TryWrite(r.Context(), d.timeout(r), func(ctx context.Context, s Stores) error {
 		var err error
 		m, err = mint.Report(ctx, d.mintDeps(s), q)
 		return err

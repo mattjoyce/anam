@@ -253,7 +253,14 @@ The batch is admitted whole or not at all:
 | 400 | `error` | The body is not one submission: bad JSON, an unknown field, no version, 0 or more than 49 envelopes, or anything but whitespace after the submission. Nothing written. |
 | 401 / 403 | `error` | No importer's token, or the operator's. |
 | 413 | `error` | The body is over 49 payloads at `max_payload_bytes` plus 1 MiB (about 16 MB at the 300 KiB default), counting whatever follows the submission. Nothing written. The whole body is read before the batch is queued, and the daemon cuts off a body that takes longer than `http_read_timeout` (30 s) to arrive. |
-| 503 | `error`, `Retry-After` | Another write held the ledger for more than `importer_wait` (5 s), usually a backup or a full mint. Wait as long as `Retry-After` says and send the same batch again. |
+| 503 | `error`, `Retry-After` | Another write held the ledger for longer than this batch could wait: `importer_wait` (5 s), or less when the request's budget is shorter (below). Nothing was written, and it never will be: a batch the queue did not take in time is dropped, not started later. Usually a backup or a full mint. Wait as long as `Retry-After` says and send the same batch again. |
+
+A request's budget is the shorter of the daemon's `timeout` and the request's own `Anam-Timeout`
+header (a Go duration, `25s`), and it counts from arrival: the wait for the write queue spends it,
+and the write has what is left (card 110). The caller's say ends when the queue takes the batch.
+Before that, a request that runs out of budget is 503 and one whose caller hangs up is dropped,
+and neither is ever written. After it, the batch is admitted or refused whole, to its own end,
+even if the caller has gone; resending it then is a `no-op`.
 
 Sending a batch again is always safe. The same payload under the same identity is a `no-op`; a
 changed payload supersedes, keeping the old version. That is the whole retry and resend protocol: an

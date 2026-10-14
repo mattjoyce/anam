@@ -68,7 +68,7 @@ func (d *Daemon) postProjections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var reg projection.Registration
-	err = d.tryWriteWithin(d.cfg.ImporterWait, d.timeout(r), func(ctx context.Context, s Stores) error {
+	err = d.tryWriteWithin(r.Context(), d.cfg.ImporterWait, d.timeout(r), func(ctx context.Context, s Stores) error {
 		var err error
 		reg, err = d.registerProjection(ctx, s.Ops, body)
 		return err

@@ -7,7 +7,7 @@ resource: internal/mint/incremental.go#fromLastRun
 anchor: "r, ok, err := d.Index.LastMintRun(ctx, int64(w))"
 basis: code
 tier: supporting
-trigger: The operator runs `anam checkpoint` with `ANAM_SERVER` set; the daemon runs the same `mint.Report` on its own after an ingest or an importer batch.
+trigger: The operator runs `anam checkpoint` with `ANAM_SERVER` set; the daemon runs the same `mint.Report` on its own after importer batches and at start when behind.
 steps:
   - actor: /components/cli.md
     caller: outside
@@ -24,7 +24,7 @@ steps:
   - actor: /components/daemon.md
     caller: /components/client.md
     label: take a turn, or 503 at once
-    action: "`postCheckpoints` uses `TryWrite`, which waits 250 ms for the worker; an ingest still running answers 503 naming it. The mint runs with the write handles and the daemon's budget."
+    action: "`postCheckpoints` uses `TryWrite`, which waits 250 ms for the worker; a write still running, such as a backup, answers 503 naming it. The mint runs with the write handles and the daemon's budget."
     resource: internal/daemon/api.go#postCheckpoints
     anchor: "err := d.TryWrite(d.timeout(r), func(ctx context.Context, s Stores) error {"
   - actor: /components/mint.md

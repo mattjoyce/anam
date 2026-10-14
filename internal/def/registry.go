@@ -7,9 +7,8 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
-// Registry holds the loaded Definitions the gate consults. R3 builds registries from
-// parsed manifests directly; bundling via go:embed and `anam def load` arrive with
-// the first real capture worker (R5).
+// Registry holds the loaded Definitions the gate consults: the bundled ones, and
+// those importers registered.
 type Registry struct {
 	byType map[facet.Type]Definition
 }

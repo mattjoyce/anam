@@ -2,9 +2,6 @@ package app
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -20,25 +17,17 @@ import (
 // mint run, after one, and with a tail of new readings after it.
 func TestTimeline_ComposedIsTheFullFold(t *testing.T) {
 	t.Parallel()
-	f := newIngestFixture(t)
-	imports := fmt.Sprintf("imports:\n  - source: records\n    path: %s\n", f.recordsDir)
+	f := newLedgerFixture(t)
 	// A medicine course opened, closed and reopened across three months, so a snapshot
 	// read from a prefix of buckets has a series begun in an earlier bucket and a
 	// closing event to see (card 64).
-	meds := `document: {name: meds.md, sha256: "0000000000000000000000000000000000000000000000000000000000000000"}
-extracted: {method: by hand, version: 1}
-records:
-  - {type: med.started, id: "m/1/started", date: "2025-12-01", drug: examplazole, course: 1, dose: "10 mg daily"}
-  - {type: med.dose-changed, id: "m/1/dose", date: "2026-01-05", drug: examplazole, course: 1, dose: "20 mg daily"}
-  - {type: med.stopped, id: "m/1/stopped", date: "2026-01-20", drug: examplazole, course: 1}
-  - {type: med.started, id: "m/2/started", date: "2026-02-05", drug: examplazole, course: 2, dose: "10 mg daily"}
-`
-	if err := os.WriteFile(filepath.Join(f.recordsDir, "meds.yaml"), []byte(meds), 0o600); err != nil {
-		t.Fatal(err)
+	meds := []record{
+		{"med.started", `{"id": "m/1/started", "date": "2025-12-01", "drug": "examplazole", "course": 1, "dose": "10 mg daily"}`},
+		{"med.dose-changed", `{"id": "m/1/dose", "date": "2026-01-05", "drug": "examplazole", "course": 1, "dose": "20 mg daily"}`},
+		{"med.stopped", `{"id": "m/1/stopped", "date": "2026-01-20", "drug": "examplazole", "course": 1}`},
+		{"med.started", `{"id": "m/2/started", "date": "2026-02-05", "drug": "examplazole", "course": 2, "dose": "10 mg daily"}`},
 	}
-	if _, _, err := f.ingest(t, imports); err != nil {
-		t.Fatal(err)
-	}
+	f.admit(t, append(append([]record(nil), bpReadings...), meds...))
 	cfg, err := config.Load(f.cfgPath)
 	if err != nil {
 		t.Fatal(err)
@@ -103,14 +92,8 @@ records:
 	same("at the mint")
 
 	// A tail: a correction of one reading and a new one, after the mint.
-	more := bpFixture + `  - {type: health.blood-pressure, id: "2026-3-01 07:00:00:1", date_excel: "2026-3-01 07:00:00", reading: "1", systolic_blood_pressure: {value: 111.0, unit: mmHg}, diastolic_blood_pressure: {value: 70.0, unit: mmHg}, effective_time_frame: {date_time: "2026-03-01T07:00:00+11:00"}, pulse: "60.0"}
-`
-	more = strings.Replace(more, "114.0", "115.0", 1)
-	if err := os.WriteFile(f.bpPath, []byte(more), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := f.ingest(t, imports); err != nil {
-		t.Fatal(err)
-	}
+	more := append(corrected(bpReadings, "114.0", "115.0"), record{"health.blood-pressure",
+		`{"id": "2026-3-01 07:00:00:1", "date_excel": "2026-3-01 07:00:00", "reading": "1", "systolic_blood_pressure": {"value": 111.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 70.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-03-01T07:00:00+11:00"}, "pulse": "60.0"}`})
+	f.admit(t, append(more, meds...))
 	same("with a tail")
 }

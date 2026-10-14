@@ -57,7 +57,8 @@ that is corrected (Arch ADR 0032, MC5). See *Ledger*, *Fold*, *Checkpoint*.
 
 **Capture worker** — The MVP's name for what is now an *importer*: an external, pluggable client that
 reads a source and submits envelopes to the ingest gate. In the MVP: `health-db` and `bp-csv`, compiled
-in; since 2026-10-11 every vendor source is an importer outside the binary (`docs/IMPORTERS.md`).
+in; since 2026-10-11 every vendor source is an importer outside the binary, and since card 119 every
+source is (`docs/IMPORTERS.md`).
 **Out of the kernel.** See *Source*, *Envelope*.
 
 **Checkpoint** — An immutable, content-addressed value of the canonical (live-only) fold over **one
@@ -97,9 +98,9 @@ captured from a source. Re-enters through the ordinary gate as `proposed`. See *
 **Endorsement** — The review status of a derived facet (`proposed` → `endorsed` / `rejected`), recorded
 as an anam-event. **Never writes back** into source systems. See *Derived facet*.
 
-**Envelope** — The message a capture worker hands the gate: `{type, source, injector, source_ref?,
+**Envelope** — The message an importer hands the gate: `{type, source, injector, source_ref?,
 payload, asserted_person?, span_hint?}`. Left out, `source_ref` is composed by the gate from the
-Definition's `identity_key`. The **only ingress**; capture workers share nothing with the
+Definition's `identity_key`. The **only ingress**; importers share nothing with the
 ledger except through it. See *Admission gate*.
 
 **Episode** — *Not a first-class Anam concept.* In Arch the Episode is the unit of storage, cost and
@@ -111,7 +112,7 @@ was for. What Arch calls an Episode, Anam expresses as an optional derived *Span
 **Error kernel** — Armstrong's term, adopted: Anam's small trusted core that must not corrupt — the
 **append-only ledger plus the admission-gate invariants** (three pillars, idempotency, immutability).
 `commit` writes artifact, anam-event and watermark in **one transaction in one substrate**; there is no
-transaction across substrates. Everything above it — fold, projections, capture workers, CLI — is
+transaction across substrates. Everything above it — fold, projections, importers, CLI — is
 disposable and rebuildable. See *Operational store*.
 
 **Event** — A meaningful occurrence on the person's timeline, placed at its Facet *fact-time* and
@@ -186,12 +187,12 @@ depth** — not freshness (the Ledger is always current, so a read replays to th
 time-OR-size-OR-rate; a quiet bucket mints nothing. Automatic after every ingest that moves W since
 2026-10-09 (card 61), and `POST /v1/checkpoints` by hand. See *Checkpoint*, *Bucket span*.
 
-**Library** — A folder root whose rows are files, read by the `documents` worker: each file is a
-`doc.reference` Facet whose payload is its **library-relative path**, sha256, size, media type and the
-date its sidecar gives it. The **default library** is `documents/` beside the ledger and needs no
-declaration; a named library is a `documents` import with its own root. The root is a place and never
-enters a fact. The share's private folder is the **inbox**, not a library: documents move from it into
-the library once their records are written. See *Native reference*.
+**Library** — The folder beside the ledger (`documents/`, `library_dir`) that holds document bytes.
+Only Anam writes it (`POST /v1/documents`, card 102), and it names each file by its sha256 (card 150),
+in subfolders of the sha256's first characters once a folder holds `library_folder_limit` files. A
+`doc.reference` Facet's payload is the document's **name** (its `path`, the identity), sha256, size,
+media type and the date its sidecar gives it; the sha256 finds the bytes. The folder never enters a
+fact. The share's private folder is the **inbox**, not a library. See *Native reference*.
 
 **Native reference** — A reference Facet's payload: a pointer to a document in its *Library*, resolved
 live by the inspector from the library root. Built in card 24 as `doc.reference`.
@@ -265,7 +266,7 @@ Anam-time becomes historically meaningful only when ingest is incremental. Contr
 *As-of*, *Bitemporal*, *Watermark*.
 
 **Source** — A capture origin, named **lower-case hyphenated**: `garmin`, `bp-csv`. The identity that
-appears in provenance and cursors. See *Capture worker*.
+appears in provenance and cursors. See *Importer*.
 
 **Source ref** — The deterministic natural key identifying **which** source row this is — composed from
 the Definition's declared `identity_key` and **never from the row's values**: `bp-csv:19:<excel_datetime>:1:<reading>`,

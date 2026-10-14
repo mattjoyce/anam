@@ -10,33 +10,41 @@ import (
 	"strings"
 
 	"github.com/mattjoyce/anam/internal/facet"
+	"github.com/mattjoyce/anam/internal/library"
 )
 
-// Library documents: the bytes a doc.reference points at, served confined to the
-// library root and isolated from the inspector's origin (card 106).
+// Library documents: the bytes a doc.reference points at, found by their sha256,
+// served confined to the library root and isolated from the inspector's origin
+// (cards 106, 150).
 
 // documentURL is the inspector's link to a reference facet's bytes, when it has a
-// library to serve them from. The path is read from the payload, which is where a
-// reference says what it points at (journal/notes/reference-payloads.md).
+// library to serve them from. The sha256 is read from the payload, which is where a
+// reference says what it points at (journal/notes/reference-payloads.md); the path,
+// the document's name, rides along only to name the download.
 func (s *Server) documentURL(f facet.Facet) string {
 	if s.library == "" || f.Descriptor.PayloadKind != facet.PayloadReference {
 		return ""
 	}
 	var ref struct {
-		Path string `json:"path"`
+		Path   string `json:"path"`
+		SHA256 string `json:"sha256"`
 	}
-	if err := json.Unmarshal(f.Payload.Bytes(), &ref); err != nil || ref.Path == "" {
+	if err := json.Unmarshal(f.Payload.Bytes(), &ref); err != nil || !library.IsSHA256(ref.SHA256) {
 		return ""
 	}
-	return "/document?path=" + url.QueryEscape(ref.Path)
+	q := url.Values{"sha256": {ref.SHA256}}
+	if ref.Path != "" {
+		q.Set("name", path.Base(ref.Path))
+	}
+	return "/document?" + q.Encode()
 }
 
-// document serves one file from the default library by its library-relative path,
-// as the reference facet recorded it. The open is confined to the library root
-// (os.Root), so a path that climbs out, or a symlink that points out, is refused
-// with the same answer as a file that is not there. The bytes are served as they
-// are, with the media type the extension names; the inspector shows and never
-// interprets.
+// document serves one file from the default library by its sha256, as the reference
+// facet recorded it. The library finds the file by that name; the open is confined
+// to the library root (os.Root), so a symlink that points out is refused with the
+// same answer as a file that is not there. The bytes are served as they are, with
+// the media type the stored file's extension names; the inspector shows and never
+// interprets. The name parameter only names the download.
 //
 // A document is untrusted material the person inspects, and the inspector shares
 // its origin with the API (card 106). So every document is served in a CSP sandbox
@@ -44,8 +52,13 @@ func (s *Server) documentURL(f facet.Facet) string {
 // as the operator and reading the record, and the active kinds (HTML, XHTML, SVG,
 // XML) are downloads rather than previews. Images, PDFs and text stay inline.
 func (s *Server) document(w http.ResponseWriter, r *http.Request) {
-	rel := r.URL.Query().Get("path")
-	if s.library == "" || rel == "" {
+	sum := r.URL.Query().Get("sha256")
+	if s.library == "" || !library.IsSHA256(sum) {
+		http.NotFound(w, r)
+		return
+	}
+	rel, err := library.Find(s.library, sum)
+	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
@@ -70,12 +83,16 @@ func (s *Server) document(w http.ResponseWriter, r *http.Request) {
 	if mt == "" {
 		mt = "application/octet-stream"
 	}
+	name := path.Base(r.URL.Query().Get("name"))
+	if name == "." || name == "/" {
+		name = path.Base(rel)
+	}
 	w.Header().Set("Content-Type", mt)
 	disposition := "inline"
 	if activeDocument(mt) {
 		disposition = "attachment"
 	}
-	w.Header().Set("Content-Disposition", disposition+"; filename=\""+path.Base(rel)+"\"")
+	w.Header().Set("Content-Disposition", mime.FormatMediaType(disposition, map[string]string{"filename": name}))
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'")
 	w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")

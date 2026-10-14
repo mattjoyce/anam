@@ -8,7 +8,7 @@ anchor: "request = json.load(sys.stdin)"
 basis: docs
 tier: core
 alternatives:
-  - Capture workers compiled into the binary that owns the ledger (how health-db, withings and bp-csv began; withings and bp-csv moved out in cards 54 and 80, and sharing a binary let their identity composition drift)
+  - Capture workers compiled into the binary that owns the ledger (how health-db, withings, bp-csv, records and documents began; withings and bp-csv moved out in cards 54 and 80, records and documents in card 119, and sharing a binary let their identity composition drift)
   - Ductile holding schemas or derived data, or Anam scheduling and polling (both refused as Senechal growing back on one side or the other)
 affects:
   - /components/importer-base.md
@@ -24,4 +24,4 @@ affects:
 
 **Why.** The gate already owned the admission contract; moving the vendor out makes the code agree with ARCHITECTURE §2's "a pluggable client, not part of the kernel", and a crashed importer can only fail to send, never corrupt the record.
 
-**What it costs.** Each source needs a resend-everything mode and a cut-over (the records importer resends what the built-in worker admitted as no-op; the Garmin importer replaced health-db under a new source name, so the old source was retired by tombstone). The two repos version separately, and this checkout of the importers is behind its origin (see [importers checkout is behind origin](/gaps/importers-checkout-behind-origin.md)).
+**What it costs.** Each source needs a resend-everything mode and a cut-over (the records and documents importers kept their sources' names, so they resend what Anam's own workers admitted as no-op; the Garmin importer replaced health-db under a new source name, so the old source was retired by tombstone). The two repos version separately, and this checkout of the importers is behind its origin (see [importers checkout is behind origin](/gaps/importers-checkout-behind-origin.md)).

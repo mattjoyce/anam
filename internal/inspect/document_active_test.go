@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -31,10 +30,9 @@ func TestDocument_ActiveContentCannotRunAsTheInspector(t *testing.T) {
 		"scan.pdf":   "%PDF-1.4",
 		"photo.png":  "\x89PNG",
 	}
+	sums := map[string]string{}
 	for name, body := range files {
-		if err := os.WriteFile(filepath.Join(library, name), []byte(body), 0o600); err != nil {
-			t.Fatal(err)
-		}
+		sums[name] = store(t, library, filepath.Ext(name), body)
 	}
 	l, err := ledger.Create(ctx, filepath.Join(t.TempDir(), "ledger.db"), person)
 	if err != nil {
@@ -45,7 +43,7 @@ func TestDocument_ActiveContentCannotRunAsTheInspector(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	for name := range files {
-		resp, err := http.Get(srv.URL + "/document?path=" + url.QueryEscape(name)) //nolint:gosec // test URL
+		resp, err := http.Get(srv.URL + "/document?sha256=" + sums[name] + "&name=" + url.QueryEscape(name)) //nolint:gosec // test URL
 		if err != nil {
 			t.Fatal(err)
 		}

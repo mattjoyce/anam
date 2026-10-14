@@ -2,7 +2,7 @@
 type: component
 title: Inspector (internal/inspect)
 description: "The read-only web harness over the full fold: timeline, facets, events, projections and definitions, plus the default library's bytes confined to its root."
-timestamp: 2026-10-11T00:00:00Z
+timestamp: 2026-10-14T00:00:00Z
 resource: internal/inspect/inspect.go#Handler
 anchor: "func Handler(d Deps) http.Handler {"
 basis: code
@@ -16,9 +16,10 @@ depends_on:
   - /components/store-ledger.md
   - /components/mint.md
   - /components/store-ops.md
+  - /components/library.md
 ---
 
-A diagnostic tool, not a shipped UI, and it keeps the full fold rather than reading from checkpoints. Routes: `/`, `/facets`, `/facet`, `/events`, `/projection`, `/document?path=`, `/definitions`, `/definition`. `/document` opens the library root with `os.OpenRoot`, so a path that climbs out or a symlink that points out gets the same 404 as a missing file. Mounted inside the daemon behind the operator token, or standalone with `anam inspect`.
+A diagnostic tool, not a shipped UI, and it keeps the full fold rather than reading from checkpoints. Routes: `/`, `/facets`, `/facet`, `/events`, `/projection`, `/document?sha256=<sum>&name=<file name>`, `/definitions`, `/definition`. `/document` finds the file by its sha256 with `library.Find` and opens it under an `os.Root` on the library, so a symlink that points out gets the same 404 as a sum that is not a sha256 or a file that is not there. The `name`, the base of the reference's `path`, only names the download in `Content-Disposition` (card 150). Mounted inside the daemon behind the operator token, or standalone with `anam inspect`.
 
 Since 2026-10-13 (card 21) the timeline carries a checkpoint strip under the band: one segment per leaf bucket of the mint's layout, sealed, behind or never minted by the one hash comparison of the bucket's value at W against the log's head, computed for the page and dropped. The daemon hands the inspector its read-only ops handle for that; `anam inspect` over a bare ledger draws no strip.
 

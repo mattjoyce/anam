@@ -87,7 +87,7 @@ steps:
     anchor: "dec.DisallowUnknownFields()"
   - actor: /components/daemon.md
     label: take a turn on the write queue
-    action: "`tryWriteWithin` offers the job to the single write worker and waits up to 5 s for it to be accepted; a mint or ingest still running past that is a 503 with `Retry-After: 15`. Once accepted the write runs on the daemon's context, so a client that disconnects does not cut it short."
+    action: "`tryWriteWithin` offers the job to the single write worker and waits up to 5 s for it to be accepted; a mint or a long write such as a backup still running past that is a 503 with `Retry-After: 15`. Once accepted the write runs on the daemon's context, so a client that disconnects does not cut it short."
     resource: internal/daemon/queue.go#tryWriteWithin
     anchor: "case <-busy.C:"
   - actor: /components/gate.md
@@ -141,7 +141,7 @@ steps:
   - actor: /components/catchup.md
     caller: /components/daemon.md
     label: replay the new events into the index
-    action: Still inside the write and only when something changed, `catchUp` runs `Sync` under its own ingest deadline. It pins the ledger id, reads the index's last seq, replays the events after it, folds each touched facet forward with the same `fold.Apply`, and lands index rows and the cursor in one ops transaction. A failure here leaves the index behind and never fails the batch.
+    action: Still inside the write and only when something changed, `catchUp` runs `Sync` under the long-write deadline (`ingest_timeout`). It pins the ledger id, reads the index's last seq, replays the events after it, folds each touched facet forward with the same `fold.Apply`, and lands index rows and the cursor in one ops transaction. A failure here leaves the index behind and never fails the batch.
     reads: [/data-structures/anam-event.md]
     writes: [/data-structures/facet-index-row.md]
     resource: internal/catchup/catchup.go#Sync
@@ -162,9 +162,9 @@ steps:
   - actor: /components/mint.md
     caller: /components/daemon.md
     label: mint after 2 s quiet, as its own write
-    action: "`mintOnRequest` waits until no batch has arrived for 2 s, then `mintAfterIngest` takes its own turn on the queue and runs the incremental mint: the tail since the last run dirtied `bucket:2026-01`, so that bucket is rebuilt, hashed, written as a new checkpoint version, and the run sealed. A failed mint is only a log line here (see [mint failure after a batch is only logged](/gaps/mint-failure-after-batch-only-logged.md))."
+    action: "`mintOnRequest` waits until no batch has arrived for 2 s, then `mintAtHead` takes its own turn on the queue and runs the incremental mint: the tail since the last run dirtied `bucket:2026-01`, so that bucket is rebuilt, hashed, written as a new checkpoint version, and the run sealed. A failed mint is only a log line here (see [mint failure after a batch is only logged](/gaps/mint-failure-after-batch-only-logged.md))."
     writes: [/data-structures/checkpoint-value.md, /data-structures/checkpoint-row.md]
-    resource: internal/daemon/ingest.go#mintAfterIngest
+    resource: internal/daemon/minting.go#mintAtHead
     anchor: "m, err = mint.Report(ctx, d.mintDeps(s), api.MintQuery{})"
   - actor: /components/importer-base.md
     label: accept only a whole admission receipt
@@ -185,7 +185,7 @@ This is the path the whole design serves: a vendor-shaped row leaves the importe
 What the trace shows that the docs state in the abstract:
 
 - The source is never a field. The importer's token names it, so an importer cannot write another source's facets.
-- Two policies for `definition_version`: the daemon requires it, the gate would accept 0 as unstated for the built-in workers.
+- Two policies for `definition_version`: the daemon requires it, the gate would still accept 0 as unstated, a policy left from the in-process workers that no caller uses since card 119.
 - The index and the snapshot part are written after the ledger commit, in the other file. A crash between them leaves them behind, and a resend repairs both.
 - The importer trusts nothing short of a whole receipt, because a 200 with a truncated body once looked like success.
 

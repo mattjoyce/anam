@@ -42,7 +42,7 @@ func newRoot(info BuildInfo) *cobra.Command {
 	root.PersistentFlags().String("server", "",
 		"ask the daemon at this URL instead of opening local files (default: $ANAM_SERVER)")
 
-	root.AddCommand(versionCmd(&cfgPath, info), statusCmd(&cfgPath, info), initCmd(&cfgPath), ingestCmd(&cfgPath),
+	root.AddCommand(versionCmd(&cfgPath, info), statusCmd(&cfgPath, info), initCmd(&cfgPath),
 		inspectCmd(&cfgPath), timelineCmd(&cfgPath), changesCmd(&cfgPath),
 		serveCmd(&cfgPath), receiptCmd(&cfgPath), checkpointCmd(&cfgPath), retractCmd(&cfgPath), projectionCmd(&cfgPath),
 		daemonCmd(&cfgPath, info))
@@ -125,7 +125,8 @@ func inspectCmd(cfgPath *string) *cobra.Command {
 }
 
 // openLedgerReadOnly opens the ledger the way every reading command does: on a handle
-// SQLite will not accept a write from. Only init and ingest open it for writing.
+// SQLite will not accept a write from. Only init, the daemon and retract open it for
+// writing.
 func openLedgerReadOnly(ctx context.Context, cfg config.Config) (*ledger.Ledger, error) {
 	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()

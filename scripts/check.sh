@@ -27,27 +27,14 @@ fi
 # internal/store may name SQLite or database/sql; the domain must not know what it is
 # stored in.
 #
-# One carve-out: internal/capture may use database/sql/sqlite to READ a source in its
-# native format (healthdata.db is a SQLite file that happens to exist in the world).
-# That is not Anam's substrate — a capture worker is outside the gate, disposable, and
-# speaks whatever its source speaks. The ledger and the capture workers share a
-# driver, so the driver's name does not tell them apart. What keeps a worker out of
-# the ledger is that it may not import internal/store at all: the Envelope is the only
-# ingress.
-echo "→ substrate boundary (stores confined to internal/store; sources to internal/capture)"
+# Nothing outside the store reads a source: every source reaches the record through
+# an importer, over the envelope API (card 119).
+echo "→ substrate boundary (stores confined to internal/store)"
 imports="$(go list -f '{{.ImportPath}}{{range .Imports}} {{.}}{{end}}{{range .TestImports}} {{.}}{{end}}{{range .XTestImports}} {{.}}{{end}}' ./... 2>/dev/null)"
 boundary="$(echo "$imports" \
   | grep -E 'database/sql|sqlite' \
-  | grep -vE '^github.com/mattjoyce/anam/internal/(store|capture)' \
+  | grep -vE '^github.com/mattjoyce/anam/internal/store' \
   || true)"
-capture_store="$(echo "$imports" \
-  | grep -E '^github.com/mattjoyce/anam/internal/capture' \
-  | grep 'github.com/mattjoyce/anam/internal/store' || true)"
-if [ -n "$capture_store" ]; then
-  echo "  FAILED: a capture worker imports Anam's store:" >&2
-  echo "$capture_store" | awk '{print "    " $1}' >&2
-  fail=1
-fi
 if [ -n "$boundary" ]; then
   echo "  FAILED: the store substrate is named outside internal/store:" >&2
   echo "$boundary" | awk '{print "    " $1}' >&2

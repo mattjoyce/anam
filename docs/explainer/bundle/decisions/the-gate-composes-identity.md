@@ -11,7 +11,7 @@ tested_by:
   - internal/gate/gate_test.go#TestCommit_ComposesASourceRefLeftOut
   - internal/facet/id_test.go#TestSourceRef_DistinctTuplesNeverCollide
 alternatives:
-  - Each capture worker composes its own source_ref (how the built-in vendor workers drifted; they are gone or no longer compose it)
+  - Each capture worker composes its own source_ref (how the in-binary vendor workers drifted; the last in-binary workers went in card 119)
   - Join the identity values with a plain separator (refused; a value carrying the separator, a timestamp's colons, could make two tuples one string)
 affects:
   - /components/gate.md

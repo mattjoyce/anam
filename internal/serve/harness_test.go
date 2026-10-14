@@ -147,7 +147,7 @@ func newHarness(t *testing.T) *harness {
 	}
 }
 
-// admit puts one row through the real gate, exactly as a capture worker would.
+// admit puts one row through the real gate, exactly as an importer's batch would.
 func (h *harness) admit(t *testing.T, source string, typ facet.Type, measuredAt, body string) {
 	t.Helper()
 	env := facet.Envelope{

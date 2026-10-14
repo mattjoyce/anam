@@ -11,7 +11,7 @@ tested_by:
   - internal/daemon/daemon_test.go#TestWritesRunOneAtATime
   - internal/daemon/daemon_test.go#TestCallerGivingUpDoesNotCutTheWrite
 alternatives:
-  - Rely on SQLite's file lock and the gate's stale-watermark retry alone (would work for correctness, but an ingest and a mint interleaving by lock would make the 503-with-Retry-After contract impossible to state)
+  - Rely on SQLite's file lock and the gate's stale-watermark retry alone (would work for correctness, but a batch and a mint interleaving by lock would make the 503-with-Retry-After contract impossible to state)
 affects:
   - /components/daemon.md
   - /components/catchup.md
@@ -20,7 +20,7 @@ affects:
 
 **Context.** Cards 42 to 45 made the daemon the one process that owns the files.
 
-**Choice.** Operator writes wait 250 ms to be accepted; an importer's batch waits 5 s, long enough to wait out a mint and short of an ingest. An accepted write runs on the daemon's context, so a client that disconnects does not cut it short and an answer never misreports a write that happened. The mint after an ingest is its own job, so a caller that waited on the ingest reads from checkpoints with no tail.
+**Choice.** Operator writes wait 250 ms to be accepted; an importer's batch waits 5 s, long enough to wait out a mint and short of a long write such as a backup. An accepted write runs on the daemon's context, so a client that disconnects does not cut it short and an answer never misreports a write that happened. The mint after importer batches is its own job, so its failure fails no batch.
 
 **Why.** Serialising writes makes catch-up and the mint simple: each sees the ledger it was queued behind.
 

@@ -25,8 +25,8 @@ func NewID(sourceRef string) string {
 // SourceRef composes a source row's identity from the source's name and the identity
 // values in declared order: "<source>:" then each value as "<byte length>:<bytes>",
 // joined with ':'. It is the one composition rule, used by the gate (from the
-// Definition's identity_key) and by every capture worker (from the row it read), so
-// the two always agree.
+// Definition's identity_key) and by anything that must know an id before the gate
+// does, such as retraction's plan, so the two always agree.
 //
 // The values are length-prefixed rather than escaped because the values are
 // external input and contain anything: a blood pressure timestamp carries colons, a

@@ -24,8 +24,7 @@ const testToken = "0123456789abcdef0123456789abcdef"
 // loopback behind a token, and two configs: one that opens the files, and one that
 // asks the daemon and names no file that exists.
 type remoteFixture struct {
-	ingestFixture
-	imports   string
+	ledgerFixture
 	remoteCfg string
 	server    string
 }
@@ -47,11 +46,8 @@ func newRemoteFixtureIn(t *testing.T, zone string) remoteFixture {
 // not.
 func newRemoteFixtureWith(t *testing.T, zone string, tweak func(t *testing.T, f remoteFixture, cfg *config.Config)) remoteFixture {
 	t.Helper()
-	f := remoteFixture{ingestFixture: newIngestFixture(t)}
-	f.imports = fmt.Sprintf("imports:\n  - source: records\n    path: %s\n", f.recordsDir)
-	if _, _, err := f.ingest(t, f.imports); err != nil {
-		t.Fatalf("seed the ledger: %v", err)
-	}
+	f := remoteFixture{ledgerFixture: newLedgerFixture(t)}
+	f.admit(t, bpReadings)
 	// Both sides read the reader's zone from config; UTC keeps the expected output
 	// independent of the machine running the test.
 	appendFile(t, f.cfgPath, "zone: "+zone+"\n")
@@ -68,10 +64,7 @@ func newRemoteFixtureWith(t *testing.T, zone string, tweak func(t *testing.T, f 
 	if tweak != nil {
 		tweak(t, f, &cfg)
 	}
-	d, err := daemon.Open(context.Background(), cfg, daemon.Options{
-		Ingest:  daemonIngest(cfg, filepath.Join(f.dir, "imports.yaml")),
-		Version: "daemon-build",
-	})
+	d, err := daemon.Open(context.Background(), cfg, daemon.Options{Version: "daemon-build"})
 	if err != nil {
 		t.Fatalf("open daemon: %v", err)
 	}
@@ -405,57 +398,5 @@ func TestCheckpoints_SameOverTheDaemon(t *testing.T) {
 	if out := f.sameOutput(t, "checkpoint", "--dry-run", "--full"); !strings.Contains(out, "0 of") ||
 		!strings.Contains(out, "folding the whole ledger") {
 		t.Errorf("a full mint after a run:\n%s", out)
-	}
-}
-
-// An ingest asked of the daemon reports as a local one does: a line per source, then
-// the verdict. The daemon reads the imports it declares; the fixture's are the same.
-func TestIngest_SameOverTheDaemon(t *testing.T) {
-	t.Parallel()
-	f := newRemoteFixture(t)
-	importsPath := filepath.Join(f.dir, "imports.yaml")
-
-	local, _, err := cli(t, f.cfgPath, "ingest", "--imports", importsPath)
-	if err != nil {
-		t.Fatalf("local ingest: %v", err)
-	}
-	remote, _, err := cli(t, f.remoteCfg, "ingest")
-	if err != nil {
-		t.Fatalf("remote ingest: %v", err)
-	}
-	if local != remote {
-		t.Fatalf("ingest differs\n--- local\n%s--- remote\n%s", local, remote)
-	}
-	if !strings.Contains(remote, "no-op=3  W=3") || !strings.Contains(remote, nothingNew) {
-		t.Errorf("a repeat ingest over the daemon:\n%s", remote)
-	}
-
-	for _, args := range [][]string{{"ingest", "bp-csv"}, {"ingest", "--batch", "1"}, {"ingest", "--imports", importsPath}} {
-		if _, _, err := cli(t, f.remoteCfg, args...); err == nil || !strings.Contains(err.Error(), "local files") {
-			t.Errorf("%v with a server: %v, want a refusal", args, err)
-		}
-	}
-	// A run that changes the ledger reports the mint the daemon ran after it (card 61).
-	if err := os.WriteFile(f.bpPath, []byte(strings.Replace(bpFixture, "114.0", "115.0", 1)), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	changed, _, err := cli(t, f.remoteCfg, "ingest")
-	if err != nil || !strings.Contains(changed, "superseded=1") || !strings.Contains(changed, "checkpoints: minted ") {
-		t.Errorf("a changing ingest over the daemon: %v\n%s", err, changed)
-	}
-}
-
-// A run the daemon could not finish fails the command, after saying what landed.
-func TestIngest_AFailedRunOverTheDaemonFails(t *testing.T) {
-	t.Parallel()
-	f := newRemoteFixture(t)
-	missing := filepath.Join(f.dir, "unmounted", "documents")
-	decl := fmt.Sprintf("imports:\n  - source: records\n    path: %s\n  - source: documents\n    path: %s\n", f.recordsDir, missing)
-	if err := os.WriteFile(filepath.Join(f.dir, "imports.yaml"), []byte(decl), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	_, _, err := cli(t, f.remoteCfg, "ingest")
-	if err == nil || !strings.Contains(err.Error(), "documents") || !strings.Contains(err.Error(), f.server) {
-		t.Fatalf("remote ingest of a missing source: %v", err)
 	}
 }

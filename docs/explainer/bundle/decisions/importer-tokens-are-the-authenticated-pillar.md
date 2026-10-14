@@ -1,7 +1,7 @@
 ---
 type: decision
 title: Per-source importer tokens are the authenticated pillar
-description: Each importer has its own token; the daemon holds only its SHA-256 beside its source and types; the token names the source, opens three routes, and cannot read the record.
+description: Each importer has its own token; the daemon holds only its SHA-256 beside its source and types; the token names the source, opens the write routes and its own snapshots, and cannot read the record.
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/daemon/importers.go#of
 anchor: "imp, ok := in[hex.EncodeToString(sum[:])]"
@@ -11,7 +11,7 @@ tested_by:
   - internal/daemon/envelopes_test.go#TestImporterRoutesAuthorize
   - internal/daemon/envelopes_test.go#TestOpenRefusesAnImporterWithTheOperatorsToken
 alternatives:
-  - One static source-to-types map in the binary (how mvpScopes still works for the built-in workers; replaced for importers in card 53 because a push source needs real credentials)
+  - One static source-to-types map in the binary (how mvpScopes worked for the in-process workers until card 119; replaced for importers in card 53 because a push source needs real credentials)
   - Token rotation and multi-scope tokens (deferred, ARCHITECTURE §13)
 affects:
   - /components/daemon.md

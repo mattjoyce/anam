@@ -353,7 +353,7 @@ source-file associations. Do not imply every facet already has a ledger-attested
 A user's assertion is source material. The application writes it into the configured records source,
 then capture submits an Envelope through the ordinary gate. No client operation inserts a facet
 directly.
-This is a source-authoring capability alongside Anam, not permission for capture workers to write the
+This is a source-authoring capability alongside Anam, not permission for importers to write the
 ledger or for the ledger to become the only home of the assertion.
 
 Use a managed records file per submission (or per deliberately grouped assertion), within the

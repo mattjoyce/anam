@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -55,26 +54,20 @@ func headOf(t *testing.T, path string) ledger.Watermark {
 }
 
 // Card 120: a retired source is tombstoned whole, in one deliberate step. It is
-// refused while an import or an importer still declares it, refused without the whole
+// refused while an importer still declares it, refused without the whole
 // fraction, reported by type on a dry run, and with --yes every live facet goes through
 // the gate as one anam-event each; a read as of before the retirement still shows them.
 func TestRetract_RetiredSourceGoesWhole(t *testing.T) {
 	t.Parallel()
-	f := newIngestFixture(t)
-	declared := fmt.Sprintf("imports:\n  - source: records\n    path: %s\n", f.recordsDir)
-	if _, _, err := f.ingest(t, declared); err != nil {
-		t.Fatalf("seed the ledger: %v", err)
-	}
+	f := newLedgerFixture(t)
+	f.admit(t, bpReadings)
 	before := headOf(t, f.ledgerPath)
 	live := liveOf(t, f.ledgerPath, "records", 0)
 	if live != 3 {
 		t.Fatalf("seeded %d live records facets, want 3", live)
 	}
-	stillImported := filepath.Join(f.dir, "imports.yaml") // written by ingest
-	other := filepath.Join(f.dir, "imports-other.yaml")
-	writeDoc(t, other, "imports:\n  - source: documents\n    path: "+f.recordsDir+"\n")
-	retire := func(imports string, more ...string) (string, error) {
-		args := append([]string{"retract", "records", "--retired", "--imports", imports}, more...)
+	retire := func(more ...string) (string, error) {
+		args := append([]string{"retract", "records", "--retired"}, more...)
 		out, _, err := cli(t, f.cfgPath, args...)
 		return out, err
 	}
@@ -85,18 +78,12 @@ func TestRetract_RetiredSourceGoesWhole(t *testing.T) {
 		}
 	}
 
-	// Still an import: refused, whatever else is said.
-	if _, err := retire(stillImported, "--yes", "--max-fraction", "1"); err == nil || !strings.Contains(err.Error(), "still declared as an import") {
-		t.Fatalf("declared import: %v", err)
-	}
-	unchanged("declared import")
-
 	// Still an importer: refused.
 	importers := filepath.Join(f.dir, "importers.yaml")
 	writeDoc(t, importers, "importers:\n  - source: records\n    token_sha256: "+strings.Repeat("ab", 32)+
 		"\n    types: [health.blood-pressure]\n")
 	appendFile(t, f.cfgPath, "importers_file: "+importers+"\n")
-	if _, err := retire(other, "--yes", "--max-fraction", "1"); err == nil || !strings.Contains(err.Error(), "still declared as an importer") {
+	if _, err := retire("--yes", "--max-fraction", "1"); err == nil || !strings.Contains(err.Error(), "still declared as an importer") {
 		t.Fatalf("declared importer: %v", err)
 	}
 	unchanged("declared importer")
@@ -105,7 +92,7 @@ func TestRetract_RetiredSourceGoesWhole(t *testing.T) {
 
 	// Undeclared, but the default fraction does not cover the whole source: refused,
 	// after the report.
-	out, err := retire(other, "--yes")
+	out, err := retire("--yes")
 	if err == nil || !strings.Contains(err.Error(), "--max-fraction 1") {
 		t.Fatalf("default fraction: %v", err)
 	}
@@ -116,13 +103,13 @@ func TestRetract_RetiredSourceGoesWhole(t *testing.T) {
 	unchanged("default fraction")
 
 	// A dry run says so and writes nothing.
-	if out, err = retire(other, "--max-fraction", "1"); err != nil || !strings.Contains(out, "dry run") {
+	if out, err = retire("--max-fraction", "1"); err != nil || !strings.Contains(out, "dry run") {
 		t.Fatalf("dry run: %v\n%s", err, out)
 	}
 	unchanged("dry run")
 
 	// Asked for in full: every live facet is tombstoned, one event each.
-	if out, err = retire(other, "--yes", "--max-fraction", "1"); err != nil || !strings.Contains(out, "tombstoned 3 facets") {
+	if out, err = retire("--yes", "--max-fraction", "1"); err != nil || !strings.Contains(out, "tombstoned 3 facets") {
 		t.Fatalf("retire: %v\n%s", err, out)
 	}
 	if w := headOf(t, f.ledgerPath); w != before+3 {
@@ -137,7 +124,7 @@ func TestRetract_RetiredSourceGoesWhole(t *testing.T) {
 	}
 
 	// Done is done: a second run has nothing to plan.
-	if out, err = retire(other, "--yes", "--max-fraction", "1"); err != nil || !strings.Contains(out, "0 live facets") {
+	if out, err = retire("--yes", "--max-fraction", "1"); err != nil || !strings.Contains(out, "0 live facets") {
 		t.Fatalf("second run: %v\n%s", err, out)
 	}
 }

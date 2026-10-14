@@ -30,7 +30,7 @@ steps:
   - actor: /components/anam-submit.md
     caller: outside
     label: stamp the current version per envelope
-    action: "`stamp_current` GETs `/v1/definitions` and sets `definition_version` on every envelope that lacks one, to the version Anam publishes as current, which is what the built-in records worker did."
+    action: "`stamp_current` GETs `/v1/definitions` and sets `definition_version` on every envelope that lacks one, to the version Anam publishes as current, which is what Anam's own records worker did before card 119."
     reads: [/data-structures/batch-event.md]
     resource: ../anam-importers/anam_submit/run.py#stamp_current
     anchor: 'current = {d["type"]: d["current"] for d in client.definitions()}'
@@ -69,6 +69,6 @@ steps:
     anchor: "ABSENT_IDS_SHOWN = 20"
 ---
 
-The resend is the rebuild's first step and the only way Anam learns what a push source no longer holds. It is idempotent by construction: every record the built-in worker admitted comes back as no-op, which is the cut-over test for the records importer.
+The resend is the rebuild's first step and the only way Anam learns what a push source no longer holds. It is idempotent by construction: every record Anam's own worker admitted before card 119 came back as no-op, which was the cut-over test for the records importer.
 
 Related: [retraction by complete resend](/decisions/retraction-by-complete-resend.md), [an importer never tombstones](/invariants/an-importer-never-tombstones.md).

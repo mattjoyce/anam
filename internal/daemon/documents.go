@@ -2,23 +2,20 @@ package daemon
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"mime"
 	"net/http"
-	"os"
-	"path"
 	"strings"
 
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
+	"github.com/mattjoyce/anam/internal/library"
 )
 
 // docType is the facet type a stored document is referenced by; an importer may post
@@ -31,20 +28,17 @@ const maxDocument = 64 << 20
 
 // The ways a document post or a reference to one is refused.
 var (
-	// ErrDocumentPath: the path is not a plain library-relative path.
-	ErrDocumentPath = errors.New("daemon: not a library-relative document path")
-	// ErrDocumentHeld: the library holds other bytes at this path. A stored document
-	// is a value: a changed document takes a new path, so the bytes an earlier
-	// reference names are never overwritten.
-	ErrDocumentHeld = errors.New("daemon: the library holds other bytes at this path")
-	// ErrDocumentMissing: a doc.reference names a path the library does not hold, or
-	// bytes other than the ones it holds there.
+	// ErrDocumentExt: the ext parameter is not a plain file extension.
+	ErrDocumentExt = errors.New("daemon: not a plain file extension")
+	// ErrDocumentMissing: a doc.reference names a sha256 the library holds no bytes for.
 	ErrDocumentMissing = errors.New("daemon: the library does not hold the document this reference names")
 )
 
-// postDocument stores one document's bytes in the library (card 102). Only Anam
-// writes the library: an importer hands it the bytes and is answered with what a
-// doc.reference names. The same bytes at the same path again are unchanged.
+// postDocument stores one document's bytes in the library (cards 102, 150). Only
+// Anam writes the library: an importer hands it the bytes and is answered with the
+// sha256 a doc.reference names. The file is named by that sha256, so the same bytes
+// again are unchanged, and other bytes are another file: a stored document is never
+// overwritten. Where in the library it sits is the library's own business.
 func (d *Daemon) postDocument(w http.ResponseWriter, r *http.Request) {
 	imp := importerOf(r)
 	if !mayWrite(imp, docType) {
@@ -55,7 +49,7 @@ func (d *Daemon) postDocument(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, errors.New("daemon: no library configured"))
 		return
 	}
-	rel, err := documentPath(r.URL.Query().Get("path"))
+	ext, err := documentExt(r.URL.Query().Get("ext"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
@@ -67,17 +61,16 @@ func (d *Daemon) postDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	sum := sha256.Sum256(body)
 	stored := api.StoredDocument{
-		Path: rel, SHA256: hex.EncodeToString(sum[:]), Bytes: int64(len(body)), MediaType: documentMediaType(rel),
+		SHA256: hex.EncodeToString(sum[:]), Bytes: int64(len(body)), MediaType: documentMediaType(ext),
 	}
-	// Through the write queue, so a backup copying the library never sees half a file.
+	// Through the write queue, so one writer counts and places, and a backup copying
+	// the library never sees half a file.
 	err = d.tryWriteWithin(importerWait, d.timeout(r), func(context.Context, Stores) error {
 		var err error
-		stored.New, err = storeDocument(d.cfg.LibraryDir, rel, body, stored.SHA256)
+		stored.New, err = library.Store(d.cfg.LibraryDir, d.cfg.LibraryFolderLimit, stored.SHA256, ext, body)
 		return err
 	})
 	switch {
-	case errors.Is(err, ErrDocumentHeld):
-		writeError(w, http.StatusConflict, err)
 	case errors.Is(err, ErrBusy), errors.Is(err, ErrStopped):
 		w.Header().Set("Retry-After", retryAfter)
 		writeError(w, http.StatusServiceUnavailable, err)
@@ -90,99 +83,29 @@ func (d *Daemon) postDocument(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// documentPath accepts a slash-separated, library-relative path to a file: no
-// absolute path, no climbing out, no dot-file or dot-directory (the library walk
-// skips those), and no sidecar name.
-func documentPath(p string) (string, error) {
-	if p == "" || strings.HasPrefix(p, "/") || strings.Contains(p, "\\") || path.Clean(p) != p {
-		return "", fmt.Errorf("%w: %q", ErrDocumentPath, p)
+// documentExt accepts a bare file extension, letters and digits, and gives it back
+// lower-cased with its dot. The extension labels the stored file for a person
+// browsing the library; empty is none.
+func documentExt(e string) (string, error) {
+	e = strings.ToLower(strings.TrimPrefix(e, "."))
+	if len(e) > 16 {
+		return "", fmt.Errorf("%w: %q", ErrDocumentExt, e)
 	}
-	for _, seg := range strings.Split(p, "/") {
-		if seg == "" || seg == "." || seg == ".." || strings.HasPrefix(seg, ".") {
-			return "", fmt.Errorf("%w: %q", ErrDocumentPath, p)
+	for _, c := range e {
+		if (c < 'a' || c > 'z') && (c < '0' || c > '9') {
+			return "", fmt.Errorf("%w: %q", ErrDocumentExt, e)
 		}
 	}
-	if strings.HasSuffix(p, ".meta.yaml") {
-		return "", fmt.Errorf("%w: %q is a sidecar name", ErrDocumentPath, p)
+	if e == "" {
+		return "", nil
 	}
-	return p, nil
+	return "." + e, nil
 }
 
-// storeDocument writes body at rel under the library root, confined to it (os.Root),
-// through a temporary file renamed into place, so the path holds the whole file or
-// nothing. It reports whether the bytes are new; the same bytes already there are not.
-func storeDocument(library, rel string, body []byte, sum string) (bool, error) {
-	if err := os.MkdirAll(library, 0o750); err != nil {
-		return false, fmt.Errorf("daemon: library: %w", err)
-	}
-	root, err := os.OpenRoot(library)
-	if err != nil {
-		return false, fmt.Errorf("daemon: library: %w", err)
-	}
-	defer func() { _ = root.Close() }()
-
-	switch held, err := heldSum(root, rel); {
-	case err == nil && held == sum:
-		return false, nil
-	case err == nil:
-		return false, fmt.Errorf("%w: %s holds sha256 %s; a changed document takes a new path", ErrDocumentHeld, rel, held)
-	case !errors.Is(err, fs.ErrNotExist):
-		return false, err
-	}
-
-	if dir := path.Dir(rel); dir != "." {
-		if err := root.MkdirAll(dir, 0o750); err != nil {
-			return false, fmt.Errorf("daemon: library %s: %w", dir, err)
-		}
-	}
-	var tag [8]byte
-	if _, err := rand.Read(tag[:]); err != nil {
-		return false, err
-	}
-	tmp := path.Join(path.Dir(rel), ".incoming-"+hex.EncodeToString(tag[:]))
-	f, err := root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o640)
-	if err != nil {
-		return false, fmt.Errorf("daemon: library: %w", err)
-	}
-	_, werr := f.Write(body)
-	serr := f.Sync()
-	cerr := f.Close()
-	if err := errors.Join(werr, serr, cerr); err != nil {
-		_ = root.Remove(tmp)
-		return false, fmt.Errorf("daemon: library %s: %w", rel, err)
-	}
-	if err := root.Rename(tmp, rel); err != nil {
-		_ = root.Remove(tmp)
-		return false, fmt.Errorf("daemon: library %s: %w", rel, err)
-	}
-	return true, nil
-}
-
-// heldSum is the sha256 of the regular file at rel, hex.
-func heldSum(root *os.Root, rel string) (string, error) {
-	f, err := root.Open(rel)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = f.Close() }()
-	info, err := f.Stat()
-	if err != nil {
-		return "", err
-	}
-	if !info.Mode().IsRegular() {
-		return "", fmt.Errorf("%w: %s is not a regular file", ErrDocumentHeld, rel)
-	}
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
-// documentMediaType is by extension, as the library worker names it: a label on the
-// pointer, not a verdict on the bytes.
-func documentMediaType(rel string) string {
-	if t := mime.TypeByExtension(strings.ToLower(path.Ext(rel))); t != "" {
+// documentMediaType is by extension: a label on the pointer, not a verdict on the
+// bytes.
+func documentMediaType(ext string) string {
+	if t := mime.TypeByExtension(ext); t != "" {
 		if i := strings.IndexByte(t, ';'); i >= 0 {
 			t = t[:i]
 		}
@@ -192,33 +115,33 @@ func documentMediaType(rel string) string {
 }
 
 // checkReferences refuses, before anything is admitted, every doc.reference in a
-// batch whose path the library does not hold or whose sha256 is not the bytes held
-// there (card 102). The reference is a pointer, and a pointer to nothing is not a fact
-// worth admitting.
-func checkReferences(library string, envs []facet.Envelope) error {
+// batch whose sha256 the library holds no bytes for (cards 102, 150). The reference
+// is a pointer, and a pointer to nothing is not a fact worth admitting. Its path is
+// the document's name and identity, and plays no part in finding the bytes.
+func checkReferences(dir string, envs []facet.Envelope) error {
 	var refused gate.Refused
-	var root *os.Root
+	var held map[string]string
+	var why string
 	for i, env := range envs {
 		if env.Type != docType {
 			continue
 		}
 		var ref struct {
-			Path   string `json:"path"`
 			SHA256 string `json:"sha256"`
 		}
 		if err := json.Unmarshal(env.Payload, &ref); err != nil {
 			continue // the gate refuses a malformed payload with its own reason
 		}
-		if root == nil && library != "" {
-			r, err := os.OpenRoot(library)
-			if err == nil {
-				root = r
-				defer func() { _ = root.Close() }()
-			}
+		if held == nil && why == "" {
+			held, why = heldDocuments(dir)
 		}
-		if why := referenceProblem(root, ref.Path, ref.SHA256); why != "" {
+		problem := why
+		if _, ok := held[ref.SHA256]; problem == "" && !ok {
+			problem = "the library holds no bytes with sha256 " + ref.SHA256
+		}
+		if problem != "" {
 			refused.Envelopes = append(refused.Envelopes, gate.RefusedEnvelope{
-				Index: i, Type: env.Type, Err: fmt.Errorf("%w: %s; post the bytes to /v1/documents first", ErrDocumentMissing, why),
+				Index: i, Type: env.Type, Err: fmt.Errorf("%w: %s; post the bytes to /v1/documents first", ErrDocumentMissing, problem),
 			})
 		}
 	}
@@ -228,21 +151,14 @@ func checkReferences(library string, envs []facet.Envelope) error {
 	return nil
 }
 
-// referenceProblem says why a reference to path with sum is not one the library can
-// honour, or "" when it can.
-func referenceProblem(root *os.Root, p, sum string) string {
-	if root == nil {
-		return "no library is configured or readable"
+// heldDocuments indexes the library once for a batch, or says why it cannot.
+func heldDocuments(dir string) (map[string]string, string) {
+	if dir == "" {
+		return nil, "no library is configured"
 	}
-	if _, err := documentPath(p); err != nil {
-		return err.Error()
-	}
-	held, err := heldSum(root, p)
+	held, err := library.Index(dir)
 	if err != nil {
-		return fmt.Sprintf("the library holds nothing at %s", p)
+		return nil, err.Error()
 	}
-	if held != sum {
-		return fmt.Sprintf("%s holds sha256 %s, the reference names %s", p, held, sum)
-	}
-	return ""
+	return held, ""
 }

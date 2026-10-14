@@ -64,7 +64,7 @@ func TestEverythingButHealthzNeedsTheToken(t *testing.T) {
 		{"healthz needs nothing", "/healthz", func(*http.Request) {}, http.StatusOK},
 		{"status without a token", "/v1/status", func(*http.Request) {}, http.StatusUnauthorized},
 		{"inspector without a token", "/", func(*http.Request) {}, http.StatusUnauthorized},
-		{"a document without a token", "/document?path=x", func(*http.Request) {}, http.StatusUnauthorized},
+		{"a document without a token", "/document?sha256=x", func(*http.Request) {}, http.StatusUnauthorized},
 		{"the wrong bearer token", "/v1/status",
 			func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+testToken[1:]+"x") }, http.StatusUnauthorized},
 		{"the right bearer token", "/v1/status",

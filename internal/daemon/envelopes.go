@@ -23,12 +23,12 @@ import (
 const maxSubmission = gate.MaxBatch*300*1024 + 1<<20
 
 // retryAfter is what a 503 asks an importer to wait, in seconds. A batch has already
-// waited importerWait for the queue, so what holds it is an ingest, which takes tens
-// of seconds.
+// waited importerWait for the queue, so what holds it is a long write (a backup, a
+// full mint, a replay into the index), which takes tens of seconds.
 const retryAfter = "15"
 
 // importerWait is how long an importer's write waits for the queue: long enough to
-// wait out a mint after the batch before it, short of an ingest.
+// wait out a mint after the batch before it, short of a long write.
 const importerWait = 5 * time.Second
 
 // postEnvelopes admits one batch from an importer, whole or not at all. The importer
@@ -108,7 +108,7 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 	default:
 		changed := changedBy(results)
-		d.ingests.sawImporter(imp.Source, d.now(), changed > 0)
+		d.sources.saw(imp.Source, d.now(), changed > 0)
 		if changed > 0 {
 			d.requestMint()
 		}
@@ -202,19 +202,4 @@ func refusalOf(r *gate.Refused) api.Refusal {
 		out.Refused[i] = api.RefusedEnvelope{Index: e.Index, Type: string(e.Type), Reason: e.Err.Error()}
 	}
 	return out
-}
-
-// sawImporter records a batch from an importer in the daemon's view of its sources.
-func (in *ingests) sawImporter(source, at string, admitted bool) {
-	in.mu.Lock()
-	defer in.mu.Unlock()
-	st := in.sources[source]
-	if st == nil {
-		st = &api.SourceStatus{Source: source}
-		in.sources[source] = st
-	}
-	st.LastScanAt = at
-	if admitted {
-		st.LastAdmissionAt = at
-	}
 }

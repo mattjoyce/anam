@@ -1,7 +1,7 @@
 ---
 type: component
 title: anam_records
-description: Sends a records folder as one snapshot of the bundled types it carries, reading YAML with Go's yaml.v3 rules so every record the built-in worker admitted resends as no-op.
+description: Sends a records folder as one snapshot of the bundled types it carries, reading YAML with Go's yaml.v3 rules so every record Anam's own records worker admitted before card 119 resends as no-op.
 timestamp: 2026-10-11T00:00:00Z
 resource: ../anam-importers/records/run.py#poll
 anchor: "def poll(request: Dict[str, Any]) -> Dict[str, Any]:"

@@ -1,7 +1,7 @@
 ---
 type: decision
 title: Commands that only read open the ledger read-only
-description: Every read command and every daemon read route uses a mode=ro handle, so SQLite itself refuses a write; only init, ingest, retract --yes and the daemon open it read-write.
+description: Every read command and every daemon read route uses a mode=ro handle, so SQLite itself refuses a write; only init, retract --yes and the daemon open it read-write.
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/store/ledger/ledger.go#OpenReadOnly
 anchor: "return openExisting(ctx, path, personID, modeReadOnly)"
@@ -24,4 +24,4 @@ affects:
 
 **Why.** A read-only open is also not blocked by an open writer, so reads proceed while a batch commits.
 
-**What it costs.** The comment on `openLedgerReadOnly` and ARCHITECTURE §8 still say only init and ingest write, which stopped being true when the daemon and retract arrived (see [architecture doc has stale sentences](/gaps/architecture-doc-stale-sentences.md)). The operational store is opened read-write by local read commands, so a local `anam timeline` creates `tracking.db`.
+**What it costs.** ARCHITECTURE §8 still says only init and ingest write, which stopped being true when the daemon and retract arrived and `ingest` went in card 119; the comment on `openLedgerReadOnly` now names init, the daemon and retract (see [architecture doc has stale sentences](/gaps/architecture-doc-stale-sentences.md)). The operational store is opened read-write by local read commands, so a local `anam timeline` creates `tracking.db`.

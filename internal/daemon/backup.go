@@ -12,7 +12,7 @@ import (
 )
 
 // postBackups takes a backup of the record into backup_dir, on the write queue: it
-// waits behind a running ingest or mint rather than refuse, since a scheduled backup
+// waits behind a running mint or batch rather than refuse, since a scheduled backup
 // has nowhere better to be, and holds the queue while it copies, so the ledger and the
 // operational store in it agree. 503 without a backup_dir, or while stopping.
 func (d *Daemon) postBackups(w http.ResponseWriter, r *http.Request) {

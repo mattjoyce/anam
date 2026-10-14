@@ -5,9 +5,11 @@ Design proposal · 2026-10-08, built by 2026-10-13 (card 50). The service's side
 blood pressure (card 80), the DreamStation (card 70), Garmin (card 55) and OwnTracks (card 130), in
 `anam-importers`.
 
-Anam's capture workers for vendor sources (`healthdb`, `withings`, `bpcsv`) were compiled into the
-binary that owns the ledger. All three have left: `withings` (card 54), `bpcsv` (card 80) and
-`healthdb` (card 55, its facets retired on 2026-10-11, the package deleted on 2026-10-13). An
+Anam's capture workers (`healthdb`, `withings`, `bpcsv`, `records`, `documents`) were compiled into
+the binary that owns the ledger. All five have left: `withings` (card 54), `bpcsv` (card 80),
+`healthdb` (card 55, its facets retired on 2026-10-11, the package deleted on 2026-10-13), and
+`records` and `documents` (card 119, to `anam_records` and `anam_documents`). `anam ingest` and
+`POST /v1/ingest` went with them. An
 importer is a ductile plugin that shapes one source's data to a Facet Definition and submits it to the
 Anam service. Anam keeps the Definitions, the gate and the record, and knows nothing about any vendor.
 The two formats still read in process, `records` and `documents`, leave with card 119.
@@ -64,7 +66,6 @@ These make an importer correct in any language, without importing Anam's code.
 1. **The gate composes identity.** Done (card 51). The gate composes `source_ref` from the
    Definition's `identity_key`; an envelope may leave it out, and one that carries it is refused on a
    mismatch. The identity rule lives once, in the Definition, and importers only shape payload fields.
-   The built-in workers no longer compose it.
 2. **A Definition's schema is standard JSON Schema.** Done (card 52). The `schema` block is JSON
    Schema draft 2020-12, so an importer validates locally with a stock library (Python's
    `jsonschema`: `jsonschema.validate(payload, manifest["schema"])`) before sending, and the gate
@@ -143,12 +144,12 @@ Where log management stops applying: logs tolerate loss and sampling and have no
    its 5,818 summary facets were retired, the ETL pipelines were removed and healthdata.db stays as an
    archive. The built-in `healthdb` worker was deleted on 2026-10-13.
 6. One-off exports (Technogym, Strong, Fitbit) get no importer. Each is a document in the library,
-   turned into a records file once by a script kept in `scripts/`, and reshaped by regenerating that
+   turned into a records file once by a script in `anam-importers` `records/extract`, and reshaped by regenerating that
    file with the same ids (card 58). The blood pressure app turned out to be live, exported
    periodically, so it has an importer (card 80), and the built-in `bpcsv` worker is gone. `records`
    and `documents` were kept inside as formats until Matt's word of 2026-10-11 that they leave too:
    records by `anam_records` (card 118), documents by `anam_documents` posting bytes to
-   `POST /v1/documents` (cards 102, 103), and then the in-process workers go (card 119).
+   `POST /v1/documents` (cards 102, 103), and the in-process workers went (card 119).
 
 ## 8. The importer contract
 
@@ -197,7 +198,8 @@ importers:
 ```
 
 - `source` is the source every envelope it submits is admitted as. A facet's identity includes its
-  source, so an importer that takes over a built-in worker's facets uses that worker's source name.
+  source, so an importer that takes over another's facets uses that source's name, as `anam_records` and
+  `anam_documents` kept `records` and `documents`.
 - `types` are the types it may submit, and the only types it may register Definitions for.
 - An importer's token opens `POST /v1/envelopes`, `POST /v1/definitions` and
   `GET /v1/definitions...`, and nothing else: it cannot read the record. The operator's token
@@ -264,16 +266,24 @@ next batch waits on it.
 ### 8.4a Documents
 
 A document's bytes reach the library through Anam, never by an importer writing into Anam's
-directory (card 102). `POST /v1/documents?path=<library-relative path>`, body the raw bytes (at
-most 64 MiB), under an importer token whose `types` include `doc.reference`. The answer is what a
-`doc.reference` names: `path`, `sha256` (hex), `bytes`, `media_type`, and `new`. 201 stored; 200
-the same bytes already at that path; 409 other bytes at that path, since a stored document is a
-value and a changed one takes a new path; 400 a path that is absolute, climbs out, names a dot-file
-or a `.meta.yaml` sidecar; 403 a token that may not submit `doc.reference`.
+directory (card 102). `POST /v1/documents?ext=<extension>`, body the raw bytes (at most 64 MiB),
+under an importer token whose `types` include `doc.reference`. The answer is `sha256` (hex),
+`bytes`, `media_type` (from the extension) and `new`. 201 stored; 200 the library already held
+these bytes; 400 an extension that is not letters and digits, at most 16; 403 a token that may not
+submit `doc.reference`. There is no conflict: Anam names the stored file by its sha256 (card 150),
+so other bytes are another file and nothing is overwritten. The extension only labels that file for
+a person browsing the library.
 
-Then the importer submits the `doc.reference` envelope as any other. An envelope naming a path the
-library does not hold, or a `sha256` other than the bytes held there, is refused with the batch
-(422), before the gate, and nothing of the batch is admitted.
+Then the importer submits the `doc.reference` envelope as any other. Its `path` is the document's
+name and identity, whatever the importer files it under; its `sha256` is how Anam finds the bytes.
+The same `path` with another `sha256`, a rescan, supersedes the facet, and the first scan's bytes
+stay for the facet version that names them. An envelope naming a `sha256` the library holds no
+bytes for is refused with the batch (422), before the gate, and nothing of the batch is admitted.
+
+Where in the library a file sits is the library's own business and never enters a fact. A file
+goes in the library root until that holds `library_folder_limit` files (default 1000), then into
+a subfolder named by the first character of its sha256, then the first two inside that, and so on.
+A stored file never moves; a lookup finds it by its name.
 
 ### 8.5 What an importer must do
 

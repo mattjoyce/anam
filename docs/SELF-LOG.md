@@ -59,13 +59,14 @@ through a snapshot projection, and the receipt pins it (`GLOSSARY.md`, *Checkpoi
 
 ## 3. The self-log: a source you keep by hand
 
-A plain file you edit, one row per event, read by a capture worker like any other source. It is a
+A plain file you edit, one row per event, read by an importer like any other source. It is a
 **source**, outside the gate, so Anam owns none of it and re-reading it is idempotent.
 
 - **Identity is a row id you assign**, stable for the row's life, never its content and never its
   line number. `source_ref = self-log:<row_id>`. Editing a row's fields supersedes the facet;
   deleting a row does not tombstone it by itself: `anam retract <source>` reports the rows the
-  source has dropped and tombstones them only with `--yes` (card 17, 2026-10-07), so a wrong row is
+  source has dropped, from the importer's newest whole resend, and tombstones them only with `--yes`
+  (card 17, 2026-10-07), so a wrong row is
   corrected in place, and a row that should never have been is retracted on purpose.
 - **Fact-time is the row's date**, the day the thing happened, as you record it. A row added late is
   a backfill and re-opens its bucket, which is the system working.
@@ -74,8 +75,8 @@ A plain file you edit, one row per event, read by a capture worker like any othe
   45 minutes, legs" is the same row with more. A field the Definition does not declare is refused,
   so a new kind of detail is a line in the manifest first.
 - **Classification** is Sensitive for everything medical; travel and gym can be Confidential.
-- Format: **records files**, one YAML per source document, read by `internal/capture/records`
-  (decided and built 2026-10-06; `INBOX.md` is the runbook). A hand-kept log is one records file
+- Format: **records files**, one YAML per source document, read by the `anam_records` importer
+  (decided and built 2026-10-06, moved out of the binary by card 119; `INBOX.md` is the runbook). A hand-kept log is one records file
   whose document is the log itself.
 
 ## 4. The types

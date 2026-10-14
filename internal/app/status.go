@@ -16,8 +16,8 @@ func statusCmd(cfgPath *string, info BuildInfo) *cobra.Command {
 		Use:   "status",
 		Short: "the record's state: which ledger, its watermark, and what the daemon has seen",
 		Long: `Status names the ledger and its watermark W. Asked of a daemon it also says which
-build is running, when it started, each source as last seen since then, and any
-ingest running or waiting. Read from local files there is no daemon history to
+build is running, when it started, and when each importer's last batch arrived
+since then. Read from local files there is no daemon history to
 report, so those parts are empty.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -76,19 +76,13 @@ func writeStatus(cmd *cobra.Command, s api.Status, server string) error {
 		return nil
 	}
 	_, _ = fmt.Fprintf(out, "since   %s\n", s.Since)
-	if s.Ingest.Running != "" {
-		_, _ = fmt.Fprintf(out, "ingest  running %s\n", s.Ingest.Running)
-	}
-	if s.Ingest.Pending != "" {
-		_, _ = fmt.Fprintf(out, "ingest  pending %s\n", s.Ingest.Pending)
-	}
 	if len(s.Sources) == 0 {
-		_, err := fmt.Fprintln(out, "no source read since the daemon started")
+		_, err := fmt.Fprintln(out, "no batch from an importer since the daemon started")
 		return err
 	}
 	_, _ = fmt.Fprintln(out)
 	w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "SOURCE\tLAST SCAN\tLAST ADMISSION")
+	_, _ = fmt.Fprintln(w, "SOURCE\tLAST BATCH\tLAST ADMISSION")
 	for _, src := range s.Sources {
 		last := src.LastAdmissionAt
 		if last == "" {

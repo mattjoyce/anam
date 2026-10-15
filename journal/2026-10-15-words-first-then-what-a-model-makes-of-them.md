@@ -88,10 +88,22 @@ save whose answer is lost, retried by the model a minute later, would land as a 
 save now names the id and time to retry with. The token never left the ThinkPad: it was made there,
 readable only by Matt, and only its hash went to unraid, which is all the daemon keeps.
 
+## Live
+
+ThinkPad.unraid deployed v0.323-60f1988 over v0.314, backing up first (W 33188 before and after), and
+registered the `conversation` importer by the token's hash. No Claude client had the MCP server
+registered yet, so the first save drove its stdio by hand: `initialize`, `tools/list`, then
+`save_note` twice. Matt's card 93 words were admitted as `conversation:8393535598127b22` at W 33200,
+the second send was a no-op, and a timeline read shows one note under source `conversation`.
+
+The save also showed a gap. Those words were said on 14 October and the note is dated 15 October
+11:49, the moment of saving, because a new note always takes the present and a correction keeps the
+note's time. Card 162 lets a save say when the words were said.
+
 ## Left open
 
-- ThinkPad.unraid to deploy anam e203c15 and register the `conversation` importer by its hash; then
-  Matt adds the note token to the MCP server's config, and a first save runs end to end.
+- Cards 162, dating a note when the words were said, and the MCP server's registration in a Claude
+  client, with the note token.
 - Cards 158 to 161: the interpreter, endorsement, the inspector's review page (its first write to the
   record), and re-reading corrected words. The source's name, `interpretation`, is still to confirm.
 - Card 141's unraid half, and the two rebuild questions in `docs/IMPORTERS.md` §6.

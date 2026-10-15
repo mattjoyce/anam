@@ -204,9 +204,14 @@ importers:
   source, so an importer that takes over another's facets uses that source's name, as `anam_records` and
   `anam_documents` kept `records` and `documents`.
 - `types` are the types it may submit, and the only types it may register Definitions for.
-- An importer's token opens `POST /v1/envelopes`, `POST /v1/definitions` and
-  `GET /v1/definitions...`, and nothing else: it cannot read the record. The operator's token
-  (`token_file`) reads the Definitions but submits nothing (403).
+- An importer's token opens `POST /v1/envelopes`, `POST /v1/documents` and `POST /v1/definitions`,
+  and since card 89 every read a `reader` has: the record, receipts, Definitions, and its own
+  source's snapshots. It does not open minting, backups, projection templates or the inspector
+  (403). The operator's token (`token_file`) reads but submits nothing (403).
+- The same file names principals that are not importers, under `principals`, each with a `name` and
+  a `role` (`reader` or `operator`) and no source or types. An importer may be listed there too,
+  with `role: importer`, a name, a source and types. Names, sources and token hashes are each used
+  once. API.md §2 has the roles.
 - Make a token with `openssl rand -hex 32`. Present it as `Authorization: Bearer <token>`.
 
 ### 8.3 Definitions

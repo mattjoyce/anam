@@ -23,23 +23,25 @@ runs, nothing else may open those files. Ask it over HTTP instead.
 
 ## What the API allows today
 
-| Route | Token | Does |
+| Route | Roles | Does |
 |---|---|---|
 | `GET /healthz` | no | `ready` (200) or `not ready` (503). Nothing else. |
-| `GET /v1/status` | yes | Version, person, ledger id, W, and per importer source when its last batch arrived (`last_scan_at`) and last changed the record. |
-| `GET /v1/timeline` | yes | The CLI's timeline read. Query: `zone` (IANA, required; `Local` is refused), `from`, `to`, `at`, `as_of`, `type`, `projection`, `explain=true`, typed as on the CLI, `w` (a watermark) in place of `as_of`, and `fields` (repeated JSON pointers into the type's schema, card 138), which answers a `frame` of `columns` and `rows` in place of `entries`. Whole, not paged; over `max_read_bytes` (default 512 KiB) it is 413 `result_too_large` with `too_large.narrow`, the parameters still unused. |
-| `GET /v1/changes` | yes | Anam-events by anam-time: `since` (required), `until`, `zone`. Carries `index_seq` and `w`; `w` above `index_seq` means the index is behind. |
-| `POST /v1/receipts` | yes | Publish a timeline read: the same query as `/v1/timeline`, which must name a `projection`. 201 with the entries (or the `frame`, with `fields`), the receipt and its hash. The receipt records W, the narrowing and the fields; verify replays them. 413 over `max_read_bytes`, and then nothing is filed. |
-| `GET /v1/receipts`, `/v1/receipts/{hash}`, `/v1/receipts/{hash}/verify` | yes | List, show (from artifacts alone), prove against the ledger. 404 unknown, 400 malformed hash, 409 a receipt this ledger cannot honour, 413 a receipt too large to show here (it still verifies). |
-| `GET /v1/checkpoints` | yes | The checkpoint log. |
-| `POST /v1/checkpoints` | yes | Mint from the last run (`?dry_run=true` derives only, `?full=true` folds the whole ledger, the repair). 503 at once while another write holds the queue. |
-| `POST /v1/backups` | yes | Back up the record into `backup_dir` (`/mnt/disk1/backup/anam/daily`), keeping 14. Waits behind a running write. The gateway's `anam_backup` asks nightly at 02:30. 503 without a `backup_dir`. |
-| `GET /v1/definitions[/{type}[/{version}]]` | yes, or an importer's | The published Definitions: list, current manifest, one version. |
-| `POST /v1/definitions` | an importer's | Register a Definition the importer emits. 201 new, 200 same body, 409 immutable or re-keyed. |
-| `POST /v1/envelopes` | an importer's | A batch of up to 49 envelopes, admitted whole (200, per-envelope outcomes) or refused whole (422, every reason). 503 with `Retry-After` while a write runs. The operator's token gets 403. A resend-everything run labels its batches as parts of one `snapshot`. Contract: `docs/IMPORTERS.md` §8. |
-| `POST /v1/documents?ext=` | an importer's, with `doc.reference` | Store a document's bytes in the library, named by their sha256 (cards 102, 150). 201 stored, 200 already held; never a conflict. A `doc.reference` envelope naming a sha256 the library does not hold is refused. |
-| `GET /v1/snapshots/{id}` | yes, or the importer whose run it is | A complete resend's report: parts admitted, whether it is complete, and what the source no longer holds (`absent`, judged from the snapshot's start). 404 unknown, or another importer's. |
-| `GET /` and below | yes | The inspector (timeline, facets, events, documents). Browser: basic auth, any user name, the token as password. |
+| `GET /v1/status` | reader, importer, operator | Version, person, ledger id, W, and per importer source when its last batch arrived (`last_scan_at`) and last changed the record. |
+| `GET /v1/timeline` | reader, importer, operator | The CLI's timeline read. Query: `zone` (IANA, required; `Local` is refused), `from`, `to`, `at`, `as_of`, `type`, `projection`, `explain=true`, typed as on the CLI, `w` (a watermark) in place of `as_of`, and `fields` (repeated JSON pointers into the type's schema, card 138), which answers a `frame` of `columns` and `rows` in place of `entries`. Whole, not paged; over `max_read_bytes` (default 512 KiB) it is 413 `result_too_large` with `too_large.narrow`, the parameters still unused. |
+| `GET /v1/changes` | reader, importer, operator | Anam-events by anam-time: `since` (required), `until`, `zone`. Carries `index_seq` and `w`; `w` above `index_seq` means the index is behind. |
+| `POST /v1/receipts` | reader, importer, operator | Publish a timeline read: the same query as `/v1/timeline`, which must name a `projection`. 201 with the entries (or the `frame`, with `fields`), the receipt and its hash. The receipt records W, the narrowing and the fields; verify replays them. 413 over `max_read_bytes`, and then nothing is filed. |
+| `GET /v1/receipts`, `/v1/receipts/{hash}`, `/v1/receipts/{hash}/verify` | reader, importer, operator | List, show (from artifacts alone), prove against the ledger. 404 unknown, 400 malformed hash, 409 a receipt this ledger cannot honour, 413 a receipt too large to show here (it still verifies). |
+| `GET /v1/checkpoints` | reader, importer, operator | The checkpoint log. |
+| `GET /v1/projections[/{name}[/{version}]]` | reader, importer, operator | The projection templates, bundled and registered: list, current, one version (card 125). |
+| `POST /v1/projections` | operator | Register a projection template. |
+| `POST /v1/checkpoints` | operator | Mint from the last run (`?dry_run=true` derives only, `?full=true` folds the whole ledger, the repair). 503 at once while another write holds the queue. |
+| `POST /v1/backups` | operator | Back up the record into `backup_dir` (`/mnt/disk1/backup/anam/daily`), keeping 14. Waits behind a running write. The gateway's `anam_backup` asks nightly at 02:30. 503 without a `backup_dir`. |
+| `GET /v1/definitions[/{type}[/{version}]]` | reader, importer, operator | The published Definitions: list, current manifest, one version. |
+| `POST /v1/definitions` | importer | Register a Definition the importer emits. 201 new, 200 same body, 409 immutable or re-keyed. |
+| `POST /v1/envelopes` | importer | A batch of up to 49 envelopes, admitted whole (200, per-envelope outcomes) or refused whole (422, every reason). 503 with `Retry-After` while a write runs. The operator's token gets 403. A resend-everything run labels its batches as parts of one `snapshot`. Contract: `docs/IMPORTERS.md` §8. |
+| `POST /v1/documents?ext=` | importer, with `doc.reference` | Store a document's bytes in the library, named by their sha256 (cards 102, 150). 201 stored, 200 already held; never a conflict. A `doc.reference` envelope naming a sha256 the library does not hold is refused. |
+| `GET /v1/snapshots/{id}` | reader, operator; an importer its own runs | A complete resend's report: parts admitted, whether it is complete, and what the source no longer holds (`absent`, judged from the snapshot's start). 404 unknown, or another importer's. |
+| `GET /` and below | operator | The inspector (timeline, facets, events, documents). Browser: basic auth, any user name, the token as password. |
 
 A POST from a browser on another site (a foreign `Origin`, or `Sec-Fetch-Site` other than
 `same-origin`) is 403 before any work, whatever credential it carries (card 108); the CLI and the
@@ -48,9 +50,11 @@ or SVG ones download rather than render (card 106).
 
 Any request may carry an `Anam-Timeout` header, the caller's own deadline as a Go duration
 (`25s`); the daemon works to the shorter of it and its configured timeout, and a read that runs
-out is 504. Importers' tokens live in `importers_file` (`ANAM_IMPORTERS_FILE`) as SHA-256
-hashes beside each importer's source and types; an importer's token opens only the importer
-routes (envelopes, definitions, its own snapshots). There is no API for retraction or for writing
+out is 504. Every token belongs to a principal with a role (card 89, `docs/API.md` §2). The
+operator's is `token_file`; the rest live in `importers_file` (`ANAM_IMPORTERS_FILE`) as SHA-256
+hashes, importers under `importers` with their source and types, readers and others under
+`principals` with a name and a role. A role the route does not admit is 403, naming the
+principal and the roles the route takes. There is no API for retraction or for writing
 a record; those are local maintenance or design (`docs/API.md`).
 
 ## The MCP adapter
@@ -99,7 +103,7 @@ Use `$(cat ...)` inside the command so the token never appears in output or hist
 daemon started. The durable answer to "what landed" is the ledger: `GET /v1/changes`.
 
 Errors are `{"error": "…"}`: 400 a query that cannot be read (a malformed date, an
-unknown projection), 401 no or wrong token (with `WWW-Authenticate: Basic`), 404 unknown
+unknown projection), 401 no or wrong token (with `WWW-Authenticate: Basic`), 403 a token whose role the route does not admit, 404 unknown
 receipt, 409 a receipt this ledger cannot honour, 413 an answer over `max_read_bytes`
 (`code: result_too_large`, `too_large: {matched, bytes, max_bytes, narrow}`), 503 while stopping, while a
 long write holds the write queue, or when the ledger cannot be read, 504 a read that ran out of time.
@@ -119,5 +123,5 @@ long write holds the write queue, or when the ledger cannot be read, 504 a read 
   `documents` are `anam_records` and `anam_documents` since card 119, and the hourly
   `anam_ingest` job is gone with `POST /v1/ingest`.
 - Layout, mounts and history: vault page `unraid_admin/vault/Anam Service Container.md`.
-  Code: `internal/daemon` (operator routes in `api.go`, importer and reader routes in
-  `daemon.go`), wiring in `internal/app/daemon.go`.
+  Code: `internal/daemon` (the route table with each route's roles in `api.go`, principals in
+  `auth.go`), wiring in `internal/app/daemon.go`.

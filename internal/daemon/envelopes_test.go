@@ -167,8 +167,8 @@ func TestImportersShareABundledType(t *testing.T) {
 	}
 }
 
-// Card 53: an importer's token opens the importer routes and nothing else, and the
-// operator's token submits nothing.
+// Card 53: an importer's token opens the importer routes, and the operator's token
+// submits nothing. Since card 89 an importer also reads (roles_test.go).
 func TestImporterRoutesAuthorize(t *testing.T) {
 	_, url, _ := serveImporters(t, importerConfig(t))
 
@@ -182,8 +182,8 @@ func TestImporterRoutesAuthorize(t *testing.T) {
 		{"definitions with the operator's token", "GET", "/v1/definitions", testToken, http.StatusOK},
 		{"definitions with an importer's token", "GET", "/v1/definitions", importerToken, http.StatusOK},
 		{"definitions with no token", "GET", "/v1/definitions", "", http.StatusUnauthorized},
-		{"the record with an importer's token", "GET", "/v1/status", importerToken, http.StatusUnauthorized},
-		{"the inspector with an importer's token", "GET", "/", importerToken, http.StatusUnauthorized},
+		{"the record with an importer's token", "GET", "/v1/status", importerToken, http.StatusOK},
+		{"the inspector with an importer's token", "GET", "/", importerToken, http.StatusForbidden},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -21,7 +21,7 @@ import (
 // only types it may submit. A registered version is immutable: the same body again is
 // unchanged, and anything else at that version is refused.
 func (d *Daemon) postDefinitions(w http.ResponseWriter, r *http.Request) {
-	imp := importerOf(r)
+	imp := principalOf(r)
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, int64(d.cfg.MaxManifestBytes)))
 	if err != nil {
 		writeError(w, http.StatusRequestEntityTooLarge, err)

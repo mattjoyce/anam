@@ -13,29 +13,68 @@ import (
 
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/config"
+	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/read"
 	"github.com/mattjoyce/anam/internal/serve"
 	"github.com/mattjoyce/anam/internal/store/artifact"
 )
 
-// The /v1 routes. Every handler is bounded by the configured timeout, and none waits
-// on the write queue, so a busy ledger never holds a request.
-func (d *Daemon) routes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /v1/status", d.getStatus)
-	mux.HandleFunc("GET /v1/timeline", d.getTimeline)
-	mux.HandleFunc("GET /v1/changes", d.getChanges)
-	mux.HandleFunc("GET /v1/receipts", d.getReceipts)
-	mux.HandleFunc("POST /v1/receipts", d.postReceipt)
-	mux.HandleFunc("GET /v1/receipts/{hash}", d.getReceipt)
-	mux.HandleFunc("GET /v1/receipts/{hash}/verify", d.verifyReceipt)
-	mux.HandleFunc("GET /v1/projections", d.getProjections)
-	mux.HandleFunc("GET /v1/projections/{name}", d.getProjection)
-	mux.HandleFunc("GET /v1/projections/{name}/{version}", d.getProjection)
-	mux.HandleFunc("POST /v1/projections", d.postProjections)
-	mux.HandleFunc("GET /v1/checkpoints", d.getCheckpoints)
-	mux.HandleFunc("POST /v1/checkpoints", d.postCheckpoints)
-	mux.HandleFunc("POST /v1/backups", d.postBackups)
+// route is one pattern, the roles whose tokens open it, and its handler.
+type route struct {
+	pattern string
+	roles   []config.Role
+	handler http.Handler
+}
+
+// Who may call a route. Reading the record, and publishing a read, which writes
+// artifacts and never the ledger, is every role's. Submitting is an importer's alone:
+// an envelope is admitted as its importer's source, and the operator is no source.
+// Running the daemon is the operator's, and so is the inspector, which shows the
+// whole record unprojected.
+var (
+	anyRole      = []config.Role{config.RoleReader, config.RoleImporter, config.RoleOperator}
+	importerOnly = []config.Role{config.RoleImporter}
+	operatorOnly = []config.Role{config.RoleOperator}
+)
+
+// routes is every route but /healthz. Every handler is bounded by the configured
+// timeout, and none waits on the write queue, so a busy ledger never holds a request.
+func (d *Daemon) routes() []route {
+	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
+	inspector := inspect.Handler(inspect.Deps{
+		Ledger: d.read, Timeout: d.cfg.Timeout, Buckets: buckets, Library: d.cfg.LibraryDir,
+		Definitions: d.defs.current.Load, Held: d.heldDefinitions, Checkpoints: d.readOps,
+		Projections: d.projections.current.Load, CachedReads: d.cfg.InspectCachedReads,
+	})
+	f := func(pattern string, roles []config.Role, h http.HandlerFunc) route { return route{pattern, roles, h} }
+	return []route{
+		f("GET /v1/status", anyRole, d.getStatus),
+		f("GET /v1/timeline", anyRole, d.getTimeline),
+		f("GET /v1/changes", anyRole, d.getChanges),
+		f("GET /v1/receipts", anyRole, d.getReceipts),
+		f("POST /v1/receipts", anyRole, d.postReceipt),
+		f("GET /v1/receipts/{hash}", anyRole, d.getReceipt),
+		f("GET /v1/receipts/{hash}/verify", anyRole, d.verifyReceipt),
+		f("GET /v1/projections", anyRole, d.getProjections),
+		f("GET /v1/projections/{name}", anyRole, d.getProjection),
+		f("GET /v1/projections/{name}/{version}", anyRole, d.getProjection),
+		f("GET /v1/checkpoints", anyRole, d.getCheckpoints),
+		f("GET /v1/definitions", anyRole, d.getDefinitions),
+		f("GET /v1/definitions/{type}", anyRole, d.getDefinition),
+		f("GET /v1/definitions/{type}/{version}", anyRole, d.getDefinition),
+		f("GET /v1/snapshots/{id}", anyRole, d.getSnapshot),
+
+		f("POST /v1/envelopes", importerOnly, d.postEnvelopes),
+		f("POST /v1/definitions", importerOnly, d.postDefinitions),
+		f("POST /v1/documents", importerOnly, d.postDocument),
+
+		f("POST /v1/projections", operatorOnly, d.postProjections),
+		f("POST /v1/checkpoints", operatorOnly, d.postCheckpoints),
+		f("POST /v1/backups", operatorOnly, d.postBackups),
+		{"/", operatorOnly, inspector},
+	}
 }
 
 func (d *Daemon) getCheckpoints(w http.ResponseWriter, r *http.Request) {

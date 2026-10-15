@@ -35,7 +35,7 @@ var snapshotID = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,128}$`)
 
 // validSnapshot checks a part's label against the importer and the batch it labels,
 // and its declared parts against maxParts (max_snapshot_parts).
-func validSnapshot(s *api.SnapshotPart, imp config.Importer, envs []api.SubmittedEnvelope, maxParts int) error {
+func validSnapshot(s *api.SnapshotPart, imp config.Principal, envs []api.SubmittedEnvelope, maxParts int) error {
 	if s == nil {
 		return nil
 	}
@@ -148,14 +148,14 @@ func recordSnapshotPart(ctx context.Context, db *ops.DB, source string, s *api.S
 	return &api.SnapshotProgress{ID: rec.ID, Parts: rec.Parts, PartsAdmitted: rec.PartsAdmitted, Complete: rec.Complete()}, nil
 }
 
-// getSnapshot reports a snapshot. An importer sees only its own source's; the
-// operator sees any. Once complete, the report says what the source's live facets of
+// getSnapshot reports a snapshot. An importer sees only its own source's; a reader
+// or the operator sees any. Once complete, the report says what the source's live facets of
 // its types are and which of them it left absent.
 func (d *Daemon) getSnapshot(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
 	s, ok, err := d.readOps.Snapshot(ctx, r.PathValue("id"))
-	if imp, isImporter := d.importers.of(r); ok && isImporter && imp.Source != s.Source {
+	if who := principalOf(r); ok && who.Role == config.RoleImporter && who.Source != s.Source {
 		ok = false // another importer's run is not this one's to see
 	}
 	switch {

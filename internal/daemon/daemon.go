@@ -28,7 +28,6 @@ import (
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
-	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
@@ -76,12 +75,14 @@ type Options struct {
 
 // Daemon owns the stores. Open it, then Run it; Run closes the stores when it returns.
 type Daemon struct {
-	cfg     config.Config
-	opts    Options
-	token   []byte
-	started string
-	writes  Stores
-	read    *ledger.Ledger
+	cfg  config.Config
+	opts Options
+	// tokenless is a daemon with no token_file: on loopback, and every request the
+	// operator's that presents no principal's token.
+	tokenless bool
+	started   string
+	writes    Stores
+	read      *ledger.Ledger
 	// readOps is a read-only handle on the operational store, so the routes that only
 	// read it cannot write it.
 	readOps *ops.DB
@@ -91,10 +92,10 @@ type Daemon struct {
 	index indexState
 	// sources is what the daemon has seen of each importer since it started.
 	sources *sources
-	// importers are who may post envelopes and Definitions; defs is what their
-	// envelopes are admitted against.
-	importers importers
-	defs      *definitions
+	// principals are who may call the daemon, each with a role; defs is what
+	// importers' envelopes are admitted against.
+	principals principals
+	defs       *definitions
 	// projections are the templates reads select from and receipts verify against:
 	// bundled, and those the operator registered (card 125).
 	projections *projections
@@ -134,7 +135,7 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 	if err != nil {
 		return nil, err
 	}
-	imps, err := loadImporters(cfg.ImportersFile, tok)
+	whom, err := loadPrincipals(cfg.ImportersFile, tok)
 	if err != nil {
 		return nil, err
 	}
@@ -202,14 +203,14 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 	return &Daemon{
 		cfg:         cfg,
 		opts:        opts,
-		token:       tok,
+		tokenless:   tok == nil,
 		started:     clock.Format(time.Now()),
 		writes:      Stores{Ledger: w, Ops: db},
 		read:        r,
 		readOps:     readOps,
 		artifacts:   artifacts,
 		sources:     newSources(),
-		importers:   imps,
+		principals:  whom,
 		defs:        defs,
 		projections: projs,
 		mints:       make(chan struct{}, 1),
@@ -263,30 +264,14 @@ func (s *indexState) wrong() error {
 	return s.err
 }
 
-// Handler is the daemon's routes: /healthz open to all, and behind the token the /v1
-// API and the inspector on everything else.
+// Handler is the daemon's routes: /healthz open to all, and every other route
+// behind a token whose role the route admits (routes).
 func (d *Daemon) Handler() http.Handler {
-	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
-	inner := http.NewServeMux()
-	d.routes(inner)
-	inner.Handle("/", inspect.Handler(inspect.Deps{
-		Ledger: d.read, Timeout: d.cfg.Timeout, Buckets: buckets, Library: d.cfg.LibraryDir,
-		Definitions: d.defs.current.Load, Held: d.heldDefinitions, Checkpoints: d.readOps,
-		Projections: d.projections.current.Load, CachedReads: d.cfg.InspectCachedReads,
-	}))
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", d.healthz)
-	// The importer routes sit outside the operator's token: an importer's token
-	// opens these and nothing else.
-	mux.Handle("POST /v1/envelopes", d.asImporter(d.postEnvelopes))
-	mux.Handle("POST /v1/definitions", d.asImporter(d.postDefinitions))
-	mux.Handle("POST /v1/documents", d.asImporter(d.postDocument))
-	mux.Handle("GET /v1/definitions", d.asReader(d.getDefinitions))
-	mux.Handle("GET /v1/definitions/{type}", d.asReader(d.getDefinition))
-	mux.Handle("GET /v1/definitions/{type}/{version}", d.asReader(d.getDefinition))
-	mux.Handle("GET /v1/snapshots/{id}", d.asReader(d.getSnapshot))
-	mux.Handle("/", d.authorize(inner))
+	for _, rt := range d.routes() {
+		mux.Handle(rt.pattern, d.admit(rt.roles, rt.handler))
+	}
 	// Before the token: a browser on another site is refused whatever credential it
 	// carries, since a cached one is exactly what it would spend (card 108).
 	return d.browserGuard(mux)

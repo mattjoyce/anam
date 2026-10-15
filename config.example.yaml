@@ -78,6 +78,11 @@ listen: 127.0.0.1:8787
 #     - source: withings
 #       token_sha256: <printf %s "$token" | sha256sum>
 #       types: [health.weight]
+# The same file names other principals, each with a role (docs/API.md §2):
+#   principals:
+#     - name: assistant
+#       role: reader
+#       token_sha256: <printf %s "$token" | sha256sum>
 # importers_file: ~/.config/anam/importers.yaml
 
 # Bounds one long write inside the daemon: an index replay, a backup, the mint at

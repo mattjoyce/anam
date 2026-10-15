@@ -20,7 +20,7 @@ var ErrForeignOrigin = errors.New("daemon: request comes from a browser on anoth
 // CLI, importers, curl) carry no Origin and no Sec-Fetch-Site, and pass; the
 // inspector's own forms are same-origin, and pass; anything cross-site is 403.
 func (d *Daemon) browserGuard(next http.Handler) http.Handler {
-	tokenless := d.token == nil
+	tokenless := d.tokenless
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := foreignBrowserRequest(r, tokenless); err != nil {
 			writeError(w, http.StatusForbidden, err)

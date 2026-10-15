@@ -40,7 +40,7 @@ func TestPostProjections(t *testing.T) {
 	post(strings.Replace(weightsV1, `"endorsed"`, `"admitted"`, 1), http.StatusConflict)                       // another body at v1
 	post(strings.Replace(weightsV1, `"health.weight"`, `"health.nothing"`, 1), http.StatusUnprocessableEntity) // no Definition
 	post(`{"name": "weights"}`, http.StatusUnprocessableEntity)                                                // not a template
-	call(t, "POST", url+"/v1/projections", importerToken, weightsV1, http.StatusUnauthorized, nil)             // not the operator's
+	call(t, "POST", url+"/v1/projections", importerToken, weightsV1, http.StatusForbidden, nil)                // not the operator's
 	// The bundled bp again is unchanged; bp v2 over it is new, and v1 stays held.
 	bp, _ := d.projections.bundled.Lookup("bp")
 	if r := post(string(bp.Body), http.StatusOK); r.New {

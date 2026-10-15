@@ -61,7 +61,7 @@ func refuseDeclared(cmd *cobra.Command, cfg config.Config, source string) error 
 	if err != nil {
 		return err
 	}
-	importers, err := config.LoadImporters(cfg.ImportersFile, reg.Has)
+	importers, err := config.LoadPrincipals(cfg.ImportersFile, reg.Has)
 	if err != nil {
 		return err
 	}

@@ -1,31 +1,112 @@
 package daemon
 
 import (
-	"crypto/subtle"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"net/http"
+	"slices"
 	"strings"
+
+	"github.com/mattjoyce/anam/internal/config"
+	"github.com/mattjoyce/anam/internal/def"
 )
 
-// authorize lets a request through when it presents the token, as a bearer token or
-// as a basic-auth password (any user name). Basic is accepted so a browser can open
-// the inspector: it prompts for it, and it cannot send a bearer header. With no token
-// configured everything passes, which Open allows only on loopback.
-func (d *Daemon) authorize(next http.Handler) http.Handler {
-	if d.token == nil {
-		return next
+// principals are the clients the daemon admits, by the hex SHA-256 of their token:
+// the operator from token_file, and everyone the importers file names. The daemon
+// never holds a client's token.
+type principals map[string]config.Principal
+
+// loadPrincipals reads the importers file at path, and adds the operator whose token
+// is operator, when there is one. A principal in the file with the operator's token
+// is refused: that token would both run the daemon and act as the principal.
+func loadPrincipals(path string, operator []byte) (principals, error) {
+	out := principals{}
+	if operator != nil {
+		out[hashOf(operator)] = config.Principal{Name: config.OperatorName, Role: config.RoleOperator}
 	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if subtle.ConstantTimeCompare(presented(r), d.token) != 1 {
-			w.Header().Set("WWW-Authenticate", `Basic realm="anam"`)
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
+	if path == "" {
+		return out, nil
+	}
+	reg, err := def.Bundled()
+	if err != nil {
+		return nil, fmt.Errorf("daemon: %w", err)
+	}
+	list, err := config.LoadPrincipals(path, reg.Has)
+	if err != nil {
+		return nil, fmt.Errorf("daemon: %w", err)
+	}
+	for _, p := range list {
+		if _, taken := out[p.TokenSHA256]; taken {
+			return nil, fmt.Errorf("daemon: %w: %s has the operator's token", config.ErrInvalidImporters, p.Name)
 		}
-		next.ServeHTTP(w, r)
+		out[p.TokenSHA256] = p
+	}
+	return out, nil
+}
+
+func hashOf(token []byte) string {
+	sum := sha256.Sum256(token)
+	return hex.EncodeToString(sum[:])
+}
+
+// who is the principal whose token the request presents. A map lookup by the token's
+// hash leaks nothing an attacker could use: matching a hash means knowing a preimage.
+// Without a token_file the daemon is on loopback and a request with no known token
+// is the operator's.
+func (d *Daemon) who(r *http.Request) (config.Principal, bool) {
+	if p := presented(r); len(p) > 0 {
+		if who, ok := d.principals[hashOf(p)]; ok {
+			return who, true
+		}
+	}
+	if d.tokenless {
+		return config.Principal{Name: config.OperatorName, Role: config.RoleOperator}, true
+	}
+	return config.Principal{}, false
+}
+
+// admit lets a request through when its principal holds one of roles, with the
+// principal in its context: 401 for no token or one the daemon does not know, 403
+// for a token whose role the route does not admit.
+func (d *Daemon) admit(roles []config.Role, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		who, ok := d.who(r)
+		switch {
+		case !ok:
+			// Basic, so a browser opening the inspector prompts for the token.
+			w.Header().Set("WWW-Authenticate", `Basic realm="anam"`)
+			writeError(w, http.StatusUnauthorized, fmt.Errorf("unauthorized"))
+		case !slices.Contains(roles, who.Role):
+			writeError(w, http.StatusForbidden, fmt.Errorf("%s holds role %s, and %s %s admits %s",
+				who.Name, who.Role, r.Method, r.URL.Path, rolesText(roles)))
+		default:
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), principalKey{}, who)))
+		}
 	})
 }
 
+func rolesText(roles []config.Role) string {
+	s := make([]string, len(roles))
+	for i, r := range roles {
+		s[i] = string(r)
+	}
+	return strings.Join(s, " or ")
+}
+
+type principalKey struct{}
+
+// principalOf is the principal admit let through.
+func principalOf(r *http.Request) config.Principal {
+	p, _ := r.Context().Value(principalKey{}).(config.Principal)
+	return p
+}
+
+// presented is the token a request carries, as a bearer token or as a basic-auth
+// password (any user name). Basic is accepted so a browser can open the inspector:
+// it prompts for it, and it cannot send a bearer header.
 func presented(r *http.Request) []byte {
 	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, "Bearer ") {
 		return []byte(strings.TrimPrefix(h, "Bearer "))

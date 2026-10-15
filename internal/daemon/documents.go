@@ -37,7 +37,7 @@ var (
 // again are unchanged, and other bytes are another file: a stored document is never
 // overwritten. Where in the library it sits is the library's own business.
 func (d *Daemon) postDocument(w http.ResponseWriter, r *http.Request) {
-	imp := importerOf(r)
+	imp := principalOf(r)
 	if !mayWrite(imp, docType) {
 		writeError(w, http.StatusForbidden, fmt.Errorf("%s may not submit %s, so may not store documents", imp.Source, docType))
 		return

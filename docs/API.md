@@ -143,6 +143,26 @@ The server is configured for one person. Caller requests cannot choose a differe
 path, a source directory, or an arbitrary executable. Operation context carries the authenticated
 actor, allowed capabilities, configured zone, deadline, and request ID; those are not model claims.
 
+### Principals and roles (card 89)
+
+Every caller is a principal: a name, a role, and the SHA-256 of its token. The daemon holds the
+hashes and never a token. The operator is the principal whose token is in `token_file`, named
+`operator`. Everyone else is listed in `importers_file`, under `principals` with a name and a role,
+or under `importers`, the file's first shape, where each entry is an importer named for its source.
+
+| Role | Opens |
+|---|---|
+| `reader` | Every read: status, timeline, changes, receipts and their verification, projections, checkpoints, Definitions, snapshots. Publishing a read (`POST /v1/receipts`), which writes artifacts and never the ledger |
+| `importer` | A reader's routes, and envelopes, documents and Definition registration, as its one source and for its types only. It sees only its own source's snapshots |
+| `operator` | A reader's routes, and minting, backups, projection templates and the inspector. It submits nothing, since it is no source |
+
+A route names the roles it admits, in one table (`internal/daemon/api.go`), and a test sends a
+token of each role to every route. No token, or one the daemon does not know, is 401; a token whose
+role the route does not admit is 403, and the refusal names the principal, its role and the roles
+the route admits. Without a `token_file` the daemon listens on loopback only, and a request that
+presents no principal's token is the operator's. Roles are the floor of access control: a reader
+narrowed to some projections is later work, not a role.
+
 ## 3. Common contracts
 
 ### Identity and time
@@ -477,6 +497,10 @@ an automated route that admits model guesses as user assertions.
 
 These are application operations, mostly exposed through an operator CLI or a separately enabled
 operator profile of a client. A conversational client does not offer them by default.
+
+Over the service API these are the `operator` role's (§2, Principals and roles). A `reader` or an
+`importer` token reaches the reads in this table (status, checkpoints, receipts) and nothing that
+runs the daemon.
 
 | Concern | Operations | Required result/constraint |
 |---|---|---|

@@ -40,7 +40,7 @@ func (d *Daemon) retryAfter() string {
 // is the source of every envelope and may submit only its own types: the gate's
 // authenticated pillar holds it to them.
 func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
-	imp := importerOf(r)
+	imp := principalOf(r)
 	envs, snap, err := decodeSubmission(w, r, imp, d.cfg.Limits)
 	if err != nil {
 		var tooLarge *http.MaxBytesError
@@ -131,7 +131,7 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 // value or garbage behind a valid batch is refused (400) and a body over
 // maxSubmission is refused (413) however the excess is spread. The server's
 // ReadTimeout bounds the read; a client that stalls is cut off there (card 109).
-func decodeSubmission(w http.ResponseWriter, r *http.Request, imp config.Importer, limits config.Limits,
+func decodeSubmission(w http.ResponseWriter, r *http.Request, imp config.Principal, limits config.Limits,
 ) ([]facet.Envelope, *api.SnapshotPart, error) {
 	source := imp.Source
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxSubmission(limits.MaxPayloadBytes)))

@@ -1,7 +1,7 @@
 ---
 type: journal
 date: 2026-10-15
-tags: [anam, journal, conversation, notes, config, journal-backfill]
+tags: [anam, journal, conversation, notes, config, journal-backfill, auth, rbac]
 ---
 
 # 15 October: words first, then what a model makes of them
@@ -100,6 +100,31 @@ The save also showed a gap. Those words were said on 14 October and the note is 
 11:49, the moment of saving, because a new note always takes the present and a correction keeps the
 note's time. Card 162 lets a save say when the words were said.
 
+## Card 89: tokens carry roles
+
+The note token made a gap concrete. The adapter read with the operator's token and saved with the
+`conversation` importer's, because an importer could not read and the operator could not submit.
+Card 89 had been reshaped on 11 October from "a token that can only read" into role-based tokens,
+and it went in the same afternoon. Every token now names a principal with a role, `reader`,
+`importer` or `operator`, and one route table names the roles each route admits
+([[a-token-names-a-principal-and-a-route-names-its-roles]]). An importer reads as a reader does,
+so one token can carry a conversation. The operator's token is held as a hash like the others, and
+the live importers file reads unchanged, with readers going under a new `principals` key.
+
+A test sends each role's token to all 22 routes. Since the table is the only way a route is
+registered, nothing escapes it. Importers changed in two places. They read where they were refused
+(200, was 401), and the operator's routes now refuse them with 403 rather than 401.
+
+Running the anam-importers suite against the branch gave one error. The same build of master gave
+the same error: the records cut-over test still calls `anam ingest --imports`, which card 119
+removed. Card 164 retires it. Merged as 9f9a317; deploying it is ThinkPad.unraid's.
+
+**Hickey.** Three wrappers that each decided access their own way became one middleware and a
+table. What stays braided is a name: `importers_file` now holds readers too.
+
+**Armstrong.** A malformed file stops the daemon at start with the reason. An unknown token is
+refused before any handler runs. No write path changed, so the gate and the ledger are untouched.
+
 ## Left open
 
 - Cards 162, dating a note when the words were said, and the MCP server's registration in a Claude
@@ -108,3 +133,6 @@ note's time. Card 162 lets a save say when the words were said.
   record), and re-reading corrected words. The source's name, `interpretation`, is still to confirm.
 - Card 141's unraid half, and the two rebuild questions in `docs/IMPORTERS.md` §6.
 - Card 156, the `ingest_timeout` rename.
+- Card 89 live: the deploy, a reader principal registered, and the adapter moved off the
+  operator's token, onto a reader token or onto the conversation importer's token alone.
+- Card 164, the stale records cut-over test in anam-importers.

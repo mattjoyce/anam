@@ -50,7 +50,7 @@ and `withings`.
 The blood-pressure CSV sent over LocalSend in the first session **was never persisted**; it is nowhere
 under `/home/matt` or `/mnt`. It must be re-sent, and this time committed to `testdata/` so it survives.
 
-It blocks the `health.blood-pressure` capture worker and the demo's 2026-01-24 "No filodipine" reading.
+It blocks the `health.blood-pressure` capture worker and the demo's 2026-01-24 "Before breakfast" reading.
 
 **It has no substitute.** `bp_systolic` and `bp_diastolic` do exist inside `healthdata.db`'s `heart`
 group (88 rows each, back to 2024-01-01) — but only as *period summaries*, not per-reading rows, and

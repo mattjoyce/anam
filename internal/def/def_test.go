@@ -46,7 +46,7 @@ var verbatimManifest = bpManifest[:strings.Index(bpManifest, `,
 const bpPayload = `{
   "measured_at": "2026-01-24T06:30:00Z",
   "systolic": 118, "diastolic": 76, "pulse": 61,
-  "position": "sitting", "comment": "No filodipine"
+  "position": "sitting", "comment": "Before breakfast"
 }`
 
 func mustParse(t *testing.T, manifest string) def.Definition {

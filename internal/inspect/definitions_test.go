@@ -136,7 +136,7 @@ func TestFacet_LinksToItsAdmittedDefinition(t *testing.T) {
 		`href="/definition?type=health.blood-pressure&amp;v=1"`,
 		` is current</a>`,
 		`<span class="j-key">&#34;systolic&#34;</span>`,
-		`<span class="j-str">&#34;No filodipine&#34;</span>`,
+		`<span class="j-str">&#34;Before breakfast&#34;</span>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("facet page lacks %q", want)

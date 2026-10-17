@@ -106,7 +106,7 @@ func TestAdmit_RoundTripsByteIdentical(t *testing.T) {
 	l := newLedger(t)
 	ctx := context.Background()
 
-	payload := `{"systolic": 118, "diastolic": 76, "pulse": 61, "comment": "No filodipine"}`
+	payload := `{"systolic": 118, "diastolic": 76, "pulse": 61, "comment": "Before breakfast"}`
 	f := testFacet(t, "bp-csv:2026-01-24T06:30:00", payload, 1)
 
 	if err := l.Admit(ctx, 0, f, admittedEvent(f, 1)); err != nil {

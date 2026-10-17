@@ -44,7 +44,7 @@ func seededServer(t *testing.T) (*httptest.Server, string, string) {
 	t.Cleanup(func() { _ = l.Close() })
 
 	bp := seedFacet(t, "bp-csv:2026-01-24T06:30:00", "health.blood-pressure",
-		`{"systolic": 118, "diastolic": 76, "comment": "No filodipine"}`)
+		`{"systolic": 118, "diastolic": 76, "comment": "Before breakfast"}`)
 	if err := l.Admit(ctx, 0, bp, event(facet.EventAdmitted, bp, 1)); err != nil {
 		t.Fatalf("Admit bp: %v", err)
 	}
@@ -226,7 +226,7 @@ func TestFacetPage_ShowsVerbatimPayloadAndItsEvents(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("GET /facet = %d", code)
 	}
-	for _, want := range []string{"No filodipine", "sha256:", "bp-csv:2026-01-24T06:30:00", "admitted"} {
+	for _, want := range []string{"Before breakfast", "sha256:", "bp-csv:2026-01-24T06:30:00", "admitted"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("facet page missing %q", want)
 		}

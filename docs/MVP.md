@@ -198,10 +198,9 @@ A whole-person read that exercises every moving part:
 1. `health.body-composition` (Withings, monthly) — weight/fat/muscle trend enters the timeline.
 2. `health.heart-rate` (Garmin) — resting HR / stress snapshot.
 3. `health.sleep` (Garmin) — sleep-stage breakdown.
-4. `health.blood-pressure` (bp-csv) — a morning triplet on 2026-01-24 with comment `"No filodipine"`
-   (medication-adherence signal), placed at its reading time.
-5. `health.insight` (derived, `proposed`) — "resting HR ran higher across the week you skipped
-   medication" — visible, endorsable, no write-back.
+4. `health.blood-pressure` (bp-csv) — a morning triplet on 2026-01-24 with a free-text comment
+   (`"Before breakfast"`), placed at its reading time.
+5. `health.insight` (derived, `proposed`) — "resting HR ran higher across the week of the short sleeps" — visible, endorsable, no write-back.
 
 The `bp` projection prunes to blood-pressure facets; `changes_since` shows the latest ingest and the
 insight; a receipt pins exactly what was served at the checkpoint watermark. Re-running `ingest bp`

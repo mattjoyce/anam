@@ -68,7 +68,7 @@ func bpEnvelope(payload string) facet.Envelope {
 	}
 }
 
-const bpPayload = `{"measured_at": "2026-01-24T06:30:00Z", "systolic": 118, "diastolic": 76, "comment": "No filodipine"}`
+const bpPayload = `{"measured_at": "2026-01-24T06:30:00Z", "systolic": 118, "diastolic": 76, "comment": "Before breakfast"}`
 
 func TestResolve_TheThreeAssuranceArms(t *testing.T) {
 	t.Parallel()

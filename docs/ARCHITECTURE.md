@@ -3,9 +3,7 @@
 > The technical design of Anam: the model, the contracts, and the mechanics. Companion to
 > `PRFAQ.md` (what and why) and `GLOSSARY.md` (the shared language).
 >
-> Anam is a re-instantiation of **Arch** (`/mnt/Projects/Arch/docs/ARCHITECTURE.md`) — the same
-> machinery, **one decision inverted**. Where this document is silent, Arch governs; where it speaks,
-> it speaks because Anam differs.
+> Where Anam came from is in `HISTORY.md`. Nothing here depends on it.
 
 ---
 
@@ -27,13 +25,8 @@ findings — is operational record, backed up, never authoritative.
 
 ### Say the rest of it honestly
 
-Arch's ADR 0035 aims that invariant back at us, and it lands:
-
-> *"'Owns no facts, rebuildable from source' stays literally true under either grain — but under
-> Person-grain it stops being the whole truth: the cross-episode continuity and identity linkage exist
-> **nowhere else**."*
-
-True. Every *fact* rebuilds; the **continuity does not**. The composed, ordered, whole-life account is
+The invariant above is true, and it is not the whole truth. Every *fact* rebuilds; the **continuity
+does not**. The composed, ordered, whole-life account is
 assembled by Anam and exists nowhere upstream. Anam is therefore not weightless, and pretending otherwise
 would be the lie that lets a context product quietly become a system of record.
 
@@ -42,16 +35,12 @@ So state it plainly: **Anam owns no fact, and Anam owns the continuity.** The co
 while Anam is switched off. That is the whole product, and it is why the ledger's order, its watermarks
 and its checkpoints are backed up rather than assumed rebuildable.
 
-### The one inversion (read this before anything else)
+### The whole-person read (read this before anything else)
 
-Arch's keystone is **ADR 0035**: *"The Episode is the unit — of storage, cost, completeness, and the
-checkpoint span. The Person is a thin identity index."* Arch deliberately **demoted Person from
-substrate to index**, reversing its own earlier person-centric pivot, on the grounds that a person is
-unbounded, a life has no edges, and *"longitudinal is system-of-record gravity."*
-
-**Anam inverts exactly that.** A personal soul-record *wants* to be longitudinal, so Anam re-promotes
-the Person to substrate and accepts the gravity — knowingly, at the scale of one life, where the cost
-Arch could not pay across a jurisdiction is affordable.
+A person is unbounded and a life has no edges, so a store of one is pulled toward being a system of
+record: *longitudinal is system-of-record gravity.* A personal record *wants* to be longitudinal, so
+Anam makes the Person the substrate and accepts the gravity, knowingly, at the scale of one life,
+where the cost is affordable.
 
 > **The whole-person timeline read is Anam's default and normal mode.**
 
@@ -59,16 +48,15 @@ Two things follow that are easy to conflate, and must not be:
 
 - **The read default is unbounded.** No span is required to read; a Span is an *optional derived lens*
   (a trip, an illness, a training block) you impose to focus.
-- **The mint unit is bounded.** Minting is **per span**, never whole-life (Arch ADR 0033). Anam's
+- **The mint unit is bounded.** Minting is **per span**, never whole-life. Anam's
   default mintable span is a **time bucket** (§7). The lifelong view **composes** bucket checkpoints; it
   never re-folds the person.
 
-Anam's earlier reasoning — *"there is no required span, therefore the mint unit is the whole timeline"* —
-was a conflation of these two, and is retracted. Removing the span as a **required read filter** never
-required removing it as a **mint unit**.
+*"There is no required span, therefore the mint unit is the whole timeline"* is a conflation of the
+two. Removing the span as a **required read filter** never required removing it as a **mint unit**.
 
-Everything else in Arch — the Facet, the ledger, the two clocks, the admission gate, mint, fold, and
-projections — carries over. The rest of this document is that machinery, re-grained to the person.
+The rest of this document is the machinery: the Facet, the ledger, the two clocks, the admission gate,
+mint, fold, and projections.
 
 ---
 
@@ -105,7 +93,7 @@ everything served upward.
 ## 3. The Facet — the atomic unit
 
 The atomic unit Anam captures and governs is the **Facet**: a captured source fragment *plus its
-governing metadata* — deliberately **not** a normalised domain entity. Three parts (Arch §3):
+governing metadata* — deliberately **not** a normalised domain entity. Three parts:
 
 - **(a) Attributes about itself** — `id`; `type`; `confidence`; `classification`
   (`Normal`/`Confidential`/`Sensitive`); `artifact_version`; `definition_version`;
@@ -160,14 +148,14 @@ fact-times or finer access control earn the cut. Facet types are **dotted and na
 Storage is **partitioned by the person**: a ledger file is pinned to one `person_id`, and all their
 facets are co-located on one **timeline**, in **fact-time** order. The person is the **substrate**.
 
-**Access is the person timeline, read whole by default.** This is the inversion. Unlike Arch, there is
-no required span filter and no fail-closed on a whole-person read — a longitudinal record is the point.
+**Access is the person timeline, read whole by default.** There is no required
+span filter and no fail-closed on a whole-person read — a longitudinal record is the point.
 A read is "my facts, in time order," optionally narrowed.
 
 ### Two kinds of Span, and they are not the same thing
 
-Conflating these produced the whole-timeline mint that §1 retracts. Anam has **two span tiers**
-(Arch ADR 0033, minus the inherited tier — Anam has no System of Record to inherit boundaries from):
+Conflating these would produce a whole-timeline mint, which §1 rules out. Anam has **two span tiers**
+(and no tier inherited from a System of Record, since it has none):
 
 | Tier | What it is | Minted? |
 |---|---|---|
@@ -178,8 +166,7 @@ A derived span is a **lens**, not a unit of consistency: composed on demand, nev
 pulsed. A saved bookmark (`span#<id>`) is a stored *query*, nothing more. The whole-life span is
 expressible and of limited use — a life is what you compose, not what you mint.
 
-Because there is one person, there is **no identity graph and no merge** — Arch's linkage machinery is
-dropped entirely.
+Because there is one person, there is **no identity graph and no merge**.
 
 What keeps a person-partitioned, longitudinally-read store honest is **not** a span filter (Anam removed
 that) but the invariant of §1: **Anam owns no source fact; every payload is verbatim-from-source and
@@ -301,7 +288,7 @@ sound. `changes_since` is built from anam-time (§9).
 
 ## 6. The admission gate — the only ingress
 
-Nothing enters the ledger except through the gate, which enforces **three pillars** (Arch §7),
+Nothing enters the ledger except through the gate, which enforces **three pillars**,
 simplified for a single person but kept in shape:
 
 1. **Facet-compliant** — the payload meets its Facet Definition (schema, envelope, time semantics,
@@ -349,10 +336,9 @@ The gate is exposed as two calls:
 - **Retraction is a tombstone** — a `tombstoned` **anam-event** against the current artifact version.
   Never a delete, and never a new artifact. It advances `W` like any other mutation (§7).
 
-  > Arch writes a tombstone as a *status-bearing artifact version* (ADR 0030), and Anam inherited the
-  > sentence. It cannot be true here: Anam folds status out of the artifact (§3, §12), so there is
-  > nowhere to put one — a Facet has no status field of any kind. The status transition *is* the whole
-  > event. Corrected once code had to write one.
+  > A tombstone is not a *status-bearing artifact version*: Anam folds status out of the artifact
+  > (§3, §12), so there is nowhere to put one, and a Facet has no status field of any kind. The status
+  > transition *is* the whole event.
 
 > **Design note (Armstrong).** Because `commit` is idempotent and atomic, an importer may **crash
 > mid-batch and simply be re-run to known-good**. There is no partial facet and no corruption. This — the
@@ -370,10 +356,10 @@ world (the sources are). Everything admitted stays; supersession and tombstoning
 never deletes.
 
 > **Any state = nearest checkpoint + replay of the anam-events since that checkpoint's watermark.**
-> (Arch ADR 0032.) A single indexed range-scan. The current canonical is the head case; a historical
+> A single indexed range-scan. The current canonical is the head case; a historical
 > as-of is the same scan with an upper bound.
 
-### Two surfaces, two names (Arch ADR 0032, MC5)
+### Two surfaces, two names
 
 The word *canonical* names exactly one of these. Anam previously used it for the other; that is corrected
 here.
@@ -422,7 +408,7 @@ read, paid by a range-scan; it is not bought by a periodic tick.
   run. The operational store pins it beside `schema_version` and **refuses a database built at another
   width**; the remedy is the same one a schema bump gets — delete `tracking.db` and re-run `init`. The
   derived tier replays, so that costs time, never a fact.
-- **Anam buckets on fact-time, where Arch buckets on anam-time.** Anam can, and Arch cannot, because
+- **Anam buckets on fact-time, not anam-time.** It can, because
   `facet_id = uuidv5(source_ref)` and `source_ref` is a source row's **identity, not its contents** (§6a):
   a superseding artifact is the same row re-read, so it carries the same `fact_time` and lands in the
   same bucket. **Every version of a logical facet lives in one bucket.** The lifelong view is therefore a
@@ -546,7 +532,7 @@ would pass on data it never rebuilt, and "Anam owns no source fact" would stop b
 
 ### The ledger — datom-shaped, not a datom engine
 
-Following Arch ADR 0031: adopt the datom **shape**, do not build a datom **engine**. Facts are
+Adopt the datom **shape**, do not build a datom **engine**. Facts are
 `[entity attribute value tx]` with `tx` = anam-time; the store supplies sorted indexes, Anam supplies
 the shape and a handful of fixed query forms.
 
@@ -799,8 +785,7 @@ reproducible: `served_hash = sha256(served bytes)` plus the exact facet-id set, 
 template version and its content hash, the definition-set version, the `served_at` time, the span, and the `ledger_id` the
 watermark counts in (since 2026-10-07; a watermark means nothing against another ledger, so `receipt
 verify` on a rebuilt ledger reports *other ledger*, never a failed reproduction, and a receipt from
-before the field is verified with a note). (Arch's consent-version and linkage-version drop out — no
-consent gating, no identity graph.)
+before the field is verified with a note).
 
 Receipts are also where **publication** is recorded. A facet's published time (§5) is the earliest
 `served_at` over the receipts naming it; there is no `published` anam-event, because being shown is not

@@ -11,7 +11,7 @@ tested_by:
   - internal/store/ledger/ledger_test.go#TestMark_TombstoneAdvancesWatermarkWithoutArtifact
   - internal/gate/gate_test.go#TestCommit_AdmitNoopSupersedeRetract
 alternatives:
-  - Arch's tombstone, a status-bearing artifact version (inherited in a sentence, then found impossible once code had to write one, since status is folded out of the artifact)
+  - A tombstone as a status-bearing artifact version (impossible here, since status is folded out of the artifact)
   - A delete (refused everywhere; the triggers forbid it)
 affects:
   - /components/gate.md
@@ -20,7 +20,7 @@ affects:
   - /invariants/status-is-derived-never-stored.md
 ---
 
-**Context.** Anam folds status out of the artifact. Arch writes a tombstone as a status-bearing artifact version, and Anam inherited the sentence.
+**Context.** Anam folds status out of the artifact. A tombstone as a status-bearing artifact version has nowhere to put the status.
 
 **Choice.** The ledger's primitive is two calls, not one with an optional artifact: `AdmitBatch` writes artifacts with their events, `Mark` writes an event alone. The status transition is the whole event. It advances W like any mutation, so a checkpoint cannot reuse a value that still lists a retracted facet.
 

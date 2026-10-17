@@ -19,4 +19,4 @@ tested_by:
   - internal/mint/mint_test.go#TestCompose_MatchesTheFoldOverARange
 ---
 
-ARCHITECTURE §12, third bullet, second half; Arch ADR 0033. The read default is unbounded and the mint unit is bounded, and the two must not be conflated: Anam once reasoned "no required span, therefore the mint unit is the whole timeline" and retracted it. `settle` only ever hashes and writes one bucket's entries; there is no code path that writes a whole-person checkpoint.
+ARCHITECTURE §12, third bullet, second half. The read default is unbounded and the mint unit is bounded, and the two must not be conflated: Anam once reasoned "no required span, therefore the mint unit is the whole timeline"; it does not hold. `settle` only ever hashes and writes one bucket's entries; there is no code path that writes a whole-person checkpoint.

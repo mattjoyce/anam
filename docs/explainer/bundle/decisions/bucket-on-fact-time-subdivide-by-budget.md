@@ -11,7 +11,7 @@ tested_by:
   - internal/mint/read_test.go#TestSubdivision_SplitsByBytesAndReadsAreStillTheFold
   - internal/mint/mint_test.go#TestRun_FactTimeMovesBetweenBuckets
 alternatives:
-  - Bucket on anam-time as Arch does (not possible here; Anam can bucket on fact-time only because a superseding artifact is the same row re-read, so every version of a facet lands in one bucket)
+  - Bucket on anam-time (not possible here; Anam can bucket on fact-time only because a superseding artifact is the same row re-read, so every version of a facet lands in one bucket)
   - A fixed width only, narrowed by hand as density rises (kept as checkpoint_budget 0; the measured worst bucket was 744 facets, and Garmin's monitoring tables would put 73,000 in one month)
 affects:
   - /components/span.md

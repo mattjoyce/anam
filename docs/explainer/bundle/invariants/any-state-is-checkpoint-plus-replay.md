@@ -20,4 +20,4 @@ tested_by:
   - internal/serve/compose_test.go#TestRun_ComposedFromTheLastRunIsTheFullFold
 ---
 
-ARCHITECTURE §7, Arch ADR 0032: a single indexed range scan. The current canonical is the head case; an as-of is the same scan with an upper bound. The guard that keeps it true is `startingRun`: a composed read refuses to start from a log that is unpinned, unsealed, has no run at or below W, or holds ids the layout cannot subdivide, and folds in full instead. So the composed path can be wrong only if the full fold is.
+ARCHITECTURE §7: a single indexed range scan. The current canonical is the head case; an as-of is the same scan with an upper bound. The guard that keeps it true is `startingRun`: a composed read refuses to start from a log that is unpinned, unsealed, has no run at or below W, or holds ids the layout cannot subdivide, and folds in full instead. So the composed path can be wrong only if the full fold is.

@@ -50,6 +50,7 @@ Extensible to "all sorts of facets" later — `calendar.event`, `mail.thread`, `
 - [`docs/SELF-LOG.md`](docs/SELF-LOG.md) — the next sources: the self-log, documents as references, and the snapshot read.
 - [`docs/INBOX.md`](docs/INBOX.md) — the runbook: from a dropped document to facts in the ledger.
 - [`docs/IMPORTERS.md`](docs/IMPORTERS.md) — proposal: sources outside Anam, as ductile plugins shaped by Definitions.
+- [`docs/HISTORY.md`](docs/HISTORY.md) — where Anam came from; optional reading.
 - [`AGENTS.md`](AGENTS.md) — engineering standards and the guiding design lens.
 
 ## Quick start

@@ -40,12 +40,10 @@ immutability, and receipts. It can tell you not only "what is my blood pressure"
 about my blood pressure on this date, and where did each reading come from." Health is simply the first
 kind of facet; calendar, mail, and notes are the same shape.
 
-**Where does Anam sit relative to Arch?**
-Anam is a re-instantiation of **Arch**, Matt's person-centric clinical context architecture, with **one
-decision inverted.** Arch deliberately *refuses* to be a longitudinal record — every read is scoped to a
-bounded episode, so it can never become a system of record for a whole life. Anam wants the opposite:
-the **whole-person timeline is the default read.** Everything else — the Facet, the append-only ledger,
-the admission gate, the two clocks, minting, projections, receipts — carries straight over.
+**Is it a record of episodes, like an admission or a trip?**
+No. The **whole-person timeline is the default read**, and an episode is an optional lens over it. The
+pieces are the Facet, the append-only ledger, the admission gate, the two clocks, minting, projections
+and receipts.
 
 **Does Anam become a second copy of my life — a new thing to secure and trust?**
 It holds your source fragments verbatim, so yes, it stores data — but it is **authored, never

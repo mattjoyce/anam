@@ -16,4 +16,4 @@ applies_to:
   - /terms/inversion.md
 ---
 
-ARCHITECTURE §12, third bullet, first half. `anam timeline` with no flags reads the whole canonical; `--from` and `--to` are optional and parsed into an inclusive-exclusive window applied after the value is composed. There is no fail-closed on a whole-person read, unlike Arch. The enforcement is the absence of a required parameter in `TimelineQuery` and the bounds parser treating an empty bound as open.
+ARCHITECTURE §12, third bullet, first half. `anam timeline` with no flags reads the whole canonical; `--from` and `--to` are optional and parsed into an inclusive-exclusive window applied after the value is composed. There is no fail-closed on a whole-person read. The enforcement is the absence of a required parameter in `TimelineQuery` and the bounds parser treating an empty bound as open.

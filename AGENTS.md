@@ -170,8 +170,8 @@ Go, and these rules hold:
 | Env var | UPPER_SNAKE | `ANAM_LEDGER_PATH` |
 
 Facet types are **dotted and namespaced** on purpose — the namespace earns its keep as sources
-multiply (`health.*`, `calendar.*`, `mail.*`, `note.*`). This deviates from Arch's snake_case facet
-names; the deviation is deliberate and lives here so it doesn't drift.
+multiply (`health.*`, `calendar.*`, `mail.*`, `note.*`). Payload keys stay snake_case; the dotted
+facet type is deliberate and lives here so it doesn't drift.
 
 ---
 

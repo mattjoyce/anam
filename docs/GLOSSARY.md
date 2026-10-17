@@ -1,8 +1,7 @@
 # Anam — Glossary
 
-> The shared language. Each term has **one** meaning. Where an Anam term differs from its Arch
-> ancestor, the entry says how. Where a word is deliberately *not* an Anam concept, it says so, so it
-> doesn't creep back in. Companion to `ARCHITECTURE.md`.
+> The shared language. Each term has **one** meaning. Where a word is deliberately *not* an Anam
+> concept, it says so, so it doesn't creep back in. Companion to `ARCHITECTURE.md`.
 
 ---
 
@@ -11,10 +10,7 @@
 **only ingress**. See *Binding*, *Envelope*.
 
 **Anam** — This system: a personal, longitudinal episodic-context store over one person's own sources.
-*anam* is Irish for *soul*. It re-instantiates *Arch* with one decision inverted (see *Inversion*).
-
-**Arch** — The parent architecture (`/mnt/Projects/Arch`): a person-centric, episode-scoped clinical
-context layer. Anam borrows its machinery wholesale and inverts its access default. See *Inversion*.
+*anam* is Irish for *soul*. Its default read is the whole person (see *Whole-person read*).
 
 **Artifact** — A specific version of a Facet's captured body. Re-versioned on a whole re-capture or a
 maturity change. Immutable once written. See *Facet*, *Supersession*.
@@ -53,7 +49,7 @@ effect quietly. See *Span*, *Checkpoint*.
 **Canonical** — The **live-only** fold at a watermark: every Facet whose current status is live.
 Superseded and tombstoned Facets are **excluded from the value** (they remain in the *Ledger*, marked).
 *Canonical* names this value and nothing else. Earlier Anam drafts used the word for the Ledger surface;
-that is corrected (Arch ADR 0032, MC5). See *Ledger*, *Fold*, *Checkpoint*.
+that is corrected. See *Ledger*, *Fold*, *Checkpoint*.
 
 **Capture worker** — The MVP's name for what is now an *importer*: an external, pluggable client that
 reads a source and submits envelopes to the ingest gate. In the MVP: `health-db` and `bp-csv`, compiled
@@ -103,11 +99,10 @@ payload, asserted_person?, span_hint?}`. Left out, `source_ref` is composed by t
 Definition's `identity_key`. The **only ingress**; importers share nothing with the
 ledger except through it. See *Admission gate*.
 
-**Episode** — *Not a first-class Anam concept.* In Arch the Episode is the unit of storage, cost and
-checkpointing (ADR 0035); Anam has **no required read span** and inherits no boundary from any System of
-Record. Anam still mints per span — a *Bucket span* — because bounded minting was never what the Episode
-was for. What Arch calls an Episode, Anam expresses as an optional derived *Span* bookmark. See *Span*,
-*Bucket span*, *Inversion*.
+**Episode** — *Not a first-class Anam concept.* Anam has **no required read span** and inherits no
+boundary from any System of Record. A trip, an illness or a training block is an optional derived *Span*
+bookmark. Anam still mints per span, a *Bucket span*, to bound replay. See *Span*, *Bucket span*,
+*Whole-person read*.
 
 **Error kernel** — Armstrong's term, adopted: Anam's small trusted core that must not corrupt — the
 **append-only ledger plus the admission-gate invariants** (three pillars, idempotency, immutability).
@@ -153,7 +148,7 @@ semantics, linking elements, validation bar, classification. Bundled as embedded
 
 **Facet type** — The kind of a Facet, named **lower-case dotted and namespaced**: `health.sleep`,
 `health.body-composition`, `health.heart-rate`, `health.heart-rate-alert`, `health.blood-pressure`, `health.metric-group` (future:
-`calendar.event`, `mail.thread`, `note.zettel`). Deviates from Arch's snake_case on purpose.
+`calendar.event`, `mail.thread`, `note.zettel`). Dotted on purpose; payload keys are snake_case.
 
 **Fold** — The computation that reads a span's anam-events up to a watermark and derives each Facet's
 **current status**, keeping the live ones — producing the *Canonical*. The serve path is *nearest
@@ -167,12 +162,10 @@ write. What makes ingest **crash-clean**. See *Content hash*, *Supersession*.
 **Insight** — An Anam-authored *derived facet*: a finding computed over the *Canonical* (e.g. a trend),
 admitted `proposed`, isolated from world-facts. See *Derived facet*, *Endorsement*.
 
-**Inversion, the** — The single decision that distinguishes Anam from Arch. Arch's keystone (ADR 0035)
-**demotes the Person from substrate to a thin identity index**, because a person is unbounded and
-"longitudinal is system-of-record gravity". **Anam re-promotes the Person to substrate** and accepts that
-gravity, at the scale of one life where the cost is affordable: the whole-person timeline read is Anam's
-default and normal mode. Anam wants to be the longitudinal record Arch refuses to be. Note what the
-inversion does *not* license: the **read default** is unbounded, the **mint unit** is not. See *Span*.
+**Whole-person read** — Anam's default and normal mode: the whole-person timeline, read without a span.
+A person is unbounded and "longitudinal is system-of-record gravity"; **Anam makes the Person the
+substrate** and accepts that gravity, at the scale of one life where the cost is affordable. Note what
+it does *not* license: the **read default** is unbounded, the **mint unit** is not. See *Span*.
 
 **Ledger** — Anam's **system of record**: the append-only log of everything it admitted, every Facet
 retained and **marked at its current status**, including superseded and tombstoned ones. Facts are
@@ -298,8 +291,8 @@ lose, because ingest is idempotent; a lost cursor is a re-scan, not data loss.
 selects an interval of it. See *Span*, *Event*.
 
 **Tombstone** — A `tombstoned` **anam-event** marking a Facet retracted **without** deleting it. No new
-artifact is written: an Anam artifact has nowhere to carry a status (contrast Arch, whose tombstone *is* a
-status-bearing artifact version). It advances the watermark like any mutation. The Facet stays in the
+artifact is written: an Anam artifact has nowhere to carry a status (a tombstone is not a status-bearing
+artifact version). It advances the watermark like any mutation. The Facet stays in the
 *Ledger* forever, marked; it is absent from the *Canonical* value by construction. See *Ledger*,
 *Canonical*, *Status*.
 

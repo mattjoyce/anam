@@ -18,4 +18,4 @@ tested_by:
   - internal/fold/fold_test.go#TestFold_Liveness
 ---
 
-ARCHITECTURE §12, ninth bullet; Arch ADR 0032, MC5. Anam once used "canonical" for the append-everything surface; that is corrected. A projection over the canonical sees live facets by construction, which is why tombstone visibility is no longer a projection knob: a reader who wants tombstones is asking the ledger a forensic question.
+ARCHITECTURE §12, ninth bullet. Anam once used "canonical" for the append-everything surface; that is corrected. A projection over the canonical sees live facets by construction, which is why tombstone visibility is no longer a projection knob: a reader who wants tombstones is asking the ledger a forensic question.

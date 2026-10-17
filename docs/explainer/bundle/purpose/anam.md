@@ -20,12 +20,6 @@ The repo is the Go service and CLI that own the record. Its sources now arrive t
 
 Matt, as the one person recorded, as the operator who runs the daemon on unraid, and as the author of each importer. Agents acting for him are the second consumer: they read projections and may one day propose findings back through the same gate. There is no second person, so there is no identity graph and no merge.
 
-## Where the theory comes from
-
-Anam re-instantiates **Arch**, a person-centric clinical context architecture, and inverts its one central decision: Arch refuses to be a longitudinal record and scopes every read to a bounded episode; Anam promotes the person to the storage substrate and makes the whole-life read normal ([the inversion](/terms/inversion.md)). Everything else carries over: the Facet, the append-only [ledger](/terms/ledger.md), two clocks, the resolve-then-commit [gate](/components/gate.md), [mint](/terms/mint.md) and [checkpoints](/terms/checkpoint.md), fold-on-read, prune-only [projections](/terms/projection.md), receipts.
-
-The lineage before that matters for reading the importers: Senechal was one system that fetched, stored, summarised and answered; it was cleaved into ductile (when to do things) and a health ETL (what was measured), and Anam succeeds the ETL as the record of what was learned and when. Every drift check in the importer design is a guard against one of those two growing back.
-
 ## What it does not do
 
 - It owns no source fact. Every payload is verbatim from its source and rebuildable; delete Anam and no fact is lost. It does own the continuity, the composed order, which is re-derivable but held nowhere else.

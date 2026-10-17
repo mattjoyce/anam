@@ -26,6 +26,6 @@
 * [Source ref](source-ref.md) - The deterministic natural key saying which source row a facet is, composed from identity fields and never from values.
 * [Status](status.md) - A facet's current state, derived by the fold from anam-events and never stored; distinct from its immutable birth status.
 * [Supersession](supersession.md) - What happens when a source row changes: a new artifact version and a superseded event against the prior, nothing mutated.
-* [The inversion](inversion.md) - The one decision that distinguishes Anam from Arch: the person is the substrate and the whole-life read is the default.
+* [The whole-person read](inversion.md) - The person is the substrate and the whole-life read is the default.
 * [Tombstone](tombstone.md) - A tombstoned anam-event marking a facet retracted without deleting it; never a new artifact.
 * [Watermark](watermark.md) - W, the seq of the newest anam-event; the position every checkpoint and receipt is pinned to.

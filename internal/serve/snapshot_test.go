@@ -7,9 +7,12 @@ import (
 
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
+	"github.com/mattjoyce/anam/internal/consent"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
+	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/gate"
+	"github.com/mattjoyce/anam/internal/receipt"
 	"github.com/mattjoyce/anam/internal/serve"
 )
 
@@ -108,5 +111,64 @@ func TestRun_MedsServesTheSnapshotWithAReceipt(t *testing.T) {
 	bare.Series = nil
 	if _, err := serve.Run(ctx, bare, "meds", true); err == nil {
 		t.Error("Run(meds) without series rules succeeded")
+	}
+}
+
+// The meds template at a past fact-time serves the courses running then, a course
+// stopped after it included, and a receipt for that read verifies (card 172). The
+// template's own snapshot is taken at the bound, not at the head and trimmed after:
+// trimmed, a course closed by now is gone at every date.
+func TestDerive_MedsAtAPastDateKeepsACourseStoppedLater(t *testing.T) {
+	t.Parallel()
+	h := medHarness(t)
+	ctx := context.Background()
+
+	h.med(t, "med.started", "m1", "2024-09-13", "felodipine", 1)
+	h.med(t, "med.stopped", "m2", "2025-12-23", "felodipine", 1)
+	h.med(t, "med.started", "m3", "2024-08-16", "ramipril", 1)
+
+	tmpl, err := h.deps.Templates.Lookup("meds")
+	if err != nil {
+		t.Fatalf("Lookup(meds): %v", err)
+	}
+	head, err := h.l.Head(ctx)
+	if err != nil {
+		t.Fatalf("Head: %v", err)
+	}
+	res, err := fold.ReadAt(ctx, h.l, head)
+	if err != nil {
+		t.Fatalf("ReadAt: %v", err)
+	}
+
+	cases := []struct {
+		at   string
+		want int
+	}{
+		{"2024-01-01T23:59:59.999999999Z", 0}, // before either course
+		{"2025-06-15T23:59:59.999999999Z", 2}, // both running; felodipine stops in December
+		{"2026-10-17T23:59:59.999999999Z", 1}, // felodipine stopped
+	}
+	for _, c := range cases {
+		q := &receipt.Query{At: c.at}
+		v, err := serve.Derive(res.Value, tmpl, consent.Open{}, h.deps.Series, c.at)
+		if err != nil {
+			t.Fatalf("Derive at %s: %v", c.at[:10], err)
+		}
+		if v, err = serve.Narrow(v, q, h.deps.Series); err != nil {
+			t.Fatalf("Narrow at %s: %v", c.at[:10], err)
+		}
+		if v.Len() != c.want {
+			t.Errorf("meds at %s served %d courses, want %d", c.at[:10], v.Len(), c.want)
+		}
+		if c.want == 0 {
+			continue // an empty value has no receipt worth proving
+		}
+		out, err := serve.Publish(ctx, h.deps, tmpl, head, q, v, false)
+		if err != nil {
+			t.Fatalf("Publish at %s: %v", c.at[:10], err)
+		}
+		if _, vr, err := serve.Verify(ctx, h.deps, out.ReceiptHash); err != nil || !vr.OK() {
+			t.Errorf("the receipt at %s did not verify: %v\n%s", c.at[:10], err, vr.Summary())
+		}
 	}
 }

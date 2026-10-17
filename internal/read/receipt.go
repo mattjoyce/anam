@@ -119,8 +119,8 @@ func Publish(ctx context.Context, src Source, d serve.Deps, q api.TimelineQuery,
 	}
 	// The view is the timeline read's own, snapshot included, so the header a reader
 	// sees is the one they would see without publishing. Narrow then takes the
-	// snapshot again, which keeps the same value (a snapshot of a snapshot is itself),
-	// so the published value is Narrow over the template's: the one Verify replays.
+	// snapshot again at the same at, which keeps the same value, so the published
+	// value is Narrow over serve.Derive's: the one Verify replays.
 	v, err := readView(ctx, src, know, q.Projection, at)
 	if err != nil {
 		return api.Published{}, err

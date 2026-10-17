@@ -18,6 +18,7 @@ import (
 	"github.com/mattjoyce/anam/internal/frame"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
+	"github.com/mattjoyce/anam/internal/serve"
 )
 
 // ErrQuery marks a query that cannot be read as asked: a malformed instant, flags
@@ -265,7 +266,7 @@ func readView(ctx context.Context, src Source, know knowledge, projName, at stri
 		if err != nil {
 			return view{}, badQuery(err)
 		}
-		served, err := projection.Apply(res.Value, t, consent.Open{}, defs)
+		served, err := serve.Derive(res.Value, t, consent.Open{}, defs, at)
 		if err != nil {
 			return view{}, err
 		}
@@ -274,8 +275,9 @@ func readView(ctx context.Context, src Source, know knowledge, projName, at stri
 
 	if at != "" {
 		// The snapshot is taken over whatever the lenses above produced: the
-		// canonical, or the served variant. Over a served snapshot shape it is the
-		// same value again, which is the right answer, not a double count.
+		// canonical, or the served variant. A served variant was derived from the
+		// canonical cut at at, so over a snapshot shape this is the same value
+		// again, not a double count.
 		snap, err := fold.Snapshot(v.shown, at, defs.Closes)
 		if err != nil {
 			return view{}, err

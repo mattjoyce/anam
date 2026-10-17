@@ -2,3 +2,9 @@ Anam
 Copyright 2026 Matt Joyce
 
 Licensed under the Apache License, Version 2.0. See LICENSE.
+
+This product bundles the IEEE 1752.1 JSON schemas under
+internal/def/conformance/ieee-1752/, copied unchanged from
+https://opensource.ieee.org/omh/1752 (schemas/physical_activity and
+schemas/utility, commit 7000803a101d), which is licensed under the
+Apache License, Version 2.0.

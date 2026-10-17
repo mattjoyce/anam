@@ -2,16 +2,17 @@
 
 > *anam* — Irish for *soul*.
 
-A personal, longitudinal **episodic-context store** about one person. Anam takes the
-[Arch](../Arch) architecture doctrine — a person-centric, append-only, evidence-backed context layer —
-and **inverts its one central decision** to serve a person rather than a hospital episode.
+A personal, longitudinal **episodic-context store** about one person. It is one person's
+record of their own life (health, documents, places, notes) held as immutable facts, with the
+present state derived from them. This is a personal project, published so others can read it and
+borrow from it. The sources, units and time zone in the examples are the author's.
 
-- **Arch** person-partitions storage but makes every read *filtered by an Episode span (default &
-  required)*, so it can never become a longitudinal record.
-- **Anam wants to be that longitudinal record.** The whole-person timeline read is the **default and
-  normal** mode; an Episode/Span (a trip, an illness, a training block) is an *optional* lens.
+Anam descends from **Arch**, a person-centric, append-only, evidence-backed context architecture
+built for a hospital episode. Arch makes every read filtered by an Episode span, so it can never
+become a longitudinal record. Anam inverts that one decision. The whole-person timeline is the
+default read, and an Episode (a trip, an illness, a training block) is an optional lens.
 
-Everything else in Arch carries over: the **Facet** held verbatim, an append-only **ledger**, two
+Everything else carries over: the **Facet** held verbatim, an append-only **ledger**, two
 clocks (fact-time / anam-time), a resolve→commit **admission gate**, **mint**/checkpoint,
 **fold-on-read**, prune-only **projections**, and **receipts**.
 
@@ -26,9 +27,12 @@ importers (envelopes, one token per source) → ingest (gate) → append-only le
 
 ## Sources
 
-Every source reaches Anam through an importer in the sibling `anam-importers` repository, a
-ductile plugin that shapes one source to a Facet Definition and posts envelopes under its own
-token (`docs/IMPORTERS.md`): Garmin, Withings, the blood pressure export, the DreamStation card,
+Every source reaches Anam through an importer in the sibling
+[`anam-importers`](https://github.com/mattjoyce/anam-importers) repository, a plugin for the
+[ductile](https://github.com/mattjoyce/ductile) gateway (a small scheduler and event router, the
+author's own) that shapes one source to a Facet Definition and posts envelopes under its own
+token (`docs/IMPORTERS.md`). Ductile is only how the author runs them; an importer is a script
+that can be run by hand, and anything that can post an envelope can feed Anam: Garmin, Withings, the blood pressure export, the DreamStation card,
 OwnTracks, and two formats of Anam's own:
 
 - **`records`** — hand-written YAML records: labs, medicines, travel, notes (`anam_records`).
@@ -52,6 +56,9 @@ Extensible to "all sorts of facets" later — `calendar.event`, `mail.thread`, `
 
 ## Quick start
 
+You need Go (see `go.mod` for the version). Nothing here needs a server, a token or any other
+machine; everything below runs on loopback against two SQLite files.
+
 ```sh
 make build
 
@@ -63,7 +70,15 @@ export ANAM_PERSON_ID=matt
 # ~/.local/share/anam/ (ledger.db and tracking.db); override with
 # ANAM_LEDGER_PATH and ANAM_DB_PATH.
 ./anam init
+
+# Run the daemon. On loopback it needs no token. Leave it running and use another terminal.
+./anam daemon
+curl http://127.0.0.1:8787/healthz                 # ready
+ANAM_SERVER=http://127.0.0.1:8787 ./anam status   # the ledger id, W, and each importer's last batch
 ```
+
+If `ANAM_SERVER` is set in your shell, `init` and `daemon` refuse to run, because the commands
+treat a configured server as the owner of the files. Unset it for the commands above.
 
 **Admit.** Facts arrive through `anam daemon`, from importers posting to `POST /v1/envelopes`,
 each under its own token (`importers_file`, `docs/IMPORTERS.md` §8).
@@ -102,3 +117,8 @@ each under its own token (`importers_file`, `docs/IMPORTERS.md` §8).
 ./anam timeline --projection bp --as-of 2026-07-10T20:00:00Z   # what it stood on when Anam knew less
 ./anam inspect                                           # the web harness; /projection switches templates
 ```
+
+## Licence
+
+Apache-2.0, see [`LICENSE`](LICENSE). Third-party material, the IEEE 1752 schemas bundled for
+conformance tests, is listed in [`NOTICE`](NOTICE).

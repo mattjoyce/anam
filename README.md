@@ -7,14 +7,12 @@ record of their own life (health, documents, places, notes) held as immutable fa
 present state derived from them. This is a personal project, published so others can read it and
 borrow from it. The sources, units and time zone in the examples are the author's.
 
-Anam descends from **Arch**, a person-centric, append-only, evidence-backed context architecture
-built for a hospital episode. Arch makes every read filtered by an Episode span, so it can never
-become a longitudinal record. Anam inverts that one decision. The whole-person timeline is the
-default read, and an Episode (a trip, an illness, a training block) is an optional lens.
+The whole-person timeline is the default read. An Episode (a trip, an illness, a training block)
+is an optional lens over it, never a requirement.
 
-Everything else carries over: the **Facet** held verbatim, an append-only **ledger**, two
-clocks (fact-time / anam-time), a resolve→commit **admission gate**, **mint**/checkpoint,
-**fold-on-read**, prune-only **projections**, and **receipts**.
+The parts: the **Facet** held verbatim, an append-only **ledger**, two clocks (fact-time and
+anam-time), a resolve→commit **admission gate**, **mint**/checkpoint, **fold-on-read**, prune-only
+**projections**, and **receipts**. Current state is always derived from the facts, never stored.
 
 ## Status
 

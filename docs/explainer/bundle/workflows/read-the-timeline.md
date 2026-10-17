@@ -18,7 +18,7 @@ steps:
   - actor: /components/client.md
     caller: /components/cli.md
     label: GET /v1/timeline with the query
-    action: The client encodes the query as URL values, sends the operator bearer token and an `Anam-Timeout` header, and refuses an answer over 64 MiB with "narrow the read".
+    action: The client encodes the query as URL values, sends its bearer token (any role may read) and an `Anam-Timeout` header, and refuses an answer over `max_response_bytes` (64 MiB by default) with "narrow the read".
     resource: internal/client/client.go#Timeline
     anchor: 'http.MethodGet, "/v1/timeline", q.Values()'
   - actor: /components/daemon.md

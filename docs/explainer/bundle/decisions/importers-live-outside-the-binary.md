@@ -9,7 +9,7 @@ basis: docs
 tier: core
 alternatives:
   - Capture workers compiled into the binary that owns the ledger (how health-db, withings, bp-csv, records and documents began; withings and bp-csv moved out in cards 54 and 80, records and documents in card 119, and sharing a binary let their identity composition drift)
-  - Ductile holding schemas or derived data, or Anam scheduling and polling (both refused as Senechal growing back on one side or the other)
+  - Ductile holding schemas or derived data, or Anam scheduling and polling (both refused, since each puts back the coupling the split removed)
 affects:
   - /components/importer-base.md
   - /components/anam-submit.md
@@ -18,7 +18,7 @@ affects:
   - /terms/importer.md
 ---
 
-**Context.** Senechal was cleaved into ductile (when to do things) and a health ETL (what was measured); Anam succeeds the ETL as the record of what was learned and when. Vendor table layouts inside Anam's binary were the braid left behind.
+**Context.** The gateway (ductile) decides when to do things; Anam is the record of what was learned and when. Vendor table layouts inside Anam's binary braided what a source says with how Anam stores it.
 
 **Choice.** An importer reads the native format, shapes payloads only, validates locally against the Definition it carries, cuts batches of 49, and emits an event; the gateway routes it to that importer's `anam_submit` instance, which holds the token. The contract is docs/IMPORTERS.md §8: the wire format, tokens, all-or-nothing batches, and what each status means. What is borrowed: Confluent's immutable numbered schema versions, CloudEvents' envelope field names, Splunk HEC's tokens pinned to sourcetypes, Elastic's integrations shipping their own schemas.
 

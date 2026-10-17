@@ -4,7 +4,7 @@ title: Admit a batch
 description: One blood-pressure export dropped in a watched folder becomes a facet in the ledger, an index row, and a minted checkpoint, with every call between the importer repo and the service traced.
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/daemon/envelopes.go#postEnvelopes
-anchor: "envs, snap, err := decodeSubmission(w, r, imp)"
+anchor: "envs, snap, err := decodeSubmission(w, r, imp, d.cfg.Limits)"
 basis: code
 tier: core
 trigger: The ductile gateway's folder_watch sees `BloodPressure_11-July-2026` under the export folder and emits `bp.export`; the pipeline runs `anam_bp_csv handle`. The example reading is `2026-1-24 06:30:00`, reading 1, 128/79 mmHg, from source `bp-csv`.
@@ -74,20 +74,21 @@ steps:
     anchor: 'status, body = self._call("POST", "/v1/envelopes", payload)'
   - actor: /components/daemon.md
     caller: /components/importer-base.md
-    label: resolve the token to an importer
-    action: "`asImporter` hashes the presented token with SHA-256 and looks it up in the map loaded from the importers file at start. The operator's own token is a 403; an unknown token is a 401. The importer's source and types ride on the request context."
+    label: resolve the token to a principal
+    action: "`admit` hashes the presented token with SHA-256 (`who`) and looks it up in the map loaded from the importers file at start. `POST /v1/envelopes` admits the importer role only, so the operator's or a reader's token is a 403 naming its principal and role; an unknown token is a 401. The importer's source and types ride on the request context."
     reads: [/data-structures/importers-file.md]
-    resource: internal/daemon/importers.go#asImporter
-    anchor: "case d.token != nil && d.isOperator(r):"
+    resource: internal/daemon/auth.go#admit
+    anchor: "case !slices.Contains(roles, who.Role):"
   - actor: /components/daemon.md
     label: decode one bounded submission
-    action: "`decodeSubmission` reads the body under a 16 MB bound, refuses unknown fields (a `source` key is a 400, the token names the source), requires 1 to 49 envelopes and a `definition_version`, and requires exactly one JSON value: anything after it is a 400, whitespace past the bound a 413. Nothing is queued yet."
+    action: "`decodeSubmission` reads the body under a bound of 49 payloads plus 1 MiB (about 16 MB at the default `max_payload_bytes`), refuses unknown fields (a `source` key is a 400, the token names the source), requires 1 to 49 envelopes and a `definition_version`, and requires exactly one JSON value: anything after it is a 400, whitespace past the bound a 413. Nothing is queued yet."
     reads: [/data-structures/batch-submission.md]
     resource: internal/daemon/envelopes.go#decodeSubmission
     anchor: "dec.DisallowUnknownFields()"
   - actor: /components/daemon.md
     label: take a turn on the write queue
-    action: "`tryWriteWithin` offers the job to the single write worker and waits up to 5 s for it to be accepted; a mint or a long write such as a backup still running past that is a 503 with `Retry-After: 15`. Once accepted the write runs on the daemon's context, so a client that disconnects does not cut it short."
+    action: "`tryWriteWithin` offers the job to the single write worker and waits up to `importer_wait` (5 s), or less when the request's budget is shorter, for it to be accepted; a mint or a long write such as a backup still running past that is a 503 with `Retry-After: 15` (`retry_after`), and a caller that has gone never starts the write. Once accepted the write runs on the daemon's context, so a client that disconnects does not cut it short."
+    reads: [/data-structures/limits.md]
     resource: internal/daemon/queue.go#tryWriteWithin
     anchor: "case <-busy.C:"
   - actor: /components/gate.md
@@ -105,7 +106,7 @@ steps:
     anchor: "if len(envs) > MaxBatch {"
   - actor: /components/gate.md
     label: the three pillars without a ledger read
-    action: "In order: envelope valid, binding is this person, source scoped for the type, Definition exists, version is the current one, assurance meets the Definition's floor, payload under 300 KiB, payload decodes with numbers kept as lexemes, closed JSON Schema passes. The first failure names the reason."
+    action: "In order: envelope valid, binding is this person, source scoped for the type, Definition exists, version is the current one, assurance meets the Definition's floor, payload under `max_payload_bytes` (300 KiB), payload decodes with numbers kept as lexemes, closed JSON Schema passes. The first failure names the reason."
     reads: [/data-structures/definition-manifest.md]
     resource: internal/def/check.go#Check
     anchor: "if err := d.schema.Validate(doc); err != nil {"
@@ -134,7 +135,7 @@ steps:
   - actor: /components/store-ledger.md
     caller: /components/gate.md
     label: artifact and event in one transaction
-    action: "`AdmitBatch` checks the block is contiguous, opens an immediate transaction, re-reads the head and refuses a stale watermark (the gate re-reads and retries, up to five times), classifies any existing `(facet_id, version)` as already-written (same bytes) or divergent (different bytes), then inserts the facet row with its payload as a BLOB and its admitted event. A trigger firing means the checks and the database disagree: `ErrCorrupt`."
+    action: "`AdmitBatch` checks the block is contiguous, opens an immediate transaction, re-reads the head and refuses a stale watermark (the gate re-reads and retries, up to `commit_retries`, five by default), classifies any existing `(facet_id, version)` as already-written (same bytes) or divergent (different bytes), then inserts the facet row with its payload as a BLOB and its admitted event. A trigger firing means the checks and the database disagree: `ErrCorrupt`."
     writes: [/data-structures/facet-artifact.md, /data-structures/anam-event.md]
     resource: internal/store/ledger/write.go#AdmitBatch
     anchor: "if err := checkBatch(readW, cs); err != nil {"

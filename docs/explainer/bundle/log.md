@@ -49,3 +49,35 @@ Card 50 closes the importers move, at anam master after 3b97178.
 
 - Code: `POST /v1/documents?ext=` replaces `?path=`; Anam names the stored file `<sha256>.<ext>`, so there is no 409 and nothing is overwritten. A doc.reference's `path` is its name and identity and its `sha256` finds the bytes; `checkReferences` refuses a sha256 the library does not hold. The new package `internal/library` (`Store`, `Find`, `Index`, `IsSHA256`) places a file by `library_folder_limit` and finds it by a walk; `storeDocument` became `library.Store`. The inspector serves `/document?sha256=&name=`. On anam-importers branch `card-150-sha256-library`, `Client.store_document(name, data)` posts `?ext=`.
 - Bundle: the component `library` added; the workflow `hand-anam-a-document`, the daemon's route table, the inspector and `importer-documents` say what the code does now.
+
+## 2026-10-14, card 110
+
+- Code: queue wait counts toward the caller's deadline. `tryWriteWithin` takes the caller's context and the request's budget (the shorter of `timeout` and `Anam-Timeout`) as an end time counted from arrival; the wait to be accepted is `min(wait, budget)`; `run` re-checks the caller and the budget as the worker takes a job, so a write whose caller has gone or whose budget is spent never starts; once accepted a write runs to its own end and is reported as it happened. `Write` keeps a deadline that starts at execution, for backups and the mint.
+- Bundle: the invariant `queue-wait-spends-the-callers-budget` added; the decision `one-write-queue-in-the-daemon`, the invariant `external-calls-fail-fast` and the daemon, admit-a-batch and mint-checkpoints pages say so, and their stale queue anchors point at `run` and `tryWriteWithin`.
+
+## 2026-10-14, card 151
+
+- Code: `config.Limits` squashed into `Config`: 21 bounds and waits (HTTP timeouts, `accept_wait`, `importer_wait`, `retry_after`, `mint_quiet`, payload, manifest, document and response bounds, snapshot retention and limits, `network_margin`, `inspect_cached_reads`), each with a `Default…` constant and a range check at load and at `daemon.Open`. `gate.New` takes `gate.Limits`, `client.New` takes the margin and the response bound, `inspect.Serve` takes its `Deps`. `timeout`, `ingest_timeout` and `backup_keep` became `Default…` constants. What stayed a constant (`gate.MaxBatch`, `Anam-Timeout`, the snapshot id's shape, `clock.Width`, the token floor) says why beside it. `config.example.yaml` lists every key. AGENTS.md gained "Defaults and invariants".
+- Bundle: the data structure `limits` and the decision `a-hard-coded-value-is-a-default-or-an-invariant` added; the gate, client, config, inspector, config-keys, admission-response, batch-submission, envelope, snapshot-part and resend pages name the keys; the gap `config-example-is-stale` narrowed to the two comments that remain.
+
+## 2026-10-15, card 157
+
+- Code: `note.annotation` v3 makes `about` optional, so a note may name no facet yet; v1 and v2 now ship in `manifests/history` (v2 had been bumped without copying v1). Card 93's decision is recorded in docs/API.md §6: a conversation is an importer and its words a note, a model's reading a second source of drafts.
+- Bundle: the decision `a-persons-words-are-a-note-and-a-models-reading-is-a-draft` and the gap `the-interpretation-source-is-decided-and-not-built` added (only the note half is built); the Definition manifest and def pages say so; the API-doc gap points at API.md §2 and §6.
+
+## 2026-10-15, card 89
+
+- Code: tokens carry roles. Every caller is a `config.Principal` (name, role, token hash; an importer also its source and types); roles are `reader`, `importer` and `operator`; `token_file` is the operator, held as a hash. One route table in `api.go` names the roles each route admits and `admit` answers 401 for an unknown token and 403, naming the principal, for a role the route does not admit. `asImporter`, `asReader`, `authorize` and `internal/config/importers.go` are gone; the importers file keeps `importers` and gains `principals`. An importer now reads as a reader does. `internal/app/retire.go` and the anam-service skill follow.
+- Bundle: the component `principals`, the invariant `each-route-names-the-roles-it-admits`, the decision `tokens-carry-roles`, the terms `principal` and `role` and the gap `reader-is-not-narrowed-to-projections` added; the daemon's route table now has a roles column; the importers file, the importer-token decision, the ingress and type-in-one-place invariants and the admit-a-batch and register-a-definition steps read from `auth.go` and `principals.go`. The ingress invariant no longer says an importer cannot read the record.
+
+## 2026-10-15, card 141
+
+- Code: docs only. docs/IMPORTERS.md §8.8 is the rebuild runbook, with `scripts/rebuild-drill.py` in anam-importers as the drill. The first drill, 2026-10-14, matched 2,939 facets in 18 types against the live record; the live rebuild has not been run.
+- Bundle: the workflow `rebuild-the-record` and the gap `the-drill-is-the-only-rebuild-so-far` added.
+
+## 2026-10-17, a sweep to master
+
+Anam at 154f190, after the README, NOTICE and lineage edits (cards 142 and the history move to docs/HISTORY.md).
+
+- Code: nothing new beyond the cards above. The README and ARCHITECTURE no longer name where the idea came from; ARCHITECTURE's "one inversion" heading is "The whole-person read".
+- Bundle: 19 stale anchors, symbols and paths re-pointed (client and gate constructors, the importers file, the importer-token, mint-cadence and write-queue anchors, the ingress and deadline invariants, the type-in-one-place invariant, the admit-a-batch, hand-anam-a-document and mint-checkpoints steps). The two lineage sentences in `importers-shape-only` and `importers-live-outside-the-binary` rewritten without it. The gap `importers-checkout-behind-origin` restated at 3451d3a, 34 commits behind origin/master. The purpose page's commit is 154f190. Counts: 1 purpose, 31 terms, 28 components, 9 workflows, 18 data structures, 24 decisions, 29 invariants, 5 change paths, 18 gaps.

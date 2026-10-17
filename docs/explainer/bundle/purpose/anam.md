@@ -2,8 +2,8 @@
 type: purpose
 title: Anam, a personal longitudinal record
 description: One person's whole-life timeline of facts, assembled verbatim from the systems that already hold their data, owning none of it, with a receipt for everything it shows.
-timestamp: 2026-10-11T00:00:00Z
-commit: 38aa3dad70a7d1eda90193675073ffe75b602073
+timestamp: 2026-10-17T00:00:00Z
+commit: 154f190
 primary_workflow: /workflows/admit-a-batch.md
 basis: docs
 ---
@@ -18,7 +18,7 @@ The repo is the Go service and CLI that own the record. Its sources now arrive t
 
 ## Who it is for
 
-Matt, as the one person recorded, as the operator who runs the daemon on unraid, and as the author of each importer. Agents acting for him are the second consumer: they read projections and may one day propose findings back through the same gate. There is no second person, so there is no identity graph and no merge.
+Matt, as the one person recorded, as the operator who runs the daemon on unraid, and as the author of each importer. Agents acting for him are the second consumer: they read projections, with a `reader` token since card 89, and may one day propose findings back through the same gate. There is no second person, so there is no identity graph and no merge.
 
 ## What it does not do
 

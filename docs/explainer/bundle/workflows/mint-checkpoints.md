@@ -24,9 +24,9 @@ steps:
   - actor: /components/daemon.md
     caller: /components/client.md
     label: take a turn, or 503 at once
-    action: "`postCheckpoints` uses `TryWrite`, which waits 250 ms for the worker; a write still running, such as a backup, answers 503 naming it. The mint runs with the write handles and the daemon's budget."
+    action: "`postCheckpoints` uses `TryWrite`, which waits `accept_wait` (250 ms) for the worker, or less when the request's budget is shorter; a write still running, such as a backup, answers 503 naming it, and a caller that has gone never starts the mint. The mint runs with the write handles and the daemon's budget."
     resource: internal/daemon/api.go#postCheckpoints
-    anchor: "err := d.TryWrite(d.timeout(r), func(ctx context.Context, s Stores) error {"
+    anchor: "err := d.TryWrite(r.Context(), d.timeout(r), func(ctx context.Context, s Stores) error {"
   - actor: /components/mint.md
     caller: /components/daemon.md
     label: Report dispatches to Run or RunFull

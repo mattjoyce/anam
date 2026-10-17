@@ -24,10 +24,10 @@ steps:
   - actor: /components/anam-submit.md
     caller: /components/importer-documents.md
     label: POST each file's bytes first
-    action: "For each entry it posts the raw bytes to `POST /v1/documents?ext=<extension>` under the importer's token, at most 64 MiB, before any envelope of the batch. On anam-importers branch `card-150-sha256-library`, `Client.store_document(name, data)` takes the extension from the name's suffix and leaves off one Anam would refuse."
+    action: "For each entry it posts the raw bytes to `POST /v1/documents?ext=<extension>` under the importer's token, at most `max_document_bytes` (64 MiB by default), before any envelope of the batch. In anam-importers `Client.store_document(name, data)` takes the extension from the name's suffix and leaves off one Anam would refuse."
     reads: [/data-structures/batch-event.md]
     resource: docs/IMPORTERS.md#8.4a Documents
-    anchor: "`POST /v1/documents?ext=<extension>`, body the raw bytes (at most 64 MiB),"
+    anchor: "`POST /v1/documents?ext=<extension>`, body the raw bytes (at most `max_document_bytes`, 64 MiB by default),"
   - actor: /components/daemon.md
     caller: /components/anam-submit.md
     label: check the token and the extension

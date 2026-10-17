@@ -1,10 +1,10 @@
 ---
 type: decision
 title: Mint cadence follows the ledger
-description: "The daemon mints after importer batches that moved W, once 2 s pass with no batch, as its own write on the queue; at start it mints if the last run is behind the head."
-timestamp: 2026-10-14T00:00:00Z
+description: "The daemon mints after importer batches that moved W, once `mint_quiet` (2 s) passes with no batch, as its own write on the queue; at start it mints if the last run is behind the head."
+timestamp: 2026-10-17T00:00:00Z
 resource: internal/daemon/minting.go#mintOnRequest
-anchor: "const mintQuiet = 2 * time.Second"
+anchor: "quiet := time.NewTimer(d.cfg.MintQuiet)"
 basis: code
 tier: supporting
 tested_by:
@@ -21,7 +21,7 @@ affects:
 
 **Context.** Card 61. Freshness comes from the ledger; a mint exists to bound replay, so it should follow the writes rather than a clock.
 
-**Choice.** One trigger, one mint. An importer batch that changed W requests a mint on a one-slot channel; `mintOnRequest` waits until no batch has arrived for 2 s and then `mintAtHead` mints once, as its own write. At start, `mintIfBehind` requests a mint when the last run is behind the head, so a batch admitted just before a shutdown is minted. The operator can also mint by hand, `anam checkpoint` (`POST /v1/checkpoints`).
+**Choice.** One trigger, one mint. An importer batch that changed W requests a mint on a one-slot channel; `mintOnRequest` waits until no batch has arrived for `mint_quiet` (2 s by default, a config key since card 151) and then `mintAtHead` mints once, as its own write. At start, `mintIfBehind` requests a mint when the last run is behind the head, so a batch admitted just before a shutdown is minted. The operator can also mint by hand, `anam checkpoint` (`POST /v1/checkpoints`).
 
 **Why.** Importers send batches of 49 in bursts; minting after each would cost a rebuild per batch for nothing.
 

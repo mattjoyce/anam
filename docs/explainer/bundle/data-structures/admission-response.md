@@ -24,6 +24,6 @@ references:
 | 400 | `error` | not one submission |
 | 409 | `error` | snapshot part mismatch or changed |
 | 413 | `error` | body over the bound |
-| 503 | `error`, `Retry-After: 15` | another write held the queue past 5 s |
+| 503 | `error`, `Retry-After: 15` | another write held the queue past `importer_wait` (5 s), or the request's own budget ran out first; the header is `retry_after` |
 
 The importer's client accepts a 200 only when `w` is a positive integer, `changed` equals the count it can see, and there is exactly one result per envelope with a known outcome; anything less is retried as a transport fault.

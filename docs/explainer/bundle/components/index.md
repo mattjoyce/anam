@@ -11,9 +11,9 @@
 * [Buckets (internal/span)](span.md) - Bucket arithmetic over fact-time: the configurable width, self-describing ids, and the layout that subdivides a year into months and days.
 * [Catch-up (internal/catchup)](catchup.md) - Replays anam-events since the index's last seen seq into the operational store, so the derived tier is behind after a crash, never wrong.
 * [CLI (internal/app)](cli.md) - The anam command tree; every command routes to the daemon when ANAM_SERVER is set, or opens the local files itself.
-* [Client (internal/client)](client.md) - The Go HTTP client the CLI uses against the daemon: bearer token, a timeout header, and a 64 MiB body bound.
-* [Config (internal/config)](config.md) - Viper over YAML and ANAM_* env vars; validates every path, refuses an unknown key or bucket width at load, and reads the importers file.
-* [Daemon](daemon.md) - The one process that owns the ledger on unraid; HTTP routes for the operator and importers, a single write queue, catch-up and mint after each write.
+* [Client (internal/client)](client.md) - The Go HTTP client the CLI uses against the daemon: bearer token, a timeout header, a network margin, and a bound on the answer it reads.
+* [Config (internal/config)](config.md) - Viper over YAML and ANAM_* env vars; validates every path and limit, refuses an unknown key or bucket width at load, and reads the importers file as principals.
+* [Daemon](daemon.md) - The one process that owns the ledger on unraid; HTTP routes behind role-checked tokens, a single write queue, catch-up and mint after each write.
 * [Definitions registry (internal/def)](def.md) - Parses Definition manifests, holds the bundled set from embedded JSON, merges registered ones, and guards a new version against re-keying.
 * [Facet domain values (internal/facet)](facet.md) - The value types everything else speaks in: Facet, AnamEvent, Envelope, the five event kinds, and SourceRef, the one function that composes identity.
 * [Fold](fold.md) - Derives each facet's current status from its anam-events in seq order and builds the canonical value, sorted and hashed.
@@ -23,7 +23,8 @@
 * [Library (internal/library)](library.md) - Anam's store of document bytes: files named <sha256>.<ext>, written only by Anam, placed by a folder limit and found again by a walk for the name.
 * [Mint](mint.md) - Writes bucket checkpoints after each change, starting from the last run and touching only the buckets the tail dirtied; also the composed reads that start from those checkpoints.
 * [Operational store (internal/store/ops)](store-ops.md) - The tracking.db SQLite file: Definitions, the facet and event indexes, the checkpoint log, mint runs and seals, snapshot parts, and the pins that refuse a mismatched ledger or width.
-* [Projection](projection.md) - Applies a bundled template to a canonical value, metadata filters only, and explains each facet's verdict by the knob that decided it.
+* [Principals and roles (internal/daemon auth)](principals.md) - Every caller is a principal with a name, a role (reader, importer or operator) and a token hash; admit lets a request through only when its role is one the route names, with 401 for an unknown token and 403 for a role the route does not admit.
+* [Projection](projection.md) - Applies a template, bundled or registered, to a canonical value, metadata filters only, and explains each facet's verdict by the knob that decided it.
 * [Read (internal/read)](read.md) - The read API behind timeline, changes, publish and the snapshot report: parses the query, picks composed or full fold, narrows, and bounds the answer.
 * [Receipt (internal/receipt)](receipt.md) - The receipt record and its proofs: validate, deterministic bytes, and compare a re-derived value with what the file holds.
 * [Serve (internal/serve)](serve.md) - Publishes a projection: canonical at head, prune, write the served value then its receipt, and verifies a receipt by re-deriving.

@@ -20,7 +20,7 @@ references:
 | `Source` | string | the importer's source, named by its token | non-empty |
 | `Injector` | string | same as source | non-empty |
 | `SourceRef` | string | optional | the gate composes it, or refuses a mismatch |
-| `Payload` | []byte | raw JSON | non-empty, at most 300 KiB, canonicalisable, passes the schema |
+| `Payload` | []byte | raw JSON | non-empty, at most `max_payload_bytes` (300 KiB), canonicalisable, passes the schema |
 | `DefinitionVersion` | int | required at the daemon | must equal the type's current version; the gate alone accepts 0 as unstated |
 | `AssertedPerson` | string | optional | drives binding assurance |
 | `SpanHint` | string | optional | advisory, copied to the binding |

@@ -2,7 +2,7 @@
 type: data-structure
 title: Definition manifest
 description: "The JSON contract for one facet type: meta with identity, time, classification, validation mode and series, and a closed JSON Schema 2020-12."
-timestamp: 2026-10-11T00:00:00Z
+timestamp: 2026-10-17T00:00:00Z
 resource: internal/def/def.go#manifest
 anchor: "type manifest struct {"
 basis: code
@@ -25,4 +25,6 @@ references: []
 
 Schema rules at load: top-level object with properties; every required property refuses null and the empty string; the top-level field behind every keying pointer is required; every object sets `additionalProperties`; no `$ref` leaves the manifest; nothing is fetched.
 
-Where they live: 28 bundled under `internal/def/manifests`, embedded; importers carry theirs under `<importer>/definitions/` in the same format and register them. Stored in the operational store's `definition` (bundled, every version) and `registered_definition` (immutable) tables.
+A version that only loosens a rule leaves older values valid: `note.annotation` v3 (card 157) made `about` optional, so v1 and v2 notes stay valid and a note may name no facet yet, because an account can come before the observation it describes. Identity, mechanism and fact time did not change (v2 timed a note by when it was written, not by the moment it is about).
+
+Where they live: 28 bundled under `internal/def/manifests`, embedded, with the 14 earlier versions a facet may have been admitted under in `manifests/history`; importers carry theirs under `<importer>/definitions/` in the same format and register them. Stored in the operational store's `definition` (bundled, every version) and `registered_definition` (immutable) tables.

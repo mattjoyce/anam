@@ -17,8 +17,10 @@
 * [Ledger](ledger.md) - Anam's append-only record of everything it admitted, every facet kept and marked at its current status.
 * [Mint](mint.md) - Checkpointing per bucket after the importer batches that moved W, rebuilding only the buckets the tail touched.
 * [Operational store](operational-store.md) - The second SQLite file, authoritative for what Anam authors, with each table annotated by where it comes back from.
+* [Principal](principal.md) - A caller the daemon admits, with a name, a role and the SHA-256 of its token; an importer principal also has the one source it submits as and the types it may submit.
 * [Projection](projection.md) - A versioned template that prunes the canonical by metadata only; a consumer selects one and never defines one.
 * [Receipt](receipt.md) - Proof of exactly what a projection served at a watermark, verifiable from the artifact alone or against the ledger.
+* [Role](role.md) - What a principal's token opens, one of reader, importer or operator; each route names the roles it admits and no handler checks who is calling.
 * [Series](series.md) - Which facets are repeated statements about one thing, stamped at the gate so a snapshot can keep the latest per thing.
 * [Snapshot (read)](snapshot-read.md) - The last-known-value read: the latest facet per series at or before a fact-time, closed series dropped.
 * [Snapshot (resend)](snapshot-resend.md) - An importer's labelled resend-everything run, from which Anam reports what the source no longer holds.

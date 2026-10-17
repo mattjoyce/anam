@@ -16,4 +16,4 @@ applies_to:
   - /components/importer-records.md
 ---
 
-docs/IMPORTERS.md §2 and §8.5 item 3; anam-importers/AGENTS.md. The drift checks fall out of the lineage: ductile holding schemas or derived data is Senechal growing back on one side, an importer joining or summarising is it growing back on the other. The base enforces the envelope's shape; the rest is review. Importers do write the payload fields the identity pointers name (an ordinal, an id), which the contract's wording does not settle (see [does writing an id field compose identity](/gaps/importers-write-identity-fields.md)).
+docs/IMPORTERS.md §2 and §8.5 item 3; anam-importers/AGENTS.md. The drift checks fall out of the split: the gateway holds no schemas or derived data, and an importer joins or summarises nothing. The base enforces the envelope's shape; the rest is review. Importers do write the payload fields the identity pointers name (an ordinal, an id), which the contract's wording does not settle (see [does writing an id field compose identity](/gaps/importers-write-identity-fields.md)).

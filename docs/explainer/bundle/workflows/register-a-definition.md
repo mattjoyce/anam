@@ -38,7 +38,7 @@ steps:
   - actor: /components/daemon.md
     caller: /components/importer-base.md
     label: importer token, type within its scope
-    action: "`asImporter` admits an importer token only; `postDefinitions` bounds the body at 1 MiB, parses the manifest (422 if not one) and refuses a type outside the importer's `types` with 403. Then it takes a turn on the write queue, waiting up to 5 s."
+    action: "`admit` lets only the importer role through to the route (any other role is a 403 naming it); `postDefinitions` bounds the body at `max_manifest_bytes` (1 MiB by default), parses the manifest (422 if not one) and refuses a type outside the importer's `types` with 403. Then it takes a turn on the write queue, waiting up to `importer_wait` (5 s)."
     reads: [/data-structures/importers-file.md]
     resource: internal/daemon/definitions.go#postDefinitions
     anchor: "if !mayWrite(imp, parsed.Type) {"

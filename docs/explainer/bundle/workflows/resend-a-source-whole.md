@@ -44,7 +44,7 @@ steps:
   - actor: /components/daemon.md
     caller: /components/importer-base.md
     label: validate the label, digest the part
-    action: The id must match `^[A-Za-z0-9._:-]{1,128}$`, parts 1 to 100000, every type within the importer's and every envelope's type among them. The part's digest is the sha256 over its sorted envelope lines, computed before the queue so a changed part is refused before the ledger is touched.
+    action: The id must match `^[A-Za-z0-9._:-]{1,128}$`, parts 1 to `max_snapshot_parts` (100000 by default), every type within the importer's and every envelope's type among them. The part's digest is the sha256 over its sorted envelope lines, computed before the queue so a changed part is refused before the ledger is touched.
     reads: [/data-structures/batch-submission.md]
     resource: internal/daemon/snapshots.go#validSnapshot
     anchor: "case !snapshotID.MatchString(s.ID):"
@@ -57,7 +57,7 @@ steps:
     anchor: "if admitted != p.Parts {"
   - actor: /components/anam-submit.md
     label: on the completing part, read the report
-    action: "The answer's `snapshot.complete` is true, so `handle` GETs `/v1/snapshots/<id>`: live, absent, carried and up to 1,000 absent ids, judged against `started_w` so a facet an incremental run sent beside the resend is never absent."
+    action: "The answer's `snapshot.complete` is true, so `handle` GETs `/v1/snapshots/<id>`: live, absent, carried and up to `max_absent_ids` (1,000 by default) absent ids, judged against `started_w` so a facet an incremental run sent beside the resend is never absent."
     reads: [/data-structures/admission-response.md, /data-structures/snapshot-part.md]
     resource: ../anam-importers/anam_submit/run.py#handle
     anchor: 'report = client.snapshot(str(snapshot["id"]))'

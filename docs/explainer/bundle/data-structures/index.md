@@ -7,12 +7,13 @@
 * [Checkpoint log](checkpoint-row.md) - The operational store's checkpoint, mint_run, mint_seal and checkpoint_size tables: one row per mint of a bucket, the runs that checked every bucket, and the seal that proves no crashed run left rows behind.
 * [Checkpoint value file](checkpoint-value.md) - The live-only value of one bucket at a watermark: a JSON array of fold entries, written under its own sha256 in the artifact directory.
 * [Config keys](config-keys.md) - Every key the daemon and CLI read, from config.yaml or ANAM_* env vars, with its default; an unknown key or an unknown bucket width is refused at load.
+* [Config limits](limits.md) - The 21 bounds and waits the daemon, the gate, the inspector and the CLI client take from the loaded config, each a key with a shipped default and a range checked at start.
 * [Definition manifest](definition-manifest.md) - The JSON contract for one facet type: meta with identity, time, classification, validation mode and series, and a closed JSON Schema 2020-12.
 * [Envelope](envelope.md) - The one message that enters the gate; the Go struct the daemon builds from a submitted envelope, with source and injector set from the token.
 * [Facet artifact row](facet-artifact.md) - One row per artifact version in the ledger's facet table: the governing metadata as columns, the payload as an opaque BLOB, and no status column.
 * [Facet index row](facet-index-row.md) - The operational store's derived index of each facet's current version, status, fact-time and bucket, written by catch-up and provably rebuildable by replaying the ledger.
 * [Fold entry](fold-entry.md) - One live facet in a canonical value: its governing metadata, derived status and payload, with no artifact version and no watermark so the hash is stable across rebuilds.
-* [Importers file](importers-file.md) - The YAML the daemon reads once at start naming each importer's source, the SHA-256 of its token, and the types it may submit and register.
+* [Importers file](importers-file.md) - The YAML the daemon reads once at start naming each principal, its role, the SHA-256 of its token and, for an importer, the source it submits as and the types it may submit and register.
 * [Projection template](projection-template.md) - An embedded JSON manifest naming a versioned prune: types, statuses, a classification ceiling, a fact-time window and a shape.
 * [Receipt](receipt.md) - Proof of what a projection served: the served hash, the facet ids, the watermark and ledger id, the template and definition-set versions, served_at, the span, and the query a read narrowed by.
 * [Snapshot tables](snapshot-part.md) - The operational store's record of an importer's resend-everything run: the run with its started and completed watermarks, each part's digest, and the facet ids the parts carried.

@@ -57,18 +57,33 @@ func Fates(entries []Entry, closes func(facet.Type) bool) []Fate {
 // at's bucket, because every version of a facet lives in one bucket and the prefix
 // holds every series' history (§7).
 func Snapshot(v Value, at string, closes func(facet.Type) bool) (Value, error) {
-	var upTo []Entry
+	cut := upTo(v, at)
+	var kept []Entry
+	for i, f := range Fates(cut, closes) {
+		if f.Kept() {
+			kept = append(kept, cut[i])
+		}
+	}
+	return NewValue(kept)
+}
+
+// Until is the value's entries at or before fact-time at ("" for no bound). Anything
+// that picks the latest entry of a series takes this cut first: run after, a series
+// closed later than at is already gone, and no cut brings it back (card 172).
+func Until(v Value, at string) (Value, error) {
+	if at == "" {
+		return v, nil
+	}
+	return NewValue(upTo(v, at))
+}
+
+func upTo(v Value, at string) []Entry {
+	var out []Entry
 	for _, e := range v.Entries() {
 		if at != "" && e.FactTime > at {
 			break // entries are in (fact_time, facet_id) order
 		}
-		upTo = append(upTo, e)
+		out = append(out, e)
 	}
-	var kept []Entry
-	for i, f := range Fates(upTo, closes) {
-		if f.Kept() {
-			kept = append(kept, upTo[i])
-		}
-	}
-	return NewValue(kept)
+	return out
 }

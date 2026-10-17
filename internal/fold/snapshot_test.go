@@ -133,3 +133,38 @@ func contains(s, sub string) bool {
 		return false
 	})()
 }
+
+// Until keeps the entries at or before its bound, the bound itself included, and an
+// empty bound keeps everything.
+func TestUntil_CutsAtOrBefore(t *testing.T) {
+	t.Parallel()
+	v, err := fold.NewValue([]fold.Entry{
+		medEntry("start-1", "med.started", "2026-03-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
+		medEntry("stop-1", "med.stopped", "2026-08-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
+	})
+	if err != nil {
+		t.Fatalf("NewValue: %v", err)
+	}
+	cases := []struct {
+		name, at string
+		want     []string
+	}{
+		{"no bound", "", []string{"start-1", "stop-1"}},
+		{"before both", "2026-02-01T00:00:00.000000000Z", nil},
+		{"on the start", "2026-03-01T00:00:00.000000000Z", []string{"start-1"}},
+		{"between", "2026-06-15T00:00:00.000000000Z", []string{"start-1"}},
+		{"after both", "2026-12-01T00:00:00.000000000Z", []string{"start-1", "stop-1"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			u, err := fold.Until(v, c.at)
+			if err != nil {
+				t.Fatalf("Until: %v", err)
+			}
+			if got := ids(u); !equal(got, c.want) {
+				t.Errorf("Until(%q) = %v, want %v", c.at, got, c.want)
+			}
+		})
+	}
+}

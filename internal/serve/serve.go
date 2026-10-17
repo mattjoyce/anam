@@ -157,7 +157,7 @@ func Run(ctx context.Context, d Deps, name string, dryRun bool) (Served, error) 
 	if err != nil {
 		return Served{}, err
 	}
-	value, err := projection.Apply(res.Value, t, d.Gate, d.Series)
+	value, err := Derive(res.Value, t, d.Gate, d.Series, "")
 	if err != nil {
 		return Served{}, err
 	}
@@ -329,7 +329,11 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 	if err != nil {
 		return r, receipt.Result{}, err
 	}
-	value, err := projection.Apply(res.Value, t, d.Gate, d.Series)
+	var at string
+	if r.Query != nil {
+		at = r.Query.At
+	}
+	value, err := Derive(res.Value, t, d.Gate, d.Series, at)
 	if err != nil {
 		return r, receipt.Result{}, err
 	}
@@ -454,4 +458,17 @@ func idsOf(v fold.Value) []string {
 		ids = append(ids, e.FacetID)
 	}
 	return ids
+}
+
+// Derive is what template t serves from the canonical v as of fact-time at ("" for
+// now). The canonical is cut at at before the template runs, so a snapshot-shaped
+// template takes its latest-per-series at at: taken at the head and trimmed after, a
+// course stopped later than at would be missing from every earlier date (card 172).
+// Every read and Verify derive through here, so a receipt replays the read it names.
+func Derive(v fold.Value, t projection.Template, g projection.Gate, s projection.Series, at string) (fold.Value, error) {
+	v, err := fold.Until(v, at)
+	if err != nil {
+		return fold.Value{}, err
+	}
+	return projection.Apply(v, t, g, s)
 }

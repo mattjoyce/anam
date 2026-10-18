@@ -32,6 +32,7 @@ func TestManifests_CarryTheHistory(t *testing.T) {
 		"health.weight":         {1, 2, 3},
 		"exercise.session":      {1, 2, 3, 4, 5},
 		"note.annotation":       {1, 2, 3},
+		"med.started":           {4, 5},
 	} {
 		for _, v := range versions {
 			if !held[typ][v] {

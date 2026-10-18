@@ -129,6 +129,9 @@ func TestParse_RejectsBadManifests(t *testing.T) {
 		"no event layout": func(m string) string {
 			return strings.Replace(m, `"layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"`, `"layout": "", "zone": "UTC"`, 1)
 		},
+		"handling is prose":  func(m string) string { return strings.Replace(m, `"schema"`, `"handling": "be kind", "schema"`, 1) },
+		"handling is a list": func(m string) string { return strings.Replace(m, `"schema"`, `"handling": ["be kind"], "schema"`, 1) },
+		"handling is null":   func(m string) string { return strings.Replace(m, `"schema"`, `"handling": null, "schema"`, 1) },
 	}
 	for name, corrupt := range breakages {
 		t.Run(name, func(t *testing.T) {
@@ -137,6 +140,24 @@ func TestParse_RejectsBadManifests(t *testing.T) {
 				t.Errorf("Parse = %v, want ErrBadManifest", err)
 			}
 		})
+	}
+}
+
+// A handling block is kept as written and read for nothing but its being an object
+// (card 166); a manifest without one has none; a refusal names the block.
+func TestParse_HandlingIsAnObjectKeptVerbatim(t *testing.T) {
+	t.Parallel()
+	block := `{"guidance": "one spelling per substance", "date_basis": ["observed", "estimated"]}`
+	d := mustParse(t, strings.Replace(bpManifest, `"schema"`, `"handling": `+block+`, "schema"`, 1))
+	if string(d.Handling) != block {
+		t.Errorf("Handling = %s, want the block as written", d.Handling)
+	}
+	if mustParse(t, bpManifest).Handling != nil {
+		t.Error("a manifest without handling has some")
+	}
+	_, err := def.Parse([]byte(strings.Replace(bpManifest, `"schema"`, `"handling": 7, "schema"`, 1)))
+	if !errors.Is(err, def.ErrBadManifest) || !strings.Contains(err.Error(), "handling") {
+		t.Errorf("Parse = %v, want ErrBadManifest naming handling", err)
 	}
 }
 

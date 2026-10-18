@@ -39,6 +39,7 @@ func TestGuard_RefusesAChangedKeyingAndNothingElse(t *testing.T) {
 		{"new version, same keying", v2, false},
 		{"schema tightened", strings.Replace(v2, `"required": [`, `"required": ["comment", `, 1), false},
 		{"classification raised", strings.Replace(v2, `"classification": "Sensitive"`, `"classification": "Confidential"`, 1), false},
+		{"handling added", strings.Replace(v2, `"schema"`, `"handling": {"guidance": "sitting"}, "schema"`, 1), false},
 		{"identity key changed", strings.Replace(v2, `"identity_key": ["/measured_at"]`, `"identity_key": ["/measured_at", "/systolic"]`, 1), true},
 		{"fact-time zone changed", strings.Replace(v2, `"zone": "UTC"`, `"zone": "Australia/Sydney"`, 1), true},
 		{"fact-time pointer changed", strings.Replace(v2, `"pointer": "/measured_at"`, `"pointer": "/systolic"`, 1), true},

@@ -294,6 +294,26 @@ func TestPostEnvelopesReadTheWholeBody(t *testing.T) {
 // Card 53: an importer registers the Definitions it emits; a registered version is
 // immutable; envelopes of the type are admitted against it, and still are after a
 // restart.
+// A handling block registers with its manifest, comes back verbatim on the GET, and a
+// changed block at the same version is another body (card 166).
+func TestDefinitions_HandlingRoundTrips(t *testing.T) {
+	_, url, _ := serveImporters(t, importerConfig(t))
+	handled := strings.Replace(readingManifest, `"schema"`,
+		`"handling": {"guidance": "value is the meter's reading, not a mean", "date_basis": ["observed"]}, "schema"`, 1)
+	var reg api.Registered
+	call(t, "POST", url+"/v1/definitions", importerToken, handled, http.StatusCreated, &reg)
+	call(t, "POST", url+"/v1/definitions", importerToken, strings.Replace(handled, "a mean", "a median", 1), http.StatusConflict, nil)
+	call(t, "POST", url+"/v1/definitions", importerToken,
+		strings.Replace(readingManifest, `"schema"`, `"handling": "be kind", "schema"`, 1), http.StatusUnprocessableEntity, nil)
+
+	var body map[string]any
+	call(t, "GET", url+"/v1/definitions/test.reading", testToken, "", http.StatusOK, &body)
+	want := map[string]any{"guidance": "value is the meter's reading, not a mean", "date_basis": []any{"observed"}}
+	if got, _ := body["handling"].(map[string]any); fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("GET handling = %v, want %v", body["handling"], want)
+	}
+}
+
 func TestPostDefinitions(t *testing.T) {
 	cfg := importerConfig(t)
 	d, url, stop := serveImporters(t, cfg)

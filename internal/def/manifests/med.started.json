@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "med.started",
-    "definition_version": 4,
+    "definition_version": 5,
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "records/med.started",
@@ -11,6 +11,9 @@
     "identity_key": ["/id"],
     "min_binding_assurance": "medium",
     "series": {"name": "med.regimen", "key": ["/drug", "/course"], "closes": false}
+  },
+  "handling": {
+    "guidance": "drug is the generic name in lower case, one spelling per substance across every source: a medicine by its generic (ramipril), a supplement by its common name (vitamin d3 + k2, magnesium glycinate). With course it is the series key, so two spellings are two regimens. The id is <source>:med/<drug-slug>/<course>/started, the drug slugged with hyphens. A date worked out rather than read (a run-out from pack size) is still the date; say how in source_note."
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",

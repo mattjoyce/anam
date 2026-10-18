@@ -234,6 +234,20 @@ is harmless. A change is a new version, which may change the schema, classificat
 but not what keys or places a facet. An importer registers its Definitions every time it starts:
 that is a no-op until a manifest changes, and it is how a lost operational store comes back.
 
+A manifest may carry a third block, `handling`, beside `meta` and `schema` (card 166). It holds what
+every writer and reader of the type must agree on for its facts to mean the same thing and the schema
+cannot say: how a drug is named when the name is half the series key, the shape of a self-log id, what
+a file's disappearance means. Anam makes three promises about it and no more. It is part of the
+version, so the 200/409 comparison includes it and an envelope's `definition_version` names the
+handling it was shaped under. It is served verbatim, on `GET /v1/definitions/{type}` and the
+inspector's Definition page, to whoever is about to write or read facets of the type; `def.Guard`
+ignores it. And Anam checks only that it is an object: no vocabulary, no verbs it knows, nothing
+read at the gate. By convention a `guidance` key holds prose, so a person or an agent reading the
+Definition before writing a records file or an importer has somewhere to start; the rest is the
+type's own. The test for what belongs there is advice to the author, not a gate: a thing goes in
+`handling` if every writer of the type must agree on it. Retry policy, poll cadence and a person's
+tolerance for drift fail that test and stay in the importer's config.
+
 ### 8.4 Envelopes
 
 `POST /v1/envelopes`, body:

@@ -8,6 +8,12 @@
 // (schema.go). The payload is inspected once, at the gate, then held verbatim and
 // opaque; validating reads it and never rewrites it.
 //
+// A third block, `handling`, is optional (card 166). It is what every writer and
+// reader of the type must agree on for its facts to mean the same thing and the
+// schema cannot say: a naming convention, an id's shape, what a disappearance means.
+// Anam holds it as part of the version, serves it verbatim and checks only that it is
+// an object. By convention a `guidance` key carries prose; the rest is the type's own.
+//
 // Fields in `meta` are addressed by JSON Pointer (RFC 6901), because Anam's payloads
 // are nested where the reference implementation's were flat.
 package def
@@ -96,6 +102,11 @@ type Definition struct {
 	// Series is nil for a type whose facets stand alone. See Series.
 	Series *Series
 
+	// Handling is the manifest's `handling` block as written, a JSON object, or nil
+	// when the manifest has none. Anam reads nothing inside it: it is served to whoever
+	// writes or reads facets of the type, and a change to it is a new version.
+	Handling json.RawMessage
+
 	// schema is the compiled schema half; nil in verbatim mode. tree is the same
 	// schema as decoded JSON, walked to answer whether a field exists (HasPointer).
 	schema *jsonschema.Schema
@@ -123,7 +134,8 @@ type manifest struct {
 		MinBindingAssurance string   `json:"min_binding_assurance"`
 		Series              *Series  `json:"series"`
 	} `json:"meta"`
-	Schema json.RawMessage `json:"schema"`
+	Schema   json.RawMessage `json:"schema"`
+	Handling json.RawMessage `json:"handling"`
 }
 
 // Parse reads and validates one manifest. A manifest is config from a file, so
@@ -166,6 +178,13 @@ func Parse(raw []byte) (Definition, error) {
 	}
 	if err := d.validate(); err != nil {
 		return Definition{}, err
+	}
+	if len(m.Handling) > 0 {
+		var block map[string]json.RawMessage
+		if err := json.Unmarshal(m.Handling, &block); err != nil || block == nil {
+			return Definition{}, fmt.Errorf("%w: handling must be a JSON object", ErrBadManifest)
+		}
+		d.Handling = m.Handling
 	}
 	switch {
 	case d.Mode == ModeVerbatim && len(m.Schema) > 0:

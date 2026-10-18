@@ -33,6 +33,12 @@
   <tr><th>min assurance</th><td>{{.Def.MinAssurance}}</td></tr>
 </table>
 
+{{if or .Guidance .Handling}}
+<h2>handling <span class="dim">what every writer and reader of this type agrees on; Anam serves it and enforces nothing in it</span></h2>
+{{if .Guidance}}<p>{{.Guidance}}</p>{{end}}
+{{if .Handling}}<pre class="json mono">{{template "json.html" .Handling}}</pre>{{end}}
+{{end}}
+
 <h2>fields <span class="dim">{{.Described}} of {{len .Fields}} described</span></h2>
 <div class="scroll">
 <table class="fields">

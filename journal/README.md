@@ -81,6 +81,7 @@ Two kinds of note:
   - [[a-persons-words-are-a-note-and-a-models-reading-is-a-draft]]
   - [[a-token-names-a-principal-and-a-route-names-its-roles]]
   - [[an-external-reading-of-a-fact-is-a-sibling-facet-from-its-own-source]] · [[handling-is-where-to-look-not-a-vocabulary-anam-enforces]]
+  - [[the-ledger-is-never-purged-a-forget-is-a-new-ledger]]
 - Open decisions
   - [[a-rebuild-from-source-restores-the-facts-not-anams-knowledge]] — the drill's finding; whether the loss is acceptable is Matt's call (`docs/IMPORTERS.md` §6).
 - Retracted

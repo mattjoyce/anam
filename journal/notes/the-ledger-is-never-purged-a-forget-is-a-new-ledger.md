@@ -16,7 +16,7 @@ content the person wants gone. If the record must forget, the remedy is a new le
 from the old one's anam-events with the forgotten records omitted and one event at the head
 naming what was left out. The old ledger is succeeded, never mutated.
 
-Matt decided this on 18 October 2026 (card 177), on an assessment that split "purge" three ways.
+Matt decided this on 18 October 2026 (card 178), on an assessment that split "purge" three ways.
 Erroneous versions have no case: each is what the source presented, and the honest record is how
 two bugs were found that day. Tombstoned content has no current need. Content that must not
 exist (a secret, a third party's data) has a real case, and it is met by the rebuild, not by a

@@ -1,14 +1,14 @@
 # Anam — the inbox: from a dropped document to facts in the ledger
 
-How a file that Matt drops on the share becomes facets, and what each step promises. The design
-is `SELF-LOG.md`; this is the runbook. Written 2026-10-06, the night the first documents went in.
+How a document dropped on the share becomes facets, and what each step promises. The design is
+`SELF-LOG.md`; this is the runbook.
 
 ## The folders
 
 ```
-/mnt/Projects/anam/private/            Windows: \\192.168.20.4\Projects\anam\private\   — the INBOX
+/mnt/Projects/anam/private/            the INBOX (the path is the author's; any folder will do)
 ├── <documents>                        dropped here; pending until processed
-└── README-processing.md               status, for Matt, kept current by whoever processes
+└── README-processing.md               status, for the person, kept current by whoever processes
 
 /mnt/Library/anam/                     the SOURCES, on the Library share, which the gateway reads
 │                                      (/mnt/user/Library/anam, at /app/anam-library read-only)
@@ -27,7 +27,7 @@ is `SELF-LOG.md`; this is the runbook. Written 2026-10-06, the night the first d
 
 The two sources reach the record through their importers on the gateway, `anam_records` and
 `anam_documents` (card 119). The sources sit on the Library share because the gateway cannot read
-`anam/private` (Matt, 2026-10-14). Anam reads no folder itself.
+`anam/private`. Anam reads no folder itself.
 
 The clone of this repo on the share ignores `private/`. Nothing in it is ever committed. The library
 is the primary source: a records file is an extraction from a document that is in the library, with
@@ -139,7 +139,13 @@ analyte per draw and one `lab.panel` for the report's draw (`acl:<lab>/panel/<sl
 - **Collection times.** History columns rarely print one; `--known-times` supplies them. One draw
   is one collection event, so the time is a fact about the lab number.
 - **Ids.** `acl:<lab_number>/<analyte-slug>`; a non-blood specimen prefixes the slug
-  (`urine-albumin`), so urine and serum albumin do not collide.
+  (`urine-albumin`), so urine and serum albumin do not collide. A panel's id takes its own
+  `panel/` segment, or a panel named for an analyte (glucose) collides with that analyte's result.
+- **Analyte names.** A name can contain digits (Free T4), so the extractor separates a name from its
+  value by the column gap, never by the first digit.
+- **A history column is a trap as well as a source.** It is the only record of a draw whose report
+  is lost, and a duplicate of a draw whose report exists. The extractor's `--history-labs` list
+  decides, and a wrong choice is caught at scan time, when one id appears in two files.
 
 **Fitbit weight logs** (Google Takeout `Weight Logs.xlsx`): `records/extract/fitbit_weight.py`,
 stdlib only, one `health.weight` per log, id `fitbit:<ISO minute>` with an ordinal when two logs
@@ -154,14 +160,27 @@ keeps a draw's identity with the lab that collected it, whichever report prints 
 
 **Everything else is read.** Interleaved text (a PDF's text with columns scrambled), scanned
 images, notes compiled from email: Claude reads the document and writes the records file by hand,
-with `extracted.method` saying so. Matt's review of the YAML is the endorsement; the architecture's
+with `extracted.method` saying so. The person's review of the YAML is the endorsement; the architecture's
 `proposed` status (§11, R9) is not built, so the method field is the honest mark. A better reading
 later supersedes under the same ids.
 
 Scanned PDFs: `pdftoppm -r 90 -png` the whole file, read each page image; re-render at 160 dpi
-when a digit is in doubt. A history row that only a later report prints (a lab that dropped a row from
+when a digit is in doubt. When the text extraction and the scan disagree, the scan is the document:
+correct the record and say which page settled it in `source_note`. A history row that only a later report prints (a lab that dropped a row from
 its own report, or a draw whose report is lost) is emitted from that later report, with a
 `source_note` saying so, under the original draw's lab number.
+
+## Reading a document
+
+- **Record what is printed, and say where it is doubtful.** A document can contradict itself (a
+  header date that differs from the dates on its own panels). Record the date the rest of the
+  document supports, and keep the printed text in the record's `source_note`. Reading is fallible,
+  and the record says where.
+- **Admit only the person's own facts.** A document that also carries someone else's results (a
+  child's, in a family scan) contributes only the person's own rows.
+- **Check the ledger before judging a range.** A new source can reach back before an existing
+  export begins, so it adds readings and does not duplicate them. Look at what the ledger holds
+  for those dates (`anam timeline --from … --to …`) first.
 
 ## Processing a drop
 
@@ -176,20 +195,3 @@ its own report, or a draw whose report is lost) is emitted from that later repor
 5. The importers send both on their next poll, the records file and the document's bytes and
    reference. The daemon mints after the batches.
 6. Update `README-processing.md` on the share.
-
-## What the first night taught
-
-- A report's history columns are the only source for a draw whose report is lost (2023), and a
-  trap for a draw whose report exists (2024). The dup-id refusal at scan time is what makes the
-  policy safe to get wrong.
-- Analyte names carry digits (Free T4); only the column gap separates a name from a value.
-- Panel ids need their own segment, or the glucose panel collides with the glucose result.
-- One report printed an ECG reported date of 10/03/2024 beside five panels saying 10/09/2024. It is
-  recorded as September and the printed text is kept in the panel record. Reading is fallible, and
-  the record says where.
-- The live diary readings from Sep–Oct 2024 were not in the bp-csv export (which starts May 2025),
-  so the diary PDF added a year of blood pressure, not duplicates. Check the ledger before assuming.
-- A scanned text extraction can be wrong where the scan is right: blood_test1.txt read the ECG date as
-  10/03/2024, the scanned original says 10/09/2024. The hand-read record was corrected and the record
-  says which page settled it.
-- Two children's results were in the 2016 scan. Other people's facts are not admitted to this record.

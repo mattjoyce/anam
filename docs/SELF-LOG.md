@@ -88,12 +88,11 @@ A plain file you edit, one row per event, read by an importer like any other sou
 | `lab` | `lab.result` | point per analyte, fact-time = draw date | analyte |
 | `doc` | `doc.reference` | the reference facet for a file or image (§5) | none |
 | `donation` | `donation.blood` | point | none |
-| `illness` | `illness.started`, `illness.ended`, `illness.hangover` | series for an illness; hangover is a point | `illness.episode` keyed by `/episode`; `illness.ended` closes |
+| `illness` | `illness.started`, `illness.ended` | series for an illness | `illness.episode` keyed by `/episode`; `illness.ended` closes |
 | `travel` | `travel.departed`, `travel.arrived`, `travel.returned` | series per trip; arrived is a leg within it | `travel.trip` keyed by `/trip`; `travel.returned` closes |
 | `travel` | `travel.flight` | point per flight leg: `from` and `to` as IATA codes, dated where it left, `date` carrying the departure airport's offset (`2018-10-10 +01:00`) | none; it carries `/trip` to group with its trip but stays outside the series |
 | `gym` | `gym.visit` | point, generic or detailed | none |
 
-Hangover is a point fact under `illness` because that is what it is; one row, one day.
 A flight is evidence of a movement, not a state of the trip. Inside `travel.trip` a flight
 dated in Singapore would sort after a return dated the same day in Sydney and hold the trip open,
 so the trip's state is departed, arrived and returned, and flights stand beside it (card 35). Detailed gym
@@ -146,7 +145,7 @@ by status from world facts. Do that on demand, not by default.
 3. ✅ **Medication types and the snapshot read**, with a snapshot projection and `--at` (card 23,
    2026-10-07): `med.started` / `med.dose-changed` / `med.stopped`, the `meds` template (shape
    `snapshot`), `timeline --at`. The inspector's projection page shows the same verdicts.
-4. ✅ **Life events** as self-log types: donation, illness, hangover, travel, gym (card 27, 2026-10-07;
+4. ✅ **Life events** as self-log types: donation, illness, travel, gym (card 27, 2026-10-07;
    illness and travel are series, closed by `illness.ended` and `travel.returned`).
 5. ✅ **Reference payload kind** and a folder source (card 24, 2026-10-07): `doc.reference`, the
    `documents` worker over a folder with `<file>.meta.yaml` sidecars carrying the date.

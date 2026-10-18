@@ -32,7 +32,7 @@ fact time; the green strip is the checkpoints.*
 
 Every fact is a **facet** of a named type, and each type has a versioned **Definition**: a JSON
 Schema, which field names the facet, and which field says when it was true. Definitions are
-immutable once published, so a change is a new version. Anam bundles the 28 below, and importers
+immutable once published, so a change is a new version. Anam bundles the 27 below, and importers
 register more.
 
 ### Bundled with Anam
@@ -56,7 +56,6 @@ register more.
 | `condition.noted` | 4 | A condition named in a document | `id` | `date` |
 | `illness.started` | 3 | The day an illness began | `id` | `date` |
 | `illness.ended` | 3 | The day an illness ended | `id` | `date` |
-| `illness.hangover` | 3 | One hangover, a single day | `id` | `date` |
 | `lab.panel` | 4 | One pathology request, the header of a draw's report | `id` | `collected` |
 | `lab.result` | 4 | One analyte's result from one draw | `id` | `collected` |
 | `donation.blood` | 4 | One visit to give blood | `id` | `date` |

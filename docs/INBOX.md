@@ -65,7 +65,7 @@ records:
 Types today: `lab.result`, `lab.panel`, `condition.noted`, `donation.blood`, `health.weight`,
 `med.missed-dose`, `med.started`, `med.dose-changed`, `med.stopped`, `med.compliance-estimate`,
 `illness.started`, `illness.ended`,
-`illness.hangover`, `travel.departed`, `travel.arrived`, `travel.returned`, `travel.flight`, `visit.clinic`, `gym.visit`,
+`travel.departed`, `travel.arrived`, `travel.returned`, `travel.flight`, `visit.clinic`, `gym.visit`,
 and `health.blood-pressure` for diary readings. Each is a manifest in `internal/def/manifests/`,
 strict, Sensitive (visits, gym and travel Confidential). Each schema is closed: a records row may
 carry only the fields its Definition declares, so a new field means a line in the manifest first. Illness rows carry an `episode` and travel

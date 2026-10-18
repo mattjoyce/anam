@@ -117,12 +117,11 @@ var typeStyles = map[facet.Type]typeStyle{
 	"med.dose-changed":        {"meds", shapeDiamond, kindEvent},
 	"med.missed-dose":         {"meds", shapeCross, kindEvent},
 
-	"visit.clinic":     {"clinical", shapeSquare, kindEvent},
-	"condition.noted":  {"clinical", shapeDiamond, kindEvent},
-	"donation.blood":   {"clinical", shapeStar, kindEvent},
-	"illness.started":  {"clinical", shapeTriUp, kindEvent},
-	"illness.ended":    {"clinical", shapeTriDown, kindEvent},
-	"illness.hangover": {"clinical", shapeCross, kindEvent},
+	"visit.clinic":    {"clinical", shapeSquare, kindEvent},
+	"condition.noted": {"clinical", shapeDiamond, kindEvent},
+	"donation.blood":  {"clinical", shapeStar, kindEvent},
+	"illness.started": {"clinical", shapeTriUp, kindEvent},
+	"illness.ended":   {"clinical", shapeTriDown, kindEvent},
 
 	"doc.reference": {"documents", shapeSquare, kindEvent},
 	// A note the person wrote about one or more facets: drawn with what is written

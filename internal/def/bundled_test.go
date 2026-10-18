@@ -74,7 +74,7 @@ func TestBundled_MedTypesShareTheRegimenSeries(t *testing.T) {
 }
 
 // The life-event types (SELF-LOG.md §4): illness and travel are series, closed by
-// their own ending type; hangover, donation and gym stand alone. Medical ones are
+// their own ending type; donation and gym stand alone. Medical ones are
 // Sensitive, travel and gym Confidential.
 func TestBundled_LifeEventTypes(t *testing.T) {
 	t.Parallel()
@@ -90,7 +90,6 @@ func TestBundled_LifeEventTypes(t *testing.T) {
 	}{
 		{"illness.started", facet.ClassificationSensitive, "illness.episode", false},
 		{"illness.ended", facet.ClassificationSensitive, "illness.episode", true},
-		{"illness.hangover", facet.ClassificationSensitive, "", false},
 		{"travel.departed", facet.ClassificationConfidential, "travel.trip", false},
 		{"travel.arrived", facet.ClassificationConfidential, "travel.trip", false},
 		{"travel.returned", facet.ClassificationConfidential, "travel.trip", true},

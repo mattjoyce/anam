@@ -50,6 +50,8 @@ Two kinds of note:
   - [[2026-10-13-ten-cards-and-a-gate-misread]] — ten cards while Matt was away: checkpoints made visible, projections registered like Definitions, the gate refuses a type change, two browser holes closed, and card 108 merged on a misread gate.
   - [[2026-10-14-anam-reads-no-source-itself]] — records and documents move to their importers (2,901 resent, all no-op), the library names a document by sha256, every opinionated default gets a config key, queue wait spends the deadline, and a rebuild drill matches 2,939 facets but cannot bring back anam-time.
   - [[2026-10-15-words-first-then-what-a-model-makes-of-them]] — the sorting reviewed in four questions, the journal and its decision notes caught up, card 93 designed by Matt (words as a note, a model's reading as endorsed drafts), and card 157 lets an assistant save his words; card 89 gives every token a role.
+  - [[2026-10-17-the-repos-go-public-the-places-i-stop-and-what-i-was-on-in-june]] — anam and anam-mcp go public; `location.stay` names the places Matt stops, a sibling facet from source `osm`, live with five stays; the supplements hand-written as `med.*` and the three guesses that make card 166's `handling` block; a snapshot projection took its snapshot at the head, not at `--at`.
+  - [[2026-10-18-a-facet-with-eleven-versions]] — one sleep facet, two bugs below Anam: the importer stamped Sydney wall clock with `Z` since the container's zone was set, and GarminDB's analyze guard counted tomorrow's row (a Date key against datetime bind strings), rewriting the day every hour; both fixed, the churn's proof pending.
 - Decision notes
   - [[the-inversion]] · [[person-substrate-grain]] · [[mint-unit-whole-timeline]]
   - [[facet-types-dotted-namespaced]] · [[facet-definition-format]]
@@ -78,6 +80,7 @@ Two kinds of note:
   - [[queue-wait-spends-the-callers-deadline-up-to-acceptance]]
   - [[a-persons-words-are-a-note-and-a-models-reading-is-a-draft]]
   - [[a-token-names-a-principal-and-a-route-names-its-roles]]
+  - [[an-external-reading-of-a-fact-is-a-sibling-facet-from-its-own-source]] · [[handling-is-where-to-look-not-a-vocabulary-anam-enforces]]
 - Open decisions
   - [[a-rebuild-from-source-restores-the-facts-not-anams-knowledge]] — the drill's finding; whether the loss is acceptable is Matt's call (`docs/IMPORTERS.md` §6).
 - Retracted

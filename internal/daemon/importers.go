@@ -9,18 +9,34 @@ import (
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
+	"github.com/mattjoyce/anam/internal/gate"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
-// mayWrite reports whether imp may submit facets of type t, and so register its
-// Definitions.
-func mayWrite(imp config.Principal, t facet.Type) bool {
+// maySubmit reports whether imp may submit facets of type t: one of its types, or
+// any with any_type.
+func maySubmit(imp config.Principal, t facet.Type) bool {
+	return imp.AnyType || mayRegister(imp, t)
+}
+
+// mayRegister reports whether imp owns type t, and so may register its
+// Definitions. An any_type importer owns nothing (card 177).
+func mayRegister(imp config.Principal, t facet.Type) bool {
 	for _, allowed := range imp.Types {
 		if allowed == t {
 			return true
 		}
 	}
 	return false
+}
+
+// scopesOf is the gate's authenticated pillar for imp: its source for its types, or
+// for every type with any_type.
+func scopesOf(imp config.Principal) gate.TokenScopes {
+	if imp.AnyType {
+		return gate.OpenScopes(imp.Source)
+	}
+	return gate.StaticScopes{imp.Source: imp.Types}
 }
 
 // definitions is the registry importers' envelopes are admitted against: the bundled

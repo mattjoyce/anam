@@ -51,7 +51,7 @@ func validSnapshot(s *api.SnapshotPart, imp config.Principal, envs []api.Submitt
 	}
 	speaks := map[string]bool{}
 	for _, t := range s.Types {
-		if !mayWrite(imp, facet.Type(t)) {
+		if !maySubmit(imp, facet.Type(t)) {
 			return fmt.Errorf("snapshot type %s is not one %s may submit", t, imp.Source)
 		}
 		speaks[t] = true

@@ -24,7 +24,8 @@ const (
 	// RoleReader reads the record and publishes reads, which write artifacts only.
 	RoleReader Role = "reader"
 	// RoleImporter reads as a reader does, and submits envelopes, documents and
-	// Definitions as its one source, for its types only.
+	// Definitions as its one source, for its types only, or with any_type any
+	// type and no Definition.
 	RoleImporter Role = "importer"
 	// RoleOperator runs the daemon: every read, minting, backups, projection
 	// templates and the inspector. It submits nothing, since it is no source.
@@ -58,8 +59,15 @@ type Principal struct {
 	TokenSHA256 string `mapstructure:"token_sha256"`
 
 	// Types are the facet types an importer may submit and register Definitions
-	// for. Only an importer has them.
+	// for: the types it owns. Only an importer has them.
 	Types []facet.Type `mapstructure:"types"`
+
+	// AnyType lets an importer submit facets of every type the daemon knows, as
+	// its source, while owning none: it registers no Definition. It is for a
+	// source that is the person speaking (card 177), whose facets are kept apart
+	// from every other source's by the source in their identity. An importer has
+	// Types or AnyType, not both.
+	AnyType bool `mapstructure:"any_type"`
 }
 
 // importersFile holds principals under two keys. importers is the file's first shape,
@@ -145,7 +153,7 @@ func validPrincipals(all []Principal, bundled func(facet.Type) bool) error {
 }
 
 // validPrincipal checks what one principal must hold: a name, a role, a token's hash,
-// and a source and types exactly when it is an importer.
+// and a source and types (or any_type) exactly when it is an importer.
 func validPrincipal(p Principal) error {
 	switch b, err := hex.DecodeString(p.TokenSHA256); {
 	case p.Name == "":
@@ -156,12 +164,14 @@ func validPrincipal(p Principal) error {
 		return fmt.Errorf("role %q is not reader, importer or operator", p.Role)
 	case err != nil || len(b) != 32 || p.TokenSHA256 != hex.EncodeToString(b):
 		return errors.New("token_sha256 is not 64 lower-case hex digits")
-	case p.Role != RoleImporter && (p.Source != "" || len(p.Types) > 0):
+	case p.Role != RoleImporter && (p.Source != "" || len(p.Types) > 0 || p.AnyType):
 		return fmt.Errorf("a %s has no source and no types: only an importer submits", p.Role)
 	case p.Role == RoleImporter && p.Source == "":
 		return errors.New("no source")
-	case p.Role == RoleImporter && len(p.Types) == 0:
+	case p.Role == RoleImporter && len(p.Types) == 0 && !p.AnyType:
 		return errors.New("no types")
+	case p.AnyType && len(p.Types) > 0:
+		return errors.New("any_type with types: list the types it owns, or any_type, not both")
 	}
 	for _, t := range p.Types {
 		if !t.Valid() {

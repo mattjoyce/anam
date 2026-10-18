@@ -102,6 +102,15 @@ func (s StaticScopes) Allowed(source string, t facet.Type) bool {
 	return false
 }
 
+// OpenScopes is one source scoped for every type: the person speaking, whose
+// facets no other source can share an identity with (card 177). The other pillars
+// hold as for any source: the type must have a Definition, and the payload must
+// comply with it.
+type OpenScopes string
+
+// Allowed reports whether source is the open one.
+func (s OpenScopes) Allowed(source string, _ facet.Type) bool { return source == string(s) }
+
 // Clock is the gate's source of now — the anam-time stamped on every anam-event. It
 // is the gate's alone: no source supplies it, and a Facet has nowhere to hold it.
 type Clock interface {

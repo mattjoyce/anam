@@ -203,15 +203,21 @@ importers:
 - `source` is the source every envelope it submits is admitted as. A facet's identity includes its
   source, so an importer that takes over another's facets uses that source's name, as `anam_records` and
   `anam_documents` kept `records` and `documents`.
-- `types` are the types it may submit, and the only types it may register Definitions for.
+- `types` are the types it may submit, and the only types it may register Definitions for: the
+  types it owns.
+- `any_type: true`, in place of `types`, lets an importer submit every type the daemon knows and
+  own none: it registers no Definition (403), and a type with no Definition is refused to it as to
+  anyone. It is for a source that is the person speaking, `conversation` (card 177); the source in
+  every facet's identity keeps what the person asserts apart from what a device observed of the
+  same kind. `types` and `any_type` together are refused at start.
 - An importer's token opens `POST /v1/envelopes`, `POST /v1/documents` and `POST /v1/definitions`,
   and since card 89 every read a `reader` has: the record, receipts, Definitions, and its own
   source's snapshots. It does not open minting, backups, projection templates or the inspector
   (403). The operator's token (`token_file`) reads but submits nothing (403).
 - The same file names principals that are not importers, under `principals`, each with a `name` and
   a `role` (`reader` or `operator`) and no source or types. An importer may be listed there too,
-  with `role: importer`, a name, a source and types. Names, sources and token hashes are each used
-  once. API.md §2 has the roles.
+  with `role: importer`, a name, a source and types or `any_type`. Names, sources and token hashes
+  are each used once. API.md §2 has the roles.
 - Make a token with `openssl rand -hex 32`. Present it as `Authorization: Bearer <token>`.
 
 ### 8.3 Definitions

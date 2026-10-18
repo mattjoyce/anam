@@ -153,7 +153,7 @@ or under `importers`, the file's first shape, where each entry is an importer na
 | Role | Opens |
 |---|---|
 | `reader` | Every read: status, timeline, changes, receipts and their verification, projections, checkpoints, Definitions, snapshots. Publishing a read (`POST /v1/receipts`), which writes artifacts and never the ledger |
-| `importer` | A reader's routes, and envelopes, documents and Definition registration, as its one source and for its types only. It sees only its own source's snapshots |
+| `importer` | A reader's routes, and envelopes, documents and Definition registration, as its one source and for its types only. With `any_type` in place of `types` it submits every type the daemon knows and registers none (card 177). It sees only its own source's snapshots |
 | `operator` | A reader's routes, and minting, backups, projection templates and the inspector. It submits nothing, since it is no source |
 
 A route names the roles it admits, in one table (`internal/daemon/api.go`), and a test sends a

@@ -35,6 +35,10 @@ func TestRegister(t *testing.T) {
 	rekeyed := strings.Replace(importedManifest, `"identity_key": ["/measured_at"]`, `"identity_key": ["/systolic"]`, 1)
 	widened := strings.Replace(importedManifest, `"comment": {"type": "string", "minLength": 1}`,
 		`"comment": {"type": "string"}`, 1)
+	// Card 166: the handling block is part of the body, so a changed block at a held
+	// version is another body, and a version that changes only its handling is new.
+	handled := strings.Replace(importedManifest, `"schema"`, `"handling": {"guidance": "sitting, before breakfast"}, "schema"`, 1)
+	rehandled := strings.Replace(handled, "before breakfast", "after breakfast", 1)
 
 	cases := []struct {
 		name       string
@@ -53,6 +57,9 @@ func TestRegister(t *testing.T) {
 		{"an older version", importedManifest, nil, []def.Stored{held(importedManifest, 2)}, false, def.ErrVersionBehind},
 		{"taken over from the binary, same body", importedManifest, []def.Stored{held(importedManifest, 1)}, nil, true, nil},
 		{"taken over from the binary, re-keyed", versioned(rekeyed, 2), []def.Stored{held(importedManifest, 1)}, nil, false, def.ErrKeyed},
+		{"the same handling again", handled, nil, []def.Stored{held(handled, 1)}, false, nil},
+		{"another handling at a registered version", rehandled, nil, []def.Stored{held(handled, 1)}, false, def.ErrRegistered},
+		{"a newer version, only its handling changed", versioned(rehandled, 2), nil, []def.Stored{held(handled, 1)}, true, nil},
 		{"a type this binary bundles", bpManifestBundled(t, bundled), nil, nil, false, def.ErrBundled},
 		{"not a manifest", `{"meta": {}}`, nil, nil, false, def.ErrBadManifest},
 	}

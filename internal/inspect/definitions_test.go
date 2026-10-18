@@ -66,6 +66,45 @@ func TestDefinition_PageMarksRolesOnTheirRows(t *testing.T) {
 	}
 }
 
+// A Definition with a handling block shows its guidance as prose and the rest of the
+// block as JSON; one without shows no handling section (card 166).
+func TestDefinition_PageShowsTheHandlingBlock(t *testing.T) {
+	t.Parallel()
+	srv, _, _ := seededServer(t)
+	code, body := get(t, srv.URL+"/definition?type=med.started")
+	if code != http.StatusOK {
+		t.Fatalf("GET /definition?type=med.started = %d: %s", code, body)
+	}
+	for _, want := range []string{"<h2>handling", "one spelling per substance", "slugged with hyphens"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("med.started's page lacks %q", want)
+		}
+	}
+	_, bp := get(t, srv.URL+"/definition?type=health.blood-pressure")
+	if strings.Contains(bp, "<h2>handling") {
+		t.Error("blood pressure declares no handling, yet its page has the section")
+	}
+
+	// The split itself: guidance comes out as text, the other keys as JSON, and a block
+	// of guidance alone leaves no JSON to show.
+	d, err := def.Parse([]byte(strings.Replace(string(bundledBody(t, "health.blood-pressure")), `"schema"`,
+		`"handling": {"guidance": "sitting", "date_basis": ["observed", "estimated"]}, "schema"`, 1)))
+	if err != nil {
+		t.Fatalf("def.Parse: %v", err)
+	}
+	guidance, rest := inspect.HandlingOf(d)
+	if guidance != "sitting" || len(rest) == 0 {
+		t.Errorf("HandlingOf = %q, %d tokens; want the prose and some JSON", guidance, len(rest))
+	}
+	var text strings.Builder
+	for _, tok := range rest {
+		text.WriteString(tok.Text)
+	}
+	if strings.Contains(text.String(), "guidance") || !strings.Contains(text.String(), "date_basis") {
+		t.Errorf("the JSON half is %q; want date_basis without guidance", text.String())
+	}
+}
+
 func TestDefinition_Refusals(t *testing.T) {
 	t.Parallel()
 	srv, _, _ := seededServer(t)

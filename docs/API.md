@@ -216,7 +216,7 @@ unbounded computation or storage. Large operator work uses an operation handle.
 | `ListProjections` | Cursor | Authorized template IDs, versions, descriptions, supported read modes and parameters. Built 2026-10-13 as `GET /v1/projections` (card 125): name, origin, newest version, every version held, description, types, shape, hash |
 | `GetProjection` | Template ID/version | Immutable definition, type coverage, restrictions, examples, supported narrowing. Built as `GET /v1/projections/{name}[/{version}]`, the manifest as canonical JSON; `POST /v1/projections` registers one under the operator's token, 201 new, 200 the same body again, 409 another body at a held version or a version behind, 422 a bad manifest or a type with no Definition |
 | `ListFacetTypes` | Optional projection, cursor | Available types, human descriptions, read/write eligibility, definition versions |
-| `GetFacetDefinition` | Type/version | Identity and time contracts, classification, validation rules, payload schema, examples, series semantics if supported |
+| `GetFacetDefinition` | Type/version | Identity and time contracts, classification, validation rules, payload schema, examples, series semantics if supported, and the `handling` block verbatim when the type declares one (card 166) |
 | `GetCoverage` | Projection, optional window and pinned position | Observed counts and date ranges by type/source, freshness observations, gaps only where justified |
 
 Definition discovery is important because payloads vary. An agent needs to know that a lab result

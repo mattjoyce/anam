@@ -99,6 +99,38 @@ type definitionData struct {
 	ParseError  string
 	Raw         []jsonToken
 	TimelineURL string
+
+	// Guidance is the handling block's `guidance` prose, and Handling the rest of the
+	// block, highlighted; both empty when the Definition declares none (card 166).
+	Guidance string
+	Handling []jsonToken
+}
+
+// handlingOf splits a Definition's handling block for the page: the `guidance` key's
+// prose, shown as text, and whatever else the block holds, shown as JSON. The block
+// is the type's own and Anam reads nothing in it, so the page shows all of it.
+func handlingOf(d def.Definition) (string, []jsonToken) {
+	if len(d.Handling) == 0 {
+		return "", nil
+	}
+	var block map[string]json.RawMessage
+	if err := json.Unmarshal(d.Handling, &block); err != nil {
+		return "", highlightJSON(d.Handling)
+	}
+	var guidance string
+	if raw, ok := block["guidance"]; ok {
+		if err := json.Unmarshal(raw, &guidance); err == nil {
+			delete(block, "guidance")
+		}
+	}
+	if len(block) == 0 {
+		return guidance, nil
+	}
+	rest, err := json.Marshal(block)
+	if err != nil {
+		return guidance, highlightJSON(d.Handling)
+	}
+	return guidance, highlightJSON(rest)
 }
 
 func (s *Server) definitionPage(w http.ResponseWriter, r *http.Request) {
@@ -158,6 +190,7 @@ func (s *Server) definitionPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data.Def = d
+	data.Guidance, data.Handling = handlingOf(d)
 	if data.Fields, err = fieldsOf(body, d); err != nil {
 		data.ParseError = err.Error()
 	}

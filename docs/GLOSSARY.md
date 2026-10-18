@@ -155,6 +155,13 @@ semantics, linking elements, validation bar, classification. Bundled as embedded
 checkpoint + replay-since*, so a read is **as fresh as ingest**. The whole-person view **composes** bucket
 checkpoints; it never re-folds the person. See *Canonical*, *Checkpoint*.
 
+**Handling** — The optional third block of a Facet Definition, beside `meta` and `schema`: what every
+writer and reader of the type must agree on for its facts to mean the same thing, and the schema cannot
+say (a naming convention, an id's shape, what a disappearance means). Anam holds it as part of the
+version, serves it verbatim and checks only that it is an object; it enforces nothing inside it. By
+convention a `guidance` key carries prose. **Not** a rule set for the gate, and **not** importer
+tactics (retry, cadence), which stay in the importer's config. See *Facet Definition*.
+
 **Idempotency** — Re-ingesting the same source row is a **no-op** (same `source_ref` + same
 `content_hash`). Guaranteed by a deterministic `facet_id = uuidv5(source_ref)` and an atomic conditional
 write. What makes ingest **crash-clean**. See *Content hash*, *Supersession*.

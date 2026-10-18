@@ -32,8 +32,8 @@ func (d *Daemon) postDefinitions(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, err)
 		return
 	}
-	if !mayWrite(imp, parsed.Type) {
-		writeError(w, http.StatusForbidden, fmt.Errorf("%s may not submit %s, so may not define it", imp.Source, parsed.Type))
+	if !mayRegister(imp, parsed.Type) {
+		writeError(w, http.StatusForbidden, fmt.Errorf("%s does not own %s, so may not define it", imp.Source, parsed.Type))
 		return
 	}
 

@@ -78,6 +78,9 @@ listen: 127.0.0.1:8787
 #     - source: withings
 #       token_sha256: <printf %s "$token" | sha256sum>
 #       types: [health.weight]
+#     - source: conversation           # the person speaking: any type, owns none
+#       token_sha256: <printf %s "$token" | sha256sum>
+#       any_type: true
 # The same file names other principals, each with a role (docs/API.md §2):
 #   principals:
 #     - name: assistant

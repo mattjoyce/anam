@@ -38,7 +38,7 @@ var (
 // overwritten. Where in the library it sits is the library's own business.
 func (d *Daemon) postDocument(w http.ResponseWriter, r *http.Request) {
 	imp := principalOf(r)
-	if !mayWrite(imp, docType) {
+	if !maySubmit(imp, docType) {
 		writeError(w, http.StatusForbidden, fmt.Errorf("%s may not submit %s, so may not store documents", imp.Source, docType))
 		return
 	}

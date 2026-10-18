@@ -133,6 +133,8 @@ importers:
 		{"an importer with no source", strings.Replace(valid, "source: conversation", "source: ''", 1)},
 		{"a reader sharing an importer's token", strings.Replace(valid, hashC, hashA, 1)},
 		{"a name an importer takes by its source", strings.Replace(valid, "name: assistant", "name: withings", 1)},
+		{"any_type beside types", strings.Replace(valid, "types: [note.annotation]", "types: [note.annotation]\n    any_type: true", 1)},
+		{"a reader with any_type", strings.Replace(valid, "role: reader", "role: reader\n    any_type: true", 1)},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -143,4 +145,20 @@ importers:
 			}
 		})
 	}
+
+	// Card 177: the person speaking submits any type and owns none, so the types
+	// another importer owns are not its concern.
+	t.Run("an importer with any_type", func(t *testing.T) {
+		t.Parallel()
+		body := strings.Replace(valid, "types: [note.annotation]", "any_type: true", 1)
+		got, err := config.LoadPrincipals(writeImporters(t, body), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range got {
+			if p.Name == "conversation" && (!p.AnyType || len(p.Types) != 0) {
+				t.Fatalf("conversation loaded as %+v", p)
+			}
+		}
+	})
 }

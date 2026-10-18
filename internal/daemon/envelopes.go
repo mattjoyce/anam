@@ -73,7 +73,7 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 		// Inside the write, where a registration cannot land between this and the
 		// admission.
 		reg := d.defs.current.Load()
-		g := gate.New(s.Ledger, reg, gate.StaticScopes{imp.Source: imp.Types}, clock.Real{}, d.cfg.PersonID, gateLimits(d.cfg))
+		g := gate.New(s.Ledger, reg, scopesOf(imp), clock.Real{}, d.cfg.PersonID, gateLimits(d.cfg))
 		bindings := make([]facet.Binding, len(envs))
 		for i, env := range envs {
 			// A malformed envelope binds to nothing; the gate's first check refuses it

@@ -167,6 +167,45 @@ func TestImportersShareABundledType(t *testing.T) {
 	}
 }
 
+// Card 177: an importer with any_type submits every type the daemon knows, as its
+// own source, and owns none: it registers no Definition, and a type with no
+// Definition is refused to it as to anyone.
+func TestAnyTypeImporterSubmitsEverythingAndDefinesNothing(t *testing.T) {
+	cfg := importerConfig(t)
+	const spokenToken = "spoken-importer-token-0123456789abcdef0123"
+	first, spoken := sha256.Sum256([]byte(importerToken)), sha256.Sum256([]byte(spokenToken))
+	body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [health.weight, test.reading]\n"+
+		"  - source: conversation\n    token_sha256: %s\n    any_type: true\n",
+		hex.EncodeToString(first[:]), hex.EncodeToString(spoken[:]))
+	if err := os.WriteFile(cfg.ImportersFile, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d, url, _ := serveImporters(t, cfg)
+
+	// test-import owns test.reading and registers it; the conversation may not.
+	call(t, "POST", url+"/v1/definitions", spokenToken, readingManifest, http.StatusForbidden, nil)
+	call(t, "POST", url+"/v1/definitions", importerToken, readingManifest, http.StatusCreated, nil)
+
+	// The conversation submits a bundled type and a registered one, each a facet of
+	// its own beside the owner's.
+	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	reading, _ := d.defs.current.Load().Lookup("test.reading")
+	readingEnv := fmt.Sprintf(`{"type": "test.reading", "definition_version": %d,
+		"payload": {"id": "r-1", "at": "2026-10-09T07:30:00Z", "value": 7}}`, reading.Version)
+	var a api.Admission
+	for _, token := range []string{spokenToken, importerToken} {
+		call(t, "POST", url+"/v1/envelopes", token, batch(weighIn("w-1", 80.5, weight.Version), readingEnv), http.StatusOK, &a)
+		if a.Changed != 2 || a.Results[0].Outcome != "admitted" || a.Results[1].Outcome != "admitted" {
+			t.Fatalf("submission under %s: %+v", token[:6], a)
+		}
+	}
+	if got := head(t, d); got != 4 {
+		t.Fatalf("W = %d, want 4: two facets per source", got)
+	}
+	unknown := `{"type": "test.unknown", "definition_version": 1, "payload": {"id": "u-1"}}`
+	call(t, "POST", url+"/v1/envelopes", spokenToken, batch(unknown), http.StatusUnprocessableEntity, nil)
+}
+
 // Card 53: an importer's token opens the importer routes, and the operator's token
 // submits nothing. Since card 89 an importer also reads (roles_test.go).
 func TestImporterRoutesAuthorize(t *testing.T) {

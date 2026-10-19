@@ -16,7 +16,7 @@ Every version Anam holds is listed; a facet links to the one it was admitted und
 
 <div class="scroll">
 <table>
-  <thead><tr><th>type</th><th>current</th><th>versions held</th><th>origin</th><th>class</th><th>described</th></tr></thead>
+  <thead><tr><th>type</th><th>current</th><th>versions held</th><th>origin</th><th>class</th><th>kind</th><th>family</th><th>described</th></tr></thead>
   <tbody>
     {{range .Definitions}}{{$t := .Type}}
     <tr>
@@ -25,6 +25,8 @@ Every version Anam holds is listed; a facet links to the one it was admitted und
       <td>{{range $i, $v := .Versions}}{{if $i}} {{end}}<a href="/definition?type={{$t}}&v={{$v}}">v{{$v}}</a>{{end}}</td>
       <td>{{.Origin}}</td>
       <td>{{.Classification}}</td>
+      <td{{if not .Kind}} class="dim"{{end}}>{{if .Kind}}{{.Kind}}{{else}}undeclared{{end}}</td>
+      <td{{if not .Family}} class="dim"{{end}}>{{if .Family}}{{.Family}}{{else}}undeclared{{end}}</td>
       <td{{if lt .Described .Fields}} class="dim"{{end}}>{{.Described}} of {{.Fields}}</td>
     </tr>
     {{end}}

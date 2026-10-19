@@ -52,8 +52,11 @@ type defSummary struct {
 	Versions       []int
 	Origin         string
 	Classification facet.Classification
-	Fields         int
-	Described      int
+	// Kind and Family are what the Definition declares (card 176), or "" for none.
+	Kind      def.Kind
+	Family    string
+	Fields    int
+	Described int
 }
 
 func (s *Server) definitionsIndex(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +74,8 @@ func (s *Server) definitionsIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	var rows []defSummary
 	for _, d := range reg.All() {
-		row := defSummary{Type: d.Type, Current: d.Version, Origin: origin[d.Type], Classification: d.Classification}
+		row := defSummary{Type: d.Type, Current: d.Version, Origin: origin[d.Type], Classification: d.Classification,
+			Kind: d.Kind, Family: d.Family}
 		for v := range bodies[d.Type] {
 			row.Versions = append(row.Versions, v)
 		}

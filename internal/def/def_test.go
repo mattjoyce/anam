@@ -76,6 +76,40 @@ func TestParse_DefaultsAndValidation(t *testing.T) {
 	}
 }
 
+// Kind and family say what a type is, for readers (card 176): read when declared,
+// empty when not, refused when not one of the three kinds or not a lower-case word.
+// Guard ignores both, so a version that only adds them keys facets as before.
+func TestParse_KindAndFamily(t *testing.T) {
+	t.Parallel()
+	declared := strings.Replace(bpManifest, `"classification": "Normal",`,
+		`"classification": "Normal", "kind": "reading", "family": "vitals",`, 1)
+	d := mustParse(t, declared)
+	if d.Kind != def.KindReading || d.Family != "vitals" {
+		t.Errorf("kind %q family %q, want reading, vitals", d.Kind, d.Family)
+	}
+	if u := mustParse(t, bpManifest); u.Kind != "" || u.Family != "" {
+		t.Errorf("undeclared: kind %q family %q, want empty", u.Kind, u.Family)
+	}
+	bad := map[string]string{
+		"a fourth kind":                  strings.Replace(declared, `"kind": "reading"`, `"kind": "thing"`, 1),
+		"a family in capitals":           strings.Replace(declared, `"family": "vitals"`, `"family": "Vital Signs"`, 1),
+		"a family with a leading hyphen": strings.Replace(declared, `"family": "vitals"`, `"family": "-vitals"`, 1),
+	}
+	for name, m := range bad {
+		if _, err := def.Parse([]byte(m)); !errors.Is(err, def.ErrBadManifest) {
+			t.Errorf("%s: Parse = %v, want ErrBadManifest", name, err)
+		}
+	}
+	reg, err := def.NewRegistry(d)
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	stored := []def.Stored{{Type: d.Type, Version: d.Version, Body: []byte(bpManifest)}}
+	if err := def.Guard(stored, reg); err != nil {
+		t.Errorf("Guard refused a version that only adds kind and family: %v", err)
+	}
+}
+
 func TestParse_RejectsBadManifests(t *testing.T) {
 	t.Parallel()
 	breakages := map[string]func(string) string{

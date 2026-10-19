@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
@@ -140,25 +141,80 @@ var typeStyles = map[facet.Type]typeStyle{
 	"travel.flight":   {"travel", shapeCross, kindEvent},
 }
 
-func styleOf(t facet.Type) typeStyle {
-	if s, ok := typeStyles[t]; ok {
-		return s
+// styles resolves a type's place on the band for one render (card 176). A Definition
+// that declares kind and family is read first, so a type the table never named draws
+// on its family's row with its kind's marker, with no change to this file. A type
+// the table names keeps its shape unless the Definition's kind disagrees. A type
+// neither declares nor the table names goes to the "other" row as a grey circle.
+type styles struct {
+	lookup func(facet.Type) (def.Definition, bool)
+}
+
+// newStyles reads declared kind and family from reg. A nil registry declares
+// nothing, so every type draws from the table as it did before card 176.
+func newStyles(reg *def.Registry) styles {
+	if reg == nil {
+		return styles{lookup: func(facet.Type) (def.Definition, bool) { return def.Definition{}, false }}
 	}
-	return typeStyle{Family: otherFamilyID, Shape: shapeCircle, Kind: kindMeasure}
+	return styles{lookup: reg.Lookup}
+}
+
+func (s styles) of(t facet.Type) typeStyle {
+	st, listed := typeStyles[t]
+	if !listed {
+		st = typeStyle{Family: otherFamilyID, Shape: shapeCircle, Kind: kindMeasure}
+	}
+	d, ok := s.lookup(t)
+	if !ok {
+		return st
+	}
+	if d.Family != "" {
+		st.Family = d.Family
+	}
+	if d.Kind == "" {
+		return st
+	}
+	k := kindOf(d.Kind)
+	if !listed || k != st.Kind {
+		st.Kind, st.Shape = k, shapeFor(k)
+	}
+	return st
 }
 
 // isEvent says whether a type marks a thing that happened, rather than a measure
 // or a reading. The "events only" filter keeps these.
-func isEvent(t facet.Type) bool { return styleOf(t).Kind == kindEvent }
+func (s styles) isEvent(t facet.Type) bool { return s.of(t).Kind == kindEvent }
 
 // markClass is the CSS class for a type's marks: its family's hue, hollow for a
 // reading.
-func markClass(t facet.Type) string {
-	st := styleOf(t)
+func (s styles) markClass(t facet.Type) string {
+	st := s.of(t)
 	if st.Kind == kindReading {
 		return hueClass(st.Family) + " hollow"
 	}
 	return hueClass(st.Family)
+}
+
+// kindOf maps a Definition's declared kind onto the band's.
+func kindOf(k def.Kind) kind {
+	switch k {
+	case def.KindReading:
+		return kindReading
+	case def.KindEvent:
+		return kindEvent
+	default:
+		return kindMeasure
+	}
+}
+
+// shapeFor is the marker a kind takes when the table names no shape for the type:
+// the legend's key, a measure a filled circle, a reading a hollow one, an event a
+// filled shape.
+func shapeFor(k kind) shape {
+	if k == kindEvent {
+		return shapeDiamond
+	}
+	return shapeCircle
 }
 
 // hueClass is the CSS class that colours a family's marks.
@@ -223,15 +279,32 @@ func markPath(s shape, x, y float64) string {
 }
 
 // rowsFor lays out the families present among types, in row order, with "other"
-// last if anything fell into it. Each row lists its types in a stable order:
-// measures, then readings, then events, each by name.
-func rowsFor(types []facet.Type) []tlRow {
+// last if anything fell into it. A family a Definition declares and the table does
+// not know gets a row of its own, under its own word, after the known rows and in
+// the neutral grey: the eight hues are assigned once, here, and a new family earns
+// one by an edit to the table. Each row lists its types in a stable order: measures,
+// then readings, then events, each by name.
+func (s styles) rowsFor(types []facet.Type) []tlRow {
 	byFamily := map[string][]facet.Type{}
 	for _, t := range types {
-		f := styleOf(t).Family
+		f := s.of(t).Family
 		byFamily[f] = append(byFamily[f], t)
 	}
 	order := append([]family{}, families...)
+	known := map[string]bool{otherFamilyID: true}
+	for _, f := range order {
+		known[f.ID] = true
+	}
+	var declared []string
+	for f := range byFamily {
+		if !known[f] {
+			declared = append(declared, f)
+		}
+	}
+	sort.Strings(declared)
+	for _, f := range declared {
+		order = append(order, family{f, f, hueNeutral})
+	}
 	order = append(order, family{otherFamilyID, "other", hueNeutral})
 	var rows []tlRow
 	for _, f := range order {
@@ -240,7 +313,7 @@ func rowsFor(types []facet.Type) []tlRow {
 			continue
 		}
 		sort.Slice(ts, func(i, j int) bool {
-			ki, kj := styleOf(ts[i]).Kind, styleOf(ts[j]).Kind
+			ki, kj := s.of(ts[i]).Kind, s.of(ts[j]).Kind
 			if ki != kj {
 				return ki < kj
 			}

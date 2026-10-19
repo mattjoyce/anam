@@ -6,6 +6,16 @@ of the API must do or may expect, newest first, by the day they merged. Each nam
 kanban board, which holds the reasoning. The full history is `git log`; the story behind the
 decisions is in `journal/`.
 
+## 2026-10-20
+
+- A Definition's `meta` may declare `kind` (`measure`, `reading` or `event`) and `family` (a
+  lower-case word such as `meds`): what the type is, for a reader. The gate ignores both. The
+  inspector draws a type that declares them on its family's row with its kind's marker before
+  anyone edits core, and the definitions page shows them (card 176).
+- `sleep.episode`, `health.heart-rate-daily` and `health.step-count` are bundled, so another source
+  may name them. An importer re-sending the body the binary bundles, at its version, is answered
+  200 unchanged rather than 409; another body of a bundled type is still refused (card 139 piece 1).
+
 ## 2026-10-19
 
 - `anam query check` holds the bundled Datalog rule `current/2` equal to `fold.Snapshot` over a

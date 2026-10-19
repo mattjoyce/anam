@@ -41,6 +41,10 @@ if [ -n "$boundary" ]; then
   fail=1
 fi
 
+# The prose is checked too: a dead link in the README's docs index or in docs/ fails
+# the gate, so the index a stranger follows is true (card 73).
+run scripts/check-links.sh
+
 run go vet ./...
 if command -v golangci-lint >/dev/null 2>&1; then run golangci-lint run ./...; else echo "golangci-lint not installed — skipping"; fi
 if command -v gosec >/dev/null 2>&1; then run gosec -severity medium -quiet ./...; else echo "gosec not installed — skipping"; fi

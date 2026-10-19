@@ -9,6 +9,7 @@ back from a backup or by registering them again from here.
 export ANAM_SERVER=http://192.168.20.4:8787 ANAM_TOKEN_FILE=~/.config/anam/token
 anam projection register projections/heart.v1.json
 anam projection register projections/sleep.v2.json
+anam projection register projections/recent-life.v1.json
 anam projection list
 ```
 
@@ -17,5 +18,5 @@ is a new version in a new file (`<name>.v<n>.json`), and every version ever regi
 stays readable, because a receipt names the version that served it.
 
 Every type a template names must have a Definition in force on the daemon when it is
-registered. `heart` and `sleep` v2 name types the Garmin importer registers, so they
-register against the live daemon and not against a bare one.
+registered. `heart`, `sleep` v2 and `recent-life` name types the Garmin and OwnTracks importers
+register, so they register against the live daemon and not against a bare one.

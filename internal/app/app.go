@@ -45,7 +45,7 @@ func newRoot(info BuildInfo) *cobra.Command {
 	root.AddCommand(versionCmd(&cfgPath, info), statusCmd(&cfgPath, info), initCmd(&cfgPath),
 		inspectCmd(&cfgPath), timelineCmd(&cfgPath), changesCmd(&cfgPath),
 		serveCmd(&cfgPath), receiptCmd(&cfgPath), checkpointCmd(&cfgPath), retractCmd(&cfgPath), projectionCmd(&cfgPath),
-		daemonCmd(&cfgPath, info))
+		queryCmd(&cfgPath), daemonCmd(&cfgPath, info))
 	return root
 }
 

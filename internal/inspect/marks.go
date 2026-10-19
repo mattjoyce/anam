@@ -122,6 +122,9 @@ var typeStyles = map[facet.Type]typeStyle{
 	"donation.blood":  {"clinical", shapeStar, kindEvent},
 	"illness.started": {"clinical", shapeTriUp, kindEvent},
 	"illness.ended":   {"clinical", shapeTriDown, kindEvent},
+	// A lens prescription (card 36): a reading taken of the person, not a thing that
+	// happened, so a hollow circle in the clinical row.
+	"vision.prescription": {"clinical", shapeCircle, kindReading},
 
 	"doc.reference": {"documents", shapeSquare, kindEvent},
 	// A note the person wrote about one or more facets: drawn with what is written

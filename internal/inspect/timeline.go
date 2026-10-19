@@ -207,7 +207,14 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := buildTimeline(res, all, from, to, zoomed, r.URL.Query()["type"], status)
+	// The Definitions in force say what each type is (kind, family; card 176), so a
+	// registered type draws on the right row before anyone edits the table.
+	reg, err := s.definitions()
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+	data := buildTimeline(newStyles(reg), res, all, from, to, zoomed, r.URL.Query()["type"], status)
 	if s.checkpoints != nil {
 		states, summary, err := checkpointStates(ctx, s.checkpoints, res, s.buckets)
 		if err != nil {
@@ -309,7 +316,7 @@ func parseInstant(s string) (t time.Time, dateOnly bool, err error) {
 	return t, false, nil
 }
 
-func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoomed bool, typeQ []string, status statusFilter) timelineData {
+func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.Time, zoomed bool, typeQ []string, status statusFilter) timelineData {
 	x := func(t time.Time) float64 {
 		frac := float64(t.Sub(from)) / float64(to.Sub(from))
 		return bandLeft + frac*(bandW-bandLeft-bandRight)
@@ -342,7 +349,7 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 
 	// Rows come from every type in the ledger, not the filtered few, so a filter
 	// hides marks without moving the rows that are left.
-	rows, yOf := layoutRows(types)
+	rows, yOf := layoutRows(st, types)
 	rowY := map[facet.Type]float64{}
 	for _, row := range rows {
 		for _, t := range row.Types {
@@ -368,7 +375,7 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 	}
 	var events []facet.Type
 	for _, t := range types {
-		if isEvent(t) {
+		if st.isEvent(t) {
 			events = append(events, t)
 		}
 	}
@@ -392,28 +399,28 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 		if !show[f.Type] || f.FactTime.Before(from) || f.FactTime.After(to) {
 			continue
 		}
-		st := res.States[f.ID]
-		if !status.admits(st.Live()) {
+		state := res.States[f.ID]
+		if !status.admits(state.Live()) {
 			continue
 		}
-		style := styleOf(f.Type)
+		style := st.of(f.Type)
 		hue := hueClass(style.Family)
-		mark := markClass(f.Type)
+		mark := st.markClass(f.Type)
 		when := f.FactTime.UTC().Format("2006-01-02 15:04Z")
 		px, py := x(f.FactTime), yOf[f.Type]
-		key := laneKey{f.Type, st.Live()}
+		key := laneKey{f.Type, state.Live()}
 		if _, ok := lanes[key]; !ok {
 			laneOrder = append(laneOrder, key)
 		}
 		lanes[key] = append(lanes[key], laneMark{at: f.FactTime, typ: f.Type, below: py > rowY[f.Type], point: tlPoint{
 			Path: markPath(style.Shape, px, py),
-			Hue:  mark, ID: f.ID, Live: st.Live(),
+			Hue:  mark, ID: f.ID, Live: state.Live(),
 			Title: fmt.Sprintf("%s · %s · v%d %s · %s",
-				when, f.Type, f.ArtifactVersion, st.Status, f.Provenance.SourceRef),
+				when, f.Type, f.ArtifactVersion, state.Status, f.Provenance.SourceRef),
 			X: px, Y: py, MS: f.FactTime.UnixMilli(),
 		}})
 		data.Shown++
-		if st.Live() {
+		if state.Live() {
 			data.Strip = append(data.Strip, tlStripEntry{
 				ID: f.ID, Type: f.Type, Hue: hue, Title: when + " · " + string(f.Type),
 			})
@@ -426,7 +433,7 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 	}
 	data.StripCount = len(data.Strip)
 	if data.StripCount > stripMax {
-		data.Tally = tallyStrip(data.Strip, types, from, to, zoomed, view)
+		data.Tally = tallyStrip(st, data.Strip, types, from, to, zoomed, view)
 		data.Strip = nil
 	}
 
@@ -434,7 +441,7 @@ func buildTimeline(res fold.Result, all []facet.Facet, from, to time.Time, zoome
 		g := tlLegendGroup{Family: row.Family, Label: row.Label, Hue: row.Hue}
 		for _, t := range row.Types {
 			g.Entries = append(g.Entries, tlLegendEntry{
-				Type: t, Swatch: markPath(styleOf(t).Shape, 8, 8.5), Class: markClass(t),
+				Type: t, Swatch: markPath(st.of(t).Shape, 8, 8.5), Class: st.markClass(t),
 				Count: counts[t], Checked: show[t],
 			})
 		}
@@ -480,8 +487,8 @@ func bucketStrip(states []bucketState, summary tlCheckpoints, res fold.Result, f
 // layoutRows places each family's row and each type's sub-lane within it. Types
 // in a row sit a few units apart, so a day's body-composition and weight do not
 // land on the same spot.
-func layoutRows(types []facet.Type) ([]tlRow, map[facet.Type]float64) {
-	rows := rowsFor(types)
+func layoutRows(st styles, types []facet.Type) ([]tlRow, map[facet.Type]float64) {
+	rows := st.rowsFor(types)
 	yOf := map[facet.Type]float64{}
 	for i := range rows {
 		rows[i].Top, rows[i].Height = rowTop+float64(i)*rowH, rowH
@@ -527,7 +534,7 @@ func monthTicks(from, to time.Time, x func(time.Time) float64) []tlTick {
 
 // tallyStrip counts a strip by type, in the legend's order, each count linking to
 // the window narrowed to its type.
-func tallyStrip(strip []tlStripEntry, types []facet.Type, from, to time.Time, zoomed bool, view tlView) []tlTally {
+func tallyStrip(st styles, strip []tlStripEntry, types []facet.Type, from, to time.Time, zoomed bool, view tlView) []tlTally {
 	counts := map[facet.Type]int{}
 	for _, e := range strip {
 		counts[e.Type]++
@@ -539,7 +546,7 @@ func tallyStrip(strip []tlStripEntry, types []facet.Type, from, to time.Time, zo
 			continue
 		}
 		tally = append(tally, tlTally{
-			Type: t, Hue: hueClass(styleOf(t).Family), Count: n,
+			Type: t, Hue: hueClass(st.of(t).Family), Count: n,
 			Href: windowLink(from, to, zoomed, tlView{Types: []facet.Type{t}, Status: view.Status}),
 		})
 	}

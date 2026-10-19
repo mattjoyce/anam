@@ -177,7 +177,10 @@ anam-importers/
 
 A Definition is a JSON manifest in exactly the format of Anam's own (`internal/def/manifests`):
 `meta` carries the type, version, `identity_key`, `time_semantics`, classification and
-`validation_mode`; `schema` is closed JSON Schema 2020-12 (§3, prerequisite 3). A type lives in one
+`validation_mode`, and may declare `kind` (`measure`, `reading` or `event`) and `family` (a
+lower-case word such as `meds`), which say what the type is so a reader can draw and filter it
+without an edit to Anam; the gate ignores both (card 176). `schema` is closed JSON Schema 2020-12
+(§3, prerequisite 3). A type lives in one
 place. While Anam's binary bundles a type, no importer may register a version of it; an importer
 takes a type over when a release drops it from the binary, registering the same body at the same
 version. The other direction works too: a release that bundles a type an importer registered admits

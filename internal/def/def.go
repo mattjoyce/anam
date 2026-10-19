@@ -72,6 +72,31 @@ type Series struct {
 	Closes bool     `json:"closes"`
 }
 
+// Kind is what sort of fact a type records, declared in the manifest's meta so a
+// reader can draw or filter a type it has never seen (card 176). It says what a type
+// is, like Classification; it is served and read, never run by the gate. Guard and
+// Register ignore it, so a version that adds or changes it keys facets as before.
+type Kind string
+
+const (
+	// KindMeasure is a period's aggregate: a day of heart rate, a night of sleep.
+	KindMeasure Kind = "measure"
+	// KindReading is one instrument value: a blood pressure, a weight.
+	KindReading Kind = "reading"
+	// KindEvent is a thing that happened: an alert, a dose change, a visit.
+	KindEvent Kind = "event"
+)
+
+// Valid reports whether k is one of the three kinds, or empty for a type that
+// declares none.
+func (k Kind) Valid() bool {
+	switch k {
+	case "", KindMeasure, KindReading, KindEvent:
+		return true
+	}
+	return false
+}
+
 // Definition is the parsed, validated contract for one facet type at one version.
 type Definition struct {
 	Type           facet.Type
@@ -101,6 +126,13 @@ type Definition struct {
 
 	// Series is nil for a type whose facets stand alone. See Series.
 	Series *Series
+
+	// Kind is what sort of fact the type records, or "" when the manifest declares
+	// none. Family is the word a reader groups the type under ("meds", "sleep"), a
+	// lower-case hyphenated word, or "". Both say what the type is, for the inspector
+	// and any reader; the gate runs neither (card 176).
+	Kind   Kind
+	Family string
 
 	// Handling is the manifest's `handling` block as written, a JSON object, or nil
 	// when the manifest has none. Anam reads nothing inside it: it is served to whoever
@@ -133,6 +165,8 @@ type manifest struct {
 		IdentityKey         []string `json:"identity_key"`
 		MinBindingAssurance string   `json:"min_binding_assurance"`
 		Series              *Series  `json:"series"`
+		Kind                string   `json:"kind"`
+		Family              string   `json:"family"`
 	} `json:"meta"`
 	Schema   json.RawMessage `json:"schema"`
 	Handling json.RawMessage `json:"handling"`
@@ -161,6 +195,8 @@ func Parse(raw []byte) (Definition, error) {
 		IdentityKey:    m.Meta.IdentityKey,
 		MinAssurance:   facet.BindingAssurance(m.Meta.MinBindingAssurance),
 		Series:         m.Meta.Series,
+		Kind:           Kind(m.Meta.Kind),
+		Family:         m.Meta.Family,
 	}
 
 	// Defaults, applied before validation so the rules below see the final shape.
@@ -226,6 +262,10 @@ func (d Definition) validate() error {
 		return fmt.Errorf("%w: identity_key must declare at least one pointer", ErrBadManifest)
 	case !d.MinAssurance.Valid():
 		return fmt.Errorf("%w: min_binding_assurance %q", ErrBadManifest, d.MinAssurance)
+	case !d.Kind.Valid():
+		return fmt.Errorf("%w: kind %q is not measure, reading or event", ErrBadManifest, d.Kind)
+	case d.Family != "" && !validFamily(d.Family):
+		return fmt.Errorf("%w: family %q is not a lower-case hyphenated word", ErrBadManifest, d.Family)
 	}
 	for _, p := range append([]string{d.FactTime.Pointer}, d.IdentityKey...) {
 		if err := checkPointerSyntax(p); err != nil {
@@ -233,6 +273,25 @@ func (d Definition) validate() error {
 		}
 	}
 	return d.validateSeries()
+}
+
+// validFamily is the shape of one segment of a type: lower-case letters and digits
+// with hyphens inside, as the naming standard has every lower-case identifier.
+func validFamily(s string) bool {
+	if s == "" {
+		return false
+	}
+	if s[0] == '-' || s[len(s)-1] == '-' {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func (d Definition) validateSeries() error {

@@ -186,6 +186,22 @@ func (c *Client) Publish(ctx context.Context, q api.TimelineQuery) (api.Publishe
 	return p, err
 }
 
+// Query asks the daemon to run a Datalog program through a projection and answer with
+// a receipt (card 173).
+func (c *Client) Query(ctx context.Context, q api.QueryRequest) (api.QueryAnswer, error) {
+	var a api.QueryAnswer
+	_, err := c.do(ctx, c.timeout, http.MethodPost, "/v1/query", nil, q, &a)
+	return a, err
+}
+
+// QueryCatalogue asks what a query can be written against: relations, attributes
+// per type and version, the instant lexeme, the bundled rules.
+func (c *Client) QueryCatalogue(ctx context.Context) (api.QueryCatalogue, error) {
+	var cat api.QueryCatalogue
+	_, err := c.do(ctx, c.timeout, http.MethodGet, "/v1/query", nil, nil, &cat)
+	return cat, err
+}
+
 // Changes asks what Anam learned in a window of anam-time.
 func (c *Client) Changes(ctx context.Context, q api.ChangesQuery) (api.Changes, error) {
 	var ch api.Changes

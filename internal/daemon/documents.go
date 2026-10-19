@@ -19,8 +19,8 @@ import (
 )
 
 // docType is the facet type a stored document is referenced by; an importer may post
-// documents only if it may submit references to them. It names a bundled type, so it
-// is not configurable.
+// documents only if it owns the references to them (mayStore). It names a bundled
+// type, so it is not configurable.
 const docType facet.Type = "doc.reference"
 
 // The ways a document post or a reference to one is refused.
@@ -38,8 +38,8 @@ var (
 // overwritten. Where in the library it sits is the library's own business.
 func (d *Daemon) postDocument(w http.ResponseWriter, r *http.Request) {
 	imp := principalOf(r)
-	if !maySubmit(imp, docType) {
-		writeError(w, http.StatusForbidden, fmt.Errorf("%s may not submit %s, so may not store documents", imp.Source, docType))
+	if !mayStore(imp) {
+		writeError(w, http.StatusForbidden, fmt.Errorf("%s does not own %s, so may not store documents", imp.Source, docType))
 		return
 	}
 	if d.cfg.LibraryDir == "" {

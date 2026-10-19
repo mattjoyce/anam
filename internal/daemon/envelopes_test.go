@@ -182,9 +182,11 @@ func TestAnyTypeImporterSubmitsEverythingAndDefinesNothing(t *testing.T) {
 	}
 	d, url, _ := serveImporters(t, cfg)
 
-	// test-import owns test.reading and registers it; the conversation may not.
+	// test-import owns test.reading and registers it; the conversation may not. Nor
+	// may it store a document: any_type reaches facets, not the library.
 	call(t, "POST", url+"/v1/definitions", spokenToken, readingManifest, http.StatusForbidden, nil)
 	call(t, "POST", url+"/v1/definitions", importerToken, readingManifest, http.StatusCreated, nil)
+	call(t, "POST", url+"/v1/documents?ext=pdf", spokenToken, "%PDF-1.4 spoken", http.StatusForbidden, nil)
 
 	// The conversation submits a bundled type and a registered one, each a facet of
 	// its own beside the owner's.

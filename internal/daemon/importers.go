@@ -16,12 +16,24 @@ import (
 // maySubmit reports whether imp may submit facets of type t: one of its types, or
 // any with any_type.
 func maySubmit(imp config.Principal, t facet.Type) bool {
-	return imp.AnyType || mayRegister(imp, t)
+	return imp.AnyType || lists(imp, t)
 }
 
 // mayRegister reports whether imp owns type t, and so may register its
 // Definitions. An any_type importer owns nothing (card 177).
 func mayRegister(imp config.Principal, t facet.Type) bool {
+	return lists(imp, t)
+}
+
+// mayStore reports whether imp may post a document's bytes to the library: it lists
+// doc.reference. any_type reaches every facet type and not the library, which takes
+// bytes only from a source that owns the references to them (card 177's audit).
+func mayStore(imp config.Principal) bool {
+	return lists(imp, docType)
+}
+
+// lists reports whether t is one of imp's types.
+func lists(imp config.Principal, t facet.Type) bool {
 	for _, allowed := range imp.Types {
 		if allowed == t {
 			return true

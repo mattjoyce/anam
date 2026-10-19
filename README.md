@@ -126,7 +126,7 @@ drops it from the current value and never from the ledger.
 
 Every fact is a **facet** of a named type, and each type has a versioned **Definition**: a JSON
 Schema, which field names the facet, and which field says when it was true. Definitions are
-immutable once published, so a change is a new version. Anam bundles the 27 below, and importers
+immutable once published, so a change is a new version. Anam bundles the 28 below, and importers
 register more. A running daemon lists what it holds at `GET /v1/definitions` and in the
 inspector's definitions page; the bundled files are in
 [`internal/def/manifests/`](internal/def/manifests/), and the gate checks this table against them.
@@ -157,6 +157,7 @@ Adding a type is a Definition file, not code.
 | `lab.result` | 4 | One analyte's result from one draw | `id` | `collected` |
 | `donation.blood` | 4 | One visit to give blood | `id` | `date` |
 | `visit.clinic` | 4 | One appointment with a clinic or practitioner | `id` | `date` |
+| `vision.prescription` | 1 | One lens prescription as an optometrist issued it, each eye as printed | `id` | `date` |
 | `travel.departed` | 4 | Leaving home on a trip | `id` | `date` |
 | `travel.flight` | 4 | One flight leg | `id` | `date` |
 | `travel.arrived` | 4 | Arriving at one place during a trip | `id` | `date` |

@@ -8,6 +8,10 @@ decisions is in `journal/`.
 
 ## 2026-10-19
 
+- `anam query check` holds the bundled Datalog rule `current/2` equal to `fold.Snapshot` over a
+  real ledger, read-only, one instant at a time; `--ledger` and `--person` point it at a copy,
+  `--projection` serves the log through a template first, `--every` samples the fact-times. The
+  evaluator itself (`internal/query`) has no other surface yet (card 173).
 - `long_write_timeout` names the daemon's long-write deadline. `ingest_timeout` and
   `ANAM_INGEST_TIMEOUT` are read as an alias with a warning at load; the two set differently are
   refused (card 156).

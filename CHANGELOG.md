@@ -8,6 +8,11 @@ decisions is in `journal/`.
 
 ## 2026-10-19
 
+- `record.link`, a file Anam remembers but does not hold (card 165), is registered by the
+  `anam_links` importer in anam-importers, not bundled. The inspector draws it in the documents
+  row and its facet page says the bytes are not held and offers no download; `docs/INBOX.md`
+  says when to use it and when `doc.reference`. No daemon change: the held-bytes refusal was
+  already keyed on `doc.reference`.
 - `anam query check` holds the bundled Datalog rule `current/2` equal to `fold.Snapshot` over a
   real ledger, read-only, one instant at a time; `--ledger` and `--person` point it at a copy,
   `--projection` serves the log through a template first, `--every` samples the fact-times. The

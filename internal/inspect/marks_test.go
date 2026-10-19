@@ -208,3 +208,17 @@ func TestTypeFilter(t *testing.T) {
 		})
 	}
 }
+
+// A record.link (card 165) is a document the library has no bytes for, registered
+// by the links importer: it draws in the documents row, as an event, with a shape
+// of its own there.
+func TestTypeStyles_LinkDrawsInTheDocumentsRow(t *testing.T) {
+	t.Parallel()
+	got, ref := styleOf("record.link"), styleOf("doc.reference")
+	if got.Family != ref.Family || got.Family == otherFamilyID {
+		t.Errorf("record.link is in the %s row, doc.reference in %s", got.Family, ref.Family)
+	}
+	if got.Kind != kindEvent || got.Shape == ref.Shape {
+		t.Errorf("record.link: want an event with its own shape, got %s/%d beside %s", got.Shape, got.Kind, ref.Shape)
+	}
+}

@@ -117,6 +117,19 @@ confined to it, under the document's own file name.
 A second documents folder is a second `anam_documents` instance with its own `documents_dir`; the
 folder is config and never enters a fact, and every path is relative to it.
 
+There are two ways to make a document a fact, and the difference is who keeps the bytes. Use
+`doc.reference` for a primary document handed to the library: the bytes are posted to Anam, the
+library is their backup, and a receipt over the facet can always reach them. Use `record.link`
+(card 165, from `anam_links` in anam-importers) for a file that belongs to another tool and stays
+where it lives, a note in a vault, a photo in a camera roll, a screenshot: the facet records that a
+file with this name, sha256, size and date was seen under a declared folder, and Anam takes no
+bytes, follows no path and serves nothing from the folder. A `record.link` whose sha256 the
+library does not hold is admitted, since the held-bytes refusal is keyed on `doc.reference`; the
+inspector says the bytes are not held and offers no download. When the importer stops finding the
+file it supersedes the facet with `unseen: true` and never retracts it, so the earlier version
+stands as what was. A receipt over a `record.link` therefore promises the observation, that this
+was recorded of the file at that time, and never the bytes.
+
 ## Extractors
 
 The extractors live in `anam-importers` under `records/extract` (card 58; Anam's copies went with

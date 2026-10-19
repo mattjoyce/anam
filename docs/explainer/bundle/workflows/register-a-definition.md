@@ -45,10 +45,10 @@ steps:
   - actor: /components/def.md
     caller: /components/daemon.md
     label: Register checks bundled and held
-    action: A type the binary bundles is `ErrBundled` (409). The same canonical body at a held version is adopted or unchanged; a different body at a held version is `ErrRegistered` (409).
+    action: A type the binary bundles is `ErrBundled` (409), unless the body is the one the binary carries at that version, which is unchanged (200) so a release taking a type back does not break the importer still sending it (card 139). The same canonical body at a held version is adopted or unchanged; a different body at a held version is `ErrRegistered` (409).
     reads: [/data-structures/definition-manifest.md]
     resource: internal/def/register.go#Register
-    anchor: "if _, ok := bundled.Lookup(d.Type); ok {"
+    anchor: "if b, ok := bundled.Lookup(d.Type); ok {"
   - actor: /components/def.md
     label: version forward, keying unchanged
     action: A version behind the newest held is `ErrVersionBehind`; a new version that changes `identity_key` or `time_semantics.fact_time` is `ErrKeyed`. Schema, classification and series may change freely, because a new keying rule needs a new ledger, not a new version.

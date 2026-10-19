@@ -11,7 +11,9 @@ import (
 // The ways a registration is refused. Each leaves the registered set as it was.
 var (
 	// ErrBundled: the type ships with this binary. A type's Definitions live in one
-	// place; an importer takes a type over once the binary stops carrying it.
+	// place; an importer takes a type over once the binary stops carrying it. The one
+	// body the binary carries at the type's version is unchanged, not this error, so a
+	// release that takes a type back does not break the importer still sending it.
 	ErrBundled = errors.New("def: type is bundled with this binary")
 
 	// ErrRegistered: a different body is already registered at this type and version.
@@ -44,12 +46,12 @@ func Register(body []byte, stored, registered []Stored, bundled *Registry) (Regi
 	if err != nil {
 		return Registration{}, err
 	}
-	if _, ok := bundled.Lookup(d.Type); ok {
-		return Registration{}, fmt.Errorf("%w: %s", ErrBundled, d.Type)
-	}
 	canon, err := facet.Canonicalize(body)
 	if err != nil {
 		return Registration{}, fmt.Errorf("%w: %v", ErrBadManifest, err)
+	}
+	if b, ok := bundled.Lookup(d.Type); ok {
+		return bundledUnchanged(d, canon, b, stored)
 	}
 
 	reg, newest, found, err := againstHeld(d, canon, stored, registered)
@@ -70,6 +72,33 @@ func Register(body []byte, stored, registered []Stored, bundled *Registry) (Regi
 		return Registration{}, fmt.Errorf("%w: %s v%d → v%d: %v", ErrKeyed, d.Type, newest.Version, d.Version, err)
 	}
 	return Registration{Definition: d, New: true}, nil
+}
+
+// bundledUnchanged decides a registration of a type this binary bundles. The body the
+// binary carries at d's version, as the store holds it, is unchanged: a release that
+// takes a type back from an importer must not break the importer still sending that
+// body, whichever is deployed first (card 139). Anything else is ErrBundled, since a
+// type's Definitions live in one place and only the binary changes a bundled one.
+func bundledUnchanged(d Definition, canon facet.Canonical, b Definition, stored []Stored) (Registration, error) {
+	if d.Version == b.Version {
+		for _, s := range stored {
+			if s.Type != d.Type {
+				continue
+			}
+			if s.Version != d.Version {
+				continue
+			}
+			same, err := sameBody(canon, s.Body)
+			if err != nil {
+				return Registration{}, fmt.Errorf("def: held definition %s v%d: %w", s.Type, s.Version, err)
+			}
+			if same {
+				return Registration{Definition: d, New: false}, nil
+			}
+			break
+		}
+	}
+	return Registration{}, fmt.Errorf("%w: %s", ErrBundled, d.Type)
 }
 
 // againstHeld looks for d's own version among what is held. found says it is there,
@@ -128,8 +157,9 @@ func sameBody(canon facet.Canonical, held []byte) (bool, error) {
 // bundled Definitions, and the newest registered version of every other type.
 //
 // A type both bundled and registered is a release that took a type back from an
-// importer. The bundled Definition wins: Register refuses the type from then on, and
-// its registered rows stay held, immutable, for the facets admitted under them.
+// importer. The bundled Definition wins: Register refuses any other body of the type
+// from then on, answers the one it carries as unchanged, and its registered rows stay
+// held, immutable, for the facets admitted under them.
 func WithRegistered(bundled *Registry, registered []Stored) (*Registry, error) {
 	newest := map[facet.Type]Stored{}
 	for _, s := range registered {

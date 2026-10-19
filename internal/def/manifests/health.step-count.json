@@ -1,0 +1,103 @@
+{
+  "meta": {
+    "facet_type": "health.step-count",
+    "definition_version": 1,
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "omh/step-count-3.0",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/effective_time_frame/time_interval/start_date_time",
+        "layout": "2006-01-02T15:04:05Z07:00",
+        "zone": "Australia/Sydney"
+      }
+    },
+    "identity_key": [
+      "/id"
+    ],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One day's steps as an Open mHealth step-count-3.0 body (omh:step-count:3.0, pinned), with the source's key for the day beside it. Garmin writes it through the anam_garmin importer (source garmin) from GarminDB's daily_summary.",
+    "type": "object",
+    "required": [
+      "id",
+      "step_count",
+      "effective_time_frame"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The source's key for the day, prefixed with what it is. For Garmin, \"steps:\" and the day as GarminDB files it, a local date. Under one source no two types share an id: a facet's id is the source plus its identity values, without the type.",
+        "examples": [
+          "steps:2026-10-09"
+        ]
+      },
+      "step_count": {
+        "type": "object",
+        "description": "The day's steps as an OMH unit-value.",
+        "required": [
+          "value",
+          "unit"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Steps, as the source counted them.",
+            "examples": [
+              6219
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "steps"
+            ],
+            "description": "Always steps."
+          }
+        }
+      },
+      "effective_time_frame": {
+        "type": "object",
+        "description": "The day counted, as an OMH time interval: local midnight to the next, in Australia/Sydney with that day's offset. The start is the fact time.",
+        "required": [
+          "time_interval"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "time_interval": {
+            "type": "object",
+            "required": [
+              "start_date_time",
+              "end_date_time"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "start_date_time": {
+                "type": "string",
+                "minLength": 1,
+                "description": "RFC 3339, the day's local midnight.",
+                "examples": [
+                  "2026-10-09T00:00:00+11:00"
+                ]
+              },
+              "end_date_time": {
+                "type": "string",
+                "minLength": 1,
+                "description": "RFC 3339, the next day's local midnight.",
+                "examples": [
+                  "2026-10-10T00:00:00+11:00"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

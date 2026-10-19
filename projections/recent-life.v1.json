@@ -1,0 +1,23 @@
+{
+  "name": "recent-life",
+  "version": 1,
+  "description": "Recent daily life for an assistant: travel, places stayed, exercise, sleep, steps, illness and notes. It does not serve medicines, laboratory results, conditions, blood pressure, heart rate, documents or hourly location tracks. The reader sets the time window, usually the last seven days. The type list is the boundary, because most of these types are Sensitive.",
+  "types": [
+    "travel.departed",
+    "travel.flight",
+    "travel.arrived",
+    "travel.returned",
+    "location.stay",
+    "exercise.session",
+    "sleep.episode",
+    "health.step-count",
+    "illness.started",
+    "illness.ended",
+    "note.annotation"
+  ],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

@@ -31,8 +31,9 @@ depends_on:
 | `timeline`, `changes`, `status`, `receipt`, `checkpoint`, `projection` | ledger read-only | yes |
 | `serve` | ledger read-only, artifacts | no, local only |
 | `retract` | ledger read-only to plan, read-write with `--yes` | no, refuses to run with a server configured |
+| `rename` | ledger read-only to plan, read-write with `--yes` | no, refuses to run with a server configured |
 | `inspect` | ledger read-only | prints the daemon URL when one is set |
 
-Routing is one function, `loadRoutedConfig`: with `server` set the command builds a [client](/components/client.md); without it the command opens the files. Commands that must own the files (`daemon`, `retract`, `serve`) call `loadConfig`, which refuses a configured server.
+Routing is one function, `loadRoutedConfig`: with `server` set the command builds a [client](/components/client.md); without it the command opens the files. Commands that must own the files (`daemon`, `retract`, `rename`, `serve`) call `loadConfig`, which refuses a configured server.
 
-There is no `ingest` command since card 119. Facts reach the ledger only from importers, through the daemon's `POST /v1/envelopes`; the CLI writes the ledger only to create it (`init`) and to tombstone (`retract --yes`). `openLedgerForWrite` and `registryOf` live in `init.go`.
+There is no `ingest` command since card 119. Facts reach the ledger only from importers, through the daemon's `POST /v1/envelopes`; the CLI writes the ledger only to create it (`init`), to tombstone (`retract --yes`), and to carry facets into a renamed type as new versions of themselves (`rename --yes`, card 140, [workflow](/workflows/rename-a-type.md)). `openLedgerForWrite` and `registryOf` live in `init.go`.

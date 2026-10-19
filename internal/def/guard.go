@@ -106,6 +106,28 @@ func sameKeying(old, now keying) error {
 	return nil
 }
 
+// Keying is the part of a Definition that says what its facets are: the identity key
+// that composes the id and the fact-time rule that places them. Guard compares it
+// across versions of one type; a rename (card 140) compares it across two types,
+// since a facet carried into a type keyed differently would not meet its own id.
+type Keying struct {
+	IdentityKey []string
+	FactTime    TimeField
+}
+
+// KeyingOf reads only the keying from a stored manifest body, as Guard does, so a
+// body in an older format than Parse accepts still answers.
+func KeyingOf(body []byte) (Keying, error) {
+	k, err := keyingOf(body)
+	return Keying(k), err
+}
+
+// SameKeying reports whether d keys and places facets as k does; the error names the
+// rule that differs.
+func (d Definition) SameKeying(k Keying) error {
+	return sameKeying(keying(k), keying{IdentityKey: d.IdentityKey, FactTime: d.FactTime})
+}
+
 func equalStrings(a, b []string) bool {
 	if len(a) != len(b) {
 		return false

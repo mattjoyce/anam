@@ -19,6 +19,7 @@ depends_on:
 | `Guard` | at daemon start (`guardBundled`), refuses a stored version whose `identity_key` or `fact_time` differs from the bundled one |
 | `Register` | decides an importer's registration: bundled type is `ErrBundled` unless it is the body the binary carries (unchanged, card 139), same body is adopted, different body at a held version is `ErrRegistered`, older version is `ErrVersionBehind`, re-keyed is `ErrKeyed` |
 | `WithRegistered` | the live registry: bundled first, registered rows for types the binary does not carry |
+| `KeyingOf`, `Definition.SameKeying` | the keying (`identity_key`, `fact_time`) read from a stored body as Guard reads it, and whether a Definition keys alike; what a rename compares across two types, since different keying would give different ids (card 140) |
 | `SetVersion` | a hash over the bundled manifests, pinned into receipts |
 | `Registry.Closes` | whether a type closes its series, for the snapshot read |
 

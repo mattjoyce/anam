@@ -209,7 +209,11 @@ importers:
   own none: it registers no Definition (403), and a type with no Definition is refused to it as to
   anyone. It is for a source that is the person speaking, `conversation` (card 177); the source in
   every facet's identity keeps what the person asserts apart from what a device observed of the
-  same kind. `types` and `any_type` together are refused at start.
+  same kind. `types` and `any_type` together are refused at start. Two edges to know: `any_type`
+  reaches facets and not the library, so `POST /v1/documents` stays with a source that lists
+  `doc.reference`; and a series is not source-stamped as an identity is, so in a snapshot read the
+  latest entry of a series wins whatever its source, and the person saying `med.stopped` closes
+  the course the records file started.
 - An importer's token opens `POST /v1/envelopes`, `POST /v1/documents` and `POST /v1/definitions`,
   and since card 89 every read a `reader` has: the record, receipts, Definitions, and its own
   source's snapshots. It does not open minting, backups, projection templates or the inspector

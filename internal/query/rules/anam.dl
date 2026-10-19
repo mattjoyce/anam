@@ -1,0 +1,34 @@
+% Anam's bundled rule set (card 173): its reading of its own time semantics, for a
+% query to build on. The base relations are
+%   entry(E, Type, FactTime, Series, Status, Source, DefinitionVersion)
+%   attr(E, Pointer, Value)
+%   closes(Type)
+% and instant/1 is the parameter: the fact-times a query asks about. The query
+% defines it, as facts or as a rule; without it current/2 and displaced/2 are empty.
+%
+%   instant("2026-06-15T00:00:00.000000000Z").
+%   instant(At) :- entry(_, "health.blood-pressure", At, _, _, _, _).
+instant/1.
+
+% before(E, At): E is at or before At. Fact-times are fixed-width, so the lexical
+% order is the chronological one.
+before(E, At) :- entry(E, _, T, _, _, _, _), instant(At), T <= At.
+
+% later(E, F): F follows E in the value's order within one series: later in time, or
+% at the same instant with the greater id. The same tie the fold breaks.
+later(E, F) :- entry(E, _, T, S, _, _, _), entry(F, _, U, S, _, _, _), S != "", T < U.
+later(E, F) :- entry(E, _, T, S, _, _, _), entry(F, _, T, S, _, _, _), S != "", E < F.
+
+% displaced(E, At): a later statement about E's series stands at or before At.
+displaced(E, At) :- later(E, F), before(F, At).
+
+% latest(E, At): E is the latest of its series at At.
+latest(E, At) :- before(E, At), entry(E, _, _, S, _, _, _), S != "", not displaced(E, At).
+
+% closed(E, At): E is the latest of its series at At and its type closes the series.
+closed(E, At) :- latest(E, At), entry(E, Type, _, _, _, _, _), closes(Type).
+
+% current(E, At): the last-known value at At, what fold.Snapshot keeps: every entry
+% at or before At that no later entry of its series has displaced and that does not
+% close its series. An entry without a series is current from its fact-time on.
+current(E, At) :- before(E, At), not displaced(E, At), not closed(E, At).

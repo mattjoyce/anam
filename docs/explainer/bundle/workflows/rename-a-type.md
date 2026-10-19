@@ -71,7 +71,7 @@ steps:
     anchor: "ps[i].renamedFrom = renames[i].From"
   - actor: /components/cli.md
     label: a block that fails names how far the run got
-    action: The error says how many were carried of how many, and to re-run. A facet already carried sits under its new type, so the fold does not list it again: the run again plans only what is left.
+    action: The error says how many were carried of how many, and to re-run. A facet already carried sits under its new type, so the fold does not list it again, so the run again plans only what is left.
     resource: internal/app/renamerun.go#renameAll
     anchor: "re-run to finish"
   - actor: /components/read.md

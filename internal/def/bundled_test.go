@@ -29,16 +29,18 @@ func TestBundled_HoldsTheHealthDBTypes(t *testing.T) {
 		t.Errorf("health.blood-pressure identity_key = %v, want [/date_excel /reading]", bp.IdentityKey)
 	}
 
-	for _, typ := range []facet.Type{
-		"health.sleep", "health.body-composition", "health.heart-rate", "health.metric-group",
+	// The three retired at card 55 are left as written, at v3; body composition stays
+	// live and took kind and family at v4 (card 147).
+	for typ, version := range map[facet.Type]int{
+		"health.sleep": 3, "health.body-composition": 4, "health.heart-rate": 3, "health.metric-group": 3,
 	} {
 		d, ok := reg.Lookup(typ)
 		if !ok {
 			t.Errorf("no bundled definition for %s", typ)
 			continue
 		}
-		if d.Version != 3 || d.Classification != facet.ClassificationSensitive {
-			t.Errorf("%s = v%d %s, want v3 Sensitive", typ, d.Version, d.Classification)
+		if d.Version != version || d.Classification != facet.ClassificationSensitive {
+			t.Errorf("%s = v%d %s, want v%d Sensitive", typ, d.Version, d.Classification, version)
 		}
 		// All four share the identity grain: one facet per (group, period_type,
 		// period_start). The worker composes source_ref on the same promise.
@@ -55,7 +57,7 @@ func TestBundled_MedTypesShareTheRegimenSeries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Bundled: %v", err)
 	}
-	for _, typ := range []facet.Type{"med.started", "med.dose-changed", "med.stopped"} {
+	for _, typ := range []facet.Type{"health.medication-started", "health.medication-dose-changed", "health.medication-stopped"} {
 		d, ok := reg.Lookup(typ)
 		if !ok {
 			t.Errorf("no bundled definition for %s", typ)
@@ -68,8 +70,8 @@ func TestBundled_MedTypesShareTheRegimenSeries(t *testing.T) {
 			t.Errorf("%s = %s %s, want Sensitive strict", typ, d.Classification, d.Mode)
 		}
 	}
-	if !reg.Closes("med.stopped") || reg.Closes("med.started") || reg.Closes("med.dose-changed") {
-		t.Error("only med.stopped closes the regimen")
+	if !reg.Closes("health.medication-stopped") || reg.Closes("health.medication-started") || reg.Closes("health.medication-dose-changed") {
+		t.Error("only health.medication-stopped closes the regimen")
 	}
 }
 
@@ -88,14 +90,14 @@ func TestBundled_LifeEventTypes(t *testing.T) {
 		series string
 		closes bool
 	}{
-		{"illness.started", facet.ClassificationSensitive, "illness.episode", false},
-		{"illness.ended", facet.ClassificationSensitive, "illness.episode", true},
-		{"travel.departed", facet.ClassificationConfidential, "travel.trip", false},
-		{"travel.arrived", facet.ClassificationConfidential, "travel.trip", false},
-		{"travel.returned", facet.ClassificationConfidential, "travel.trip", true},
-		{"travel.flight", facet.ClassificationConfidential, "", false},
-		{"donation.blood", facet.ClassificationSensitive, "", false},
-		{"gym.visit", facet.ClassificationConfidential, "", false},
+		{"health.illness-started", facet.ClassificationSensitive, "illness.episode", false},
+		{"health.illness-ended", facet.ClassificationSensitive, "illness.episode", true},
+		{"place.departed", facet.ClassificationConfidential, "travel.trip", false},
+		{"place.arrived", facet.ClassificationConfidential, "travel.trip", false},
+		{"place.returned", facet.ClassificationConfidential, "travel.trip", true},
+		{"place.flight", facet.ClassificationConfidential, "", false},
+		{"health.donation", facet.ClassificationSensitive, "", false},
+		{"activity.gym-visit", facet.ClassificationConfidential, "", false},
 	}
 	for _, c := range cases {
 		d, ok := reg.Lookup(c.typ)
@@ -132,9 +134,9 @@ func TestBundled_FlightIsDatedWhereItLeft(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Bundled: %v", err)
 	}
-	d, ok := reg.Lookup("travel.flight")
+	d, ok := reg.Lookup("place.flight")
 	if !ok {
-		t.Fatal("no bundled definition for travel.flight")
+		t.Fatal("no bundled definition for place.flight")
 	}
 	cases := []struct{ date, want string }{
 		{"2018-10-10 +01:00", "2018-10-09T23:00:00Z"}, // SQ317 out of London, BST
@@ -158,7 +160,7 @@ func TestBundled_FlightIsDatedWhereItLeft(t *testing.T) {
 	}
 }
 
-// doc.reference is the first reference-kind type: the descriptor says the payload is
+// record.document is the first reference-kind type: the descriptor says the payload is
 // a pointer, and the Definition requires what the pointer must say.
 func TestBundled_DocReferenceIsAReference(t *testing.T) {
 	t.Parallel()
@@ -166,12 +168,12 @@ func TestBundled_DocReferenceIsAReference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Bundled: %v", err)
 	}
-	d, ok := reg.Lookup("doc.reference")
+	d, ok := reg.Lookup("record.document")
 	if !ok {
-		t.Fatal("no bundled definition for doc.reference")
+		t.Fatal("no bundled definition for record.document")
 	}
 	if d.PayloadKind != facet.PayloadReference || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/path" {
-		t.Errorf("doc.reference = kind %s identity %v", d.PayloadKind, d.IdentityKey)
+		t.Errorf("record.document = kind %s identity %v", d.PayloadKind, d.IdentityKey)
 	}
 	bp, _ := reg.Lookup("health.blood-pressure")
 	if bp.PayloadKind != facet.PayloadVerbatim {
@@ -190,7 +192,7 @@ func TestRegistry_Identify(t *testing.T) {
 	payload := []byte(`{"path":"scans/bp.jpg","sha256":"00","media_type":"image/jpeg","bytes":10,"date":"2024-09-16"}`)
 	want := facet.SourceRef("documents", "scans/bp.jpg")
 	for _, carried := range []string{"", want, "documents:something-else"} {
-		env := facet.Envelope{Type: "doc.reference", Source: "documents", SourceRef: carried, Payload: payload}
+		env := facet.Envelope{Type: "record.document", Source: "documents", SourceRef: carried, Payload: payload}
 		if got, err := reg.Identify(env); err != nil || got != want {
 			t.Errorf("carrying %q: Identify = %q, %v; want %q", carried, got, err, want)
 		}
@@ -201,16 +203,16 @@ func TestRegistry_Identify(t *testing.T) {
 }
 
 // The lab extraction script writes time_unknown on a draw whose report printed no
-// time. The bundled lab.result must admit what its own extractor writes.
+// time. The bundled health.lab-result must admit what its own extractor writes.
 func TestBundled_LabResultAdmitsAnUntimedDraw(t *testing.T) {
 	t.Parallel()
 	reg, err := def.Bundled()
 	if err != nil {
 		t.Fatalf("def.Bundled: %v", err)
 	}
-	d, ok := reg.Lookup("lab.result")
+	d, ok := reg.Lookup("health.lab-result")
 	if !ok {
-		t.Fatal("no bundled lab.result")
+		t.Fatal("no bundled health.lab-result")
 	}
 	var payload map[string]any
 	if err := json.Unmarshal([]byte(`{"id": "acl:12345678/potassium", "collected": "2026-03-04 00:00",
@@ -231,7 +233,8 @@ func TestBundled_LabResultAdmitsAnUntimedDraw(t *testing.T) {
 // source's own fields beside it. Its identity and fact time are v3's, so the guard
 // passes and the readings supersede in place; a v3-shaped payload is refused. Card
 // 97: v5 names the six export columns v4 refused, as text, so one ticked checkbox
-// no longer stops the export. The bundled file is byte for byte the importer's.
+// no longer stops the export. Card 147: v6 is v5 declaring kind and family. The
+// bundled file is byte for byte the importer's.
 func TestBundled_BloodPressureIsAnOMHBody(t *testing.T) {
 	t.Parallel()
 	reg, err := def.Bundled()
@@ -242,7 +245,7 @@ func TestBundled_BloodPressureIsAnOMHBody(t *testing.T) {
 	if !ok {
 		t.Fatal("no bundled health.blood-pressure")
 	}
-	if d.Version != 5 || d.FactTime.Pointer != "/date_excel" || len(d.IdentityKey) != 2 {
+	if d.Version != 6 || d.FactTime.Pointer != "/date_excel" || len(d.IdentityKey) != 2 || d.Kind != def.KindReading || d.Family != "vitals" {
 		t.Fatalf("v%d fact time %s identity %v", d.Version, d.FactTime.Pointer, d.IdentityKey)
 	}
 	decode := func(s string) map[string]any {
@@ -290,11 +293,11 @@ func TestBundled_NoteAnnotationIsThePersonsWords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, ok := reg.Lookup("note.annotation")
+	d, ok := reg.Lookup("record.note")
 	if !ok {
-		t.Fatal("no bundled note.annotation")
+		t.Fatal("no bundled record.note")
 	}
-	if d.Version != 3 || d.FactTime.Pointer != "/at" || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" {
+	if d.Version != 1 || d.FactTime.Pointer != "/at" || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" {
 		t.Fatalf("v%d fact time %s identity %v", d.Version, d.FactTime.Pointer, d.IdentityKey)
 	}
 	decode := func(s string) map[string]any {
@@ -337,9 +340,9 @@ func TestBundledVisionPrescription(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, ok := reg.Lookup("vision.prescription")
+	d, ok := reg.Lookup("health.vision-prescription")
 	if !ok {
-		t.Fatal("no bundled vision.prescription")
+		t.Fatal("no bundled health.vision-prescription")
 	}
 	if d.Version != 1 || d.FactTime.Pointer != "/date" || d.FactTime.Layout != "2006-01-02" ||
 		len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" || d.Series != nil {

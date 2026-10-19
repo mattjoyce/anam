@@ -1,7 +1,7 @@
 # Workflows
 
 * [Admit a batch](admit-a-batch.md) - One blood-pressure export dropped in a watched folder becomes a facet in the ledger, an index row, and a minted checkpoint, with every call between the importer repo and the service traced.
-* [Hand Anam a document](hand-anam-a-document.md) - anam_documents names a scanned letter and its sidecar in a batch; anam_submit posts the bytes to POST /v1/documents, the daemon stores them in the library as <sha256>.<ext> through the write queue, and the doc.reference that names them is admitted only if the library holds bytes with its sha256.
+* [Hand Anam a document](hand-anam-a-document.md) - anam_documents names a scanned letter and its sidecar in a batch; anam_submit posts the bytes to POST /v1/documents, the daemon stores them in the library as <sha256>.<ext> through the write queue, and the record.document that names them is admitted only if the library holds bytes with its sha256.
 * [Mint checkpoints](mint-checkpoints.md) - anam checkpoint over the daemon rebuilds only the buckets the events since the last run touched, writes a new version for each whose hash moved, and seals the log.
 * [Publish a projection](publish-a-projection.md) - anam serve bp prunes the canonical at the head with the bp template, writes the served value and a receipt that pins what was shown, and prints the receipt hash.
 * [Read the timeline](read-the-timeline.md) - anam timeline --from 2026-01-01 --to 2026-02-01 against the daemon, answered by composing the last mint's checkpoints with the tail of events, or by a full fold when the checkpoint log cannot be trusted.

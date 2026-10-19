@@ -107,7 +107,7 @@ governing metadata* — deliberately **not** a normalised domain entity. Three p
   any other payload (`path`, `sha256`, `media_type`, `bytes`, `date`), so the descriptor describes the
   payload it holds — `application/json`, kind `reference`, hash over the reference — and the reference
   describes what it points at. One integrity invariant for both kinds. The first reference type is
-  `doc.reference`, from the `documents` folder source (built 2026-10-07;
+  `record.document`, from the `documents` folder source (built 2026-10-07;
   `journal/notes/reference-payloads.md`).
 
 Two rules make this safe:
@@ -256,8 +256,8 @@ Anam-time gains real resolution only when ingest becomes incremental — worth k
 
 > **The last-known-value read is the snapshot** (`fold.Snapshot`, built 2026-10-07; `SELF-LOG.md` §2).
 > "The facts as of January" most often means *the latest statement before January about each thing*,
-> and "each thing" is neither an identity (every change is its own row) nor a type (`med.started` and
-> `med.stopped` are one regimen). It is the **series**: a Definition declares a series family, the key
+> and "each thing" is neither an identity (every change is its own row) nor a type (`health.medication-started` and
+> `health.medication-stopped` are one regimen). It is the **series**: a Definition declares a series family, the key
 > pointers that name one series within it, and whether its type **closes** the series. The gate composes
 > `<family>:<values>` and stamps it on the facet as metadata, beside `fact_time`, so the snapshot groups
 > on it without opening a payload. The snapshot at `D` keeps the latest entry per series at or before
@@ -611,7 +611,7 @@ running.
 
 **The ledger's directory is the record, and the backup unit.** Beside `ledger.db` sit the published
 artifacts (`artifacts/`) and the **default library** (`documents/`): the primary source documents the
-facts were extracted from, each referenced by a `doc.reference` that names it and its sha256. Anam
+facts were extracted from, each referenced by a `record.document` that names it and its sha256. Anam
 alone writes the library (`POST /v1/documents`, card 102) and names each file by its sha256 (card 150),
 so a stored file is a value: never overwritten, never renamed, found by its name. Where a file sits
 is the library's business, and neither the root nor the folder enters a fact: the facet carries the
@@ -897,7 +897,7 @@ one or two projections plus a CLI timeline viewer, manual mint, and receipts. Re
 
 **Deferred, not forgotten:**
 
-- **Binary / native-reference facets** — `doc.reference` is built over a folder source (2026-10-07).
+- **Binary / native-reference facets** — `record.document` is built over a folder source (2026-10-07).
   Anam never serves the bytes; the inspector shows the path and hash. A removed file is retracted
   by `anam retract`, deliberately; EXIF is not read, a sidecar carries the date.
 - **Adaptive mint cadence (time-OR-size-OR-rate)** — manual `checkpoint` only; the bucket-span seam and

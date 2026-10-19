@@ -28,7 +28,7 @@ import (
 // query evaluates over. A snapshot-shaped one has already taken latest-per-series.
 const logTemplate = `{
   "name": "everything", "version": 1, "description": "every type, as a log",
-  "types": ["health.blood-pressure", "health.weight", "med.started", "med.dose-changed", "med.stopped"],
+  "types": ["health.blood-pressure", "health.weight", "health.medication-started", "health.medication-dose-changed", "health.medication-stopped"],
   "statuses": ["admitted", "endorsed"], "max_classification": "Sensitive",
   "from": "", "to": "", "shape": "log"
 }`
@@ -51,7 +51,7 @@ func newHarness(t *testing.T) *harness {
 	scopes := gate.StaticScopes{
 		"bp-csv":    {"health.blood-pressure"},
 		"health-db": {"health.weight"},
-		"self-log":  {"med.started", "med.dose-changed", "med.stopped"},
+		"self-log":  {"health.medication-started", "health.medication-dose-changed", "health.medication-stopped"},
 	}
 	tmpl, err := projection.Parse([]byte(logTemplate))
 	if err != nil {
@@ -112,11 +112,11 @@ func (h *harness) served(t *testing.T) (fold.Value, map[string]int, fold.Result)
 // restarted as a second course in August; five readings across the year, one high.
 func (h *harness) seedRegimen(t *testing.T) {
 	t.Helper()
-	h.med(t, "med.started", "m1", "2026-03-01", "ramipril", 1)
-	h.med(t, "med.dose-changed", "m2", "2026-05-15", "ramipril", 1)
-	h.med(t, "med.started", "m3", "2026-05-01", "vitamin d3 + k2", 1)
-	h.med(t, "med.stopped", "m4", "2026-07-15", "vitamin d3 + k2", 1)
-	h.med(t, "med.started", "m5", "2026-08-10", "vitamin d3 + k2", 2)
+	h.med(t, "health.medication-started", "m1", "2026-03-01", "ramipril", 1)
+	h.med(t, "health.medication-dose-changed", "m2", "2026-05-15", "ramipril", 1)
+	h.med(t, "health.medication-started", "m3", "2026-05-01", "vitamin d3 + k2", 1)
+	h.med(t, "health.medication-stopped", "m4", "2026-07-15", "vitamin d3 + k2", 1)
+	h.med(t, "health.medication-started", "m5", "2026-08-10", "vitamin d3 + k2", 2)
 	h.bp(t, "2026-02-15T07:00:00Z", 121, 79)
 	h.bp(t, "2026-04-10T07:00:00Z", 146, 92)
 	h.bp(t, "2026-06-01T07:00:00Z", 118, 76)
@@ -200,7 +200,7 @@ func TestQuestion_RegimenAtEachReading(t *testing.T) {
 	v, versions, _ := h.served(t)
 	ans, err := tryRun(v, versions, h.defs, `
 		instant(At) :- entry(_, "health.blood-pressure", At, _, _, _, _).
-		regimen_type("med.started"). regimen_type("med.dose-changed").
+		regimen_type("health.medication-started"). regimen_type("health.medication-dose-changed").
 		regimen(At, Drug) :- entry(_, "health.blood-pressure", At, _, _, _, _), current(E, At),
 		                     entry(E, T, _, _, _, _, _), regimen_type(T), attr(E, "/drug", Drug).
 	`, "regimen")
@@ -231,7 +231,7 @@ func TestQuestion_DaysWithoutVitaminD3K2(t *testing.T) {
 	v, versions, _ := h.served(t)
 	ans, err := tryRun(v, versions, h.defs, `
 		instant(At) :- entry(_, "health.blood-pressure", At, _, _, _, _).
-		regimen_type("med.started"). regimen_type("med.dose-changed").
+		regimen_type("health.medication-started"). regimen_type("health.medication-dose-changed").
 		on_d3k2(At) :- current(E, At), entry(E, T, _, _, _, _, _), regimen_type(T), attr(E, "/drug", "vitamin d3 + k2").
 		without(At) :- entry(_, "health.blood-pressure", At, _, _, _, _),
 		               At >= "2026-06-01T00:00:00.000000000Z", At < "2026-09-01T00:00:00.000000000Z", not on_d3k2(At).
@@ -248,7 +248,7 @@ func TestQuestion_DaysWithoutVitaminD3K2(t *testing.T) {
 	high, err := tryRun(v, versions, h.defs, `
 		instant(At) :- entry(_, "health.blood-pressure", At, _, _, _, _).
 		high(At, S, Drug) :- entry(R, "health.blood-pressure", At, _, _, _, _), attr(R, "/systolic", S), S > 140,
-		                     current(E, At), entry(E, "med.started", _, _, _, _, _), attr(E, "/drug", Drug).
+		                     current(E, At), entry(E, "health.medication-started", _, _, _, _, _), attr(E, "/drug", Drug).
 	`, "high")
 	if err != nil {
 		t.Fatalf("high: %v", err)

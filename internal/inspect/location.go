@@ -14,7 +14,7 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
-// A location.track facet (card 130) is one UTC hour of one phone's fixes. The
+// A place.track facet (card 130) is one UTC hour of one phone's fixes. The
 // inspector draws those fixes as a track without a map (card 133): a local flat
 // projection, metres east and north of the track's centre, the fixes joined in time
 // order, each ringed by its accuracy at scale, with a scale bar. Nothing is fetched
@@ -23,7 +23,7 @@ import (
 // the hour, honestly, not a street map.
 
 // typeLocationTrack is the facet type the drawing reads.
-const typeLocationTrack facet.Type = "location.track"
+const typeLocationTrack facet.Type = "place.track"
 
 // Track geometry, in viewBox units.
 const (
@@ -47,7 +47,7 @@ type trackPoint struct {
 	Device  string
 }
 
-// trackHour is a location.track payload, as much of it as the drawing reads.
+// trackHour is a place.track payload, as much of it as the drawing reads.
 type trackHour struct {
 	ID     string `json:"id"`
 	Hour   string `json:"hour"`
@@ -61,20 +61,20 @@ type trackHour struct {
 	} `json:"points"`
 }
 
-// parseTrack reads a location.track facet's fixes. A payload the drawing cannot read
+// parseTrack reads a place.track facet's fixes. A payload the drawing cannot read
 // is an error, and the page falls back to the JSON alone.
 func parseTrack(f facet.Facet) (device string, pts []trackPoint, err error) {
 	var h trackHour
 	if err := json.Unmarshal(f.Payload.Bytes(), &h); err != nil {
-		return "", nil, fmt.Errorf("location.track payload: %w", err)
+		return "", nil, fmt.Errorf("place.track payload: %w", err)
 	}
 	for i, p := range h.Points {
 		if p.Lat == nil || p.Lon == nil {
-			return "", nil, fmt.Errorf("location.track point %d: no lat/lon", i)
+			return "", nil, fmt.Errorf("place.track point %d: no lat/lon", i)
 		}
 		t, err := time.Parse(time.RFC3339, p.T)
 		if err != nil {
-			return "", nil, fmt.Errorf("location.track point %d: %w", i, err)
+			return "", nil, fmt.Errorf("place.track point %d: %w", i, err)
 		}
 		pt := trackPoint{T: t, Lat: *p.Lat, Lon: *p.Lon, FacetID: f.ID, Device: h.Device}
 		if p.Acc != nil && *p.Acc > 0 {
@@ -224,7 +224,7 @@ func hourHue(p trackPoint) string {
 	return fmt.Sprintf("h%d", p.T.UTC().Hour()%8)
 }
 
-// facetTrack draws one location.track facet for its page; nil for any other type,
+// facetTrack draws one place.track facet for its page; nil for any other type,
 // or a payload the drawing cannot read.
 func facetTrack(f facet.Facet) *trackView {
 	if f.Type != typeLocationTrack {
@@ -250,7 +250,7 @@ type locationData struct {
 	Nav      tlNav
 }
 
-// location draws the live location.track hours in a window. Without a window it
+// location draws the live place.track hours in a window. Without a window it
 // shows the newest UTC day that has positions.
 func (s *Server) location(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), s.timeout)
@@ -273,7 +273,7 @@ func (s *Server) location(w http.ResponseWriter, r *http.Request) {
 
 	data := locationData{W: res.W, Device: device}
 	if len(hours) == 0 {
-		data.Empty = "no location.track facets are live"
+		data.Empty = "no place.track facets are live"
 		render(w, "location.html", data)
 		return
 	}

@@ -38,7 +38,7 @@ func medHarness(t *testing.T) *harness {
 	h := newHarness(t)
 	var defs []def.Definition
 	for _, m := range []string{bpManifest, sleepManifest,
-		medManifest("med.started", false), medManifest("med.dose-changed", false), medManifest("med.stopped", true)} {
+		medManifest("health.medication-started", false), medManifest("health.medication-dose-changed", false), medManifest("health.medication-stopped", true)} {
 		d, err := def.Parse([]byte(m))
 		if err != nil {
 			t.Fatalf("def.Parse: %v", err)
@@ -51,7 +51,7 @@ func medHarness(t *testing.T) *harness {
 	}
 	scopes := gate.StaticScopes{
 		"bp-csv": {"health.blood-pressure"}, "health-db": {"health.sleep"},
-		"self-log": {"med.started", "med.dose-changed", "med.stopped"},
+		"self-log": {"health.medication-started", "health.medication-dose-changed", "health.medication-stopped"},
 	}
 	h.gate = gate.New(h.l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	h.deps.Series = reg
@@ -81,11 +81,11 @@ func TestRun_MedsServesTheSnapshotWithAReceipt(t *testing.T) {
 	h := medHarness(t)
 	ctx := context.Background()
 
-	h.med(t, "med.started", "m1", "2026-03-01", "ramipril", 1)
-	h.med(t, "med.dose-changed", "m2", "2026-05-10", "ramipril", 1)
-	h.med(t, "med.stopped", "m3", "2026-08-01", "ramipril", 1)
-	h.med(t, "med.started", "m4", "2026-10-01", "ramipril", 2)
-	h.med(t, "med.started", "m5", "2026-04-01", "atorvastatin", 1)
+	h.med(t, "health.medication-started", "m1", "2026-03-01", "ramipril", 1)
+	h.med(t, "health.medication-dose-changed", "m2", "2026-05-10", "ramipril", 1)
+	h.med(t, "health.medication-stopped", "m3", "2026-08-01", "ramipril", 1)
+	h.med(t, "health.medication-started", "m4", "2026-10-01", "ramipril", 2)
+	h.med(t, "health.medication-started", "m5", "2026-04-01", "atorvastatin", 1)
 
 	out, err := serve.Run(ctx, h.deps, "meds", false)
 	if err != nil {
@@ -123,9 +123,9 @@ func TestDerive_MedsAtAPastDateKeepsACourseStoppedLater(t *testing.T) {
 	h := medHarness(t)
 	ctx := context.Background()
 
-	h.med(t, "med.started", "m1", "2024-09-13", "felodipine", 1)
-	h.med(t, "med.stopped", "m2", "2025-12-23", "felodipine", 1)
-	h.med(t, "med.started", "m3", "2024-08-16", "ramipril", 1)
+	h.med(t, "health.medication-started", "m1", "2024-09-13", "felodipine", 1)
+	h.med(t, "health.medication-stopped", "m2", "2025-12-23", "felodipine", 1)
+	h.med(t, "health.medication-started", "m3", "2024-08-16", "ramipril", 1)
 
 	tmpl, err := h.deps.Templates.Lookup("meds")
 	if err != nil {

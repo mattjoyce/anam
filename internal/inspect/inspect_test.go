@@ -407,7 +407,7 @@ func TestTimeline_MarksCarryWhatSelectionNeeds(t *testing.T) {
 			t.Errorf("mark lacks %s: %s", want, mark)
 		}
 	}
-	for _, want := range []string{`id="selection"`, `id="sel-annotate"`, `id="note-draft"`, "note.annotation", "private/records/notes.yaml"} {
+	for _, want := range []string{`id="selection"`, `id="sel-annotate"`, `id="note-draft"`, "record.note", "private/records/notes.yaml"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("timeline missing %q", want)
 		}

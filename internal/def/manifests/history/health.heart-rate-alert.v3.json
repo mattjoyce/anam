@@ -1,0 +1,28 @@
+{
+  "meta": {
+    "facet_type": "health.heart-rate-alert",
+    "definition_version": 3,
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "health-db/event",
+    "time_semantics": {
+      "fact_time": {"pointer": "/fact_time", "layout": "2006-01-02T15:04:05Z", "zone": "UTC"}
+    },
+    "identity_key": ["/source", "/kind", "/fact_time"]
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One abnormal high heart rate alert the Garmin watch raised. The health ETL (ductile-healthdata fit_events.py) decodes it from the watch's monitoring FIT files into healthdata.db's events table, and the health-db worker carries the row over unchanged.",
+    "type": "object",
+    "required": ["source", "kind", "fact_time", "heart_rate", "threshold", "unit"],
+    "properties": {
+      "fact_time": {"type": "string", "minLength": 1, "description": "events.fact_time: when the watch raised the alert, the FIT timestamp written by the ETL in UTC to the second. This is the fact time.", "examples": ["2026-01-24T03:15:42Z"]},
+      "heart_rate": {"type": "number", "description": "events.value: the heart rate that tripped the alert, in beats per minute. Garmin does not document the event; the ETL reads it from the high byte of FIT event 66's data field.", "examples": [124]},
+      "kind": {"type": "string", "minLength": 1, "enum": ["hr_high_alert"], "description": "events.kind: the ETL's name for the event. Only hr_high_alert rows become this type.", "examples": ["hr_high_alert"]},
+      "source": {"type": "string", "minLength": 1, "description": "events.source: the device family the ETL read, always \"garmin\" today.", "examples": ["garmin"]},
+      "threshold": {"type": "number", "description": "events.threshold: the alert threshold configured on the watch, in beats per minute, from the low byte of the same FIT data field.", "examples": [120]},
+      "unit": {"type": "string", "minLength": 1, "description": "events.unit: the unit of heart_rate and threshold, written by the ETL as \"bpm\".", "examples": ["bpm"]}
+    },
+    "additionalProperties": false
+  }
+}

@@ -1,7 +1,9 @@
 {
   "meta": {
     "facet_type": "health.blood-pressure",
-    "definition_version": 5,
+    "definition_version": 6,
+    "kind": "reading",
+    "family": "vitals",
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "bp-csv/reading",

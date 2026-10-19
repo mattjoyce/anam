@@ -22,10 +22,10 @@ func TestTimeline_ComposedIsTheFullFold(t *testing.T) {
 	// read from a prefix of buckets has a series begun in an earlier bucket and a
 	// closing event to see (card 64).
 	meds := []record{
-		{"med.started", `{"id": "m/1/started", "date": "2025-12-01", "drug": "examplazole", "course": 1, "dose": "10 mg daily"}`},
-		{"med.dose-changed", `{"id": "m/1/dose", "date": "2026-01-05", "drug": "examplazole", "course": 1, "dose": "20 mg daily"}`},
-		{"med.stopped", `{"id": "m/1/stopped", "date": "2026-01-20", "drug": "examplazole", "course": 1}`},
-		{"med.started", `{"id": "m/2/started", "date": "2026-02-05", "drug": "examplazole", "course": 2, "dose": "10 mg daily"}`},
+		{"health.medication-started", `{"id": "m/1/started", "date": "2025-12-01", "drug": "examplazole", "course": 1, "dose": "10 mg daily"}`},
+		{"health.medication-dose-changed", `{"id": "m/1/dose", "date": "2026-01-05", "drug": "examplazole", "course": 1, "dose": "20 mg daily"}`},
+		{"health.medication-stopped", `{"id": "m/1/stopped", "date": "2026-01-20", "drug": "examplazole", "course": 1}`},
+		{"health.medication-started", `{"id": "m/2/started", "date": "2026-02-05", "drug": "examplazole", "course": 2, "dose": "10 mg daily"}`},
 	}
 	f.admit(t, append(append([]record(nil), bpReadings...), meds...))
 	cfg, err := config.Load(f.cfgPath)
@@ -46,7 +46,7 @@ func TestTimeline_ComposedIsTheFullFold(t *testing.T) {
 		for _, q := range []api.TimelineQuery{
 			{}, {From: "2026-02-01"}, {To: "2026-02-10"}, {At: "2026-02-10"},
 			{At: "2025-12-15"}, {At: "2026-01-10"}, {At: "2026-01-25"}, {At: "2026-03-01"},
-			{At: "2026-01-10", From: "2026-01-01"}, {At: "2026-02-10", Type: "med.started"},
+			{At: "2026-01-10", From: "2026-01-01"}, {At: "2026-02-10", Type: "health.medication-started"},
 			{At: "2026-01-10", AsOf: "2099-01-01"},
 			{Type: "health.blood-pressure"}, {Projection: "bp"}, {AsOf: "2000-01-01"},
 			{AsOf: "2099-01-01"},
@@ -67,7 +67,7 @@ func TestTimeline_ComposedIsTheFullFold(t *testing.T) {
 		// And the snapshots say what the course was: on the dose change in January,
 		// closed after the stop, the second course open in February.
 		for at, want := range map[string]string{
-			"2026-01-10": "med.dose-changed", "2026-01-25": "", "2026-02-10": "med.started",
+			"2026-01-10": "health.medication-dose-changed", "2026-01-25": "", "2026-02-10": "health.medication-started",
 		} {
 			got, err := read.Timeline(ctx, src, api.TimelineQuery{At: at, Zone: "UTC"})
 			if err != nil {
@@ -75,7 +75,7 @@ func TestTimeline_ComposedIsTheFullFold(t *testing.T) {
 			}
 			var meds []string
 			for _, e := range got.Entries {
-				if strings.HasPrefix(string(e.Type), "med.") {
+				if strings.HasPrefix(string(e.Type), "health.medication-") {
 					meds = append(meds, string(e.Type))
 				}
 			}

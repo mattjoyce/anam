@@ -47,17 +47,26 @@ type family struct {
 // the eight hues are spent on the families that are.
 const hueNeutral = -1
 
-// families in row order, top to bottom. Hues are assigned once, here, and never
-// move when a filter hides a family (dataviz: colour follows the entity).
+// families in row order, top to bottom: the families the Definitions declare (card
+// 147), by domain. Hues are assigned once, here, and never move when a filter hides a
+// family (dataviz: colour follows the entity). Thirteen families and eight hues: the
+// hue stays with the row that carried it before the taxonomy, through its most
+// telling successor, and the rows of background measures (a day's steps, an hour of
+// positions), of rare events (a condition) and of what the person wrote or filed take
+// the neutral grey.
 var families = []family{
-	{"heart", "heart", 7},
+	{"vitals", "vitals", 7},
 	{"body", "body", 0},
 	{"sleep", "sleep", 6},
-	{"activity", "activity", 3},
+	{"movement", "movement", hueNeutral},
+	{"exercise", "exercise", 3},
 	{"labs", "labs", 2},
+	{"conditions", "conditions", hueNeutral},
 	{"meds", "meds", 4},
 	{"clinical", "clinical", 5},
-	{"travel", "travel", 1},
+	{"location", "location", hueNeutral},
+	{"trips", "trips", 1},
+	{"notes", "notes", hueNeutral},
 	{"documents", "documents", hueNeutral},
 }
 
@@ -76,72 +85,49 @@ type typeStyle struct {
 	Kind   kind
 }
 
-// typeStyles is every bundled or registered type's place on the band. A type not listed goes to
-// the "other" row as a grey circle, so a new Definition shows up before anyone
-// styles it.
+// typeStyles is the shapes: the types whose mark is not the one their kind takes by
+// default (shapeFor), so that within a row a start, an end, a miss and an alert are
+// told apart. Row and kind come from the Definition's family and kind (card 176); an
+// entry here only lends the shape, and a type not listed draws its kind's default.
+// Since card 147 every bundled Definition declares both, so the table no longer
+// places a type, except the three retired health-db types, which are left as they
+// were written and draw only in a read as-of before card 55.
 var typeStyles = map[facet.Type]typeStyle{
-	"health.heart-rate":       {"heart", shapeCircle, kindMeasure},
-	"health.blood-pressure":   {"heart", shapeSquare, kindReading},
-	"health.heart-rate-alert": {"heart", shapeAlert, kindEvent},
-	// Registered by the Garmin importer since card 55, which retired health-db:
-	// the day's heart rate that health.heart-rate was. Both are measures and both
-	// are circles; the retired one draws only in a read as_of an earlier W.
-	"health.heart-rate-daily": {"heart", shapeCircle, kindMeasure},
+	"health.heart-rate":   {"vitals", shapeCircle, kindMeasure},
+	"health.sleep":        {"sleep", shapeCircle, kindMeasure},
+	"health.metric-group": {"movement", shapeCircle, kindMeasure},
 
-	"health.body-composition": {"body", shapeCircle, kindMeasure},
-	"health.weight":           {"body", shapeSquare, kindReading},
-	// Registered by the Withings importer since card 86, not bundled.
+	"health.blood-pressure":   {"vitals", shapeSquare, kindReading},
+	"health.heart-rate-alert": {"vitals", shapeAlert, kindEvent},
+
+	"health.weight":      {"body", shapeSquare, kindReading},
 	"health.measurement": {"body", shapeDiamond, kindReading},
 
-	"health.sleep": {"sleep", shapeCircle, kindMeasure},
-	// One facet per CPAP session (card 70), registered by the DreamStation importer
-	// rather than bundled: a session, drawn as the activity row draws one.
-	"sleep.cpap-session": {"sleep", shapeDiamond, kindEvent},
-	// A night of sleep from the Garmin importer (card 55), the successor of
-	// health.sleep.
-	"sleep.episode": {"sleep", shapeCircle, kindMeasure},
+	"activity.gym-visit": {"exercise", shapeSquare, kindEvent},
 
-	"health.metric-group": {"activity", shapeCircle, kindMeasure},
-	// The Garmin importer's day (card 55): a day's steps, and the day's summary
-	// of floors, distance and calories. Successors of health.metric-group.
-	"health.step-count": {"activity", shapeCircle, kindMeasure},
-	"garmin.day":        {"activity", shapeCircle, kindMeasure},
-	"gym.visit":         {"activity", shapeSquare, kindEvent},
-	"exercise.session":  {"activity", shapeDiamond, kindEvent},
+	"health.lab-panel": {"labs", shapeSquare, kindEvent},
 
-	"lab.result": {"labs", shapeCircle, kindReading},
-	"lab.panel":  {"labs", shapeSquare, kindEvent},
+	"health.medication-started":     {"meds", shapeTriUp, kindEvent},
+	"health.medication-stopped":     {"meds", shapeTriDown, kindEvent},
+	"health.medication-missed-dose": {"meds", shapeCross, kindEvent},
+	// A dose taken (card 179): the moment of an intake, a filled square among the
+	// regimen's triangles.
+	"health.medication-dose": {"meds", shapeSquare, kindEvent},
 
-	"med.compliance-estimate": {"meds", shapeCircle, kindMeasure},
-	"med.started":             {"meds", shapeTriUp, kindEvent},
-	"med.stopped":             {"meds", shapeTriDown, kindEvent},
-	"med.dose-changed":        {"meds", shapeDiamond, kindEvent},
-	"med.missed-dose":         {"meds", shapeCross, kindEvent},
+	"health.illness-started": {"conditions", shapeTriUp, kindEvent},
+	"health.illness-ended":   {"conditions", shapeTriDown, kindEvent},
 
-	"visit.clinic":    {"clinical", shapeSquare, kindEvent},
-	"condition.noted": {"clinical", shapeDiamond, kindEvent},
-	"donation.blood":  {"clinical", shapeStar, kindEvent},
-	"illness.started": {"clinical", shapeTriUp, kindEvent},
-	"illness.ended":   {"clinical", shapeTriDown, kindEvent},
-	// A lens prescription (card 36): a reading taken of the person, not a thing that
-	// happened, so a hollow circle in the clinical row.
-	"vision.prescription": {"clinical", shapeCircle, kindReading},
+	"health.encounter": {"clinical", shapeSquare, kindEvent},
+	"health.donation":  {"clinical", shapeStar, kindEvent},
 
-	"doc.reference": {"documents", shapeSquare, kindEvent},
+	"place.departed": {"trips", shapeTriUp, kindEvent},
+	"place.arrived":  {"trips", shapeTriDown, kindEvent},
+	"place.flight":   {"trips", shapeCross, kindEvent},
+
+	"record.document": {"documents", shapeSquare, kindEvent},
 	// A file Anam remembers but does not hold (card 165), registered by the links
-	// importer: a document the library has no bytes for, so the documents row.
+	// importer: a document the library has no bytes for.
 	"record.link": {"documents", shapeCross, kindEvent},
-	// A note the person wrote about one or more facets: drawn with what is written
-	// down, at the moment it was written (card 136); the facets it is about are
-	// reached through its payload.
-	"note.annotation": {"documents", shapeDiamond, kindEvent},
-	// An hour of the phone's positions (card 130): a measure in the travel row,
-	// which is where the person was; the eight hues are spent (card 133).
-	"location.track":  {"travel", shapeCircle, kindMeasure},
-	"travel.departed": {"travel", shapeTriUp, kindEvent},
-	"travel.arrived":  {"travel", shapeTriDown, kindEvent},
-	"travel.returned": {"travel", shapeDiamond, kindEvent},
-	"travel.flight":   {"travel", shapeCross, kindEvent},
 }
 
 // styles resolves a type's place on the band for one render (card 176). A Definition

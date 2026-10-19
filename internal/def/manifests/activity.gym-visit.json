@@ -1,0 +1,60 @@
+{
+  "meta": {
+    "facet_type": "activity.gym-visit",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "exercise",
+    "classification": "Confidential",
+    "validation_mode": "strict",
+    "source_schema": "records/activity.gym-visit",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02 15:04", "zone": "Australia/Sydney"}
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One gym visit, from a records file: the statement that a visit happened, with as much detail as the source has. The Strong extract (scripts/extract-strong-csv.py) wrote one per workout until card 56 moved Strong to activity.exercise-session; a hand-kept row may say no more than the day. Values are the source's own.",
+    "type": "object",
+    "required": ["id", "date"],
+    "properties": {
+      "activity": {"type": "string", "minLength": 1, "description": "What was done, in words. The Strong extract wrote \"strength training\"; a hand-kept row says it its own way.", "examples": ["strength training"]},
+      "app": {"type": "string", "minLength": 1, "description": "The app that logged the workout, \"Strong\" for rows from the Strong extract.", "examples": ["Strong"]},
+      "avg_watts": {"type": "number", "description": "Average power in watts, as written in the hand-kept note."},
+      "date": {"type": "string", "minLength": 1, "description": "When the visit started, local Sydney time to the minute. This is the fact time. With time_unknown, the time is a placeholder.", "examples": ["2026-01-24 06:30"]},
+      "distance_m": {"type": "number", "description": "Distance covered in metres, as written in the hand-kept note."},
+      "duration": {"type": "string", "minLength": 1, "description": "How long the whole session took, warm-up and cool-down included, as the hand-kept note wrote it: minutes, seconds and tenths (m:ss.t). Kept as text, not converted.", "examples": ["08:15.3"]},
+      "duration_sec": {"type": "number", "description": "Strong's \"Duration (sec)\" for the workout, as reported. Strong leaves a workout open until the next starts, so it can be far too long.", "examples": [3725]},
+      "exercises": {"type": "array", "items": {"type": "string", "minLength": 1, "description": "One exercise name, verbatim."}, "description": "The workout's exercise names in the order Strong first lists them, from the \"Exercise Name\" column.", "examples": [["Bench Press (Barbell)", "Squat (Barbell)"]]},
+      "id": {"type": "string", "minLength": 1, "description": "The records row's id. The Strong extract wrote strong: and the workout's start; a hand-kept row has its own.", "examples": ["strong:2026-01-24T06:30:00"]},
+      "max_watts": {"type": "number", "description": "Peak power in watts, as written in the hand-kept note."},
+      "sets": {
+        "type": "array",
+        "description": "Every row of the Strong workout in file order, set by set, rest timers and notes included.",
+        "items": {
+          "type": "object",
+          "description": "One Strong CSV row, minus the workout-level columns.",
+          "properties": {
+            "distance_m": {"type": "number", "description": "The \"Distance (meters)\" column, in metres.", "examples": [1000]},
+            "exercise": {"type": "string", "minLength": 1, "description": "The \"Exercise Name\" column, verbatim.", "examples": ["Bench Press (Barbell)"]},
+            "kg": {"type": "number", "description": "The \"Weight (kg)\" column, in kilograms.", "examples": [60]},
+            "note": {"type": "string", "minLength": 1, "description": "The row's \"Notes\" column, verbatim."},
+            "reps": {"type": "number", "description": "The \"Reps\" column.", "examples": [8]},
+            "rpe": {"type": "number", "description": "The \"RPE\" column, the rating of perceived exertion as logged."},
+            "seconds": {"type": "number", "description": "The \"Seconds\" column, a timed set's length in seconds.", "examples": [45]},
+            "set": {"type": "string", "minLength": 1, "description": "The \"Set Order\" column as text: a set number, or a marker such as \"Rest Timer\" or \"Note\" for rows that are not sets.", "examples": ["1"]}
+          },
+          "required": ["exercise", "set"],
+          "additionalProperties": false
+        }
+      },
+      "split_500m": {"type": "string", "minLength": 1, "description": "Pace per 500 m as the hand-kept note wrote it, in minutes, seconds and tenths followed by words naming the stretch it covers, which can be the work interval rather than the whole session. Kept as text."},
+      "started": {"type": "string", "minLength": 1, "description": "Strong's \"Date\" column, the workout's start to the second, local time. Strong rows only.", "examples": ["2026-01-24 06:30:00"]},
+      "time_unknown": {"type": "boolean", "description": "True when the source gave the day but no time, so date carries midnight as a placeholder.", "examples": [true]},
+      "workout_name": {"type": "string", "minLength": 1, "description": "Strong's \"Workout Name\" column.", "examples": ["Morning Workout"]},
+      "workout_notes": {"type": "array", "items": {"type": "string", "minLength": 1, "description": "One workout note, verbatim."}, "description": "The workout's distinct \"Workout Notes\" values, sorted."}
+    },
+    "additionalProperties": false
+  }
+}

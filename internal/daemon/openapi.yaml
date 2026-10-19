@@ -132,7 +132,7 @@ paths:
                 canonical: sha256:1976fb0a4cfc1313ce243c81ae29b34671610d8c3898da3dab3a40a67d737d02
                 entries:
                   - facet_id: 923f857a-84a2-5284-9d4a-b73e6d0a16c4
-                    type: sleep.episode
+                    type: health.sleep-episode
                     fact_time: "2026-10-18T07:44:00.000000000Z"
                     source: garmin
                     source_ref: garmin:16:sleep:2026-10-18
@@ -308,7 +308,7 @@ paths:
                   - { name: instant, arity: 1, args: [At], kind: parameter, doc: the fact-times a query asks about }
                 instant: { layout: "2006-01-02T15:04:05.000000000Z07:00", example: "2026-06-15T00:00:00.000000000Z" }
                 types:
-                  - type: med.started
+                  - type: health.medication-started
                     current: 5
                     series: med.regimen
                     closes: false
@@ -349,7 +349,7 @@ paths:
             schema: { $ref: "#/components/schemas/QueryRequest" }
             example:
               projection: everything
-              text: "instant(At) :- entry(_, \"health.blood-pressure\", At, _, _, _, _).\nregimen(At, Drug) :- entry(_, \"health.blood-pressure\", At, _, _, _, _), current(E, At), entry(E, \"med.started\", _, _, _, _, _), attr(E, \"/drug\", Drug)."
+              text: "instant(At) :- entry(_, \"health.blood-pressure\", At, _, _, _, _).\nregimen(At, Drug) :- entry(_, \"health.blood-pressure\", At, _, _, _, _), current(E, At), entry(E, \"health.medication-started\", _, _, _, _, _), attr(E, \"/drug\", Drug)."
               relation: regimen
       responses:
         "200":
@@ -420,7 +420,7 @@ paths:
                     current: 1
                     versions: [1]
                     description: The current regimen, the latest statement about each course.
-                    types: [med.started, med.dose-changed, med.stopped]
+                    types: [health.medication-started, health.medication-dose-changed, health.medication-stopped]
                     shape: snapshot
                     hash: sha256:7a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -569,7 +569,7 @@ paths:
               example:
                 definitions:
                   - { type: health.weight, origin: bundled, current: 3, versions: [1, 2, 3] }
-                  - { type: sleep.episode, origin: registered, current: 1, versions: [1] }
+                  - { type: health.sleep-episode, origin: registered, current: 1, versions: [1] }
         "401": { $ref: "#/components/responses/Unauthorized" }
     post:
       operationId: postDefinitions
@@ -598,7 +598,7 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Registered" }
-              example: { type: sleep.episode, version: 2, new: true }
+              example: { type: health.sleep-episode, version: 2, new: true }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Immutable" }
@@ -669,7 +669,7 @@ paths:
                 parts_admitted: 3
                 complete: true
                 source: garmin
-                types: [sleep.episode]
+                types: [health.sleep-episode]
                 carried: 1317
                 started_at: "2026-10-19T05:02:00.000000000Z"
                 started_w: 33370
@@ -749,9 +749,9 @@ paths:
       tags: [submit]
       x-anam-roles: [importer]
       x-anam-type: StoredDocument
-      summary: Hand Anam a document's bytes; the answer is the sha256 a doc.reference names.
+      summary: Hand Anam a document's bytes; the answer is the sha256 a record.document names.
       description: >-
-        Only a principal that lists doc.reference among its types may store documents.
+        Only a principal that lists record.document among its types may store documents.
         The same bytes again are unchanged (200); other bytes are another file (201).
         Bounded by max_document_bytes.
       parameters:

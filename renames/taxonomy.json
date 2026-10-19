@@ -1,0 +1,116 @@
+{
+  "renames": [
+    {
+      "from": "health.heart-rate-daily",
+      "to": "health.heart-rate-day"
+    },
+    {
+      "from": "sleep.episode",
+      "to": "health.sleep-episode"
+    },
+    {
+      "from": "sleep.cpap-session",
+      "to": "health.cpap-session"
+    },
+    {
+      "from": "lab.result",
+      "to": "health.lab-result"
+    },
+    {
+      "from": "lab.panel",
+      "to": "health.lab-panel"
+    },
+    {
+      "from": "condition.noted",
+      "to": "health.condition"
+    },
+    {
+      "from": "illness.started",
+      "to": "health.illness-started"
+    },
+    {
+      "from": "illness.ended",
+      "to": "health.illness-ended"
+    },
+    {
+      "from": "med.started",
+      "to": "health.medication-started"
+    },
+    {
+      "from": "med.stopped",
+      "to": "health.medication-stopped"
+    },
+    {
+      "from": "med.dose-changed",
+      "to": "health.medication-dose-changed"
+    },
+    {
+      "from": "med.missed-dose",
+      "to": "health.medication-missed-dose"
+    },
+    {
+      "from": "med.compliance-estimate",
+      "to": "health.medication-compliance"
+    },
+    {
+      "from": "visit.clinic",
+      "to": "health.encounter"
+    },
+    {
+      "from": "donation.blood",
+      "to": "health.donation"
+    },
+    {
+      "from": "vision.prescription",
+      "to": "health.vision-prescription"
+    },
+    {
+      "from": "exercise.session",
+      "to": "activity.exercise-session"
+    },
+    {
+      "from": "gym.visit",
+      "to": "activity.gym-visit"
+    },
+    {
+      "from": "health.step-count",
+      "to": "activity.steps"
+    },
+    {
+      "from": "garmin.day",
+      "to": "activity.day"
+    },
+    {
+      "from": "location.stay",
+      "to": "place.stay"
+    },
+    {
+      "from": "location.track",
+      "to": "place.track"
+    },
+    {
+      "from": "travel.departed",
+      "to": "place.departed"
+    },
+    {
+      "from": "travel.arrived",
+      "to": "place.arrived"
+    },
+    {
+      "from": "travel.returned",
+      "to": "place.returned"
+    },
+    {
+      "from": "travel.flight",
+      "to": "place.flight"
+    },
+    {
+      "from": "note.annotation",
+      "to": "record.note"
+    },
+    {
+      "from": "doc.reference",
+      "to": "record.document"
+    }
+  ]
+}

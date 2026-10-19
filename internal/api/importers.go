@@ -130,7 +130,7 @@ type Registered struct {
 	New bool `json:"new"`
 }
 
-// StoredDocument is the answer to POST /v1/documents: the sha256 a doc.reference
+// StoredDocument is the answer to POST /v1/documents: the sha256 a record.document
 // names for the bytes the library now holds (cards 102, 150). Where in the library
 // the file sits is not part of the answer: a reference finds it by its sha256.
 type StoredDocument struct {

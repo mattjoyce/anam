@@ -70,16 +70,16 @@ func regimenFixture(t *testing.T) (fold.Value, map[string]int, []string, string)
 		course2 = "med.regimen:ramipril:2"
 	)
 	v, versions := value(t,
-		entry("start-1", "med.started", day("2026-03-01"), course1, `{}`),
-		entry("dose-1", "med.dose-changed", day("2026-05-10"), course1, `{}`),
-		entry("stop-1", "med.stopped", day("2026-08-01"), course1, `{}`),
-		entry("start-2", "med.started", day("2026-10-01"), course2, `{}`),
+		entry("start-1", "health.medication-started", day("2026-03-01"), course1, `{}`),
+		entry("dose-1", "health.medication-dose-changed", day("2026-05-10"), course1, `{}`),
+		entry("stop-1", "health.medication-stopped", day("2026-08-01"), course1, `{}`),
+		entry("start-2", "health.medication-started", day("2026-10-01"), course2, `{}`),
 		entry("weight", "health.weight", day("2026-06-01"), "", `{}`),
 		// Two statements at one instant: the value's order (fact_time, facet_id)
 		// breaks the tie, in the fold and in the rules alike.
-		entry("tie-a", "med.started", day("2026-11-01"), "med.regimen:atorvastatin:1", `{}`),
-		entry("tie-b", "med.dose-changed", day("2026-11-01"), "med.regimen:atorvastatin:1", `{}`),
-		entry("tie-c", "med.stopped", day("2026-12-01"), "med.regimen:atorvastatin:1", `{}`),
+		entry("tie-a", "health.medication-started", day("2026-11-01"), "med.regimen:atorvastatin:1", `{}`),
+		entry("tie-b", "health.medication-dose-changed", day("2026-11-01"), "med.regimen:atorvastatin:1", `{}`),
+		entry("tie-c", "health.medication-stopped", day("2026-12-01"), "med.regimen:atorvastatin:1", `{}`),
 	)
 	dates := []string{day("2026-02-01"), day("2026-03-01"), day("2026-04-01"), day("2026-06-15"), day("2026-09-01"), day("2026-12-01"), day("2026-11-15"), day("2027-01-01")}
 	text := "instant(At) :- entry(_, _, At, _, _, _, _).\n"

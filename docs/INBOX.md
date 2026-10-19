@@ -14,7 +14,7 @@ How a document dropped on the share becomes facets, and what each step promises.
 │                                      (/mnt/user/Library/anam, at /app/anam-library read-only)
 ├── records/                           one YAML per document, read by anam_records
 └── documents/                         every processed primary document, read by anam_documents;
-    ├── <document>                     each with a sidecar, each a doc.reference facet;
+    ├── <document>                     each with a sidecar, each a record.document facet;
     └── <document>.meta.yaml           `date:` the document's own date
 
 <the daemon's data directory>          the RECORD, and the backup unit
@@ -42,7 +42,7 @@ the hash its `document.sha256` records; its `document.name` is the document's pa
 document:  {name: 2026-01-30_pathology_lipid_studies.pdf, sha256: a2716a1e…}
 extracted: {method: records/extract/acl_pathology.py, version: 1}
 records:
-  - type: lab.result                   # a bundled Definition with identity_key ["/id"]
+  - type: health.lab-result                   # a bundled Definition with identity_key ["/id"]
     id: acl:39986323/total-chol        # identity, chosen once, deterministic from the content
     collected: 2026-01-30 08:53        # fact-time, per the Definition's pointer and layout
     ...                                # the fact, as printed
@@ -62,29 +62,29 @@ records:
   `anam retract records` lists what the folder no longer holds, and `--yes` tombstones it. An empty or
   unreadable folder is refused, and more than a tenth of the source in one run needs `--max-fraction`.
 
-Types today: `lab.result`, `lab.panel`, `condition.noted`, `donation.blood`, `health.weight`,
-`med.missed-dose`, `med.started`, `med.dose-changed`, `med.stopped`, `med.compliance-estimate`,
-`illness.started`, `illness.ended`,
-`travel.departed`, `travel.arrived`, `travel.returned`, `travel.flight`, `visit.clinic`, `gym.visit`,
-`vision.prescription`, and `health.blood-pressure` for diary readings. Each is a manifest in
+Types today: `health.lab-result`, `health.lab-panel`, `health.condition`, `health.donation`, `health.weight`,
+`health.medication-missed-dose`, `health.medication-started`, `health.medication-dose-changed`, `health.medication-stopped`, `health.medication-compliance`,
+`health.illness-started`, `health.illness-ended`,
+`place.departed`, `place.arrived`, `place.returned`, `place.flight`, `health.encounter`, `activity.gym-visit`,
+`health.vision-prescription`, and `health.blood-pressure` for diary readings. Each is a manifest in
 `internal/def/manifests/`, strict, Sensitive (visits, gym, travel and the lens prescription
 Confidential). Each schema is closed: a records row may
 carry only the fields its Definition declares, so a new field means a line in the manifest first. Illness rows carry an `episode` and travel
-rows a `trip`; those are the series keys, so `illness.ended` and `travel.returned` close what
-`illness.started` and `travel.departed` opened, and `anam timeline --at` shows what was open on a day.
+rows a `trip`; those are the series keys, so `health.illness-ended` and `place.returned` close what
+`health.illness-started` and `place.departed` opened, and `anam timeline --at` shows what was open on a day.
 
 The three `med.*` regimen types are a **series** (`docs/SELF-LOG.md` §2): every row carries `drug` and
 `course`, and a restart after a stop is a new course number. `anam timeline --at <date>` answers "what
 was I on"; `anam serve meds` publishes the current regimen with a receipt.
 
 ```yaml
-  - type: med.started
+  - type: health.medication-started
     id: self-log:med/ramipril/1/started
     date: 2024-09-16
     drug: ramipril
     course: 1
     dose: 5 mg daily
-  - type: med.stopped
+  - type: health.medication-stopped
     id: self-log:med/ramipril/1/stopped
     date: 2025-02-01
     drug: ramipril
@@ -93,7 +93,7 @@ was I on"; `anam serve meds` publishes the current regimen with a receipt.
 
 ## Documents as facts of their own
 
-Every processed document is a facet: `doc.reference`, whose payload is the document's path in the
+Every processed document is a facet: `record.document`, whose payload is the document's path in the
 source folder, the sha256, the media type and size, and the date from a sidecar. `anam_documents`
 reads the share's `documents/` folder, and `anam_submit` posts each file's bytes to
 `POST /v1/documents` before its reference, so the **library** beside the ledger holds them and Anam
@@ -118,13 +118,13 @@ A second documents folder is a second `anam_documents` instance with its own `do
 folder is config and never enters a fact, and every path is relative to it.
 
 There are two ways to make a document a fact, and the difference is who keeps the bytes. Use
-`doc.reference` for a primary document handed to the library: the bytes are posted to Anam, the
+`record.document` for a primary document handed to the library: the bytes are posted to Anam, the
 library is their backup, and a receipt over the facet can always reach them. Use `record.link`
 (card 165, from `anam_links` in anam-importers) for a file that belongs to another tool and stays
 where it lives, a note in a vault, a photo in a camera roll, a screenshot: the facet records that a
 file with this name, sha256, size and date was seen under a declared folder, and Anam takes no
 bytes, follows no path and serves nothing from the folder. A `record.link` whose sha256 the
-library does not hold is admitted, since the held-bytes refusal is keyed on `doc.reference`; the
+library does not hold is admitted, since the held-bytes refusal is keyed on `record.document`; the
 inspector says the bytes are not held and offers no download. When the importer stops finding the
 file it supersedes the facet with `unseen: true` and never retracts it, so the earlier version
 stands as what was. A receipt over a `record.link` therefore promises the observation, that this
@@ -144,8 +144,8 @@ python3 -I records/extract/acl_pathology.py --out-dir /mnt/Library/anam/records 
 
 It runs `pdftotext -layout`, reads the header (Lab REF, REFERRED, COLLECTED, REPORTED), the
 panel and specimen, the date/time/lab-number columns, each analyte row (values by column, `*`
-flags, range, unit), and the lab's comment for the report's own draw. It emits `lab.result` per
-analyte per draw and one `lab.panel` for the report's draw (`acl:<lab>/panel/<slug>`).
+flags, range, unit), and the lab's comment for the report's own draw. It emits `health.lab-result` per
+analyte per draw and one `health.lab-panel` for the report's draw (`acl:<lab>/panel/<slug>`).
 
 - **Which draws.** The report's own, plus the lab numbers in `--history-labs`. History columns are
   the lab restating an earlier draw; emit one only when no report of its own exists (the 2023 draw,
@@ -164,7 +164,7 @@ analyte per draw and one `lab.panel` for the report's draw (`acl:<lab>/panel/<sl
 **Fitbit weight logs** (Google Takeout `Weight Logs.xlsx`): `records/extract/fitbit_weight.py`,
 stdlib only, one `health.weight` per log, id `fitbit:<ISO minute>` with an ordinal when two logs
 share a minute. **Strong workouts** (the app's CSV, semicolon-separated): `records/extract/strong_csv.py`,
-one `gym.visit` per workout keyed by its start time (the export's "Workout #" is renumbered per export),
+one `activity.gym-visit` per workout keyed by its start time (the export's "Workout #" is renumbered per export),
 every set kept verbatim under `sets`.
 
 **Lab ids name the lab that did the work.** `acl:<lab_number>/<analyte>` for Australian Clinical Labs,

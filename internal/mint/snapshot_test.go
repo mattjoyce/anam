@@ -50,7 +50,7 @@ func medRegistry(t *testing.T) *def.Registry {
 	t.Helper()
 	var defs []def.Definition
 	for _, m := range []string{bpManifest, weightManifest,
-		medManifest("med.started", false), medManifest("med.dose-changed", false), medManifest("med.stopped", true)} {
+		medManifest("health.medication-started", false), medManifest("health.medication-dose-changed", false), medManifest("health.medication-stopped", true)} {
 		d, err := def.Parse([]byte(m))
 		if err != nil {
 			t.Fatalf("def.Parse: %v", err)
@@ -78,14 +78,14 @@ func TestSnapshot_FromComposedCheckpointsEqualsTheFold(t *testing.T) {
 	h := newHarness(t)
 	reg := medRegistry(t)
 	h.useRegistry(t, reg, map[string][]facet.Type{
-		"self-log": {"med.started", "med.dose-changed", "med.stopped"},
+		"self-log": {"health.medication-started", "health.medication-dose-changed", "health.medication-stopped"},
 	})
 
 	h.weight(t, "w-1", "2026-04-02T07:00:00Z", 81.0)
-	h.med(t, "med.started", "m1", "2026-03-01", "ramipril", 1)
-	h.med(t, "med.dose-changed", "m2", "2026-05-10", "ramipril", 1)
-	h.med(t, "med.stopped", "m3", "2026-08-01", "ramipril", 1)
-	h.med(t, "med.started", "m4", "2026-10-01", "ramipril", 2)
+	h.med(t, "health.medication-started", "m1", "2026-03-01", "ramipril", 1)
+	h.med(t, "health.medication-dose-changed", "m2", "2026-05-10", "ramipril", 1)
+	h.med(t, "health.medication-stopped", "m3", "2026-08-01", "ramipril", 1)
+	h.med(t, "health.medication-started", "m4", "2026-10-01", "ramipril", 2)
 	h.run(t, false)
 
 	full, err := fold.Read(context.Background(), h.l)
@@ -154,17 +154,17 @@ func TestSnapshot_AsOfBeforeTheStopArrived(t *testing.T) {
 	h := newHarness(t)
 	reg := medRegistry(t)
 	h.useRegistry(t, reg, map[string][]facet.Type{
-		"self-log": {"med.started", "med.dose-changed", "med.stopped"},
+		"self-log": {"health.medication-started", "health.medication-dose-changed", "health.medication-stopped"},
 	})
 	ctx := context.Background()
 
-	h.med(t, "med.started", "m1", "2026-03-01", "ramipril", 1)
-	h.med(t, "med.dose-changed", "m2", "2026-05-10", "ramipril", 1)
+	h.med(t, "health.medication-started", "m1", "2026-03-01", "ramipril", 1)
+	h.med(t, "health.medication-dose-changed", "m2", "2026-05-10", "ramipril", 1)
 	beforeStop, err := h.l.Head(ctx)
 	if err != nil {
 		t.Fatalf("Head: %v", err)
 	}
-	h.med(t, "med.stopped", "m3", "2026-08-01", "ramipril", 1)
+	h.med(t, "health.medication-stopped", "m3", "2026-08-01", "ramipril", 1)
 
 	const at = "2026-09-01T00:00:00.000000000Z"
 	now, err := fold.Read(ctx, h.l)

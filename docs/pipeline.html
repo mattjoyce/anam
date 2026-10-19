@@ -106,7 +106,7 @@
   <rect class="box" x="392" y="30" width="286" height="56" rx="8" fill="var(--work)"/>
   <text class="ttl" x="535" y="50" text-anchor="middle">anam_garmin</text>
   <text class="sub" x="535" y="65" text-anchor="middle">handle: the changed days · poll: everything, weekly</text>
-  <text class="sub" x="535" y="79" text-anchor="middle">sleep.episode · heart-rate-daily · step-count · garmin.day · session · alert</text>
+  <text class="sub" x="535" y="79" text-anchor="middle">health.sleep-episode · heart-rate-daily · step-count · activity.day · session · alert</text>
 
   <!-- Withings -->
   <rect class="box" x="8" y="100" width="130" height="56" rx="8" fill="var(--source)"/>
@@ -145,7 +145,7 @@
   <rect class="box" x="392" y="240" width="286" height="56" rx="8" fill="var(--work)"/>
   <text class="ttl" x="535" y="260" text-anchor="middle">anam_dreamstation</text>
   <text class="sub" x="535" y="275" text-anchor="middle">decodes the card, resends everything</text>
-  <text class="sub" x="535" y="289" text-anchor="middle">sleep.cpap-session, every session</text>
+  <text class="sub" x="535" y="289" text-anchor="middle">health.cpap-session, every session</text>
 
   <!-- OwnTracks -->
   <rect class="box" x="8" y="310" width="130" height="56" rx="8" fill="var(--source)"/>
@@ -158,7 +158,7 @@
   <rect class="box" x="392" y="310" width="286" height="56" rx="8" fill="var(--work)"/>
   <text class="ttl" x="535" y="330" text-anchor="middle">anam_owntracks</text>
   <text class="sub" x="535" y="345" text-anchor="middle">on each pull</text>
-  <text class="sub" x="535" y="359" text-anchor="middle">location.track, an hour of positions each</text>
+  <text class="sub" x="535" y="359" text-anchor="middle">place.track, an hour of positions each</text>
 
   <!-- Records and documents -->
   <rect class="box" x="8" y="380" width="130" height="56" rx="8" fill="var(--source)"/>
@@ -226,15 +226,15 @@
   <li><strong>Collect from Garmin</strong>
     The <code>garmindb</code> container on unraid runs its own cron, four times a day. It downloads from Garmin Connect into <code>healthdata/garmin/DBs/</code> (<code>garmin.db</code>, <code>garmin_summary.db</code>, the activity databases) and keeps every FIT file. The <code>garmin</code> plugin in the gateway checks <code>garmin.db</code>'s modification time every 30 minutes and raises <code>health.new_data</code> with the days that changed.</li>
   <li><strong>Import from Garmin</strong>
-    Pipeline <code>anam-garmin-sync</code> runs <code>anam_garmin</code> on that event (<code>handle</code>, the changed days) and weekly by cron (<code>poll</code>, everything, labelled a snapshot so Anam knows the resend finished). It shapes nights to <code>sleep.episode</code>, daily heart rate to <code>health.heart-rate-daily</code>, steps to <code>health.step-count</code>, the rest of the day to <code>garmin.day</code>, activities to <code>exercise.session</code>, and reads the FIT files for <code>health.heart-rate-alert</code>. Live since 11 October (card 55).</li>
+    Pipeline <code>anam-garmin-sync</code> runs <code>anam_garmin</code> on that event (<code>handle</code>, the changed days) and weekly by cron (<code>poll</code>, everything, labelled a snapshot so Anam knows the resend finished). It shapes nights to <code>health.sleep-episode</code>, daily heart rate to <code>health.heart-rate-day</code>, steps to <code>activity.steps</code>, the rest of the day to <code>activity.day</code>, activities to <code>activity.exercise-session</code>, and reads the FIT files for <code>health.heart-rate-alert</code>. Live since 11 October (card 55).</li>
   <li><strong>Withings</strong>
     The <code>withings</code> plugin polls the Withings cloud every six hours into <code>withings.db</code> and raises one event per new measurement. <code>anam_withings</code> shapes each to <code>health.measurement</code> and posts it; a weigh-in reaches the ledger in seconds. Live since 10 October (card 54).</li>
   <li><strong>Blood pressure</strong>
     The phone app's CSV export is dropped into a watched folder on the share. <code>bp_export_watch</code> sees the new file and <code>anam_bp_csv</code> shapes every reading to <code>health.blood-pressure</code>. Exports are never moved, so a <code>poll</code> resends them all (card 80).</li>
   <li><strong>DreamStation</strong>
-    The CPAP's SD card is copied to <code>healthdata/dreamstation/P-SERIES</code> every few months. <code>dreamstation_card_watch</code> watches its <code>LAST.TXT</code> every 15 minutes, and <code>anam_dreamstation</code> decodes the card and resends every session as <code>sleep.cpap-session</code> (card 70).</li>
+    The CPAP's SD card is copied to <code>healthdata/dreamstation/P-SERIES</code> every few months. <code>dreamstation_card_watch</code> watches its <code>LAST.TXT</code> every 15 minutes, and <code>anam_dreamstation</code> decodes the card and resends every session as <code>health.cpap-session</code> (card 70).</li>
   <li><strong>OwnTracks</strong>
-    The phone posts its positions to <code>webhooks.ductile.run/owntracks</code>, a Cloudflare worker that spools them. The gateway pulls the spool and <code>anam_owntracks</code> posts an hour of positions as one <code>location.track</code> facet (card 130).</li>
+    The phone posts its positions to <code>webhooks.ductile.run/owntracks</code>, a Cloudflare worker that spools them. The gateway pulls the spool and <code>anam_owntracks</code> posts an hour of positions as one <code>place.track</code> facet (card 130).</li>
   <li><strong>Records and documents</strong>
     Hand-written YAML records (labs, medicines, travel, notes) and the document library live under <code>anam/private</code> on the share. The daemon reads them when the gateway's <code>anam_ingest</code> asks, hourly. An unchanged row is a no-op, so the hourly run costs nothing when there is no news.</li>
   <li><strong>Anam</strong>
@@ -265,13 +265,13 @@
 <table>
   <thead><tr><th>Source</th><th>Types</th><th>Grain</th><th>Trigger</th></tr></thead>
   <tbody>
-    <tr><td>Garmin</td><td><code>sleep.episode</code>, <code>health.heart-rate-daily</code>, <code>health.step-count</code>, <code>garmin.day</code>, <code>exercise.session</code>, <code>health.heart-rate-alert</code></td><td>a night, a day's figure, a day, a session, an alert</td><td>event, weekly poll</td></tr>
+    <tr><td>Garmin</td><td><code>health.sleep-episode</code>, <code>health.heart-rate-day</code>, <code>activity.steps</code>, <code>activity.day</code>, <code>activity.exercise-session</code>, <code>health.heart-rate-alert</code></td><td>a night, a day's figure, a day, a session, an alert</td><td>event, weekly poll</td></tr>
     <tr><td>Withings</td><td><code>health.measurement</code></td><td>every measurement</td><td>event</td></tr>
     <tr><td>Blood pressure export</td><td><code>health.blood-pressure</code></td><td>every reading</td><td>a new file</td></tr>
-    <tr><td>DreamStation</td><td><code>sleep.cpap-session</code></td><td>every device session</td><td>the card copy's <code>LAST.TXT</code></td></tr>
-    <tr><td>OwnTracks</td><td><code>location.track</code></td><td>an hour of positions</td><td>each pull</td></tr>
+    <tr><td>DreamStation</td><td><code>health.cpap-session</code></td><td>every device session</td><td>the card copy's <code>LAST.TXT</code></td></tr>
+    <tr><td>OwnTracks</td><td><code>place.track</code></td><td>an hour of positions</td><td>each pull</td></tr>
     <tr><td>Records</td><td>labs, medicines, travel, visits, notes, one-off exports as records</td><td>one record each</td><td>hourly ingest</td></tr>
-    <tr><td>Documents</td><td><code>doc.reference</code></td><td>one file each</td><td>hourly ingest</td></tr>
+    <tr><td>Documents</td><td><code>record.document</code></td><td>one file each</td><td>hourly ingest</td></tr>
   </tbody>
 </table>
 </div>
@@ -294,9 +294,9 @@ sqlite3 "file:/mnt/Projects/healthdata/garmin/DBs/garmin.db?mode=ro" \
 sqlite3 "file:/mnt/Projects/healthdata/withings/withings.db?mode=ro" \
   "SELECT MAX(date) FROM measurements"
 
-# 3. Anam admitted Garmin days: the newest garmin.day fact time, from the daemon
+# 3. Anam admitted Garmin days: the newest activity.day fact time, from the daemon
 curl -H "Authorization: Bearer $(cat ~/.config/anam/token)" \
-  "http://192.168.20.4:8787/v1/timeline?zone=UTC&amp;type=garmin.day&amp;from=$(date -d '-90 days' +%F)" \
+  "http://192.168.20.4:8787/v1/timeline?zone=UTC&amp;type=activity.day&amp;from=$(date -d '-90 days' +%F)" \
   | jq -r '.entries[-1].fact_time'
 
 # 4. Anam ingested Withings: the same for health.measurement</code></pre>

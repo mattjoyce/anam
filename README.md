@@ -126,7 +126,7 @@ drops it from the current value and never from the ledger.
 
 Every fact is a **facet** of a named type, and each type has a versioned **Definition**: a JSON
 Schema, which field names the facet, and which field says when it was true. Definitions are
-immutable once published, so a change is a new version. Anam bundles the 31 below, and importers
+immutable once published, so a change is a new version. Anam bundles the 32 below, and importers
 register more. A running daemon lists what it holds at `GET /v1/definitions` and in the
 inspector's definitions page; the bundled files are in
 [`internal/def/manifests/`](internal/def/manifests/), and the gate checks this table against them.
@@ -134,39 +134,40 @@ Adding a type is a Definition file, not code.
 
 ### Bundled with Anam
 
-| Type | Version | What it records | Keyed by | Fact time |
-|---|---|---|---|---|
-| `health.blood-pressure` | 5 | One blood pressure reading, as an Open mHealth body | `date_excel`, `reading` | `date_excel` |
-| `health.weight` | 3 | One body weight | `id` | `date` |
-| `health.body-composition` | 3 | A period's body metrics (fat, muscle and the rest) | `group`, `period_type`, `period_start` | `period_start` |
-| `health.heart-rate` | 3 | A period's heart rate metrics | `group`, `period_type`, `period_start` | `period_start` |
-| `health.heart-rate-alert` | 3 | One abnormal high heart rate alert from a watch | `source`, `kind`, `fact_time` | `fact_time` |
-| `health.sleep` | 3 | A period's sleep metrics | `group`, `period_type`, `period_start` | `period_start` |
-| `health.metric-group` | 3 | A period's metrics for the health groups with no type of their own | `group`, `period_type`, `period_start` | `period_start` |
-| `health.step-count` | 1 | One day's steps, as an Open mHealth step-count body | `id` | interval start |
-| `health.heart-rate-daily` | 1 | One figure for a day's heart rate, as an Open mHealth heart-rate body | `id`, `statistic` | interval start |
-| `sleep.episode` | 1 | One sleep episode, as an IEEE 1752 sleep-episode body | `id` | interval start |
-| `exercise.session` | 5 | One session of exercise, as an IEEE 1752 physical activity | `id` | session start |
-| `gym.visit` | 4 | One gym visit | `id` | `date` |
-| `med.started` | 5 | A medicine course starting | `id` | `date` |
-| `med.dose-changed` | 4 | A change of dose within a course | `id` | `date` |
-| `med.stopped` | 3 | A course ending | `id` | `date` |
-| `med.missed-dose` | 4 | A dose the person says they missed | `id` | `date` |
-| `med.compliance-estimate` | 4 | The person's own estimate of how well they kept to a course | `id` | `date` |
-| `condition.noted` | 4 | A condition named in a document | `id` | `date` |
-| `illness.started` | 3 | The day an illness began | `id` | `date` |
-| `illness.ended` | 3 | The day an illness ended | `id` | `date` |
-| `lab.panel` | 4 | One pathology request, the header of a draw's report | `id` | `collected` |
-| `lab.result` | 4 | One analyte's result from one draw | `id` | `collected` |
-| `donation.blood` | 4 | One visit to give blood | `id` | `date` |
-| `visit.clinic` | 4 | One appointment with a clinic or practitioner | `id` | `date` |
-| `vision.prescription` | 1 | One lens prescription as an optometrist issued it, each eye as printed | `id` | `date` |
-| `travel.departed` | 4 | Leaving home on a trip | `id` | `date` |
-| `travel.flight` | 4 | One flight leg | `id` | `date` |
-| `travel.arrived` | 4 | Arriving at one place during a trip | `id` | `date` |
-| `travel.returned` | 4 | Getting home from a trip | `id` | `date` |
-| `note.annotation` | 3 | A note in the person's own words, about some facets or none | `id` | `at` |
-| `doc.reference` | 3 | A pointer to one file in the documents library; the bytes never enter the ledger | `path` | `date` |
+| Type | Version | family | kind | What it records | Identity | Fact time |
+|---|---|---|---|---|---|---|
+| `health.heart-rate-day` | 1 | vitals | measure | One figure for a day's heart rate, as an Open mHealth heart-rate body | `id`, `statistic` | interval start |
+| `health.heart-rate-alert` | 4 | vitals | event | One abnormal high heart rate alert from a watch | `source`, `kind`, `fact_time` | `fact_time` |
+| `health.blood-pressure` | 6 | vitals | reading | One blood pressure reading, as an Open mHealth body | `date_excel`, `reading` | `date_excel` |
+| `health.weight` | 4 | body | reading | One body weight | `id` | `date` |
+| `health.body-composition` | 4 | body | measure | A period's body metrics (fat, muscle and the rest) | `group`, `period_type`, `period_start` | `period_start` |
+| `health.sleep-episode` | 1 | sleep | measure | One sleep episode, as an IEEE 1752 sleep-episode body | `id` | interval start |
+| `health.lab-panel` | 1 | labs | event | One pathology request, the header of a draw's report | `id` | `collected` |
+| `health.lab-result` | 1 | labs | reading | One analyte's result from one draw | `id` | `collected` |
+| `health.condition` | 1 | conditions | event | A condition named in a document | `id` | `date` |
+| `health.illness-started` | 1 | conditions | event | The day an illness began | `id` | `date` |
+| `health.illness-ended` | 1 | conditions | event | The day an illness ended | `id` | `date` |
+| `health.medication-started` | 1 | meds | event | A medicine course starting | `id` | `date` |
+| `health.medication-dose-changed` | 1 | meds | event | A change of dose within a course | `id` | `date` |
+| `health.medication-stopped` | 1 | meds | event | A course ending | `id` | `date` |
+| `health.medication-dose` | 1 | meds | event | One dose of a medicine taken at a moment, outside any course | `id` | `taken_at` |
+| `health.medication-missed-dose` | 1 | meds | event | A dose the person says they missed | `id` | `date` |
+| `health.medication-compliance` | 1 | meds | measure | The person's own estimate of how well they kept to a course | `id` | `date` |
+| `health.encounter` | 1 | clinical | event | One appointment with a clinic or practitioner | `id` | `date` |
+| `health.donation` | 1 | clinical | event | One visit to give blood | `id` | `date` |
+| `health.vision-prescription` | 1 | clinical | reading | One lens prescription as an optometrist issued it, each eye as printed | `id` | `date` |
+| `activity.exercise-session` | 1 | exercise | event | One session of exercise, as an IEEE 1752 physical activity | `id` | session start |
+| `activity.gym-visit` | 1 | exercise | event | One gym visit | `id` | `date` |
+| `activity.steps` | 1 | movement | measure | One day's steps, as an Open mHealth step-count body | `id` | interval start |
+| `place.departed` | 1 | trips | event | Leaving home on a trip | `id` | `date` |
+| `place.flight` | 1 | trips | event | One flight leg | `id` | `date` |
+| `place.arrived` | 1 | trips | event | Arriving at one place during a trip | `id` | `date` |
+| `place.returned` | 1 | trips | event | Getting home from a trip | `id` | `date` |
+| `record.note` | 1 | notes | event | A note in the person's own words, about some facets or none | `id` | `at` |
+| `record.document` | 1 | documents |  | A pointer to one file in the documents library; the bytes never enter the ledger | `path` | `date` |
+| `health.heart-rate` | 3 |  |  | A period's heart rate metrics (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
+| `health.sleep` | 3 |  |  | A period's sleep metrics (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
+| `health.metric-group` | 3 |  |  | A period's metrics for the health groups with no type of their own (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
 
 ### Registered by importers
 
@@ -177,10 +178,10 @@ them to the daemon on first use. Their versions are that repository's to state; 
 | Type | What it records | Importer |
 |---|---|---|
 | `health.measurement` | One Withings measurement | withings |
-| `garmin.day` | One day of a Garmin watch's daily summary | garmin |
-| `sleep.cpap-session` | One therapy session from a DreamStation card | dreamstation |
-| `location.track` | One UTC hour of a phone's positions | owntracks |
-| `location.stay` | One place a phone stayed, named from OpenStreetMap | stays |
+| `activity.day` | One day of a Garmin watch's daily summary | garmin |
+| `health.cpap-session` | One therapy session from a DreamStation card | dreamstation |
+| `place.track` | One UTC hour of a phone's positions | owntracks |
+| `place.stay` | One place a phone stayed, named from OpenStreetMap | stays |
 
 ## Getting facts in
 
@@ -191,7 +192,7 @@ shapes its rows to a Definition, and posts them to the daemon under its own toke
 are Anam's own:
 
 - **`records`**: hand-written YAML records for labs, medicines, travel and notes.
-- **`documents`**: a folder of files with sidecars, each a `doc.reference`. The importer posts the
+- **`documents`**: a folder of files with sidecars, each a `record.document`. The importer posts the
   bytes and Anam keeps them in its library.
 
 The importers are plugins for the [ductile](https://github.com/mattjoyce/ductile) gateway, a small

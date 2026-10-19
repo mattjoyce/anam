@@ -1,7 +1,7 @@
 ---
 type: component
 title: anam_dreamstation
-description: Decodes a CPAP SD card copy with the dreamstation package and sends every session as sleep.cpap-session, a type the binary does not bundle, so it registers its own Definition.
+description: Decodes a CPAP SD card copy with the dreamstation package and sends every session as health.cpap-session, a type the binary does not bundle, so it registers its own Definition.
 timestamp: 2026-10-11T00:00:00Z
 resource: ../anam-importers/dreamstation_card/run.py#batch_events
 anchor: "def batch_events(request: Dict[str, Any]) -> Dict[str, Any]:"

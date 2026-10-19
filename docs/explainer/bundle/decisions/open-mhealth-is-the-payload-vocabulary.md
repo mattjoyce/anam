@@ -1,7 +1,7 @@
 ---
 type: decision
 title: Health measures use Open mHealth bodies where one exists
-description: health.blood-pressure v4 and later, and exercise.session, conform to a pinned Open mHealth (IEEE 1752) schema, with the source's own text kept beside it.
+description: health.blood-pressure v4 and later, and activity.exercise-session, conform to a pinned Open mHealth (IEEE 1752) schema, with the source's own text kept beside it.
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/def/manifests/health.blood-pressure.json#required
 anchor: '"required": ["date_excel", "reading", "systolic_blood_pressure", "diastolic_blood_pressure", "effective_time_frame"],'
@@ -14,7 +14,7 @@ affects:
   - /data-structures/definition-manifest.md
 ---
 
-**Context.** Decided 2026-10-08 (journal note, IMPORTERS §3). `exercise.session` is one type for Technogym, Strong, Garmin and Concept2 because each shapes to the same OMH `physical-activity` body.
+**Context.** Decided 2026-10-08 (journal note, IMPORTERS §3). `activity.exercise-session` is one type for Technogym, Strong, Garmin and Concept2 because each shapes to the same OMH `physical-activity` body.
 
 **Choice.** A pinned OMH schema inside Anam's closed JSON Schema, plus the export's own columns as text so nothing the source wrote is lost. Identity and fact-time still come from the source's fields (`date_excel`, `reading`).
 

@@ -49,7 +49,7 @@ they are applied after the projection and the narrowing above, to what those alr
 reader sees no facet and no field a projection without them would not have served. The answer is a
 **frame**: `columns`, the envelope's columns then the pointers, and `rows`, one array per facet in
 timeline order, in place of `entries`. A pointer a row lacks is null. Measured on the live daemon, a
-month of `exercise.session` is 184 KB whole and 2.7 KB as a frame of distance, duration and erg
+month of `activity.exercise-session` is 184 KB whole and 2.7 KB as a frame of distance, duration and erg
 type; the largest row, 752 strokes, is 72 KB whole and under 500 bytes in the frame. The receipt pins
 the fields beside `query`, the served hash is over the frame's bytes, and `narrow` names `fields`
 when a read is refused as too large. This amends the sentence below, §5's "cannot request selected
@@ -323,7 +323,7 @@ governance contract. Never describe a metadata query as having searched every wo
    resurrect nor exclude a facet.
 5. Publish the selected value and receipt; deliver bounded pages of that value.
 
-A filter that removes `med.stopped` before series resolution could resurrect a stopped course.
+A filter that removes `health.medication-stopped` before series resolution could resurrect a stopped course.
 The core therefore owns this order. A snapshot template must be validated as compatible with the
 series families it serves. Hidden evidence can affect core state resolution without being exposed
 in explanations. Equal fact-times within a series need an explicit core tie policy; until defined,
@@ -397,7 +397,7 @@ source-file associations. Do not imply every facet already has a ledger-attested
 **Decided since (card 93, 2026-10-15); the records-file route below is overtaken.** A conversation is
 an importer like any other, posting envelopes under its own token (§8 of `docs/IMPORTERS.md`); no
 records file sits between it and the gate. The person's words are saved at once and verbatim as a
-`note.annotation` under source `conversation`, which may name no facet yet (v3, card 157). A model's
+`record.note` under source `conversation`, which may name no facet yet (v3, card 157). A model's
 reading of those words is a second source, `interpretation`, whose facts link back to the exact note
 version and carry `standing: draft | endorsed | rejected`; the person endorses or rejects a draft
 with a new version, and nothing is deleted (cards 158 to 161). The operations and the concurrency
@@ -436,7 +436,7 @@ the definition, source revision, or authorization cannot change before submissio
 ```json
 {
   "submission_id": "client-generated-stable-id",
-  "type": "med.missed-dose",
+  "type": "health.medication-missed-dose",
   "definition_version": 1,
   "assertion": {
     "text": "I missed yesterday's dose",
@@ -451,7 +451,7 @@ the definition, source revision, or authorization cannot change before submissio
 ```
 
 The example illustrates the proposed authoring contract. `course_ref` needs an agreed Definition;
-it is not a claim about today's `med.missed-dose` schema. Discovery must advertise exactly
+it is not a claim about today's `health.medication-missed-dose` schema. Discovery must advertise exactly
 what the installed version accepts.
 
 The source writer assigns a stable row ID on the user's behalf and returns it. It retains the original

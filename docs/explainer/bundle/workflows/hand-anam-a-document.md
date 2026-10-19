@@ -1,7 +1,7 @@
 ---
 type: workflow
 title: Hand Anam a document
-description: anam_documents names a scanned letter and its sidecar in a batch; anam_submit posts the bytes to POST /v1/documents, the daemon stores them in the library as <sha256>.<ext> through the write queue, and the doc.reference that names them is admitted only if the library holds bytes with its sha256.
+description: anam_documents names a scanned letter and its sidecar in a batch; anam_submit posts the bytes to POST /v1/documents, the daemon stores them in the library as <sha256>.<ext> through the write queue, and the record.document that names them is admitted only if the library holds bytes with its sha256.
 timestamp: 2026-10-14T00:00:00Z
 resource: internal/daemon/documents.go#postDocument
 anchor: "stored.New, err = library.Store(d.cfg.LibraryDir, d.cfg.LibraryFolderLimit, stored.SHA256, ext, body)"
@@ -12,7 +12,7 @@ steps:
   - actor: /components/importer-documents.md
     caller: outside
     label: describe each file from its sidecar
-    action: "Every file's sidecar gives its `date`; the importer measures the path, sha256, size and media type, and builds one `doc.reference` envelope per file. A missing sidecar stops the run."
+    action: "Every file's sidecar gives its `date`; the importer measures the path, sha256, size and media type, and builds one `record.document` envelope per file. A missing sidecar stops the run."
     resource: docs/INBOX.md#Documents as facts of their own
     anchor: "Every file in the source folder has a sidecar beside it,"
   - actor: /components/importer-documents.md
@@ -31,7 +31,7 @@ steps:
   - actor: /components/daemon.md
     caller: /components/anam-submit.md
     label: check the token and the extension
-    action: "`postDocument` refuses a token whose types do not include `doc.reference` (403) and an extension that is not letters and digits, at most 16 (400). It measures the sha256, size and media type (by extension) from the body."
+    action: "`postDocument` refuses a token whose types do not include `record.document` (403) and an extension that is not letters and digits, at most 16 (400). It measures the sha256, size and media type (by extension) from the body."
     resource: internal/daemon/documents.go#postDocument
     anchor: "if !mayStore(imp) {"
   - actor: /components/daemon.md
@@ -50,7 +50,7 @@ steps:
     caller: /components/importer-base.md
     branch: a reference to bytes the library lacks
     label: refuse the whole batch, 422
-    action: "Inside the write and before the gate, `checkReferences` indexes the library once with `library.Index` and looks up each `doc.reference`'s sha256; a reference whose sha256 the library holds no bytes for refuses the batch, and nothing of it is admitted. The path plays no part in finding the bytes."
+    action: "Inside the write and before the gate, `checkReferences` indexes the library once with `library.Index` and looks up each `record.document`'s sha256; a reference whose sha256 the library holds no bytes for refuses the batch, and nothing of it is admitted. The path plays no part in finding the bytes."
     ends: true
     resource: internal/daemon/documents.go#checkReferences
     anchor: "post the bytes to /v1/documents first"

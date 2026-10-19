@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -53,31 +54,51 @@ func locationServer(t *testing.T) (*httptest.Server, string) {
 		return f
 	}
 	admit("bp-csv:2026-01-24T06:30:00", "health.blood-pressure", `{"systolic": 118}`, time.Date(2026, 7, 5, 6, 30, 0, 0, time.UTC))
-	a := admit("owntracks:loc:tokay:2026-10-12T02:00:00Z", "location.track", hourA, time.Date(2026, 10, 12, 2, 0, 0, 0, time.UTC))
-	admit("owntracks:loc:tokay:2026-10-12T03:00:00Z", "location.track", hourB, time.Date(2026, 10, 12, 3, 0, 0, 0, time.UTC))
-	admit("owntracks:loc:tokay:2026-10-11T22:00:00Z", "location.track", hourPrev, time.Date(2026, 10, 11, 22, 0, 0, 0, time.UTC))
-	admit("owntracks:loc:other:2026-10-12T02:00:00Z", "location.track", hourOther, time.Date(2026, 10, 12, 2, 0, 0, 0, time.UTC))
+	a := admit("owntracks:loc:tokay:2026-10-12T02:00:00Z", "place.track", hourA, time.Date(2026, 10, 12, 2, 0, 0, 0, time.UTC))
+	admit("owntracks:loc:tokay:2026-10-12T03:00:00Z", "place.track", hourB, time.Date(2026, 10, 12, 3, 0, 0, 0, time.UTC))
+	admit("owntracks:loc:tokay:2026-10-11T22:00:00Z", "place.track", hourPrev, time.Date(2026, 10, 11, 22, 0, 0, 0, time.UTC))
+	admit("owntracks:loc:other:2026-10-12T02:00:00Z", "place.track", hourOther, time.Date(2026, 10, 12, 2, 0, 0, 0, time.UTC))
 
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Definitions: trackDefinitions(t)}))
 	t.Cleanup(srv.Close)
 	return srv, a.ID
 }
 
-// A location.track hour draws in the travel row as a measure (card 133): the
-// legend lists it under travel, not "other".
-func TestTimeline_LocationHoursSitInTheTravelRow(t *testing.T) {
+// trackDefinitions is the registry the owntracks importer leaves the daemon with: a
+// place.track Definition declaring its family and kind (card 147), which is what
+// places the hours on the band.
+func trackDefinitions(t *testing.T) func() *def.Registry {
+	t.Helper()
+	d, err := def.Parse([]byte(`{"meta": {"facet_type": "place.track", "definition_version": 1, "classification": "Sensitive",
+	  "validation_mode": "strict", "source_schema": "owntracks/hour", "kind": "measure", "family": "location",
+	  "time_semantics": {"fact_time": {"pointer": "/hour", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}},
+	  "identity_key": ["/id"]},
+	 "schema": {"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object",
+	  "required": ["id", "hour"], "additionalProperties": false, "properties": {"id": {"type": "string", "minLength": 1}, "hour": {"type": "string", "minLength": 1}}}}`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	reg, err := def.NewRegistry(d)
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	return func() *def.Registry { return reg }
+}
+
+// A place.track hour draws in the location row as a measure (cards 133, 147): the
+// legend lists it under location, not "other".
+func TestTimeline_LocationHoursSitInTheLocationRow(t *testing.T) {
 	t.Parallel()
 	srv, _ := locationServer(t)
 	_, body := get(t, srv.URL+"/")
-	travel := strings.Index(body, `class="fam"`)
-	if travel < 0 {
+	if !strings.Contains(body, `class="fam"`) {
 		t.Fatal("no legend")
 	}
 	if strings.Contains(body, ">other<") {
-		t.Error("an 'other' row drawn: location.track has no style")
+		t.Error("an 'other' row drawn: place.track has no style")
 	}
-	if !strings.Contains(body, `value="location.track" checked`) {
-		t.Error("legend does not list location.track")
+	if !strings.Contains(body, `value="place.track" checked`) {
+		t.Error("legend does not list place.track")
 	}
 }
 
@@ -144,7 +165,7 @@ func TestLocation_EmptyRecordSaysSo(t *testing.T) {
 	t.Parallel()
 	srv, _, _ := seededServer(t)
 	code, body := get(t, srv.URL+"/location")
-	if code != http.StatusOK || !strings.Contains(body, "no location.track facets are live") {
+	if code != http.StatusOK || !strings.Contains(body, "no place.track facets are live") {
 		t.Errorf("GET /location = %d, body lacks the empty notice", code)
 	}
 }

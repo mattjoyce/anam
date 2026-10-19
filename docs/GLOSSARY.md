@@ -125,10 +125,10 @@ ordered and a span filtered without anything ever parsing a payload. Narrowed wi
 is a *derived span* and **not** an as-of. Contrast *Anam-time*; see *Bitemporal*, *Span*.
 
 **Series** — Which facets are repeated statements about one thing over time, so that a *Snapshot*
-can keep the latest per thing. Neither identity (every change is its own row) nor type (`med.started`
-and `med.stopped` are one regimen). A Definition declares a series **family** (`med.regimen`, named like
+can keep the latest per thing. Neither identity (every change is its own row) nor type (`health.medication-started`
+and `health.medication-stopped` are one regimen). A Definition declares a series **family** (`med.regimen`, named like
 a type), the ordered key pointers that name one series within it (the drug and the course), and
-whether the type **closes** the series (`med.stopped`). The gate composes `<family>:<values>` and
+whether the type **closes** the series (`health.medication-stopped`). The gate composes `<family>:<values>` and
 stamps it on the Facet as metadata, beside *fact-time* and *classification*, so no read opens a
 payload to group. Every type in a family declares the same key; the registry refuses one keyed two ways.
 
@@ -190,12 +190,12 @@ time-OR-size-OR-rate; a quiet bucket mints nothing. Automatic after every ingest
 **Library** — The folder beside the ledger (`documents/`, `library_dir`) that holds document bytes.
 Only Anam writes it (`POST /v1/documents`, card 102), and it names each file by its sha256 (card 150),
 in subfolders of the sha256's first characters once a folder holds `library_folder_limit` files. A
-`doc.reference` Facet's payload is the document's **name** (its `path`, the identity), sha256, size,
+`record.document` Facet's payload is the document's **name** (its `path`, the identity), sha256, size,
 media type and the date its sidecar gives it; the sha256 finds the bytes. The folder never enters a
 fact. The share's private folder is the **inbox**, not a library. See *Native reference*.
 
 **Native reference** — A reference Facet's payload: a pointer to a document in its *Library*, resolved
-live by the inspector from the library root. Built in card 24 as `doc.reference`.
+live by the inspector from the library root. Built in card 24 as `record.document`.
 
 **Operational store** — The SQLite database holding Anam's own state: Facet Definitions, projection
 templates, token scopes, the facet and anam-event indexes, the span registry and per-span `V`/`Wᵥ`, the

@@ -1,0 +1,66 @@
+{
+  "meta": {
+    "facet_type": "health.vision-prescription",
+    "definition_version": 1,
+    "kind": "reading",
+    "family": "clinical",
+    "classification": "Confidential",
+    "validation_mode": "strict",
+    "source_schema": "records/health.vision-prescription",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium"
+  },
+  "handling": {
+    "guidance": "One facet per prescription as issued, dated the day of the sight test. The id is <provider-slug>:<date>, the slug the health.encounter for the same test uses, so the two read together. Powers are dioptres as printed, signed (+3.25 is 3.25, -1.00 is -1), axis in whole degrees; a cell the prescription leaves blank is left out, never written as 0. kind says what the lenses are for; a contact lens prescription is a facet of its own, not folded into the spectacles one. Say in source_note what was read and from where."
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One lens prescription as an optometrist issued it: the refraction for each eye and what the lenses are for. Written into records files by hand from the prescription or a transcription of it.",
+    "type": "object",
+    "required": ["id", "date", "provider", "kind", "right", "left"],
+    "properties": {
+      "date": {"type": "string", "minLength": 1, "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "description": "The day the prescription was issued, YYYY-MM-DD, which is the day of the sight test. This is the fact time.", "examples": ["2023-01-06"]},
+      "expires": {"type": "string", "minLength": 1, "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "description": "The day the prescription stops being valid, YYYY-MM-DD, as printed.", "examples": ["2024-01-06"]},
+      "id": {"type": "string", "minLength": 1, "description": "Identity, chosen by the writer: a slug for the provider, a colon, the date issued.", "examples": ["example-optical:2023-01-06"]},
+      "kind": {"type": "string", "enum": ["spectacles", "contact-lenses"], "description": "What the lenses are for. A prescription for spectacles says it is not one for contact lenses, and the reverse.", "examples": ["spectacles"]},
+      "left": {
+        "type": "object",
+        "description": "The left eye's refraction, as printed.",
+        "required": ["sphere"],
+        "properties": {
+          "sphere": {"type": "number", "description": "Spherical power in dioptres, signed; positive is long-sighted.", "examples": [1.5]},
+          "cylinder": {"type": "number", "description": "Cylindrical power in dioptres, signed: the astigmatism correction.", "examples": [-1]},
+          "axis": {"type": "integer", "minimum": 0, "maximum": 180, "description": "The cylinder's axis in whole degrees.", "examples": [90]},
+          "add": {"type": "number", "description": "The near addition in dioptres, for reading.", "examples": [2]},
+          "intermediate_add": {"type": "number", "description": "The intermediate addition in dioptres, for screen distance.", "examples": [1.5]},
+          "prism_horizontal": {"type": "number", "description": "Horizontal prism in prism dioptres, as printed, when any."},
+          "prism_vertical": {"type": "number", "description": "Vertical prism in prism dioptres, as printed, when any."}
+        },
+        "additionalProperties": false
+      },
+      "note": {"type": "string", "minLength": 1, "description": "Anything else the writer took from the prescription: what was ordered on it, a remark the optometrist printed."},
+      "practitioner": {"type": "string", "minLength": 1, "description": "The optometrist as printed, with their provider number when the prescription shows one.", "examples": ["A. Example, provider number 000000AA"]},
+      "provider": {"type": "string", "minLength": 1, "description": "The practice as the prescription names it.", "examples": ["Example Optical"]},
+      "right": {
+        "type": "object",
+        "description": "The right eye's refraction, as printed.",
+        "required": ["sphere"],
+        "properties": {
+          "sphere": {"type": "number", "description": "Spherical power in dioptres, signed; positive is long-sighted.", "examples": [3.25]},
+          "cylinder": {"type": "number", "description": "Cylindrical power in dioptres, signed: the astigmatism correction.", "examples": [-1]},
+          "axis": {"type": "integer", "minimum": 0, "maximum": 180, "description": "The cylinder's axis in whole degrees.", "examples": [90]},
+          "add": {"type": "number", "description": "The near addition in dioptres, for reading.", "examples": [2]},
+          "intermediate_add": {"type": "number", "description": "The intermediate addition in dioptres, for screen distance.", "examples": [1.5]},
+          "prism_horizontal": {"type": "number", "description": "Horizontal prism in prism dioptres, as printed, when any."},
+          "prism_vertical": {"type": "number", "description": "Vertical prism in prism dioptres, as printed, when any."}
+        },
+        "additionalProperties": false
+      },
+      "source_note": {"type": "string", "minLength": 1, "description": "What the writer read and where: the prescription itself, or a transcription of it, and which one."}
+    },
+    "additionalProperties": false
+  }
+}

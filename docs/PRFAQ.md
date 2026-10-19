@@ -61,7 +61,10 @@ can observe your facts but never rewrite them.
 **How is "what I was shown" provable?**
 Every served view is a **projection** — a template that only *prunes* facts, never reshapes or invents
 them — and it comes with a **receipt**: the exact set of facts, the template version, and the *watermark*
-(the moment of knowledge) it was rendered at. The same receipt reproduces the same view.
+(the moment of knowledge) it was rendered at. The same receipt reproduces the same view. A question
+an agent asks across your facts ("what was I taking when that reading was high?") runs as a query
+through the same projection, and its answer carries the same kind of receipt: the query it ran, pinned
+to the watermark, so you can run it again and get the same answer.
 
 **Why immutable, append-only? Isn't that wasteful?**
 Because a soul-record whose past can be silently rewritten is worth nothing. Immutability is what lets

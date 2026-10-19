@@ -213,7 +213,8 @@ pointers into the payload, so only those come back. Fields only **take away**: t
 projection and narrowing, to whole facets those already admitted, so they can neither resurrect nor exclude
 a facet, and never show a field a projection would not have served. The envelope is always whole; the
 stored payload stays opaque bytes, read at serve time. The answer is a *Frame*. The *Receipt* pins the
-fields. Blending projections and computing over fields are not fields. See *Frame*, *Projection*.
+fields. Computing over fields is a *Query*, not fields; blending projections is neither. See *Frame*,
+*Projection*, *Query*.
 
 **Frame** — The shape a read with *Fields* answers in: `columns`, the envelope's attributes then the
 pointers, and `rows`, one array per facet in timeline order, a null where a row lacks a pointer. A
@@ -224,7 +225,8 @@ without fields answers in whole facets as before. See *Fields*.
 filters only (type allow-list, datetime, endorsement status, max classification); whole-Facet
 include/exclude; **never reshapes, never generates**. Materialised as a content-addressed file. A consumer
 *selects*, never defines; it may name the *Fields* it wants of what the projection serves, which only
-narrows. The operator defines: templates are **bundled** with the binary (the floor) or **registered**
+narrows, or run a *Query* over it, which relates what it served and never widens it. The operator
+defines: templates are **bundled** with the binary (the floor) or **registered**
 over the API (card 125, 2026-10-13), each version immutable and every version held readable, since a
 receipt names the version and its hash. Tombstone visibility is **not** a knob — the Canonical is live-only; a reader wanting tombstones
 queries the *Ledger*. See *Fields*, *Receipt*, *Canonical*.
@@ -236,6 +238,18 @@ the method/model and the canonical watermark it was computed from.
 the receipts naming it** (an Anam clock). Deliberately *not* an anam-event — being shown changes
 nothing Anam knows — so it lives in the published-artifact tier and is lost with it. See *Receipt*,
 *Anam-event*.
+
+**Query** — The third read, after the timeline and *Fields* (decided 2026-10-17, card 173; not yet
+built): a Datalog program evaluated over the *Fold* at a watermark, **through a *Projection***. The
+projection decides which whole facets the query may see; the query relates them: joins across types
+along *Fact-time*, selection by any payload field the served Definition's schema names, aggregates,
+windows. Base relations are the *Envelope* (`entry/7`, with `definition_version`) and the payload
+fields read from the served copy (`attr/3`, any schema pointer). Bundled rules such as `current/2` ship
+as a versioned rule set; `current/2` is held equal to *Snapshot read* by a standing test. The answer
+is a derived value that hashes, with a *Receipt* naming the projection, the rule-set hash and the
+query text, so `receipt verify` re-runs it. A query reads payload fields from the served copy and
+never from the store, moves no *Watermark*, and writes nothing. The store never selects by payload; a
+read may. See *Fields*, *Projection*, *Receipt*.
 
 **Receipt** — Proof of exactly what a projection served at a watermark: `served_hash`, the facet-id set,
 watermark, template version, definition-set version, `served_at`, optional span, and since 2026-10-07

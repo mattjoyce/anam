@@ -30,6 +30,10 @@ decisions is in `journal/`.
 
 ## 2026-10-19
 
+- `scripts/souffle-diff.py` runs the bundled rules and the card's questions through Anam's
+  evaluator and through Soufflé over the same facts and compares the answers: the oracle for the
+  engine's general machinery, run by hand until it has earned trust, never part of the gate
+  (card 173).
 - The query surface (card 173, second slice). `POST /v1/query` runs a Datalog program through a
   projection at the head, `as_of` or `w`, built on the bundled rules, and answers one relation with
   a receipt that names the projection, the rule set's hash and the program; `anam receipt verify`

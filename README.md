@@ -126,7 +126,7 @@ drops it from the current value and never from the ledger.
 
 Every fact is a **facet** of a named type, and each type has a versioned **Definition**: a JSON
 Schema, which field names the facet, and which field says when it was true. Definitions are
-immutable once published, so a change is a new version. Anam bundles the 28 below, and importers
+immutable once published, so a change is a new version. Anam bundles the 31 below, and importers
 register more. A running daemon lists what it holds at `GET /v1/definitions` and in the
 inspector's definitions page; the bundled files are in
 [`internal/def/manifests/`](internal/def/manifests/), and the gate checks this table against them.
@@ -143,6 +143,9 @@ Adding a type is a Definition file, not code.
 | `health.heart-rate-alert` | 3 | One abnormal high heart rate alert from a watch | `source`, `kind`, `fact_time` | `fact_time` |
 | `health.sleep` | 3 | A period's sleep metrics | `group`, `period_type`, `period_start` | `period_start` |
 | `health.metric-group` | 3 | A period's metrics for the health groups with no type of their own | `group`, `period_type`, `period_start` | `period_start` |
+| `health.step-count` | 1 | One day's steps, as an Open mHealth step-count body | `id` | interval start |
+| `health.heart-rate-daily` | 1 | One figure for a day's heart rate, as an Open mHealth heart-rate body | `id`, `statistic` | interval start |
+| `sleep.episode` | 1 | One sleep episode, as an IEEE 1752 sleep-episode body | `id` | interval start |
 | `exercise.session` | 5 | One session of exercise, as an IEEE 1752 physical activity | `id` | session start |
 | `gym.visit` | 4 | One gym visit | `id` | `date` |
 | `med.started` | 5 | A medicine course starting | `id` | `date` |
@@ -174,9 +177,6 @@ them to the daemon on first use. Their versions are that repository's to state; 
 | Type | What it records | Importer |
 |---|---|---|
 | `health.measurement` | One Withings measurement | withings |
-| `health.step-count` | One day's steps, as an Open mHealth body | garmin |
-| `health.heart-rate-daily` | One figure for a day's heart rate, as an Open mHealth body | garmin |
-| `sleep.episode` | One sleep episode, as an IEEE 1752 body | garmin |
 | `garmin.day` | One day of a Garmin watch's daily summary | garmin |
 | `sleep.cpap-session` | One therapy session from a DreamStation card | dreamstation |
 | `location.track` | One UTC hour of a phone's positions | owntracks |

@@ -1,0 +1,275 @@
+{
+  "meta": {
+    "facet_type": "sleep.episode",
+    "definition_version": 1,
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "ieee-1752/sleep-episode-1.0",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/effective_time_frame/time_interval/start_date_time",
+        "layout": "2006-01-02T15:04:05Z07:00",
+        "zone": "UTC"
+      }
+    },
+    "identity_key": [
+      "/id"
+    ],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One sleep episode as an IEEE 1752 sleep-episode-1.0 body (Open mHealth, pinned), with the source's own fields beside it. Garmin writes one per day, through the anam_garmin importer (source garmin), from GarminDB's sleep table; other sources may write it with their own id. The time frame, durations and is_main_sleep are the IEEE body; id, score, qualifier and the averages are the source's.",
+    "type": "object",
+    "required": [
+      "id",
+      "effective_time_frame"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The source's key for the episode, prefixed with what it is. For Garmin, \"sleep:\" and the sleep table's day: the date Garmin files the night under, the day you woke. For Fitbit, \"fitbit:sleep:\" and the local start. Under one source no two types share an id: a facet's id is the source plus its identity values, without the type.",
+        "examples": [
+          "sleep:2026-10-08"
+        ]
+      },
+      "effective_time_frame": {
+        "type": "object",
+        "description": "When the episode ran, as an IEEE 1752 time interval. Start and end in UTC; the start is the fact time.",
+        "required": [
+          "time_interval"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "time_interval": {
+            "type": "object",
+            "required": [
+              "start_date_time",
+              "end_date_time"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "start_date_time": {
+                "type": "string",
+                "minLength": 1,
+                "description": "RFC 3339 instant sleep began.",
+                "examples": [
+                  "2026-10-07T12:44:00Z"
+                ]
+              },
+              "end_date_time": {
+                "type": "string",
+                "minLength": 1,
+                "description": "RFC 3339 instant sleep ended.",
+                "examples": [
+                  "2026-10-07T18:42:00Z"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "total_sleep_time": {
+        "type": "object",
+        "description": "Time asleep within the episode as an IEEE 1752 duration-unit-value in minutes, as the source reports it.",
+        "required": [
+          "value",
+          "unit"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Minutes.",
+            "examples": [
+              78
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "min"
+            ],
+            "description": "Always min."
+          }
+        }
+      },
+      "light_sleep_duration": {
+        "type": "object",
+        "description": "Time in light sleep as an IEEE 1752 duration-unit-value in minutes, as the source reports it.",
+        "required": [
+          "value",
+          "unit"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Minutes.",
+            "examples": [
+              78
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "min"
+            ],
+            "description": "Always min."
+          }
+        }
+      },
+      "deep_sleep_duration": {
+        "type": "object",
+        "description": "Time in deep sleep as an IEEE 1752 duration-unit-value in minutes, as the source reports it.",
+        "required": [
+          "value",
+          "unit"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Minutes.",
+            "examples": [
+              78
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "min"
+            ],
+            "description": "Always min."
+          }
+        }
+      },
+      "rem_sleep_duration": {
+        "type": "object",
+        "description": "Time in REM sleep as an IEEE 1752 duration-unit-value in minutes, as the source reports it.",
+        "required": [
+          "value",
+          "unit"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Minutes.",
+            "examples": [
+              78
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "min"
+            ],
+            "description": "Always min."
+          }
+        }
+      },
+      "wake_after_sleep_onset": {
+        "type": "object",
+        "description": "Time awake between falling asleep and the final waking, as an IEEE 1752 duration-unit-value in minutes, as the source reports it.",
+        "required": [
+          "value",
+          "unit"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Minutes.",
+            "examples": [
+              78
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "min"
+            ],
+            "description": "Always min."
+          }
+        }
+      },
+      "is_main_sleep": {
+        "type": "boolean",
+        "description": "Whether this is the main sleep rather than a nap, as the importer judges it. Garmin's sleep table holds one sleep per day, its main one, so Garmin's are true.",
+        "examples": [
+          true
+        ]
+      },
+      "score": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 100,
+        "description": "Garmin's sleep score, 0 to 100. Garmin's own measure; absent when Garmin gave none.",
+        "examples": [
+          75
+        ]
+      },
+      "qualifier": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Garmin's word for the score, as it wrote it.",
+        "examples": [
+          "FAIR"
+        ]
+      },
+      "avg_spo2": {
+        "type": "number",
+        "description": "Garmin's average blood oxygen saturation over the episode, in percent. Absent when not measured.",
+        "examples": [
+          94.0
+        ]
+      },
+      "avg_rr": {
+        "type": "number",
+        "description": "Garmin's average respiration rate over the episode, in breaths per minute.",
+        "examples": [
+          14.0
+        ]
+      },
+      "avg_stress": {
+        "type": "number",
+        "description": "Garmin's average stress level over the episode, on its 0 to 100 scale.",
+        "examples": [
+          19.0
+        ]
+      },
+      "awake_count": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "Fitbit's count of times awake in the episode, as its sleep log (written by an IFTTT applet) reports it. Absent for other sources.",
+        "examples": [
+          3
+        ]
+      },
+      "restless_count": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "Fitbit's count of restless spells in the episode, as its sleep log reports it. Absent for other sources.",
+        "examples": [
+          11
+        ]
+      },
+      "restless_minutes": {
+        "type": "number",
+        "minimum": 0,
+        "description": "Fitbit's time restless in the episode, in minutes, as its sleep log reports it. Absent for other sources.",
+        "examples": [
+          5
+        ]
+      }
+    }
+  }
+}

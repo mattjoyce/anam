@@ -178,11 +178,13 @@ anam-importers/
 A Definition is a JSON manifest in exactly the format of Anam's own (`internal/def/manifests`):
 `meta` carries the type, version, `identity_key`, `time_semantics`, classification and
 `validation_mode`; `schema` is closed JSON Schema 2020-12 (§3, prerequisite 3). A type lives in one
-place. While Anam's binary bundles a type, no importer may register it; an importer takes a type over
-when a release drops it from the binary, registering the same body at the same version. The other
-direction works too: a release that bundles a type an importer registered admits it against the
-bundled Definition from then on, keeps the registered rows for the facets admitted under them, and
-says so in its log. No two importers may name the same type unless the binary bundles it: a bundled
+place. While Anam's binary bundles a type, no importer may register a version of it; an importer
+takes a type over when a release drops it from the binary, registering the same body at the same
+version. The other direction works too: a release that bundles a type an importer registered admits
+it against the bundled Definition from then on, keeps the registered rows for the facets admitted
+under them, and says so in its log. An importer that still sends the body the binary now carries,
+at its version, is answered unchanged (200), not refused, so the release and the importer's
+redeploy need no order between them (card 139); any other body of a bundled type is a 409. No two importers may name the same type unless the binary bundles it: a bundled
 type's Definitions come from Anam, so no importer can register a version that refuses another's
 envelopes, and any number may submit it, each under its own source (`exercise.session` from Garmin
 and Concept2). A release that drops a type two importers share refuses to start until one of them

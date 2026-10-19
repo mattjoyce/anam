@@ -39,6 +39,17 @@ func TestRegister(t *testing.T) {
 	// version is another body, and a version that changes only its handling is new.
 	handled := strings.Replace(importedManifest, `"schema"`, `"handling": {"guidance": "sitting, before breakfast"}, "schema"`, 1)
 	rehandled := strings.Replace(handled, "before breakfast", "after breakfast", 1)
+	// Card 139: a release that takes a type back from an importer must not break the
+	// importer still sending the body the binary now carries. The store holds the
+	// bundled body, as the daemon writes it at start.
+	bpBundled, ok := bundled.Lookup("health.blood-pressure")
+	if !ok {
+		t.Fatal("health.blood-pressure is not bundled")
+	}
+	bpAtBundled := versioned(bpManifest, bpBundled.Version)
+	bpStored := def.Stored{Type: "health.blood-pressure", Version: bpBundled.Version, Body: []byte(bpAtBundled)}
+	bpOtherAtBundled := strings.Replace(bpAtBundled, `"comment": {"type": "string", "minLength": 1}`,
+		`"comment": {"type": "string"}`, 1)
 
 	cases := []struct {
 		name       string
@@ -61,6 +72,9 @@ func TestRegister(t *testing.T) {
 		{"another handling at a registered version", rehandled, nil, []def.Stored{held(handled, 1)}, false, def.ErrRegistered},
 		{"a newer version, only its handling changed", versioned(rehandled, 2), nil, []def.Stored{held(handled, 1)}, true, nil},
 		{"a type this binary bundles", bpManifestBundled(t, bundled), nil, nil, false, def.ErrBundled},
+		{"a type this binary bundles, the body it carries", bpAtBundled, []def.Stored{bpStored}, nil, false, nil},
+		{"a type this binary bundles, another body at its version", bpOtherAtBundled, []def.Stored{bpStored}, nil, false, def.ErrBundled},
+		{"a type this binary bundles, its body but the store holds none", bpAtBundled, nil, nil, false, def.ErrBundled},
 		{"not a manifest", `{"meta": {}}`, nil, nil, false, def.ErrBadManifest},
 	}
 	for _, c := range cases {

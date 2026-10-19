@@ -1,10 +1,10 @@
 ---
 type: invariant
 title: A type lives in one place
-description: While the binary bundles a type no importer may register it and any number may submit it; an importer takes a type over when a release drops it; two importers naming an unbundled type refuse the daemon's start.
-timestamp: 2026-10-17T00:00:00Z
+description: While the binary bundles a type no importer may register another body of it and any number may submit it (the one body the binary carries is answered unchanged); an importer takes a type over when a release drops it; two importers naming an unbundled type refuse the daemon's start.
+timestamp: 2026-10-20T00:00:00Z
 resource: internal/def/register.go#Register
-anchor: "if _, ok := bundled.Lookup(d.Type); ok {"
+anchor: "if b, ok := bundled.Lookup(d.Type); ok {"
 basis: code
 tier: supporting
 enforced_at: internal/config/principals.go#LoadPrincipals

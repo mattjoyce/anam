@@ -72,8 +72,9 @@
 {{template "track.html" .Track}}
 {{end}}
 
-<h2>payload <span class="dim">{{if eq (print .Facet.Descriptor.PayloadKind) "reference"}}(a reference: the bytes stay in the library, at this path and hash){{else}}(verbatim, canonical bytes){{end}}</span></h2>
+<h2>payload <span class="dim">{{if eq (print .Facet.Descriptor.PayloadKind) "reference"}}(a reference: the bytes stay in the library, at this path and hash){{else if .BytesNotHeld}}(a link: a file Anam remembers but does not hold){{else}}(verbatim, canonical bytes){{end}}</span></h2>
 {{if .DocumentURL}}<p><a href="{{.DocumentURL}}">open the document</a> <span class="dim">served from the default library, bytes as they are</span></p>{{end}}
+{{if .BytesNotHeld}}<p class="dim">The bytes are not held: this facet records that a file with this name, hash and date was seen where it lives, and Anam serves nothing from there. The sha256 names bytes outside Anam.</p>{{end}}
 <pre class="json mono">{{template "json.html" .Payload}}</pre>
 
 <h2>anam-events for this facet</h2>

@@ -128,6 +128,9 @@ var typeStyles = map[facet.Type]typeStyle{
 	"vision.prescription": {"clinical", shapeCircle, kindReading},
 
 	"doc.reference": {"documents", shapeSquare, kindEvent},
+	// A file Anam remembers but does not hold (card 165), registered by the links
+	// importer: a document the library has no bytes for, so the documents row.
+	"record.link": {"documents", shapeCross, kindEvent},
 	// A note the person wrote about one or more facets: drawn with what is written
 	// down, at the moment it was written (card 136); the facets it is about are
 	// reached through its payload.

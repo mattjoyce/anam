@@ -8,6 +8,11 @@ decisions is in `journal/`.
 
 ## 2026-10-20
 
+- `record.link`, a file Anam remembers but does not hold (card 165), is registered by the
+  `anam_links` importer in anam-importers, not bundled. The inspector draws it in the documents
+  row and its facet page says the bytes are not held and offers no download; `docs/INBOX.md`
+  says when to use it and when `doc.reference`. No daemon change: the held-bytes refusal was
+  already keyed on `doc.reference`.
 - A Definition's `meta` may declare `kind` (`measure`, `reading` or `event`) and `family` (a
   lower-case word such as `meds`): what the type is, for a reader. The gate ignores both. The
   inspector draws a type that declares them on its family's row with its kind's marker before

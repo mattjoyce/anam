@@ -198,6 +198,9 @@ def export(args, env, work):
                                for row in attrs if isinstance(row[2], (int, float)) and not isinstance(row[2], bool)))
     write_facts(work, "closes", ([clean(row[0])] for row in closes))
     times = sorted({row[2] for row in entries})
+    if not times:
+        sys.exit(f"the projection {args.projection} serves no entry, so there is no instant to ask about; "
+                 "pick one that serves facets (anam projection list)")
     instants = times[:: args.every]
     write_facts(work, "instant", ([t] for t in instants))
     print(f"exported {len(entries)} entries, {len(attrs)} attrs, {len(closes)} closing types; "

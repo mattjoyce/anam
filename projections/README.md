@@ -19,5 +19,4 @@ stays readable, because a receipt names the version that served it.
 
 Every type a template names must have a Definition in force on the daemon when it is
 registered. `heart`, `sleep` v2 and `recent-life` name types the Garmin and OwnTracks importers
-register, so they
-register against the live daemon and not against a bare one.
+register, so they register against the live daemon and not against a bare one.

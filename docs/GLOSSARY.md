@@ -243,7 +243,7 @@ nothing Anam knows — so it lives in the published-artifact tier and is lost wi
 built): a Datalog program evaluated over the *Fold* at a watermark, **through a *Projection***. The
 projection decides which whole facets the query may see; the query relates them: joins across types
 along *Fact-time*, selection by any payload field the served Definition's schema names, aggregates,
-windows. Base relations are the *Envelope* (`entry/6`, with `definition_version`) and the payload
+windows. Base relations are the *Envelope* (`entry/7`, with `definition_version`) and the payload
 fields read from the served copy (`attr/3`, any schema pointer). Bundled rules such as `current/2` ship
 as a versioned rule set; `current/2` is held equal to *Snapshot read* by a standing test. The answer
 is a derived value that hashes, with a *Receipt* naming the projection, the rule-set hash and the

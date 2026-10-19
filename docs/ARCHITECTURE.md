@@ -782,7 +782,7 @@ across types along fact-time, selection by any payload field the served Definiti
 aggregates and windows. A query answer is a **derived value read off a projection**, which is why it
 does not break the rule that projections prune. The projection still only prunes; the generating is
 done by the query, over what the projection served, and the answer is a new value that hashes, not a
-change to any facet. Base relations are the envelope (`entry/6` with type, fact-time, series,
+change to any facet. Base relations are the envelope (`entry/7` with the entity, type, fact-time, series,
 status, source, and `definition_version`) and the payload fields read from the served copy
 (`attr(E, Pointer, Value)` for any pointer the schema defines, validated as fields are). Bundled
 rules (`current/2`, `displaced/2`) ship as a named, versioned rule set so an agent builds on

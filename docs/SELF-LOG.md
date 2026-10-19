@@ -25,7 +25,8 @@ that runs March to June, stored as one fact dated March, is invisible to a May q
 
 **An interval is a series of point facts.** Started, changed, stopped, each with its own fact-time,
 each immutable, each a row in the source. The kind of change goes in the **facet type**, so it is
-metadata and no read opens a payload: `med.started`, `med.dose-changed`, `med.stopped`.
+metadata and the fold tells them apart without opening a payload: `med.started`, `med.dose-changed`,
+`med.stopped`.
 
 **The series key says which facts are the same thing over time.** Identity is too fine (every change
 has its own id) and type is too coarse. A Definition declares a series **family** and the pointers

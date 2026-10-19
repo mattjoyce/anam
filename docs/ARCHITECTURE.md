@@ -533,8 +533,11 @@ would pass on data it never rebuilt, and "Anam owns no source fact" would stop b
 ### The ledger — datom-shaped, not a datom engine
 
 Adopt the datom **shape**, do not build a datom **engine**. Facts are
-`[entity attribute value tx]` with `tx` = anam-time; the store supplies sorted indexes, Anam supplies
-the shape and a handful of fixed query forms.
+`[entity attribute value tx]` with `tx` = anam-time; the store supplies sorted indexes over the
+envelope, Anam supplies the shape and a handful of fixed read forms. The general query language
+Anam does have (Datalog, §9, card 173) is not an engine over the store: it evaluates over a served
+**value**, the fold at a watermark, after a projection has decided what that value holds. The store
+answers the fixed forms; everything richer is computed over what they return.
 
 > **It is not EAVT, and calling it that invites a query Anam cannot answer.** EAVT implies you could ask
 > the ledger for the `systolic` attribute. You cannot: there is no such attribute, because the payload
@@ -543,8 +546,11 @@ the shape and a handful of fixed query forms.
 > projections filter on. The payload beneath it is one opaque, content-addressed value. A reader who
 > wants a field names it as one of the read's **fields** (§9, 2026-10-12) and gets that field of each
 > whole reading the projection served, cut from the verbatim payload at serve time; the store never
-> decomposes it, and nothing is indexed by field. What a reader still cannot do is ask the ledger *for*
-> every `systolic`: fields narrow what a projection serves, they do not select by payload.
+> decomposes it, and nothing is indexed by field. The **store** never selects by payload; a **read**
+> may, over the served copy, through a projection (decided 2026-10-17, card 173). "Every reading with
+> systolic over 140" is a query answered by opening each served payload the projection admitted,
+> not an index lookup the ledger performs, and the distinction is what keeps opacity a storage rule
+> rather than a ceiling on what a person may ask of their own record.
 >
 > The accurate description is **an entity, a governed envelope, an opaque payload, and two clocks**
 > (§5) — a datom with a fat, opaque value. Bare "EAVT" is one letter-string standing in for a design it
@@ -766,8 +772,28 @@ run after every projection knob, over the whole facets they admitted, and only c
 or exclude a facet, cannot show a field the projection would not have served whole, and never touch the
 envelope. The stored payload stays opaque; the cut is made on the served copy. The answer is a **frame**,
 columns and rows, a relation rather than a list of facets, which is why a model can ask about a year of
-rowing without a stroke of it in its context. The receipt pins the fields and hashes the frame. Blending
-projections and computing over fields (aggregates, windows) are a later contract, not fields.
+rowing without a stroke of it in its context. The receipt pins the fields and hashes the frame.
+
+The third read is a **query** (decided 2026-10-17, card 173; Datalog, because Anam is Datomic-shaped
+and a query is a pure function of a database value, and `fold.Value` at `W` is that value). A query
+runs **through a projection**, never beside one: the projection decides which whole facets the
+query may see, exactly as it does for a timeline or a frame, and the query then relates them: joins
+across types along fact-time, selection by any payload field the served Definition's schema names,
+aggregates and windows. A query answer is a **derived value read off a projection**, which is why it
+does not break the rule that projections prune. The projection still only prunes; the generating is
+done by the query, over what the projection served, and the answer is a new value that hashes, not a
+change to any facet. Base relations are the envelope (`entry/6` with type, fact-time, series,
+status, source, and `definition_version`) and the payload fields read from the served copy
+(`attr(E, Pointer, Value)` for any pointer the schema defines, validated as fields are). Bundled
+rules (`current/2`, `displaced/2`) ship as a named, versioned rule set so an agent builds on
+Anam's reading of its own time semantics rather than rewriting it. The answer is a receipt like any
+other served thing: it carries the watermark and `ledger_id`, the projection name, version and
+content hash, the definition-set version, the rule-set hash, and the query text; `receipt verify`
+re-runs the same query over the same value and must get the same hash. A query moves no watermark
+and writes nothing. The evaluator is read-side and disposable, outside the error kernel; a wrong
+answer is fixed by fixing the rules and asking again, and the bundled `current/2` is held equal to
+`fold.Snapshot` by a standing test, so there is one account of liveness even while there are two
+implementations of it. Blending projections remains a later contract.
 
 > *Tombstone visibility* is no longer a projection knob. It was one only while "canonical" named the
 > append-everything surface. A projection over the canonical sees live facets by construction; a reader
@@ -855,7 +881,10 @@ Anam later as an ordinary source fact.
 - **Three-pillar admission through the one gate**; **`commit` is idempotent and atomic** — artifact,
   anam-event and watermark in one transaction, in one substrate (crash-clean).
 - Projections **prune, never reshape or generate**; a consumer selects, never defines. The **fields** a
-  consumer names only take away (§9).
+  consumer names only take away. A **query** generates, but only over what a projection served:
+  every query runs through a projection, reads payload fields from the served copy and never from
+  the store, moves no watermark, and answers with a receipt that names the projection, the
+  rule set and the query (§9).
 - Agent findings are derived Facets admitted as `proposed`; **endorsement never writes back**.
 - **The Envelope is the only ingress**; every external call is timed and fails fast.
 
@@ -883,3 +912,9 @@ one or two projections plus a CLI timeline viewer, manual mint, and receipts. Re
 - **Last-known-value reads** (§5a) — built as the snapshot over the series stamp (2026-10-07). Not yet
   exposed on `timeline` or as a snapshot projection template; and a Definition that changes its series
   key reaches only facets admitted after the change, because admission is idempotent on content.
+- **The query surface** (§9, card 173) — decided 2026-10-17, not built. Evaluator and the
+  `current/2` = `fold.Snapshot` equality test first; introspection, `anam query`, `/v1/query` and the
+  anam-mcp tool after card 166. Whether `fold.Fates` later becomes the bundled rules, so there is one
+  decision procedure instead of two, is a separate decision for after the equality test has run for a
+  while: it would move the evaluator onto the serve path, inside the trusted core, and that is not
+  what this card admits.

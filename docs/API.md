@@ -46,8 +46,10 @@ month of `exercise.session` is 184 KB whole and 2.7 KB as a frame of distance, d
 type; the largest row, 752 strokes, is 72 KB whole and under 500 bytes in the frame. The receipt pins
 the fields beside `query`, the served hash is over the frame's bytes, and `narrow` names `fields`
 when a read is refused as too large. This amends the sentence below, §5's "cannot request selected
-payload fields", and ARCHITECTURE.md §9. Blending projections and computing over fields (aggregates,
-windows) are not this: they come after, as their own contract.
+payload fields", and ARCHITECTURE.md §9. Computing over fields (joins, selection by a payload
+value, aggregates, windows) is not this either: it is the query, `anam query` and `/v1/query`, a
+Datalog program run through a projection (decided 2026-10-17, card 173, ARCHITECTURE.md §9; not yet
+built). Blending projections stays a later contract.
 
 This document proposes the application API that every client shares: the CLI, the inspector,
 importers, and conversational clients (§8). The two conversational features are **chat with my

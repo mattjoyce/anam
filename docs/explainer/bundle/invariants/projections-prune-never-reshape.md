@@ -13,6 +13,7 @@ applies_to:
   - /components/projection.md
   - /components/serve.md
   - /terms/projection.md
+  - /terms/query.md
   - /data-structures/projection-template.md
 tested_by:
   - internal/projection/projection_test.go#TestApply_PropertyPruneOnly
@@ -20,3 +21,5 @@ tested_by:
 ---
 
 ARCHITECTURE §12, twelfth bullet, and §9. The knobs are a type allow-list (deny by default), a status filter, a maximum classification, a fact-time window and a shape; the shape is the one knob whose verdict depends on other entries, which is why it is a template knob and not a read-time flag. A served value is a subset of the canonical's entries with the same bytes per entry, which the property test checks over random templates. A wide-open template reproduces the canonical hash.
+
+A [query](/terms/query.md) does generate, and this invariant survives it because the query runs over what the projection served, never beside it: the projection still only prunes, the query relates the facets it admitted, and the answer is a new value with its own receipt, not a change to any facet ([a read may select by payload](/decisions/a-read-may-select-by-payload-the-store-never-does.md)).

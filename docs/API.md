@@ -55,8 +55,25 @@ the fields beside `query`, the served hash is over the frame's bytes, and `narro
 when a read is refused as too large. This amends the sentence below, §5's "cannot request selected
 payload fields", and ARCHITECTURE.md §9. Computing over fields (joins, selection by a payload
 value, aggregates, windows) is not this either: it is the query, `anam query` and `/v1/query`, a
-Datalog program run through a projection (decided 2026-10-17, card 173, ARCHITECTURE.md §9; not yet
-built). Blending projections stays a later contract.
+Datalog program run through a projection (decided 2026-10-17, card 173, ARCHITECTURE.md §9; built
+2026-10-19, below). Blending projections stays a later contract.
+
+**The query (2026-10-19, card 173).** `POST /v1/query` takes a JSON body: `projection` (required;
+the projection decides which whole facets the query may see), `text`, a Datalog program in Anam's
+own small syntax built on the bundled rules (`current/2`, `displaced/2`), `relation`, the derived
+relation to answer, `as_of` or `w` as a timeline read takes them, and `dry_run`. The base relations
+are `entry/7` (the envelope with the Definition version), `attr/3` (every scalar leaf of each served
+payload by its JSON pointer, read from the served copy) and `closes/1`; `instant/1` is the parameter
+the program defines, as facts with the whole fact-time lexeme or as a rule. The answer is one sorted
+relation that hashes, filed with a receipt whose `program` names the rule set, its hash, the text
+and the relation, and whose `template` is the projection; `/v1/receipts/{hash}/verify` re-runs it
+and must get the same hash, and refuses (409) under a binary whose rules moved. `GET /v1/query` is
+the introspection a program is written against: the relations, the fact-time lexeme, each type's
+pointers at each Definition version held, and the rules with their text. A program that cannot run
+is 400 with a message that says what to change; a derivation or an answer over `max_read_bytes` is
+413 with `instant`, `projection` and `program` as `narrow`. `warnings` names a pointer some versions
+of a type declare and others do not. `anam query run` and `anam query describe` are the CLI, local
+or over the daemon.
 
 This document proposes the application API that every client shares: the CLI, the inspector,
 importers, and conversational clients (§8). The two conversational features are **chat with my

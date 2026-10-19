@@ -85,7 +85,7 @@ func TestTypeStyles_GarminTypesTakeTheRowsTheyReplaced(t *testing.T) {
 		{"garmin.day", "health.metric-group"},
 	}
 	for _, c := range cases {
-		got, old := styleOf(c.typ), styleOf(c.replaced)
+		got, old := newStyles(nil).of(c.typ), newStyles(nil).of(c.replaced)
 		if got.Family == otherFamilyID {
 			t.Errorf("%s falls into the other row", c.typ)
 		}
@@ -118,6 +118,70 @@ func TestTypeStyles_OneShapeMeansOneThingAcrossRows(t *testing.T) {
 				t.Errorf("%s: the %s shape means something %s is not", typ, sh, typ)
 			}
 		}
+	}
+}
+
+// A Definition that declares kind and family draws on that family's row with the
+// kind's marker, with no entry in the table (card 176). A declared family the table
+// does not know is a row of its own, grey, after the known rows. A type the table
+// names keeps its shape when the Definition agrees on its kind, and without a
+// registry every type draws from the table as before.
+func TestStyles_DeclaredKindAndFamilyWin(t *testing.T) {
+	t.Parallel()
+	manifest := func(typ, kind, family string) string {
+		return `{"meta": {"facet_type": "` + typ + `", "definition_version": 1, "classification": "Normal",
+		  "validation_mode": "strict", "source_schema": "test/row", "kind": "` + kind + `", "family": "` + family + `",
+		  "time_semantics": {"fact_time": {"pointer": "/at", "layout": "2006-01-02", "zone": "UTC"}},
+		  "identity_key": ["/id"]},
+		 "schema": {"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object",
+		  "required": ["id", "at"],
+		  "properties": {"id": {"type": "string", "minLength": 1}, "at": {"type": "string", "minLength": 1}},
+		  "additionalProperties": false}}`
+	}
+	parse := func(m string) def.Definition {
+		d, err := def.Parse([]byte(m))
+		if err != nil {
+			t.Fatalf("Parse: %v", err)
+		}
+		return d
+	}
+	reg, err := def.NewRegistry(
+		parse(manifest("test.pressure", "reading", "heart")),
+		parse(manifest("test.harvest", "event", "garden")),
+		parse(manifest("med.started", "event", "meds")),
+	)
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	st := newStyles(reg)
+
+	if got := st.of("test.pressure"); got.Family != "heart" || got.Kind != kindReading || got.Shape != shapeCircle {
+		t.Errorf("declared reading in heart: got %+v", got)
+	}
+	if c := st.markClass("test.pressure"); !strings.HasSuffix(c, " hollow") {
+		t.Errorf("a declared reading draws hollow, got class %q", c)
+	}
+	if got := st.of("test.harvest"); got.Family != "garden" || got.Kind != kindEvent || got.Shape != shapeDiamond || !st.isEvent("test.harvest") {
+		t.Errorf("declared event in an unknown family: got %+v", got)
+	}
+	if got := st.of("med.started"); got.Shape != shapeTriUp || got.Family != "meds" {
+		t.Errorf("a table type whose Definition agrees keeps its shape, got %+v", got)
+	}
+	if got := newStyles(nil).of("test.pressure"); got.Family != otherFamilyID || got.Kind != kindMeasure {
+		t.Errorf("without a registry the table decides, got %+v", got)
+	}
+
+	rows := st.rowsFor([]facet.Type{"test.harvest", "med.started", "test.pressure", "no.such"})
+	var ids []string
+	for _, r := range rows {
+		ids = append(ids, r.Family)
+		if r.Family == "garden" && (r.Label != "garden" || r.Hue != "hx") {
+			t.Errorf("the garden row: label %q hue %q, want its own word in grey", r.Label, r.Hue)
+		}
+	}
+	want := []string{"heart", "meds", "garden", "other"}
+	if strings.Join(ids, ",") != strings.Join(want, ",") {
+		t.Errorf("rows %v, want %v: known families, then declared, then other", ids, want)
 	}
 }
 

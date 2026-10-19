@@ -21,10 +21,11 @@ func queryCmd(cfgPath *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "query",
 		Short: "the Datalog read over a served value (card 173)",
-		Long: `Query is the third read: a Datalog program evaluated over what a projection serves.
-Only its check is here so far; running a query of your own is a later slice.`,
+		Long: `Query is the third read: a Datalog program evaluated over what a projection serves,
+answered with a receipt (card 173). describe says what can be asked, run asks it,
+and check holds the bundled rules to the fold over a real ledger.`,
 	}
-	cmd.AddCommand(queryCheckCmd(cfgPath))
+	cmd.AddCommand(queryDescribeCmd(cfgPath), queryRunCmd(cfgPath), queryCheckCmd(cfgPath))
 	return cmd
 }
 

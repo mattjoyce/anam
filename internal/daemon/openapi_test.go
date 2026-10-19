@@ -188,6 +188,8 @@ var apiTypes = map[string]func() any{
 	"Refusal":              func() any { return new(api.Refusal) },
 	"StoredDocument":       func() any { return new(api.StoredDocument) },
 	"Backup":               func() any { return new(api.Backup) },
+	"QueryCatalogue":       func() any { return new(api.QueryCatalogue) },
+	"QueryAnswer":          func() any { return new(api.QueryAnswer) },
 }
 
 // decodeStrict round-trips a YAML example through JSON into v, refusing unknown

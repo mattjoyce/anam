@@ -2,8 +2,30 @@ package query
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
+
+// ErrTooLarge marks an evaluation refused for its size: the tuples it derived encode
+// to more than the bound. Asking about fewer instants, through a narrower projection
+// or with a more selective rule is the remedy; asking again unchanged will fail again.
+var ErrTooLarge = errors.New("query: derivation too large")
+
+// TooLarge is the refusal itself: the relation that crossed the bound, and the
+// measure, counted over every derived relation as the tuples' text.
+type TooLarge struct {
+	Relation string
+	Tuples   int
+	Bytes    int
+	MaxBytes int
+}
+
+func (e *TooLarge) Error() string {
+	return fmt.Sprintf("derivation too large: %d derived tuples encode to more than %d bytes (max_read_bytes), at %s",
+		e.Tuples, e.MaxBytes, e.Relation)
+}
+
+func (e *TooLarge) Is(target error) bool { return target == ErrTooLarge }
 
 // relation is a set of tuples with insertion order and lazily built indexes, one per
 // argument position a join has asked for.
@@ -57,10 +79,12 @@ type Result struct {
 
 // Evaluate runs a plan over a base to its fixpoint, stratum by stratum, semi-naive
 // within each: after the first round only the tuples new in the last round are
-// joined again. It reads values and writes nothing; the deadline on ctx is the one
-// bound it honours in this slice.
-func Evaluate(ctx context.Context, plan Plan, base Base) (Result, error) {
-	ev := &evaluator{ctx: ctx, db: map[string]*relation{}}
+// joined again. It reads values and writes nothing. Two bounds hold it: the deadline
+// on ctx, and maxBytes over the text of every tuple it derives, intermediate
+// relations included, since a query's derived relations can be larger than its input
+// (a before/2 over every instant). Zero is no bound; over it, *TooLarge.
+func Evaluate(ctx context.Context, plan Plan, base Base, maxBytes int) (Result, error) {
+	ev := &evaluator{ctx: ctx, db: map[string]*relation{}, maxBytes: maxBytes}
 	for name, rel := range base.relations {
 		ev.db[name] = rel
 	}
@@ -79,6 +103,9 @@ type evaluator struct {
 	ctx   context.Context
 	db    map[string]*relation
 	steps int
+
+	maxBytes, bytes, tuples int
+	over                    *TooLarge
 }
 
 // stratum evaluates one stratum's rules to a fixpoint.
@@ -87,6 +114,9 @@ func (ev *evaluator) stratum(rules []rule) error {
 	for _, r := range rules {
 		if err := ev.apply(r, nil, -1, delta); err != nil {
 			return err
+		}
+		if ev.over != nil {
+			return ev.over
 		}
 	}
 	for len(delta) > 0 {
@@ -133,8 +163,26 @@ func (ev *evaluator) apply(r rule, delta *relation, deltaPos int, out map[string
 			rel = newRelation()
 			out[r.Head.Name] = rel
 		}
-		rel.add(t)
+		if rel.add(t) {
+			ev.count(r.Head.Name, t)
+		}
 	})
+}
+
+// count charges one derived tuple against the bound, as the bytes its JSON takes.
+func (ev *evaluator) count(relation string, t Tuple) {
+	n := 1 + len(t) // brackets and commas
+	for _, c := range t {
+		n += len(c.s)
+		if c.kind == KindString {
+			n += 2
+		}
+	}
+	ev.tuples++
+	ev.bytes += n
+	if ev.maxBytes > 0 && ev.bytes > ev.maxBytes && ev.over == nil {
+		ev.over = &TooLarge{Relation: relation, Tuples: ev.tuples, Bytes: ev.bytes, MaxBytes: ev.maxBytes}
+	}
 }
 
 // join extends env through the body literals from i on, calling emit for every
@@ -162,6 +210,9 @@ func (ev *evaluator) join(r rule, i int, env map[string]Const, delta *relation, 
 		rel = delta
 	}
 	for _, idx := range matching(rel, l.Atom.Args, env) {
+		if ev.over != nil {
+			return ev.over
+		}
 		if ev.steps++; ev.steps%stepsPerDeadlineCheck == 0 {
 			if err := ev.ctx.Err(); err != nil {
 				return fmt.Errorf("query: evaluation stopped: %w", err)

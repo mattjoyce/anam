@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/def"
 )
 
@@ -156,6 +158,9 @@ func checkAtom(a Atom, arities map[string]int, defs Definitions) error {
 	if n != len(a.Args) {
 		return fmt.Errorf("%s has %d arguments, but %s is %s/%d", a.Name, len(a.Args), a.Name, a.Name, n)
 	}
+	if a.Name == RelInstant {
+		return checkInstant(a)
+	}
 	if a.Name != RelAttr || a.Args[1].IsVar() {
 		return nil
 	}
@@ -164,6 +169,27 @@ func checkAtom(a Atom, arities map[string]int, defs Definitions) error {
 		return fmt.Errorf("attr: the pointer must be a string, got %s", p.Text())
 	}
 	return checkPointer(p.Text(), defs)
+}
+
+// checkInstant holds a constant in instant/1 to the fact-time lexeme (clock.Layout):
+// a bare date is refused with the lexeme it should have been, since as written it
+// sorts before every entry of its day.
+func checkInstant(a Atom) error {
+	for _, arg := range a.Args {
+		if arg.IsVar() {
+			continue
+		}
+		s := arg.Const.Text()
+		if t, err := clock.Parse(s); err == nil && clock.Format(t) == s {
+			continue
+		}
+		example := "2026-06-15T00:00:00.000000000Z"
+		if day, err := time.Parse(time.DateOnly, s); err == nil {
+			example = clock.Format(day)
+		}
+		return fmt.Errorf("instant %s is not a fact-time; write the whole instant, as %s (layout %s)", arg.Const.Text(), example, clock.Layout)
+	}
+	return nil
 }
 
 // checkPointer is the fields' own check (card 138): the pointer is well formed and

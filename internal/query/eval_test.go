@@ -123,7 +123,7 @@ func tryRun(v fold.Value, versions map[string]int, defs *def.Registry, text, rel
 	if err != nil {
 		return query.Answer{}, err
 	}
-	res, err := query.Evaluate(context.Background(), plan, base)
+	res, err := query.Evaluate(context.Background(), plan, base, 0)
 	if err != nil {
 		return query.Answer{}, err
 	}
@@ -261,7 +261,7 @@ func TestEvaluate_HonoursTheDeadline(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := query.Evaluate(ctx, plan, base); !errors.Is(err, context.Canceled) {
+	if _, err := query.Evaluate(ctx, plan, base, 0); !errors.Is(err, context.Canceled) {
 		t.Errorf("Evaluate on a cancelled context = %v, want context.Canceled", err)
 	}
 }

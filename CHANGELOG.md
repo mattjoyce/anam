@@ -6,13 +6,31 @@ of the API must do or may expect, newest first, by the day they merged. Each nam
 kanban board, which holds the reasoning. The full history is `git log`; the story behind the
 decisions is in `journal/`.
 
-## 2026-10-19
+## 2026-10-20
 
 - `record.link`, a file Anam remembers but does not hold (card 165), is registered by the
   `anam_links` importer in anam-importers, not bundled. The inspector draws it in the documents
   row and its facet page says the bytes are not held and offers no download; `docs/INBOX.md`
   says when to use it and when `doc.reference`. No daemon change: the held-bytes refusal was
   already keyed on `doc.reference`.
+- A Definition's `meta` may declare `kind` (`measure`, `reading` or `event`) and `family` (a
+  lower-case word such as `meds`): what the type is, for a reader. The gate ignores both. The
+  inspector draws a type that declares them on its family's row with its kind's marker before
+  anyone edits core, and the definitions page shows them (card 176).
+- `sleep.episode`, `health.heart-rate-daily` and `health.step-count` are bundled, so another source
+  may name them. An importer re-sending the body the binary bundles, at its version, is answered
+  200 unchanged rather than 409; another body of a bundled type is still refused (card 139 piece 1).
+
+## 2026-10-19
+
+- The query surface (card 173, second slice). `POST /v1/query` runs a Datalog program through a
+  projection at the head, `as_of` or `w`, built on the bundled rules, and answers one relation with
+  a receipt that names the projection, the rule set's hash and the program; `anam receipt verify`
+  replays it. `GET /v1/query` and `anam query describe` are the introspection: relations, each
+  type's pointers at each Definition version, the fact-time lexeme, the rules. `anam query run` is
+  the CLI, local or over the daemon. A constant in `instant/1` must be the whole fact-time lexeme;
+  a derivation or an answer over `max_read_bytes` is 413 with `instant`, `projection` and `program`
+  as the narrowings. A query moves no watermark and writes artifacts only.
 - `anam query check` holds the bundled Datalog rule `current/2` equal to `fold.Snapshot` over a
   real ledger, read-only, one instant at a time; `--ledger` and `--person` point it at a copy,
   `--projection` serves the log through a template first, `--every` samples the fact-times. The

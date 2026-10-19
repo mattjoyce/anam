@@ -22,6 +22,8 @@ references: []
 | `identity_key` | JSON Pointers, in order, composed into the source ref | required, at least one |
 | `min_binding_assurance` | the floor a binding must meet | `medium` |
 | `series` | `{name, key[], closes}` | none |
+| `kind` | what sort of fact the type records, for readers: `measure`, `reading` or `event` (card 176); the gate ignores it | none |
+| `family` | the lower-case hyphenated word a reader groups the type under (`meds`, `sleep`); the inspector draws the type on that row (card 176); the gate ignores it | none |
 
 Schema rules at load: top-level object with properties; every required property refuses null and the empty string; the top-level field behind every keying pointer is required; every object sets `additionalProperties`; no `$ref` leaves the manifest; nothing is fetched.
 

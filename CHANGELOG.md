@@ -8,6 +8,13 @@ decisions is in `journal/`.
 
 ## 2026-10-20
 
+- `anam rename --table <json> [--yes]` carries every live facet of a type into another type as the
+  next version of itself, through the gate: the same id, source, identity values, fact-time and
+  payload, with the new Definition's classification and series. The old version stays, so
+  anam-time is kept and a read as-of before the run is unchanged. The two types must key alike,
+  the dry run reports what the gate would refuse, and a refusal writes nothing. The gate
+  supersedes on a type change only under this run's mark; the API's refusal of a changed type
+  (card 105) stands. The daemon is stopped while it runs (card 140).
 - `record.link`, a file Anam remembers but does not hold (card 165), is registered by the
   `anam_links` importer in anam-importers, not bundled. The inspector draws it in the documents
   row and its facet page says the bytes are not held and offers no download; `docs/INBOX.md`

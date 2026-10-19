@@ -39,6 +39,11 @@ type prepared struct {
 	facetID   string
 	factTime  time.Time
 	series    string
+
+	// renamedFrom is the type the facet is leaving in a rename (card 140), set only
+	// by Rehearse and RenameBatch, never from the wire. Empty for every commit the
+	// API makes, so disposition's refusal of a changed type (card 105) stands there.
+	renamedFrom facet.Type
 }
 
 // CommitBatch admits envelopes in one transaction, over one contiguous block of seqs.
@@ -68,7 +73,14 @@ func (g *Gate) CommitBatch(ctx context.Context, envs []facet.Envelope, bindings 
 	if err != nil {
 		return nil, 0, err
 	}
+	return g.commitPrepared(ctx, ps)
+}
 
+// commitPrepared writes prepared envelopes as one block: the head read once, the
+// dispositions decided together, one transaction, retried on a stale watermark. It
+// is CommitBatch past its pillars, and RenameBatch (card 140) shares it, so a rename
+// is written the way an admission is.
+func (g *Gate) commitPrepared(ctx context.Context, ps []prepared) ([]Result, ledger.Watermark, error) {
 	results := make([]Result, len(ps))
 	pending := make([]int, len(ps)) // indexes still to write, in order
 	for i := range ps {
@@ -320,6 +332,12 @@ func (g *Gate) disposition(ctx context.Context, p prepared) (disposition, error)
 	case err != nil:
 		return disposition{}, err
 	case current.Type != p.env.Type:
+		if p.renamedFrom != "" && current.Type == p.renamedFrom {
+			// A rename (card 140): the next version carries the new type whether or
+			// not the payload changed, since the hash is over the payload alone and
+			// an unchanged payload would otherwise read as a no-op.
+			return disposition{version: current.ArtifactVersion + 1, kind: facet.EventSuperseded, prior: current.ArtifactVersion}, nil
+		}
 		return disposition{}, fmt.Errorf("%w: %s is a %s (v%d), the envelope is a %s; the two types share identity values under source %s",
 			ErrTypeChanged, p.env.SourceRef, current.Type, current.ArtifactVersion, p.env.Type, p.env.Source)
 	case current.Descriptor.ContentHash == p.hash:

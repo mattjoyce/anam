@@ -264,11 +264,12 @@ func (s *indexState) wrong() error {
 	return s.err
 }
 
-// Handler is the daemon's routes: /healthz open to all, and every other route
-// behind a token whose role the route admits (routes).
+// Handler is the daemon's routes: /healthz and the API's description open to all,
+// and every other route behind a token whose role the route admits (routes).
 func (d *Daemon) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", d.healthz)
+	mux.HandleFunc(openAPIPath, d.getOpenAPI)
 	for _, rt := range d.routes() {
 		mux.Handle(rt.pattern, d.admit(rt.roles, rt.handler))
 	}

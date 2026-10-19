@@ -3,6 +3,13 @@
 Design proposal · 2026-10-07 · documentation only; these APIs are not implemented.
 Split 2026-10-10 (card 72): the MCP mapping moved to the `anam-mcp` repository (§8).
 
+**The shapes are in the spec (2026-10-19, card 49).** `internal/daemon/openapi.yaml` describes every
+route the daemon serves, with its roles, parameters, bodies and status codes, and a test holds it to
+the mux: a route added without a path there, or a path without a route, fails `scripts/check.sh`,
+and every example decodes into its `internal/api` type. A running daemon serves it at
+`GET /v1/openapi.yaml` without a token. This document stays the prose: why the routes are what they
+are, and what is still proposed.
+
 **What runs today (2026-10-08, cards 42–45).** `anam daemon` serves an interim `/v1` surface
 that carries the CLI's existing reads, not the `ReadRecord` contract below: `status`, `ingest`
 and `operations/{id}`, `timeline`, `changes`, `receipts` (list, show, verify) and `checkpoints`

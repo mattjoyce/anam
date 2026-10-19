@@ -327,3 +327,58 @@ func TestBundled_NoteAnnotationIsThePersonsWords(t *testing.T) {
 		}
 	}
 }
+
+// Card 36: a lens prescription as an optometrist issued it, each eye's refraction
+// as printed. The row is the 2023 prescription in the records file, with the
+// provider's details made generic.
+func TestBundledVisionPrescription(t *testing.T) {
+	t.Parallel()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, ok := reg.Lookup("vision.prescription")
+	if !ok {
+		t.Fatal("no bundled vision.prescription")
+	}
+	if d.Version != 1 || d.FactTime.Pointer != "/date" || d.FactTime.Layout != "2006-01-02" ||
+		len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" || d.Series != nil {
+		t.Fatalf("v%d fact time %s %s identity %v series %v", d.Version, d.FactTime.Pointer, d.FactTime.Layout, d.IdentityKey, d.Series)
+	}
+	decode := func(s string) map[string]any {
+		t.Helper()
+		var m map[string]any
+		if err := json.Unmarshal([]byte(s), &m); err != nil {
+			t.Fatal(err)
+		}
+		return m
+	}
+	row := `{"id": "example-optical:2023-01-06", "date": "2023-01-06", "expires": "2024-01-06",
+		"provider": "Example Optical", "practitioner": "A. Example, provider number 000000AA", "kind": "spectacles",
+		"right": {"sphere": 3.25, "cylinder": -1, "axis": 90, "intermediate_add": 1.5, "add": 2},
+		"left": {"sphere": 1.5, "cylinder": -1, "axis": 90, "intermediate_add": 1.5, "add": 2},
+		"source_note": "read from the transcription of the prescription attached to the 6 Jan 2023 email"}`
+	if err := d.Check(decode(row)); err != nil {
+		t.Errorf("the prescription was refused: %v", err)
+	}
+	sphereOnly := `{"id": "example-optical:2023-01-06", "date": "2023-01-06", "provider": "Example Optical",
+		"kind": "spectacles", "right": {"sphere": 3.25}, "left": {"sphere": 1.5}}`
+	if err := d.Check(decode(sphereOnly)); err != nil {
+		t.Errorf("a prescription with only spheres was refused: %v", err)
+	}
+	for name, payload := range map[string]string{
+		"no kind":           strings.Replace(row, `"kind": "spectacles",`, ``, 1),
+		"a kind of its own": strings.Replace(row, `"spectacles"`, `"sunglasses"`, 1),
+		"an axis past 180": strings.Replace(row, `"axis": 90, "intermediate_add": 1.5, "add": 2},
+		"left"`, `"axis": 190, "intermediate_add": 1.5, "add": 2},
+		"left"`, 1),
+		"a sphere as text":   strings.Replace(row, `"sphere": 3.25`, `"sphere": "+3.25"`, 1),
+		"an eye without one": strings.Replace(row, `"left": {"sphere": 1.5, `, `"left": {`, 1),
+		"a field of its own": strings.Replace(row, `"kind":`, `"pupillary_distance": 64, "kind":`, 1),
+		"a date with a time": strings.Replace(row, `"date": "2023-01-06"`, `"date": "2023-01-06 14:40"`, 1),
+	} {
+		if err := d.Check(decode(payload)); err == nil {
+			t.Errorf("%s was admitted", name)
+		}
+	}
+}

@@ -27,6 +27,7 @@ import (
 	"github.com/mattjoyce/anam/internal/frame"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
+	"github.com/mattjoyce/anam/internal/query"
 	"github.com/mattjoyce/anam/internal/receipt"
 	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -86,6 +87,10 @@ type Deps struct {
 	// DefinitionSetVersion is the receipt's provenance field, passed in rather than
 	// read here so that this package needs no opinion about definitions.
 	DefinitionSetVersion string
+
+	// Definitions are the Definitions in force, which a query's base relations and
+	// pointer check read (card 173). Nil means the bundled ones alone.
+	Definitions query.Definitions
 }
 
 // Served reports one completed serve.
@@ -97,6 +102,9 @@ type Served struct {
 	// receipt's ServedHash is over, and what the reader is answered with. Nil for a
 	// whole serve.
 	Frame *frame.Frame
+
+	// Answer is the served value of a query receipt (card 173). Nil otherwise.
+	Answer *query.Answer
 
 	// CanonicalHash and CanonicalLen describe what was pruned *from*, so the operator
 	// can see the ratio rather than only the result.
@@ -325,6 +333,10 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 			ErrOtherLedger, r.LedgerID, ledgerID, r.Watermark)
 	}
 
+	if r.Program != nil {
+		out, err := verifyQuery(ctx, d, r, t, notes)
+		return r, out, err
+	}
 	res, err := valueAt(ctx, d, ledger.Watermark(r.Watermark))
 	if err != nil {
 		return r, receipt.Result{}, err
@@ -393,6 +405,13 @@ func Show(d Deps, receiptHash string) (receipt.Receipt, Shown, error) {
 	if err != nil {
 		return r, Shown{}, err
 	}
+	if r.Program != nil {
+		var a query.Answer
+		if err := json.Unmarshal(served, &a); err != nil {
+			return r, Shown{}, fmt.Errorf("serve: parse served answer %s: %w", r.ServedHash, err)
+		}
+		return r, Shown{Answer: &a}, nil
+	}
 	if r.Query != nil && len(r.Query.Fields) > 0 {
 		f, err := frame.Parse(served)
 		if err != nil {
@@ -408,10 +427,11 @@ func Show(d Deps, receiptHash string) (receipt.Receipt, Shown, error) {
 }
 
 // Shown is a served value read back from the artifact tier: the entries of a whole
-// serve, or the frame of one that named fields.
+// serve, the frame of one that named fields, or the answer of a query.
 type Shown struct {
 	Entries []fold.Entry
 	Frame   *frame.Frame
+	Answer  *query.Answer
 }
 
 // List returns the receipts in the store, newest serve first.

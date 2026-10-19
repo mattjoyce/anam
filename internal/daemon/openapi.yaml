@@ -1,0 +1,1284 @@
+openapi: 3.1.0
+# The daemon's API, hand-written (card 49). internal/daemon/openapi_test.go holds it
+# to the mux: every route in routes() is a path here with the same roles, every path
+# here is a route, and every example decodes into the internal/api type it names
+# (x-anam-type). docs/API.md is the prose; this file is the shapes.
+info:
+  title: Anam
+  version: v1
+  summary: One person's longitudinal record, read whole and written through a gate.
+  description: >-
+    Every route but /healthz and this document takes a token: a bearer token, or the
+    same token as a basic-auth password so a browser can open the inspector. A token
+    names a principal with a role (reader, importer or operator), and each operation
+    says which roles open it (x-anam-roles). 401 is no token or an unknown one, 403 a
+    role the route does not admit. Every error body is an Error. A request may carry
+    Anam-Timeout, its own deadline, and the daemon works to the shorter of that and
+    its configured timeout.
+servers:
+  - url: http://127.0.0.1:8787
+    description: the default listen address; a token file is required to listen beyond loopback
+security:
+  - bearer: []
+  - basic: []
+tags:
+  - name: record
+    description: What the record holds and when.
+  - name: receipts
+    description: Reads filed with proof of what they served.
+  - name: catalogue
+    description: Definitions, projections and checkpoints.
+  - name: submit
+    description: How facts, Definitions and documents arrive, an importer's alone.
+  - name: operate
+    description: Minting and backups, the operator's alone.
+paths:
+  /healthz:
+    get:
+      operationId: healthz
+      tags: [operate]
+      security: []
+      x-anam-roles: []
+      summary: Whether the daemon can read its ledger.
+      responses:
+        "200":
+          description: ready
+          content:
+            text/plain:
+              schema: { type: string, const: "ready\n" }
+        "503":
+          description: the ledger's head could not be read within the timeout
+          content:
+            text/plain:
+              schema: { type: string }
+  /v1/openapi.yaml:
+    get:
+      operationId: openapi
+      tags: [operate]
+      security: []
+      x-anam-roles: []
+      summary: This document, as the running build carries it.
+      responses:
+        "200":
+          description: the specification
+          content:
+            application/yaml:
+              schema: { type: string }
+  /v1/status:
+    get:
+      operationId: getStatus
+      tags: [record]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: Status
+      summary: The record's state and what the daemon has seen of each source.
+      parameters: [{ $ref: "#/components/parameters/AnamTimeout" }]
+      responses:
+        "200":
+          description: the state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Status" }
+              example:
+                version: v0.336-265c26c
+                person: matt
+                ledger_id: 0d1e2f3a-4b5c-5d6e-8f90-a1b2c3d4e5f6
+                w: 33378
+                since: "2026-10-18T19:00:12.000000000Z"
+                sources:
+                  - source: garmin
+                    last_scan_at: "2026-10-19T05:02:41.000000000Z"
+                    last_admission_at: "2026-10-19T05:02:41.000000000Z"
+                  - source: withings
+                    last_scan_at: "2026-10-19T04:10:03.000000000Z"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503": { $ref: "#/components/responses/LedgerUnavailable" }
+        "504": { $ref: "#/components/responses/Timeout" }
+  /v1/timeline:
+    get:
+      operationId: getTimeline
+      tags: [record]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: Timeline
+      summary: The whole-person read, narrowed as asked.
+      description: >-
+        Live facets in fact-time order. from and to narrow by fact time, at takes the
+        snapshot (the latest of each series at or before it), as_of or w winds Anam's
+        clock back, type keeps one type, projection prunes through a template, explain
+        shows every version with its verdict, and fields cuts the payload to named
+        pointers and answers with a frame. The answer is bounded by max_read_bytes;
+        over it, 413 says what is left to narrow by.
+      parameters:
+        - { $ref: "#/components/parameters/From" }
+        - { $ref: "#/components/parameters/To" }
+        - { $ref: "#/components/parameters/At" }
+        - { $ref: "#/components/parameters/AsOf" }
+        - { $ref: "#/components/parameters/W" }
+        - { $ref: "#/components/parameters/Type" }
+        - { $ref: "#/components/parameters/Projection" }
+        - { $ref: "#/components/parameters/Explain" }
+        - { $ref: "#/components/parameters/Fields" }
+        - { $ref: "#/components/parameters/Zone" }
+        - { $ref: "#/components/parameters/AnamTimeout" }
+      responses:
+        "200":
+          description: the read
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Timeline" }
+              example:
+                w: 33378
+                live: 14609
+                shown: 1
+                canonical: sha256:1976fb0a4cfc1313ce243c81ae29b34671610d8c3898da3dab3a40a67d737d02
+                entries:
+                  - facet_id: 923f857a-84a2-5284-9d4a-b73e6d0a16c4
+                    type: sleep.episode
+                    fact_time: "2026-10-18T07:44:00.000000000Z"
+                    source: garmin
+                    source_ref: garmin:16:sleep:2026-10-18
+                    status: admitted
+                    classification: Sensitive
+                    content_hash: sha256:ec002e673b06e5688a000c8b8a345759cb68b93b01edbea62ca04d65adbc1705
+                    payload: { id: "sleep:2026-10-18", total_sleep_time: { unit: min, value: 555 } }
+                versions: { 923f857a-84a2-5284-9d4a-b73e6d0a16c4: 1 }
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "504": { $ref: "#/components/responses/Timeout" }
+  /v1/changes:
+    get:
+      operationId: getChanges
+      tags: [record]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: Changes
+      summary: What Anam learned between two anam-times.
+      parameters:
+        - name: since
+          in: query
+          required: true
+          schema: { type: string }
+          description: an anam-time, RFC 3339 or a bare date in zone
+        - name: until
+          in: query
+          schema: { type: string }
+          description: an anam-time; empty means now
+        - { $ref: "#/components/parameters/Zone" }
+        - { $ref: "#/components/parameters/AnamTimeout" }
+      responses:
+        "200":
+          description: the anam-events in the window, from the operational store's index
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Changes" }
+              example:
+                index_seq: 33378
+                w: 33378
+                since: "2026-10-19T00:00:00.000000000Z"
+                changes:
+                  - seq: 33377
+                    anam_time: "2026-10-19T04:10:03.000000000Z"
+                    kind: superseded
+                    facet_id: 2c6d1f5e-8a1b-5c2d-9e3f-4a5b6c7d8e9f
+                    artifact_version: 2
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/IndexWrong" }
+        "503": { $ref: "#/components/responses/LedgerUnavailable" }
+        "504": { $ref: "#/components/responses/Timeout" }
+  /v1/receipts:
+    get:
+      operationId: getReceipts
+      tags: [receipts]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: Receipts
+      summary: The receipts of past serves, newest first.
+      responses:
+        "200":
+          description: the receipts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Receipts" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      operationId: postReceipt
+      tags: [receipts]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: Published
+      summary: Publish a read, filed with a receipt.
+      description: >-
+        The timeline read the query describes, through the projection it names, filed
+        as an artifact with a receipt that names exactly the entries served at W.
+        Writes artifacts only, never the ledger. The parameters are the timeline's;
+        projection is required.
+      parameters:
+        - { $ref: "#/components/parameters/From" }
+        - { $ref: "#/components/parameters/To" }
+        - { $ref: "#/components/parameters/At" }
+        - { $ref: "#/components/parameters/AsOf" }
+        - { $ref: "#/components/parameters/W" }
+        - { $ref: "#/components/parameters/Type" }
+        - name: projection
+          in: query
+          required: true
+          schema: { type: string }
+          description: the template that prunes the read
+        - { $ref: "#/components/parameters/Explain" }
+        - { $ref: "#/components/parameters/Fields" }
+        - { $ref: "#/components/parameters/Zone" }
+        - { $ref: "#/components/parameters/AnamTimeout" }
+      responses:
+        "201":
+          description: the read, with its receipt
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Published" }
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: the projection is not registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409": { $ref: "#/components/responses/CannotHonour" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "504": { $ref: "#/components/responses/Timeout" }
+  /v1/receipts/{hash}:
+    get:
+      operationId: getReceipt
+      tags: [receipts]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: ReceiptShown
+      summary: A receipt and the value it served, from the artifacts alone.
+      parameters:
+        - { $ref: "#/components/parameters/ReceiptHash" }
+      responses:
+        "200":
+          description: the receipt and its entries, or its frame
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReceiptShown" }
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NoArtifact" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+  /v1/receipts/{hash}/verify:
+    get:
+      operationId: verifyReceipt
+      tags: [receipts]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: ReceiptVerified
+      summary: Re-derive a receipt from the ledger and re-hash its file.
+      parameters:
+        - { $ref: "#/components/parameters/ReceiptHash" }
+        - { $ref: "#/components/parameters/AnamTimeout" }
+      responses:
+        "200":
+          description: both proofs, each reported on its own
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReceiptVerified" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NoArtifact" }
+        "409": { $ref: "#/components/responses/CannotHonour" }
+        "504": { $ref: "#/components/responses/Timeout" }
+  /v1/projections:
+    get:
+      operationId: getProjections
+      tags: [catalogue]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: Projections
+      summary: The projection templates a reader may select.
+      responses:
+        "200":
+          description: every template, its newest version and every version held
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Projections" }
+              example:
+                projections:
+                  - name: meds
+                    origin: bundled
+                    current: 1
+                    versions: [1]
+                    description: The current regimen, the latest statement about each course.
+                    types: [med.started, med.dose-changed, med.stopped]
+                    shape: snapshot
+                    hash: sha256:7a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      operationId: postProjections
+      tags: [operate]
+      x-anam-roles: [operator]
+      x-anam-type: RegisteredProjection
+      summary: Register a projection template.
+      description: >-
+        201 a new version, 200 the same body again at a held version, 409 another body
+        at a held version or a version behind the current, 422 a bad manifest or a type
+        with no Definition.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectionManifest" }
+      responses:
+        "200":
+          description: already held, unchanged
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RegisteredProjection" }
+        "201":
+          description: registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RegisteredProjection" }
+              example: { name: meds, version: 2, hash: sha256:7a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9, new: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Immutable" }
+        "413": { $ref: "#/components/responses/BodyTooLarge" }
+        "422": { $ref: "#/components/responses/BadManifest" }
+        "503": { $ref: "#/components/responses/Busy" }
+  /v1/projections/{name}:
+    get:
+      operationId: getProjectionCurrent
+      tags: [catalogue]
+      x-anam-roles: [reader, importer, operator]
+      summary: A template's manifest at its current version, as canonical JSON.
+      parameters:
+        - { $ref: "#/components/parameters/ProjectionName" }
+      responses:
+        "200":
+          description: the manifest
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectionManifest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /v1/projections/{name}/{version}:
+    get:
+      operationId: getProjectionVersion
+      tags: [catalogue]
+      x-anam-roles: [reader, importer, operator]
+      summary: A template's manifest at one version, as canonical JSON.
+      parameters:
+        - { $ref: "#/components/parameters/ProjectionName" }
+        - { $ref: "#/components/parameters/Version" }
+      responses:
+        "200":
+          description: the manifest
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectionManifest" }
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /v1/checkpoints:
+    get:
+      operationId: getCheckpoints
+      tags: [catalogue]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: Checkpoints
+      summary: Every checkpoint ever minted, by bucket and version.
+      parameters: [{ $ref: "#/components/parameters/AnamTimeout" }]
+      responses:
+        "200":
+          description: the checkpoint log
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Checkpoints" }
+              example:
+                db: /data/tracking.db
+                checkpoints:
+                  - span_id: "2026-10"
+                    v: 12
+                    covers_w: 33378
+                    value_hash: sha256:0c1d2e3f405162738495a6b7c8d9e0f10a2b3c4d5e6f708192a3b4c5d6e7f809
+                    minted_at: "2026-10-19T05:03:00.000000000Z"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/IndexWrong" }
+        "504": { $ref: "#/components/responses/Timeout" }
+    post:
+      operationId: postCheckpoints
+      tags: [operate]
+      x-anam-roles: [operator]
+      x-anam-type: Mint
+      summary: Mint every bucket whose value moved.
+      description: >-
+        Runs on the write queue; while another write holds it, 503 at once. dry_run
+        derives and publishes nothing; full folds the whole ledger instead of starting
+        from the last run.
+      parameters:
+        - name: dry_run
+          in: query
+          schema: { type: boolean, default: false }
+        - name: full
+          in: query
+          schema: { type: boolean, default: false }
+        - { $ref: "#/components/parameters/AnamTimeout" }
+      responses:
+        "200":
+          description: what happened to each bucket
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Mint" }
+              example:
+                w: 33378
+                written: true
+                full: false
+                from: 33201
+                outcomes:
+                  - { span_id: "2026-10", v: 12, covers_w: 33378, value_hash: sha256:0c1d2e3f405162738495a6b7c8d9e0f10a2b3c4d5e6f708192a3b4c5d6e7f809, len: 1821, minted: true }
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "503": { $ref: "#/components/responses/Busy" }
+        "504": { $ref: "#/components/responses/Timeout" }
+  /v1/definitions:
+    get:
+      operationId: getDefinitions
+      tags: [catalogue]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: Definitions
+      summary: Every type the daemon admits, with its current version and every version held.
+      parameters: [{ $ref: "#/components/parameters/AnamTimeout" }]
+      responses:
+        "200":
+          description: the types
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Definitions" }
+              example:
+                definitions:
+                  - { type: health.weight, origin: bundled, current: 3, versions: [1, 2, 3] }
+                  - { type: sleep.episode, origin: registered, current: 1, versions: [1] }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      operationId: postDefinitions
+      tags: [submit]
+      x-anam-roles: [importer]
+      x-anam-type: Registered
+      summary: Register a Definition for a type the importer owns.
+      description: >-
+        201 a new version, 200 the same body again at a held version, 403 a type the
+        importer does not own (one of its types; an any_type importer owns none), 409
+        another body at a held version, a bundled type, or a version behind, 422 a bad
+        manifest.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DefinitionManifest" }
+      responses:
+        "200":
+          description: already held, unchanged
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Registered" }
+        "201":
+          description: registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Registered" }
+              example: { type: sleep.episode, version: 2, new: true }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Immutable" }
+        "413": { $ref: "#/components/responses/BodyTooLarge" }
+        "422": { $ref: "#/components/responses/BadManifest" }
+        "503": { $ref: "#/components/responses/Busy" }
+  /v1/definitions/{type}:
+    get:
+      operationId: getDefinitionCurrent
+      tags: [catalogue]
+      x-anam-roles: [reader, importer, operator]
+      summary: A type's Definition at its current version, as published.
+      parameters:
+        - { $ref: "#/components/parameters/FacetType" }
+        - { $ref: "#/components/parameters/AnamTimeout" }
+      responses:
+        "200":
+          description: the manifest
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DefinitionManifest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /v1/definitions/{type}/{version}:
+    get:
+      operationId: getDefinitionVersion
+      tags: [catalogue]
+      x-anam-roles: [reader, importer, operator]
+      summary: A type's Definition at one version, as it was in force.
+      parameters:
+        - { $ref: "#/components/parameters/FacetType" }
+        - { $ref: "#/components/parameters/Version" }
+        - { $ref: "#/components/parameters/AnamTimeout" }
+      responses:
+        "200":
+          description: the manifest
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DefinitionManifest" }
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /v1/snapshots/{id}:
+    get:
+      operationId: getSnapshot
+      tags: [submit]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: SnapshotReport
+      summary: How far a complete resend has got, and what it left absent once complete.
+      description: >-
+        An importer sees only its own source's runs; another source's is 404 to it.
+        Nothing is tombstoned by a snapshot; absence is reported.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        - { $ref: "#/components/parameters/AnamTimeout" }
+      responses:
+        "200":
+          description: the report
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SnapshotReport" }
+              example:
+                id: garmin:2026-10-19T05
+                parts: 3
+                parts_admitted: 3
+                complete: true
+                source: garmin
+                types: [sleep.episode]
+                carried: 1317
+                started_at: "2026-10-19T05:02:00.000000000Z"
+                started_w: 33370
+                completed_at: "2026-10-19T05:02:41.000000000Z"
+                completed_w: 33378
+                live: 1317
+                absent: 0
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "413":
+          description: more facets to judge absent than max_absent_judged allows
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /v1/envelopes:
+    post:
+      operationId: postEnvelopes
+      tags: [submit]
+      x-anam-roles: [importer]
+      x-anam-type: Admission
+      summary: Submit one batch of facts, admitted whole or not at all.
+      description: >-
+        The token's principal is the source of every envelope and may submit only its
+        types (or any type, with any_type). The gate checks each envelope against its
+        Definition; one failure refuses the batch and nothing is written (422, with
+        every refused envelope named). Admission is idempotent: the same content again
+        is a no-op, changed content under the same identity supersedes. At most
+        gate.MaxBatch envelopes. A batch may be one part of a complete resend
+        (snapshot). While another write holds the queue past importer_wait, 503 with
+        Retry-After.
+      parameters: [{ $ref: "#/components/parameters/AnamTimeout" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Submission" }
+            example:
+              envelopes:
+                - type: health.weight
+                  definition_version: 3
+                  payload: { id: "conversation:weight/2026-10-19", date: "2026-10-19 07:30", kg: 80.5 }
+                  asserted_person: matt
+      responses:
+        "200":
+          description: admitted; an outcome for every envelope and W after
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Admission" }
+              example:
+                w: 33379
+                changed: 1
+                results:
+                  - { index: 0, outcome: admitted, facet_id: 5e6f7081-92a3-5b4c-8d5e-6f708192a3b4, artifact_version: 1 }
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: a snapshot part that does not belong to the run its id names
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "413": { $ref: "#/components/responses/BodyTooLarge" }
+        "422":
+          description: refused whole; every failing envelope and why
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Refusal" }
+              example:
+                error: "envelope 0: not compliant: /kg: expected number, got string"
+                refused:
+                  - { index: 0, type: health.weight, reason: "not compliant: /kg: expected number, got string" }
+        "503": { $ref: "#/components/responses/Busy" }
+        "504": { $ref: "#/components/responses/Timeout" }
+  /v1/documents:
+    post:
+      operationId: postDocument
+      tags: [submit]
+      x-anam-roles: [importer]
+      x-anam-type: StoredDocument
+      summary: Hand Anam a document's bytes; the answer is the sha256 a doc.reference names.
+      description: >-
+        Only a principal that lists doc.reference among its types may store documents.
+        The same bytes again are unchanged (200); other bytes are another file (201).
+        Bounded by max_document_bytes.
+      parameters:
+        - name: ext
+          in: query
+          required: true
+          schema: { type: string, pattern: "^[A-Za-z0-9]{1,16}$" }
+          description: the file's extension, which names its media type
+        - { $ref: "#/components/parameters/AnamTimeout" }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: already held
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StoredDocument" }
+        "201":
+          description: stored
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StoredDocument" }
+              example: { sha256: 3b5d5c3712955042212316173ccf37be6a3d6a1a4a5a2a4e6e6c2e0f1b2c3d4e, bytes: 48213, media_type: application/pdf, new: true }
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "413": { $ref: "#/components/responses/BodyTooLarge" }
+        "503": { $ref: "#/components/responses/Busy" }
+  /v1/backups:
+    post:
+      operationId: postBackups
+      tags: [operate]
+      x-anam-roles: [operator]
+      x-anam-type: Backup
+      summary: Copy the record into backup_dir, holding the write queue while it copies.
+      responses:
+        "200":
+          description: the backup taken
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Backup" }
+              example: { path: /backups/anam-20261019T050300Z, w: 33378, bytes: 73400320, files: 41, pruned: [/backups/anam-20261005T050300Z] }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "503":
+          description: no backup_dir configured, or the daemon is stopping
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      description: "Authorization: Bearer <token>; the token names a principal in the importers file, or the operator's token_file"
+    basic:
+      type: http
+      scheme: basic
+      description: the same token as the password, any user name; for a browser opening the inspector
+  parameters:
+    AnamTimeout:
+      name: Anam-Timeout
+      in: header
+      schema: { type: string, example: 4s }
+      description: the caller's own deadline, a Go duration; the daemon works to the shorter of it and its timeout
+    Zone:
+      name: zone
+      in: query
+      schema: { type: string, example: Australia/Sydney }
+      description: the reader's zone, an IANA name; a bare date is a day in it. Local is refused
+    From:
+      name: from
+      in: query
+      schema: { type: string }
+      description: fact-time lower bound, inclusive; RFC 3339 or a bare date in zone
+    To:
+      name: to
+      in: query
+      schema: { type: string }
+      description: fact-time upper bound, exclusive; excluded by at
+    At:
+      name: at
+      in: query
+      schema: { type: string }
+      description: the snapshot at this fact-time, the latest of each series at or before it
+    AsOf:
+      name: as_of
+      in: query
+      schema: { type: string }
+      description: read what Anam knew at this anam-time
+    W:
+      name: w
+      in: query
+      schema: { type: integer, format: int64 }
+      description: read at this watermark instead of an anam-time; the W a receipt names
+    Type:
+      name: type
+      in: query
+      schema: { type: string, example: health.blood-pressure }
+      description: keep one facet type
+    Projection:
+      name: projection
+      in: query
+      schema: { type: string }
+      description: prune through this template; the served hash is the one a receipt would record
+    Explain:
+      name: explain
+      in: query
+      schema: { type: boolean, default: false }
+      description: every version with its verdict, in place of the entries
+    Fields:
+      name: fields
+      in: query
+      style: form
+      explode: true
+      schema: { type: array, items: { type: string, example: /kg } }
+      description: payload fields wanted, as JSON pointers into the type's schema; the answer is then a frame
+    ReceiptHash:
+      name: hash
+      in: path
+      required: true
+      schema: { type: string, pattern: "^sha256:[0-9a-f]{64}$" }
+    ProjectionName:
+      name: name
+      in: path
+      required: true
+      schema: { type: string }
+    FacetType:
+      name: type
+      in: path
+      required: true
+      schema: { type: string, example: health.weight }
+    Version:
+      name: version
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+  responses:
+    Unauthorized:
+      description: no token, or one the daemon does not know
+      headers:
+        WWW-Authenticate:
+          schema: { type: string, const: 'Basic realm="anam"' }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: unauthorized }
+    Forbidden:
+      description: the token's role does not open this route, or the importer does not own the type
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    BadQuery:
+      description: a parameter, path value or body that cannot be read as asked
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: nothing by that name or version
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NoArtifact:
+      description: no receipt filed under that hash
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    CannotHonour:
+      description: the receipt names a template version that moved, or another ledger
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Immutable:
+      description: another body at a held version, a version behind the current, or a bundled type
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    BadManifest:
+      description: the manifest does not parse as one, or names a type with no Definition
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    BodyTooLarge:
+      description: the body is over its bound (max_manifest_bytes, max_document_bytes, or a batch of max_payload_bytes payloads)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    TooLarge:
+      description: the answer is over max_read_bytes; the body measures it and names what is left to narrow by
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example:
+            error: "the answer is 1203411 bytes against a bound of 524288"
+            code: result_too_large
+            too_large: { matched: 14609, bytes: 524288, max_bytes: 524288, narrow: [from, type, projection] }
+    Busy:
+      description: another write holds the queue past the wait, or the daemon is stopping
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: whole seconds (retry_after)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    IndexWrong:
+      description: the operational store's index was built from another ledger or is ahead of this one; restart the daemon on a sound one
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    LedgerUnavailable:
+      description: the ledger could not be read
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Timeout:
+      description: the request ran out of time, the shorter of Anam-Timeout and the daemon's timeout
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, description: what went wrong, in words }
+        code: { type: string, enum: [result_too_large], description: a name for a program, when there is one }
+        too_large: { $ref: "#/components/schemas/TooLarge" }
+    TooLarge:
+      type: object
+      required: [matched, bytes, max_bytes]
+      properties:
+        matched: { type: integer }
+        bytes: { type: integer, description: what the entries encode to, counted up to the bound }
+        max_bytes: { type: integer }
+        narrow: { type: array, items: { type: string }, description: query parameters not yet used }
+    Status:
+      type: object
+      required: [version, person, ledger_id, w, sources]
+      properties:
+        version: { type: string }
+        person: { type: string }
+        ledger_id: { type: string, format: uuid }
+        w: { type: integer, format: int64, description: the watermark, the newest anam-event's seq }
+        since: { type: string, description: when the daemon started }
+        sources:
+          type: array
+          items: { $ref: "#/components/schemas/SourceStatus" }
+    SourceStatus:
+      type: object
+      required: [source, last_scan_at]
+      properties:
+        source: { type: string }
+        last_scan_at: { type: string, description: when the source's last batch arrived }
+        last_admission_at: { type: string, description: when its last batch that changed anything arrived }
+    AnamTime:
+      type: string
+      description: a fixed-width UTC instant, 2006-01-02T15:04:05.000000000Z
+      example: "2026-10-19T05:02:41.000000000Z"
+    Entry:
+      type: object
+      description: one live facet as the fold presents it
+      required: [facet_id, type, fact_time, source, source_ref, status, classification, content_hash, payload]
+      properties:
+        facet_id: { type: string, format: uuid }
+        type: { type: string }
+        fact_time: { $ref: "#/components/schemas/AnamTime" }
+        series: { type: string, description: the Definition's series stamp, when the type has one }
+        source: { type: string }
+        source_ref: { type: string }
+        status: { type: string, enum: [admitted, endorsed, superseded, tombstoned] }
+        classification: { type: string }
+        content_hash: { type: string }
+        payload: { description: the facet's payload, verbatim }
+    Frame:
+      type: object
+      description: entries cut to named fields, as columns and rows
+      required: [columns, rows]
+      properties:
+        columns: { type: array, items: { type: string } }
+        rows: { type: array, items: { type: array, items: {} } }
+    ProjectionRead:
+      type: object
+      required: [name, version, served, hash]
+      properties:
+        name: { type: string }
+        version: { type: integer }
+        served: { type: integer, description: facets the projection served before any narrowing }
+        hash: { type: string }
+    VerdictRow:
+      type: object
+      required: [fact_time, type, version, standing, source_ref, facet_id]
+      properties:
+        fact_time: { $ref: "#/components/schemas/AnamTime" }
+        type: { type: string }
+        version: { type: integer }
+        standing: { type: string, enum: [served, excluded, superseded] }
+        reason: { type: string }
+        source_ref: { type: string }
+        facet_id: { type: string, format: uuid }
+    VerdictCounts:
+      type: object
+      properties:
+        served: { type: integer }
+        excluded: { type: integer }
+        superseded: { type: integer }
+    Timeline:
+      type: object
+      required: [w, live, shown, canonical]
+      properties:
+        w: { type: integer, format: int64 }
+        live: { type: integer }
+        shown: { type: integer }
+        as_of: { $ref: "#/components/schemas/AnamTime" }
+        at: { $ref: "#/components/schemas/AnamTime" }
+        at_hash: { type: string }
+        canonical: { type: string, description: the whole-person value's hash at W, whatever the narrowing }
+        projection: { $ref: "#/components/schemas/ProjectionRead" }
+        entries: { type: array, items: { $ref: "#/components/schemas/Entry" } }
+        versions: { type: object, additionalProperties: { type: integer }, description: each shown entry's artifact version, by facet id }
+        frame: { $ref: "#/components/schemas/Frame" }
+        verdicts: { type: array, items: { $ref: "#/components/schemas/VerdictRow" } }
+        counts: { $ref: "#/components/schemas/VerdictCounts" }
+    Changes:
+      type: object
+      required: [index_seq, w, since, changes]
+      properties:
+        index_seq: { type: integer, format: int64, description: the last anam-event the index holds; below w, the index is behind }
+        w: { type: integer, format: int64 }
+        since: { $ref: "#/components/schemas/AnamTime" }
+        until: { $ref: "#/components/schemas/AnamTime" }
+        changes: { type: array, items: { $ref: "#/components/schemas/Change" } }
+    Change:
+      type: object
+      required: [seq, anam_time, kind, facet_id, artifact_version]
+      properties:
+        seq: { type: integer, format: int64 }
+        anam_time: { $ref: "#/components/schemas/AnamTime" }
+        kind: { type: string, enum: [admitted, superseded, tombstoned] }
+        facet_id: { type: string, format: uuid }
+        artifact_version: { type: integer }
+    Receipt:
+      type: object
+      required: [served_hash, facet_ids, watermark, template, template_version, definition_set_version, served_at, span]
+      properties:
+        served_hash: { type: string }
+        facet_ids: { type: array, items: { type: string } }
+        watermark: { type: integer, format: int64 }
+        template: { type: string }
+        template_version: { type: integer }
+        definition_set_version: { type: string }
+        served_at: { $ref: "#/components/schemas/AnamTime" }
+        span: { type: string }
+        ledger_id: { type: string }
+        query: { $ref: "#/components/schemas/ReceiptQuery" }
+        template_hash: { type: string }
+    ReceiptQuery:
+      type: object
+      description: how the read narrowed the template's value, resolved to instants
+      properties:
+        from: { $ref: "#/components/schemas/AnamTime" }
+        before: { $ref: "#/components/schemas/AnamTime" }
+        at: { $ref: "#/components/schemas/AnamTime" }
+        type: { type: string }
+        fields: { type: array, items: { type: string } }
+    Receipts:
+      type: object
+      required: [dir, receipts]
+      properties:
+        dir: { type: string }
+        receipts:
+          type: array
+          items:
+            type: object
+            required: [hash, receipt]
+            properties:
+              hash: { type: string }
+              receipt: { $ref: "#/components/schemas/Receipt" }
+    ReceiptShown:
+      type: object
+      required: [hash, receipt, entries]
+      properties:
+        hash: { type: string }
+        receipt: { $ref: "#/components/schemas/Receipt" }
+        entries: { type: array, items: { $ref: "#/components/schemas/Entry" } }
+        frame: { $ref: "#/components/schemas/Frame" }
+    ReceiptVerified:
+      type: object
+      required: [hash, receipt, result]
+      properties:
+        hash: { type: string }
+        receipt: { $ref: "#/components/schemas/Receipt" }
+        result:
+          type: object
+          required: [reproduced, intact, derived_hash]
+          properties:
+            reproduced: { type: boolean, description: re-derived at the watermark, the same value }
+            intact: { type: boolean, description: the file on disk still hashes to its name }
+            stored_hash: { type: string }
+            derived_hash: { type: string }
+            missing: { type: array, items: { type: string } }
+            unexpected: { type: array, items: { type: string } }
+            notes: { type: array, items: { type: string } }
+    Published:
+      allOf:
+        - { $ref: "#/components/schemas/Timeline" }
+        - type: object
+          required: [receipt_hash, receipt]
+          properties:
+            receipt_hash: { type: string }
+            receipt: { $ref: "#/components/schemas/Receipt" }
+    Projections:
+      type: object
+      required: [projections]
+      properties:
+        projections:
+          type: array
+          items:
+            type: object
+            required: [name, origin, current, versions, description, types, shape, hash]
+            properties:
+              name: { type: string }
+              origin: { type: string, enum: [bundled, registered] }
+              current: { type: integer }
+              versions: { type: array, items: { type: integer } }
+              description: { type: string }
+              types: { type: array, items: { type: string } }
+              shape: { type: string, enum: [log, snapshot] }
+              hash: { type: string }
+    ProjectionManifest:
+      type: object
+      description: a projection template, as docs/ARCHITECTURE.md and internal/projection define it
+      required: [name, version, types, statuses, max_classification]
+      properties:
+        name: { type: string }
+        version: { type: integer, minimum: 1 }
+        description: { type: string }
+        types: { type: array, items: { type: string } }
+        statuses: { type: array, items: { type: string } }
+        max_classification: { type: string }
+        from: { type: string }
+        to: { type: string }
+        shape: { type: string, enum: [log, snapshot] }
+    RegisteredProjection:
+      type: object
+      required: [name, version, hash, new]
+      properties:
+        name: { type: string }
+        version: { type: integer }
+        hash: { type: string }
+        new: { type: boolean }
+    Checkpoints:
+      type: object
+      required: [db, checkpoints]
+      properties:
+        db: { type: string }
+        checkpoints:
+          type: array
+          items:
+            type: object
+            required: [span_id, v, covers_w, value_hash, minted_at]
+            properties:
+              span_id: { type: string }
+              v: { type: integer }
+              covers_w: { type: integer, format: int64 }
+              value_hash: { type: string }
+              minted_at: { $ref: "#/components/schemas/AnamTime" }
+    Mint:
+      type: object
+      required: [w, written, full, outcomes]
+      properties:
+        w: { type: integer, format: int64 }
+        written: { type: boolean, description: false for a dry run }
+        full: { type: boolean }
+        from: { type: integer, format: int64 }
+        outcomes:
+          type: array
+          items:
+            type: object
+            required: [span_id, v, covers_w, value_hash, len, minted]
+            properties:
+              span_id: { type: string }
+              v: { type: integer }
+              covers_w: { type: integer, format: int64 }
+              value_hash: { type: string }
+              len: { type: integer }
+              minted: { type: boolean }
+    Definitions:
+      type: object
+      required: [definitions]
+      properties:
+        definitions:
+          type: array
+          items:
+            type: object
+            required: [type, origin, current, versions]
+            properties:
+              type: { type: string }
+              origin: { type: string, enum: [bundled, registered] }
+              current: { type: integer }
+              versions: { type: array, items: { type: integer } }
+    DefinitionManifest:
+      type: object
+      description: a Definition as published; the schema is JSON Schema 2020-12, closed
+      required: [meta, schema]
+      properties:
+        meta:
+          type: object
+          required: [facet_type, definition_version, classification, validation_mode, source_schema, schema_version, media_type, payload_kind, time_semantics, identity_key]
+          properties:
+            facet_type: { type: string }
+            definition_version: { type: integer, minimum: 1 }
+            classification: { type: string }
+            validation_mode: { type: string }
+            source_schema: { type: string }
+            schema_version: { type: integer }
+            media_type: { type: string }
+            payload_kind: { type: string }
+            time_semantics:
+              type: object
+              required: [fact_time]
+              properties:
+                fact_time:
+                  type: object
+                  required: [pointer, layout, zone]
+                  properties:
+                    pointer: { type: string, example: /date }
+                    layout: { type: string, example: "2006-01-02 15:04" }
+                    zone: { type: string, example: Australia/Sydney }
+            identity_key: { type: array, items: { type: string } }
+            min_binding_assurance: { type: string, enum: [low, medium, high] }
+            series:
+              type: object
+              required: [name, key]
+              properties:
+                name: { type: string }
+                key: { type: array, items: { type: string } }
+                closes: { type: boolean }
+        schema: { type: object, description: JSON Schema 2020-12 }
+        handling: { type: object, description: what every writer of the type agrees on, served verbatim; guidance is prose by convention }
+    Registered:
+      type: object
+      required: [type, version, new]
+      properties:
+        type: { type: string }
+        version: { type: integer }
+        new: { type: boolean }
+    Submission:
+      type: object
+      required: [envelopes]
+      properties:
+        envelopes:
+          type: array
+          maxItems: 500
+          items: { $ref: "#/components/schemas/Envelope" }
+        snapshot: { $ref: "#/components/schemas/SnapshotPart" }
+    Envelope:
+      type: object
+      required: [type, definition_version, payload]
+      properties:
+        type: { type: string }
+        definition_version: { type: integer, description: the type's current version }
+        source_ref: { type: string, description: optional; the gate composes it from the identity key and checks it when sent }
+        payload: { description: the fact, shaped to the Definition }
+        asserted_person: { type: string, description: the person's id; set, the binding is high assurance }
+        span_hint: { type: string }
+    SnapshotPart:
+      type: object
+      required: [id, part, parts, types]
+      properties:
+        id: { type: string, pattern: "^[A-Za-z0-9._:-]{1,128}$" }
+        part: { type: integer, minimum: 1 }
+        parts: { type: integer, minimum: 1 }
+        types: { type: array, items: { type: string } }
+    SnapshotProgress:
+      type: object
+      required: [id, parts, parts_admitted, complete]
+      properties:
+        id: { type: string }
+        parts: { type: integer }
+        parts_admitted: { type: integer }
+        complete: { type: boolean }
+    SnapshotReport:
+      allOf:
+        - { $ref: "#/components/schemas/SnapshotProgress" }
+        - type: object
+          required: [source, types, carried, started_at, started_w]
+          properties:
+            source: { type: string }
+            types: { type: array, items: { type: string } }
+            carried: { type: integer }
+            started_at: { $ref: "#/components/schemas/AnamTime" }
+            started_w: { type: integer, format: int64 }
+            completed_at: { $ref: "#/components/schemas/AnamTime" }
+            completed_w: { type: integer, format: int64 }
+            live: { type: integer }
+            absent: { type: integer }
+            absent_ids: { type: array, items: { type: string } }
+    Admission:
+      type: object
+      required: [w, changed, results]
+      properties:
+        w: { type: integer, format: int64 }
+        changed: { type: integer }
+        results:
+          type: array
+          items:
+            type: object
+            required: [index, outcome, facet_id, artifact_version]
+            properties:
+              index: { type: integer }
+              outcome: { type: string, enum: [admitted, superseded, no-op] }
+              facet_id: { type: string, format: uuid }
+              artifact_version: { type: integer }
+        snapshot: { $ref: "#/components/schemas/SnapshotProgress" }
+    Refusal:
+      type: object
+      required: [error, refused]
+      properties:
+        error: { type: string }
+        refused:
+          type: array
+          items:
+            type: object
+            required: [index, type, reason]
+            properties:
+              index: { type: integer }
+              type: { type: string }
+              reason: { type: string }
+    StoredDocument:
+      type: object
+      required: [sha256, bytes, media_type, new]
+      properties:
+        sha256: { type: string, pattern: "^[0-9a-f]{64}$" }
+        bytes: { type: integer, format: int64 }
+        media_type: { type: string }
+        new: { type: boolean }
+    Backup:
+      type: object
+      required: [path, w, bytes, files]
+      properties:
+        path: { type: string }
+        w: { type: integer, format: int64 }
+        bytes: { type: integer, format: int64 }
+        files: { type: integer }
+        pruned: { type: array, items: { type: string } }

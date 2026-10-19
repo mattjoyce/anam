@@ -26,6 +26,7 @@ runs, nothing else may open those files. Ask it over HTTP instead.
 | Route | Roles | Does |
 |---|---|---|
 | `GET /healthz` | no | `ready` (200) or `not ready` (503). Nothing else. |
+| `GET /v1/openapi.yaml` | no | The API's description as the running build carries it (card 49): every route below with its parameters, bodies, status codes and roles. Read it before guessing at a shape. |
 | `GET /v1/status` | reader, importer, operator | Version, person, ledger id, W, and per importer source when its last batch arrived (`last_scan_at`) and last changed the record. |
 | `GET /v1/timeline` | reader, importer, operator | The CLI's timeline read. Query: `zone` (IANA, required; `Local` is refused), `from`, `to`, `at`, `as_of`, `type`, `projection`, `explain=true`, typed as on the CLI, `w` (a watermark) in place of `as_of`, and `fields` (repeated JSON pointers into the type's schema, card 138), which answers a `frame` of `columns` and `rows` in place of `entries`. Whole, not paged; over `max_read_bytes` (default 512 KiB) it is 413 `result_too_large` with `too_large.narrow`, the parameters still unused. |
 | `GET /v1/changes` | reader, importer, operator | Anam-events by anam-time: `since` (required), `until`, `zone`. Carries `index_seq` and `w`; `w` above `index_seq` means the index is behind. |

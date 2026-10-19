@@ -37,7 +37,7 @@ runs, nothing else may open those files. Ask it over HTTP instead.
 | `POST /v1/checkpoints` | operator | Mint from the last run (`?dry_run=true` derives only, `?full=true` folds the whole ledger, the repair). 503 at once while another write holds the queue. |
 | `POST /v1/backups` | operator | Back up the record into `backup_dir` (`/mnt/disk1/backup/anam/daily`), keeping 14. Waits behind a running write. The gateway's `anam_backup` asks nightly at 02:30. 503 without a `backup_dir`. |
 | `GET /v1/definitions[/{type}[/{version}]]` | reader, importer, operator | The published Definitions: list, current manifest, one version. |
-| `POST /v1/definitions` | importer | Register a Definition the importer emits. 201 new, 200 same body, 409 immutable or re-keyed. |
+| `POST /v1/definitions` | importer | Register a Definition the importer emits. 201 new, 200 same body, 409 immutable or re-keyed. An `any_type` importer registers none (card 177). A Definition may carry a `handling` block, served verbatim (card 166). |
 | `POST /v1/envelopes` | importer | A batch of up to 49 envelopes, admitted whole (200, per-envelope outcomes) or refused whole (422, every reason). 503 with `Retry-After` while a write runs. The operator's token gets 403. A resend-everything run labels its batches as parts of one `snapshot`. Contract: `docs/IMPORTERS.md` §8. |
 | `POST /v1/documents?ext=` | importer, with `doc.reference` | Store a document's bytes in the library, named by their sha256 (cards 102, 150). 201 stored, 200 already held; never a conflict. A `doc.reference` envelope naming a sha256 the library does not hold is refused. |
 | `GET /v1/snapshots/{id}` | reader, operator; an importer its own runs | A complete resend's report: parts admitted, whether it is complete, and what the source no longer holds (`absent`, judged from the snapshot's start). 404 unknown, or another importer's. |
@@ -52,20 +52,26 @@ Any request may carry an `Anam-Timeout` header, the caller's own deadline as a G
 (`25s`); the daemon works to the shorter of it and its configured timeout, and a read that runs
 out is 504. Every token belongs to a principal with a role (card 89, `docs/API.md` §2). The
 operator's is `token_file`; the rest live in `importers_file` (`ANAM_IMPORTERS_FILE`) as SHA-256
-hashes, importers under `importers` with their source and types, readers and others under
+hashes, importers under `importers` with their source and `types` (or `any_type: true`, which submits every type and registers none, card 177), readers and others under
 `principals` with a name and a role. A role the route does not admit is 403, naming the
-principal and the roles the route takes. There is no API for retraction or for writing
-a record; those are local maintenance or design (`docs/API.md`).
+principal and the roles the route takes. There is no API for retraction; that is local maintenance (`docs/API.md`). A fact is written only
+as an envelope, by an importer.
 
 ## The MCP adapter
 
-`~/Projects/anam-mcp` (card 72) is a client of this API for a model, nothing more. It uses six
-routes: `/v1/status`, `/v1/definitions` (list and one type), `/v1/timeline`, `POST /v1/receipts`,
-and receipt show and verify. Its four tools are `describe_record`, `describe_type`,
+`~/Projects/anam-mcp` (cards 72, 93, 157) is a client of this API for a model, public at
+github.com/mattjoyce/anam-mcp. Its read tools are `describe_record`, `describe_type`,
 `read_record` (a receipted read when it names a projection, otherwise unreceipted and it says so)
-and `verify_receipt`, plus the resource `anam://receipts/{hash}`. It writes nothing: admission,
-checkpoints, backups, envelopes and the inspector stay with this skill and the CLI. Configure it
-with `ANAM_SERVER`, `ANAM_TOKEN_FILE`, `ANAM_ZONE` and `ANAM_MCP_TIMEOUT`.
+and `verify_receipt`, plus the resource `anam://receipts/{hash}`. They use `/v1/status`,
+`/v1/definitions`, `/v1/timeline`, `POST /v1/receipts` and receipt show and verify.
+
+It writes only when `ANAM_MCP_NOTE_TOKEN_FILE` names the token of the `conversation` importer
+(source `conversation`, `any_type: true`, card 177). Then it offers `save_note` (the person's words
+as a `note.annotation`) and `save_fact` (a facet of any type, validated by the gate, marked as
+asserted by the person), both through `POST /v1/envelopes`. Unset, it writes nothing. Admission of
+other sources, checkpoints, backups and the inspector stay with this skill and the CLI. Configure
+it with `ANAM_SERVER`, `ANAM_TOKEN_FILE`, `ANAM_ZONE`, `ANAM_MCP_TIMEOUT` and
+`ANAM_MCP_NOTE_TOKEN_FILE`.
 
 ## The CLI against the daemon
 

@@ -278,7 +278,8 @@ func TestTypeFilter(t *testing.T) {
 // of its own there.
 func TestTypeStyles_LinkDrawsInTheDocumentsRow(t *testing.T) {
 	t.Parallel()
-	got, ref := styleOf("record.link"), styleOf("doc.reference")
+	st := newStyles(nil)
+	got, ref := st.of("record.link"), st.of("doc.reference")
 	if got.Family != ref.Family || got.Family == otherFamilyID {
 		t.Errorf("record.link is in the %s row, doc.reference in %s", got.Family, ref.Family)
 	}

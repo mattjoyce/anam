@@ -5,6 +5,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -91,10 +92,16 @@ type Config struct {
 	// oldest beyond it.
 	BackupKeep int `mapstructure:"backup_keep"`
 
-	// IngestTimeout bounds one long write inside the daemon: a replay of the ledger
-	// into the index, a backup, the mint at start. Timeout still bounds each call
-	// within it. The name is from when it bounded an ingest run; deployments set it
-	// as ANAM_INGEST_TIMEOUT, so it stays.
+	// LongWriteTimeout bounds one long write inside the daemon: a replay of the
+	// ledger into the index, a backup, the mint at start. Timeout still bounds each
+	// call within it. Until card 156 the key was ingest_timeout, from when it bounded
+	// an ingest run; Load still reads that name, and ANAM_INGEST_TIMEOUT, as an alias.
+	LongWriteTimeout time.Duration `mapstructure:"long_write_timeout"`
+
+	// IngestTimeout is the retired name of LongWriteTimeout. It is decoded so a
+	// config or environment that still sets it is honoured, with a warning, rather
+	// than refused as an unknown key. Load moves its value across and leaves this
+	// zero; nothing reads it after that.
 	IngestTimeout time.Duration `mapstructure:"ingest_timeout"`
 
 	// Timeout bounds every call to a store. Anam fails fast rather than hanging (§8).
@@ -150,6 +157,14 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 	if err := v.BindEnv("person_id"); err != nil {
 		return Config{}, fmt.Errorf("bind person_id: %w", err)
 	}
+	// long_write_timeout and its retired name have no viper default either, so that
+	// IsSet says whether each was actually given; the default is applied after both
+	// are read (longWriteTimeout).
+	for _, key := range []string{"long_write_timeout", "ingest_timeout"} {
+		if err := v.BindEnv(key); err != nil {
+			return Config{}, fmt.Errorf("bind %s: %w", key, err)
+		}
+	}
 
 	v.SetDefault("ledger_path", DefaultLedgerPath())
 	v.SetDefault("db_path", DefaultDBPath())
@@ -163,7 +178,6 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 	v.SetDefault("importers_file", "")
 	v.SetDefault("server", "")
 	v.SetDefault("checkpoint_budget", DefaultCheckpointBudget)
-	v.SetDefault("ingest_timeout", DefaultIngestTimeout)
 	v.SetDefault("backup_dir", "")
 	v.SetDefault("backup_keep", DefaultBackupKeep)
 	v.SetDefault("max_read_bytes", DefaultMaxReadBytes)
@@ -190,6 +204,9 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 	errorOnUnknownKeys := func(dc *mapstructure.DecoderConfig) { dc.ErrorUnused = true }
 	if err := v.Unmarshal(&c, errorOnUnknownKeys); err != nil {
 		return Config{}, fmt.Errorf("decode config: %w: %v", ErrInvalid, err)
+	}
+	if err := c.adoptLongWriteTimeout(v.IsSet("long_write_timeout"), v.IsSet("ingest_timeout")); err != nil {
+		return Config{}, err
 	}
 
 	// Filesystem paths are expanded once, here, so every consumer sees the same
@@ -222,6 +239,28 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 	return c, nil
 }
 
+// adoptLongWriteTimeout settles long_write_timeout from the two keys that may name
+// it (card 156): the new key when given; its retired name ingest_timeout when only
+// that is given, with a warning so the deployment moves; the default when neither
+// is. The two given with different values is a config that contradicts itself, so
+// it is refused rather than one of them being picked. The retired field is left
+// zero either way.
+func (c *Config) adoptLongWriteTimeout(newSet, oldSet bool) error {
+	switch {
+	case newSet && oldSet && c.LongWriteTimeout != c.IngestTimeout:
+		return fmt.Errorf("%w: long_write_timeout (%s) and its old name ingest_timeout (%s) differ; set long_write_timeout only",
+			ErrInvalid, c.LongWriteTimeout, c.IngestTimeout)
+	case oldSet:
+		slog.Warn("config: ingest_timeout is the old name of long_write_timeout; set long_write_timeout (ANAM_LONG_WRITE_TIMEOUT) instead",
+			"value", c.IngestTimeout)
+		c.LongWriteTimeout = c.IngestTimeout
+	case !newSet:
+		c.LongWriteTimeout = DefaultLongWriteTimeout
+	}
+	c.IngestTimeout = 0
+	return nil
+}
+
 // Validate reports whether c is usable.
 func (c Config) Validate() error {
 	switch {
@@ -243,8 +282,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("%w: library_dir is required", ErrInvalid)
 	case c.Timeout <= 0:
 		return fmt.Errorf("%w: timeout must be positive, got %s", ErrInvalid, c.Timeout)
-	case c.IngestTimeout <= 0:
-		return fmt.Errorf("%w: ingest_timeout must be positive, got %s", ErrInvalid, c.IngestTimeout)
+	case c.LongWriteTimeout <= 0:
+		return fmt.Errorf("%w: long_write_timeout must be positive, got %s", ErrInvalid, c.LongWriteTimeout)
 	case c.BackupDir != "" && c.BackupKeep < 1:
 		return fmt.Errorf("%w: backup_keep must be at least 1, got %d", ErrInvalid, c.BackupKeep)
 	case c.CheckpointBudget < 0:
@@ -342,9 +381,9 @@ func (c Config) Buckets() (span.Buckets, error) { return span.New(c.BucketWidth)
 // milliseconds, so five seconds is a store that is stuck, not slow.
 const DefaultTimeout = 5 * time.Second
 
-// DefaultIngestTimeout is ingest_timeout's default: a full replay of the record into
-// the index takes a few minutes on the NAS.
-const DefaultIngestTimeout = 15 * time.Minute
+// DefaultLongWriteTimeout is long_write_timeout's default: a full replay of the
+// record into the index takes a few minutes on the NAS.
+const DefaultLongWriteTimeout = 15 * time.Minute
 
 // DefaultBackupKeep is backup_keep's default: two weeks of nightly backups.
 const DefaultBackupKeep = 14

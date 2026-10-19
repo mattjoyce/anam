@@ -334,7 +334,7 @@ func (d *Daemon) Serve(ctx context.Context, ln net.Listener) error {
 	// ErrStopped or the daemon's context ending, when there is nothing left to catch
 	// up for.
 	go func() {
-		_ = d.Write(ctx, d.cfg.IngestTimeout, func(ctx context.Context, s Stores) error {
+		_ = d.Write(ctx, d.cfg.LongWriteTimeout, func(ctx context.Context, s Stores) error {
 			d.catchUp(ctx, s)
 			return nil
 		})

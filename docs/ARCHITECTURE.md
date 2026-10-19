@@ -912,9 +912,10 @@ one or two projections plus a CLI timeline viewer, manual mint, and receipts. Re
 - **Last-known-value reads** (§5a) — built as the snapshot over the series stamp (2026-10-07). Not yet
   exposed on `timeline` or as a snapshot projection template; and a Definition that changes its series
   key reaches only facets admitted after the change, because admission is idempotent on content.
-- **The query surface** (§9, card 173) — decided 2026-10-17, not built. Evaluator and the
-  `current/2` = `fold.Snapshot` equality test first; introspection, `anam query`, `/v1/query` and the
-  anam-mcp tool after card 166. Whether `fold.Fates` later becomes the bundled rules, so there is one
+- **The query surface** (§9, card 173) — decided 2026-10-17; the evaluator, the bundled rule set
+  and the `current/2` = `fold.Snapshot` equality test are built (`internal/query`, 2026-10-19), the
+  surfaces are not: introspection, the size bound, the receipt, `anam query`, `/v1/query` and the
+  anam-mcp tool follow. Whether `fold.Fates` later becomes the bundled rules, so there is one
   decision procedure instead of two, is a separate decision for after the equality test has run for a
   while: it would move the evaluator onto the serve path, inside the trusted core, and that is not
   what this card admits.

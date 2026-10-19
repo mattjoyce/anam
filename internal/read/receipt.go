@@ -51,6 +51,7 @@ func ServeDeps(l serve.Ledger, artifacts serve.Store, checkpoints mint.Checkpoin
 		Clock:                clock.Real{},
 		DefinitionSetVersion: defSet,
 		Series:               defs,
+		Definitions:          defs,
 	}, nil
 }
 
@@ -74,7 +75,7 @@ func Receipt(d serve.Deps, hash string) (api.ReceiptShown, error) {
 	if err != nil {
 		return api.ReceiptShown{}, err
 	}
-	return api.ReceiptShown{Hash: hash, Receipt: r, Entries: shown.Entries, Frame: shown.Frame}, nil
+	return api.ReceiptShown{Hash: hash, Receipt: r, Entries: shown.Entries, Frame: shown.Frame, Answer: shown.Answer}, nil
 }
 
 // VerifyReceipt proves one receipt against the ledger and the artifact on disk.

@@ -57,6 +57,8 @@ func (d *Daemon) routes() []route {
 		f("POST /v1/receipts", anyRole, d.postReceipt),
 		f("GET /v1/receipts/{hash}", anyRole, d.getReceipt),
 		f("GET /v1/receipts/{hash}/verify", anyRole, d.verifyReceipt),
+		f("GET /v1/query", anyRole, d.getQueryCatalogue),
+		f("POST /v1/query", anyRole, d.postQuery),
 		f("GET /v1/projections", anyRole, d.getProjections),
 		f("GET /v1/projections/{name}", anyRole, d.getProjection),
 		f("GET /v1/projections/{name}/{version}", anyRole, d.getProjection),

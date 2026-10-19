@@ -14,6 +14,12 @@ import (
 //go:embed rules/anam.dl
 var bundledText string
 
+// RelInstant is the bundled set's parameter relation, instant(At): the fact-times a
+// query asks about. It is declared by the bundled set and defined by the query, and
+// a constant in it must be a whole fact-time lexeme, since a shorter one sorts before
+// every entry of its day and asks a question nobody meant.
+const RelInstant = "instant"
+
 // BundledName and BundledVersion identify the bundled rule set. The version is an
 // invariant, not a default: it is part of what an answer means, and moves when the
 // rules' meaning does, with the hash catching any change the version did not.

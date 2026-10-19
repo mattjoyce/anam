@@ -69,6 +69,35 @@ type Receipt struct {
 	// from the one that served. Receipts before 2026-10-13 have none; it is last
 	// and omitted when empty, so their bytes are unchanged.
 	TemplateHash string `json:"template_hash,omitempty"`
+	// Program is the query a receipt answers (card 173): the rule set it stood on,
+	// the text it ran and the relation answered. The template is the projection the
+	// query ran through, and ServedHash is the answer's. Nil for a timeline receipt;
+	// last and omitted when nil, so every earlier receipt keeps its bytes.
+	Program *Program `json:"program,omitempty"`
+}
+
+// Program is the query half of a query receipt. RuleSetHash pins the bundled rules
+// the query built on, so a binary whose rules moved cannot pass as the one that
+// answered; Text is the query as written, and Relation the one it was answered with.
+type Program struct {
+	RuleSet        string `json:"rule_set"`
+	RuleSetVersion int    `json:"rule_set_version"`
+	RuleSetHash    string `json:"rule_set_hash"`
+	Text           string `json:"text"`
+	Relation       string `json:"relation"`
+}
+
+// check refuses a program a receipt could not replay.
+func (p Program) check() error {
+	switch {
+	case p.RuleSet == "" || p.RuleSetVersion < 1 || p.RuleSetHash == "":
+		return fmt.Errorf("%w: program names no rule set", ErrMalformed)
+	case strings.TrimSpace(p.Text) == "":
+		return fmt.Errorf("%w: program has no text", ErrMalformed)
+	case p.Relation == "":
+		return fmt.Errorf("%w: program names no relation", ErrMalformed)
+	}
+	return nil
 }
 
 // Query is how a read narrowed the template's value before it was served, resolved to
@@ -137,8 +166,12 @@ func (r Receipt) Validate() error {
 		return fmt.Errorf("%w: query narrows nothing; omit it", ErrMalformed)
 	case r.Query != nil && r.Query.At != "" && r.Query.Before != "":
 		return fmt.Errorf("%w: query has both at and before; a snapshot has one upper bound", ErrMalformed)
+	case r.Query != nil && r.Program != nil:
+		return fmt.Errorf("%w: a query receipt is not narrowed; the program names its instants", ErrMalformed)
 	case r.Query != nil:
 		return r.Query.checkFields()
+	case r.Program != nil:
+		return r.Program.check()
 	}
 	return nil
 }

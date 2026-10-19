@@ -18,6 +18,7 @@ import (
 	"github.com/mattjoyce/anam/internal/frame"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
+	"github.com/mattjoyce/anam/internal/query"
 	"github.com/mattjoyce/anam/internal/serve"
 )
 
@@ -71,6 +72,10 @@ type Source struct {
 	// Projections are the templates a read may select: the bundled ones and those
 	// the operator registered (card 125). Nil means the bundled ones alone.
 	Projections *projection.Registry
+	// Held is every Definition body by type and version, for a query's introspection
+	// and its per-version warnings (card 173). Nil means the bundled ones and their
+	// history alone.
+	Held query.Held
 }
 
 // projections is src's templates, or the bundled ones when it names none.

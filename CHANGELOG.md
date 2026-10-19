@@ -18,6 +18,14 @@ decisions is in `journal/`.
 
 ## 2026-10-19
 
+- The query surface (card 173, second slice). `POST /v1/query` runs a Datalog program through a
+  projection at the head, `as_of` or `w`, built on the bundled rules, and answers one relation with
+  a receipt that names the projection, the rule set's hash and the program; `anam receipt verify`
+  replays it. `GET /v1/query` and `anam query describe` are the introspection: relations, each
+  type's pointers at each Definition version, the fact-time lexeme, the rules. `anam query run` is
+  the CLI, local or over the daemon. A constant in `instant/1` must be the whole fact-time lexeme;
+  a derivation or an answer over `max_read_bytes` is 413 with `instant`, `projection` and `program`
+  as the narrowings. A query moves no watermark and writes artifacts only.
 - `anam query check` holds the bundled Datalog rule `current/2` equal to `fold.Snapshot` over a
   real ledger, read-only, one instant at a time; `--ledger` and `--person` point it at a copy,
   `--projection` serves the log through a template first, `--every` samples the fact-times. The

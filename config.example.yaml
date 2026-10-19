@@ -89,8 +89,9 @@ listen: 127.0.0.1:8787
 # importers_file: ~/.config/anam/importers.yaml
 
 # Bounds one long write inside the daemon: an index replay, a backup, the mint at
-# start. Named for the ingest run it once bounded.
-ingest_timeout: 15m
+# start. Its old name, ingest_timeout (ANAM_INGEST_TIMEOUT), is still read with a
+# warning; the two set differently are refused.
+long_write_timeout: 15m
 
 # --- bucketing ----------------------------------------------------------------
 # How much fact-time one checkpoint bucket covers: `monthly` or `weekly`.

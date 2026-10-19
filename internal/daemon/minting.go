@@ -85,13 +85,13 @@ func (d *Daemon) mintIfBehind(ctx context.Context) {
 
 // catchUp replays the ledger into the operational store's index, so reads of it are
 // as fresh as the last write. It runs inside a write, on the write handles, with the
-// long-write budget (ingest_timeout) rather than the per-call timeout: a replay of the whole ledger after
-// the index was rebuilt must be able to finish. A failure is not the write's. An
+// long-write budget (long_write_timeout) rather than the per-call timeout: a replay
+// of the whole ledger after the index was rebuilt must be able to finish. A failure is not the write's. An
 // index left behind is reported in every answer read from it; an index found wrong,
 // built from another ledger or ahead of this one, is recorded, and the routes that
 // read it refuse until the daemon is restarted on a sound one.
 func (d *Daemon) catchUp(ctx context.Context, s Stores) {
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), d.cfg.IngestTimeout)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), d.cfg.LongWriteTimeout)
 	defer cancel()
 	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
 	res, err := catchup.Sync(ctx, s.Ledger, s.Ops, buckets)

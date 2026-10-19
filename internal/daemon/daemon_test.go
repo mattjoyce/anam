@@ -32,7 +32,7 @@ func newConfig(t *testing.T) config.Config {
 		LibraryFolderLimit: config.DefaultLibraryFolderLimit,
 		Zone:               "UTC",
 		Timeout:            5 * time.Second,
-		IngestTimeout:      time.Minute,
+		LongWriteTimeout:   time.Minute,
 		BucketWidth:        span.Default,
 		Listen:             "127.0.0.1:0",
 		Limits:             config.DefaultLimits(),

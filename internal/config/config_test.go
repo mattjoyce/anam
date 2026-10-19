@@ -44,7 +44,7 @@ func TestLoadDefaults(t *testing.T) {
 		Zone:               "Local",
 		Listen:             config.DefaultListen,
 		Timeout:            5 * time.Second,
-		IngestTimeout:      15 * time.Minute,
+		LongWriteTimeout:   15 * time.Minute,
 		BackupKeep:         14,
 		BucketWidth:        span.Default,
 		CheckpointBudget:   config.DefaultCheckpointBudget,
@@ -115,7 +115,7 @@ bucket_width: weekly
 		Zone:               "Local",
 		Listen:             config.DefaultListen,
 		Timeout:            12 * time.Second,
-		IngestTimeout:      15 * time.Minute,
+		LongWriteTimeout:   15 * time.Minute,
 		BackupKeep:         14,
 		BucketWidth:        span.Weekly,
 		CheckpointBudget:   config.DefaultCheckpointBudget,
@@ -245,7 +245,7 @@ func TestValidate(t *testing.T) {
 		LibraryDir:         "/srv/documents",
 		Zone:               "Australia/Sydney",
 		Timeout:            5 * time.Second,
-		IngestTimeout:      time.Minute,
+		LongWriteTimeout:   time.Minute,
 		BucketWidth:        span.Default,
 		LibraryFolderLimit: config.DefaultLibraryFolderLimit,
 		Limits:             config.DefaultLimits(),
@@ -274,7 +274,7 @@ func TestValidate(t *testing.T) {
 		{"unknown zone", func(c *config.Config) { c.Zone = "Mars/Olympus" }, true},
 		{"utc zone", func(c *config.Config) { c.Zone = "UTC" }, false},
 		{"zero timeout", func(c *config.Config) { c.Timeout = 0 }, true},
-		{"zero ingest_timeout", func(c *config.Config) { c.IngestTimeout = 0 }, true},
+		{"zero long_write_timeout", func(c *config.Config) { c.LongWriteTimeout = 0 }, true},
 		{"negative timeout", func(c *config.Config) { c.Timeout = -time.Second }, true},
 		{"weekly bucket_width", func(c *config.Config) { c.BucketWidth = span.Weekly }, false},
 		{"unknown bucket_width", func(c *config.Config) { c.BucketWidth = "fortnightly" }, true},
@@ -302,6 +302,62 @@ func TestValidate(t *testing.T) {
 			}
 			if err != nil {
 				t.Errorf("Validate() = %v, want nil", err)
+			}
+		})
+	}
+}
+
+// TestLongWriteTimeoutReadsItsOldName is card 156: ingest_timeout and
+// ANAM_INGEST_TIMEOUT still set the long-write deadline, so a deployment that has
+// not moved keeps its value; the two names given differently are refused; and a
+// zero or negative value is refused under either name, the way a default is.
+func TestLongWriteTimeoutReadsItsOldName(t *testing.T) {
+	tests := []struct {
+		name    string
+		body    string
+		env     map[string]string
+		want    time.Duration
+		wantErr bool
+	}{
+		{"neither: the default", "", nil, config.DefaultLongWriteTimeout, false},
+		{"new key in the file", "long_write_timeout: 20m\n", nil, 20 * time.Minute, false},
+		{"old key in the file", "ingest_timeout: 20m\n", nil, 20 * time.Minute, false},
+		{"new variable", "", map[string]string{"ANAM_LONG_WRITE_TIMEOUT": "25m"}, 25 * time.Minute, false},
+		{"old variable, as unraid sets it", "", map[string]string{"ANAM_INGEST_TIMEOUT": "15m"}, 15 * time.Minute, false},
+		{"both, the same", "long_write_timeout: 20m\ningest_timeout: 20m\n", nil, 20 * time.Minute, false},
+		{"both, different", "long_write_timeout: 20m\ningest_timeout: 10m\n", nil, 0, true},
+		{"old in the file, new in the environment, different", "ingest_timeout: 10m\n",
+			map[string]string{"ANAM_LONG_WRITE_TIMEOUT": "20m"}, 0, true},
+		{"zero under the new name", "long_write_timeout: 0s\n", nil, 0, true},
+		{"negative under the old name", "", map[string]string{"ANAM_INGEST_TIMEOUT": "-1m"}, 0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("ANAM_LONG_WRITE_TIMEOUT", "")
+			t.Setenv("ANAM_INGEST_TIMEOUT", "")
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+			path := writeConfig(t, "person_id: matt\n"+tt.body)
+
+			got, err := config.Load(path)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("Load() = %s, want an error", got.LongWriteTimeout)
+				}
+				if !errors.Is(err, config.ErrInvalid) {
+					t.Errorf("Load() error = %v, want it to wrap ErrInvalid", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if got.LongWriteTimeout != tt.want {
+				t.Errorf("LongWriteTimeout = %s, want %s", got.LongWriteTimeout, tt.want)
+			}
+			if got.IngestTimeout != 0 {
+				t.Errorf("IngestTimeout = %s after Load, want it moved across and zero", got.IngestTimeout)
 			}
 		})
 	}

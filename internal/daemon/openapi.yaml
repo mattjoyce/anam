@@ -281,6 +281,125 @@ paths:
         "404": { $ref: "#/components/responses/NoArtifact" }
         "409": { $ref: "#/components/responses/CannotHonour" }
         "504": { $ref: "#/components/responses/Timeout" }
+  /v1/query:
+    get:
+      operationId: getQueryCatalogue
+      tags: [record]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: QueryCatalogue
+      summary: What a query can be written against.
+      description: >-
+        The introspection an agent reads before writing a Datalog program (card 173):
+        the base relations and the instant parameter, the exact fact-time lexeme, every
+        type's payload pointers at every Definition version held, and the bundled rule
+        set with its hash, its text and the relations it defines. Reads no facet.
+      parameters:
+        - { $ref: "#/components/parameters/AnamTimeout" }
+      responses:
+        "200":
+          description: the catalogue
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QueryCatalogue" }
+              example:
+                syntax: "A program is rules, facts and declarations, each ending in a period; % starts a comment."
+                relations:
+                  - { name: entry, arity: 7, args: [E, Type, FactTime, Series, Status, Source, DefinitionVersion], kind: base, doc: one served facet's envelope }
+                  - { name: instant, arity: 1, args: [At], kind: parameter, doc: the fact-times a query asks about }
+                instant: { layout: "2006-01-02T15:04:05.000000000Z07:00", example: "2026-06-15T00:00:00.000000000Z" }
+                types:
+                  - type: med.started
+                    current: 5
+                    series: med.regimen
+                    closes: false
+                    versions:
+                      - { version: 4, pointers: [/course, /date, /drug, /id] }
+                      - { version: 5, pointers: [/as_dispensed, /course, /date, /dispensed_at, /dose, /drug, /id, /prescribed_by, /source_note] }
+                rules:
+                  name: anam
+                  version: 1
+                  hash: sha256:1976fb0a4cfc1313ce243c81ae29b34671610d8c3898da3dab3a40a67d737d02
+                  text: "instant/1.\ncurrent(E, At) :- before(E, At), not displaced(E, At), not closed(E, At).\n"
+                  relations:
+                    - { name: current, arity: 2, args: [E, At], kind: rule, doc: the last-known value at At }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "504": { $ref: "#/components/responses/Timeout" }
+    post:
+      operationId: postQuery
+      tags: [record]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: QueryAnswer
+      summary: Run a Datalog program through a projection, answered with a receipt.
+      description: >-
+        The third read (ARCHITECTURE.md §9, card 173). The program runs over what the
+        named projection serves at the head, or at as_of or w, built on the bundled
+        rules; the named relation is the answer, a sorted relation that hashes. The
+        answer is filed with a receipt naming the projection, the rule set and the
+        program unless dry_run is set, so the same query at the same W reproduces it.
+        A program that cannot run is refused with 400 and a message saying what to
+        change; a derivation or an answer over max_read_bytes is 413, with instant,
+        projection and program as the narrowings. Writes artifacts only, never the
+        ledger, and moves no watermark.
+      parameters:
+        - { $ref: "#/components/parameters/AnamTimeout" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QueryRequest" }
+            example:
+              projection: everything
+              text: "instant(At) :- entry(_, \"health.blood-pressure\", At, _, _, _, _).\nregimen(At, Drug) :- entry(_, \"health.blood-pressure\", At, _, _, _, _), current(E, At), entry(E, \"med.started\", _, _, _, _, _), attr(E, \"/drug\", Drug)."
+              relation: regimen
+      responses:
+        "200":
+          description: the answer, derived and not filed (dry_run)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QueryAnswer" }
+        "201":
+          description: the answer, filed with its receipt
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/QueryAnswer" }
+              example:
+                w: 33378
+                ledger_id: 4b1f7c2e-8d3a-4f6b-9c1e-2a7d5e8f0b3c
+                live: 14609
+                canonical: sha256:1976fb0a4cfc1313ce243c81ae29b34671610d8c3898da3dab3a40a67d737d02
+                projection: { name: everything, version: 1, served: 14609, hash: sha256:1976fb0a4cfc1313ce243c81ae29b34671610d8c3898da3dab3a40a67d737d02 }
+                definition_set_version: sha256:ec002e673b06e5688a000c8b8a345759cb68b93b01edbea62ca04d65adbc1705
+                rules: { name: anam, version: 1, hash: sha256:7a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9 }
+                answer:
+                  relation: regimen
+                  tuples:
+                    - ["2026-06-01T07:00:00.000000000Z", ramipril]
+                    - ["2026-06-01T07:00:00.000000000Z", vitamin d3 + k2]
+                hash: sha256:ec002e673b06e5688a000c8b8a345759cb68b93b01edbea62ca04d65adbc1705
+                warnings: ["health.blood-pressure declares /missed_medication at v3, v4, v5 and not at v1, v2; facets admitted under those versions have no attr for it"]
+                receipt_hash: 7a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9
+                receipt:
+                  served_hash: sha256:ec002e673b06e5688a000c8b8a345759cb68b93b01edbea62ca04d65adbc1705
+                  facet_ids: [923f857a-84a2-5284-9d4a-b73e6d0a16c4]
+                  watermark: 33378
+                  template: everything
+                  template_version: 1
+                  template_hash: sha256:1976fb0a4cfc1313ce243c81ae29b34671610d8c3898da3dab3a40a67d737d02
+                  definition_set_version: sha256:ec002e673b06e5688a000c8b8a345759cb68b93b01edbea62ca04d65adbc1705
+                  served_at: "2026-10-19T12:00:00.000000000Z"
+                  span: all
+                  ledger_id: 4b1f7c2e-8d3a-4f6b-9c1e-2a7d5e8f0b3c
+                  program:
+                    rule_set: anam
+                    rule_set_version: 1
+                    rule_set_hash: sha256:7a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9
+                    text: "regimen(At, Drug) :- ..."
+                    relation: regimen
+                written: true
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "504": { $ref: "#/components/responses/Timeout" }
   /v1/projections:
     get:
       operationId: getProjections
@@ -992,6 +1111,17 @@ components:
         ledger_id: { type: string }
         query: { $ref: "#/components/schemas/ReceiptQuery" }
         template_hash: { type: string }
+        program: { $ref: "#/components/schemas/ReceiptProgram" }
+    ReceiptProgram:
+      type: object
+      description: the query a receipt answers (card 173); the template is the projection it ran through
+      required: [rule_set, rule_set_version, rule_set_hash, text, relation]
+      properties:
+        rule_set: { type: string }
+        rule_set_version: { type: integer }
+        rule_set_hash: { type: string }
+        text: { type: string }
+        relation: { type: string }
     ReceiptQuery:
       type: object
       description: how the read narrowed the template's value, resolved to instants
@@ -1022,6 +1152,98 @@ components:
         receipt: { $ref: "#/components/schemas/Receipt" }
         entries: { type: array, items: { $ref: "#/components/schemas/Entry" } }
         frame: { $ref: "#/components/schemas/Frame" }
+        answer: { $ref: "#/components/schemas/Answer" }
+    Answer:
+      type: object
+      description: a query's answer, one relation's tuples sorted; a constant is a string, a number or a boolean
+      required: [relation, tuples]
+      properties:
+        relation: { type: string }
+        tuples: { type: array, items: { type: array, items: {} } }
+    QueryRequest:
+      type: object
+      required: [projection, text, relation]
+      properties:
+        projection: { type: string, description: the template the query runs through }
+        text: { type: string, description: the program, Anam's Datalog, built on the bundled rules }
+        relation: { type: string, description: the derived relation answered }
+        as_of: { type: string, description: read what Anam knew at this anam-time }
+        w: { type: integer, format: int64, description: read at this watermark instead }
+        dry_run: { type: boolean, description: derive the answer and its receipt, file nothing }
+        zone: { type: string, description: the reader's zone, for a bare date in as_of }
+    QueryAnswer:
+      type: object
+      required: [w, ledger_id, live, canonical, projection, definition_set_version, rules, answer, hash, receipt_hash, receipt, written]
+      properties:
+        w: { type: integer, format: int64 }
+        ledger_id: { type: string }
+        as_of: { $ref: "#/components/schemas/AnamTime" }
+        live: { type: integer }
+        canonical: { type: string }
+        projection: { $ref: "#/components/schemas/ProjectionRead" }
+        definition_set_version: { type: string }
+        rules:
+          type: object
+          required: [name, version, hash]
+          properties:
+            name: { type: string }
+            version: { type: integer }
+            hash: { type: string }
+        answer: { $ref: "#/components/schemas/Answer" }
+        hash: { type: string, description: the answer's hash, the receipt's served_hash }
+        warnings: { type: array, items: { type: string } }
+        receipt_hash: { type: string }
+        receipt: { $ref: "#/components/schemas/Receipt" }
+        written: { type: boolean }
+    QueryCatalogue:
+      type: object
+      required: [syntax, relations, instant, types, rules]
+      properties:
+        syntax: { type: string }
+        relations:
+          type: array
+          items:
+            type: object
+            required: [name, arity, args, kind]
+            properties:
+              name: { type: string }
+              arity: { type: integer }
+              args: { type: array, items: { type: string } }
+              kind: { type: string, enum: [base, parameter, rule] }
+              doc: { type: string }
+        instant:
+          type: object
+          required: [layout, example]
+          properties:
+            layout: { type: string }
+            example: { type: string }
+        types:
+          type: array
+          items:
+            type: object
+            required: [type, current, closes, versions]
+            properties:
+              type: { type: string }
+              current: { type: integer }
+              series: { type: string }
+              closes: { type: boolean }
+              versions:
+                type: array
+                items:
+                  type: object
+                  required: [version, pointers]
+                  properties:
+                    version: { type: integer }
+                    pointers: { type: array, items: { type: string } }
+        rules:
+          type: object
+          required: [name, version, hash, text, relations]
+          properties:
+            name: { type: string }
+            version: { type: integer }
+            hash: { type: string }
+            text: { type: string }
+            relations: { type: array, items: { type: object } }
     ReceiptVerified:
       type: object
       required: [hash, receipt, result]

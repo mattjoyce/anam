@@ -192,6 +192,10 @@ func writeReceipt(cmd *cobra.Command, shown api.ReceiptShown, asJSON bool) error
 	if asJSON {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s v%d at W=%d, served %s\n",
 			r.Template, r.TemplateVersion, r.Watermark, r.ServedAt)
+		if shown.Answer != nil {
+			_, err := fmt.Fprintf(out, "%s\n", shown.Answer.Bytes())
+			return err
+		}
 		if shown.Frame != nil {
 			_, err := fmt.Fprintf(out, "%s\n", shown.Frame.Bytes())
 			return err
@@ -212,7 +216,13 @@ func writeReceipt(cmd *cobra.Command, shown api.ReceiptShown, asJSON bool) error
 	if r.Query != nil {
 		_, _ = fmt.Fprintf(out, "  query      %s\n", queryLine(*r.Query))
 	}
+	if p := r.Program; p != nil {
+		_, _ = fmt.Fprintf(out, "  program    %s answered with %s v%d %s\n%s\n", p.Relation, p.RuleSet, p.RuleSetVersion, p.RuleSetHash, indent(p.Text))
+	}
 	_, _ = fmt.Fprintln(out)
+	if shown.Answer != nil {
+		return writeAnswer(out, *shown.Answer)
+	}
 	if shown.Frame != nil {
 		// The served frame holds fact times as stored; show renders from the
 		// artifact alone and names no zone, so they stay as served.
@@ -292,6 +302,9 @@ func writeVerified(cmd *cobra.Command, v api.ReceiptVerified) error {
 		r.Template, r.TemplateVersion, r.Watermark, r.ServedAt, len(r.FacetIDs), r.Span, ledgerOrUnnamed(r.LedgerID))
 	if r.Query != nil {
 		_, _ = fmt.Fprintf(w, "  narrowed by %s\n", queryLine(*r.Query))
+	}
+	if p := r.Program; p != nil {
+		_, _ = fmt.Fprintf(w, "  answered %s with %s v%d %s\n", p.Relation, p.RuleSet, p.RuleSetVersion, p.RuleSetHash)
 	}
 	_, _ = fmt.Fprintln(w)
 	_, _ = fmt.Fprint(w, res.Summary())

@@ -28,6 +28,10 @@ type facetData struct {
 	// the inspector's own route to the bytes. Empty otherwise.
 	DocumentURL string
 
+	// BytesNotHeld is set for a record.link (card 165): the facet names a file whose
+	// bytes Anam does not hold, so the page says so in place of a download.
+	BytesNotHeld bool
+
 	// AnamTime is read off this artifact's own admitted event, not off the Facet: a
 	// Facet carries one clock, the world's. When Anam learned of it is the ledger's
 	// business, and the ledger is where the page has to go to ask.
@@ -168,6 +172,7 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 		Status:            status,
 		FactTime:          f.FactTime.Format(time.RFC3339),
 		DocumentURL:       s.documentURL(f),
+		BytesNotHeld:      bytesNotHeld(f),
 		AnamTime:          anamTimeOf(mine, f.ArtifactVersion),
 		Bucket:            s.buckets.Of(f.FactTime).ID(),
 		Payload:           highlightJSON(f.Payload.Bytes()),

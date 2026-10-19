@@ -17,6 +17,18 @@ import (
 // served confined to the library root and isolated from the inspector's origin
 // (cards 106, 150).
 
+// linkType is the facet type for a file Anam remembers but does not hold (card 165):
+// an observation of a file's name, hash and date, registered by the links importer.
+// Its sha256 names bytes outside Anam, so the page says so and offers no download.
+// Not configurable: it names a type.
+const linkType facet.Type = "record.link"
+
+// bytesNotHeld says whether f names a file whose bytes Anam, by design, does not
+// hold. A record.link is verbatim (the payload is the whole fact, not a pointer the
+// inspector can follow), so documentURL already gives it no link; this is the page's
+// word for why.
+func bytesNotHeld(f facet.Facet) bool { return f.Type == linkType }
+
 // documentURL is the inspector's link to a reference facet's bytes, when it has a
 // library to serve them from. The sha256 is read from the payload, which is where a
 // reference says what it points at (journal/notes/reference-payloads.md); the path,

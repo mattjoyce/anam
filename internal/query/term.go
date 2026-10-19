@@ -1,6 +1,7 @@
 package query
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -55,6 +56,32 @@ func (c Const) MarshalJSON() ([]byte, error) {
 		return json.Marshal(c.s)
 	}
 	return []byte(c.s), nil
+}
+
+// UnmarshalJSON reads a constant back from the JSON MarshalJSON wrote, so an answer
+// decoded on the client holds the constants the server's did.
+func (c *Const) UnmarshalJSON(b []byte) error {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.UseNumber()
+	var v any
+	if err := dec.Decode(&v); err != nil {
+		return err
+	}
+	switch t := v.(type) {
+	case string:
+		*c = String(t)
+	case bool:
+		*c = Bool(t)
+	case json.Number:
+		n, err := Number(t.String())
+		if err != nil {
+			return err
+		}
+		*c = n
+	default:
+		return fmt.Errorf("%w: a constant is a string, a number or a boolean, not %s", ErrSyntax, b)
+	}
+	return nil
 }
 
 // key is the constant's identity for sets and joins. The kind prefix keeps the

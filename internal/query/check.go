@@ -97,7 +97,7 @@ func currentAt(ctx context.Context, rules RuleSet, base Base, defs Definitions, 
 	if err != nil {
 		return nil, err
 	}
-	res, err := Evaluate(ctx, plan, base)
+	res, err := Evaluate(ctx, plan, base, 0)
 	if err != nil {
 		return nil, err
 	}

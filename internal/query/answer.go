@@ -30,16 +30,40 @@ func (r Result) Relation(name string) (Answer, error) {
 	copy(tuples, rel.tuples)
 	sort.Slice(tuples, func(i, j int) bool { return tupleLess(tuples[i], tuples[j]) })
 	a := Answer{Relation: name, Tuples: tuples}
+	if err := a.seal(); err != nil {
+		return Answer{}, err
+	}
+	return a, nil
+}
+
+// seal pins the answer's one serialisation and its hash.
+func (a *Answer) seal() error {
 	b, err := json.Marshal(struct {
 		Relation string  `json:"relation"`
 		Tuples   []Tuple `json:"tuples"`
 	}{a.Relation, a.Tuples})
 	if err != nil {
-		return Answer{}, fmt.Errorf("query: serialise answer: %w", err)
+		return fmt.Errorf("query: serialise answer: %w", err)
 	}
 	sum := sha256.Sum256(b)
 	a.bytes, a.hash = b, "sha256:"+hex.EncodeToString(sum[:])
-	return a, nil
+	return nil
+}
+
+// UnmarshalJSON reads an answer as it travels and seals it again, so an answer
+// decoded on the client, or read back from a served artifact, has the bytes and
+// the hash the server's had.
+func (a *Answer) UnmarshalJSON(b []byte) error {
+	type plain Answer // no methods: a plain decode, not this one again
+	var p plain
+	if err := json.Unmarshal(b, &p); err != nil {
+		return err
+	}
+	if p.Relation == "" || p.Tuples == nil {
+		return fmt.Errorf("%w: not an answer (no relation or tuples)", ErrSyntax)
+	}
+	*a = Answer{Relation: p.Relation, Tuples: p.Tuples}
+	return a.seal()
 }
 
 // Len is how many tuples the answer holds.

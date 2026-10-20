@@ -94,7 +94,7 @@ captured from a source. Re-enters through the ordinary gate as `proposed`. See *
 **Domain** — The first segment of a *Facet type*, and a closed set of eight: `health`, `activity`, `place` and
 `record` are in use; `social`, `money`, `media` and `work` are reserved for the next dense sources (`social.message`,
 `money.transaction`, `media.play`). A new kind of fact joins one of the eight and never earns a ninth head, so growth is
-in the second segment and in the Definition's `family` (a finer grouping, such as `meds` or `trips`) and `kind`
+in the concept, in a specialisation after it, and in the Definition's `family` (a finer grouping, such as `meds` or `trips`) and `kind`
 (`measure`, `reading` or `event`). Name the common concept and code the open-ended tail: lab results are one type
 with the test code in the payload, not a type per test.
 
@@ -153,9 +153,11 @@ Definition*.
 semantics, linking elements, validation bar, classification. Bundled as embedded JSON; loadable via
 `anam def load`. See *Facet*.
 
-**Facet type** — The kind of a Facet, named **lower-case dotted** as `domain.concept`: `health.blood-pressure`,
+**Facet type** — The kind of a Facet, named **lower-case dotted** as `domain.concept[.specialisation…]`: `health.blood-pressure`,
 `health.sleep-episode`, `health.heart-rate-alert`, `activity.steps`, `place.stay`, `record.edge`. The first word is a
-*Domain*; the second names the concept. Dotted on purpose; payload keys are snake_case.
+*Domain*; the second names the concept; a third or later names a specialisation, either a kind within the
+concept or the vendor whose own payload shape it is. Dotted on purpose; payload keys are snake_case. Where a
+distinction goes is [where a distinction is encoded](explainer/bundle/decisions/where-a-distinction-is-encoded.md).
 
 **Fold** — The computation that reads a span's anam-events up to a watermark and derives each Facet's
 **current status**, keeping the live ones — producing the *Canonical*. The serve path is *nearest

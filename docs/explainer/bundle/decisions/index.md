@@ -1,5 +1,6 @@
 # Decisions
 
+* [A distinction goes in the cheapest place that lets its reader ask cleanly](where-a-distinction-is-encoded.md) - A type is domain.concept[.specialisation…]; a distinction lives in the type name, the Definition's meta, a payload field, provenance, an edge or a projection, and is promoted up that list only when something forces it.
 * [A hard-coded value is a default or an invariant](a-hard-coded-value-is-a-default-or-an-invariant.md) - A value someone could reasonably choose differently is a config key with a shipped default and a range check; a value whose change breaks correctness or a contract stays a constant with a comment saying why; no test hook changes either.
 * [A mint starts from the last run](a-mint-starts-from-the-last-run.md) - The checkpoints at the last run are the value at that W, so only the buckets the events since then touched can differ; the full mint remains as oracle and repair.
 * [A read may select by payload; the store never does](a-read-may-select-by-payload-the-store-never-does.md) - Payload opacity is a storage rule, not a ceiling on what a person may ask of their own record; a query selects and joins by any schema field, read from the served copy through a projection, and the store still never decomposes or indexes a payload.

@@ -49,13 +49,13 @@ func TestRun_ComposedFromTheLastRunIsTheFullFold(t *testing.T) {
 		{
 			name: "snapshot shape", template: "meds",
 			seed: func(h *harness) {
-				h.med(t, "health.medication-started", "m1", "2026-03-01", "ramipril", 1)
-				h.med(t, "health.medication-dose-changed", "m2", "2026-05-10", "ramipril", 1)
-				h.med(t, "health.medication-started", "m5", "2026-04-01", "atorvastatin", 1)
+				h.med(t, "health.medication.started", "m1", "2026-03-01", "ramipril", 1)
+				h.med(t, "health.medication.dose-changed", "m2", "2026-05-10", "ramipril", 1)
+				h.med(t, "health.medication.started", "m5", "2026-04-01", "atorvastatin", 1)
 			},
 			tail: func(h *harness) {
-				h.med(t, "health.medication-stopped", "m3", "2026-08-01", "ramipril", 1) // closes a course started before the run
-				h.med(t, "health.medication-started", "m4", "2026-10-01", "ramipril", 2)
+				h.med(t, "health.medication.stopped", "m3", "2026-08-01", "ramipril", 1) // closes a course started before the run
+				h.med(t, "health.medication.started", "m4", "2026-10-01", "ramipril", 2)
 			},
 		},
 	} {

@@ -11,7 +11,7 @@ import (
 func TestWorkbench_AbsentMeansReadOnly(t *testing.T) {
 	t.Parallel()
 	srv, bp, _ := seededServer(t)
-	if code, _ := get(t, srv.URL+"/entry?type=health.medication-dose"); code != http.StatusNotFound {
+	if code, _ := get(t, srv.URL+"/entry?type=health.medication.dose"); code != http.StatusNotFound {
 		t.Fatalf("GET /entry = %d, want 404", code)
 	}
 	_, body := get(t, srv.URL+"/definitions")

@@ -32,7 +32,7 @@ func TestCompile_RefusesWithAReason(t *testing.T) {
 		{"anonymous in comparison", `a(X) :- entry(X, _, _, _, _, _, _), _ > 1.`, "_ in a comparison compares nothing"},
 		{"unstratifiable", `a(X) :- entry(X, _, _, _, _, _, _), not b(X). b(X) :- entry(X, _, _, _, _, _, _), not a(X).`, "depend on each other through a negation"},
 		{"bad pointer", `a(X) :- attr(X, "drug", _).`, `attr: json pointer: "drug" must start with '/'`},
-		{"undeclared pointer", `a(X) :- attr(X, "/dosage", _).`, "no Definition declares a field at /dosage (the types are health.blood-pressure, health.medication-dose-changed, health.medication-started"},
+		{"undeclared pointer", `a(X) :- attr(X, "/dosage", _).`, "no Definition declares a field at /dosage (the types are health.blood-pressure, health.medication.dose-changed, health.medication.started"},
 		{"pointer is not a string", `a(X) :- attr(X, 1, _).`, "attr: the pointer must be a string, got 1"},
 		{"instant undefined", `a(X) :- current(X, _).`, "a reads instant/1, which is declared but has no rules or facts; define it in the query"},
 	}

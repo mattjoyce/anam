@@ -71,13 +71,13 @@ func TestDefinition_PageMarksRolesOnTheirRows(t *testing.T) {
 func TestDefinition_PageShowsTheHandlingBlock(t *testing.T) {
 	t.Parallel()
 	srv, _, _ := seededServer(t)
-	code, body := get(t, srv.URL+"/definition?type=health.medication-started")
+	code, body := get(t, srv.URL+"/definition?type=health.medication.started")
 	if code != http.StatusOK {
-		t.Fatalf("GET /definition?type=health.medication-started = %d: %s", code, body)
+		t.Fatalf("GET /definition?type=health.medication.started = %d: %s", code, body)
 	}
 	for _, want := range []string{"<h2>handling", "one spelling per substance", "slugged with hyphens"} {
 		if !strings.Contains(body, want) {
-			t.Errorf("health.medication-started's page lacks %q", want)
+			t.Errorf("health.medication.started's page lacks %q", want)
 		}
 	}
 	_, bp := get(t, srv.URL+"/definition?type=health.blood-pressure")

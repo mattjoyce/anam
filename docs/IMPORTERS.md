@@ -183,7 +183,7 @@ without an edit to Anam; the gate ignores both (card 176). It may also declare `
 (card 188), the type's id rule for the one identity field the payload carries: literal text with
 `{source}`, `{/pointer}`, `{/pointer|slug}` (lower case, runs of other characters turned to one
 hyphen) and `{/fact_time_pointer|<Go time layout>}` placeholders, as
-`{source}:med/{/drug|slug}/dose/{/taken_at|2006-01-02T15:04}` for `health.medication-dose`. The gate
+`{source}:med/{/drug|slug}/dose/{/taken_at|2006-01-02T15:04}` for `health.medication.dose`. The gate
 fills the identity field from it when an envelope leaves it out, and refuses an envelope whose field
 disagrees, showing both. A writer that wants the id before it sends builds it with `def.ComposeID`;
 one that is not Go leaves the field out. A change of template is a new version. `schema` is closed JSON Schema 2020-12
@@ -224,7 +224,7 @@ importers:
   same kind. `types` and `any_type` together are refused at start. Two edges to know: `any_type`
   reaches facets and not the library, so `POST /v1/documents` stays with a source that lists
   `record.document`; and a series is not source-stamped as an identity is, so in a snapshot read the
-  latest entry of a series wins whatever its source, and the person saying `health.medication-stopped` closes
+  latest entry of a series wins whatever its source, and the person saying `health.medication.stopped` closes
   the course the records file started.
 - An importer's token opens `POST /v1/envelopes`, `POST /v1/documents` and `POST /v1/definitions`,
   and since card 89 every read a `reader` has: the record, receipts, Definitions, and its own
@@ -238,7 +238,7 @@ importers:
   ```yaml
   importers:
     - source: workbench
-      types: [health.medication-dose]
+      types: [health.medication.dose]
   ```
 
   The `workbench` source is reserved. It owns none of its types, so another importer may own one

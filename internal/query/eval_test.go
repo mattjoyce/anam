@@ -55,7 +55,7 @@ const weightManifest = `{
 func registry(t *testing.T) *def.Registry {
 	t.Helper()
 	var defs []def.Definition
-	for _, m := range []string{medManifest("health.medication-started", false), medManifest("health.medication-dose-changed", false), medManifest("health.medication-stopped", true), bpManifest, weightManifest} {
+	for _, m := range []string{medManifest("health.medication.started", false), medManifest("health.medication.dose-changed", false), medManifest("health.medication.stopped", true), bpManifest, weightManifest} {
 		d, err := def.Parse([]byte(m))
 		if err != nil {
 			t.Fatalf("def.Parse: %v", err)
@@ -160,10 +160,10 @@ func same(a, b []string) bool {
 func TestEvaluate_RecursionReachesTheFixpoint(t *testing.T) {
 	t.Parallel()
 	v, versions := value(t,
-		entry("a", "health.medication-started", day("2026-01-01"), "", `{}`),
-		entry("b", "health.medication-started", day("2026-01-02"), "", `{}`),
-		entry("c", "health.medication-started", day("2026-01-03"), "", `{}`),
-		entry("d", "health.medication-started", day("2026-01-04"), "", `{}`),
+		entry("a", "health.medication.started", day("2026-01-01"), "", `{}`),
+		entry("b", "health.medication.started", day("2026-01-02"), "", `{}`),
+		entry("c", "health.medication.started", day("2026-01-03"), "", `{}`),
+		entry("d", "health.medication.started", day("2026-01-04"), "", `{}`),
 	)
 	ans := run(t, v, versions, `
 		next(E, F) :- entry(E, _, T, _, _, _, _), entry(F, _, U, _, _, _, _), T < U, not between(E, F).
@@ -217,8 +217,8 @@ func TestEvaluate_ComparisonsAndAttributes(t *testing.T) {
 func TestAnswer_IsAValue(t *testing.T) {
 	t.Parallel()
 	v, versions := value(t,
-		entry("b", "health.medication-started", day("2026-01-02"), "", `{}`),
-		entry("a", "health.medication-started", day("2026-01-01"), "", `{}`),
+		entry("b", "health.medication.started", day("2026-01-02"), "", `{}`),
+		entry("a", "health.medication.started", day("2026-01-01"), "", `{}`),
 	)
 	text := `ids(E, N) :- entry(E, _, _, _, _, _, N).`
 	first, second := run(t, v, versions, text, "ids"), run(t, v, versions, text, "ids")
@@ -242,7 +242,7 @@ func TestEvaluate_HonoursTheDeadline(t *testing.T) {
 	t.Parallel()
 	var entries []fold.Entry
 	for i := 0; i < 200; i++ {
-		entries = append(entries, entry(strings.Repeat("x", 3)+string(rune('0'+i%10))+string(rune('a'+i/10)), "health.medication-started", day("2026-01-01"), "", `{}`))
+		entries = append(entries, entry(strings.Repeat("x", 3)+string(rune('0'+i%10))+string(rune('a'+i/10)), "health.medication.started", day("2026-01-01"), "", `{}`))
 	}
 	v, versions := value(t, entries...)
 	rules, _ := query.Bundled()

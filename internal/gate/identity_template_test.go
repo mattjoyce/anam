@@ -17,7 +17,7 @@ import (
 
 // Card 188 S1: a Definition that declares an identity_template has its identity field
 // filled when an envelope leaves it out and held to it when it carries it. Over the
-// bundled health.medication-dose and a real ledger.
+// bundled health.medication.dose and a real ledger.
 
 func newDoseGate(t *testing.T) *gate.Gate {
 	t.Helper()
@@ -30,12 +30,12 @@ func newDoseGate(t *testing.T) *gate.Gate {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scopes := gate.StaticScopes{"conversation": {"health.medication-dose", "health.weight"}}
+	scopes := gate.StaticScopes{"conversation": {"health.medication.dose", "health.weight"}}
 	return gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 }
 
 func doseEnvelope(payload string) facet.Envelope {
-	return facet.Envelope{Type: "health.medication-dose", Source: "conversation", Injector: "conversation", Payload: []byte(payload)}
+	return facet.Envelope{Type: "health.medication.dose", Source: "conversation", Injector: "conversation", Payload: []byte(payload)}
 }
 
 const (

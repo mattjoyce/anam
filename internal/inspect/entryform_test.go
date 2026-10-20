@@ -162,7 +162,7 @@ func TestDrawFormRefusesNestedSchemas(t *testing.T) {
 	}
 	for _, m := range manifests {
 		d, ok := reg.Lookup(m.Type)
-		if !ok || d.Version != m.Version || (m.Type != "health.blood-pressure" && m.Type != "health.medication-dose") {
+		if !ok || d.Version != m.Version || (m.Type != "health.blood-pressure" && m.Type != "health.medication.dose") {
 			continue
 		}
 		_, err := drawForm(m.Body, d, false)

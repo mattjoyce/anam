@@ -136,10 +136,10 @@ gate refuses it rather than choose (card 197). How the source's clock was read i
 *Source time*.
 
 **Series** — Which facets are repeated statements about one thing over time, so that a *Snapshot*
-can keep the latest per thing. Neither identity (every change is its own row) nor type (`health.medication-started`
-and `health.medication-stopped` are one regimen). A Definition declares a series **family** (`med.regimen`, named like
+can keep the latest per thing. Neither identity (every change is its own row) nor type (`health.medication.started`
+and `health.medication.stopped` are one regimen). A Definition declares a series **family** (`med.regimen`, named like
 a type), the ordered key pointers that name one series within it (the drug and the course), and
-whether the type **closes** the series (`health.medication-stopped`). The gate composes `<family>:<values>` and
+whether the type **closes** the series (`health.medication.stopped`). The gate composes `<family>:<values>` and
 stamps it on the Facet as metadata, beside *fact-time* and *classification*, so no read opens a
 payload to group. Every type in a family declares the same key; the registry refuses one keyed two ways.
 

@@ -22,9 +22,9 @@ func doseDef(t *testing.T) def.Definition {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, ok := reg.Lookup("health.medication-dose")
+	d, ok := reg.Lookup("health.medication.dose")
 	if !ok {
-		t.Fatal("health.medication-dose is not bundled")
+		t.Fatal("health.medication.dose is not bundled")
 	}
 	return d
 }
@@ -182,12 +182,12 @@ func TestBundled_OnlyTheDoseDeclaresATemplate(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, d := range reg.All() {
-		want := d.Type == "health.medication-dose"
+		want := d.Type == "health.medication.dose"
 		if got := d.IdentityTemplate != ""; got != want {
 			t.Errorf("%s declares a template: %v, want %v", d.Type, got, want)
 		}
 	}
-	if d := doseDef(t); d.Version != 2 {
-		t.Errorf("health.medication-dose is v%d, want 2", d.Version)
+	if d := doseDef(t); d.Version != 1 {
+		t.Errorf("health.medication.dose is v%d, want 1", d.Version)
 	}
 }

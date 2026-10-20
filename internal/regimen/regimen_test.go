@@ -68,10 +68,10 @@ func TestExpected_LeavesTheLedgerUntouched(t *testing.T) {
 	if err != nil {
 		t.Fatalf("def.Bundled: %v", err)
 	}
-	g := gate.New(l, defs, gate.StaticScopes{"records": {"health.medication-compliance"}}, clock.Real{}, "matt", gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
+	g := gate.New(l, defs, gate.StaticScopes{"records": {"health.medication.compliance"}}, clock.Real{}, "matt", gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 
 	env := facet.Envelope{
-		Type: "health.medication-compliance", Source: "records", Injector: "records",
+		Type: "health.medication.compliance", Source: "records", Injector: "records",
 		SourceRef: facet.SourceRef("records", "self-log:est/ramipril/1/2026-02"),
 		Payload: []byte(`{"id": "self-log:est/ramipril/1/2026-02", "date": "2026-02-03",
 			"drug": "ramipril", "course": 1, "period_start": "2026-01-01", "period_end": "2026-01-31",
@@ -116,9 +116,9 @@ func TestComplianceEstimate_IsBoundedAtTheGate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("def.Bundled: %v", err)
 	}
-	d, ok := defs.Lookup("health.medication-compliance")
+	d, ok := defs.Lookup("health.medication.compliance")
 	if !ok {
-		t.Fatal("no bundled definition for health.medication-compliance")
+		t.Fatal("no bundled definition for health.medication.compliance")
 	}
 	for value, want := range map[string]bool{`0.95`: true, `1`: true, `0`: true, `"0.5"`: false, `95`: false, `1.5`: false, `-0.1`: false} {
 		doc, err := def.Decode([]byte(`{"id": "e", "date": "2026-02-03", "drug": "x", "course": 1,

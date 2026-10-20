@@ -386,7 +386,7 @@ governance contract. Never describe a metadata query as having searched every wo
    resurrect nor exclude a facet.
 5. Publish the selected value and receipt; deliver bounded pages of that value.
 
-A filter that removes `health.medication-stopped` before series resolution could resurrect a stopped course.
+A filter that removes `health.medication.stopped` before series resolution could resurrect a stopped course.
 The core therefore owns this order. A snapshot template must be validated as compatible with the
 series families it serves. Hidden evidence can affect core state resolution without being exposed
 in explanations. Equal fact-times within a series need an explicit core tie policy; until defined,
@@ -499,7 +499,7 @@ the definition, source revision, or authorization cannot change before submissio
 ```json
 {
   "submission_id": "client-generated-stable-id",
-  "type": "health.medication-missed-dose",
+  "type": "health.medication.dose-missed",
   "definition_version": 1,
   "assertion": {
     "text": "I missed yesterday's dose",
@@ -514,7 +514,7 @@ the definition, source revision, or authorization cannot change before submissio
 ```
 
 The example illustrates the proposed authoring contract. `course_ref` needs an agreed Definition;
-it is not a claim about today's `health.medication-missed-dose` schema. Discovery must advertise exactly
+it is not a claim about today's `health.medication.dose-missed` schema. Discovery must advertise exactly
 what the installed version accepts.
 
 The source writer assigns a stable row ID on the user's behalf and returns it. It retains the original

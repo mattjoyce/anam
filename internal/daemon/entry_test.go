@@ -22,7 +22,7 @@ func workbenchConfig(t *testing.T) (serve func() (*Daemon, string)) {
 		t.Fatal(err)
 	}
 	defer func() { _ = f.Close() }()
-	if _, err := f.WriteString("  - source: workbench\n    types: [health.medication-dose]\n"); err != nil {
+	if _, err := f.WriteString("  - source: workbench\n    types: [health.medication.dose]\n"); err != nil {
 		t.Fatal(err)
 	}
 	return func() (*Daemon, string) {
@@ -33,7 +33,7 @@ func workbenchConfig(t *testing.T) (serve func() (*Daemon, string)) {
 
 // doseEntry is an entry body for a melatonin dose at the minute taken, with no id.
 func doseEntry(version int, taken string, amount float64) string {
-	return fmt.Sprintf(`{"type": "health.medication-dose", "definition_version": %d,
+	return fmt.Sprintf(`{"type": "health.medication.dose", "definition_version": %d,
 		"payload": {"drug": "melatonin", "amount": %v, "unit": "mg", "taken_at": %q, "reason": "to help sleep"}}`,
 		version, amount, taken)
 }
@@ -44,7 +44,7 @@ func doseEntry(version int, taken string, amount float64) string {
 func TestPostEntryAdmitsADoseAsTheWorkbench(t *testing.T) {
 	serve := workbenchConfig(t)
 	d, url := serve()
-	dose, _ := d.defs.current.Load().Lookup("health.medication-dose")
+	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
 	v := dose.Version
 
 	var got api.Entry
@@ -100,7 +100,7 @@ func TestPostEntryAdmitsADoseAsTheWorkbench(t *testing.T) {
 func TestPostEntryRefusesAsAnImporterWouldBe(t *testing.T) {
 	serve := workbenchConfig(t)
 	d, url := serve()
-	dose, _ := d.defs.current.Load().Lookup("health.medication-dose")
+	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
 	v := dose.Version
 
 	cases := []struct {
@@ -112,12 +112,12 @@ func TestPostEntryRefusesAsAnImporterWouldBe(t *testing.T) {
 			`{"type": "health.weight", "definition_version": 3, "payload": {"id": "w", "date": "2026-10-09 07:30", "kg": 80}}`,
 			http.StatusUnprocessableEntity, "source not authorized"},
 		{"a payload the Definition refuses",
-			fmt.Sprintf(`{"type": "health.medication-dose", "definition_version": %d, "payload": {"drug": "melatonin", "amount": "five", "unit": "mg", "taken_at": "2026-10-19 22:00"}}`, v),
+			fmt.Sprintf(`{"type": "health.medication.dose", "definition_version": %d, "payload": {"drug": "melatonin", "amount": "five", "unit": "mg", "taken_at": "2026-10-19 22:00"}}`, v),
 			http.StatusUnprocessableEntity, "not compliant"},
 		{"an id that disagrees with the rule",
-			fmt.Sprintf(`{"type": "health.medication-dose", "definition_version": %d, "payload": {"id": "workbench:med/melatonin/dose/other", "drug": "melatonin", "amount": 5, "unit": "mg", "taken_at": "2026-10-19 22:00"}}`, v),
+			fmt.Sprintf(`{"type": "health.medication.dose", "definition_version": %d, "payload": {"id": "workbench:med/melatonin/dose/other", "drug": "melatonin", "amount": 5, "unit": "mg", "taken_at": "2026-10-19 22:00"}}`, v),
 			http.StatusUnprocessableEntity, "identity"},
-		{"a definition version that is not in force", doseEntry(v-1, "2026-10-19 22:00", 5),
+		{"a definition version that is not in force", doseEntry(v+1, "2026-10-19 22:00", 5),
 			http.StatusConflict, "another definition version"},
 	}
 	for _, c := range cases {
@@ -147,19 +147,19 @@ func TestPostEntryRefusesAsAnImporterWouldBe(t *testing.T) {
 func TestPostEntryTakesOnlyTheThreeFields(t *testing.T) {
 	serve := workbenchConfig(t)
 	d, url := serve()
-	dose, _ := d.defs.current.Load().Lookup("health.medication-dose")
+	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
 	v := dose.Version
 	payload := `{"drug": "melatonin", "amount": 5, "unit": "mg", "taken_at": "2026-10-19 22:00"}`
 
 	for name, body := range map[string]string{
-		"a source":                  fmt.Sprintf(`{"type": "health.medication-dose", "definition_version": %d, "source": "garmin", "payload": %s}`, v, payload),
-		"an injector":               fmt.Sprintf(`{"type": "health.medication-dose", "definition_version": %d, "injector": "x", "payload": %s}`, v, payload),
-		"an id outside the payload": fmt.Sprintf(`{"type": "health.medication-dose", "definition_version": %d, "id": "x", "payload": %s}`, v, payload),
+		"a source":                  fmt.Sprintf(`{"type": "health.medication.dose", "definition_version": %d, "source": "garmin", "payload": %s}`, v, payload),
+		"an injector":               fmt.Sprintf(`{"type": "health.medication.dose", "definition_version": %d, "injector": "x", "payload": %s}`, v, payload),
+		"an id outside the payload": fmt.Sprintf(`{"type": "health.medication.dose", "definition_version": %d, "id": "x", "payload": %s}`, v, payload),
 		"no type":                   fmt.Sprintf(`{"definition_version": %d, "payload": %s}`, v, payload),
-		"no definition version":     `{"type": "health.medication-dose", "payload": ` + payload + `}`,
-		"no payload":                fmt.Sprintf(`{"type": "health.medication-dose", "definition_version": %d}`, v),
+		"no definition version":     `{"type": "health.medication.dose", "payload": ` + payload + `}`,
+		"no payload":                fmt.Sprintf(`{"type": "health.medication.dose", "definition_version": %d}`, v),
 		"a payload that is not an object": fmt.Sprintf(
-			`{"type": "health.medication-dose", "definition_version": %d, "payload": [1]}`, v),
+			`{"type": "health.medication.dose", "definition_version": %d, "payload": [1]}`, v),
 		"a second value": doseEntry(v, "2026-10-19 22:00", 5) + ` {}`,
 		"not JSON":       `entry`,
 	} {
@@ -167,7 +167,7 @@ func TestPostEntryTakesOnlyTheThreeFields(t *testing.T) {
 			call(t, "POST", url+"/v1/entry", testToken, body, http.StatusBadRequest, nil)
 		})
 	}
-	huge := fmt.Sprintf(`{"type": "health.medication-dose", "definition_version": %d, "payload": {"reason": %q}}`,
+	huge := fmt.Sprintf(`{"type": "health.medication.dose", "definition_version": %d, "payload": {"reason": %q}}`,
 		v, strings.Repeat("x", d.cfg.MaxPayloadBytes+entryHeadroom))
 	call(t, "POST", url+"/v1/entry", testToken, huge, http.StatusRequestEntityTooLarge, nil)
 	if w := head(t, d); w != 0 {
@@ -181,7 +181,7 @@ func TestPostEntryTakesOnlyTheThreeFields(t *testing.T) {
 func TestPostEntryIsTheOperatorsAndNotAForeignPages(t *testing.T) {
 	serve := workbenchConfig(t)
 	d, url := serve()
-	dose, _ := d.defs.current.Load().Lookup("health.medication-dose")
+	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
 	body := doseEntry(dose.Version, "2026-10-19 22:00", 5)
 
 	call(t, "POST", url+"/v1/entry", importerToken, body, http.StatusForbidden, nil)
@@ -212,7 +212,7 @@ func TestPostEntryIsTheOperatorsAndNotAForeignPages(t *testing.T) {
 func TestPostEntryWithoutAWorkbenchPrincipal(t *testing.T) {
 	cfg := importerConfig(t)
 	d, url, _ := serveImporters(t, cfg)
-	dose, _ := d.defs.current.Load().Lookup("health.medication-dose")
+	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
 	status, answer := postAs(t, url+"/v1/entry", doseEntry(dose.Version, "2026-10-19 22:00", 5), nil)
 	if status != http.StatusNotFound || !strings.Contains(answer, "declares no workbench principal") {
 		t.Fatalf("%d %s, want 404 saying the importers file declares no workbench principal", status, answer)

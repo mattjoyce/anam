@@ -257,8 +257,8 @@ Anam-time gains real resolution only when ingest becomes incremental — worth k
 
 > **The last-known-value read is the snapshot** (`fold.Snapshot`, built 2026-10-07; `SELF-LOG.md` §2).
 > "The facts as of January" most often means *the latest statement before January about each thing*,
-> and "each thing" is neither an identity (every change is its own row) nor a type (`health.medication-started` and
-> `health.medication-stopped` are one regimen). It is the **series**: a Definition declares a series family, the key
+> and "each thing" is neither an identity (every change is its own row) nor a type (`health.medication.started` and
+> `health.medication.stopped` are one regimen). It is the **series**: a Definition declares a series family, the key
 > pointers that name one series within it, and whether its type **closes** the series. The gate composes
 > `<family>:<values>` and stamps it on the facet as metadata, beside `fact_time`, so the snapshot groups
 > on it without opening a payload. The snapshot at `D` keeps the latest entry per series at or before

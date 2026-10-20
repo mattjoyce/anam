@@ -279,3 +279,10 @@ func (c *Client) RegisterProjection(ctx context.Context, manifest []byte) (api.R
 	_, err := c.do(ctx, c.timeout, http.MethodPost, "/v1/projections", nil, json.RawMessage(manifest), &reg)
 	return reg, err
 }
+
+// Coverage asks what the record holds, type by type, at the W q names.
+func (c *Client) Coverage(ctx context.Context, q api.CoverageQuery) (api.Coverage, error) {
+	var cv api.Coverage
+	_, err := c.do(ctx, c.timeout, http.MethodGet, "/v1/coverage", q.Values(), nil, &cv)
+	return cv, err
+}

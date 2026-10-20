@@ -43,7 +43,7 @@ func newRoot(info BuildInfo) *cobra.Command {
 		"ask the daemon at this URL instead of opening local files (default: $ANAM_SERVER)")
 
 	root.AddCommand(versionCmd(&cfgPath, info), statusCmd(&cfgPath, info), initCmd(&cfgPath),
-		inspectCmd(&cfgPath), timelineCmd(&cfgPath), changesCmd(&cfgPath),
+		inspectCmd(&cfgPath), timelineCmd(&cfgPath), changesCmd(&cfgPath), coverageCmd(&cfgPath),
 		serveCmd(&cfgPath), receiptCmd(&cfgPath), checkpointCmd(&cfgPath), retractCmd(&cfgPath), renameCmd(&cfgPath),
 		projectionCmd(&cfgPath), queryCmd(&cfgPath), daemonCmd(&cfgPath, info))
 	return root

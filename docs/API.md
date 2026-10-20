@@ -267,7 +267,7 @@ unbounded computation or storage. Large operator work uses an operation handle.
 | `GetProjection` | Template ID/version | Immutable definition, type coverage, restrictions, examples, supported narrowing. Built as `GET /v1/projections/{name}[/{version}]`, the manifest as canonical JSON; `POST /v1/projections` registers one under the operator's token, 201 new, 200 the same body again, 409 another body at a held version or a version behind, 422 a bad manifest or a type with no Definition |
 | `ListFacetTypes` | Optional projection, cursor | Available types, human descriptions, read/write eligibility, definition versions |
 | `GetFacetDefinition` | Type/version | Identity and time contracts, classification, validation rules, payload schema, examples, series semantics if supported, and the `handling` block verbatim when the type declares one (card 166) |
-| `GetCoverage` | Projection, optional window and pinned position | Observed counts and date ranges by type/source, freshness observations, gaps only where justified |
+| `GetCoverage` | Projection, optional window and pinned position | Observed counts and date ranges by type/source, freshness observations, gaps only where justified. Built 2026-10-21 as `GET /v1/coverage` (card 90), any role: at the head, `?w=` or `?as_of=`, optionally `?projection=`, each type's live count, earliest and latest fact-time, and each source's share, with `w`, `ledger_id` and the canonical hash, so the same W gives the same answer. No window yet |
 
 Definition discovery is important because payloads vary. An agent needs to know that a lab result
 may carry a unit and reference range, or that a medication change needs a course reference. Today's
@@ -280,6 +280,13 @@ Coverage distinguishes `observed_fact_time_range`, `last_successful_capture`, `l
 `checked_at`. A quiet source may be current without recent facts. Completeness is `unknown` unless
 the source declares a coverage contract. The receipt watermark proves a ledger position, not source
 freshness. Discovery itself is scoped: disallowed types and counts must not leak through a catalog.
+
+As built (card 90) the split runs along the route. `GET /v1/coverage` is the record at a W: the
+observed counts and fact-time ranges, a value any later read at that W reproduces. Freshness
+(`last_scan_at`, `last_admission_at`) is `GET /v1/status`'s, daemon state since it started rather
+than a fact at a W. The two stay apart. Scoping is not built: a reader is as wide as the operator on
+reads, so coverage shows every type to every role, as the timeline does (card 89 leaves narrowing a
+reader to projections for later).
 
 ## 5. Reading: one explicit query, one stable evidence set
 

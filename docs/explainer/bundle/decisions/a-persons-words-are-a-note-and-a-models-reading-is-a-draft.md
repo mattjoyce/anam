@@ -4,7 +4,7 @@ title: A person's words are a note, and a model's reading is a draft
 description: "A conversation is an importer; the person's words are saved at once and verbatim as a record.edge under source conversation, which may name no facet yet; a model's reading is a second source whose facts are drafts the person endorses by a new version."
 timestamp: 2026-10-17T00:00:00Z
 resource: docs/API.md#Writing
-anchor: "which may name no facet yet (v3, card 157)"
+anchor: "which may name no facet yet (`note.annotation` v3, card 157)"
 basis: docs
 tier: supporting
 alternatives:
@@ -21,4 +21,4 @@ affects:
 
 **Choice.** The words are a `record.edge` under source `conversation`, written at once. A model may read them into ordinary typed facts under a second source, `interpretation`; each links to the exact note version it came from and carries `standing: draft | endorsed | rejected`. The person endorses or rejects a draft with a new version, and nothing is deleted.
 
-**What is built.** Only the first part: card 157 made `note.annotation` v3 (now `record.edge`) accept a note that names no facet, so the words can land before any facet exists, and a later version of the same note can name them. Card 104 then made `record.note` v2 an edge, renamed `record.edge` by card 191: `from` and `to` as lists of facet ids with a `kind`, `interpreted_from` declared for the reading's link back to the note version, and a facet's read answers the live edges touching it beside its payload. The `interpretation` source, the `standing` field, endorsement and the inspector's review (cards 158 to 161) are cut but not built (see [the interpretation source is decided and not built](/gaps/the-interpretation-source-is-decided-and-not-built.md)).
+**What is built.** Only the first part: card 157 made `note.annotation` v3 accept a note that names no facet, so the words can land before any facet exists, and a later version of the same note can name them. Card 104 then made `record.note` v2 an edge (the type's lineage: `note.annotation` (v1 to v3), then `record.note` (v1, v2), now `record.edge`): `from` and `to` as lists of facet ids with a `kind`, `interpreted_from` declared for the reading's link back to the note version, and a facet's read answers the live edges touching it beside its payload. The `interpretation` source, the `standing` field, endorsement and the inspector's review (cards 158 to 161) are cut but not built (see [the interpretation source is decided and not built](/gaps/the-interpretation-source-is-decided-and-not-built.md)).

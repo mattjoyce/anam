@@ -176,7 +176,7 @@ records a measure, a reading or an event.
 | `place.flight` | 1 | trips | event | One flight leg | `id` | `date` |
 | `place.arrived` | 1 | trips | event | Arriving at one place during a trip | `id` | `date` |
 | `place.returned` | 1 | trips | event | Getting home from a trip | `id` | `date` |
-| `record.edge` | 1 | notes | event | An edge joining facets, with or without words; a note in the person's own words is one (was `record.note`) | `id` | `at` |
+| `record.edge` | 1 | notes | event | An edge joining facets, with or without words; a note in the person's own words is one (was `note.annotation` (v1 to v3), then `record.note` (v1, v2)) | `id` | `at` |
 | `record.document` | 1 | documents |  | A pointer to one file in the documents library; the bytes never enter the ledger | `path` | `date` |
 | `health.heart-rate` | 3 |  |  | A period's heart rate metrics (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
 | `health.sleep` | 3 |  |  | A period's sleep metrics (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |

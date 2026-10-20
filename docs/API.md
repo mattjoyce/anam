@@ -453,7 +453,7 @@ source-file associations. Do not imply every facet already has a ledger-attested
 **Decided since (card 93, 2026-10-15); the records-file route below is overtaken.** A conversation is
 an importer like any other, posting envelopes under its own token (§8 of `docs/IMPORTERS.md`); no
 records file sits between it and the gate. The person's words are saved at once and verbatim as a
-`record.edge` (named `record.note` until card 191) under source `conversation`, which may name no facet yet (v3, card 157). A model's
+`record.edge` (the type's lineage: `note.annotation` (v1 to v3), then `record.note` (v1, v2), now `record.edge`) under source `conversation`, which may name no facet yet (`note.annotation` v3, card 157). A model's
 reading of those words is a second source, `interpretation`, whose facts link back to the exact note
 version and carry `standing: draft | endorsed | rejected`; the person endorses or rejects a draft
 with a new version, and nothing is deleted (cards 158 to 161). The operations and the concurrency

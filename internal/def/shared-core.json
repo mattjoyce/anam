@@ -1,3 +1,14 @@
 {
-  "splits": []
+  "splits": [
+    {
+      "type": "activity.exercise-session",
+      "leaves": [
+        "activity.exercise-session.garmin",
+        "activity.exercise-session.concept2",
+        "activity.exercise-session.technogym",
+        "activity.exercise-session.strong"
+      ],
+      "shared": ["/id", "/activity_name", "/effective_time_frame", "/source"]
+    }
+  ]
 }

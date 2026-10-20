@@ -1,0 +1,36 @@
+{
+  "renames": [
+    {
+      "from": "activity.exercise-session",
+      "to": "activity.exercise-session.garmin",
+      "select": {"pointer": "/id", "prefix": "garmin:session:"}
+    },
+    {
+      "from": "activity.exercise-session",
+      "to": "activity.exercise-session.concept2",
+      "select": {"pointer": "/id", "prefix": "concept2:session:"}
+    },
+    {
+      "from": "activity.exercise-session",
+      "to": "activity.exercise-session.technogym",
+      "select": {"pointer": "/id", "prefix": "technogym:"}
+    },
+    {
+      "from": "activity.exercise-session",
+      "to": "activity.exercise-session.strong",
+      "select": {"pointer": "/id", "prefix": "strong:session:"}
+    },
+    {
+      "from": "activity.day",
+      "to": "activity.day.garmin"
+    },
+    {
+      "from": "health.measurement",
+      "to": "health.measurement.withings"
+    },
+    {
+      "from": "health.cpap-session",
+      "to": "health.cpap-session.dreamstation"
+    }
+  ]
+}

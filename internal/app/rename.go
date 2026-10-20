@@ -47,9 +47,11 @@ live facet of a type split this way must match exactly one rename.
 The dry run is the report: per rename, how many facets would be carried, how
 many already were, and how many the gate would refuse, with the reasons, and
 every facet of a split type that matches no rename or more than one. Either
-stops the run before anything is written. The two types must
-key and place facets the same way, or the ids would not meet; the run checks
-that against the stored Definitions before it asks the gate anything.
+stops the run before anything is written. The two types must compose ids from
+the same identity key, or the ids would not meet; the run checks that against
+the stored Definitions before it asks the gate anything. A type arrived at may
+place facets by another fact-time rule: the report names each such rename and
+how many facets the rule moves in fact time.
 
 Stop the daemon first. The run opens the ledger itself, like a retraction.`,
 		Args: cobra.NoArgs,
@@ -105,12 +107,14 @@ const (
 
 // renameItem is one live facet of a type left, the renames that match it, and its
 // fate. A facet is placed when exactly one rename matches; only then is the gate
-// asked about it, and row is that rename's index in the table.
+// asked about it, and row is that rename's index in the table. moved is whether the
+// fact-time rule of the type it arrives at gives it another fact time (card 195).
 type renameItem struct {
 	rows   []int
 	facet  facet.Facet
 	fate   renameFate
 	reason string
+	moved  bool
 }
 
 // row is the index of the one rename that carries the item; placed items only.
@@ -119,9 +123,10 @@ func (it renameItem) row() int { return it.rows[0] }
 // renamePlan is the dry run as a value: every live facet the table reaches, with
 // what the gate would do to it, against the Definitions in force.
 type renamePlan struct {
-	table renameTable
-	defs  *def.Registry
-	items []renameItem
+	table    renameTable
+	defs     *def.Registry
+	replaced map[int]def.TimeField // the fact-time rule each re-placing rename leaves, by row
+	items    []renameItem
 }
 
 func (p renamePlan) count(f renameFate) int {
@@ -138,7 +143,7 @@ func (p renamePlan) count(f renameFate) int {
 // left on the one rename that matches it, and asks the gate what it would do with
 // each facet placed. It writes nothing.
 func planRename(ctx context.Context, cfg config.Config, tbl renameTable) (renamePlan, error) {
-	defs, err := checkRenameKeying(ctx, cfg, tbl)
+	defs, replaced, err := checkRenameKeying(ctx, cfg, tbl)
 	if err != nil {
 		return renamePlan{}, err
 	}
@@ -152,7 +157,7 @@ func planRename(ctx context.Context, cfg config.Config, tbl renameTable) (rename
 	}
 	defer func() { _ = l.Close() }()
 
-	plan := renamePlan{table: tbl, defs: defs, items: placeAll(tbl, facets)}
+	plan := renamePlan{table: tbl, defs: defs, replaced: replaced, items: placeAll(tbl, facets)}
 	g := gate.New(l, defs, renameScopes(tbl, plan.items), clock.Real{}, cfg.PersonID, renameLimits(cfg))
 	for i, it := range plan.items {
 		if it.fate == renameUnplaced {
@@ -162,8 +167,27 @@ func planRename(ctx context.Context, cfg config.Config, tbl renameTable) (rename
 		res, err := g.Rehearse(fctx, renameOf(it.facet, tbl.Renames[it.row()].To))
 		cancel()
 		plan.items[i].fate, plan.items[i].reason = fateOf(res, err)
+		if _, ok := replaced[it.row()]; ok && plan.items[i].fate == renameCarry {
+			plan.items[i].moved = movesInFactTime(defs, tbl.Renames[it.row()].To, it.facet)
+		}
 	}
 	return plan, nil
+}
+
+// movesInFactTime reports whether the type a facet arrives at reads another fact time
+// from its payload than the facet holds. The gate has just taken the payload, so the
+// rule reads; a payload it would not read is no move.
+func movesInFactTime(defs *def.Registry, to facet.Type, f facet.Facet) bool {
+	d, ok := defs.Lookup(to)
+	if !ok {
+		return false
+	}
+	doc, err := def.Decode(f.Payload.Bytes())
+	if err != nil {
+		return false // the gate decoded it a moment ago; a payload that does not decode moves nowhere
+	}
+	at, err := d.FactTimeOf(doc)
+	return err == nil && !at.Equal(f.FactTime)
 }
 
 // placeAll matches every facet against the table. A facet that matches no rename,

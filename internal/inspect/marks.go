@@ -100,8 +100,10 @@ var typeStyles = map[facet.Type]typeStyle{
 	"health.blood-pressure":   {"vitals", shapeSquare, kindReading},
 	"health.heart-rate-alert": {"vitals", shapeAlert, kindEvent},
 
-	"health.weight":      {"body", shapeSquare, kindReading},
-	"health.measurement": {"body", shapeDiamond, kindReading},
+	"health.weight": {"body", shapeSquare, kindReading},
+	// A Withings row, named for its vendor since card 195. A read as-of before the run
+	// draws health.measurement by its Definition's kind and family alone.
+	"health.measurement.withings": {"body", shapeDiamond, kindReading},
 
 	"activity.gym-visit": {"exercise", shapeSquare, kindEvent},
 

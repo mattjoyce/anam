@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/consent"
+	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/projection"
@@ -109,6 +110,8 @@ func TestParse_RejectsBadValuesAtLoad(t *testing.T) {
 
 	cases := map[string]string{
 		"unknown key":         `{"name":"x","version":1,"types":[],"statuses":[],"max_classification":"Normal","tombstones":true}`,
+		"bare domain prefix":  template("x", []string{"health."}, []string{"admitted"}, "Normal", "", ""),
+		"double dot prefix":   template("x", []string{"health.sleep.."}, []string{"admitted"}, "Normal", "", ""),
 		"unnamespaced type":   template("x", []string{"bloodpressure"}, []string{"admitted"}, "Normal", "", ""),
 		"unknown status":      template("x", []string{"health.sleep"}, []string{"published"}, "Normal", "", ""),
 		"unknown class":       template("x", []string{"health.sleep"}, []string{"admitted"}, "Secret", "", ""),
@@ -433,5 +436,72 @@ func TestApply_RequiresAGate(t *testing.T) {
 	tmpl := mustParse(t, template("t", []string{"health.sleep"}, []string{"admitted"}, "Normal", "", ""))
 	if _, err := projection.Apply(canonical(t), tmpl, nil, nil); err == nil {
 		t.Error("Apply with no consent gate was accepted")
+	}
+}
+
+// A `types` entry that ends in "." admits every type under it, at a segment boundary
+// only (card 193): the two leaves are served and the hyphenated sibling is refused.
+func TestApply_TypePrefixServesLeavesAndStopsAtTheBoundary(t *testing.T) {
+	t.Parallel()
+
+	v, err := fold.NewValue([]fold.Entry{
+		entry("f-garmin", "activity.exercise-session.garmin", "2026-01-24T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
+		entry("f-concept2", "activity.exercise-session.concept2", "2026-01-25T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
+		entry("f-sibling", "activity.exercise-session-note", "2026-01-26T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
+		entry("f-concept", "activity.exercise-session", "2026-01-27T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
+	})
+	if err != nil {
+		t.Fatalf("fold.NewValue: %v", err)
+	}
+	tmpl := mustParse(t, template("exercise", []string{"activity.exercise-session."}, []string{"admitted"}, "Normal", "", ""))
+	served, err := projection.Apply(v, tmpl, consent.Open{}, nil)
+	if err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if got, want := ids(served), []string{"f-garmin", "f-concept2"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("served %v, want %v", got, want)
+	}
+}
+
+// Covers resolves a template against the Definitions held: exact entries stay, a
+// prefix brings in the types under it, and the hyphenated sibling stays out.
+func TestCovers_ResolvesPrefixesAgainstDefinitions(t *testing.T) {
+	t.Parallel()
+
+	defs := []def.Definition{
+		{Type: "activity.exercise-session.garmin"},
+		{Type: "activity.exercise-session.concept2"},
+		{Type: "activity.exercise-session-note"},
+		{Type: "health.sleep"},
+	}
+	tests := []struct {
+		name  string
+		types []string
+		want  []facet.Type
+	}{
+		{"prefix", []string{"activity.exercise-session."},
+			[]facet.Type{"activity.exercise-session.concept2", "activity.exercise-session.garmin"}},
+		{"exact and prefix, no duplicate", []string{"activity.exercise-session.garmin", "activity.exercise-session.", "health.sleep"},
+			[]facet.Type{"activity.exercise-session.concept2", "activity.exercise-session.garmin", "health.sleep"}},
+		{"exact entry with no definition is kept", []string{"health.weight"}, []facet.Type{"health.weight"}},
+		{"prefix over nothing", []string{"money.spend."}, []facet.Type{}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			tmpl := mustParse(t, template("x", tc.types, []string{"admitted"}, "Normal", "", ""))
+			if got := tmpl.Covers(defs); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("Covers = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPatterns_KeepsPrefixesAsWritten(t *testing.T) {
+	t.Parallel()
+
+	tmpl := mustParse(t, template("x", []string{"activity.exercise-session.", "health.sleep"}, []string{"admitted"}, "Normal", "", ""))
+	if got, want := tmpl.Patterns(), []string{"health.sleep", "activity.exercise-session."}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Patterns = %v, want %v", got, want)
 	}
 }

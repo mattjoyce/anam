@@ -109,3 +109,13 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 - Code: `record.note` is renamed `record.edge`, the edge with commentary card 104 made it. `record.edge` v1 is `record.note` v2 under the new name, which joins its v1 in `manifests/history`; `renames/record-edge.json` is the table `anam rename` runs; the edge rules, `catchup.EdgeType`, the inspector's note draft and `recent-life` v3 name the new type.
 - Bundle: the edge index row, decision and gap pages say `record.edge`; the Definition manifest page counts 46 in history.
 - Bundle: every page that tells the type's history gives its lineage in one clause, `note.annotation` (v1 to v3), then `record.note` (v1, v2), now `record.edge`; the def component page now says it was `note.annotation` v2 that card 157 found bumped without its v1.
+
+## 2026-10-21, card 192
+
+- Code: none. A type is `domain.concept[.specialisation…]`: a third or later segment is allowed for a specialisation, and the old "two segments" sentence from card 147 is dropped, since nobody reasoned it and `facet.typePattern` never enforced it. The closed set of eight domains stands.
+- Bundle: the decision "a distinction goes in the cheapest place that lets its reader ask cleanly" is new, with the table of six places and their cost to change; the Definition manifest page says the shape and points to it. AGENTS.md, ARCHITECTURE, GLOSSARY and README say the same.
+
+## 2026-10-21, card 193
+
+- Code: a projection template's `types` entry, and the timeline's `type` parameter, may be a prefix ending in `.`; `facet.Matches` is the one predicate for the projection, the timeline and a receipt's replay.
+- Bundle: the projection component and the projection template page say so.

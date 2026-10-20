@@ -372,11 +372,11 @@ func listProjections(cmd *cobra.Command, templates *projection.Registry) error {
 
 func joinTypes(t projection.Template) string {
 	out := ""
-	for i, ft := range t.Types {
+	for i, ft := range t.Patterns() {
 		if i > 0 {
 			out += ","
 		}
-		out += string(ft)
+		out += ft
 	}
 	if out == "" {
 		return "(none)"

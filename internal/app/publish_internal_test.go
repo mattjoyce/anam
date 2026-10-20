@@ -26,6 +26,7 @@ func TestPublish_SameOverTheDaemonAndVerifies(t *testing.T) {
 		{"--from", "2026-02-10"},
 		{"--at", "2026-02-10"},
 		{"--type", "health.blood-pressure", "--to", "2026-02-10"},
+		{"--type", "health.blood-pressure."},
 		{},
 	} {
 		read := append([]string{"timeline", "--projection", "bp"}, narrowing...)
@@ -70,6 +71,8 @@ func TestPublish_RefusalsAreTheSameOverTheDaemon(t *testing.T) {
 		{"timeline", "--publish", "--projection", "bp", "--explain"},
 		{"timeline", "--w", "1", "--as-of", "2026-01-01"},
 		{"timeline", "--w", "999"},
+		{"timeline", "--type", "health."},
+		{"timeline", "--projection", "bp", "--publish", "--type", "health.blood-pressure.."},
 	} {
 		_, _, localErr := cli(t, f.cfgPath, args...)
 		_, _, remoteErr := cli(t, f.remoteCfg, args...)

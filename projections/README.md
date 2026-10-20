@@ -19,6 +19,14 @@ before card 191; they stay for the receipts that name them. A registered version
 is a new version in a new file (`<name>.v<n>.json`), and every version ever registered
 stays readable, because a receipt names the version that served it.
 
-Every type a template names must have a Definition in force on the daemon when it is
+A `types` entry is a type or a type prefix (card 193). An entry ending in `.`, such as
+`activity.exercise-session.`, admits every type under it, so a leaf added later is served without a new
+version of the template. A prefix matches at a segment boundary only: `health.heart-rate.` admits
+`health.heart-rate.day` and not `health.heart-rate-variability`, nor `health.heart-rate` itself. A prefix
+needs at least a domain and a concept (`health.` alone is refused). A receipt over a prefix still
+verifies after a new leaf is registered, since verify re-derives at the receipt's own W and a type
+created later has no facets at that W.
+
+Every exact type a template names must have a Definition in force on the daemon when it is
 registered. `heart`, `sleep` v3 and `recent-life` v3 name types the Garmin, OwnTracks and stays importers
 register, so they register against the live daemon and not against a bare one.

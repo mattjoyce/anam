@@ -112,10 +112,14 @@ func (m manifest) requireEveryKnob() error {
 // the domain does not know.
 func (t *Template) adoptFilters(types, statuses []string) error {
 	for _, s := range types {
-		ft := facet.Type(s)
-		if !ft.Valid() {
-			return fmt.Errorf("%w: %s: %q is not a valid namespaced facet type", ErrBadTemplate, t.Name, s)
+		if !facet.ValidPattern(s) {
+			return fmt.Errorf("%w: %s: %q is not a valid namespaced facet type or type prefix", ErrBadTemplate, t.Name, s)
 		}
+		if facet.IsPrefixPattern(s) {
+			t.Prefixes = append(t.Prefixes, s)
+			continue
+		}
+		ft := facet.Type(s)
 		t.Types = append(t.Types, ft)
 		t.typeSet[ft] = true
 	}

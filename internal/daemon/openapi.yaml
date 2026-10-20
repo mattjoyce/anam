@@ -1107,7 +1107,11 @@ components:
       name: type
       in: query
       schema: { type: string, example: health.blood-pressure }
-      description: keep one facet type
+      description: >-
+        keep one facet type, or every type under a prefix that ends in a dot
+        (activity.exercise-session.). A prefix matches at a segment boundary only,
+        so health.heart-rate. does not match health.heart-rate-variability. A
+        malformed value is a 400.
     Projection:
       name: projection
       in: query

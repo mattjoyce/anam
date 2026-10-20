@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/mattjoyce/anam/internal/facet"
 )
 
 // ErrMalformed is returned by Parse for bytes that are not a whole receipt.
@@ -121,7 +123,8 @@ func (q Query) IsZero() bool {
 }
 
 // Admits reports whether a facet at factTime of type typ passes q's window [From,
-// Before) and type. It is the one narrowing predicate: the timeline read, its
+// Before) and type. q.Type is a type pattern: one exact type, or a prefix ending in
+// "." (facet.Matches, card 193). It is the one narrowing predicate: the timeline read, its
 // explain, a publish and a verify all narrow through it (card 92), so what a reader
 // sees and what a receipt certifies cannot drift apart. The snapshot at At is not
 // part of it; that is fold.Snapshot's, taken before. A nil q admits everything.
@@ -130,7 +133,7 @@ func (q *Query) Admits(factTime, typ string) bool {
 		return true
 	}
 	return (q.From == "" || factTime >= q.From) && (q.Before == "" || factTime < q.Before) &&
-		(q.Type == "" || typ == q.Type)
+		(q.Type == "" || facet.Matches(facet.Type(typ), q.Type))
 }
 
 // checkFields refuses a field that is not a JSON pointer: a receipt naming one

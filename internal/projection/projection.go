@@ -31,8 +31,10 @@ package projection
 import (
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/mattjoyce/anam/internal/consent"
+	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 )
@@ -79,8 +81,14 @@ type Template struct {
 	Version     int
 	Description string
 
-	// Types is the facet-type allow-list.
+	// Types is the facet-type allow-list: the exact types the manifest names.
 	Types []facet.Type
+
+	// Prefixes are the manifest's `types` entries that end in ".", each admitting every
+	// type under it at a segment boundary (card 193). A type created later is served
+	// without a new version of the template. Types and Prefixes together are the
+	// allow-list; Covers resolves it against the Definitions held.
+	Prefixes []string
 
 	// Statuses is the endorsement-status filter. Only live statuses can appear in a
 	// canonical, so in practice this chooses between "admitted facts" and "facts a
@@ -154,6 +162,53 @@ const (
 // Served reports whether this verdict includes the entry.
 func (r Reason) Served() bool { return r == ReasonServed }
 
+// admitsType reports whether typ is on the allow-list: named exactly, or under a prefix.
+func (t Template) admitsType(typ facet.Type) bool {
+	if t.typeSet[typ] {
+		return true
+	}
+	for _, p := range t.Prefixes {
+		if facet.Matches(typ, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// Covers returns the types the template serves among the Definitions held: every
+// exact entry, and every Definition type under a prefix. Exact entries are returned
+// whether or not a Definition holds them, as before. The result is sorted and free of
+// duplicates. Nothing but a Definition can bring a type into being, so this is the set
+// a reader can be served.
+func (t Template) Covers(defs []def.Definition) []facet.Type {
+	seen := make(map[facet.Type]bool, len(t.Types))
+	out := make([]facet.Type, 0, len(t.Types))
+	for _, ft := range t.Types {
+		if !seen[ft] {
+			seen[ft] = true
+			out = append(out, ft)
+		}
+	}
+	for _, d := range defs {
+		if !seen[d.Type] && t.admitsType(d.Type) {
+			seen[d.Type] = true
+			out = append(out, d.Type)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
+}
+
+// Patterns returns the `types` entries as the manifest wrote them, exact types then
+// prefixes, for display: a prefix is shown as a prefix, not expanded.
+func (t Template) Patterns() []string {
+	out := make([]string, 0, len(t.Types)+len(t.Prefixes))
+	for _, ft := range t.Types {
+		out = append(out, string(ft))
+	}
+	return append(out, t.Prefixes...)
+}
+
 // verdict applies the template's four filters to one entry and says which, if any,
 // excluded it. It reads only governing metadata; Entry.Payload is never consulted (§9).
 //
@@ -162,7 +217,7 @@ func (r Reason) Served() bool { return r == ReasonServed }
 // keeps the answer stable rather than dependent on evaluation order.
 func (t Template) verdict(e fold.Entry) Reason {
 	switch {
-	case !t.typeSet[e.Type]:
+	case !t.admitsType(e.Type):
 		return ReasonType
 	case !t.statusSet[e.Status]:
 		return ReasonStatus

@@ -142,7 +142,7 @@ Adding a type is a Definition file, not code.
 
 ### Bundled with Anam
 
-Every type is named `domain.concept`, and the first word is one of eight: `health`, `activity`, `place`
+Every type is named `domain.concept[.specialisation…]`, and the first word is one of eight: `health`, `activity`, `place`
 and `record` today, with `social`, `money`, `media` and `work` held for later. A new kind of fact joins
 one of them and never adds a ninth. `family` groups types within a domain, and `kind` says whether a type
 records a measure, a reading or an event.

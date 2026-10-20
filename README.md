@@ -100,6 +100,14 @@ of the files. Unset it for those two commands.
 
 ## How it fits together
 
+![How Anam fits together: a source and its importer post envelopes to the daemon's API in; the admission gate checks each against its Definition and appends it to the ledger; replay feeds the derived tables and the fold; a projection applies a template and goes out to the readers, the CLI, MCP for Claude, curl and the inspector and Workbench, whose own writes come back in the way the importers do](docs/assets/anam-overview.svg)
+
+*The gate and the ledger are the error kernel. Green is rebuilt by replaying the ledger, and
+blue is Anam's own record, kept in the backup. The source is
+[`anam-overview.excalidraw`](docs/assets/anam-overview.excalidraw), editable in Excalidraw.*
+
+The same, as text:
+
 ```text
 importers (envelopes, one token per source) → admission gate → append-only ledger (SQLite)
                                                                         │ replay

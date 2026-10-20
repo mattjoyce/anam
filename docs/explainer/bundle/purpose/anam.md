@@ -16,6 +16,8 @@ Anam (Irish for *soul*) is that place for exactly one person. It reads their sou
 
 The repo is the Go service and CLI that own the record. Its sources now arrive through a second repo, `anam-importers`: Python ductile plugins that each know one vendor and submit [envelopes](/terms/envelope.md) over HTTP. This explainer covers both, because the contract between them is where most of the design shows.
 
+The whole of it is drawn in [one diagram](https://github.com/mattjoyce/anam/blob/master/docs/assets/anam-overview.svg): sources and importers on the left, the daemon and the files it alone opens in the middle, the readers on the right. Its Excalidraw source, `docs/assets/anam-overview.excalidraw`, sits beside it.
+
 ## Who it is for
 
 Matt, as the one person recorded, as the operator who runs the daemon on unraid, and as the author of each importer. Agents acting for him are the second consumer: they read projections, with a `reader` token since card 89, and may one day propose findings back through the same gate. There is no second person, so there is no identity graph and no merge.

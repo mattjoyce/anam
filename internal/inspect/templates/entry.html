@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>anam: {{if .Edit}}correct{{else}}enter{{end}} {{.Type}}</title>
+{{template "style.html"}}
+</head>
+<body>
+<header>
+  <h1>{{if .Edit}}correct{{else}}enter{{end}} <span class="mono">{{.Type}}</span></h1>
+  {{template "nav.html"}}
+</header>
+
+<p class="meta">
+  {{if .Description}}{{.Description}}<br>{{end}}
+  Drawn from <a href="{{.DefinitionURL}}">definition v{{.Version}}</a>; the gate checks what you save against it again.
+</p>
+
+{{if .NotDrawn}}
+<p class="message" role="alert">{{.NotDrawn}}</p>
+{{else}}
+{{if .Message}}<p class="message" role="alert"><strong>Not saved.</strong> {{.Message}}{{if .Notice}}<br>{{.Notice}}{{end}}</p>{{end}}
+{{if .Edit}}<p class="meta">Correcting <a class="mono" href="/facet?id={{.Edit}}">{{.Edit}}</a>. Saving writes a new version of this facet. The fields that decide which facet it is are locked, because changing one would make a different fact; to change one, retract this entry and enter a new one.</p>{{end}}
+{{if .Guidance}}<details class="guidance" open><summary>what the Definition says about this type</summary><p>{{.Guidance}}</p></details>{{end}}
+
+<form method="post" action="/entry" class="entry">
+  <input type="hidden" name="type" value="{{.Type}}">
+  <input type="hidden" name="v" value="{{.Version}}">
+  {{if .Edit}}<input type="hidden" name="edit" value="{{.Edit}}">{{end}}
+  {{range .Fields}}
+  <div class="field{{if .Problem}} bad{{end}}">
+    <label for="f.{{.Name}}">{{.Name}}{{if .Required}} <span class="role">required</span>{{end}}{{if .Locked}} <span class="role">identity, locked</span>{{end}}</label>
+    {{if and (eq .Input "select") (not .Locked)}}
+    <select id="f.{{.Name}}" name="f.{{.Name}}"{{if .Required}} required{{end}}>
+      {{$value := .Value}}{{range .Options}}<option value="{{.Text}}"{{if and .Text (eq .Text $value)}} selected{{end}}>{{.Text}}</option>{{end}}
+    </select>
+    {{else}}
+    <input id="f.{{.Name}}" name="f.{{.Name}}" type="{{if eq .Input "select"}}text{{else}}{{.Input}}{{end}}"{{if .Step}} step="{{.Step}}"{{end}} value="{{.Value}}"{{if .Placeholder}} placeholder="{{.Placeholder}}"{{end}}{{if .Required}} required{{end}}{{if .Locked}} readonly{{end}}>
+    {{end}}
+    {{if .Problem}}<span class="problem">{{.Problem}}</span>{{end}}
+    <span class="hint">{{.Description}}{{range .Hints}} <span class="dim">({{.}})</span>{{end}}</span>
+  </div>
+  {{end}}
+  {{if .IDRule}}<p class="hint">Anam builds the id from the Definition's own rule, <span class="mono">{{.IDRule}}</span>, so there is no id field.</p>{{end}}
+  <p><button type="submit">{{if .Edit}}Save a new version{{else}}Save{{end}}</button></p>
+</form>
+{{end}}
+</body>
+</html>

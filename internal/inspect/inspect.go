@@ -1,6 +1,7 @@
-// Package inspect serves a read-only web view over the ledger — the diagnostic
-// harness for looking at what Anam holds (MVP.md §3: a harness for proving the model,
-// not a shipped UI).
+// Package inspect serves the web view over the ledger, the Anam Workbench: pages that
+// read what Anam holds (MVP.md §3), and, when the daemon hands it a Workbench, forms
+// that enter, correct and retract a fact by hand through the gate (card 188). The
+// read pages never write; the entry routes are their own handlers (workbench.go).
 //
 // Since R4 the fold exists, so the inspector renders both of Anam's surfaces under
 // their own names (§7): the landing page is the capture→compose picture — the
@@ -75,6 +76,10 @@ type Server struct {
 	// the projection page; nil means the bundled ones.
 	projections func() *projection.Registry
 
+	// bench is the Workbench the daemon supplies for entering facets by hand; nil means
+	// the inspector only reads, and the entry routes do not exist (card 188).
+	bench Workbench
+
 	// The fold cache, keyed by watermark: a whole-person read is one replay plus
 	// one fetch per live facet, too dear to repeat per page view. Every request
 	// still reads the head (one cheap call), so a moved W is never served stale —
@@ -111,6 +116,9 @@ type Deps struct {
 	Held        HeldDefinitions
 	Checkpoints Checkpoints
 	Projections func() *projection.Registry
+	// Workbench lets the pages enter, correct and retract facets by hand, through the
+	// daemon's write; nil leaves the inspector read-only (a standalone `anam inspect`).
+	Workbench Workbench
 	// CachedReads is how many historical folds the inspector keeps
 	// (inspect_cached_reads); zero keeps none.
 	CachedReads int
@@ -121,7 +129,7 @@ func Handler(d Deps) http.Handler {
 	s := &Server{
 		ledger: d.Ledger, timeout: d.Timeout, buckets: d.Buckets, library: d.Library,
 		defs: d.Definitions, heldDefs: d.Held, checkpoints: d.Checkpoints, projections: d.Projections,
-		cachedReads: d.CachedReads,
+		cachedReads: d.CachedReads, bench: d.Workbench,
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.timeline)
@@ -134,6 +142,11 @@ func Handler(d Deps) http.Handler {
 	mux.HandleFunc("GET /document", s.document)
 	mux.HandleFunc("GET /definitions", s.definitionsIndex)
 	mux.HandleFunc("GET /definition", s.definitionPage)
+	if s.bench != nil {
+		mux.HandleFunc("GET /entry", s.entryPage)
+		mux.HandleFunc("POST /entry", s.entrySubmit)
+		mux.HandleFunc("POST /retract", s.retractSubmit)
+	}
 	return mux
 }
 

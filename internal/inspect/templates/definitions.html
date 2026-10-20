@@ -16,9 +16,9 @@ Every version Anam holds is listed; a facet links to the one it was admitted und
 
 <div class="scroll">
 <table>
-  <thead><tr><th>type</th><th>current</th><th>versions held</th><th>origin</th><th>class</th><th>kind</th><th>family</th><th>described</th></tr></thead>
+  <thead><tr><th>type</th><th>current</th><th>versions held</th><th>origin</th><th>class</th><th>kind</th><th>family</th><th>described</th><th>enter by hand</th></tr></thead>
   <tbody>
-    {{range .Definitions}}{{$t := .Type}}
+    {{range .Definitions}}{{$t := .Type}}{{$bench := $.Bench}}
     <tr>
       <td><a class="mono" href="/definition?type={{.Type}}">{{.Type}}</a></td>
       <td>v{{.Current}}</td>
@@ -28,6 +28,7 @@ Every version Anam holds is listed; a facet links to the one it was admitted und
       <td{{if not .Kind}} class="dim"{{end}}>{{if .Kind}}{{.Kind}}{{else}}undeclared{{end}}</td>
       <td{{if not .Family}} class="dim"{{end}}>{{if .Family}}{{.Family}}{{else}}undeclared{{end}}</td>
       <td{{if lt .Described .Fields}} class="dim"{{end}}>{{.Described}} of {{.Fields}}</td>
+      <td>{{if .Enterable}}<a href="/entry?type={{$t}}">Enter</a>{{else}}<span class="dim" title="{{if $bench}}Not on the Workbench's list: only the types the importers file names for the workbench principal can be entered by hand.{{else}}This inspector runs apart from the daemon, so it has no Workbench.{{end}}">not enterable</span>{{end}}</td>
     </tr>
     {{end}}
   </tbody>

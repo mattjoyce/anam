@@ -8,6 +8,19 @@ decisions is in `journal/`.
 
 ## 2026-10-20
 
+- The inspector can enter, correct and retract a fact by hand (card 188, slice 4). When the importers
+  file declares a `workbench` principal, the Definitions page shows an Enter link on each type in its
+  `types` and none on the rest, and `/entry?type=<type>` draws a form from that type's Definition at
+  request time: one control per schema property (an `enum` a select, the fact-time field a date and
+  time read in the Definition's zone and written in its layout), `description`, `examples` and
+  `handling.guidance` as help, and the Definition version it was drawn from sent back so a changed
+  Definition is refused. The id is not a field: the gate composes it. A save shows the gate's
+  answer (admitted, superseded, no-op, or its refusal words beside what was typed); a type whose
+  schema needs a nested object or a list, blood pressure's, gets a plain message and no form. On a
+  facet the workbench entered, Edit reopens the form filled, with the fields that decide which facet
+  it is locked, and Retract tombstones it after a confirm; a facet of any other source has neither
+  button. Nothing new to configure: the pages ask the daemon for the workbench's types. A standalone
+  `anam inspect` has no Workbench and no entry routes.
 - The operator can enter a fact by hand through `POST /v1/entry` (card 188, slice 2). The importers
   file may declare a `workbench` principal (`source: workbench`, `types: [...]`, no token; a
   `token_sha256` or `any_type` on it is refused at start), and the daemon admits the operator's entry

@@ -57,6 +57,11 @@ type facetData struct {
 	Versions []int
 	Latest   int
 	Prior    int
+
+	// CanEdit and CanRetract are set on the newest version of a live facet that the
+	// Workbench entered, and on no other (card 188).
+	CanEdit    bool
+	CanRetract bool
 }
 
 // facetAt resolves the version the page shows: the newest, or the one ?v= names,
@@ -159,7 +164,10 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, rowsNote := s.payloadRows(ctx, f)
+	canEdit, canRetract := s.workbenchActions(f, latest.ArtifactVersion, status)
 	render(w, "facet.html", facetData{
+		CanEdit:           canEdit,
+		CanRetract:        canRetract,
 		DefinitionURL:     defURL,
 		CurrentDefinition: currentDef,
 		Rows:              rows,

@@ -15,7 +15,7 @@
   {{if .Description}}{{.Description}}<br>{{end}}
   versions held: {{$cur := .Current}}{{$t := .Def.Type}}{{$v := .Def.Version}}{{range $i, $n := .Versions}}{{if $i}} · {{end}}{{if eq $n $v}}<strong>v{{$n}}</strong>{{else}}<a href="/definition?type={{$t}}&v={{$n}}">v{{$n}}</a>{{end}}{{if eq $n $cur}} <span class="dim">(current)</span>{{end}}{{end}}
   {{if lt .Def.Version .Current}}<br><strong>v{{.Current}} is current.</strong> This is an earlier version, as it was in force for the facets admitted under it.{{end}}
-  <br><a href="{{.TimelineURL}}">this type's facts on the timeline</a>
+  <br><a href="{{.TimelineURL}}">this type's facts on the timeline</a>{{if .EnterURL}} · <a href="{{.EnterURL}}">Enter one by hand</a>{{end}}
 </p>
 
 {{if .ParseError}}<p><strong>This build cannot parse this version:</strong> <span class="mono">{{.ParseError}}</span>. The body below is as it was held.</p>{{end}}

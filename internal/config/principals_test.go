@@ -96,7 +96,7 @@ principals:
     role: importer
     source: conversation
     token_sha256: ` + hashB + `
-    types: [record.note]
+    types: [record.edge]
 importers:
   - source: withings
     token_sha256: ` + hashA + `
@@ -129,11 +129,11 @@ importers:
 		{"no role", strings.Replace(valid, "role: reader", "role: ''", 1)},
 		{"an unknown role", strings.Replace(valid, "role: reader", "role: admin", 1)},
 		{"a reader with a source", strings.Replace(valid, "role: reader", "role: reader\n    source: chat", 1)},
-		{"a reader with types", strings.Replace(valid, "role: reader", "role: reader\n    types: [record.note]", 1)},
+		{"a reader with types", strings.Replace(valid, "role: reader", "role: reader\n    types: [record.edge]", 1)},
 		{"an importer with no source", strings.Replace(valid, "source: conversation", "source: ''", 1)},
 		{"a reader sharing an importer's token", strings.Replace(valid, hashC, hashA, 1)},
 		{"a name an importer takes by its source", strings.Replace(valid, "name: assistant", "name: withings", 1)},
-		{"any_type beside types", strings.Replace(valid, "types: [record.note]", "types: [record.note]\n    any_type: true", 1)},
+		{"any_type beside types", strings.Replace(valid, "types: [record.edge]", "types: [record.edge]\n    any_type: true", 1)},
 		{"a reader with any_type", strings.Replace(valid, "role: reader", "role: reader\n    any_type: true", 1)},
 	}
 	for _, c := range cases {
@@ -150,7 +150,7 @@ importers:
 	// another importer owns are not its concern.
 	t.Run("an importer with any_type", func(t *testing.T) {
 		t.Parallel()
-		body := strings.Replace(valid, "types: [record.note]", "any_type: true", 1)
+		body := strings.Replace(valid, "types: [record.edge]", "any_type: true", 1)
 		got, err := config.LoadPrincipals(writeImporters(t, body), nil)
 		if err != nil {
 			t.Fatal(err)

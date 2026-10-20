@@ -6,6 +6,15 @@ of the API must do or may expect, newest first, by the day they merged. Each nam
 kanban board, which holds the reasoning. The full history is `git log`; the story behind the
 decisions is in `journal/`.
 
+## 2026-10-21
+
+- `record.note` is now `record.edge` (card 191): since card 104 the type joins facets, and a note is
+  an edge of kind `about`. `record.edge` v1 is `record.note` v2 under the new name, and the old name's
+  versions stay in the Definition history, so every facet admitted as `record.note` still reads.
+  The operator runs `anam rename --table renames/record-edge.json` (dry, then `--yes`, the daemon
+  stopped) to carry the live notes, and registers `projections/recent-life.v3.json`. A writer sends
+  `record.edge` and `to`; `about` stays accepted as the old name of `to`.
+
 ## 2026-10-20
 
 - The inspector can enter, correct and retract a fact by hand (card 188, slice 4). When the importers

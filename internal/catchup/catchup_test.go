@@ -82,7 +82,7 @@ func newHarness(t *testing.T) (*gate.Gate, *ledger.Ledger, *ops.DB) {
 	return gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}), l, db
 }
 
-// noteHarness is newHarness with the bundled record.note beside the readings, and a
+// noteHarness is newHarness with the bundled record.edge beside the readings, and a
 // records source allowed to write it, so a test can assert an edge about a reading.
 func noteHarness(t *testing.T) (*gate.Gate, *ledger.Ledger, *ops.DB) {
 	t.Helper()

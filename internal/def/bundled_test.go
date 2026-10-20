@@ -293,11 +293,11 @@ func TestBundled_NoteAnnotationIsThePersonsWords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, ok := reg.Lookup("record.note")
+	d, ok := reg.Lookup("record.edge")
 	if !ok {
-		t.Fatal("no bundled record.note")
+		t.Fatal("no bundled record.edge")
 	}
-	if d.Version != 2 || d.FactTime.Pointer != "/at" || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" {
+	if d.Version != 1 || d.FactTime.Pointer != "/at" || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" {
 		t.Fatalf("v%d fact time %s identity %v", d.Version, d.FactTime.Pointer, d.IdentityKey)
 	}
 	decode := func(s string) map[string]any {

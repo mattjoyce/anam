@@ -158,12 +158,12 @@ func advance(ctx context.Context, l Ledger, o Ops, events []facet.AnamEvent, buc
 	return rows, edges, nil
 }
 
-// EdgeType is the facet type whose payload joins facets (card 104): record.note, the
-// note that is an edge. Its Definition declares `from` and `to` as lists of facet ids,
-// `about` as the v1 name of `to`, and `kind` with "about" the meaning when absent;
-// the edge index is derived from those fields and nothing else. A test holds the
-// bundled Definition to declaring them.
-const EdgeType facet.Type = "record.note"
+// EdgeType is the facet type whose payload joins facets (card 104): record.edge, the
+// note that became an edge, named record.note until card 191. Its Definition declares
+// `from` and `to` as lists of facet ids, `about` as record.note v1's name of `to`, and
+// `kind` with "about" the meaning when absent; the edge index is derived from those
+// fields and nothing else. A test holds the bundled Definition to declaring them.
+const EdgeType facet.Type = "record.edge"
 
 // edgeEnds reads the ends an edge facet's payload names, one row per facet id per
 // side. A payload that does not decode, or whose ends are not lists of strings, is

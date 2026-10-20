@@ -125,7 +125,7 @@ func TestApplyReplay_ReplacesAnEdgesEnds(t *testing.T) {
 
 	note := func(v int, status facet.Status) ops.FacetRow {
 		r := facetRow("n", v, status)
-		r.Type = "record.note"
+		r.Type = "record.edge"
 		r.FactTime = "2026-07-06T06:30:00.000000000Z"
 		return r
 	}

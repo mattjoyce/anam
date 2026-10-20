@@ -154,7 +154,7 @@ semantics, linking elements, validation bar, classification. Bundled as embedded
 `anam def load`. See *Facet*.
 
 **Facet type** — The kind of a Facet, named **lower-case dotted** as `domain.concept`: `health.blood-pressure`,
-`health.sleep-episode`, `health.heart-rate-alert`, `activity.steps`, `place.stay`, `record.note`. The first word is a
+`health.sleep-episode`, `health.heart-rate-alert`, `activity.steps`, `place.stay`, `record.edge`. The first word is a
 *Domain*; the second names the concept. Dotted on purpose; payload keys are snake_case.
 
 **Fold** — The computation that reads a span's anam-events up to a watermark and derives each Facet's

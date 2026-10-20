@@ -139,7 +139,7 @@ Two rules make this safe:
 Granularity is a choice: start coarse (one Facet per source fragment) and decompose only where real
 fact-times or finer access control earn the cut. Facet types are **dotted `domain.concept`** under a closed set of eight
 domains (`health.blood-pressure`, `health.body-composition`, `activity.steps`, `place.stay`,
-`record.note`), so new sources slot into a domain (`social.message`, `money.transaction`, `media.play`).
+`record.edge`), so new sources slot into a domain (`social.message`, `money.transaction`, `media.play`).
 
 ---
 

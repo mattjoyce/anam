@@ -103,3 +103,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: a published read over `max_read_bytes` is filed once and answered a page at a time: `POST /v1/receipts` answers the first page with `page` and a `next_cursor`, and `GET /v1/receipts/{hash}?cursor=` reads each later page from the served artifact. The cursor is checked against the receipt (400 `cursor_invalid`). 413 stays for one facet over the bound alone. The timeline, explain, publish and verify narrow through one predicate, `receipt.Query.Admits`; `bounds.admits` is gone.
 - Bundle: the decision "published reads page by a checked cursor" is new; the bounded-reads decision, the read component and the daemon route table say so.
+
+## 2026-10-21, card 191
+
+- Code: `record.note` is renamed `record.edge`, the edge with commentary card 104 made it. `record.edge` v1 is `record.note` v2 under the new name, which joins its v1 in `manifests/history`; `renames/record-edge.json` is the table `anam rename` runs; the edge rules, `catchup.EdgeType`, the inspector's note draft and `recent-life` v3 name the new type.
+- Bundle: the edge index row, decision and gap pages say `record.edge`; the Definition manifest page counts 46 in history.

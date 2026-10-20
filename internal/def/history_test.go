@@ -28,7 +28,8 @@ func TestManifests_CarryTheHistory(t *testing.T) {
 	}
 	// Card 147 renamed most types: a renamed type's every version stays in the
 	// history under its old name, since that is the name its facets' earlier versions
-	// were admitted under, and the new name starts at v1.
+	// were admitted under, and the new name starts at v1. Card 191 did the same for
+	// record.note, now record.edge.
 	for typ, versions := range map[facet.Type][]int{
 		"health.blood-pressure":     {1, 2, 3, 4, 5, 6},
 		"health.measurement":        {1, 2},
@@ -37,6 +38,7 @@ func TestManifests_CarryTheHistory(t *testing.T) {
 		"activity.exercise-session": {1},
 		"note.annotation":           {1, 2, 3},
 		"record.note":               {1, 2},
+		"record.edge":               {1},
 		"med.started":               {4, 5},
 		"health.medication-started": {1},
 		"health.medication-dose":    {1, 2},
@@ -54,6 +56,9 @@ func TestManifests_CarryTheHistory(t *testing.T) {
 	}
 	if bp, ok := reg.Lookup("health.blood-pressure"); !ok || bp.Version != 6 {
 		t.Errorf("Bundled bp = v%d, %v; want the current v6 alone", bp.Version, ok)
+	}
+	if _, ok := reg.Lookup("record.note"); ok {
+		t.Error("Bundled carries record.note, which is record.edge since card 191")
 	}
 	if _, ok := reg.Lookup("health.measurement"); ok {
 		t.Error("Bundled carries health.measurement, which left the bundle; its history must not bring it back")

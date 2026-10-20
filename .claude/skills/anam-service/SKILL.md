@@ -71,7 +71,7 @@ and `verify_receipt`, plus the resource `anam://receipts/{hash}`. They use `/v1/
 
 It writes only when `ANAM_MCP_NOTE_TOKEN_FILE` names the token of the `conversation` importer
 (source `conversation`, `any_type: true`, card 177). Then it offers `save_note` (the person's words
-as a `record.note`) and `save_fact` (a facet of any type, validated by the gate, marked as
+as a `record.edge`) and `save_fact` (a facet of any type, validated by the gate, marked as
 asserted by the person), both through `POST /v1/envelopes`. Unset, it writes nothing. Admission of
 other sources, checkpoints, backups and the inspector stay with this skill and the CLI. Configure
 it with `ANAM_SERVER`, `ANAM_TOKEN_FILE`, `ANAM_ZONE`, `ANAM_MCP_TIMEOUT` and

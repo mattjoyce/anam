@@ -41,7 +41,7 @@ type facetData struct {
 	Payload []jsonToken
 	Events  []facet.AnamEvent
 
-	// Track is a location.track facet's hour drawn (card 133); nil otherwise.
+	// Track is a place.track facet's hour drawn (card 133); nil otherwise.
 	Track *trackView
 
 	// DefinitionURL is the Definition the facet was admitted under; CurrentDefinition

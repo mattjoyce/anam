@@ -41,6 +41,9 @@ decisions is in `journal/`.
 - `sleep.episode`, `health.heart-rate-daily` and `health.step-count` are bundled, so another source
   may name them. An importer re-sending the body the binary bundles, at its version, is answered
   200 unchanged rather than 409; another body of a bundled type is still refused (card 139 piece 1).
+- `scripts/pipeline-staleness.sh` reads the Garmin days as `activity.day`. It reported "no rows"
+  against a record that holds only the new name, so run it after the rename run, not before
+  (card 147).
 
 ## 2026-10-19
 

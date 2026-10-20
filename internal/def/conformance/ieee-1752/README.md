@@ -5,6 +5,6 @@ Copied unchanged from IEEE's `omh/1752` repository (https://opensource.ieee.org/
 Each file keeps its own `$id` under `https://w3id.org/ieee/ieee-1752-schema/`; their `$ref`s are
 relative to that base, and every file they reach is here, so nothing is fetched.
 
-`physical-activity-1.0.json` is what `exercise.session` (`source_schema`
+`physical-activity-1.0.json` is what `activity.exercise-session` (`source_schema`
 `ieee-1752/physical-activity-1.0`) conforms to. `internal/def/conformance_test.go` holds the
 Definition's examples to it.

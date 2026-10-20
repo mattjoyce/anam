@@ -58,7 +58,7 @@ type TimeField struct {
 // Series says which facets of this type are repeated statements about one thing
 // over time, so that a snapshot read can keep the latest per thing (SELF-LOG.md §2).
 // Identity is too fine for that (every change is its own row) and type is too coarse
-// (`med.started` and `med.stopped` are one regimen).
+// (`health.medication-started` and `health.medication-stopped` are one regimen).
 //
 // Name is the family the series belongs to, dotted and namespaced like a facet type;
 // every type that takes part in one family declares the same Name and the same Key,

@@ -83,7 +83,7 @@ days_between() {
 
 garmin=$(newest "Garmin collected" "$GARMIN_DB" "SELECT MAX(day) FROM daily_summary") || exit $?
 withings=$(newest "Withings collected" "$WITHINGS_DB" "SELECT MAX(date) FROM measurements") || exit $?
-anam_day=$(newest_anam "Anam admitted (Garmin days)" garmin.day) || exit $?
+anam_day=$(newest_anam "Anam admitted (Garmin days)" activity.day) || exit $?
 anam_meas=$(newest_anam "Anam ingested (Withings)" health.measurement) || exit $?
 
 printf 'Garmin collected      %s\nWithings collected    %s\nAnam, Garmin days     %s\nAnam, Withings rows   %s\n' \

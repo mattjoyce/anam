@@ -2,6 +2,7 @@ package inspect
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -147,6 +148,11 @@ type tlCheckpoints struct {
 	Have    bool
 	Buckets []tlBucket
 
+	// Wrong is the log's refusal when the operational index is wrong (ErrIndexWrong):
+	// the strip is drawn as one red band carrying these words, and nothing else of
+	// the log is read, since none of it can be trusted until the operator rebuilds it.
+	Wrong string
+
 	Total, Sealed, Behind, Never int
 
 	// Run is the last mint run at or below W, when there is one. LogSealed is
@@ -217,11 +223,15 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 	data := buildTimeline(newStyles(reg), res, all, from, to, zoomed, r.URL.Query()["type"], status)
 	if s.checkpoints != nil {
 		states, summary, err := checkpointStates(ctx, s.checkpoints, res, s.buckets)
-		if err != nil {
+		switch {
+		case errors.Is(err, ErrIndexWrong):
+			data.Checkpoints = tlCheckpoints{Have: true, Wrong: err.Error()}
+		case err != nil:
 			httpError(w, err)
 			return
+		default:
+			data.Checkpoints = bucketStrip(states, summary, res, from, to, data)
 		}
-		data.Checkpoints = bucketStrip(states, summary, res, from, to, data)
 	}
 	data.Query = cleanView(r.URL.RawQuery)
 	data.HasDefault = stored != ""

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/api"
@@ -71,10 +72,11 @@ func TestGetReceiptFacet_EntryWithItsLinks(t *testing.T) {
 	call(t, "GET", url+"/v1/receipts/sha256:"+hex.EncodeToString(sum[:])+"/facets/"+w1, testToken, "", http.StatusNotFound, nil)
 }
 
-// The inspector's facet page reads the same edge index, behind the same index state:
-// once a catch-up has found the index wrong, the page refuses as the API's facet route
-// does, rather than draw the facet with links the index got wrong.
-func TestFacetPage_RefusesAWrongIndex(t *testing.T) {
+// The inspector reads the same operational index, behind the same index state. Once
+// a catch-up has found the index wrong, the facet page refuses as the API's facet
+// route does, rather than draw the facet with links the index got wrong; the timeline,
+// which is the ledger's, stays up and draws the checkpoint strip red with the words.
+func TestInspector_SaysWhenTheIndexIsWrong(t *testing.T) {
 	cfg := newConfig(t)
 	dir := t.TempDir()
 	cfg.TokenFile = writeToken(t, dir, testToken)
@@ -91,6 +93,21 @@ func TestFacetPage_RefusesAWrongIndex(t *testing.T) {
 	w1 := a.Results[0].FacetID
 
 	call(t, "GET", url+"/facet?id="+w1, testToken, "", http.StatusOK, nil)
+	if _, body := page(t, http.MethodGet, url+"/?view=whole", nil, nil); strings.Contains(body, "index is wrong") || !strings.Contains(body, `class="bucket`) {
+		t.Errorf("before: the timeline should draw the strip:\n%s", body)
+	}
 	d.index.set(catchup.ErrIndexAhead)
 	call(t, "GET", url+"/facet?id="+w1, testToken, "", http.StatusInternalServerError, nil)
+	code, body := page(t, http.MethodGet, url+"/?view=whole", nil, nil)
+	if code != http.StatusOK {
+		t.Fatalf("after: the timeline answered %d, want 200", code)
+	}
+	for _, want := range []string{`<g class="wrong">`, "checkpoint strip not drawn: inspect: the operational index is wrong: catchup: replay cursor is ahead", "anam timeline"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("after: the timeline lacks %q", want)
+		}
+	}
+	if strings.Contains(body, `class="bucket `) {
+		t.Error("after: the strip still draws buckets from a wrong index")
+	}
 }

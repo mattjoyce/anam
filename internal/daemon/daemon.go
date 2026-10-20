@@ -28,6 +28,7 @@ import (
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
+	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
@@ -268,20 +269,50 @@ func (s *indexState) wrong() error {
 	return s.err
 }
 
-// guardedEdges is the edge index as the inspector reads it: the read-only ops handle
-// behind the daemon's index state, so a wrong index refuses the facet page the way it
-// refuses GET /v1/receipts/{hash}/facets/{facet_id}, rather than draw links the index
-// got wrong. The inspector knows nothing of "wrong": it is given a handle that refuses.
-type guardedEdges struct {
+// guardedIndex is the operational index as the inspector reads it, for the checkpoint
+// strip and the facet page's links: the read-only ops handle behind the daemon's
+// index state, so an index a catch-up has found wrong refuses with
+// inspect.ErrIndexWrong instead of answering from rows that cannot be trusted. The
+// inspector knows nothing else of "wrong": the facet page refuses on it as GET
+// /v1/receipts/{hash}/facets/{facet_id} does, and the timeline draws the strip red.
+type guardedIndex struct {
 	ops   *ops.DB
 	state *indexState
 }
 
-func (g guardedEdges) TouchingEdges(ctx context.Context, facetID string) (ops.Touching, error) {
+func (g guardedIndex) wrong() error {
 	if err := g.state.wrong(); err != nil {
+		return fmt.Errorf("%w: %w", inspect.ErrIndexWrong, err)
+	}
+	return nil
+}
+
+func (g guardedIndex) TouchingEdges(ctx context.Context, facetID string) (ops.Touching, error) {
+	if err := g.wrong(); err != nil {
 		return ops.Touching{}, err
 	}
 	return g.ops.TouchingEdges(ctx, facetID)
+}
+
+func (g guardedIndex) SpanHeads(ctx context.Context) (map[string]ops.CheckpointRow, error) {
+	if err := g.wrong(); err != nil {
+		return nil, err
+	}
+	return g.ops.SpanHeads(ctx)
+}
+
+func (g guardedIndex) LastMintRun(ctx context.Context, w int64) (int64, bool, error) {
+	if err := g.wrong(); err != nil {
+		return 0, false, err
+	}
+	return g.ops.LastMintRun(ctx, w)
+}
+
+func (g guardedIndex) LogSealed(ctx context.Context) (bool, error) {
+	if err := g.wrong(); err != nil {
+		return false, err
+	}
+	return g.ops.LogSealed(ctx)
 }
 
 // Handler is the daemon's routes: /healthz and the API's description open to all,

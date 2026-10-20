@@ -35,7 +35,8 @@ type Rename struct {
 // every pillar a commit runs, then the disposition against the ledger as it stands.
 // It is the dry run's question: would the gate take this, and as what? A facet the
 // ledger does not hold answers admitted, which a rename run reads as an anomaly,
-// since it carries only facets the fold listed.
+// since it carries only facets the fold listed. A facet whose status is not live is
+// refused with ErrFacetNotLive (card 185).
 func (g *Gate) Rehearse(ctx context.Context, r Rename) (Result, error) {
 	p, err := g.prepare(r.Env, r.Binding)
 	if err != nil {
@@ -61,7 +62,8 @@ func (g *Gate) Rehearse(ctx context.Context, r Rename) (Result, error) {
 // RenameBatch commits renames as one block, as CommitBatch does envelopes: each
 // facet's next version under its new type, or a no-op where it already arrived. A
 // facet whose current type is not the one its rename says it is leaving is refused
-// with ErrTypeChanged, and the block is not written.
+// with ErrTypeChanged, a facet whose status is not live with ErrFacetNotLive, and
+// the block is not written in either case.
 func (g *Gate) RenameBatch(ctx context.Context, renames []Rename) ([]Result, ledger.Watermark, error) {
 	if len(renames) == 0 {
 		return nil, 0, nil

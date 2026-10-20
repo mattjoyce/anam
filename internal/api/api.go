@@ -7,8 +7,8 @@
 package api
 
 // Error is the body of every response that is not a success. Error says what went
-// wrong in words. Code, when set, names it for a program: today result_too_large
-// alone, with its measure in TooLarge.
+// wrong in words. Code, when set, names it for a program: result_too_large, with its
+// measure in TooLarge, or cursor_invalid.
 type Error struct {
 	Error    string    `json:"error"`
 	Code     string    `json:"code,omitempty"`
@@ -18,14 +18,25 @@ type Error struct {
 // CodeTooLarge is the Code of a read refused for its size (413).
 const CodeTooLarge = "result_too_large"
 
+// CodeCursorInvalid is the Code of a page asked for with a cursor that does not name
+// a page of the receipt it was presented to (400, card 92).
+const CodeCursorInvalid = "cursor_invalid"
+
 // TooLarge measures a read the daemon refused to answer whole: how many entries
 // matched, what they encode to (counted up to the bound only), the bound, and the
 // narrowings the query has not used yet, each a query parameter name.
+//
+// A published read pages rather than refuse (card 92), so there it is refused only
+// for one facet over the bound alone; FacetID names it, and Matched is 1. A page
+// refused so carries NextCursor, the page after that facet, so a reader can open the
+// facet alone (GET /v1/receipts/{hash}/facets/{facet_id}) and walk on.
 type TooLarge struct {
-	Matched  int      `json:"matched"`
-	Bytes    int      `json:"bytes"`
-	MaxBytes int      `json:"max_bytes"`
-	Narrow   []string `json:"narrow,omitempty"`
+	Matched    int      `json:"matched"`
+	Bytes      int      `json:"bytes"`
+	MaxBytes   int      `json:"max_bytes"`
+	Narrow     []string `json:"narrow,omitempty"`
+	FacetID    string   `json:"facet_id,omitempty"`
+	NextCursor string   `json:"next_cursor,omitempty"`
 }
 
 // Status is the answer to "what state is the record in".

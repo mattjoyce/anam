@@ -253,7 +253,11 @@ paths:
         The timeline read the query describes, through the projection it names, filed
         as an artifact with a receipt that names exactly the entries served at W.
         Writes artifacts only, never the ledger. The parameters are the timeline's;
-        projection is required.
+        projection is required. A read too large for one answer is filed once, whole,
+        and answered a page at a time (card 92): entries (or the frame's rows) and
+        versions are the first page, shown is the whole count, and page.next_cursor
+        reads the next page from GET /v1/receipts/{hash}. 413 only when one facet
+        alone is over max_read_bytes, which no page can carry; nothing is filed.
       parameters:
         - { $ref: "#/components/parameters/From" }
         - { $ref: "#/components/parameters/To" }
@@ -272,10 +276,40 @@ paths:
         - { $ref: "#/components/parameters/AnamTimeout" }
       responses:
         "201":
-          description: the read, with its receipt
+          description: the read's first page, with its receipt
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Published" }
+              example:
+                w: 33378
+                live: 14609
+                shown: 2
+                canonical: sha256:1976fb0a4cfc1313ce243c81ae29b34671610d8c3898da3dab3a40a67d737d02
+                projection: { name: bp, version: 1, served: 2, hash: sha256:1976fb0a4cfc1313ce243c81ae29b34671610d8c3898da3dab3a40a67d737d02 }
+                entries:
+                  - facet_id: 923f857a-84a2-5284-9d4a-b73e6d0a16c4
+                    type: health.blood-pressure
+                    fact_time: "2026-10-18T07:44:00.000000000Z"
+                    source: bp-csv
+                    source_ref: bp-csv:2026-10-18T07:44
+                    status: admitted
+                    classification: Sensitive
+                    content_hash: sha256:ec002e673b06e5688a000c8b8a345759cb68b93b01edbea62ca04d65adbc1705
+                    payload: { id: "bp:2026-10-18T07:44", systolic: 128, diastolic: 82 }
+                versions: { 923f857a-84a2-5284-9d4a-b73e6d0a16c4: 1 }
+                receipt_hash: sha256:5d0c3a7e9b1f42d8a6c3e0b7f19d2a4c8e6b0f3a5d7c9e1b2a4f6d8c0e2b4a6c
+                receipt:
+                  served_hash: sha256:1976fb0a4cfc1313ce243c81ae29b34671610d8c3898da3dab3a40a67d737d02
+                  facet_ids: [923f857a-84a2-5284-9d4a-b73e6d0a16c4, b81e3f2a-6c4d-5e7f-8a9b-0c1d2e3f4a5b]
+                  watermark: 33378
+                  template: bp
+                  template_version: 1
+                  template_hash: sha256:7a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9
+                  definition_set_version: sha256:ec002e673b06e5688a000c8b8a345759cb68b93b01edbea62ca04d65adbc1705
+                  served_at: "2026-10-21T09:00:00.000000000Z"
+                  span: all
+                  ledger_id: 4b1f7c2e-8d3a-4f6b-9c1e-2a7d5e8f0b3c
+                page: { offset: 0, returned_count: 1, total_count: 2, next_cursor: eyJ2IjoxLCJyZWNlaXB0Ijoic2hhMjU2OjVkMGMzYTdlOWIxZjQyZDhhNmMzZTBiN2YxOWQyYTRjOGU2YjBmM2E1ZDdjOWUxYjJhNGY2ZDhjMGUyYjRhNmMiLCJvZmZzZXQiOjEsImZhY2V0X2lkIjoiYjgxZTNmMmEtNmM0ZC01ZTdmLThhOWItMGMxZDJlM2Y0YTViIn0 }
         "400": { $ref: "#/components/responses/BadQuery" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404":
@@ -292,16 +326,53 @@ paths:
       tags: [receipts]
       x-anam-roles: [reader, importer, operator]
       x-anam-type: ReceiptShown
-      summary: A receipt and the value it served, from the artifacts alone.
+      summary: A receipt and the value it served, a page at a time, from the artifacts alone.
+      description: >-
+        Without a cursor, the receipt and the first page of its value; with one, the
+        page it names, carrying hash and page but not the receipt again (card 92).
+        Every page is whole facets cut to max_read_bytes from the served artifact the
+        receipt hashes, never a new read, so walking next_cursor to the end gives back
+        exactly the receipt's facet_ids in order. A frame pages by rows, every page
+        with all the columns. A query receipt's answer is one relation and is not
+        paged. A page whose first facet is over the bound alone is 413 naming it, with
+        the cursor past it; open the facet at /v1/receipts/{hash}/facets/{facet_id}.
       parameters:
         - { $ref: "#/components/parameters/ReceiptHash" }
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+          description: >-
+            a next_cursor this receipt issued; opaque. Checked against the receipt, so
+            another receipt's cursor, a changed offset or anything else is 400
+            cursor_invalid
       responses:
         "200":
-          description: the receipt and its entries, or its frame
+          description: the receipt and a page of its entries, or of its frame; or its answer
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ReceiptShown" }
-        "400": { $ref: "#/components/responses/BadQuery" }
+              example:
+                hash: sha256:5d0c3a7e9b1f42d8a6c3e0b7f19d2a4c8e6b0f3a5d7c9e1b2a4f6d8c0e2b4a6c
+                entries:
+                  - facet_id: b81e3f2a-6c4d-5e7f-8a9b-0c1d2e3f4a5b
+                    type: health.blood-pressure
+                    fact_time: "2026-10-19T07:40:00.000000000Z"
+                    source: bp-csv
+                    source_ref: bp-csv:2026-10-19T07:40
+                    status: admitted
+                    classification: Sensitive
+                    content_hash: sha256:0a4cfc1313ce243c81ae29b34671610d8c3898da3dab3a40a67d737d021976fb
+                    payload: { id: "bp:2026-10-19T07:40", systolic: 131, diastolic: 84 }
+                page: { offset: 1, returned_count: 1, total_count: 2 }
+        "400":
+          description: a cursor this receipt did not issue (code cursor_invalid), or a hash that is not one
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example:
+                error: "cursor invalid: offset 3 is outside the receipt's 2 facets"
+                code: cursor_invalid
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NoArtifact" }
         "413": { $ref: "#/components/responses/TooLarge" }
@@ -1130,7 +1201,10 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
     TooLarge:
-      description: the answer is over max_read_bytes; the body measures it and names what is left to narrow by
+      description: >-
+        the answer is over max_read_bytes; the body measures it and names what is left
+        to narrow by. A published read pages instead, so there it is one facet over
+        the bound alone, named in too_large.facet_id
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -1168,7 +1242,7 @@ components:
       required: [error]
       properties:
         error: { type: string, description: what went wrong, in words }
-        code: { type: string, enum: [result_too_large], description: a name for a program, when there is one }
+        code: { type: string, enum: [result_too_large, cursor_invalid], description: a name for a program, when there is one }
         too_large: { $ref: "#/components/schemas/TooLarge" }
     TooLarge:
       type: object
@@ -1178,6 +1252,20 @@ components:
         bytes: { type: integer, description: what the entries encode to, counted up to the bound }
         max_bytes: { type: integer }
         narrow: { type: array, items: { type: string }, description: query parameters not yet used }
+        facet_id: { type: string, description: the one facet over the bound alone, when a published read is refused for it (card 92) }
+        next_cursor: { type: string, description: on a page refused for its first facet, the page after it }
+    Page:
+      type: object
+      description: >-
+        which portion of a receipted value an answer carries (card 92): the receipt's
+        facets from offset, returned_count of them, of total_count; next_cursor reads
+        the next page, absent on the last
+      required: [offset, returned_count, total_count]
+      properties:
+        offset: { type: integer }
+        returned_count: { type: integer }
+        total_count: { type: integer }
+        next_cursor: { type: string }
     Status:
       type: object
       required: [version, person, ledger_id, w, sources]
@@ -1361,13 +1449,14 @@ components:
               receipt: { $ref: "#/components/schemas/Receipt" }
     ReceiptShown:
       type: object
-      required: [hash, receipt, entries]
+      required: [hash, entries]
       properties:
         hash: { type: string }
-        receipt: { $ref: "#/components/schemas/Receipt" }
+        receipt: { $ref: "#/components/schemas/Receipt", description: on the first page only }
         entries: { type: array, items: { $ref: "#/components/schemas/Entry" } }
         frame: { $ref: "#/components/schemas/Frame" }
         answer: { $ref: "#/components/schemas/Answer" }
+        page: { $ref: "#/components/schemas/Page", description: absent for a query receipt's answer, which is not paged }
     FacetShown:
       type: object
       required: [hash, receipt, entry, links]
@@ -1506,10 +1595,11 @@ components:
       allOf:
         - { $ref: "#/components/schemas/Timeline" }
         - type: object
-          required: [receipt_hash, receipt]
+          required: [receipt_hash, receipt, page]
           properties:
             receipt_hash: { type: string }
             receipt: { $ref: "#/components/schemas/Receipt" }
+            page: { $ref: "#/components/schemas/Page", description: "the first page; shown is its total_count" }
     Projections:
       type: object
       required: [projections]

@@ -99,3 +99,7 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 - Code: `record.note` v2 is an edge facet: `kind` from a closed list (`about`, `interpreted_from`), `from` and `to` as lists of facet ids, `about` kept as the v1 name of `to`, `pins` for an exact version; every v1 value is a v2 value unchanged. The operational store gains `facet_edge` (schema version 8, so a pre-edge file refuses and is replayed), written by catch-up from each live edge's payload. The bundled rule set gains `edge_to/2`, `edge_from/2` and `linked/2`. `GET /v1/receipts/{hash}/facets/{facet_id}` answers one facet as the receipt served it beside its links at the index's watermark.
 - Bundle: the edge index row page is new; the store, catch-up, daemon, query and decision pages say so; the Definition manifest counts move.
 
+## 2026-10-21, card 92
+
+- Code: a published read over `max_read_bytes` is filed once and answered a page at a time: `POST /v1/receipts` answers the first page with `page` and a `next_cursor`, and `GET /v1/receipts/{hash}?cursor=` reads each later page from the served artifact. The cursor is checked against the receipt (400 `cursor_invalid`). 413 stays for one facet over the bound alone. The timeline, explain, publish and verify narrow through one predicate, `receipt.Query.Admits`; `bounds.admits` is gone.
+- Bundle: the decision "published reads page by a checked cursor" is new; the bounded-reads decision, the read component and the daemon route table say so.

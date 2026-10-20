@@ -49,7 +49,7 @@ a projection, reads it as `GET /v1/timeline` would, and files what it shows with
 receipt records W and the resolved narrowing (`query`: `at`, `from`, `before`, `type`), and
 `/v1/receipts/{hash}/verify` replays it. Reads also take `w`, a watermark, in place of `as_of`, so a
 follow-up stands on a cited read's knowledge. This is the first piece of §5's receipted reads;
-paging is card 92. Evidence by facet is `GET /v1/receipts/{hash}/facets/{facet_id}` (card 91,
+paging is card 92, below. Evidence by facet is `GET /v1/receipts/{hash}/facets/{facet_id}` (card 91,
 2026-10-21): one facet as the receipt served it, the payload and envelope as admitted, beside
 `links`, the live edge facets that name it on either side (card 104), read from the edge index at
 the index's own watermark and never written into the facet. A facet the receipt did not serve is
@@ -58,13 +58,38 @@ the index's own watermark and never written into the facet. A facet the receipt 
 **Bounded reads (2026-10-11, card 88).** The daemon answers a read within `max_read_bytes`
 (`ANAM_MAX_READ_BYTES`, default 512 KiB, §3's budget; 0 is no bound), measured over the entries it
 would answer with, encoded as it sends them, whole facets only. `GET /v1/timeline`, `POST
-/v1/receipts` and `GET /v1/receipts/{hash}` refuse a larger answer with 413 and a body a program can
+/v1/receipts` and `GET /v1/receipts/{hash}` refused a larger answer with 413 (the two receipt routes
+page instead since card 92, below) and a body a program can
 act on: `code: result_too_large`, and `too_large` with `matched` (how many entries), `bytes` (counted
 up to the bound), `max_bytes`, and `narrow`, the query parameters still unused (`type`, `from`, `to`,
 `at`, `projection`). A refused publish files nothing. A receipt too large to show still verifies,
 and shows locally. A local read, the operator at their own files, has no bound. The fold still runs
 whole before the refusal: the bound protects the answer and the client's context, not the daemon's
 work.
+
+**Paged published reads (2026-10-21, card 92).** A published read too large for one answer is no
+longer refused: `POST /v1/receipts` files the whole value and its receipt once, and answers the
+first page, with `page` (`offset`, `returned_count`, `total_count`, `next_cursor`); `shown` is the
+whole count. `GET /v1/receipts/{hash}?cursor=…` reads each later page, and without a cursor answers
+the first page, so a small receipt reads as before, with a `page` that has no `next_cursor`. A page
+is whole facets, as many from its offset as fit `max_read_bytes` by card 88's measure, cut from the
+served artifact the receipt hashes: never a new read, so walking `next_cursor` to the end gives back
+exactly the receipt's `facet_ids`, in order, whatever Anam learned in between. A frame pages by rows,
+with every column on every page. The receipt rides the first page only; a later page carries `hash`
+and `page`. The cursor is opaque, and checked rather than trusted: it names its format, the receipt,
+the offset and the facet at that offset, and anything that does not match the receipt it is
+presented to is 400 with `code: cursor_invalid`. No key signs it, because the receipt is immutable
+and its own `facet_ids` are the check. 413 is left for one facet over the bound alone, which no page
+can carry: a publish holding one files nothing, and `too_large.facet_id` names it; a page that starts
+at one (a receipt published locally, or under a larger bound) names it with the `next_cursor` past
+it, and the facet opens alone at `/v1/receipts/{hash}/facets/{facet_id}`. A query receipt's answer
+(card 173) is one relation and is not paged. Dropping the total refusal on a publish adds no work
+the daemon was not already doing: the fold and the projection ran whole before card 88's refusal
+too, and the value it files is the record's own, content-addressed, so publishing the same read
+again files a new receipt and no second value. Each page re-reads the served file, so walking n
+pages reads it n times. The CLI's `anam receipt show` reads every page and shows the whole receipt,
+or one page with `--cursor`; `anam timeline --publish` over the daemon shows the first page and
+names the receipt to show for the rest.
 
 **Fields (2026-10-12, card 138; built the same day).** A read may name its **fields**: a
 temporary subset of the type's schema, as JSON pointers, and nothing else of the payload comes

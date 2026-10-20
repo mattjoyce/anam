@@ -7,7 +7,6 @@ import (
 
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/clock"
-	"github.com/mattjoyce/anam/internal/fold"
 )
 
 // The CLI's date handling is the part a person touches most and the part with the most
@@ -59,7 +58,8 @@ func TestParseInstant(t *testing.T) {
 func TestParseBounds_UpperIsInclusiveToTheOperator(t *testing.T) {
 	t.Parallel()
 
-	entry := func(s string) fold.Entry { return fold.Entry{FactTime: s} }
+	// The bounds narrow through the receipt's own predicate, as every read does.
+	admits := func(b bounds, s string) bool { return queryOf(b, "", "", nil).Admits(s, "") }
 
 	t.Run("a bare --to includes its whole day", func(t *testing.T) {
 		t.Parallel()
@@ -71,11 +71,11 @@ func TestParseBounds_UpperIsInclusiveToTheOperator(t *testing.T) {
 			"2026-01-24T00:00:00.000000000Z",
 			"2026-01-24T23:59:59.999999999Z",
 		} {
-			if !b.admits(entry(in)) {
+			if !admits(b, in) {
 				t.Errorf("--to 2026-01-24 excluded %s, which is in that day", in)
 			}
 		}
-		if b.admits(entry("2026-01-25T00:00:00.000000000Z")) {
+		if admits(b, "2026-01-25T00:00:00.000000000Z") {
 			t.Error("--to 2026-01-24 admitted the next midnight")
 		}
 	})
@@ -86,10 +86,10 @@ func TestParseBounds_UpperIsInclusiveToTheOperator(t *testing.T) {
 		if err != nil {
 			t.Fatalf("parseBounds: %v", err)
 		}
-		if !b.admits(entry("2026-01-24T06:36:00.000000000Z")) {
+		if !admits(b, "2026-01-24T06:36:00.000000000Z") {
 			t.Error("--to at an instant excluded that very instant")
 		}
-		if b.admits(entry("2026-01-24T06:36:00.000000001Z")) {
+		if admits(b, "2026-01-24T06:36:00.000000001Z") {
 			t.Error("--to at an instant admitted one nanosecond later")
 		}
 	})
@@ -100,10 +100,10 @@ func TestParseBounds_UpperIsInclusiveToTheOperator(t *testing.T) {
 		if err != nil {
 			t.Fatalf("parseBounds: %v", err)
 		}
-		if !b.admits(entry("2026-01-24T06:36:00.000000000Z")) {
+		if !admits(b, "2026-01-24T06:36:00.000000000Z") {
 			t.Error("--from excluded its own instant")
 		}
-		if b.admits(entry("2026-01-24T06:35:59.999999999Z")) {
+		if admits(b, "2026-01-24T06:35:59.999999999Z") {
 			t.Error("--from admitted one nanosecond earlier")
 		}
 	})
@@ -115,7 +115,7 @@ func TestParseBounds_UpperIsInclusiveToTheOperator(t *testing.T) {
 			t.Fatalf("parseBounds: %v", err)
 		}
 		for _, in := range []string{"1970-01-01T00:00:00.000000000Z", "2999-12-31T23:59:59.999999999Z"} {
-			if !b.admits(entry(in)) {
+			if !admits(b, in) {
 				t.Errorf("unbounded excluded %s", in)
 			}
 		}

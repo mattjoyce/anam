@@ -10,7 +10,6 @@ import (
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
-	"github.com/mattjoyce/anam/internal/receipt"
 	"github.com/mattjoyce/anam/internal/serve"
 )
 
@@ -69,15 +68,6 @@ func Receipts(d serve.Deps, dir string) (api.Receipts, error) {
 	return out, nil
 }
 
-// Receipt reads one receipt and the served value it names from the artifacts alone.
-func Receipt(d serve.Deps, hash string) (api.ReceiptShown, error) {
-	r, shown, err := serve.Show(d, hash)
-	if err != nil {
-		return api.ReceiptShown{}, err
-	}
-	return api.ReceiptShown{Hash: hash, Receipt: r, Entries: shown.Entries, Frame: shown.Frame, Answer: shown.Answer}, nil
-}
-
 // VerifyReceipt proves one receipt against the ledger and the artifact on disk.
 func VerifyReceipt(ctx context.Context, d serve.Deps, hash string) (api.ReceiptVerified, error) {
 	r, res, err := serve.Verify(ctx, d, hash)
@@ -97,8 +87,11 @@ func VerifyReceipt(ctx context.Context, d serve.Deps, hash string) (api.ReceiptV
 // and access is decided by projections; explain publishes nothing. Both are refused
 // as bad queries. Publishing writes artifacts and nothing on the ledger.
 //
-// limit bounds what the publish answers with, as Fit measures it; it is checked
-// before anything is filed, so a refused publish leaves no artifact. Zero is no bound.
+// limit bounds what the publish answers with, as Fit measures it (card 92). The read
+// is filed whole, once, and answered a page at a time: the first page here, the rest
+// by ReceiptPage from the artifact. Only a facet over limit alone, which no page can
+// carry, is refused, and that is checked before anything is filed, so a refused
+// publish leaves no artifact. Zero is no bound, one page.
 func Publish(ctx context.Context, src Source, d serve.Deps, q api.TimelineQuery, limit int) (api.Published, error) {
 	if q.Projection == "" {
 		return api.Published{}, badQuery(errors.New("a published read names a projection: a receipt is what a projection served"))
@@ -130,10 +123,7 @@ func Publish(ctx context.Context, src Source, d serve.Deps, q api.TimelineQuery,
 		return api.Published{}, err
 	}
 
-	rq := &receipt.Query{From: b.from, Before: b.toX, At: at, Type: q.Type, Fields: q.Fields}
-	if rq.IsZero() {
-		rq = nil
-	}
+	rq := queryOf(b, at, q.Type, q.Fields)
 	value, err := serve.Narrow(v.shown, rq, v.defs)
 	if err != nil {
 		return api.Published{}, err
@@ -145,10 +135,20 @@ func Publish(ctx context.Context, src Source, d serve.Deps, q api.TimelineQuery,
 	if err != nil {
 		return api.Published{}, badQuery(err)
 	}
+	ids := make([]string, 0, value.Len())
+	for _, e := range value.Entries() {
+		ids = append(ids, e.FacetID)
+	}
+	narrowings := Narrowings(q)
+	hint := "no page can carry it; " + NarrowHint(narrowings)
 	if fr != nil {
-		err = fitQuery(fr.Rows, limit, q)
+		err = fitEach(fr.Rows, ids, limit, hint)
 	} else {
-		err = fitQuery(value.Entries(), limit, q)
+		err = fitEach(value.Entries(), ids, limit, hint)
+	}
+	var tl *TooLarge
+	if errors.As(err, &tl) {
+		tl.Narrow = narrowings
 	}
 	if err != nil {
 		return api.Published{}, err
@@ -158,20 +158,28 @@ func Publish(ctx context.Context, src Source, d serve.Deps, q api.TimelineQuery,
 		return api.Published{}, err
 	}
 
-	t := v.describe()
-	if served.Frame != nil {
-		t.Frame = served.Frame
-		t.Shown = served.Frame.Len()
-		return api.Published{Timeline: t, ReceiptHash: served.ReceiptHash, Receipt: served.Receipt}, nil
-	}
-	t.Entries = value.Entries()
-	ids := make([]string, 0, len(t.Entries))
-	for _, e := range t.Entries {
-		ids = append(ids, e.FacetID)
-	}
-	if t.Versions, err = v.versionsOf(ctx, src.Ledger, ids); err != nil {
+	// The first page is read back from what was just filed, by the function every
+	// later page is read by, so no page is cut two ways. The answer's header and
+	// versions are the read's own, as a timeline read's are; the pages after it are
+	// the artifact's alone.
+	first, err := ReceiptPage(d, served.ReceiptHash, "", limit)
+	if err != nil {
 		return api.Published{}, err
 	}
-	t.Shown = len(t.Entries)
-	return api.Published{Timeline: t, ReceiptHash: served.ReceiptHash, Receipt: served.Receipt}, nil
+	t := v.describe()
+	// Shown is what the narrowing kept, the whole published value, and so the page's
+	// total_count; the page says which of it this answer carries.
+	t.Shown = len(ids)
+	out := api.Published{ReceiptHash: served.ReceiptHash, Receipt: served.Receipt, Page: *first.Page}
+	if first.Frame != nil {
+		t.Frame = first.Frame
+		out.Timeline = t
+		return out, nil
+	}
+	t.Entries = first.Entries
+	if t.Versions, err = v.versionsOf(ctx, src.Ledger, ids[:first.Page.ReturnedCount]); err != nil {
+		return api.Published{}, err
+	}
+	out.Timeline = t
+	return out, nil
 }

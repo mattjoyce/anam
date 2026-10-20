@@ -9,6 +9,7 @@ import (
 	"github.com/mattjoyce/anam/internal/consent"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/projection"
+	"github.com/mattjoyce/anam/internal/receipt"
 )
 
 // The explain view answers the question a governed system has to be able to answer:
@@ -30,17 +31,14 @@ import (
 
 // explain fills t with the verdict on every artifact version the read stands on,
 // narrowed by fact-time and type. The counts are taken before the narrowing.
-func explain(ctx context.Context, l fold.Ledger, v view, b bounds, typeFilter string, t api.Timeline,
+func explain(ctx context.Context, l fold.Ledger, v view, q *receipt.Query, t api.Timeline,
 ) (api.Timeline, error) {
 	rows, counts, err := explainRows(ctx, l, v)
 	if err != nil {
 		return api.Timeline{}, err
 	}
 	for _, r := range rows {
-		if typeFilter != "" && r.Type != typeFilter {
-			continue
-		}
-		if !b.admits(fold.Entry{FactTime: r.FactTime}) {
+		if !q.Admits(r.FactTime, r.Type) {
 			continue
 		}
 		t.Verdicts = append(t.Verdicts, r)

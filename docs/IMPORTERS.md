@@ -374,6 +374,12 @@ it no longer does (card 78; Matt, 2026-10-10).
   snapshot, with the same guards as a scan: an empty run is refused, `--max-fraction` bounds a run,
   and nothing is written without `--yes`. There is no automatic retraction: a tombstone cannot be
   undone (a resend of the same row is a no-op), and an importer is outside the error kernel.
+- **One facet by hand.** A source no importer resends (`workbench`, where a person enters a record;
+  `conversation`) has no snapshot to compare with. `anam retract <source> --facet <id>` shows the facet and
+  what the tombstone would do, and `--yes` appends it; `POST /v1/facets/{id}/retract` is the same for the
+  operator (API.md). It refuses a facet of another source, a facet that is not live, and a source an
+  importer declares and has a complete snapshot for, which the importer's resend reconciles instead
+  (card 188, slice 3).
 - **Retiring a source.** When an importer replaces a source under another name (card 55: `garmin`
   for `health-db`), the old source is neither empty nor unreadable; it is gone by decision, and
   nothing scans it again. `anam retract <old-source> --retired` plans every live facet of the old

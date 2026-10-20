@@ -188,6 +188,7 @@ var apiTypes = map[string]func() any{
 	"Refusal":              func() any { return new(api.Refusal) },
 	"StoredDocument":       func() any { return new(api.StoredDocument) },
 	"Backup":               func() any { return new(api.Backup) },
+	"Retraction":           func() any { return new(api.Retraction) },
 	"QueryCatalogue":       func() any { return new(api.QueryCatalogue) },
 	"QueryAnswer":          func() any { return new(api.QueryAnswer) },
 }

@@ -804,6 +804,50 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+  /v1/facets/{id}/retract:
+    post:
+      operationId: postFacetRetract
+      tags: [operate]
+      x-anam-roles: [operator]
+      x-anam-type: Retraction
+      summary: Tombstone one facet of a source nobody resends, by hand.
+      description: >-
+        The body names the source the facet must belong to. The plan is the one
+        `anam retract <source> --facet` applies, made inside the write: 409 for a facet
+        of another source, a facet that is not live, or a source an importer declares
+        and has completed a snapshot for (its next resend reconciles it); 404 for a
+        facet the ledger does not hold. The artifact stays, and a read as of before the
+        tombstone still shows the facet. A request from a browser on another site is 403.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - { $ref: "#/components/parameters/AnamTimeout" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RetractRequest" }
+            example: { source: workbench }
+      responses:
+        "200":
+          description: the tombstone, or a no-op when another writer got there first
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Retraction" }
+              example: { facet_id: 7f3a9c1e5d2b4a68, source: workbench, type: health.medication-dose, artifact_version: 1, outcome: tombstoned, seq: 33379, w: 33379 }
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: the facet is of another source, is not live, or its source is reconciled by an importer's snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503": { $ref: "#/components/responses/Busy" }
+        "504": { $ref: "#/components/responses/Timeout" }
 components:
   securitySchemes:
     bearer:
@@ -1495,6 +1539,23 @@ components:
         bytes: { type: integer, format: int64 }
         media_type: { type: string }
         new: { type: boolean }
+    RetractRequest:
+      type: object
+      required: [source]
+      additionalProperties: false
+      properties:
+        source: { type: string, description: the source the facet must belong to; a guard, not a selector }
+    Retraction:
+      type: object
+      required: [facet_id, source, type, artifact_version, outcome, w]
+      properties:
+        facet_id: { type: string }
+        source: { type: string }
+        type: { type: string }
+        artifact_version: { type: integer, description: the version the tombstone marks }
+        outcome: { type: string, enum: [tombstoned, no-op] }
+        seq: { type: integer, format: int64, description: the anam-event's position; absent for a no-op }
+        w: { type: integer, format: int64, description: the watermark after the request }
     Backup:
       type: object
       required: [path, w, bytes, files]

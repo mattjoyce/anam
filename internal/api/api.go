@@ -63,6 +63,27 @@ type Backup struct {
 	Pruned []string `json:"pruned,omitempty"`
 }
 
+// RetractRequest is the body of POST /v1/facets/{id}/retract: the source the facet must
+// belong to. It is a guard, not a selector: the facet is named by the path, and a
+// facet of another source is refused.
+type RetractRequest struct {
+	Source string `json:"source"`
+}
+
+// Retraction is a facet tombstoned by hand: which version the tombstone marks, the
+// anam-event's position and the watermark after it. Outcome is tombstoned, or no-op
+// when another writer tombstoned the facet between the plan and the write, in which
+// case there is no Seq of this request's.
+type Retraction struct {
+	FacetID         string `json:"facet_id"`
+	Source          string `json:"source"`
+	Type            string `json:"type"`
+	ArtifactVersion int    `json:"artifact_version"`
+	Outcome         string `json:"outcome"`
+	Seq             int64  `json:"seq,omitempty"`
+	W               int64  `json:"w"`
+}
+
 // MintRun is a mint the daemon ran on its own account, once batches stopped arriving.
 type MintRun struct {
 	W       int64 `json:"w"`

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -36,10 +37,11 @@ import (
 func retractCmd(cfgPath *string) *cobra.Command {
 	var yes, retired bool
 	var maxFraction float64
+	var facetID string
 
 	cmd := &cobra.Command{
 		Use:   "retract <source>",
-		Short: "tombstone the facets a source no longer holds",
+		Short: "tombstone the facets a source no longer holds, or one facet by hand",
 		Long: `Retract compares what the ledger holds live from one source with what the
 source holds now, and lists the facets the source has dropped. Nothing is
 written unless --yes is given; then each listed facet is tombstoned through
@@ -60,13 +62,26 @@ A source replaced by an importer under another name is retired: --retired plans
 every live facet of the source, by type, and tombstones them all with --yes. It
 refuses a source an importer still declares, and asks for --max-fraction 1, so
 the whole source goes only on purpose. The artifacts stay; a read --at a time
-before the retirement still shows them.`,
+before the retirement still shows them.
+
+A source nobody resends (workbench, conversation) has no snapshot to compare with.
+There a wrong entry is undone one facet at a time: --facet <id> shows the facet and
+what the tombstone would do, and with --yes tombstones that one facet. It refuses a
+facet that belongs to another source, a facet that is not live, and a source an
+importer declares and has sent a complete snapshot for, which its next resend
+reconciles instead. The artifact stays; a read --at before it still shows the facet.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			source := args[0]
 			cfg, err := loadConfig(*cfgPath, cmd)
 			if err != nil {
 				return err
+			}
+			if facetID != "" {
+				if retired {
+					return errors.New("--facet and --retired are two different retractions; pass one")
+				}
+				return runFacetRetraction(cmd, cfg, source, facetID, yes)
 			}
 			if retired {
 				return runRetirement(cmd, cfg, source, yes, maxFraction)
@@ -95,6 +110,8 @@ before the retirement still shows them.`,
 	cmd.Flags().BoolVar(&yes, "yes", false, "write the tombstones; without it the command only reports")
 	cmd.Flags().Float64Var(&maxFraction, "max-fraction", 0.1,
 		"refuse to retract more than this fraction of the source's live facets in one run")
+	cmd.Flags().StringVar(&facetID, "facet", "",
+		"retract this one facet of the source by hand (for a source with no importer snapshot)")
 	cmd.Flags().BoolVar(&retired, "retired", false,
 		"the source is retired, not rescanned: plan every live facet it holds (needs --max-fraction 1 to write)")
 	return cmd

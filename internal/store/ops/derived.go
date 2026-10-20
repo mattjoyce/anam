@@ -244,7 +244,7 @@ func (d *DB) TouchingEdges(ctx context.Context, facetID string) (Touching, error
 	if err != nil {
 		return Touching{}, fmt.Errorf("ops: read edges touching %s: %w", facetID, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var r EdgeRow
 		var factTime string

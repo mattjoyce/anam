@@ -23,6 +23,7 @@ It serves on the configured address (listen, ANAM_LISTEN):
     GET  /v1/status                     ledger id, W, and each importer's last batch
     GET  /v1/timeline                   the timeline read, with the reader's zone
     GET  /v1/changes                    anam-events in a window of anam-time
+    GET  /v1/coverage                   each type's count, fact-time range and sources at a W
     GET  /v1/receipts[/{hash}[/verify]] receipts: list, show, prove
     POST /v1/receipts                   publish a timeline read through a projection, with a receipt
     GET  /v1/projections[/{name}[/{v}]] the projection templates: list, newest, one version

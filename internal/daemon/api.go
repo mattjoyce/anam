@@ -54,6 +54,7 @@ func (d *Daemon) routes() []route {
 		f("GET /v1/status", anyRole, d.getStatus),
 		f("GET /v1/timeline", anyRole, d.getTimeline),
 		f("GET /v1/changes", anyRole, d.getChanges),
+		f("GET /v1/coverage", anyRole, d.getCoverage),
 		f("GET /v1/receipts", anyRole, d.getReceipts),
 		f("POST /v1/receipts", anyRole, d.postReceipt),
 		f("GET /v1/receipts/{hash}", anyRole, d.getReceipt),
@@ -413,4 +414,27 @@ func writeError(w http.ResponseWriter, status int, err error) {
 
 func sortSources(s []api.SourceStatus) {
 	sort.Slice(s, func(i, j int) bool { return s[i].Source < s[j].Source })
+}
+
+// getCoverage counts what the record holds at the head or at a named W, type by type
+// and source by source (card 90), on the read handles and under the request's bound.
+func (d *Daemon) getCoverage(w http.ResponseWriter, r *http.Request) {
+	q, err := api.CoverageQueryOf(r.URL.Query())
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := namedZone(q.Zone); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
+	defer cancel()
+	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts, Definitions: d.defs.current.Load(), Projections: d.projections.current.Load()}
+	c, err := read.Coverage(ctx, src, q)
+	if err != nil {
+		writeReadError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, c)
 }

@@ -178,6 +178,7 @@ var apiTypes = map[string]func() any{
 	"Status":               func() any { return new(api.Status) },
 	"Timeline":             func() any { return new(api.Timeline) },
 	"Changes":              func() any { return new(api.Changes) },
+	"Coverage":             func() any { return new(api.Coverage) },
 	"Receipts":             func() any { return new(api.Receipts) },
 	"ReceiptShown":         func() any { return new(api.ReceiptShown) },
 	"ReceiptVerified":      func() any { return new(api.ReceiptVerified) },

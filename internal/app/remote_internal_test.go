@@ -299,6 +299,7 @@ func TestTimeline_ABadQueryIsTheSameErrorOverTheDaemon(t *testing.T) {
 		{"timeline", "--at", "2026-01-01", "--to", "2026-01-02"},
 		{"timeline", "--projection", "no-such-projection"},
 		{"changes", "--since", "yesterday"},
+		{"coverage", "--projection", "no-such-projection"},
 	} {
 		_, _, localErr := cli(t, f.cfgPath, args...)
 		_, _, remoteErr := cli(t, f.remoteCfg, args...)
@@ -319,6 +320,24 @@ func TestChanges_SameOverTheDaemon(t *testing.T) {
 		t.Errorf("changes missed the readings:\n%s", out)
 	}
 	f.sameOutput(t, "changes", "--since", "2000-01-01", "--until", "2000-01-02")
+}
+
+// Card 90: coverage is one value, rendered alike from the local files and the daemon.
+func TestCoverage_SameOverTheDaemon(t *testing.T) {
+	t.Parallel()
+	f := newRemoteFixture(t)
+	out := f.sameOutput(t, "coverage")
+	if !strings.Contains(out, "health.blood-pressure  3") {
+		t.Errorf("coverage missed the readings:\n%s", out)
+	}
+	for _, args := range [][]string{
+		{"coverage", "--json"},
+		{"coverage", "--w", "1"},
+		{"coverage", "--as-of", "2000-01-01"},
+		{"coverage", "--projection", "bp"},
+	} {
+		f.sameOutput(t, args...)
+	}
 }
 
 // The daemon has no zone of its own, so a query that names Local is refused rather

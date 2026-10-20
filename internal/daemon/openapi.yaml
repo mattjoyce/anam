@@ -185,6 +185,50 @@ paths:
         "500": { $ref: "#/components/responses/IndexWrong" }
         "503": { $ref: "#/components/responses/LedgerUnavailable" }
         "504": { $ref: "#/components/responses/Timeout" }
+  /v1/coverage:
+    get:
+      operationId: getCoverage
+      tags: [record]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: Coverage
+      summary: What the record holds, type by type, at a watermark.
+      description: >-
+        For each type in the value at the head, or at as_of or w: how many live facets,
+        the earliest and latest fact-time among them, and each source's share. With
+        projection it counts what that template serves. It is counted from the same
+        value the timeline reads, so the same W gives the same answer, and canonical
+        (or the projection's hash) names it. Coverage says what is recorded, never that
+        a source is complete: freshness is GET /v1/status's, and a gap in fact-time may
+        be a gap in the world. A read with no checkpoint to start from folds the whole
+        ledger within the timeout, or answers 504.
+      parameters:
+        - { $ref: "#/components/parameters/AsOf" }
+        - { $ref: "#/components/parameters/W" }
+        - { $ref: "#/components/parameters/Projection" }
+        - { $ref: "#/components/parameters/Zone" }
+        - { $ref: "#/components/parameters/AnamTimeout" }
+      responses:
+        "200":
+          description: the coverage
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Coverage" }
+              example:
+                w: 33378
+                ledger_id: 6f1c2d3e-4a5b-4c6d-8e7f-9a0b1c2d3e4f
+                live: 14609
+                canonical: sha256:1976fb0a4cfc1313ce243c81ae29b34671610d8c3898da3dab3a40a67d737d02
+                types:
+                  - type: health.blood-pressure
+                    count: 1204
+                    earliest: "2019-03-02T21:10:00.000000000Z"
+                    latest: "2026-10-18T20:31:00.000000000Z"
+                    sources:
+                      - { source: bp-csv, count: 1180, earliest: "2019-03-02T21:10:00.000000000Z", latest: "2026-02-10T18:04:00.000000000Z" }
+                      - { source: garmin, count: 24, earliest: "2026-02-14T19:40:00.000000000Z", latest: "2026-10-18T20:31:00.000000000Z" }
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "504": { $ref: "#/components/responses/Timeout" }
   /v1/receipts:
     get:
       operationId: getReceipts
@@ -1221,6 +1265,34 @@ components:
         frame: { $ref: "#/components/schemas/Frame" }
         verdicts: { type: array, items: { $ref: "#/components/schemas/VerdictRow" } }
         counts: { $ref: "#/components/schemas/VerdictCounts" }
+    Coverage:
+      type: object
+      description: what is recorded at w, never that a source is complete
+      required: [w, ledger_id, live, canonical, types]
+      properties:
+        w: { type: integer, format: int64 }
+        ledger_id: { type: string, format: uuid }
+        live: { type: integer, description: facets counted, the whole person's or what the projection served }
+        canonical: { type: string, description: the whole-person value's hash at w }
+        projection: { $ref: "#/components/schemas/ProjectionRead" }
+        types: { type: array, items: { $ref: "#/components/schemas/TypeCoverage" } }
+    TypeCoverage:
+      type: object
+      required: [type, count, earliest, latest, sources]
+      properties:
+        type: { type: string }
+        count: { type: integer }
+        earliest: { $ref: "#/components/schemas/AnamTime" }
+        latest: { $ref: "#/components/schemas/AnamTime" }
+        sources: { type: array, items: { $ref: "#/components/schemas/SourceCoverage" } }
+    SourceCoverage:
+      type: object
+      required: [source, count, earliest, latest]
+      properties:
+        source: { type: string }
+        count: { type: integer }
+        earliest: { $ref: "#/components/schemas/AnamTime" }
+        latest: { $ref: "#/components/schemas/AnamTime" }
     Changes:
       type: object
       required: [index_seq, w, since, changes]

@@ -254,6 +254,9 @@ func Parse(raw []byte) (Definition, error) {
 		d.schema = s
 		// compileSchema has just decoded the same bytes, so this cannot fail.
 		_ = json.Unmarshal(m.Schema, &d.tree)
+		if err := checkSourceTimeShape(d.tree); err != nil {
+			return Definition{}, err
+		}
 	}
 	loc, err := time.LoadLocation(d.FactTime.Zone)
 	if err != nil {

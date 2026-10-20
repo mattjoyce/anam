@@ -131,6 +131,10 @@ does not stay buried in the payload, and that promotion is load-bearing: it is w
 ordered and a span filtered without anything ever parsing a payload. Narrowed with `--from`/`--to`, which
 is a *derived span* and **not** an as-of. Contrast *Anam-time*; see *Bitemporal*, *Span*.
 
+A wall clock the zone skips or repeats at a daylight-saving change names no single instant, and the
+gate refuses it rather than choose (card 197). How the source's clock was read is the payload's
+*Source time*.
+
 **Series** — Which facets are repeated statements about one thing over time, so that a *Snapshot*
 can keep the latest per thing. Neither identity (every change is its own row) nor type (`health.medication-started`
 and `health.medication-stopped` are one regimen). A Definition declares a series **family** (`med.regimen`, named like
@@ -290,6 +294,15 @@ Anam-time becomes historically meaningful only when ingest is incremental. Contr
 
 **Source** — A capture origin, named **lower-case hyphenated**: `garmin`, `bp-csv`. The identity that
 appears in provenance and cursors. See *Importer*.
+
+**Source time** — The payload's `source_time` (card 197): the fact time as the source supplied it
+(`value`), the zone that value is read in (`zone`, an IANA name, `UTC` or a fixed offset), and who
+decided that zone (`basis`: `source`, `configuration` or `assumption`). It sits beside *Fact-time*,
+which stays the one UTC instant the gate derives, so a reader can tell an offset the source supplied
+from an importer's guess. Its shape is Anam's (`internal/def/sourcetime/`), copied into each
+Definition that carries it and checked at load; a type that needs it lists it in `required`. A
+daily aggregate's interval is not here: it is the Open mHealth `effective_time_frame`, each end at
+its own offset.
 
 **Source ref** — The deterministic natural key identifying **which** source row this is — composed from
 the Definition's declared `identity_key` and **never from the row's values**: `bp-csv:19:<excel_datetime>:1:<reading>`,

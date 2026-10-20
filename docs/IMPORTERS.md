@@ -271,6 +271,21 @@ is harmless. A change is a new version, which may change the schema, classificat
 but not what keys or places a facet. An importer registers its Definitions every time it starts:
 that is a no-op until a manifest changes, and it is how a lost operational store comes back.
 
+A payload says how its source's clock was read in `source_time` (card 197): `value`, the time as
+the source supplied it; `zone`, the IANA zone, `UTC` or fixed offset it is read in; `basis`, who
+decided that zone, `source` (the source supplied it, or the value is UTC by its definition),
+`configuration` (a setting a person made for this source) or `assumption` (the importer chose it,
+and logs that it did; a Definition's zone with nothing behind it is an assumption). A Definition
+carries it by copying one of the shapes in `internal/def/sourcetime/` as a top-level property, and
+requires it as any other field; Parse refuses any other shape, and the gate refuses a zone that
+does not exist. A daily aggregate's interval is the Open mHealth `effective_time_frame`, the interval
+the source counted, each end at its own offset. A Definition whose fact time is a zoneless wall clock
+gets that clock refused when its zone skips or repeats it (a daylight-saving gap or overlap): the
+importer reads the source's offset where there is one, and `anam_importer.clock.local_instant`
+refuses the same cases in Python before it sends. Garmin's types carry it now; the types still read
+from a Sydney wall clock without it are listed in `internal/def/sourcetime_test.go`, and that list
+only shrinks.
+
 A manifest may carry a third block, `handling`, beside `meta` and `schema` (card 166). It holds what
 every writer and reader of the type must agree on for its facts to mean the same thing and the schema
 cannot say: how a drug is named when the name is half the series key, the shape of a self-log id, what

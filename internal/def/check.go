@@ -13,8 +13,9 @@ import (
 // facet-compliant pillar (§6).
 var ErrNotCompliant = errors.New("def: payload not compliant")
 
-// Check holds a decoded payload to the Definition's schema. Verbatim checks nothing
-// here (identity and time are enforced by their own calls).
+// Check holds a decoded payload to the Definition's schema, and a source_time's zone
+// to the zones that exist. Verbatim checks nothing here (identity and time are
+// enforced by their own calls).
 //
 // The schema is closed and its required fields refuse null and "" (schema.go), so a
 // passing payload names no field the Definition does not declare and leaves no
@@ -26,7 +27,7 @@ func (d Definition) Check(doc any) error {
 	if err := d.schema.Validate(doc); err != nil {
 		return fmt.Errorf("%w: %s", ErrNotCompliant, oneLine(err))
 	}
-	return nil
+	return d.checkSourceTime(doc)
 }
 
 // oneLine flattens the validator's indented report into one line for a log or an
@@ -65,6 +66,13 @@ func (d Definition) timeAt(doc any, tf TimeField) (time.Time, error) {
 	t, err := time.ParseInLocation(tf.Layout, s, d.loc)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("%w: time %s value %q does not parse as %q", ErrNotCompliant, tf.Pointer, s, tf.Layout)
+	}
+	// A wall clock the zone skips or repeats names no one instant, and the gate does
+	// not choose one for the source (card 197).
+	if zoneless(tf.Layout) {
+		if err := oneInstant(tf.Layout, s, t, d.loc); err != nil {
+			return time.Time{}, fmt.Errorf("%w: time %s value %q %v", ErrNotCompliant, tf.Pointer, s, err)
+		}
 	}
 	return t.UTC(), nil
 }

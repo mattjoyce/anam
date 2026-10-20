@@ -2,6 +2,7 @@ package inspect
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -19,6 +20,14 @@ type Checkpoints interface {
 	LastMintRun(ctx context.Context, w int64) (run int64, ok bool, err error)
 	LogSealed(ctx context.Context) (bool, error)
 }
+
+// ErrIndexWrong is how a Checkpoints or Edges handle says the operational index it
+// reads from is wrong (built from another ledger, or ahead of this one), as the
+// daemon's catch-up finds it, rather than merely behind. The daemon wraps its refusal
+// in this; the inspector knows nothing else of "wrong". The facet page refuses on it,
+// as the API's facet route does; the timeline keeps the page and draws the strip red
+// with the words, since the timeline itself is the ledger's and stays right.
+var ErrIndexWrong = errors.New("inspect: the operational index is wrong")
 
 // The three states a bucket can be in, each one hash comparison (card 21, the
 // hard-and-soft-checkpoints decision of 2026-10-06): the bucket's live value at W,

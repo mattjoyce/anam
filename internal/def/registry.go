@@ -101,7 +101,11 @@ func (r *Registry) Identify(env facet.Envelope) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("%w: no definition for %s", ErrNotCompliant, env.Type)
 	}
-	doc, err := Decode(env.Payload)
+	payload, err := d.WithID(env.Source, env.Payload)
+	if err != nil {
+		return "", err
+	}
+	doc, err := Decode(payload)
 	if err != nil {
 		return "", err
 	}

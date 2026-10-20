@@ -155,7 +155,7 @@ records a measure, a reading or an event.
 | `health.medication-started` | 1 | meds | event | A medicine course starting | `id` | `date` |
 | `health.medication-dose-changed` | 1 | meds | event | A change of dose within a course | `id` | `date` |
 | `health.medication-stopped` | 1 | meds | event | A course ending | `id` | `date` |
-| `health.medication-dose` | 1 | meds | event | One dose of a medicine taken at a moment, outside any course | `id` | `taken_at` |
+| `health.medication-dose` | 2 | meds | event | One dose of a medicine taken at a moment, outside any course | `id` | `taken_at` |
 | `health.medication-missed-dose` | 1 | meds | event | A dose the person says they missed | `id` | `date` |
 | `health.medication-compliance` | 1 | meds | measure | The person's own estimate of how well they kept to a course | `id` | `date` |
 | `health.encounter` | 1 | clinical | event | One appointment with a clinic or practitioner | `id` | `date` |

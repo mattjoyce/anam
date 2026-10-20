@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "health.medication-dose",
-    "definition_version": 1,
+    "definition_version": 2,
     "kind": "event",
     "family": "meds",
     "classification": "Sensitive",
@@ -11,10 +11,11 @@
       "fact_time": {"pointer": "/taken_at", "layout": "2006-01-02 15:04", "zone": "Australia/Sydney"}
     },
     "identity_key": ["/id"],
+    "identity_template": "{source}:med/{/drug|slug}/dose/{/taken_at|2006-01-02T15:04}",
     "min_binding_assurance": "medium"
   },
   "handling": {
-    "guidance": "One dose, taken at a moment: a fact that an intake happened, not a statement about a course. drug is the generic name in lower case, the one spelling health.medication-started fixes for the substance (melatonin, paracetamol), so a dose and its regimen share the drug's name. amount and unit are the quantity taken as the pack states it (5 and mg), never a daily total. taken_at is when it was taken, to the minute, in Australia/Sydney; a time worked out rather than read (bedtime, with the hour unknown) is still the time, and source_note says how. course ties the dose to a known regimen's course and is left out for an as-needed or one-off dose; reason says why it was taken when there is no course. The id is <source>:med/<drug-slug>/dose/<taken_at as YYYY-MM-DDTHH:MM>. A dose never appears in the meds regimen projection; the doses projection reads them back at their time."
+    "guidance": "One dose, taken at a moment: a fact that an intake happened, not a statement about a course. drug is the generic name in lower case, the one spelling health.medication-started fixes for the substance (melatonin, paracetamol), so a dose and its regimen share the drug's name. amount and unit are the quantity taken as the pack states it (5 and mg), never a daily total. taken_at is when it was taken, to the minute, in Australia/Sydney; a time worked out rather than read (bedtime, with the hour unknown) is still the time, and source_note says how. course ties the dose to a known regimen's course and is left out for an as-needed or one-off dose; reason says why it was taken when there is no course. The id is declared in identity_template, <source>:med/<drug-slug>/dose/<taken_at as YYYY-MM-DDTHH:MM>, and every writer builds it from there: leave id out and Anam fills it; send it and it must match. A dose never appears in the meds regimen projection; the doses projection reads them back at their time."
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -25,7 +26,7 @@
       "amount": {"type": "number", "exclusiveMinimum": 0, "description": "The quantity taken, in unit: the strength on the pack times what was taken.", "examples": [5]},
       "course": {"type": "number", "description": "The course of this drug the dose belongs to, counting as the regimen does, when the dose is part of a known course. Left out for an as-needed or one-off dose. An annotation the reader may use, not a reference the gate enforces.", "examples": [1]},
       "drug": {"type": "string", "minLength": 1, "description": "The generic drug name in lower case, as the regimen's writer normalised it, so a dose and its course share one spelling.", "examples": ["melatonin"]},
-      "id": {"type": "string", "minLength": 1, "description": "Identity, chosen by the writer: the source prefix, then med, the drug, dose and the moment.", "examples": ["conversation:med/melatonin/dose/2026-10-17T22:30"]},
+      "id": {"type": "string", "minLength": 1, "description": "Identity, composed from the rest by the Definition's identity_template: the source prefix, then med, the drug, dose and the moment. A writer may leave it out and Anam fills it; one that sends it must send exactly the composition.", "examples": ["conversation:med/melatonin/dose/2026-10-17T22:30"]},
       "reason": {"type": "string", "minLength": 1, "description": "Why it was taken, for a dose that belongs to no course, in the person's words.", "examples": ["for sleep"]},
       "source_note": {"type": "string", "minLength": 1, "description": "How the dose was recorded and what the time rests on: said in conversation the next morning, read from a diary, worked out from bedtime. Reader's text, not the source's."},
       "taken_at": {"type": "string", "minLength": 1, "description": "When the dose was taken, YYYY-MM-DD HH:MM in Australia/Sydney. This is the fact time.", "examples": ["2026-10-17 22:30"]},

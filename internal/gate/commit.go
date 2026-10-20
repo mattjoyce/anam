@@ -183,7 +183,7 @@ func (g *Gate) commitPrepared(ctx context.Context, ps []prepared) ([]Result, led
 // prepare runs every pillar that needs no ledger read and derives identity and
 // integrity — everything Commit does before its first Head.
 func (g *Gate) prepare(env facet.Envelope, binding facet.Binding) (prepared, error) {
-	d, doc, err := g.admitChecks(env, binding)
+	env, d, doc, err := g.admitChecks(env, binding)
 	if err != nil {
 		return prepared{}, err
 	}
@@ -285,38 +285,46 @@ type disposition struct {
 
 // admitChecks runs the pillars that need no ledger read: structure, token scope,
 // definition existence and version, assurance floor, size, and compliance.
-func (g *Gate) admitChecks(env facet.Envelope, binding facet.Binding) (def.Definition, any, error) {
+func (g *Gate) admitChecks(env facet.Envelope, binding facet.Binding) (facet.Envelope, def.Definition, any, error) {
 	if err := env.Validate(); err != nil {
-		return def.Definition{}, nil, err
+		return facet.Envelope{}, def.Definition{}, nil, err
 	}
 	if binding.PersonID != g.personID {
-		return def.Definition{}, nil, fmt.Errorf("%w: binding is for %q", ErrAssuranceBelowFloor, binding.PersonID)
+		return facet.Envelope{}, def.Definition{}, nil, fmt.Errorf("%w: binding is for %q", ErrAssuranceBelowFloor, binding.PersonID)
 	}
 	if !g.scopes.Allowed(env.Source, env.Type) {
-		return def.Definition{}, nil, fmt.Errorf("%w: %s → %s", ErrNotAuthorized, env.Source, env.Type)
+		return facet.Envelope{}, def.Definition{}, nil, fmt.Errorf("%w: %s → %s", ErrNotAuthorized, env.Source, env.Type)
 	}
 	d, ok := g.defs.Lookup(env.Type)
 	if !ok {
-		return def.Definition{}, nil, fmt.Errorf("%w: %s", ErrNoDefinition, env.Type)
+		return facet.Envelope{}, def.Definition{}, nil, fmt.Errorf("%w: %s", ErrNoDefinition, env.Type)
 	}
 	if env.DefinitionVersion != 0 && env.DefinitionVersion != d.Version {
-		return def.Definition{}, nil, fmt.Errorf("%w: shaped to v%d, %s is v%d",
+		return facet.Envelope{}, def.Definition{}, nil, fmt.Errorf("%w: shaped to v%d, %s is v%d",
 			ErrDefinitionVersion, env.DefinitionVersion, env.Type, d.Version)
 	}
 	if assuranceRank(binding.Assurance) < assuranceRank(d.MinAssurance) {
-		return def.Definition{}, nil, fmt.Errorf("%w: %s < %s", ErrAssuranceBelowFloor, binding.Assurance, d.MinAssurance)
+		return facet.Envelope{}, def.Definition{}, nil, fmt.Errorf("%w: %s < %s", ErrAssuranceBelowFloor, binding.Assurance, d.MinAssurance)
 	}
 	if len(env.Payload) > g.limits.MaxPayloadBytes {
-		return def.Definition{}, nil, fmt.Errorf("%w: %d bytes > %d", ErrPayloadTooLarge, len(env.Payload), g.limits.MaxPayloadBytes)
+		return facet.Envelope{}, def.Definition{}, nil, fmt.Errorf("%w: %d bytes > %d", ErrPayloadTooLarge, len(env.Payload), g.limits.MaxPayloadBytes)
 	}
+	// A type that declares an id rule has its identity field filled when the envelope
+	// leaves it out and held to the rule when it carries it, before the schema, which
+	// requires the field, sees the payload (card 188).
+	payload, err := d.WithID(env.Source, env.Payload)
+	if err != nil {
+		return facet.Envelope{}, def.Definition{}, nil, err
+	}
+	env.Payload = payload
 	doc, err := def.Decode(env.Payload)
 	if err != nil {
-		return def.Definition{}, nil, err
+		return facet.Envelope{}, def.Definition{}, nil, err
 	}
 	if err := d.Check(doc); err != nil {
-		return def.Definition{}, nil, err
+		return facet.Envelope{}, def.Definition{}, nil, err
 	}
-	return d, doc, nil
+	return env, d, doc, nil
 }
 
 // disposition decides what this commit is by asking the ledger for the facet's

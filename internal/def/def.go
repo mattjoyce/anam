@@ -134,6 +134,14 @@ type Definition struct {
 	Kind   Kind
 	Family string
 
+	// IdentityTemplate is the type's id rule, when it declares one (card 188): a
+	// string every writer builds the identity field from with ComposeID and the gate
+	// checks the envelope against. "" for a type whose writers choose the id. It is
+	// part of the version, and what its placeholders read must be required by the
+	// schema, as the identity key is. The grammar is in idtemplate.go.
+	IdentityTemplate string
+	idParts          []idPart
+
 	// Handling is the manifest's `handling` block as written, a JSON object, or nil
 	// when the manifest has none. Anam reads nothing inside it: it is served to whoever
 	// writes or reads facets of the type, and a change to it is a new version.
@@ -167,6 +175,7 @@ type manifest struct {
 		Series              *Series  `json:"series"`
 		Kind                string   `json:"kind"`
 		Family              string   `json:"family"`
+		IdentityTemplate    string   `json:"identity_template"`
 	} `json:"meta"`
 	Schema   json.RawMessage `json:"schema"`
 	Handling json.RawMessage `json:"handling"`
@@ -197,6 +206,8 @@ func Parse(raw []byte) (Definition, error) {
 		Series:         m.Meta.Series,
 		Kind:           Kind(m.Meta.Kind),
 		Family:         m.Meta.Family,
+
+		IdentityTemplate: m.Meta.IdentityTemplate,
 	}
 
 	// Defaults, applied before validation so the rules below see the final shape.
@@ -214,6 +225,16 @@ func Parse(raw []byte) (Definition, error) {
 	}
 	if err := d.validate(); err != nil {
 		return Definition{}, err
+	}
+	if d.IdentityTemplate != "" {
+		parts, err := parseTemplate(d.IdentityTemplate)
+		if err == nil {
+			err = d.checkTemplate(parts)
+		}
+		if err != nil {
+			return Definition{}, fmt.Errorf("%w: identity_template %q: %v", ErrBadManifest, d.IdentityTemplate, err)
+		}
+		d.idParts = parts
 	}
 	if len(m.Handling) > 0 {
 		var block map[string]json.RawMessage
@@ -314,9 +335,10 @@ func (d Definition) validateSeries() error {
 }
 
 // keyedFields is the top-level field behind every pointer that keys or places a facet:
-// the fact time, the identity key and the series key. The schema must require them.
+// the fact time, the identity key, the identity template's reads and the series key. The schema must require them.
 func (d Definition) keyedFields() []string {
 	ptrs := append([]string{d.FactTime.Pointer}, d.IdentityKey...)
+	ptrs = append(ptrs, templatePointers(d.idParts)...)
 	if d.Series != nil {
 		ptrs = append(ptrs, d.Series.Key...)
 	}

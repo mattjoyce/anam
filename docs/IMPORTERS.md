@@ -179,7 +179,14 @@ A Definition is a JSON manifest in exactly the format of Anam's own (`internal/d
 `meta` carries the type, version, `identity_key`, `time_semantics`, classification and
 `validation_mode`, and may declare `kind` (`measure`, `reading` or `event`) and `family` (a
 lower-case word such as `meds`), which say what the type is so a reader can draw and filter it
-without an edit to Anam; the gate ignores both (card 176). `schema` is closed JSON Schema 2020-12
+without an edit to Anam; the gate ignores both (card 176). It may also declare `identity_template`
+(card 188), the type's id rule for the one identity field the payload carries: literal text with
+`{source}`, `{/pointer}`, `{/pointer|slug}` (lower case, runs of other characters turned to one
+hyphen) and `{/fact_time_pointer|<Go time layout>}` placeholders, as
+`{source}:med/{/drug|slug}/dose/{/taken_at|2006-01-02T15:04}` for `health.medication-dose`. The gate
+fills the identity field from it when an envelope leaves it out, and refuses an envelope whose field
+disagrees, showing both. A writer that wants the id before it sends builds it with `def.ComposeID`;
+one that is not Go leaves the field out. A change of template is a new version. `schema` is closed JSON Schema 2020-12
 (§3, prerequisite 3). A type lives in one
 place. While Anam's binary bundles a type, no importer may register a version of it; an importer
 takes a type over when a release drops it from the binary, registering the same body at the same

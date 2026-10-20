@@ -16,6 +16,7 @@ import (
 	"fmt"
 
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/span"
@@ -43,7 +44,7 @@ type Ops interface {
 	PinLedger(ctx context.Context, ledgerID string) error
 	LastSeq(ctx context.Context) (int64, error)
 	FacetStates(ctx context.Context, ids []string) (map[string]fold.State, error)
-	ApplyReplay(ctx context.Context, fromSeq, uptoSeq int64, events []ops.EventRow, facets []ops.FacetRow) error
+	ApplyReplay(ctx context.Context, fromSeq, uptoSeq int64, events []ops.EventRow, facets []ops.FacetRow, edges []ops.EdgeRow) error
 }
 
 // Result reports what a sync did.
@@ -87,7 +88,7 @@ func Sync(ctx context.Context, l Ledger, o Ops, buckets span.Buckets) (Result, e
 		return Result{}, err
 	}
 
-	facets, err := advance(ctx, l, o, events, buckets)
+	facets, edges, err := advance(ctx, l, o, events, buckets)
 	if err != nil {
 		return Result{}, err
 	}
@@ -99,7 +100,7 @@ func Sync(ctx context.Context, l Ledger, o Ops, buckets span.Buckets) (Result, e
 			Kind: ev.Kind, FacetID: ev.FacetID, ArtifactVersion: ev.ArtifactVersion,
 		}
 	}
-	if err := o.ApplyReplay(ctx, last, int64(head), eventRows, facets); err != nil {
+	if err := o.ApplyReplay(ctx, last, int64(head), eventRows, facets, edges); err != nil {
 		return Result{}, err
 	}
 	return Result{From: last, To: int64(head)}, nil
@@ -110,7 +111,7 @@ func Sync(ctx context.Context, l Ledger, o Ops, buckets span.Buckets) (Result, e
 // mid-sync is therefore invisible here: the artifact versions this replay names were
 // written before it started and never change. Anything the new events did not reach is
 // simply next run's work — the cursor moves with the rows, in one transaction.
-func advance(ctx context.Context, l Ledger, o Ops, events []facet.AnamEvent, buckets span.Buckets) (rows []ops.FacetRow, err error) {
+func advance(ctx context.Context, l Ledger, o Ops, events []facet.AnamEvent, buckets span.Buckets) (rows []ops.FacetRow, edges []ops.EdgeRow, err error) {
 	var ids []string
 	seen := map[string]bool{}
 	for _, ev := range events {
@@ -122,13 +123,13 @@ func advance(ctx context.Context, l Ledger, o Ops, events []facet.AnamEvent, buc
 
 	states, err := o.FacetStates(ctx, ids)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for _, ev := range events {
 		cur, known := states[ev.FacetID]
 		next, err := fold.Apply(cur, known, ev)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		states[ev.FacetID] = next
 	}
@@ -138,7 +139,7 @@ func advance(ctx context.Context, l Ledger, o Ops, events []facet.AnamEvent, buc
 		st := states[id]
 		f, err := l.Version(ctx, id, st.Version)
 		if err != nil {
-			return nil, fmt.Errorf("%w: facet %s replayed to v%d: %v",
+			return nil, nil, fmt.Errorf("%w: facet %s replayed to v%d: %v",
 				fold.ErrCorruptStream, id, st.Version, err)
 		}
 		rows = append(rows, ops.FacetRow{
@@ -146,6 +147,58 @@ func advance(ctx context.Context, l Ledger, o Ops, events []facet.AnamEvent, buc
 			FactTime: clock.Format(f.FactTime), BucketID: buckets.Of(f.FactTime).ID(),
 			Version: st.Version, Status: st.Status, ContentHash: f.Descriptor.ContentHash,
 		})
+		if f.Type == EdgeType && st.Status != facet.StatusTombstoned {
+			ends, err := edgeEnds(f)
+			if err != nil {
+				return nil, nil, fmt.Errorf("%w: facet %s v%d: %v", fold.ErrCorruptStream, id, st.Version, err)
+			}
+			edges = append(edges, ends...)
+		}
+	}
+	return rows, edges, nil
+}
+
+// EdgeType is the facet type whose payload joins facets (card 104): record.note, the
+// note that is an edge. Its Definition declares `from` and `to` as lists of facet ids,
+// `about` as the v1 name of `to`, and `kind` with "about" the meaning when absent;
+// the edge index is derived from those fields and nothing else. A test holds the
+// bundled Definition to declaring them.
+const EdgeType facet.Type = "record.note"
+
+// edgeEnds reads the ends an edge facet's payload names, one row per facet id per
+// side. A payload that does not decode, or whose ends are not lists of strings, is
+// not an admitted value of the Definition, so the stream is corrupt rather than the
+// index a guess.
+func edgeEnds(f facet.Facet) ([]ops.EdgeRow, error) {
+	doc, err := def.Decode(f.Payload.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	kind := "about"
+	if k, err := def.Resolve(doc, "/kind"); err == nil {
+		s, ok := k.(string)
+		if !ok {
+			return nil, fmt.Errorf("kind is not a string")
+		}
+		kind = s
+	}
+	var rows []ops.EdgeRow
+	for _, side := range []struct{ pointer, side string }{{"/from", ops.SideFrom}, {"/to", ops.SideTo}, {"/about", ops.SideTo}} {
+		v, err := def.Resolve(doc, side.pointer)
+		if err != nil {
+			continue // absent: no ends on that side
+		}
+		list, ok := v.([]any)
+		if !ok {
+			return nil, fmt.Errorf("%s is not a list", side.pointer)
+		}
+		for _, item := range list {
+			id, ok := item.(string)
+			if !ok {
+				return nil, fmt.Errorf("%s holds a value that is not a facet id", side.pointer)
+			}
+			rows = append(rows, ops.EdgeRow{EdgeID: f.ID, Kind: kind, Side: side.side, FacetID: id})
+		}
 	}
 	return rows, nil
 }

@@ -49,7 +49,11 @@ a projection, reads it as `GET /v1/timeline` would, and files what it shows with
 receipt records W and the resolved narrowing (`query`: `at`, `from`, `before`, `type`), and
 `/v1/receipts/{hash}/verify` replays it. Reads also take `w`, a watermark, in place of `as_of`, so a
 follow-up stands on a cited read's knowledge. This is the first piece of §5's receipted reads;
-paging and evidence by facet are cards 92 and 91.
+paging is card 92. Evidence by facet is `GET /v1/receipts/{hash}/facets/{facet_id}` (card 91,
+2026-10-21): one facet as the receipt served it, the payload and envelope as admitted, beside
+`links`, the live edge facets that name it on either side (card 104), read from the edge index at
+the index's own watermark and never written into the facet. A facet the receipt did not serve is
+404, since a facet id alone opens nothing a projection did not serve.
 
 **Bounded reads (2026-10-11, card 88).** The daemon answers a read within `max_read_bytes`
 (`ANAM_MAX_READ_BYTES`, default 512 KiB, §3's budget; 0 is no bound), measured over the entries it

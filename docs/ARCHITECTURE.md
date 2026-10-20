@@ -518,7 +518,7 @@ rebuild has to know what it may drop:
 
 | Tier | Tables | Recovery |
 |---|---|---|
-| **Derived** | facet index, anam-event index, checkpoint index, `span_head`, sync cursors | replay the ledger |
+| **Derived** | facet index, edge index (card 104), anam-event index, checkpoint index, `span_head`, sync cursors | replay the ledger |
 | **Provisioned** | Facet Definitions (bundled and registered), bundled projection templates, token scopes | the embedded assets, config, and each importer registering its Definitions again — i.e. git |
 | **Authored** | registered projection templates (card 125), saved span bookmarks, GC state, the operational log | nowhere Anam can reach. Back it up; a registered template also comes back by registering it again from wherever the operator keeps the file |
 | **Disposable** | importers' complete-resend snapshots (card 78): which parts of a run were admitted and which facet ids they carried | the next resend makes another; nothing is tombstoned from here without an operator's `anam retract --yes`, and an incomplete snapshot is dropped after `snapshot_ttl`, a day by default |
@@ -785,7 +785,7 @@ done by the query, over what the projection served, and the answer is a new valu
 change to any facet. Base relations are the envelope (`entry/7` with the entity, type, fact-time, series,
 status, source, and `definition_version`) and the payload fields read from the served copy
 (`attr(E, Pointer, Value)` for any pointer the schema defines, validated as fields are). Bundled
-rules (`current/2`, `displaced/2`) ship as a named, versioned rule set so an agent builds on
+rules (`current/2`, `displaced/2`, and `linked/2` over the edge facets, card 104) ship as a named, versioned rule set so an agent builds on
 Anam's reading of its own time semantics rather than rewriting it. The answer is a receipt like any
 other served thing: it carries the watermark and `ledger_id`, the projection name, version and
 content hash, the definition-set version, the rule-set hash, and the query text; `receipt verify`

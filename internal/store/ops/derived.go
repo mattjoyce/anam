@@ -37,6 +37,38 @@ type EventRow struct {
 	ArtifactVersion int
 }
 
+// EdgeRow is one facet_edge row: one end of a live edge facet (card 104). Side is
+// "from" or "to"; Kind is the edge's kind as its payload says it, "about" when absent.
+type EdgeRow struct {
+	EdgeID  string
+	Kind    string
+	Side    string
+	FacetID string
+}
+
+// The two sides of an edge.
+const (
+	SideFrom = "from"
+	SideTo   = "to"
+)
+
+// Edge is one live edge facet as the index holds it: its id, kind, fact-time, and
+// the facet ids on each side, each side in id order.
+type Edge struct {
+	EdgeID   string
+	Kind     string
+	FactTime string
+	From     []string
+	To       []string
+}
+
+// Touching is the live edges touching one facet, read with the cursor they are
+// current to in one transaction, so the watermark and the rows are one value.
+type Touching struct {
+	LastSeq int64
+	Edges   []Edge
+}
+
 // LastSeq reports how far the derived tier has replayed the ledger: the seq of the
 // last anam-event applied, 0 for a fresh database.
 func (d *DB) LastSeq(ctx context.Context) (int64, error) {
@@ -83,10 +115,12 @@ func (d *DB) FacetStates(ctx context.Context, ids []string) (map[string]fold.Sta
 }
 
 // ApplyReplay lands one catch-up batch: the new anam-events, the changed facets
-// at their new states, and the cursor move to uptoSeq — one transaction, so the
-// derived tier is never half-applied. The cursor is moved conditionally from
-// fromSeq, so two racing catch-ups cannot interleave batches.
-func (d *DB) ApplyReplay(ctx context.Context, fromSeq, uptoSeq int64, events []EventRow, facets []FacetRow) error {
+// at their new states, their edge rows, and the cursor move to uptoSeq — one
+// transaction, so the derived tier is never half-applied. The cursor is moved
+// conditionally from fromSeq, so two racing catch-ups cannot interleave batches.
+// Every changed facet's edge rows are replaced by the ones in edges: a facet that is
+// not an edge, or an edge tombstoned, ends with none.
+func (d *DB) ApplyReplay(ctx context.Context, fromSeq, uptoSeq int64, events []EventRow, facets []FacetRow, edges []EdgeRow) error {
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("ops: begin replay tx: %w", err)
@@ -122,6 +156,16 @@ func (d *DB) ApplyReplay(ctx context.Context, fromSeq, uptoSeq int64, events []E
 			  status = excluded.status, content_hash = excluded.content_hash`,
 			f.FacetID, string(f.Type), f.FactTime, f.BucketID, f.Version, string(f.Status), f.ContentHash); err != nil {
 			return fmt.Errorf("ops: index facet %s: %w", f.FacetID, err)
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM facet_edge WHERE edge_id = ?`, f.FacetID); err != nil {
+			return fmt.Errorf("ops: clear edge rows of %s: %w", f.FacetID, err)
+		}
+	}
+	for _, e := range edges {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO facet_edge (edge_id, kind, side, facet_id) VALUES (?, ?, ?, ?)`,
+			e.EdgeID, e.Kind, e.Side, e.FacetID); err != nil {
+			return fmt.Errorf("ops: index edge %s %s %s: %w", e.EdgeID, e.Side, e.FacetID, err)
 		}
 	}
 
@@ -176,4 +220,49 @@ func (d *DB) ChangesSince(ctx context.Context, since, until string) ([]EventRow,
 		return nil, fmt.Errorf("ops: iterate changes: %w", err)
 	}
 	return out, nil
+}
+
+// TouchingEdges reads the live edges that name facetID on either side, whole (every
+// end of each), with the cursor they are current to. Edges come back in id order.
+func (d *DB) TouchingEdges(ctx context.Context, facetID string) (Touching, error) {
+	tx, err := d.db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return Touching{}, fmt.Errorf("ops: begin edges tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var t Touching
+	err = tx.QueryRowContext(ctx, `SELECT last_seq FROM replay_cursor WHERE id = 1`).Scan(&t.LastSeq)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return Touching{}, fmt.Errorf("ops: read replay cursor: %w", err)
+	}
+	rows, err := tx.QueryContext(ctx, `
+		SELECT e.edge_id, e.kind, e.side, e.facet_id, COALESCE(f.fact_time, '')
+		FROM facet_edge e LEFT JOIN facet_index f ON f.facet_id = e.edge_id
+		WHERE e.edge_id IN (SELECT edge_id FROM facet_edge WHERE facet_id = ?)
+		ORDER BY e.edge_id, e.side, e.facet_id`, facetID)
+	if err != nil {
+		return Touching{}, fmt.Errorf("ops: read edges touching %s: %w", facetID, err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var r EdgeRow
+		var factTime string
+		if err := rows.Scan(&r.EdgeID, &r.Kind, &r.Side, &r.FacetID, &factTime); err != nil {
+			return Touching{}, fmt.Errorf("ops: scan edge row: %w", err)
+		}
+		if n := len(t.Edges); n == 0 || t.Edges[n-1].EdgeID != r.EdgeID {
+			t.Edges = append(t.Edges, Edge{EdgeID: r.EdgeID, Kind: r.Kind, FactTime: factTime})
+		}
+		e := &t.Edges[len(t.Edges)-1]
+		if r.Side == SideFrom {
+			e.From = append(e.From, r.FacetID)
+		} else {
+			e.To = append(e.To, r.FacetID)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return Touching{}, fmt.Errorf("ops: read edges touching %s: %w", facetID, err)
+	}
+	return t, nil
 }

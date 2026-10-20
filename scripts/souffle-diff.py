@@ -62,8 +62,17 @@ latest(E, At) :- before(E, At), entry(E, _, _, S, _, _, _), S != "", !displaced(
 closed(E, At) :- latest(E, At), entry(E, Type, _, _, _, _, _), closes(Type).
 .decl current(e:symbol, at:symbol)
 current(E, At) :- before(E, At), !displaced(E, At), !closed(E, At).
+.decl edge_to(e:symbol, f:symbol)
+edge_to(E, F) :- entry(E, "record.note", _, _, _, _, _), attr(E, P, F), match("/to/.*", P).
+edge_to(E, F) :- entry(E, "record.note", _, _, _, _, _), attr(E, P, F), match("/about/.*", P).
+.decl edge_from(e:symbol, f:symbol)
+edge_from(E, F) :- entry(E, "record.note", _, _, _, _, _), attr(E, P, F), match("/from/.*", P).
+.decl linked(e:symbol, f:symbol)
+linked(E, F) :- edge_to(E, F).
+linked(E, F) :- edge_from(E, F).
 .output current
 .output displaced
+.output linked
 """
 
 # The questions of 2026-10-17, and the selection by payload §8 admits, each as Anam
@@ -262,7 +271,7 @@ def run(args, env, work):
     out = run_souffle(args, work)
     facts = "".join(f'instant("{t}").\n' for t in instants)
     ok = True
-    for relation in ("current", "displaced"):
+    for relation in ("current", "displaced", "linked"):
         ok &= compare(relation, anam_query(args, env, facts, relation), read_souffle(out, relation))
     for q in QUESTIONS:
         ok &= compare(q["relation"], anam_query(args, env, facts + q["anam"], q["relation"]), read_souffle(out, q["relation"]))

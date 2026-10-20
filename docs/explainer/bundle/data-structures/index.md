@@ -12,6 +12,7 @@
 * [Envelope](envelope.md) - The one message that enters the gate; the Go struct the daemon builds from a submitted envelope, with source and injector set from the token.
 * [Facet artifact row](facet-artifact.md) - One row per artifact version in the ledger's facet table: the governing metadata as columns, the payload as an opaque BLOB, and no status column.
 * [Facet index row](facet-index-row.md) - The operational store's derived index of each facet's current version, status, fact-time and bucket, written by catch-up and provably rebuildable by replaying the ledger.
+* [Edge index row](facet-edge-row.md) - The operational store's derived index of each live edge facet's ends, one row per facet id on each side, written by catch-up from the edge's own payload and rebuilt by replaying the ledger.
 * [Fold entry](fold-entry.md) - One live facet in a canonical value: its governing metadata, derived status and payload, with no artifact version and no watermark so the hash is stable across rebuilds.
 * [Importers file](importers-file.md) - The YAML the daemon reads once at start naming each principal, its role, the SHA-256 of its token and, for an importer, the source it submits as and the types it may submit and register.
 * [Projection template](projection-template.md) - An embedded JSON manifest naming a versioned prune: types, statuses, a classification ceiling, a fact-time window and a shape.

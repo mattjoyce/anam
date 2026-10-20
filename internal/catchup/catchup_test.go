@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -79,6 +80,59 @@ func newHarness(t *testing.T) (*gate.Gate, *ledger.Ledger, *ops.DB) {
 	}
 	scopes := gate.StaticScopes{"bp-csv": {"health.blood-pressure"}}
 	return gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}), l, db
+}
+
+// noteHarness is newHarness with the bundled record.note beside the readings, and a
+// records source allowed to write it, so a test can assert an edge about a reading.
+func noteHarness(t *testing.T) (*gate.Gate, *ledger.Ledger, *ops.DB) {
+	t.Helper()
+	ctx := context.Background()
+	l, err := ledger.Create(ctx, filepath.Join(t.TempDir(), "ledger.db"), person)
+	if err != nil {
+		t.Fatalf("ledger.Create: %v", err)
+	}
+	t.Cleanup(func() { _ = l.Close() })
+	db, err := ops.Open(ctx, filepath.Join(t.TempDir(), "tracking.db"), testBuckets(t))
+	if err != nil {
+		t.Fatalf("ops.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	bp, err := def.Parse([]byte(bpManifest))
+	if err != nil {
+		t.Fatalf("def.Parse: %v", err)
+	}
+	bundled, err := def.Bundled()
+	if err != nil {
+		t.Fatalf("def.Bundled: %v", err)
+	}
+	note, ok := bundled.Lookup(catchup.EdgeType)
+	if !ok {
+		t.Fatalf("no bundled %s", catchup.EdgeType)
+	}
+	reg, err := def.NewRegistry(bp, note)
+	if err != nil {
+		t.Fatalf("NewRegistry: %v", err)
+	}
+	scopes := gate.StaticScopes{"bp-csv": {"health.blood-pressure"}, "records": {catchup.EdgeType}}
+	return gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}), l, db
+}
+
+func commitNote(t *testing.T, g *gate.Gate, id, payload string) gate.Result {
+	t.Helper()
+	env := facet.Envelope{
+		Type: catchup.EdgeType, Source: "records", Injector: "records",
+		SourceRef: facet.SourceRef("records", id),
+		Payload:   []byte(`{"id": "` + id + `", "at": "2026-10-09 11:29", ` + payload + `}`),
+	}
+	binding, err := g.Resolve(env)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	res, _, err := g.Commit(context.Background(), env, binding)
+	if err != nil {
+		t.Fatalf("Commit note: %v", err)
+	}
+	return res
 }
 
 func commit(t *testing.T, g *gate.Gate, measuredAt, reading string) gate.Result {
@@ -204,7 +258,7 @@ func TestSync_RefusesACursorAheadOfTheLedger(t *testing.T) {
 	ctx := context.Background()
 
 	commit(t, g, "2026-03-01T06:30:00Z", `"systolic": 120, "diastolic": 78`)
-	if err := db.ApplyReplay(ctx, 0, 99, nil, nil); err != nil {
+	if err := db.ApplyReplay(ctx, 0, 99, nil, nil, nil); err != nil {
 		t.Fatalf("force cursor: %v", err)
 	}
 
@@ -312,5 +366,99 @@ func TestChangesSince_ReturnsABatchsSharedInstantWhole(t *testing.T) {
 		t.Fatalf("ChangesSince up to the instant: %v", err)
 	} else if len(upto) != n {
 		t.Errorf("up to the batch's instant = %d changes, want %d (the bound is inclusive)", len(upto), n)
+	}
+}
+
+// The edge index is derived from the edges' own payloads (card 104): a note about a
+// reading is an edge touching it; a new version naming another reading moves the
+// edge; a retraction removes it; and a fresh store replayed from genesis holds exactly
+// what the incremental syncs left.
+func TestSync_DerivesTheEdgeIndex(t *testing.T) {
+	t.Parallel()
+	g, l, db := noteHarness(t)
+	ctx := context.Background()
+
+	a := commit(t, g, "2026-01-24T06:30:00Z", `"systolic": 118, "diastolic": 76`)
+	b := commit(t, g, "2026-01-25T06:30:00Z", `"systolic": 121, "diastolic": 79`)
+	n := commitNote(t, g, "note:1", `"about": ["`+a.FacetID+`"], "text": "During a large work meeting, presenting."`)
+	if _, err := catchup.Sync(ctx, l, db, testBuckets(t)); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	got, err := db.TouchingEdges(ctx, a.FacetID)
+	if err != nil {
+		t.Fatalf("TouchingEdges: %v", err)
+	}
+	if len(got.Edges) != 1 || got.Edges[0].EdgeID != n.FacetID || got.Edges[0].Kind != "about" ||
+		!reflect.DeepEqual(got.Edges[0].To, []string{a.FacetID}) || got.Edges[0].From != nil || got.LastSeq != 3 {
+		t.Fatalf("touching a = %+v, want the note about a at seq 3", got)
+	}
+
+	// A v2 writer: the note now names b on its to side and says its kind; a is free.
+	commitNote(t, g, "note:1", `"kind": "about", "to": ["`+b.FacetID+`"], "text": "The next morning."`)
+	if _, err := catchup.Sync(ctx, l, db, testBuckets(t)); err != nil {
+		t.Fatalf("second Sync: %v", err)
+	}
+	if got, _ := db.TouchingEdges(ctx, a.FacetID); len(got.Edges) != 0 {
+		t.Errorf("after the move, a is touched by %+v", got.Edges)
+	}
+	if got, _ := db.TouchingEdges(ctx, b.FacetID); len(got.Edges) != 1 || !reflect.DeepEqual(got.Edges[0].To, []string{b.FacetID}) {
+		t.Errorf("after the move, b is touched by %+v", got.Edges)
+	}
+
+	// A second edge, a model's reading: from a draft (here, a reading stands in) to the note.
+	commitNote(t, g, "interp:1", `"kind": "interpreted_from", "from": ["`+a.FacetID+`"], "to": ["`+n.FacetID+`"]`)
+	if _, err := catchup.Sync(ctx, l, db, testBuckets(t)); err != nil {
+		t.Fatalf("third Sync: %v", err)
+	}
+	byNote, _ := db.TouchingEdges(ctx, n.FacetID)
+	if len(byNote.Edges) != 1 || byNote.Edges[0].Kind != "interpreted_from" || !reflect.DeepEqual(byNote.Edges[0].From, []string{a.FacetID}) {
+		t.Errorf("the note is touched by %+v, want the interpretation from a", byNote.Edges)
+	}
+
+	// Retracting the note removes its edge; the interpretation still names it.
+	if _, _, err := g.Retract(ctx, n.FacetID); err != nil {
+		t.Fatalf("Retract: %v", err)
+	}
+	if _, err := catchup.Sync(ctx, l, db, testBuckets(t)); err != nil {
+		t.Fatalf("fourth Sync: %v", err)
+	}
+	if got, _ := db.TouchingEdges(ctx, b.FacetID); len(got.Edges) != 0 {
+		t.Errorf("after the retraction, b is touched by %+v", got.Edges)
+	}
+
+	// Provably derived: a fresh store replayed from genesis agrees, facet by facet.
+	fresh, err := ops.Open(ctx, filepath.Join(t.TempDir(), "fresh.db"), testBuckets(t))
+	if err != nil {
+		t.Fatalf("ops.Open fresh: %v", err)
+	}
+	t.Cleanup(func() { _ = fresh.Close() })
+	if _, err := catchup.Sync(ctx, l, fresh, testBuckets(t)); err != nil {
+		t.Fatalf("Sync fresh: %v", err)
+	}
+	for _, id := range []string{a.FacetID, b.FacetID, n.FacetID} {
+		inc, _ := db.TouchingEdges(ctx, id)
+		full, _ := fresh.TouchingEdges(ctx, id)
+		if !reflect.DeepEqual(inc, full) {
+			t.Errorf("replay from genesis disagrees for %s: %+v vs %+v", id, full, inc)
+		}
+	}
+}
+
+// The edge index reads fields the bundled Definition of the edge type declares, and
+// nothing else; the Definition is held to declaring them.
+func TestEdgeType_DeclaresItsEnds(t *testing.T) {
+	t.Parallel()
+	bundled, err := def.Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, ok := bundled.Lookup(catchup.EdgeType)
+	if !ok {
+		t.Fatalf("no bundled %s", catchup.EdgeType)
+	}
+	for _, p := range []string{"/kind", "/from/0", "/to/0", "/about/0"} {
+		if err := d.HasPointer(p); err != nil {
+			t.Errorf("%s does not declare %s: %v", catchup.EdgeType, p, err)
+		}
 	}
 }

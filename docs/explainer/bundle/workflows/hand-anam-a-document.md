@@ -60,8 +60,8 @@ steps:
     label: admit as any batch
     action: "The gate admits the references as in [admit a batch](/workflows/admit-a-batch.md). The `path` is the document's name and identity: the same file resent is a no-op, and a rescan under the same path with other bytes supersedes the facet while the first bytes stay in the library."
     ends: true
-    resource: internal/daemon/envelopes.go#postEnvelopes
-    anchor: "if err := checkReferences(d.cfg.LibraryDir, envs); err != nil {"
+    resource: internal/daemon/envelopes.go#admitBatch
+    anchor: "if err := checkReferences(d.cfg.LibraryDir, b.envs); err != nil {"
 ---
 
 Before card 102 the library was a folder Anam's documents worker read in place, and something outside Anam put the files there. Now the bytes come in over the importer's token like the envelopes do, so the library has one writer and a reference can be checked against the bytes it names. Card 150 named each stored file by its sha256, so a changed document no longer needs a new path: its new bytes are a new file and its facet supersedes. Where a file sits is the [library](/components/library.md)'s own business and never enters a fact. The inspector serves a reference's bytes by sha256, confined to the library (see [inspector](/components/inspect.md)).

@@ -42,6 +42,7 @@ runs, nothing else may open those files. Ask it over HTTP instead.
 | `GET /v1/definitions[/{type}[/{version}]]` | reader, importer, operator | The published Definitions: list, current manifest, one version. |
 | `POST /v1/definitions` | importer | Register a Definition the importer emits. 201 new, 200 same body, 409 immutable or re-keyed. An `any_type` importer registers none (card 177). A Definition may carry a `handling` block, served verbatim (card 166). |
 | `POST /v1/envelopes` | importer | A batch of up to 49 envelopes, admitted whole (200, per-envelope outcomes) or refused whole (422, every reason). 503 with `Retry-After` while a write runs. The operator's token gets 403. A resend-everything run labels its batches as parts of one `snapshot`. Contract: `docs/IMPORTERS.md` §8. |
+| `POST /v1/entry` | operator | One fact entered by hand, admitted as source `workbench` (card 188): body `{type, definition_version, payload}`, no source or id. Answers `admitted`, `superseded` or `no-op` with the facet id, seq and `w`. 404 if the importers file declares no `workbench` principal; 409 for a stale `definition_version`; 422 with the gate's reasons. Behind the origin guard. |
 | `POST /v1/documents?ext=` | importer, with `record.document` | Store a document's bytes in the library, named by their sha256 (cards 102, 150). 201 stored, 200 already held; never a conflict. A `record.document` envelope naming a sha256 the library does not hold is refused. |
 | `GET /v1/snapshots/{id}` | reader, operator; an importer its own runs | A complete resend's report: parts admitted, whether it is complete, and what the source no longer holds (`absent`, judged from the snapshot's start). 404 unknown, or another importer's. |
 | `GET /` and below | operator | The inspector (timeline, facets, events, documents). Browser: basic auth, any user name, the token as password. |
@@ -57,8 +58,8 @@ out is 504. Every token belongs to a principal with a role (card 89, `docs/API.m
 operator's is `token_file`; the rest live in `importers_file` (`ANAM_IMPORTERS_FILE`) as SHA-256
 hashes, importers under `importers` with their source and `types` (or `any_type: true`, which submits every type and registers none, card 177), readers and others under
 `principals` with a name and a role. A role the route does not admit is 403, naming the
-principal and the roles the route takes. There is no API for retraction; that is local maintenance (`docs/API.md`). A fact is written only
-as an envelope, by an importer.
+principal and the roles the route takes. A fact is written only
+as an envelope, by an importer, or entered by hand by the operator at `POST /v1/entry`, which the daemon admits as source `workbench`. One facet of a source nobody resends is retracted by hand with `POST /v1/facets/{id}/retract` (`docs/API.md`).
 
 ## The MCP adapter
 

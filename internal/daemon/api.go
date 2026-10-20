@@ -76,6 +76,7 @@ func (d *Daemon) routes() []route {
 		f("POST /v1/checkpoints", operatorOnly, d.postCheckpoints),
 		f("POST /v1/backups", operatorOnly, d.postBackups),
 		f("POST /v1/facets/{id}/retract", operatorOnly, d.postFacetRetract),
+		f("POST /v1/entry", operatorOnly, d.postEntry),
 		{"/", operatorOnly, inspector},
 	}
 }

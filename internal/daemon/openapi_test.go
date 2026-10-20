@@ -129,7 +129,12 @@ func TestOpenAPI_ExamplesDecodeIntoTheAPITypes(t *testing.T) {
 			}
 		}
 	}
-	// The one request body with an example is a Submission.
+	if ex := s.Paths["/v1/entry"]["post"].RequestBody.Content["application/json"].Example; ex != nil {
+		if err := decodeStrict(ex, new(api.EntryRequest)); err != nil {
+			t.Errorf("POST /v1/entry request example does not decode into api.EntryRequest: %v", err)
+		}
+	}
+	// The other request body with an example is a Submission.
 	if ex := s.Paths["/v1/envelopes"]["post"].RequestBody.Content["application/json"].Example; ex != nil {
 		if err := decodeStrict(ex, new(api.Submission)); err != nil {
 			t.Errorf("POST /v1/envelopes request example does not decode into api.Submission: %v", err)
@@ -189,6 +194,7 @@ var apiTypes = map[string]func() any{
 	"StoredDocument":       func() any { return new(api.StoredDocument) },
 	"Backup":               func() any { return new(api.Backup) },
 	"Retraction":           func() any { return new(api.Retraction) },
+	"Entry":                func() any { return new(api.Entry) },
 	"QueryCatalogue":       func() any { return new(api.QueryCatalogue) },
 	"QueryAnswer":          func() any { return new(api.QueryAnswer) },
 }

@@ -27,7 +27,20 @@ new `w`. It plans inside the write queue's one write, with the plan `anam retrac
 applies, and refuses with 409 a facet of another source, a facet that is not live, and a source an
 importer declares and has completed a snapshot for (its next resend reconciles it); 404 for a facet the
 ledger does not hold. Like the other writes it is 403 to a browser on another site, and 503 while another
-write holds the queue. The artifact stays, and a read as of before the tombstone still shows the facet. `POST /v1/envelopes` and the `/v1/definitions`
+write holds the queue. The artifact stays, and a read as of before the tombstone still shows the facet.
+`POST /v1/entry` (card 188, slice 2) enters one fact by hand, as the operator, for the Workbench. The
+body is `{"type", "definition_version", "payload"}` and nothing else: no source, injector or id. The daemon
+submits the one envelope as the `workbench` principal the importers file declares (a source with no token and
+`types` as its allow-list; [IMPORTERS.md](IMPORTERS.md) §8.2), through the same write as `POST /v1/envelopes`,
+so the gate, the write queue, the index catch-up, `/v1/status` and the mint are the same. The gate fills the
+identity field from the Definition's `identity_template`, or refuses a payload that lacks it when the type
+declares none. The answer is `outcome` (`admitted`, `superseded` for a new version of a facet already held, or
+`no-op`), the `facet_id`, the `artifact_version`, the `seq` of the event it wrote (none for a no-op) and `w`.
+404 when the importers file declares no workbench principal; 409 when `definition_version` is not the type's
+version in force; 422 with the gate's reasons, verbatim, for a type outside the workbench's types or a payload
+the Definition refuses; 403 to any role but the operator and to a browser on another site; 503 while another
+write holds the queue. A fact entered this way is under source `workbench`; `source`, not `source_schema`, is
+where a fact came from. `POST /v1/envelopes` and the `/v1/definitions`
 routes (card 53) are the importers' side, under importers' own tokens; their contract is
 [IMPORTERS.md](IMPORTERS.md) §8.
 
@@ -187,7 +200,7 @@ or under `importers`, the file's first shape, where each entry is an importer na
 |---|---|
 | `reader` | Every read: status, timeline, changes, receipts and their verification, projections, checkpoints, Definitions, snapshots. Publishing a read (`POST /v1/receipts`), which writes artifacts and never the ledger |
 | `importer` | A reader's routes, and envelopes, documents and Definition registration, as its one source and for its types only. With `any_type` in place of `types` it submits every type the daemon knows, registers none and stores no document (card 177). It sees only its own source's snapshots |
-| `operator` | A reader's routes, and minting, backups, projection templates and the inspector. It submits nothing, since it is no source |
+| `operator` | A reader's routes, and minting, backups, projection templates and the inspector. It submits no envelopes, since it is no source; it enters facts by hand at `POST /v1/entry`, which the daemon admits as the `workbench` source (card 188) |
 
 A route names the roles it admits, in one table (`internal/daemon/api.go`), and a test sends a
 token of each role to every route. No token, or one the daemon does not know, is 401; a token whose

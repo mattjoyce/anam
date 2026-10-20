@@ -22,29 +22,40 @@ type principals map[string]config.Principal
 // loadPrincipals reads the importers file at path, and adds the operator whose token
 // is operator, when there is one. A principal in the file with the operator's token
 // is refused: that token would both run the daemon and act as the principal.
-func loadPrincipals(path string, operator []byte) (principals, error) {
+//
+// The workbench principal, when the file declares one, is returned apart and is not in
+// the map: it has no token, so no request authenticates as it. The daemon submits as it
+// for the operator's entries (POST /entry), which is how an importer's token never
+// reaches a browser.
+func loadPrincipals(path string, operator []byte) (principals, *config.Principal, error) {
 	out := principals{}
 	if operator != nil {
 		out[hashOf(operator)] = config.Principal{Name: config.OperatorName, Role: config.RoleOperator}
 	}
 	if path == "" {
-		return out, nil
+		return out, nil, nil
 	}
 	reg, err := def.Bundled()
 	if err != nil {
-		return nil, fmt.Errorf("daemon: %w", err)
+		return nil, nil, fmt.Errorf("daemon: %w", err)
 	}
 	list, err := config.LoadPrincipals(path, reg.Has)
 	if err != nil {
-		return nil, fmt.Errorf("daemon: %w", err)
+		return nil, nil, fmt.Errorf("daemon: %w", err)
 	}
+	var workbench *config.Principal
 	for _, p := range list {
+		if p.Source == config.WorkbenchSource {
+			wb := p
+			workbench = &wb
+			continue
+		}
 		if _, taken := out[p.TokenSHA256]; taken {
-			return nil, fmt.Errorf("daemon: %w: %s has the operator's token", config.ErrInvalidImporters, p.Name)
+			return nil, nil, fmt.Errorf("daemon: %w: %s has the operator's token", config.ErrInvalidImporters, p.Name)
 		}
 		out[p.TokenSHA256] = p
 	}
-	return out, nil
+	return out, workbench, nil
 }
 
 func hashOf(token []byte) string {

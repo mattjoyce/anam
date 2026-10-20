@@ -8,6 +8,16 @@ decisions is in `journal/`.
 
 ## 2026-10-20
 
+- The operator can enter a fact by hand through `POST /v1/entry` (card 188, slice 2). The importers
+  file may declare a `workbench` principal (`source: workbench`, `types: [...]`, no token; a
+  `token_sha256` or `any_type` on it is refused at start), and the daemon admits the operator's entry
+  as that source, so no importer token reaches a browser. The body is `type`, `definition_version`
+  and `payload`, with no source or id: the gate fills the identity field from the Definition's
+  `identity_template`. The answer is `admitted`, `superseded` or `no-op` with the facet id, `seq`
+  and `w`; a stale `definition_version` is 409, a refusal is 422 with the gate's words, and a daemon
+  whose file declares no workbench answers 404. The route and `POST /v1/envelopes` now share one
+  write (`admitBatch`), so both end in the same queue, catch-up, status and mint. To switch it on,
+  add `- source: workbench` with its `types` to the importers file; there is no form yet.
 - A type's id rule can be declared in its Definition (card 188 S1). `meta.identity_template` is a
   string such as `{source}:med/{/drug|slug}/dose/{/taken_at|2006-01-02T15:04}`: literal text, the
   source, and payload fields by JSON pointer with an optional `slug` or time layout. `def.ComposeID`

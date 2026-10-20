@@ -229,7 +229,22 @@ importers:
 - An importer's token opens `POST /v1/envelopes`, `POST /v1/documents` and `POST /v1/definitions`,
   and since card 89 every read a `reader` has: the record, receipts, Definitions, and its own
   source's snapshots. It does not open minting, backups, projection templates or the inspector
-  (403). The operator's token (`token_file`) reads but submits nothing (403).
+  (403). The operator's token (`token_file`) reads but submits no envelopes (403).
+- The `workbench` entry is the one principal with no token (card 188). It lets the operator enter
+  facts by hand at `POST /v1/entry`, which the daemon admits as source `workbench`, so no importer
+  token ever reaches a browser. It is listed with the importers, takes `types` as the allow-list of
+  what may be entered by hand, and a `token_sha256` on it is refused at start, as is `any_type`:
+
+  ```yaml
+  importers:
+    - source: workbench
+      types: [health.medication-dose]
+  ```
+
+  The `workbench` source is reserved. It owns none of its types, so another importer may own one
+  (`types` for a type no binary bundles is that importer's alone), and the workbench registers no
+  Definition. Leave the entry out and `POST /v1/entry` answers 404, saying the file declares no
+  workbench principal. `anam retract workbench --facet <id> --yes` undoes one entry.
 - The same file names principals that are not importers, under `principals`, each with a `name` and
   a `role` (`reader` or `operator`) and no source or types. An importer may be listed there too,
   with `role: importer`, a name, a source and types or `any_type`. Names, sources and token hashes

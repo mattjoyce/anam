@@ -123,6 +123,23 @@ func (f ledgerFixture) admit(t *testing.T, recs []record) ledger.Watermark {
 	return w
 }
 
+// admitHeld is admit under the Definitions in defs, for a type the binary keeps only
+// in its history.
+func (f ledgerFixture) admitHeld(t *testing.T, defs *def.Registry, recs []record) ledger.Watermark {
+	t.Helper()
+	ctx := context.Background()
+	l, err := ledger.Open(ctx, f.ledgerPath, "matt")
+	if err != nil {
+		t.Fatalf("open ledger: %v", err)
+	}
+	defer func() { _ = l.Close() }()
+	w, err := admitUnder(ctx, l, defs, recs)
+	if err != nil {
+		t.Fatalf("admit records: %v", err)
+	}
+	return w
+}
+
 func writeDoc(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {

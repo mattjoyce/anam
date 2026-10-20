@@ -3,26 +3,23 @@ package app
 import (
 	"context"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/facet"
-	"github.com/mattjoyce/anam/internal/span"
 	"github.com/mattjoyce/anam/internal/store/ledger"
-	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
 // Card 194: a rename table splits one type into several by a selector. Every live
 // facet of the type split must match exactly one row; one that matches none, or
 // more than one, stops the dry run and the real run before anything is written.
 
-// sessionOf is an exercise session with the given payload id, a minimal payload the
-// bundled activity.exercise-session takes.
+// sessionOf is an exercise session with the given payload id, a minimal payload
+// activity.exercise-session took and each of its leaves takes. The binary keeps the
+// type only in its history since card 195 split it, so the tests admit sessions
+// under that (admitHeld).
 func sessionOf(id, start string) record {
 	return record{"activity.exercise-session", `{"id": "` + id + `", "activity_name": "rowing.machine", ` +
 		`"effective_time_frame": {"time_interval": {"start_date_time": "` + start + `", "duration": {"value": 1200, "unit": "sec"}}}}`}
@@ -53,43 +50,6 @@ const splitTable = `{"renames": [
   {"from": "activity.exercise-session", "to": "activity.exercise-session.strong", "select": {"pointer": "/id", "prefix": "strong:session:"}}
 ]}`
 
-// registerLeaves registers each leaf in the fixture's operational store, as an
-// importer would, as a copy of the bundled activity.exercise-session under the
-// leaf's name: the same keying and schema, so the ids meet.
-func registerLeaves(t *testing.T, f ledgerFixture, types []facet.Type) {
-	t.Helper()
-	ctx := context.Background()
-	raw, err := os.ReadFile(filepath.Join("..", "def", "manifests", "activity.exercise-session.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	buckets, err := config.Config{BucketWidth: span.Default}.Buckets()
-	if err != nil {
-		t.Fatal(err)
-	}
-	db, err := ops.Open(ctx, filepath.Join(f.dir, "tracking.db"), buckets)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = db.Close() }()
-	for _, typ := range types {
-		var m map[string]any
-		if err := json.Unmarshal(raw, &m); err != nil {
-			t.Fatal(err)
-		}
-		meta := m["meta"].(map[string]any)
-		meta["facet_type"], meta["definition_version"] = string(typ), 1
-		body, err := json.Marshal(m)
-		if err != nil {
-			t.Fatal(err)
-		}
-		row := ops.DefinitionRow{Type: string(typ), Version: 1, Body: string(body)}
-		if err := db.RegisterDefinition(ctx, row, "2026-10-21T00:00:00.000000000Z"); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
 // reportRowTo is the report's row for a rename arriving at to, split into fields.
 func reportRowTo(t *testing.T, out string, to facet.Type) []string {
 	t.Helper()
@@ -106,8 +66,7 @@ func TestRename_SplitsATypeByASelector(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := newLedgerFixture(t)
-	before := f.admit(t, sessions)
-	registerLeaves(t, f, leaves)
+	before := f.admitHeld(t, heldDefs(t, "activity.exercise-session"), sessions)
 	table := renameTableFile(t, f.dir, "split.json", splitTable)
 	asOf, _, err := cli(t, f.cfgPath, "timeline", "--json", "--w", strconv.FormatInt(int64(before), 10))
 	if err != nil {
@@ -197,8 +156,7 @@ func TestRename_SplitsATypeByASelector(t *testing.T) {
 func TestRename_ASplitRefusesAFacetNoOneRowPlaces(t *testing.T) {
 	t.Parallel()
 	f := newLedgerFixture(t)
-	before := f.admit(t, append(append([]record{}, sessions...), sessionOf("polar:session:5", "2026-03-05T07:00:00+11:00")))
-	registerLeaves(t, f, leaves)
+	before := f.admitHeld(t, heldDefs(t, "activity.exercise-session"), append(append([]record{}, sessions...), sessionOf("polar:session:5", "2026-03-05T07:00:00+11:00")))
 
 	cases := []struct {
 		name, table, says string

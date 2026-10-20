@@ -34,14 +34,13 @@ func TestConformance_ExamplesPassTheDefinitionAndThePinnedSchema(t *testing.T) {
 		t.Fatalf("no conformance examples: %v", err)
 	}
 	for _, name := range examples {
-		// <facet type>.<example>.json: the type is the first two dotted parts.
-		parts := strings.SplitN(name, ".", 3)
-		typ := facet.Type(parts[0] + "." + parts[1])
+		// <facet type>[.<example>].json: the type is the longest dotted prefix of the
+		// name that is a bundled type, since a type may have a third segment (card 195).
+		d, ok := typeNamed(reg, strings.TrimSuffix(name, ".json"))
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			d, ok := reg.Lookup(typ)
 			if !ok {
-				t.Fatalf("no bundled definition for %s", typ)
+				t.Fatalf("no bundled definition for %s", name)
 			}
 			raw, err := fs.ReadFile(testdata, name)
 			if err != nil {
@@ -60,6 +59,17 @@ func TestConformance_ExamplesPassTheDefinitionAndThePinnedSchema(t *testing.T) {
 			}
 		})
 	}
+}
+
+// typeNamed is the bundled Definition whose type is the longest dotted prefix of stem.
+func typeNamed(reg *def.Registry, stem string) (def.Definition, bool) {
+	parts := strings.Split(stem, ".")
+	for n := len(parts); n >= 2; n-- {
+		if d, ok := reg.Lookup(facet.Type(strings.Join(parts[:n], "."))); ok {
+			return d, true
+		}
+	}
+	return def.Definition{}, false
 }
 
 // pinnedSchema compiles conformance/<standard>/<name>.json with its sibling files

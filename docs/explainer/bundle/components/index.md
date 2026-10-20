@@ -3,7 +3,7 @@
 * [Admission gate](gate.md) - The only ingress: resolve binds an envelope to the person, commit validates it against its Definition, composes identity, and appends through the ledger idempotently.
 * [anam_bp_csv](importer-bp-csv.md) - Shapes a blood-pressure app export to health.blood-pressure v6, an Open mHealth body beside the export's own text, one reading sent once from the newest export.
 * [anam_documents](importer-documents.md) - Sends a folder of documents with .meta.yaml sidecars as one snapshot of record.document envelopes, each batch naming the files whose bytes anam_submit hands Anam's library before the envelopes go.
-* [anam_dreamstation](importer-dreamstation.md) - Decodes a CPAP SD card copy with the dreamstation package and sends every session as health.cpap-session, a type the binary does not bundle, so it registers its own Definition.
+* [anam_dreamstation](importer-dreamstation.md) - Decodes a CPAP SD card copy with the dreamstation package and sends every session as health.cpap-session.dreamstation, a type the binary does not bundle, so it registers its own Definition.
 * [anam_records](importer-records.md) - Sends a records folder as one snapshot of the bundled types it carries, reading YAML with Go's yaml.v3 rules so every record Anam's own records worker admitted before card 119 resends as no-op.
 * [anam_submit](anam-submit.md) - The one generic plugin that posts batches: makes sure Anam publishes the batch's Definitions, submits under the importer's token, and raises the absent alert on a completed snapshot.
 * [Artifact store (internal/store/artifact)](store-artifact.md) - Content-addressed files under artifact_dir: checkpoint values, served values and receipts, written atomically and re-hashed on read.

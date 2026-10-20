@@ -27,7 +27,7 @@ func TestDefinitions_IndexListsEveryType(t *testing.T) {
 	}
 	for _, want := range []string{
 		`href="/definition?type=health.blood-pressure"`,
-		`href="/definition?type=activity.exercise-session"`,
+		`href="/definition?type=activity.exercise-session.garmin"`,
 		` of `, // the described count, "0 of 15"
 		`name="viewport"`,
 		`href="/definitions"`, // the shared nav

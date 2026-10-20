@@ -7,12 +7,12 @@ resource: internal/daemon/definitions.go#postDefinitions
 anchor: "parsed, err := def.Parse(body)"
 basis: code
 tier: supporting
-trigger: The first `anam_dreamstation` batch reaches a daemon whose binary does not bundle `health.cpap-session`, or an operational store was lost and rebuilt, so the GET below is a 404.
+trigger: The first `anam_dreamstation` batch reaches a daemon whose binary does not bundle `health.cpap-session.dreamstation`, or an operational store was lost and rebuilt, so the GET below is a 404.
 steps:
   - actor: /components/importer-dreamstation.md
     caller: outside
     label: the card run carries its own Definition
-    action: A folder watch on the card copy runs `handle`; every session on the card becomes an envelope of `health.cpap-session`, and each batch event carries the importer's `definitions/health.cpap-session.json` as text, since the binary does not bundle it.
+    action: A folder watch on the card copy runs `handle`; every session on the card becomes an envelope of `health.cpap-session.dreamstation`, and each batch event carries the importer's `definitions/health.cpap-session.dreamstation.json` as text, since the binary does not bundle it.
     writes: [/data-structures/batch-event.md]
     resource: ../anam-importers/dreamstation_card/run.py#batch_events
     anchor: "whole = not card.skipped_files"

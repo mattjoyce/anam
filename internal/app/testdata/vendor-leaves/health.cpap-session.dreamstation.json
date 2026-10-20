@@ -1,0 +1,117 @@
+{
+  "meta": {
+    "facet_type": "health.cpap-session.dreamstation",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "sleep",
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "dreamstation/session",
+    "time_semantics": {
+      "fact_time": {"pointer": "/start", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
+    },
+    "identity_key": ["/device_serial", "/session"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One therapy session as a Philips DreamStation recorded it on its SD card: the summary file's times, settings and statistics, and a tally of the events file. Only what the device wrote. Indexes such as AHI, and anything per night, are reads over these facets. This is the DreamStation leaf of health.cpap-session, the device's own payload shape named for its vendor (anam card 192). Version 1 is health.cpap-session v1 under its leaf's name (anam card 195), every rule unchanged; card 195's rename (renames/vendor-leaves.json in anam) carried each facet across as the next version of itself.",
+    "type": "object",
+    "required": ["device_serial", "session", "start", "duration_seconds", "mask_on_spans", "settings"],
+    "properties": {
+      "device_serial": {"type": "string", "minLength": 1, "description": "The device's serial number, from PROP.TXT (LOINC 69993-4, as reference)."},
+      "device_model": {"type": "string", "minLength": 1, "description": "The model number, from PROP.TXT (LOINC 69991-8, as reference)."},
+      "device_software": {"type": "string", "minLength": 1, "description": "The device's software version, from PROP.TXT."},
+      "session": {"type": "integer", "minimum": 0, "description": "The session number the device gave this session; its files are named for it in hex."},
+      "start": {"type": "string", "minLength": 1, "description": "When the session started, a UTC instant from the summary's header."},
+      "duration_seconds": {"type": "integer", "minimum": 0, "description": "How long the session ran, in seconds."},
+      "mask_on_spans": {
+        "type": "array",
+        "description": "Each span the mask was on, as [start, end] in seconds from the session start.",
+        "items": {"type": "array", "prefixItems": [{"type": "integer", "minimum": 0}, {"type": "integer", "minimum": 0}], "minItems": 2, "maxItems": 2, "items": false}
+      },
+      "settings": {
+        "type": "object",
+        "description": "The settings in force for the session. Pressures in cm H2O.",
+        "required": ["mode"],
+        "properties": {
+          "mode": {"type": "string", "minLength": 1, "description": "Therapy mode, such as cpap, auto_cpap or bilevel."},
+          "pressure": {"type": "number", "description": "Fixed CPAP pressure."},
+          "pressure_min": {"type": "number", "description": "Lower bound of the auto range."},
+          "pressure_max": {"type": "number", "description": "Upper bound of the auto range."},
+          "epap": {"type": "number"},
+          "ipap": {"type": "number"},
+          "epap_min": {"type": "number"},
+          "ipap_max": {"type": "number"},
+          "pressure_support_min": {"type": "number"},
+          "pressure_support_max": {"type": "number"},
+          "ramp_pressure": {"type": "number", "description": "Pressure the ramp starts from."},
+          "auto_trial_days": {"type": "integer", "minimum": 0},
+          "ramp_type": {"type": "string", "minLength": 1, "description": "linear, smart or plus."},
+          "ramp_minutes": {"type": "integer", "minimum": 0},
+          "flex_mode": {"type": "string", "minLength": 1, "description": "Pressure relief: off, c_flex, c_flex_plus, a_flex, bi_flex, rise_time or p_flex."},
+          "flex_level": {"type": "integer", "minimum": 0},
+          "humidifier_target_hours": {"type": "number", "minimum": 0},
+          "tubing_mm": {"type": "integer", "minimum": 0, "description": "Tubing diameter."},
+          "tubing_heated": {"type": "boolean"},
+          "mask_resistance": {"type": "integer", "minimum": 0},
+          "humidifier": {
+            "type": "object",
+            "required": ["mode", "level", "tube_temperature"],
+            "properties": {
+              "mode": {"type": "string", "minLength": 1},
+              "level": {"type": "integer", "minimum": 0},
+              "tube_temperature": {"type": "integer", "minimum": 0}
+            },
+            "additionalProperties": false
+          },
+          "comfort_flags": {"type": "integer", "minimum": 0, "description": "The raw comfort-settings byte, kept as the device wrote it."},
+          "flex_locked": {"type": "boolean"},
+          "mask_resistance_locked": {"type": "boolean"},
+          "tubing_locked": {"type": "boolean"},
+          "show_ahi": {"type": "boolean"},
+          "auto_on": {"type": "boolean"},
+          "auto_off": {"type": "boolean"}
+        },
+        "additionalProperties": false
+      },
+      "pressure": {
+        "type": "object",
+        "description": "The device's own pressure summary for the session, cm H2O.",
+        "required": ["minimum", "maximum", "percentile_90", "mean"],
+        "properties": {
+          "minimum": {"type": "number"},
+          "maximum": {"type": "number"},
+          "percentile_90": {"type": "number"},
+          "mean": {"type": "number"}
+        },
+        "additionalProperties": false
+      },
+      "device_counts": {
+        "type": "object",
+        "description": "The device's own session counts, and minutes of each breathing pattern, from the summary file.",
+        "required": ["obstructive_apneas", "clear_airway_apneas", "hypopneas", "reras", "flow_limitations", "snores",
+                     "large_leak_minutes", "periodic_breathing_minutes", "variable_breathing_minutes"],
+        "properties": {
+          "obstructive_apneas": {"type": "integer", "minimum": 0},
+          "clear_airway_apneas": {"type": "integer", "minimum": 0},
+          "hypopneas": {"type": "integer", "minimum": 0},
+          "reras": {"type": "integer", "minimum": 0},
+          "flow_limitations": {"type": "integer", "minimum": 0},
+          "snores": {"type": "integer", "minimum": 0},
+          "large_leak_minutes": {"type": "integer", "minimum": 0},
+          "periodic_breathing_minutes": {"type": "integer", "minimum": 0},
+          "variable_breathing_minutes": {"type": "integer", "minimum": 0}
+        },
+        "additionalProperties": false
+      },
+      "event_counts": {
+        "type": "object",
+        "description": "How many of each event kind the events file records, by the decoder's name for the kind.",
+        "propertyNames": {"pattern": "^[a-z][a-z0-9_]*$"},
+        "additionalProperties": {"type": "integer", "minimum": 1}
+      }
+    },
+    "additionalProperties": false
+  }
+}

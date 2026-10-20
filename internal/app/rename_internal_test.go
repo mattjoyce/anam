@@ -123,9 +123,10 @@ func TestRename_RefusesBeforeWriting(t *testing.T) {
 	trip := record{"place.trip.departed", `{"id": "self-log:trip/1/departed", "date": "2026-04-01", "trip": "tokyo", "destination": "Tokyo"}`}
 	before := f.admit(t, append(append([]record{}, illnesses...), trip))
 
-	// health.weight is keyed by id and dated by date, as an illness is, but its layout
-	// carries the time of day: a different fact-time rule, so different keying.
-	mis := renameTableFile(t, f.dir, "mis.json", `{"renames": [{"from": "health.illness.started", "to": "health.weight"}]}`)
+	// health.blood-pressure composes its id from date_excel and reading, where an
+	// illness's is its id: another identity key, so the ids would not meet. A different
+	// fact-time rule alone is no refusal (card 195; TestRename_TheTableGivesEachVendorItsLeaf).
+	mis := renameTableFile(t, f.dir, "mis.json", `{"renames": [{"from": "health.illness.started", "to": "health.blood-pressure"}]}`)
 	if _, _, err := cli(t, f.cfgPath, "rename", "--table", mis, "--yes"); err == nil || !strings.Contains(err.Error(), "ids would not meet") {
 		t.Errorf("different keying: %v, want a refusal saying the ids would not meet", err)
 	}

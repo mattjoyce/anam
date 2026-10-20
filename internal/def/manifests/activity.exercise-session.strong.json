@@ -1,0 +1,111 @@
+{
+  "meta": {
+    "facet_type": "activity.exercise-session.strong",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "exercise",
+    "classification": "Confidential",
+    "validation_mode": "strict",
+    "source_schema": "ieee-1752/physical-activity-1.0",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/effective_time_frame/time_interval/start_date_time",
+        "layout": "2006-01-02T15:04:05Z07:00",
+        "zone": "Australia/Sydney"
+      }
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One workout logged in the Strong app, shaped as an IEEE 1752 physical-activity-1.0 payload as strength_training, with the workout's sets beside it. The extractor records/extract/strong_csv.py in anam-importers writes a records file from a Strong CSV export, one record per workout, and the records importer sends it. Values are Strong's own, apart from the start time and the capped duration, which the extractor derives: Strong keeps a workout open until the next one starts, so the interval is at most 3 hours (duration_capped) and Strong's figure stays as reported_duration_sec. This is the Strong leaf of activity.exercise-session: Strong's own payload shape, named for its vendor (card 192), so a reader asks about exercise across the leaves by the prefix activity.exercise-session. and knows which shape each fact has. Version 1 is activity.exercise-session v2 cut to the fields Strong writes, each with the same rules, and its facets came across in card 195's rename (renames/vendor-leaves.json), each the next version of itself with its payload unchanged. The shared core, id, activity_name, effective_time_frame and source, is the same on all four leaves of activity.exercise-session (internal/def/shared-core.json).",
+    "type": "object",
+    "required": ["id", "activity_name", "effective_time_frame"],
+    "properties": {
+      "activity_name": {
+        "type": "string",
+        "description": "The IEEE 1752 activity name: strength_training for every Strong workout.",
+        "examples": ["strength_training"],
+        "enum": [
+          "aerobics", "archery", "badminton", "baseball", "basketball", "biathlon", "biking",
+          "biking.hand", "biking.mountain", "biking.road", "biking.spinning", "biking.stationary",
+          "biking.utility", "boxing", "calisthenics", "circuit_training", "cricket", "crossfit", "curling",
+          "dancing", "diving", "elevator", "elliptical", "ergometer", "escalator", "fencing",
+          "football.american", "football.australian", "football.soccer", "frisbee_disc", "gardening",
+          "golf", "guided_breathing", "gymnastics", "handball", "interval_training.high_intensity",
+          "hiking", "hockey", "horseback_riding", "housework", "ice_skating", "interval_training",
+          "in_vehicle", "jump_rope", "kayaking", "kettlebell_training", "kickboxing", "kick_scooter",
+          "kitesurfing", "martial_arts", "meditation", "martial_arts.mixed", "on_foot", "other", "p90x",
+          "paragliding", "pilates", "polo", "racquetball", "rock_climbing", "rowing", "rowing.machine",
+          "rugby", "running", "running.jogging", "running.sand", "running.treadmill", "sailing",
+          "scuba_diving", "skateboarding", "skating", "skating.cross", "skating.indoor", "skating.inline",
+          "skiing", "skiing.back_country", "skiing.cross_country", "skiing.downhill", "skiing.kite",
+          "skiing.roller", "sledding", "sleep", "sleep.awake", "sleep.deep", "sleep.light", "sleep.rem",
+          "snowboarding", "snowmobile", "snowshoeing", "softball", "squash", "stair_climbing",
+          "stair_climbing.machine", "standup_paddleboarding", "still", "strength_training", "surfing",
+          "swimming", "swimming.open_water", "swimming.pool", "table_tennis", "team_sports", "tennis",
+          "tilting", "treadmill", "unknown", "volleyball", "volleyball.beach", "volleyball.indoor",
+          "wakeboarding", "walking", "walking.fitness", "walking.nordic", "walking.paced",
+          "walking.stroller", "walking.treadmill", "water_polo", "weightlifting", "wheelchair",
+          "windsurfing", "yoga", "zumba"
+        ]
+      },
+      "duration_capped": {"type": "boolean", "description": "True when Strong's reported duration was zero or below, or over 3 hours, so the interval's duration was set to 3 hours by the extractor (Matt's rule). Absent otherwise.", "examples": [true]},
+      "effective_time_frame": {
+        "type": "object",
+        "description": "When the session happened, as an IEEE 1752 time interval.",
+        "examples": [{"time_interval": {"start_date_time": "2020-11-09T06:46:22+11:00", "duration": {"value": 611, "unit": "sec"}}}],
+        "properties": {
+          "time_interval": {
+            "type": "object",
+            "description": "The session's start and length.",
+            "properties": {
+              "duration": {
+                "type": "object",
+                "description": "The session's length in seconds: Strong's reported duration, or 3 hours when duration_capped.",
+                "examples": [{"value": 1260.5, "unit": "sec"}],
+                "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"sec\", set by the extractor."}, "value": {"type": "number", "description": "Seconds, a whole or decimal number."}},
+                "required": ["unit", "value"],
+                "additionalProperties": false
+              },
+              "start_date_time": {"type": "string", "minLength": 1, "description": "The start, ISO 8601 with offset, to the second, derived by the extractor: Strong's \"Date\" column read as Sydney time, so a workout logged abroad is placed as if at home. This is the fact time.", "examples": ["2026-01-24T18:21:08+11:00"]}
+            },
+            "required": ["duration", "start_date_time"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["time_interval"],
+        "additionalProperties": false
+      },
+      "exercises": {"type": "array", "items": {"type": "string", "minLength": 1, "description": "One exercise name, verbatim."}, "description": "The workout's exercise names in the order Strong first lists them, from the \"Exercise Name\" column.", "examples": [["Bench Press (Barbell)", "Squat (Barbell)"]]},
+      "id": {"type": "string", "minLength": 1, "description": "The records row's id: strong:session: and the workout's start as Strong's \"Date\" column writes it.", "examples": ["strong:session:2020-11-09T06:46:22"]},
+      "reported_duration_sec": {"type": "number", "description": "Strong's \"Duration (sec)\" for the workout, always kept as reported, even when it is unusable.", "examples": [3725]},
+      "sets": {
+        "type": "array",
+        "description": "Every row of the Strong workout in file order, set by set, rest timers and notes included.",
+        "items": {
+          "type": "object",
+          "description": "One Strong CSV row, minus the workout-level columns.",
+          "examples": [{"exercise": "Bench Press (Barbell)", "set": "1", "kg": 60, "reps": 8}],
+          "properties": {
+            "distance_m": {"type": "number", "description": "The \"Distance (meters)\" column, in metres.", "examples": [1000]},
+            "exercise": {"type": "string", "minLength": 1, "description": "The \"Exercise Name\" column, verbatim.", "examples": ["Bench Press (Barbell)"]},
+            "kg": {"type": "number", "description": "The \"Weight (kg)\" column, in kilograms.", "examples": [60]},
+            "note": {"type": "string", "minLength": 1, "description": "The row's \"Notes\" column, verbatim."},
+            "reps": {"type": "number", "description": "The \"Reps\" column.", "examples": [8]},
+            "rpe": {"type": "number", "description": "The \"RPE\" column, the rating of perceived exertion as logged."},
+            "seconds": {"type": "number", "description": "The \"Seconds\" column, a timed set's length in seconds.", "examples": [45]},
+            "set": {"type": "string", "minLength": 1, "description": "The \"Set Order\" column as text: a set number, or a marker such as \"Rest Timer\" or \"Note\" for rows that are not sets.", "examples": ["1"]}
+          },
+          "required": ["exercise", "set"],
+          "additionalProperties": false
+        }
+      },
+      "source": {"type": "string", "minLength": 1, "description": "Which app the session came from: always \"Strong\", written by the extractor.", "examples": ["Strong"]},
+      "workout_name": {"type": "string", "minLength": 1, "description": "Strong's \"Workout Name\" column.", "examples": ["Morning Workout"]},
+      "workout_notes": {"type": "array", "items": {"type": "string", "minLength": 1, "description": "One workout note, verbatim."}, "description": "The workout's distinct \"Workout Notes\" values, sorted."}
+    },
+    "additionalProperties": false
+  }
+}

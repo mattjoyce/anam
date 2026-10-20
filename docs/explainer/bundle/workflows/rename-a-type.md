@@ -27,8 +27,8 @@ steps:
     anchor: "is both left and arrived at; one run is one step"
   - actor: /components/def.md
     caller: /components/cli.md
-    label: the two types must key alike
-    action: "`KeyingOf` reads the newest held body of the type left, as Guard does, and `SameKeying` compares it with the Definition in force for the type arrived at. A facet's id is the source and the identity values, so different keying would give different ids: duplicates beside the originals, not versions. The whole run is refused before the fold is read."
+    label: the two types must compose ids alike
+    action: "`KeyingOf` reads the newest held body of the type left, as Guard does, and `SameIdentity` compares its identity key with the Definition in force for the type arrived at. A facet's id is the source and the identity values, so a different identity key would give different ids: duplicates beside the originals, not versions. The whole run is refused before the fold is read. A different fact-time rule is allowed (card 195): the rename notes it, and the gate places each carried facet by the new rule."
     reads: [/data-structures/definition-manifest.md]
     resource: internal/app/renamerun.go#checkRenameKeying
     anchor: "the ids would not meet"
@@ -57,7 +57,7 @@ steps:
     anchor: 'if p.renamedFrom != "" && current.Type == p.renamedFrom {'
   - actor: /components/cli.md
     label: the report
-    action: "Per pair, how many facets the gate would carry and how many it would refuse, and its selector, then a line per refusal and per unmatched or doubly matched facet, naming the facet and the reason. An unplaced facet or a refusal anywhere ends the run with nothing written, even with `--yes`."
+    action: "Per pair, how many facets the gate would carry and how many it would refuse, and its selector; a line for each pair whose type arrived at reads fact time by another rule, with how many of its facets move; then a line per refusal and per unmatched or doubly matched facet, naming the facet and the reason. An unplaced facet or a refusal anywhere ends the run with nothing written, even with `--yes`."
     resource: internal/app/renamerun.go#writeRenameReport
     anchor: 'FROM\tTO\tCARRY\tREFUSED\tSELECT'
   - actor: /components/cli.md
@@ -87,6 +87,8 @@ steps:
     anchor: "Anam-time is kept"
 ---
 
-Card 194 lets a pair carry a `select`, so one table splits a type into leaves, as card 195 splits `activity.exercise-session` by its payload id's prefix, `garmin:session:`, `concept2:session:`, `technogym:` and `strong:session:`. The source alone would not do, since Strong and Technogym both arrive through the `records` importer. A leaf spells its shared core out in full, because a manifest cannot reference another file; `internal/def/shared-core.json` names the pointers a split's leaves share, and a def test holds their schemas identical, description and examples aside.
+Card 194 lets a pair carry a `select`, so one table splits a type into leaves, as card 195's `renames/vendor-leaves.json` splits `activity.exercise-session` by its payload id's prefix, `garmin:session:`, `concept2:session:`, `technogym:` and `strong:session:`. The source alone would not do, since Strong and Technogym both arrive through the `records` importer. A leaf spells its shared core out in full, because a manifest cannot reference another file; `internal/def/shared-core.json` names the pointers a split's leaves share, and a def test holds their schemas identical, description and examples aside.
+
+Card 195 also lets the type arrived at read fact time by another rule. The keying check had compared the fact-time rule as well as the identity key, as Guard does across the versions of one type. The rule places a facet and does not name it, and the gate reads each carried facet's fact time afresh from the type it arrives at, while the facet's earlier versions keep theirs, so a read as-of before the run is unchanged. `activity.day.garmin` uses it: it reads the start of the day Garmin counted, where `activity.day` read the date at Sydney midnight, so the run moves the days the watch spent at another offset, 54 of 717 when it was planned (Matt, card 197).
 
 Card 140. The alternative, a new ledger built facet by facet, flattened anam-time to the migration moment and split receipts from their ledger; this keeps one ledger and adds one version per facet. The type is not in a facet's id, so the new version lands on the same facet; `type` is a column on every version row, so nothing is overwritten and the append-only triggers permit the insert. The one concession the gate makes is scoped by the call, and `ErrTypeChanged` guards every other path as before.

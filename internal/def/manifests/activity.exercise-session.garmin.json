@@ -1,0 +1,137 @@
+{
+  "meta": {
+    "facet_type": "activity.exercise-session.garmin",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "exercise",
+    "classification": "Confidential",
+    "validation_mode": "strict",
+    "source_schema": "ieee-1752/physical-activity-1.0",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/effective_time_frame/time_interval/start_date_time",
+        "layout": "2006-01-02T15:04:05Z07:00",
+        "zone": "Australia/Sydney"
+      }
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One session of exercise a Garmin watch recorded, shaped as an IEEE 1752 physical-activity-1.0 payload with the FIT session's other figures beside it in snake_case. The anam_garmin importer sends each session in the activity FIT files GarminDB downloads, one per sport of a multisport activity. Values are the watch's own, apart from the activity name, which the importer maps. A Garmin Cardio session often spans the machine sessions done during it, which the Technogym and Concept2 leaves also hold, so a sum across the leaves counts that time twice. This is the Garmin leaf of activity.exercise-session: Garmin's own payload shape, named for its vendor (card 192), so a reader asks about exercise across the leaves by the prefix activity.exercise-session. and knows which shape each fact has. Version 1 is activity.exercise-session v2 cut to the fields Garmin writes, each with the same rules, and its facets came across in card 195's rename (renames/vendor-leaves.json), each the next version of itself with its payload unchanged. The shared core, id, activity_name, effective_time_frame and source, is the same on all four leaves of activity.exercise-session (internal/def/shared-core.json).",
+    "type": "object",
+    "required": ["id", "activity_name", "effective_time_frame"],
+    "properties": {
+      "activity_name": {
+        "type": "string",
+        "description": "The IEEE 1752 activity name, mapped by the importer from the FIT sport and sub-sport: walking to walking, running on a treadmill to running.treadmill, indoor rowing to rowing.machine, cardio training to other (Google Fit has no general cardio), and any pair it has no mapping for to unknown. fit_sport and fit_sub_sport keep what the watch wrote.",
+        "examples": ["walking"],
+        "enum": [
+          "aerobics", "archery", "badminton", "baseball", "basketball", "biathlon", "biking",
+          "biking.hand", "biking.mountain", "biking.road", "biking.spinning", "biking.stationary",
+          "biking.utility", "boxing", "calisthenics", "circuit_training", "cricket", "crossfit", "curling",
+          "dancing", "diving", "elevator", "elliptical", "ergometer", "escalator", "fencing",
+          "football.american", "football.australian", "football.soccer", "frisbee_disc", "gardening",
+          "golf", "guided_breathing", "gymnastics", "handball", "interval_training.high_intensity",
+          "hiking", "hockey", "horseback_riding", "housework", "ice_skating", "interval_training",
+          "in_vehicle", "jump_rope", "kayaking", "kettlebell_training", "kickboxing", "kick_scooter",
+          "kitesurfing", "martial_arts", "meditation", "martial_arts.mixed", "on_foot", "other", "p90x",
+          "paragliding", "pilates", "polo", "racquetball", "rock_climbing", "rowing", "rowing.machine",
+          "rugby", "running", "running.jogging", "running.sand", "running.treadmill", "sailing",
+          "scuba_diving", "skateboarding", "skating", "skating.cross", "skating.indoor", "skating.inline",
+          "skiing", "skiing.back_country", "skiing.cross_country", "skiing.downhill", "skiing.kite",
+          "skiing.roller", "sledding", "sleep", "sleep.awake", "sleep.deep", "sleep.light", "sleep.rem",
+          "snowboarding", "snowmobile", "snowshoeing", "softball", "squash", "stair_climbing",
+          "stair_climbing.machine", "standup_paddleboarding", "still", "strength_training", "surfing",
+          "swimming", "swimming.open_water", "swimming.pool", "table_tennis", "team_sports", "tennis",
+          "tilting", "treadmill", "unknown", "volleyball", "volleyball.beach", "volleyball.indoor",
+          "wakeboarding", "walking", "walking.fitness", "walking.nordic", "walking.paced",
+          "walking.stroller", "walking.treadmill", "water_polo", "weightlifting", "wheelchair",
+          "windsurfing", "yoga", "zumba"
+        ]
+      },
+      "avg_hr_bpm": {"type": "number", "description": "Average heart rate in beats per minute: the session's avg_heart_rate.", "examples": [132]},
+      "avg_power_w": {"type": "number", "description": "Average power in watts: the session's avg_power.", "examples": [148]},
+      "base_movement_quantity": {
+        "type": "object",
+        "description": "The stroke count, as an IEEE 1752 movement count: the session's total_strokes, on sessions that count strokes.",
+        "examples": [{"value": 612, "unit": "strokes"}],
+        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"strokes\", set by the importer."}, "value": {"type": "number", "description": "The source's stroke count, as reported."}},
+        "required": ["unit", "value"],
+        "additionalProperties": false
+      },
+      "distance": {
+        "type": "object",
+        "description": "Distance covered in metres: the session's total_distance, left out when the watch reports zero, as it does for a session that measures no distance.",
+        "examples": [{"value": 5000, "unit": "m"}],
+        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"m\", set by the importer."}, "value": {"type": "number", "description": "The source's distance, as reported."}},
+        "required": ["unit", "value"],
+        "additionalProperties": false
+      },
+      "cumulative_elevation_gain": {
+        "type": "object",
+        "description": "Total ascent in metres, as an IEEE 1752 elevation gain: Garmin's session total_ascent. Only on sessions that record altitude.",
+        "examples": [{"value": 127, "unit": "m"}],
+        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"m\", set by the importer."}, "value": {"type": "number", "description": "Garmin's total_ascent, as reported."}},
+        "required": ["unit", "value"],
+        "additionalProperties": false
+      },
+      "descent_m": {"type": "number", "description": "Garmin's session total_descent, total descent in metres. Only on sessions that record altitude.", "examples": [127]},
+      "duration": {
+        "type": "object",
+        "description": "The session's net duration in seconds: its total_timer_time, which leaves out time the timer was paused, so it can be shorter than the interval.",
+        "examples": [{"value": 1260.5, "unit": "sec"}],
+        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"sec\", set by the importer."}, "value": {"type": "number", "description": "The source's duration, as reported."}},
+        "required": ["unit", "value"],
+        "additionalProperties": false
+      },
+      "effective_time_frame": {
+        "type": "object",
+        "description": "When the session happened, as an IEEE 1752 time interval.",
+        "examples": [{"time_interval": {"start_date_time": "2024-09-28T03:53:22Z", "duration": {"value": 5718.079, "unit": "sec"}}}],
+        "properties": {
+          "time_interval": {
+            "type": "object",
+            "description": "The session's start and length.",
+            "properties": {
+              "duration": {
+                "type": "object",
+                "description": "The session's length in seconds: its total_elapsed_time, start to stop with pauses included.",
+                "examples": [{"value": 1260.5, "unit": "sec"}],
+                "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"sec\", set by the importer."}, "value": {"type": "number", "description": "Seconds, a whole or decimal number."}},
+                "required": ["unit", "value"],
+                "additionalProperties": false
+              },
+              "start_date_time": {"type": "string", "minLength": 1, "description": "The start, ISO 8601 with offset, to the second: the FIT session's start_time, a true UTC instant written with Z. This is the fact time.", "examples": ["2026-01-24T18:21:08+11:00"]}
+            },
+            "required": ["duration", "start_date_time"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["time_interval"],
+        "additionalProperties": false
+      },
+      "fit_sport": {"type": "string", "minLength": 1, "description": "The FIT session's sport, as the Garmin FIT SDK names it, or its number when the SDK has no name for it (\"54\" is the watch's Safety profile).", "examples": ["training"]},
+      "fit_sub_sport": {"type": "string", "minLength": 1, "description": "The FIT session's sub-sport, as the Garmin FIT SDK names it, or its number when the SDK has no name for it.", "examples": ["cardio_training"]},
+      "id": {"type": "string", "minLength": 1, "description": "garmin:session: and the session's UTC start, as the importer writes it.", "examples": ["garmin:session:2024-09-28T03:53:22Z"]},
+      "kcal_burned": {
+        "type": "object",
+        "description": "Energy burned in kcal: the session's total_calories.",
+        "examples": [{"value": 312, "unit": "kcal"}],
+        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"kcal\", set by the importer."}, "value": {"type": "number", "description": "The source's calories, as reported."}},
+        "required": ["unit", "value"],
+        "additionalProperties": false
+      },
+      "max_hr_bpm": {"type": "number", "description": "Peak heart rate in beats per minute: the session's max_heart_rate.", "examples": [151]},
+      "max_power_w": {"type": "number", "description": "Peak power in watts: the session's max_power.", "examples": [212]},
+      "source": {"type": "string", "minLength": 1, "description": "Which app the session came from: always \"Garmin\", written by the importer.", "examples": ["Garmin"]},
+      "source_time": {"type": "object", "description": "How the session's start was read (card 197): value is the FIT start_time, UTC by the format's definition (basis source). Not required, as in activity.exercise-session v2.", "required": ["value", "zone", "basis"], "additionalProperties": false, "properties": {"value": {"type": "string", "minLength": 1, "description": "The fact time as the source supplied it, as text and never rewritten: a date, a wall clock, an RFC 3339 string, or an epoch as its digits.", "examples": ["2026-10-17", "2026-10-20T20:00:00+11:00", "1792269840000"]}, "zone": {"type": "string", "minLength": 1, "pattern": "^([A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$", "description": "The zone value is read in, and nothing else: an IANA name when one is known, UTC for a value that is UTC, else a fixed offset +HH:MM or -HH:MM. The gate refuses a name that is no zone.", "examples": ["Australia/Sydney", "UTC", "+01:00"]}, "basis": {"type": "string", "enum": ["source", "configuration", "assumption"], "description": "Who decided the zone. source: the source supplied it with the value, or the value is UTC by the source's own definition. configuration: a setting a person made for this source names it. assumption: the importer or writer chose it, with nothing behind it but its own default or the Definition's zone, and logged that it did."}}},
+      "sport_profile": {"type": "string", "minLength": 1, "description": "The name of the activity profile on the watch that recorded the session, Garmin's sport_profile_name, such as Cardio, Walk or Safety.", "examples": ["Cardio"]},
+      "training_effect_aerobic": {"type": "number", "description": "Garmin's session total_training_effect, its aerobic training effect on a 0 to 5 scale, computed by the watch.", "examples": [3.3]},
+      "training_effect_anaerobic": {"type": "number", "description": "Garmin's session total_anaerobic_training_effect, its anaerobic training effect on a 0 to 5 scale, computed by the watch.", "examples": [2.4]},
+      "training_load": {"type": "number", "description": "Garmin's session training_load_peak, the training load the watch computes for the session; Garmin does not publish how.", "examples": [74]}
+    },
+    "additionalProperties": false
+  }
+}

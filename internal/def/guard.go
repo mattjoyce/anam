@@ -107,9 +107,10 @@ func sameKeying(old, now keying) error {
 }
 
 // Keying is the part of a Definition that says what its facets are: the identity key
-// that composes the id and the fact-time rule that places them. Guard compares it
-// across versions of one type; a rename (card 140) compares it across two types,
-// since a facet carried into a type keyed differently would not meet its own id.
+// that composes the id and the fact-time rule that places them. Guard holds both
+// across versions of one type. A rename (card 140) compares the identity key across
+// two types, since a facet carried into a type keyed differently would not meet its
+// own id, and reports a fact-time rule that differs (card 195).
 type Keying struct {
 	IdentityKey []string
 	FactTime    TimeField
@@ -122,10 +123,16 @@ func KeyingOf(body []byte) (Keying, error) {
 	return Keying(k), err
 }
 
-// SameKeying reports whether d keys and places facets as k does; the error names the
-// rule that differs.
-func (d Definition) SameKeying(k Keying) error {
-	return sameKeying(keying(k), keying{IdentityKey: d.IdentityKey, FactTime: d.FactTime})
+// SameIdentity reports whether d composes a facet's id from the identity key k does;
+// the error names the key that differs. A rename (card 140) needs this and no more for
+// a carried facet to meet its own id. The fact-time rule may differ (card 195): it
+// places a facet and does not name it, and the gate reads each carried facet's fact
+// time afresh under the type it arrives at.
+func (d Definition) SameIdentity(k Keying) error {
+	if !equalStrings(k.IdentityKey, d.IdentityKey) {
+		return fmt.Errorf("identity_key was %v, is %v", k.IdentityKey, d.IdentityKey)
+	}
+	return nil
 }
 
 func equalStrings(a, b []string) bool {

@@ -311,6 +311,9 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 		return r, receipt.Result{}, err
 	}
 	var notes []string
+	if cur, err := d.Templates.Lookup(r.Template); err == nil && cur.Version != t.Version {
+		notes = append(notes, fmt.Sprintf("replayed %s v%d from the held history; v%d is current", t.Name, t.Version, cur.Version))
+	}
 	switch r.TemplateHash {
 	case t.Hash:
 	case "":

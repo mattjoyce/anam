@@ -95,40 +95,40 @@ func newestHeldBodies(ctx context.Context, db *ops.DB) (map[facet.Type][]byte, e
 }
 
 // writeRenameReport says what the run would do, per rename, and names every facet the
-// gate would refuse with the reason: a run carries thousands, so the shape is the
-// count per pair and a line per refusal. A facet already carried sits under its new
+// gate would refuse and every facet no one rename places, with the reason: a run
+// carries thousands, so the shape is the count per pair and a line per refusal. A facet already carried sits under its new
 // type, so the fold never lists it again: a rerun or a resumed run plans only what is
 // left, and a no-op from the gate is an oddity worth one line, not a column.
 func writeRenameReport(cmd *cobra.Command, plan renamePlan) {
 	out := cmd.OutOrStdout()
 	type tally struct{ carry, refused int }
-	by := map[renamePair]*tally{}
-	for _, p := range plan.table.Renames {
-		by[p] = &tally{}
-	}
+	by := make([]tally, len(plan.table.Renames))
 	for _, it := range plan.items {
-		t := by[it.pair]
 		switch it.fate {
 		case renameCarry:
-			t.carry++
+			by[it.row()].carry++
 		case renameRefused:
-			t.refused++
-		case renameDone:
+			by[it.row()].refused++
+		case renameDone, renameUnplaced:
 		}
 	}
 	w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "FROM\tTO\tCARRY\tREFUSED")
-	for _, p := range plan.table.Renames {
-		t := by[p]
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%d\n", p.From, p.To, t.carry, t.refused)
+	_, _ = fmt.Fprintln(w, "FROM\tTO\tCARRY\tREFUSED\tSELECT")
+	for i, p := range plan.table.Renames {
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%d\t%s\n", p.From, p.To, by[i].carry, by[i].refused, p.Select)
 	}
 	_ = w.Flush()
 	if n := plan.count(renameDone); n > 0 {
 		_, _ = fmt.Fprintf(out, "%d facets are already under their new type\n", n)
 	}
 	for _, it := range plan.items {
-		if it.fate == renameRefused {
+		switch {
+		case it.fate == renameRefused:
 			_, _ = fmt.Fprintf(out, "refused %s: %s\n", it.facet.Provenance.SourceRef, it.reason)
+		case it.fate == renameUnplaced && len(it.rows) == 0:
+			_, _ = fmt.Fprintf(out, "unmatched %s (%s): %s\n", it.facet.Provenance.SourceRef, it.facet.Type, it.reason)
+		case it.fate == renameUnplaced:
+			_, _ = fmt.Fprintf(out, "doubly matched %s (%s): %s\n", it.facet.Provenance.SourceRef, it.facet.Type, it.reason)
 		}
 	}
 }
@@ -138,11 +138,9 @@ func writeRenameReport(cmd *cobra.Command, plan renamePlan) {
 // again is all no-op up to there and carries on.
 func renameAll(cmd *cobra.Command, cfg config.Config, plan renamePlan) error {
 	var carry []renameItem
-	var facets []facet.Facet
 	for _, it := range plan.items {
 		if it.fate == renameCarry {
 			carry = append(carry, it)
-			facets = append(facets, it.facet)
 		}
 	}
 	l, err := openLedgerForWrite(cmd.Context(), cfg)
@@ -150,14 +148,14 @@ func renameAll(cmd *cobra.Command, cfg config.Config, plan renamePlan) error {
 		return err
 	}
 	defer func() { _ = l.Close() }()
-	g := gate.New(l, plan.defs, renameScopes(plan.table, facets), clock.Real{}, cfg.PersonID, renameLimits(cfg))
+	g := gate.New(l, plan.defs, renameScopes(plan.table, carry), clock.Real{}, cfg.PersonID, renameLimits(cfg))
 
 	done := 0
 	for start := 0; start < len(carry); start += gate.MaxBatch {
 		end := min(start+gate.MaxBatch, len(carry))
 		batch := make([]gate.Rename, 0, end-start)
 		for _, it := range carry[start:end] {
-			batch = append(batch, renameOf(it.facet, it.pair.To))
+			batch = append(batch, renameOf(it.facet, plan.table.Renames[it.row()].To))
 		}
 		ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
 		results, _, err := g.RenameBatch(ctx, batch)

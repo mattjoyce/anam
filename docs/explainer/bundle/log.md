@@ -119,3 +119,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: a projection template's `types` entry, and the timeline's `type` parameter, may be a prefix ending in `.`; `facet.Matches` is the one predicate for the projection, the timeline and a receipt's replay.
 - Bundle: the projection component and the projection template page say so.
+
+## 2026-10-21, card 194
+
+- Code: a rename table's row may carry `select` (`source`, a `pointer` and `prefix`, or both), so one table splits a type into leaves; every live facet of a split type must match exactly one row, or the dry run and the run refuse before writing. `internal/def/shared-core.json` and its test hold a split's shared fields identical across its leaves.
+- Bundle: the rename workflow gains the placing step, the loader's select rules and the report's SELECT column.

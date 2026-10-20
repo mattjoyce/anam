@@ -12,6 +12,31 @@ the run is unchanged.
 - `record-edge.json`: card 191, `record.note` to `record.edge`, the note that card 104 made an edge.
   Its own table, because `taxonomy.json` already arrives at `record.note` and a table is one step.
 
+## The table
+
+```json
+{"renames": [
+  {"from": "health.heart-rate-daily", "to": "health.heart-rate-day"},
+  {"from": "activity.exercise-session", "to": "activity.exercise-session.technogym",
+   "select": {"source": "records", "pointer": "/id", "prefix": "technogym:"}}
+]}
+```
+
+A row without `select` carries every live facet of its `from`, and no other row may name that
+`from`. A row with `select` carries only the facets it matches, so several rows split one type
+into leaves (card 194). `source` matches the facet's source; `pointer` and `prefix` come
+together and match when the payload holds a string at the pointer that starts with the prefix.
+Each is optional, and a `select` names at least one. Every live facet of a split type must match
+exactly one row: the dry run lists the facets that match none and those that match more than
+one, and the run refuses on either before it writes anything. Rows are not tried in order, so
+the table means the same whichever way its rows are sorted. A table is still one step, with no
+type both left and arrived at.
+
+A split's leaves repeat the fields they share, since a manifest cannot reference another file.
+`internal/def/shared-core.json` names, for each split type, its leaves and those shared pointers,
+and a def test holds the schema at each one identical across the leaves, description and
+examples aside.
+
 A table names types the binary bundles or the daemon holds as registered, so the importers' new
 Definitions (`health.cpap-session`, `activity.day`, `place.stay`, `place.track`) are registered
 before the run. The run is dry by default and reports what the gate would refuse; `--yes` writes,

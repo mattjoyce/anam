@@ -44,6 +44,10 @@ decisions is in `journal/`.
 - `scripts/pipeline-staleness.sh` reads the Garmin days as `activity.day`. It reported "no rows"
   against a record that holds only the new name, so run it after the rename run, not before
   (card 147).
+- The explainer bundle says what the taxonomy made true: the eight domains, 32 bundled Definitions
+  and 43 in history, `health.blood-pressure` at v6, `record.note` at v1. Its log has an entry for
+  cards 139, 140, 147, 165, 168, 176 and 179, its anchor is c08bfb5, and the gap about the importers
+  checkout is closed. The tracked `.pyc` under `docs/explainer` is removed (card 147).
 
 ## 2026-10-19
 

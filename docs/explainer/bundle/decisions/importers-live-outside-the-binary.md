@@ -24,4 +24,4 @@ affects:
 
 **Why.** The gate already owned the admission contract; moving the vendor out makes the code agree with ARCHITECTURE §2's "a pluggable client, not part of the kernel", and a crashed importer can only fail to send, never corrupt the record.
 
-**What it costs.** Each source needs a resend-everything mode and a cut-over (the records and documents importers kept their sources' names, so they resend what Anam's own workers admitted as no-op; the Garmin importer replaced health-db under a new source name, so the old source was retired by tombstone). The two repos version separately, and this checkout of the importers is behind its origin (see [importers checkout is behind origin](/gaps/importers-checkout-behind-origin.md)).
+**What it costs.** Each source needs a resend-everything mode and a cut-over (the records and documents importers kept their sources' names, so they resend what Anam's own workers admitted as no-op; the Garmin importer replaced health-db under a new source name, so the old source was retired by tombstone). The two repos version separately.

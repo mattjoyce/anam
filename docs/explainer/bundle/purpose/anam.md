@@ -3,7 +3,7 @@ type: purpose
 title: Anam, a personal longitudinal record
 description: One person's whole-life timeline of facts, assembled verbatim from the systems that already hold their data, owning none of it, with a receipt for everything it shows.
 timestamp: 2026-10-17T00:00:00Z
-commit: 154f190
+commit: c08bfb5
 primary_workflow: /workflows/admit-a-batch.md
 basis: docs
 ---

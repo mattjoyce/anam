@@ -61,7 +61,7 @@ steps:
   - actor: /components/importer-base.md
     caller: /components/anam-submit.md
     label: make sure Anam publishes the Definition
-    action: "`ensure_published` GETs `/v1/definitions/health.blood-pressure/5`; a 404 would POST the manifest (see [register a Definition](/workflows/register-a-definition.md)); a different body at that version stops the run. The type is bundled, so this is a 200 and nothing is posted."
+    action: "`ensure_published` GETs `/v1/definitions/health.blood-pressure/6`; a 404 would POST the manifest (see [register a Definition](/workflows/register-a-definition.md)); a different body at that version stops the run. The type is bundled, so this is a 200 and nothing is posted."
     reads: [/data-structures/definition-manifest.md]
     resource: ../anam-importers/anam_importer/definitions.py#ensure_published
     anchor: "published = client.definition(d.type, d.version)"

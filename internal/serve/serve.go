@@ -265,8 +265,7 @@ func Narrow(v fold.Value, q *receipt.Query, s projection.Series) (fold.Value, er
 	}
 	var kept []fold.Entry
 	for _, e := range v.Entries() {
-		if (q.From == "" || e.FactTime >= q.From) && (q.Before == "" || e.FactTime < q.Before) &&
-			(q.Type == "" || string(e.Type) == q.Type) {
+		if q.Admits(e.FactTime, string(e.Type)) {
 			kept = append(kept, e)
 		}
 	}

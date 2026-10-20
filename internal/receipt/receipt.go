@@ -120,6 +120,19 @@ func (q Query) IsZero() bool {
 	return q.From == "" && q.Before == "" && q.At == "" && q.Type == "" && len(q.Fields) == 0
 }
 
+// Admits reports whether a facet at factTime of type typ passes q's window [From,
+// Before) and type. It is the one narrowing predicate: the timeline read, its
+// explain, a publish and a verify all narrow through it (card 92), so what a reader
+// sees and what a receipt certifies cannot drift apart. The snapshot at At is not
+// part of it; that is fold.Snapshot's, taken before. A nil q admits everything.
+func (q *Query) Admits(factTime, typ string) bool {
+	if q == nil {
+		return true
+	}
+	return (q.From == "" || factTime >= q.From) && (q.Before == "" || factTime < q.Before) &&
+		(q.Type == "" || typ == q.Type)
+}
+
 // checkFields refuses a field that is not a JSON pointer: a receipt naming one
 // could not be replayed.
 func (q Query) checkFields() error {

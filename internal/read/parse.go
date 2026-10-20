@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/clock"
-	"github.com/mattjoyce/anam/internal/fold"
+	"github.com/mattjoyce/anam/internal/receipt"
 )
 
 // parseAsOf reads the --as-of anam-time. A bare date means "as Anam knew it at the
@@ -34,14 +34,16 @@ type bounds struct {
 	toX  string // exclusive upper, "" for unbounded
 }
 
-func (b bounds) admits(e fold.Entry) bool {
-	if b.from != "" && e.FactTime < b.from {
-		return false
+// queryOf is the narrowing a read applies, as the receipt that would certify it
+// records it: b's window, the snapshot at at, the type and the fields. Every read
+// builds its query here and narrows through receipt.Query.Admits, so the timeline
+// and a published read cannot narrow two ways (card 92). Nil when nothing narrows.
+func queryOf(b bounds, at, typ string, fields []string) *receipt.Query {
+	q := &receipt.Query{From: b.from, Before: b.toX, At: at, Type: typ, Fields: fields}
+	if q.IsZero() {
+		return nil
 	}
-	if b.toX != "" && e.FactTime >= b.toX {
-		return false
-	}
-	return true
+	return q
 }
 
 // parseBoundsAt reads the fact-time flags. --at is a bound like --to (a bare date

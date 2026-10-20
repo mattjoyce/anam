@@ -132,13 +132,16 @@ func Timeline(ctx context.Context, src Source, q api.TimelineQuery) (api.Timelin
 		return api.Timeline{}, err
 	}
 	t := v.describe()
+	rq := queryOf(b, at, q.Type, q.Fields)
 	if q.Explain {
-		return explain(ctx, src.Ledger, v, b, q.Type, t)
+		return explain(ctx, src.Ledger, v, rq, t)
 	}
 
+	// The snapshot at at was taken by the read above; what is left is the window and
+	// the type, through the predicate a receipt is verified with.
 	var ids []string
 	for _, e := range v.shown.Entries() {
-		if b.admits(e) && (q.Type == "" || string(e.Type) == q.Type) {
+		if rq.Admits(e.FactTime, string(e.Type)) {
 			t.Entries = append(t.Entries, e)
 			ids = append(ids, e.FacetID)
 		}

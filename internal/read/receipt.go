@@ -10,7 +10,6 @@ import (
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
-	"github.com/mattjoyce/anam/internal/receipt"
 	"github.com/mattjoyce/anam/internal/serve"
 )
 
@@ -130,10 +129,7 @@ func Publish(ctx context.Context, src Source, d serve.Deps, q api.TimelineQuery,
 		return api.Published{}, err
 	}
 
-	rq := &receipt.Query{From: b.from, Before: b.toX, At: at, Type: q.Type, Fields: q.Fields}
-	if rq.IsZero() {
-		rq = nil
-	}
+	rq := queryOf(b, at, q.Type, q.Fields)
 	value, err := serve.Narrow(v.shown, rq, v.defs)
 	if err != nil {
 		return api.Published{}, err

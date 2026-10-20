@@ -52,40 +52,62 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	a, err := d.admitBatch(r.Context(), imp, intake{envs: envs, snap: snap}, d.timeout(r))
+	if d.writeAdmitError(w, err) {
+		return
+	}
+	writeJSON(w, http.StatusOK, a)
+}
+
+// intake is what a route hands the write: the envelopes to admit, and the snapshot
+// part they are when they come from a complete resend.
+type intake struct {
+	envs []facet.Envelope
+	snap *api.SnapshotPart
+}
+
+// admitBatch is everything the daemon does for a batch once it knows who sent it,
+// whichever route took it: the write queue, taken within budget (ImporterWait); the
+// snapshot and library-reference checks; the gate, held to who's source and types by
+// its authenticated pillar; the index catch-up; the snapshot's record; what status
+// reports of the source; and a mint when anything changed. It answers the gate's
+// outcomes, or the error the caller maps with writeAdmitError. Nothing else admits
+// an envelope: the envelope route and the Workbench's entry route both end here.
+func (d *Daemon) admitBatch(ctx context.Context, who config.Principal, b intake, budget time.Duration) (api.Admission, error) {
 	var results []gate.Result
 	var head ledger.Watermark
 	var progress *api.SnapshotProgress
 	var digest string
-	if snap != nil {
-		digest = partDigest(envs)
+	if b.snap != nil {
+		digest = partDigest(b.envs)
 	}
-	err = d.tryWriteWithin(r.Context(), d.cfg.ImporterWait, d.timeout(r), func(ctx context.Context, s Stores) error {
+	err := d.tryWriteWithin(ctx, d.cfg.ImporterWait, budget, func(ctx context.Context, s Stores) error {
 		// A part that does not belong to the run its id names, or that was already
 		// recorded with other envelopes, is refused before anything is admitted.
-		if err := checkSnapshot(ctx, s.Ops, imp.Source, snap, digest); err != nil {
+		if err := checkSnapshot(ctx, s.Ops, who.Source, b.snap, digest); err != nil {
 			return err
 		}
 		// A reference to a document the library does not hold is refused before the
 		// gate sees the batch, and nothing of it is admitted (card 102).
-		if err := checkReferences(d.cfg.LibraryDir, envs); err != nil {
+		if err := checkReferences(d.cfg.LibraryDir, b.envs); err != nil {
 			return err
 		}
 		// Inside the write, where a registration cannot land between this and the
 		// admission.
 		reg := d.defs.current.Load()
-		g := gate.New(s.Ledger, reg, scopesOf(imp), clock.Real{}, d.cfg.PersonID, gateLimits(d.cfg))
-		bindings := make([]facet.Binding, len(envs))
-		for i, env := range envs {
+		g := gate.New(s.Ledger, reg, scopesOf(who), clock.Real{}, d.cfg.PersonID, gateLimits(d.cfg))
+		bindings := make([]facet.Binding, len(b.envs))
+		for i, env := range b.envs {
 			// A malformed envelope binds to nothing; the gate's first check refuses it
 			// again and names it with the rest.
 			bindings[i], _ = g.Resolve(env)
 		}
 		var err error
-		results, head, err = g.CommitBatch(ctx, envs, bindings)
+		results, head, err = g.CommitBatch(ctx, b.envs, bindings)
 		if err == nil && changedBy(results) > 0 {
 			d.catchUp(ctx, s)
 		}
-		if err == nil && snap != nil {
+		if err == nil && b.snap != nil {
 			// The ledger has the batch already; a failure here leaves the snapshot one
 			// part short, so it never completes and nothing follows from it. The
 			// importer resends the part, which admits as no-ops and records it. A
@@ -93,14 +115,33 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 			// was recorded to compare it to: the protocol fixes a part's envelopes for
 			// the life of its run id, and a run that reads its source again is a new
 			// run (card 107).
-			progress, err = recordSnapshotPart(ctx, s.Ops, imp.Source, snap, digest, results, head, time.Now(),
+			progress, err = recordSnapshotPart(ctx, s.Ops, who.Source, b.snap, digest, results, head, time.Now(),
 				ops.SnapshotRetention{Incomplete: d.cfg.SnapshotTTL, Complete: d.cfg.SnapshotKeep})
 		}
 		return err
 	})
+	if err != nil {
+		return api.Admission{}, err
+	}
+	changed := changedBy(results)
+	d.sources.saw(who.Source, d.now(), changed > 0)
+	if changed > 0 {
+		d.requestMint()
+	}
+	a := admissionOf(results, head)
+	a.Snapshot = progress
+	return a, nil
+}
 
+// writeAdmitError answers an error admitBatch returned, and reports whether there was
+// one. A batch the gate refused is 422 with every envelope's reason; a snapshot part
+// that does not fit its run is 409; a write queue that is busy, or stopping, is 503
+// with Retry-After; a budget spent is 504.
+func (d *Daemon) writeAdmitError(w http.ResponseWriter, err error) bool {
 	var refused *gate.Refused
 	switch {
+	case err == nil:
+		return false
 	case errors.Is(err, ops.ErrSnapshotMismatch), errors.Is(err, ops.ErrSnapshotPartChanged):
 		writeError(w, http.StatusConflict, err)
 	case errors.As(err, &refused):
@@ -110,18 +151,10 @@ func (d *Daemon) postEnvelopes(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, err)
 	case errors.Is(err, context.DeadlineExceeded):
 		writeError(w, http.StatusGatewayTimeout, err)
-	case err != nil:
-		writeError(w, http.StatusInternalServerError, err)
 	default:
-		changed := changedBy(results)
-		d.sources.saw(imp.Source, d.now(), changed > 0)
-		if changed > 0 {
-			d.requestMint()
-		}
-		a := admissionOf(results, head)
-		a.Snapshot = progress
-		writeJSON(w, http.StatusOK, a)
+		writeError(w, http.StatusInternalServerError, err)
 	}
+	return true
 }
 
 // decodeSubmission reads a batch into envelopes from imp's source, and its snapshot

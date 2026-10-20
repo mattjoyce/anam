@@ -36,6 +36,14 @@ const (
 // reserved, so a log or a refusal that names the operator means that token.
 const OperatorName = "operator"
 
+// WorkbenchSource is the source of facts entered by hand in the Workbench (card 188).
+// It is reserved, and an invariant: a fact's identity names its source, so changing
+// it would orphan every entry already made. The importers file may declare a
+// principal with this source to say which types the Workbench may enter; that
+// principal has no token, since the daemon holds it itself and no client authenticates
+// as it.
+const WorkbenchSource = "workbench"
+
 // Principal is one client the daemon admits: its name, its role, the SHA-256 of its
 // token, and for an importer the source it submits as and the facet types it may
 // submit. The daemon holds only the hash, so the file can be read by whoever runs it
@@ -55,11 +63,14 @@ type Principal struct {
 	Source string `mapstructure:"source"`
 
 	// TokenSHA256 is the hex SHA-256 of the token, without a trailing newline:
-	// printf %s "$token" | sha256sum.
+	// printf %s "$token" | sha256sum. The workbench principal has none, and a hash on
+	// it is an error.
 	TokenSHA256 string `mapstructure:"token_sha256"`
 
 	// Types are the facet types an importer may submit and register Definitions
-	// for: the types it owns. Only an importer has them.
+	// for: the types it owns. Only an importer has them. For the workbench they are
+	// the allow-list of what may be entered by hand, and it owns none of them: it
+	// registers nothing, so another importer may own a type the workbench lists.
 	Types []facet.Type `mapstructure:"types"`
 
 	// AnyType lets an importer submit facets of every type the daemon knows, as
@@ -132,10 +143,10 @@ func validPrincipals(all []Principal, bundled func(facet.Type) bool) error {
 			return bad("name used twice")
 		case sources[p.Source]:
 			return bad("source named twice")
-		case hashes[p.TokenSHA256]:
+		case p.TokenSHA256 != "" && hashes[p.TokenSHA256]:
 			return bad("token shared with another principal")
 		}
-		for _, t := range p.Types {
+		for _, t := range ownedTypes(p) {
 			if bundled != nil && bundled(t) {
 				continue
 			}
@@ -144,7 +155,10 @@ func validPrincipals(all []Principal, bundled func(facet.Type) bool) error {
 			}
 			owners[t] = p.Source
 		}
-		names[p.Name], hashes[p.TokenSHA256] = true, true
+		names[p.Name] = true
+		if p.TokenSHA256 != "" {
+			hashes[p.TokenSHA256] = true
+		}
 		if p.Source != "" {
 			sources[p.Source] = true
 		}
@@ -153,8 +167,13 @@ func validPrincipals(all []Principal, bundled func(facet.Type) bool) error {
 }
 
 // validPrincipal checks what one principal must hold: a name, a role, a token's hash,
-// and a source and types (or any_type) exactly when it is an importer.
+// and a source and types (or any_type) exactly when it is an importer. The workbench
+// is the exception on the hash: it has none, and a types list that names what may be
+// entered by hand.
 func validPrincipal(p Principal) error {
+	if p.Source == WorkbenchSource {
+		return validWorkbench(p)
+	}
 	switch b, err := hex.DecodeString(p.TokenSHA256); {
 	case p.Name == "":
 		return errors.New("no name")
@@ -172,6 +191,39 @@ func validPrincipal(p Principal) error {
 		return errors.New("no types")
 	case p.AnyType && len(p.Types) > 0:
 		return errors.New("any_type with types: list the types it owns, or any_type, not both")
+	}
+	for _, t := range p.Types {
+		if !t.Valid() {
+			return fmt.Errorf("type %q is not a valid namespaced facet type", t)
+		}
+	}
+	return nil
+}
+
+// ownedTypes are the types p owns: its types, except the workbench's, which are an
+// allow-list and not an ownership, so another importer may own the same type.
+func ownedTypes(p Principal) []facet.Type {
+	if p.Source == WorkbenchSource {
+		return nil
+	}
+	return p.Types
+}
+
+// validWorkbench checks the workbench principal: an importer with the reserved source,
+// no token, and an explicit list of the types that may be entered by hand. any_type is
+// refused, since the list is the allow-list and names types one by one.
+func validWorkbench(p Principal) error {
+	switch {
+	case p.Name == "" || p.Name == OperatorName:
+		return fmt.Errorf("source %s needs a name other than %q", WorkbenchSource, OperatorName)
+	case p.Role != RoleImporter:
+		return fmt.Errorf("source %s is an importer's, not a %s's", WorkbenchSource, p.Role)
+	case p.TokenSHA256 != "":
+		return fmt.Errorf("source %s has no token_sha256: the daemon holds this principal itself", WorkbenchSource)
+	case p.AnyType:
+		return fmt.Errorf("source %s lists the types it may enter, and takes no any_type", WorkbenchSource)
+	case len(p.Types) == 0:
+		return errors.New("no types")
 	}
 	for _, t := range p.Types {
 		if !t.Valid() {

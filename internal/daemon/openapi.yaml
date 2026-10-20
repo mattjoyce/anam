@@ -848,6 +848,70 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "503": { $ref: "#/components/responses/Busy" }
         "504": { $ref: "#/components/responses/Timeout" }
+  /v1/entry:
+    post:
+      operationId: postEntry
+      tags: [operate]
+      x-anam-roles: [operator]
+      x-anam-type: Entry
+      summary: Enter one fact by hand, as the workbench source.
+      description: >-
+        The Workbench's write (card 188). The operator's token opens it, and the daemon
+        submits the one envelope as the workbench principal the importers file declares
+        (`source: workbench`, no token, `types` its allow-list): no importer token
+        reaches a browser. It is a route over the same write as POST /v1/envelopes, so
+        the gate holds the entry to the workbench's types as it holds an importer, and
+        the write queue, index catch-up, status and mint are the same. The body names
+        no source, injector or id: the gate fills the identity field from the
+        Definition's identity_template, or refuses a payload that lacks the field when
+        the type declares none. 404 when the importers file declares no workbench
+        principal; 409 when definition_version is not the type's version in force;
+        422 when the gate refuses (a type outside the workbench's types, a payload the
+        Definition refuses, an id that disagrees with the rule), with its words
+        verbatim; 503 with Retry-After while another write holds the queue. A request
+        from a browser on another site is 403.
+      parameters: [{ $ref: "#/components/parameters/AnamTimeout" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EntryRequest" }
+            example:
+              type: health.medication-dose
+              definition_version: 2
+              payload: { drug: melatonin, amount: 5, unit: mg, taken_at: "2026-10-19 22:00", reason: to help sleep }
+      responses:
+        "200":
+          description: admitted, superseded (a new version of a facet already held), or a no-op (the same facet, unchanged, with its id)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Entry" }
+              example: { outcome: admitted, facet_id: 4b0ec770-9f8f-555f-a680-378d02ae6ede, artifact_version: 1, seq: 33380, w: 33380 }
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: the importers file declares no workbench principal
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: definition_version is not the type's version in force; the gate's words, in the refusal's shape
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Refusal" }
+        "413": { $ref: "#/components/responses/BodyTooLarge" }
+        "422":
+          description: refused, nothing written; the gate's reason for the entry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Refusal" }
+              example:
+                error: "batch refused, nothing admitted: envelope 0 (health.medication-dose): def: payload not compliant: /amount: expected number, got string"
+                refused:
+                  - { index: 0, type: health.medication-dose, reason: "def: payload not compliant: /amount: expected number, got string" }
+        "503": { $ref: "#/components/responses/Busy" }
+        "504": { $ref: "#/components/responses/Timeout" }
 components:
   securitySchemes:
     bearer:
@@ -1555,6 +1619,23 @@ components:
         artifact_version: { type: integer, description: the version the tombstone marks }
         outcome: { type: string, enum: [tombstoned, no-op] }
         seq: { type: integer, format: int64, description: the anam-event's position; absent for a no-op }
+        w: { type: integer, format: int64, description: the watermark after the request }
+    EntryRequest:
+      type: object
+      required: [type, definition_version, payload]
+      additionalProperties: false
+      properties:
+        type: { type: string, description: a type on the workbench principal's types }
+        definition_version: { type: integer, description: the version the form was drawn from; 409 unless it is the type's version in force }
+        payload: { type: object, description: shaped to that Definition; the identity field may be left out when the type declares an identity_template }
+    Entry:
+      type: object
+      required: [outcome, facet_id, artifact_version, w]
+      properties:
+        outcome: { type: string, enum: [admitted, superseded, no-op] }
+        facet_id: { type: string, format: uuid }
+        artifact_version: { type: integer }
+        seq: { type: integer, format: int64, description: the anam-event the entry wrote; absent for a no-op }
         w: { type: integer, format: int64, description: the watermark after the request }
     Backup:
       type: object

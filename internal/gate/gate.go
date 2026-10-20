@@ -57,6 +57,12 @@ var (
 	// impossible to miss.
 	ErrTypeChanged = errors.New("gate: facet id is held by a facet of another type")
 
+	// ErrFacetNotLive: a rename was offered a facet whose current status is not live
+	// (card 185). No anam-event advances a version and keeps its status, so a
+	// superseded after a tombstoned reads as admitted and would bring the dead facet
+	// back. The refusal is the design: a dead facet stays under the type it died in.
+	ErrFacetNotLive = errors.New("gate: a rename carries only a live facet")
+
 	// ErrContention: the bounded retry gave up. The worker may simply re-run;
 	// commit is idempotent.
 	ErrContention = errors.New("gate: watermark contention not resolved within retry budget")

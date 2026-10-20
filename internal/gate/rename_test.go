@@ -161,3 +161,100 @@ func TestRename_RefusesWhatIsNotTheTypeLeft(t *testing.T) {
 		t.Errorf("the refusals wrote: W %d → %d", before, w)
 	}
 }
+
+// Card 185: the gate, not the caller, keeps a dead facet dead. No anam-event
+// advances a version and keeps its status, so a superseded after a tombstoned reads
+// as admitted: carrying a tombstoned facet would bring it back. Both entry points
+// refuse it with ErrFacetNotLive, naming the facet, its type and its status, and
+// write nothing. These tests call the gate directly, so no CLI planning is in play.
+func TestRename_RefusesAFacetThatIsNotLive(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	g, l := newRenameGate(t)
+	dead := admitReading(t, g, l)
+	if _, _, err := g.Retract(ctx, dead.ID); err != nil {
+		t.Fatalf("Retract: %v", err)
+	}
+
+	// Live and dead offered together: the block is refused whole, so the live one is
+	// not carried either.
+	live := facet.Envelope{
+		Type: "health.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
+		SourceRef: facet.SourceRef("bp-csv", "2026-01-26T06:30:00Z"),
+		Payload:   []byte(`{"measured_at": "2026-01-26T06:30:00Z", "systolic": 118, "diastolic": 78}`),
+	}
+	lb, err := g.Resolve(live)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, _, err := g.Commit(ctx, live, lb)
+	if err != nil {
+		t.Fatalf("admit the live reading: %v", err)
+	}
+	liveFacet, err := l.CurrentVersion(ctx, res.FacetID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, _ := l.Head(ctx)
+
+	for name, call := range map[string]func() error{
+		"Rehearse": func() error {
+			_, err := g.Rehearse(ctx, renameOf(dead, "health.pressure"))
+			return err
+		},
+		"RenameBatch": func() error {
+			_, _, err := g.RenameBatch(ctx, []gate.Rename{renameOf(dead, "health.pressure")})
+			return err
+		},
+		"RenameBatch with a live facet beside it": func() error {
+			_, _, err := g.RenameBatch(ctx, []gate.Rename{
+				renameOf(liveFacet, "health.pressure"), renameOf(dead, "health.pressure"),
+			})
+			return err
+		},
+	} {
+		err := call()
+		if !errors.Is(err, gate.ErrFacetNotLive) {
+			t.Errorf("%s: %v, want ErrFacetNotLive", name, err)
+			continue
+		}
+		for _, want := range []string{dead.ID, "health.blood-pressure", "tombstoned"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("%s: %q does not name %q", name, err, want)
+			}
+		}
+	}
+	if w, _ := l.Head(ctx); w != before {
+		t.Errorf("the refusals wrote: W %d → %d", before, w)
+	}
+	cur, err := l.CurrentVersion(ctx, dead.ID)
+	if err != nil || cur.Type != "health.blood-pressure" || cur.ArtifactVersion != 1 {
+		t.Errorf("the dead facet is %s v%d, %v; want health.blood-pressure v1 as it died", cur.Type, cur.ArtifactVersion, err)
+	}
+	// The live facet beside it was not carried by the refused block, and still can be.
+	if r, _, err := g.RenameBatch(ctx, []gate.Rename{renameOf(liveFacet, "health.pressure")}); err != nil || r[0].Outcome != gate.OutcomeSuperseded {
+		t.Errorf("a live facet alone = %+v, %v; want superseded", r, err)
+	}
+}
+
+// A facet carried and then retracted is dead under its new type, and the run again
+// does not bring it back.
+func TestRename_RefusesACarriedFacetThatWasRetracted(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	g, l := newRenameGate(t)
+	f := admitReading(t, g, l)
+	if _, _, err := g.RenameBatch(ctx, []gate.Rename{renameOf(f, "health.pressure")}); err != nil {
+		t.Fatalf("RenameBatch: %v", err)
+	}
+	if _, _, err := g.Retract(ctx, f.ID); err != nil {
+		t.Fatalf("Retract: %v", err)
+	}
+	before, _ := l.Head(ctx)
+	if _, _, err := g.RenameBatch(ctx, []gate.Rename{renameOf(f, "health.pressure")}); !errors.Is(err, gate.ErrFacetNotLive) {
+		t.Errorf("rerun over a retracted facet: %v, want ErrFacetNotLive", err)
+	}
+	if w, _ := l.Head(ctx); w != before {
+		t.Errorf("the refusal wrote: W %d → %d", before, w)
+	}
+}

@@ -331,6 +331,15 @@ func (g *Gate) disposition(ctx context.Context, p prepared) (disposition, error)
 		return disposition{version: 1, kind: facet.EventAdmitted}, nil
 	case err != nil:
 		return disposition{}, err
+	}
+	if p.renamedFrom != "" {
+		// A rename carries only a live facet (card 185). The gate decides it, not the
+		// caller that planned the run, so no caller can bring a dead facet back.
+		if err := g.requireLive(ctx, current); err != nil {
+			return disposition{}, err
+		}
+	}
+	switch {
 	case current.Type != p.env.Type:
 		if p.renamedFrom != "" && current.Type == p.renamedFrom {
 			// A rename (card 140): the next version carries the new type whether or
@@ -349,6 +358,29 @@ func (g *Gate) disposition(ctx context.Context, p prepared) (disposition, error)
 			prior:   current.ArtifactVersion,
 		}, nil
 	}
+}
+
+// requireLive refuses a facet whose current status is not live, by the only means
+// status is ever decided: folding the facet's anam-events up to the head. Only this
+// facet's events are folded, as in Retract, since its state depends on nothing else.
+func (g *Gate) requireLive(ctx context.Context, f facet.Facet) error {
+	head, err := g.ledger.Head(ctx)
+	if err != nil {
+		return err
+	}
+	events, err := g.ledger.FacetEvents(ctx, f.ID, head)
+	if err != nil {
+		return err
+	}
+	states, err := fold.Fold(events)
+	if err != nil {
+		return err
+	}
+	if st := states[f.ID]; !st.Live() {
+		return fmt.Errorf("%w: %s is a %s (v%d) and its status is %q",
+			ErrFacetNotLive, f.ID, f.Type, f.ArtifactVersion, st.Status)
+	}
+	return nil
 }
 
 // Retract appends a tombstoned anam-event against the facet's current version —

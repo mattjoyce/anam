@@ -8,6 +8,11 @@ decisions is in `journal/`.
 
 ## 2026-10-20
 
+- The gate refuses to carry a facet that is not live (card 185). `Rehearse` and `RenameBatch` fold
+  the facet's events and answer `ErrFacetNotLive` for a tombstoned facet, naming its id, type and
+  status, and write nothing. Until now only the CLI's plan kept the 6,218 tombstoned facets dead on
+  2026-10-20; any other caller of `RenameBatch` would have brought them back. A dead facet stays
+  under the type it died in.
 - The Soufflé oracle names the renamed medication types (card 182). `scripts/souffle-diff.py` still asked about `med.started` and `med.dose-changed`, which no facet holds since the rename, so its regimen questions would have answered empty on both engines and agreed for the wrong reason. They now ask about `health.medication-started` and `health.medication-dose-changed`.
 - Verify reproduces a read served under an old type name (card 187). After the rename a receipt
   served before it, such as the two `meds` v1 receipts, failed to verify with one extra facet: the

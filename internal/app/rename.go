@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -38,9 +40,14 @@ version. The old version stays, so a read --as-of a moment before the run is
 unchanged, and a read after shows the new type. Nothing is written unless
 --yes is given.
 
+A rename may carry a select, to split one type into several: the source a
+facet came from, and a string in its payload that starts with a prefix. Every
+live facet of a type split this way must match exactly one rename.
+
 The dry run is the report: per rename, how many facets would be carried, how
-many already were, and how many the gate would refuse, with the reasons. A
-refusal anywhere stops the run before anything is written. The two types must
+many already were, and how many the gate would refuse, with the reasons, and
+every facet of a split type that matches no rename or more than one. Either
+stops the run before anything is written. The two types must
 key and place facets the same way, or the ids would not meet; the run checks
 that against the stored Definitions before it asks the gate anything.
 
@@ -63,6 +70,9 @@ Stop the daemon first. The run opens the ledger itself, like a retraction.`,
 				return err
 			}
 			writeRenameReport(cmd, plan)
+			if n := plan.count(renameUnplaced); n > 0 {
+				return fmt.Errorf("%d facets match no rename or more than one; nothing written", n)
+			}
 			if n := plan.count(renameRefused); n > 0 {
 				return fmt.Errorf("%d facets the gate would refuse; nothing written", n)
 			}
@@ -77,7 +87,7 @@ Stop the daemon first. The run opens the ledger itself, like a retraction.`,
 		},
 	}
 	cmd.Flags().StringVar(&table, "table", "",
-		`JSON file naming the renames: {"renames": [{"from": "old.type", "to": "new.type"}]}`)
+		`JSON file naming the renames: {"renames": [{"from": "old.type", "to": "new.type", "select": {"source": "s", "pointer": "/id", "prefix": "p:"}}]}, select optional`)
 	cmd.Flags().BoolVar(&yes, "yes", false, "write the new versions; without it the command only reports")
 	_ = cmd.MarkFlagRequired("table")
 	return cmd
@@ -87,18 +97,24 @@ Stop the daemon first. The run opens the ledger itself, like a retraction.`,
 type renameFate int
 
 const (
-	renameCarry   renameFate = iota // the gate would supersede: carry it
-	renameDone                      // already under the new type: a no-op
-	renameRefused                   // the gate refuses, or the ledger does not hold it
+	renameCarry    renameFate = iota // the gate would supersede: carry it
+	renameDone                       // already under the new type: a no-op
+	renameRefused                    // the gate refuses, or the ledger does not hold it
+	renameUnplaced                   // no rename matches it, or more than one does
 )
 
-// renameItem is one live facet of a type left, and its fate.
+// renameItem is one live facet of a type left, the renames that match it, and its
+// fate. A facet is placed when exactly one rename matches; only then is the gate
+// asked about it, and row is that rename's index in the table.
 type renameItem struct {
-	pair   renamePair
+	rows   []int
 	facet  facet.Facet
 	fate   renameFate
 	reason string
 }
+
+// row is the index of the one rename that carries the item; placed items only.
+func (it renameItem) row() int { return it.rows[0] }
 
 // renamePlan is the dry run as a value: every live facet the table reaches, with
 // what the gate would do to it, against the Definitions in force.
@@ -118,17 +134,9 @@ func (p renamePlan) count(f renameFate) int {
 	return n
 }
 
-// toOf is the table as a map from the type left to the type arrived at.
-func (t renameTable) toOf() map[facet.Type]facet.Type {
-	to := make(map[facet.Type]facet.Type, len(t.Renames))
-	for _, p := range t.Renames {
-		to[p.From] = p.To
-	}
-	return to
-}
-
-// planRename checks the keying, reads the fold, and asks the gate what it would do
-// with every live facet of a type left. It writes nothing.
+// planRename checks the keying, reads the fold, places every live facet of a type
+// left on the one rename that matches it, and asks the gate what it would do with
+// each facet placed. It writes nothing.
 func planRename(ctx context.Context, cfg config.Config, tbl renameTable) (renamePlan, error) {
 	defs, err := checkRenameKeying(ctx, cfg, tbl)
 	if err != nil {
@@ -143,19 +151,40 @@ func planRename(ctx context.Context, cfg config.Config, tbl renameTable) (rename
 		return renamePlan{}, err
 	}
 	defer func() { _ = l.Close() }()
-	g := gate.New(l, defs, renameScopes(tbl, facets), clock.Real{}, cfg.PersonID, renameLimits(cfg))
 
-	to := tbl.toOf()
-	plan := renamePlan{table: tbl, defs: defs}
-	for _, f := range facets {
-		item := renameItem{pair: renamePair{From: f.Type, To: to[f.Type]}, facet: f}
+	plan := renamePlan{table: tbl, defs: defs, items: placeAll(tbl, facets)}
+	g := gate.New(l, defs, renameScopes(tbl, plan.items), clock.Real{}, cfg.PersonID, renameLimits(cfg))
+	for i, it := range plan.items {
+		if it.fate == renameUnplaced {
+			continue
+		}
 		fctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
-		res, err := g.Rehearse(fctx, renameOf(f, to[f.Type]))
+		res, err := g.Rehearse(fctx, renameOf(it.facet, tbl.Renames[it.row()].To))
 		cancel()
-		item.fate, item.reason = fateOf(res, err)
-		plan.items = append(plan.items, item)
+		plan.items[i].fate, plan.items[i].reason = fateOf(res, err)
 	}
 	return plan, nil
+}
+
+// placeAll matches every facet against the table. A facet that matches no rename,
+// or more than one, is unplaced, with the reason; the rest wait for the gate.
+func placeAll(tbl renameTable, facets []facet.Facet) []renameItem {
+	items := make([]renameItem, len(facets))
+	for i, f := range facets {
+		rows := tbl.place(f)
+		items[i] = renameItem{rows: rows, facet: f}
+		switch {
+		case len(rows) == 0:
+			items[i].fate, items[i].reason = renameUnplaced, "no rename's select matches it"
+		case len(rows) > 1:
+			nums := make([]string, len(rows))
+			for j, r := range rows {
+				nums[j] = strconv.Itoa(r + 1)
+			}
+			items[i].fate, items[i].reason = renameUnplaced, "renames "+strings.Join(nums, ", ")+" all match it"
+		}
+	}
+	return items
 }
 
 // liveFacetsLeaving is every live facet of a type the table leaves, at the version
@@ -210,19 +239,20 @@ func fateOf(res gate.Result, err error) (renameFate, string) {
 	}
 }
 
-// renameScopes lets each facet's source submit the type it arrives at, and nothing
-// else: the gate's authenticated pillar still runs, scoped to the run.
-func renameScopes(tbl renameTable, facets []facet.Facet) gate.StaticScopes {
-	to := tbl.toOf()
+// renameScopes lets each placed facet's source submit the type its rename arrives
+// at, and nothing else: the gate's authenticated pillar still runs, scoped to the run.
+func renameScopes(tbl renameTable, items []renameItem) gate.StaticScopes {
 	scopes := gate.StaticScopes{}
 	seen := map[string]bool{}
-	for _, f := range facets {
-		key := f.Provenance.Source + " " + string(to[f.Type])
-		if seen[key] {
+	for _, it := range items {
+		if it.fate == renameUnplaced {
 			continue
 		}
-		seen[key] = true
-		scopes[f.Provenance.Source] = append(scopes[f.Provenance.Source], to[f.Type])
+		src, to := it.facet.Provenance.Source, tbl.Renames[it.row()].To
+		if key := src + " " + string(to); !seen[key] {
+			seen[key] = true
+			scopes[src] = append(scopes[src], to)
+		}
 	}
 	return scopes
 }

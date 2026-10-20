@@ -2,17 +2,17 @@
 type: workflow
 title: Rename a type
 description: anam rename --table renames.json --yes carries every live facet of a type into another type as the next version of itself, same id, through the gate, so anam-time is kept and a read as-of before the run is unchanged.
-timestamp: 2026-10-20T00:00:00Z
+timestamp: 2026-10-21T00:00:00Z
 resource: internal/app/rename.go#planRename
-anchor: "res, err := g.Rehearse(fctx, renameOf(f, to[f.Type]))"
+anchor: "res, err := g.Rehearse(fctx, renameOf(it.facet, tbl.Renames[it.row()].To))"
 basis: code
 tier: supporting
-trigger: The taxonomy renames a type (card 147). The operator stops the daemon, writes a table of types left and types arrived at, runs `anam rename --table renames.json` and reads the report, then runs it again with `--yes`.
+trigger: The taxonomy renames a type (card 147), or splits one into leaves by what its facets say (card 194). The operator stops the daemon, writes a table of types left and types arrived at, runs `anam rename --table renames.json` and reads the report, then runs it again with `--yes`.
 steps:
   - actor: /components/cli.md
     caller: outside
     label: renameCmd reads its flags
-    action: "`--table`, a JSON file of `{from, to}` pairs, and `--yes`. Without `--yes` the command only reports."
+    action: "`--table`, a JSON file of `{from, to}` pairs, each with an optional `select`, and `--yes`. Without `--yes` the command only reports."
     resource: internal/app/rename.go#renameCmd
     anchor: 'cmd.Flags().BoolVar(&yes, "yes", false, "write the new versions; without it the command only reports")'
   - actor: /components/cli.md
@@ -22,8 +22,8 @@ steps:
     anchor: 'if cfg.Server != "" {'
   - actor: /components/cli.md
     label: load and check the table
-    action: Two valid types in every pair, none that goes nowhere, no type left twice, and no chain, so one run is one step and a rerun is all no-op. Unknown keys are refused.
-    resource: internal/app/renametable.go#loadRenameTable
+    action: "Two valid types in every pair, none that goes nowhere, and no chain, so one run is one step and a rerun is all no-op. A pair without `select` is the only pair that leaves its type. A type split by `select` is left by several pairs, each with one: `source`, a `pointer` and `prefix` together, or both, and no pair repeated. Unknown keys are refused."
+    resource: internal/app/renametable.go#check
     anchor: "is both left and arrived at; one run is one step"
   - actor: /components/def.md
     caller: /components/cli.md
@@ -39,6 +39,11 @@ steps:
     reads: [/data-structures/fold-entry.md]
     resource: internal/app/rename.go#liveFacetsLeaving
     anchor: "return facetsOf(rctx, src.Ledger, entries)"
+  - actor: /components/cli.md
+    label: place each facet on one pair
+    action: "`place` matches each facet against every pair: its type is the pair's `from`, its source is the selector's `source` if named, and the string at the selector's `pointer` in its payload starts with the `prefix` if named. A facet that matches no pair, or more than one, is unplaced and goes no further; first match never wins, so a pair means the same wherever it sits in the table."
+    resource: internal/app/rename.go#placeAll
+    anchor: "all match it"
   - actor: /components/gate.md
     caller: /components/cli.md
     label: rehearse each facet
@@ -52,9 +57,9 @@ steps:
     anchor: 'if p.renamedFrom != "" && current.Type == p.renamedFrom {'
   - actor: /components/cli.md
     label: the report
-    action: Per pair, how many facets the gate would carry and how many it would refuse, then a line per refusal naming the facet and the reason. A refusal anywhere ends the run with nothing written, even with `--yes`.
+    action: "Per pair, how many facets the gate would carry and how many it would refuse, and its selector, then a line per refusal and per unmatched or doubly matched facet, naming the facet and the reason. An unplaced facet or a refusal anywhere ends the run with nothing written, even with `--yes`."
     resource: internal/app/renamerun.go#writeRenameReport
-    anchor: 'FROM\tTO\tCARRY\tREFUSED'
+    anchor: 'FROM\tTO\tCARRY\tREFUSED\tSELECT'
   - actor: /components/cli.md
     branch: without --yes
     label: dry run, nothing written
@@ -81,5 +86,7 @@ steps:
     resource: internal/gate/rename.go#Rename
     anchor: "Anam-time is kept"
 ---
+
+Card 194 lets a pair carry a `select`, so one table splits a type into leaves, as card 195 splits `activity.exercise-session` by its payload id's prefix, `garmin:session:`, `concept2:session:`, `technogym:` and `strong:session:`. The source alone would not do, since Strong and Technogym both arrive through the `records` importer. A leaf spells its shared core out in full, because a manifest cannot reference another file; `internal/def/shared-core.json` names the pointers a split's leaves share, and a def test holds their schemas identical, description and examples aside.
 
 Card 140. The alternative, a new ledger built facet by facet, flattened anam-time to the migration moment and split receipts from their ledger; this keeps one ledger and adds one version per facet. The type is not in a facet's id, so the new version lands on the same facet; `type` is a column on every version row, so nothing is overwritten and the append-only triggers permit the insert. The one concession the gate makes is scoped by the call, and `ErrTypeChanged` guards every other path as before.

@@ -34,3 +34,4 @@ graphify-out/
 
 # Personal source documents kept beside the repo for inspection. Never committed.
 /private/
+__pycache__/

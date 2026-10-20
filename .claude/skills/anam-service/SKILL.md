@@ -29,6 +29,8 @@ runs, nothing else may open those files. Ask it over HTTP instead.
 | `GET /v1/openapi.yaml` | no | The API's description as the running build carries it (card 49): every route below with its parameters, bodies, status codes and roles. Read it before guessing at a shape. |
 | `GET /v1/status` | reader, importer, operator | Version, person, ledger id, W, and per importer source when its last batch arrived (`last_scan_at`) and last changed the record. |
 | `GET /v1/timeline` | reader, importer, operator | The CLI's timeline read. Query: `zone` (IANA, required; `Local` is refused), `from`, `to`, `at`, `as_of`, `type`, `projection`, `explain=true`, typed as on the CLI, `w` (a watermark) in place of `as_of`, and `fields` (repeated JSON pointers into the type's schema, card 138), which answers a `frame` of `columns` and `rows` in place of `entries`. Whole, not paged; over `max_read_bytes` (default 512 KiB) it is 413 `result_too_large` with `too_large.narrow`, the parameters still unused. |
+| `POST /v1/query` | reader, importer, operator | Run a Datalog program through a named `projection` (card 173): body `projection`, `text`, `relation`, `as_of` or `w`, `dry_run`. The projection decides which facets the program sees; the program computes over them (selection by payload value, joins, aggregates). The answer is one sorted relation, filed with a receipt, and `/v1/receipts/{hash}/verify` re-runs it. 400 a program that cannot run (the message says what to change), 413 a derivation or answer over `max_read_bytes`, 409 on verify under a binary whose rules moved. |
+| `GET /v1/query` | reader, importer, operator | The introspection a program is written against: the relations, the fact-time lexeme, each type's pointers by Definition version, and the bundled rules with their text. |
 | `GET /v1/changes` | reader, importer, operator | Anam-events by anam-time: `since` (required), `until`, `zone`. Carries `index_seq` and `w`; `w` above `index_seq` means the index is behind. |
 | `POST /v1/receipts` | reader, importer, operator | Publish a timeline read: the same query as `/v1/timeline`, which must name a `projection`. 201 with the entries (or the `frame`, with `fields`), the receipt and its hash. The receipt records W, the narrowing and the fields; verify replays them. 413 over `max_read_bytes`, and then nothing is filed. |
 | `GET /v1/receipts`, `/v1/receipts/{hash}`, `/v1/receipts/{hash}/verify` | reader, importer, operator | List, show (from artifacts alone), prove against the ledger. 404 unknown, 400 malformed hash, 409 a receipt this ledger cannot honour, 413 a receipt too large to show here (it still verifies). |
@@ -77,7 +79,7 @@ it with `ANAM_SERVER`, `ANAM_TOKEN_FILE`, `ANAM_ZONE`, `ANAM_MCP_TIMEOUT` and
 ## The CLI against the daemon
 
 Set `ANAM_SERVER` (or `--server`) and `ANAM_TOKEN_FILE`, and `status`, `version`, `timeline`,
-`changes`, `receipt` and `checkpoint` ask the daemon, printing what they print against
+`changes`, `receipt`, `query` and `checkpoint` ask the daemon, printing what they print against
 local files. `inspect` prints the inspector's URL. No person or ledger path is needed.
 
 ```bash
@@ -86,6 +88,9 @@ anam status
 anam timeline --from 2026-06-01 --to 2026-06-30 --type health.blood-pressure
 ```
 
+- `anam query describe` and `anam query run --projection <name> -e '<program>'` (`--dry-run` derives
+  only) are the query, local or over the daemon. Describe first, since the program is written against
+  the relations and pointers it lists.
 - With a server set, `init`, `serve <projection>`, `retract` and `daemon` refuse: they open local
   files the daemon owns. Unset `ANAM_SERVER` to run them as maintenance, with the daemon stopped.
   A bare `anam serve` only lists the bundled projections and needs neither. To publish a read

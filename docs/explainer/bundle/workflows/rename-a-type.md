@@ -46,7 +46,7 @@ steps:
     resource: internal/gate/rename.go#Rehearse
     anchor: "p.renamedFrom = r.From"
   - actor: /components/gate.md
-    label: supersede on a type change, only when marked
+    label: supersede on a type change if marked
     action: "`disposition` refuses a commit whose facet is held under another type (card 105). A prepared envelope marked with the type it leaves, when the facet's current type is that one, supersedes instead, whether or not the payload changed: the hash is over the payload alone, so an unchanged payload would otherwise read as a no-op. The API path carries no mark."
     resource: internal/gate/commit.go#disposition
     anchor: 'if p.renamedFrom != "" && current.Type == p.renamedFrom {'
@@ -70,8 +70,8 @@ steps:
     resource: internal/gate/rename.go#RenameBatch
     anchor: "ps[i].renamedFrom = renames[i].From"
   - actor: /components/cli.md
-    label: a block that fails names how far the run got
-    action: The error says how many were carried of how many, and to re-run. A facet already carried sits under its new type, so the fold does not list it again, so the run again plans only what is left.
+    label: a failed block says how far it got
+    action: The error says how many were carried of how many, and to re-run. A facet already carried sits under its new type, so the fold does not list it again, and the run again plans only what is left.
     resource: internal/app/renamerun.go#renameAll
     anchor: "re-run to finish"
   - actor: /components/read.md

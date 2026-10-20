@@ -915,8 +915,9 @@ one or two projections plus a CLI timeline viewer, manual mint, and receipts. Re
 - **The query surface** (§9, card 173) — decided 2026-10-17, built 2026-10-19: the evaluator, the
   bundled rule set and the `current/2` = `fold.Snapshot` equality test (`internal/query`, held on a
   copy of the real record by `anam query check`), then introspection (`GET /v1/query`), the size
-  bound over the derivation, the receipt, `anam query run` and `POST /v1/query`. The anam-mcp tool
-  and the Soufflé differential script follow. Whether `fold.Fates` later becomes the bundled rules, so there is one
+  bound over the derivation, the receipt, `anam query run` and `POST /v1/query`; the anam-mcp
+  tools; and `scripts/souffle-diff.py`, the differential run against Soufflé, an oracle run by
+  hand until the engine has earned trust and then retired, never a dependency of the gate. Whether `fold.Fates` later becomes the bundled rules, so there is one
   decision procedure instead of two, is a separate decision for after the equality test has run for a
   while: it would move the evaluator onto the serve path, inside the trusted core, and that is not
   what this card admits.

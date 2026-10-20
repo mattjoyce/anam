@@ -218,3 +218,56 @@ func TestAnamEventReferencesFacetNotTheReverse(t *testing.T) {
 		}
 	}
 }
+
+func TestMatches(t *testing.T) {
+	tests := []struct {
+		name    string
+		typ     facet.Type
+		pattern string
+		want    bool
+	}{
+		{"exact", "health.sleep", "health.sleep", true},
+		{"exact other", "health.sleep", "health.weight", false},
+		{"exact is not a prefix", "health.sleep.night", "health.sleep", false},
+		{"prefix matches a leaf", "health.heart-rate.day", "health.heart-rate.", true},
+		{"prefix matches a deeper leaf", "health.heart-rate.day.garmin", "health.heart-rate.", true},
+		{"prefix stops at the segment boundary", "health.heart-rate-variability", "health.heart-rate.", false},
+		{"prefix does not match its own concept", "health.heart-rate", "health.heart-rate.", false},
+		{"prefix does not match another concept", "health.weight.day", "health.heart-rate.", false},
+		{"empty pattern matches nothing", "health.sleep", "", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := facet.Matches(tc.typ, tc.pattern); got != tc.want {
+				t.Errorf("Matches(%q, %q) = %v, want %v", tc.typ, tc.pattern, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidPattern(t *testing.T) {
+	tests := []struct {
+		pattern string
+		want    bool
+	}{
+		{"health.sleep", true},
+		{"health.heart-rate.", true},
+		{"health.heart-rate.day.", true},
+		{"health.", false},
+		{"health", false},
+		{".", false},
+		{"", false},
+		{"Health.sleep.", false},
+		{"health.sleep..", false},
+		{"health..sleep.", false},
+		{"health.sleep-", false},
+		{"health.sleep*", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.pattern, func(t *testing.T) {
+			if got := facet.ValidPattern(tc.pattern); got != tc.want {
+				t.Errorf("ValidPattern(%q) = %v, want %v", tc.pattern, got, tc.want)
+			}
+		})
+	}
+}

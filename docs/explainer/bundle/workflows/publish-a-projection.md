@@ -46,7 +46,7 @@ steps:
     label: one verdict per entry, by the first knob
     action: Type allow-list, then status, then classification ceiling, then fact-time window; only entries that pass are shown to the consent gate; a snapshot shape would then demote displaced and closed entries. The payload is never read.
     resource: internal/projection/projection.go#verdict
-    anchor: "case !t.typeSet[e.Type]:"
+    anchor: "case !t.admitsType(e.Type):"
   - actor: /components/serve.md
     label: build and validate the receipt
     action: "`Publish` takes the served bytes (the value's one serialisation), hashes them, and builds the receipt: served hash, facet ids in served order, watermark, ledger id, template name and version, definition-set version, served_at, span, and no query for a whole serve."

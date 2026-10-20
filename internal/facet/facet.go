@@ -304,3 +304,31 @@ func (e Envelope) Validate() error {
 	}
 	return nil
 }
+
+// IsPrefixPattern reports whether pattern names a type prefix rather than one type: it
+// ends in ".", the segment boundary, so it can only ever match whole segments.
+func IsPrefixPattern(pattern string) bool { return strings.HasSuffix(pattern, ".") }
+
+// ValidPattern reports whether pattern is a well-formed type pattern: an exact type
+// that is Valid, or a prefix that is Valid once its trailing "." is removed. A bare
+// domain such as "health." is therefore not a pattern; a prefix names at least a
+// domain and a concept (card 193).
+func ValidPattern(pattern string) bool {
+	if IsPrefixPattern(pattern) {
+		return Type(strings.TrimSuffix(pattern, ".")).Valid()
+	}
+	return Type(pattern).Valid()
+}
+
+// Matches reports whether pattern matches t. An exact pattern matches only that type.
+// A prefix pattern matches every type that starts with it, which is a match at a
+// segment boundary and nowhere else: "health.heart-rate." matches
+// "health.heart-rate.day" but neither "health.heart-rate-variability" nor
+// "health.heart-rate" itself. It checks no validity, so a malformed pattern matches
+// by the same rule; callers refuse one with ValidPattern first.
+func Matches(t Type, pattern string) bool {
+	if IsPrefixPattern(pattern) {
+		return len(t) > len(pattern) && strings.HasPrefix(string(t), pattern)
+	}
+	return string(t) == pattern
+}

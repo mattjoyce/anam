@@ -44,6 +44,13 @@ where a fact came from. `POST /v1/envelopes` and the `/v1/definitions`
 routes (card 53) are the importers' side, under importers' own tokens; their contract is
 [IMPORTERS.md](IMPORTERS.md) §8.
 
+**Type prefixes (2026-10-21, card 193).** A projection template's `types` entries and the timeline's
+`type` parameter each take an exact facet type or a prefix ending in `.`, such as
+`activity.exercise-session.`. A prefix matches every type under it at a segment boundary and nowhere
+else: `health.heart-rate.` matches `health.heart-rate.day` but not `health.heart-rate-variability` or
+`health.heart-rate`. One predicate does the matching for the projection, the timeline and a receipt's
+replay. A malformed `type` (a bare domain such as `health.`, a double dot, a wildcard) is a 400.
+
 **Receipted reads (2026-10-10, card 87).** `POST /v1/receipts` takes a timeline query that names
 a projection, reads it as `GET /v1/timeline` would, and files what it shows with a receipt. The
 receipt records W and the resolved narrowing (`query`: `at`, `from`, `before`, `type`), and

@@ -106,6 +106,9 @@ func Timeline(ctx context.Context, src Source, q api.TimelineQuery) (api.Timelin
 	if err != nil {
 		return api.Timeline{}, badQuery(err)
 	}
+	if err := checkType(q.Type); err != nil {
+		return api.Timeline{}, err
+	}
 	know, err := knowledgeOf(q, loc)
 	if err != nil {
 		return api.Timeline{}, err
@@ -178,9 +181,9 @@ func (v view) checkFields(q api.TimelineQuery) error {
 	var types []facet.Type
 	switch {
 	case q.Type != "":
-		types = []facet.Type{facet.Type(q.Type)}
+		types = coveredBy(q.Type, v.defs.All())
 	case v.tmpl != nil:
-		types = v.tmpl.Types
+		types = v.tmpl.Covers(v.defs.All())
 	default:
 		for _, d := range v.defs.All() {
 			types = append(types, d.Type)
@@ -198,6 +201,30 @@ func (v view) checkFields(q api.TimelineQuery) error {
 		}
 	}
 	return nil
+}
+
+// checkType refuses a type parameter that is neither a facet type nor a prefix of one.
+func checkType(pattern string) error {
+	if pattern != "" && !facet.ValidPattern(pattern) {
+		return badQuery(fmt.Errorf("type %q: want a facet type, or a prefix ending in a dot (activity.exercise-session.)", pattern))
+	}
+	return nil
+}
+
+// coveredBy returns the types a query's type pattern names: the type itself when it is
+// exact, so a type with no Definition is still refused by name, else every Definition
+// type under the prefix.
+func coveredBy(pattern string, defs []def.Definition) []facet.Type {
+	if !facet.IsPrefixPattern(pattern) {
+		return []facet.Type{facet.Type(pattern)}
+	}
+	var out []facet.Type
+	for _, d := range defs {
+		if facet.Matches(d.Type, pattern) {
+			out = append(out, d.Type)
+		}
+	}
+	return out
 }
 
 // view is one read of the person, optionally wound back, optionally pruned, and

@@ -253,3 +253,33 @@ func TestCompare_HashDisagreementOutweighsSetEquality(t *testing.T) {
 		t.Errorf("the id sets match; Missing=%v Unexpected=%v", got.Missing, got.Unexpected)
 	}
 }
+
+// The type narrowing is facet.Matches: one exact type, or a prefix at a segment
+// boundary, so the timeline and a receipt's replay agree on a prefix (card 193).
+func TestQueryAdmits_TypePattern(t *testing.T) {
+	t.Parallel()
+
+	const at = "2026-02-10T00:00:00.000000000Z"
+	tests := []struct {
+		name    string
+		pattern string
+		typ     string
+		want    bool
+	}{
+		{"no type narrows nothing", "", "health.sleep", true},
+		{"exact", "health.sleep", "health.sleep", true},
+		{"exact other", "health.sleep", "health.weight", false},
+		{"prefix leaf", "health.heart-rate.", "health.heart-rate.day", true},
+		{"prefix hyphenated sibling", "health.heart-rate.", "health.heart-rate-variability", false},
+		{"prefix is not its own concept", "health.heart-rate.", "health.heart-rate", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			q := &receipt.Query{Type: tc.pattern}
+			if got := q.Admits(at, tc.typ); got != tc.want {
+				t.Errorf("Admits(%q) under type %q = %v, want %v", tc.typ, tc.pattern, got, tc.want)
+			}
+		})
+	}
+}

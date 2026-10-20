@@ -130,9 +130,7 @@ func (d *Daemon) getProjections(w http.ResponseWriter, _ *http.Request) {
 			Name: cur.Name, Origin: d.projectionOrigin(cur), Current: cur.Version,
 			Description: cur.Description, Shape: string(cur.Shape), Hash: cur.Hash, Types: []string{},
 		}
-		for _, t := range cur.Types {
-			s.Types = append(s.Types, string(t))
-		}
+		s.Types = append(s.Types, cur.Patterns()...)
 		for _, v := range reg.Versions(cur.Name) {
 			s.Versions = append(s.Versions, v.Version)
 		}

@@ -107,6 +107,9 @@ func Publish(ctx context.Context, src Source, d serve.Deps, q api.TimelineQuery,
 	if err != nil {
 		return api.Published{}, badQuery(err)
 	}
+	if err := checkType(q.Type); err != nil {
+		return api.Published{}, err
+	}
 	know, err := knowledgeOf(q, loc)
 	if err != nil {
 		return api.Published{}, err

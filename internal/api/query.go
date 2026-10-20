@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+
+	"github.com/mattjoyce/anam/internal/facet"
 )
 
 // The read queries travel as URL query parameters, under their JSON names.
@@ -47,6 +49,9 @@ func TimelineQueryOf(v url.Values) (TimelineQuery, error) {
 			return TimelineQuery{}, fmt.Errorf("w %q: %w", s, err)
 		}
 		w = n
+	}
+	if t := v.Get("type"); t != "" && !facet.ValidPattern(t) {
+		return TimelineQuery{}, fmt.Errorf("type %q: want a facet type, or a prefix ending in a dot (activity.exercise-session.)", t)
 	}
 	return TimelineQuery{
 		From: v.Get("from"), To: v.Get("to"), At: v.Get("at"), AsOf: v.Get("as_of"), W: w,

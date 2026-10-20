@@ -16,7 +16,7 @@ references: []
 | `name` | yes | the file must be `<name>.json` |
 | `version` | yes, at least 1 | pinned into receipts |
 | `description` | no | |
-| `types` | yes | allow-list, deny by default; an empty list serves nothing |
+| `types` | yes | allow-list, deny by default; an empty list serves nothing. An entry is a type or a prefix ending in `.` (`activity.exercise-session.`) that admits every type under it at a segment boundary (card 193) |
 | `statuses` | yes | endorsement filter, deny by default |
 | `max_classification` | yes | Normal 1, Confidential 2, Sensitive 3; unknown ranks above every known |
 | `from`, `to` | present, may be empty | `[from, to)` in the clock layout |

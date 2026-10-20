@@ -8,6 +8,7 @@ decisions is in `journal/`.
 
 ## 2026-10-20
 
+- The Soufflé oracle names the renamed medication types (card 182). `scripts/souffle-diff.py` still asked about `med.started` and `med.dose-changed`, which no facet holds since the rename, so its regimen questions would have answered empty on both engines and agreed for the wrong reason. They now ask about `health.medication-started` and `health.medication-dose-changed`.
 - Verify reproduces a read served under an old type name (card 187). After the rename a receipt
   served before it, such as the two `meds` v1 receipts, failed to verify with one extra facet: the
   replay no longer knew that `med.stopped` closes a course, because the Definitions in force name

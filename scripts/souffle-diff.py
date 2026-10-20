@@ -72,13 +72,13 @@ QUESTIONS = [
     {
         "relation": "regimen",
         "anam": """
-regimen_type("med.started"). regimen_type("med.dose-changed").
+regimen_type("health.medication-started"). regimen_type("health.medication-dose-changed").
 regimen(At, Drug) :- entry(_, "health.blood-pressure", At, _, _, _, _), current(E, At),
                      entry(E, T, _, _, _, _, _), regimen_type(T), attr(E, "/drug", Drug).
 """,
         "souffle": """
 .decl regimen_type(t:symbol)
-regimen_type("med.started"). regimen_type("med.dose-changed").
+regimen_type("health.medication-started"). regimen_type("health.medication-dose-changed").
 .decl regimen(at:symbol, drug:symbol)
 regimen(At, Drug) :- entry(_, "health.blood-pressure", At, _, _, _, _), current(E, At),
                      entry(E, T, _, _, _, _, _), regimen_type(T), attr(E, "/drug", Drug).
@@ -88,7 +88,7 @@ regimen(At, Drug) :- entry(_, "health.blood-pressure", At, _, _, _, _), current(
     {
         "relation": "without",
         "anam": """
-regimen_type("med.started"). regimen_type("med.dose-changed").
+regimen_type("health.medication-started"). regimen_type("health.medication-dose-changed").
 on_d3k2(At) :- current(E, At), entry(E, T, _, _, _, _, _), regimen_type(T), attr(E, "/drug", "vitamin d3 + k2").
 without(At) :- entry(_, "health.blood-pressure", At, _, _, _, _),
                At >= "2026-06-01T00:00:00.000000000Z", At < "2026-09-01T00:00:00.000000000Z", not on_d3k2(At).

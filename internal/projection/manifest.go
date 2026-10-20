@@ -205,6 +205,7 @@ func Bundled() (*Registry, error) {
 	}
 
 	r := &Registry{held: make(map[string][]Template, len(entries))}
+	current := make(map[string]int, len(entries)) // each bundled template's version, before history joins it
 	for _, e := range entries {
 		if e.IsDir() {
 			continue // history, read below against the current versions
@@ -221,6 +222,7 @@ func Bundled() (*Registry, error) {
 			return nil, fmt.Errorf("%w: duplicate template %q", ErrBadTemplate, t.Name)
 		}
 		r.held[t.Name] = []Template{t}
+		current[t.Name] = t.Version
 	}
 	history, err := manifestFS.ReadDir("manifests/history")
 	if err != nil {
@@ -235,8 +237,8 @@ func Bundled() (*Registry, error) {
 			return nil, fmt.Errorf("%w: history %s declares %s v%d (file must be named %s)",
 				ErrBadTemplate, e.Name(), t.Name, t.Version, want)
 		}
-		cur, ok := r.held[t.Name]
-		if !ok || t.Version >= cur[0].Version {
+		cur, ok := current[t.Name]
+		if !ok || t.Version >= cur {
 			return nil, fmt.Errorf("%w: history %s is not an earlier version of a bundled template", ErrBadTemplate, e.Name())
 		}
 		if err := r.add(t); err != nil {

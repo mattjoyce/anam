@@ -107,22 +107,22 @@ var typeStyles = map[facet.Type]typeStyle{
 
 	"health.lab-panel": {"labs", shapeSquare, kindEvent},
 
-	"health.medication-started":     {"meds", shapeTriUp, kindEvent},
-	"health.medication-stopped":     {"meds", shapeTriDown, kindEvent},
-	"health.medication-missed-dose": {"meds", shapeCross, kindEvent},
+	"health.medication.started":     {"meds", shapeTriUp, kindEvent},
+	"health.medication.stopped":     {"meds", shapeTriDown, kindEvent},
+	"health.medication.dose-missed": {"meds", shapeCross, kindEvent},
 	// A dose taken (card 179): the moment of an intake, a filled square among the
 	// regimen's triangles.
-	"health.medication-dose": {"meds", shapeSquare, kindEvent},
+	"health.medication.dose": {"meds", shapeSquare, kindEvent},
 
-	"health.illness-started": {"conditions", shapeTriUp, kindEvent},
-	"health.illness-ended":   {"conditions", shapeTriDown, kindEvent},
+	"health.illness.started": {"conditions", shapeTriUp, kindEvent},
+	"health.illness.ended":   {"conditions", shapeTriDown, kindEvent},
 
 	"health.encounter": {"clinical", shapeSquare, kindEvent},
 	"health.donation":  {"clinical", shapeStar, kindEvent},
 
-	"place.departed": {"trips", shapeTriUp, kindEvent},
-	"place.arrived":  {"trips", shapeTriDown, kindEvent},
-	"place.flight":   {"trips", shapeCross, kindEvent},
+	"place.trip.departed": {"trips", shapeTriUp, kindEvent},
+	"place.trip.arrived":  {"trips", shapeTriDown, kindEvent},
+	"place.trip.flight":   {"trips", shapeCross, kindEvent},
 
 	"record.document": {"documents", shapeSquare, kindEvent},
 	// A file Anam remembers but does not hold (card 165), registered by the links

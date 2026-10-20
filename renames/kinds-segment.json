@@ -1,0 +1,52 @@
+{
+  "renames": [
+    {
+      "from": "health.medication-dose-changed",
+      "to": "health.medication.dose-changed"
+    },
+    {
+      "from": "health.medication-missed-dose",
+      "to": "health.medication.dose-missed"
+    },
+    {
+      "from": "health.medication-started",
+      "to": "health.medication.started"
+    },
+    {
+      "from": "health.medication-stopped",
+      "to": "health.medication.stopped"
+    },
+    {
+      "from": "health.medication-dose",
+      "to": "health.medication.dose"
+    },
+    {
+      "from": "health.medication-compliance",
+      "to": "health.medication.compliance"
+    },
+    {
+      "from": "health.illness-started",
+      "to": "health.illness.started"
+    },
+    {
+      "from": "health.illness-ended",
+      "to": "health.illness.ended"
+    },
+    {
+      "from": "place.departed",
+      "to": "place.trip.departed"
+    },
+    {
+      "from": "place.arrived",
+      "to": "place.trip.arrived"
+    },
+    {
+      "from": "place.returned",
+      "to": "place.trip.returned"
+    },
+    {
+      "from": "place.flight",
+      "to": "place.trip.flight"
+    }
+  ]
+}

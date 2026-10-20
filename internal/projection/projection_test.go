@@ -138,13 +138,23 @@ func TestBundled_ParsesBpAndSleep(t *testing.T) {
 	if got, want := r.Names(), []string{"bp", "doses", "meds", "sleep"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("bundled names = %v, want %v", got, want)
 	}
-	// Card 147: meds v2 names the types under the health domain, and v1 is held from
-	// manifests/history so a receipt that names it still verifies against it.
-	if cur, err := r.Lookup("meds"); err != nil || cur.Version != 2 {
-		t.Errorf("meds = v%d, %v; want v2 current", cur.Version, err)
+	// Card 147: meds v2 names the types under the health domain, and card 196 gave them
+	// their third segment in v3. Every earlier version is held from manifests/history so a
+	// receipt that names it still verifies against it.
+	if cur, err := r.Lookup("meds"); err != nil || cur.Version != 3 || cur.Types[0] != "health.medication.started" {
+		t.Errorf("meds = v%d %v, %v; want v3 current, naming health.medication.started", cur.Version, cur.Types, err)
+	}
+	if old, err := r.Version("meds", 2); err != nil || old.Types[0] != "health.medication-started" {
+		t.Errorf("meds v2 = %+v, %v; want the history's template", old.Types, err)
 	}
 	if old, err := r.Version("meds", 1); err != nil || old.Types[0] != "med.started" {
 		t.Errorf("meds v1 = %+v, %v; want the history's template", old.Types, err)
+	}
+	if cur, err := r.Lookup("doses"); err != nil || cur.Version != 2 || cur.Types[0] != "health.medication.dose" {
+		t.Errorf("doses = v%d %v, %v; want v2 current, naming health.medication.dose", cur.Version, cur.Types, err)
+	}
+	if old, err := r.Version("doses", 1); err != nil || old.Types[0] != "health.medication-dose" {
+		t.Errorf("doses v1 = %+v, %v; want the history's template", old.Types, err)
 	}
 	for _, tmpl := range r.All() {
 		if tmpl.Version < 1 {

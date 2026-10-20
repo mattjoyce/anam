@@ -338,15 +338,15 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   n_components_backup[&quot;Backup (internal/backup)&quot;]
   n_components_config[&quot;Config (internal/config)&quot;]
   n_components_inspect[&quot;Inspector (internal/inspect)&quot;]
-  n_components_library[&quot;Library (internal/library)&quot;]
-  n_components_projection[&quot;Projection&quot;]
   n_components_def[&quot;Definitions registry (internal/def)&quot;]
-  n_components_mint[&quot;Mint&quot;]
-  n_components_store_ops[&quot;Operational store (internal/store/ops)&quot;]
-  n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
-  n_components_span[&quot;Buckets (internal/span)&quot;]
-  n_components_facet[&quot;Facet domain values (internal/facet)&quot;]
+  n_components_library[&quot;Library (internal/library)&quot;]
   n_components_fold[&quot;Fold&quot;]
+  n_components_span[&quot;Buckets (internal/span)&quot;]
+  n_components_projection[&quot;Projection&quot;]
+  n_components_mint[&quot;Mint&quot;]
+  n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
+  n_components_facet[&quot;Facet domain values (internal/facet)&quot;]
+  n_components_store_ops[&quot;Operational store (internal/store/ops)&quot;]
   n_components_backup --&gt; n_components_store_ledger
   n_components_config --&gt; n_components_span
   n_components_config --&gt; n_components_facet
@@ -361,17 +361,17 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   click n_components_backup &quot;#components-backup&quot;
   click n_components_config &quot;#components-config&quot;
   click n_components_inspect &quot;#components-inspect&quot;
-  click n_components_library &quot;#components-library&quot;
-  click n_components_projection &quot;#components-projection&quot;
   click n_components_def &quot;#components-def&quot;
-  click n_components_mint &quot;#components-mint&quot;
-  click n_components_store_ops &quot;#components-store-ops&quot;
-  click n_components_store_ledger &quot;#components-store-ledger&quot;
-  click n_components_span &quot;#components-span&quot;
-  click n_components_facet &quot;#components-facet&quot;
+  click n_components_library &quot;#components-library&quot;
   click n_components_fold &quot;#components-fold&quot;
+  click n_components_span &quot;#components-span&quot;
+  click n_components_projection &quot;#components-projection&quot;
+  click n_components_mint &quot;#components-mint&quot;
+  click n_components_store_ledger &quot;#components-store-ledger&quot;
+  click n_components_facet &quot;#components-facet&quot;
+  click n_components_store_ops &quot;#components-store-ops&quot;
 classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
-  class n_components_backup,n_components_config,n_components_inspect,n_components_library,n_components_projection,n_components_def,n_components_mint,n_components_store_ops,n_components_store_ledger,n_components_span,n_components_facet,n_components_fold component;</pre></div></figure>
+  class n_components_backup,n_components_config,n_components_inspect,n_components_def,n_components_library,n_components_fold,n_components_span,n_components_projection,n_components_mint,n_components_store_ledger,n_components_facet,n_components_store_ops component;</pre></div></figure>
 <figure class="diagram"><figcaption>Components: derived</figcaption><p class="diagram-note">Boxes outside the group are drawn where a member depends on them.</p><div class="scroll"><pre class="mermaid">graph LR
   n_components_catchup[&quot;Catch-up (internal/catchup)&quot;]
   n_components_fold[&quot;Fold&quot;]
@@ -379,12 +379,12 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   n_components_read[&quot;Read (internal/read)&quot;]
   n_components_span[&quot;Buckets (internal/span)&quot;]
   n_components_store_ops[&quot;Operational store (internal/store/ops)&quot;]
-  n_components_store_artifact[&quot;Artifact store (internal/store/artifact)&quot;]
-  n_components_projection[&quot;Projection&quot;]
-  n_components_def[&quot;Definitions registry (internal/def)&quot;]
-  n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
   n_components_serve[&quot;Serve (internal/serve)&quot;]
+  n_components_def[&quot;Definitions registry (internal/def)&quot;]
+  n_components_projection[&quot;Projection&quot;]
+  n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
   n_components_facet[&quot;Facet domain values (internal/facet)&quot;]
+  n_components_store_artifact[&quot;Artifact store (internal/store/artifact)&quot;]
   n_components_catchup --&gt; n_components_store_ledger
   n_components_catchup --&gt; n_components_store_ops
   n_components_catchup --&gt; n_components_fold
@@ -412,32 +412,32 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   click n_components_read &quot;#components-read&quot;
   click n_components_span &quot;#components-span&quot;
   click n_components_store_ops &quot;#components-store-ops&quot;
-  click n_components_store_artifact &quot;#components-store-artifact&quot;
-  click n_components_projection &quot;#components-projection&quot;
-  click n_components_def &quot;#components-def&quot;
-  click n_components_store_ledger &quot;#components-store-ledger&quot;
   click n_components_serve &quot;#components-serve&quot;
+  click n_components_def &quot;#components-def&quot;
+  click n_components_projection &quot;#components-projection&quot;
+  click n_components_store_ledger &quot;#components-store-ledger&quot;
   click n_components_facet &quot;#components-facet&quot;
+  click n_components_store_artifact &quot;#components-store-artifact&quot;
 classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
-  class n_components_catchup,n_components_fold,n_components_mint,n_components_read,n_components_span,n_components_store_ops,n_components_store_artifact,n_components_projection,n_components_def,n_components_store_ledger,n_components_serve,n_components_facet component;</pre></div></figure>
+  class n_components_catchup,n_components_fold,n_components_mint,n_components_read,n_components_span,n_components_store_ops,n_components_serve,n_components_def,n_components_projection,n_components_store_ledger,n_components_facet,n_components_store_artifact component;</pre></div></figure>
 <figure class="diagram"><figcaption>Components: entry</figcaption><p class="diagram-note">Boxes outside the group are drawn where a member depends on them.</p><div class="scroll"><pre class="mermaid">graph LR
   n_components_cli[&quot;CLI (internal/app)&quot;]
   n_components_client[&quot;Client (internal/client)&quot;]
   n_components_daemon[&quot;Daemon&quot;]
   n_components_principals[&quot;Principals and roles (internal/daemon auth)&quot;]
-  n_components_read[&quot;Read (internal/read)&quot;]
-  n_components_library[&quot;Library (internal/library)&quot;]
   n_components_config[&quot;Config (internal/config)&quot;]
-  n_components_store_artifact[&quot;Artifact store (internal/store/artifact)&quot;]
-  n_components_backup[&quot;Backup (internal/backup)&quot;]
-  n_components_def[&quot;Definitions registry (internal/def)&quot;]
-  n_components_mint[&quot;Mint&quot;]
-  n_components_catchup[&quot;Catch-up (internal/catchup)&quot;]
-  n_components_gate[&quot;Admission gate&quot;]
-  n_components_store_ops[&quot;Operational store (internal/store/ops)&quot;]
-  n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
   n_components_serve[&quot;Serve (internal/serve)&quot;]
+  n_components_def[&quot;Definitions registry (internal/def)&quot;]
+  n_components_library[&quot;Library (internal/library)&quot;]
   n_components_inspect[&quot;Inspector (internal/inspect)&quot;]
+  n_components_gate[&quot;Admission gate&quot;]
+  n_components_mint[&quot;Mint&quot;]
+  n_components_backup[&quot;Backup (internal/backup)&quot;]
+  n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
+  n_components_read[&quot;Read (internal/read)&quot;]
+  n_components_catchup[&quot;Catch-up (internal/catchup)&quot;]
+  n_components_store_ops[&quot;Operational store (internal/store/ops)&quot;]
+  n_components_store_artifact[&quot;Artifact store (internal/store/artifact)&quot;]
   n_components_cli --&gt; n_components_daemon
   n_components_cli --&gt; n_components_client
   n_components_cli --&gt; n_components_config
@@ -469,21 +469,21 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   click n_components_client &quot;#components-client&quot;
   click n_components_daemon &quot;#components-daemon&quot;
   click n_components_principals &quot;#components-principals&quot;
-  click n_components_read &quot;#components-read&quot;
-  click n_components_library &quot;#components-library&quot;
   click n_components_config &quot;#components-config&quot;
-  click n_components_store_artifact &quot;#components-store-artifact&quot;
-  click n_components_backup &quot;#components-backup&quot;
-  click n_components_def &quot;#components-def&quot;
-  click n_components_mint &quot;#components-mint&quot;
-  click n_components_catchup &quot;#components-catchup&quot;
-  click n_components_gate &quot;#components-gate&quot;
-  click n_components_store_ops &quot;#components-store-ops&quot;
-  click n_components_store_ledger &quot;#components-store-ledger&quot;
   click n_components_serve &quot;#components-serve&quot;
+  click n_components_def &quot;#components-def&quot;
+  click n_components_library &quot;#components-library&quot;
   click n_components_inspect &quot;#components-inspect&quot;
+  click n_components_gate &quot;#components-gate&quot;
+  click n_components_mint &quot;#components-mint&quot;
+  click n_components_backup &quot;#components-backup&quot;
+  click n_components_store_ledger &quot;#components-store-ledger&quot;
+  click n_components_read &quot;#components-read&quot;
+  click n_components_catchup &quot;#components-catchup&quot;
+  click n_components_store_ops &quot;#components-store-ops&quot;
+  click n_components_store_artifact &quot;#components-store-artifact&quot;
 classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
-  class n_components_cli,n_components_client,n_components_daemon,n_components_principals,n_components_read,n_components_library,n_components_config,n_components_store_artifact,n_components_backup,n_components_def,n_components_mint,n_components_catchup,n_components_gate,n_components_store_ops,n_components_store_ledger,n_components_serve,n_components_inspect component;</pre></div></figure>
+  class n_components_cli,n_components_client,n_components_daemon,n_components_principals,n_components_config,n_components_serve,n_components_def,n_components_library,n_components_inspect,n_components_gate,n_components_mint,n_components_backup,n_components_store_ledger,n_components_read,n_components_catchup,n_components_store_ops,n_components_store_artifact component;</pre></div></figure>
 <figure class="diagram"><figcaption>Components: kernel</figcaption><p class="diagram-note">Boxes outside the group are drawn where a member depends on them.</p><div class="scroll"><pre class="mermaid">graph LR
   n_components_def[&quot;Definitions registry (internal/def)&quot;]
   n_components_facet[&quot;Facet domain values (internal/facet)&quot;]
@@ -509,9 +509,9 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   n_components_receipt[&quot;Receipt (internal/receipt)&quot;]
   n_components_serve[&quot;Serve (internal/serve)&quot;]
   n_components_store_artifact[&quot;Artifact store (internal/store/artifact)&quot;]
-  n_components_fold[&quot;Fold&quot;]
-  n_components_mint[&quot;Mint&quot;]
   n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
+  n_components_mint[&quot;Mint&quot;]
+  n_components_fold[&quot;Fold&quot;]
   n_components_facet[&quot;Facet domain values (internal/facet)&quot;]
   n_components_projection --&gt; n_components_fold
   n_components_projection --&gt; n_components_facet
@@ -526,12 +526,12 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   click n_components_receipt &quot;#components-receipt&quot;
   click n_components_serve &quot;#components-serve&quot;
   click n_components_store_artifact &quot;#components-store-artifact&quot;
-  click n_components_fold &quot;#components-fold&quot;
-  click n_components_mint &quot;#components-mint&quot;
   click n_components_store_ledger &quot;#components-store-ledger&quot;
+  click n_components_mint &quot;#components-mint&quot;
+  click n_components_fold &quot;#components-fold&quot;
   click n_components_facet &quot;#components-facet&quot;
 classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
-  class n_components_library,n_components_projection,n_components_receipt,n_components_serve,n_components_store_artifact,n_components_fold,n_components_mint,n_components_store_ledger,n_components_facet component;</pre></div></figure><details class="concept type-component" id="components-gate" open><summary><span class="title">Admission gate</span> <span class="desc">The only ingress: resolve binds an envelope to the person, commit validates it against its Definition, composes identity, and appends through the ledger idempotently.</span></summary><div class="concept-body"><p class="labels"><span class="label label-type type-component">component</span> <span class="label label-tier">core</span> <span class="label label-basis">basis: code</span> <span class="label label-resource"><code>internal/gate/gate.go#New</code></span> <span class="label label-anchor">anchor <code>func New(l Ledger, defs Definitions, scopes TokenScopes, clock Clock, personID string, limits Limits) *Gate {</code></span></p><p><strong>Depends on</strong> <a class="ref ref-component" href="#components-store-ledger">Ledger store (internal/store/ledger)</a>, <a class="ref ref-component" href="#components-def">Definitions registry (internal/def)</a>, <a class="ref ref-component" href="#components-facet">Facet domain values (internal/facet)</a>, <a class="ref ref-component" href="#components-fold">Fold</a> <span class="label">group: kernel</span></p><p>Two calls, as the doctrine says: <code>Resolve</code> enforces association (binding and its assurance), <code>CommitBatch</code> enforces facet-compliance and token scope and writes.</p>
+  class n_components_library,n_components_projection,n_components_receipt,n_components_serve,n_components_store_artifact,n_components_store_ledger,n_components_mint,n_components_fold,n_components_facet component;</pre></div></figure><details class="concept type-component" id="components-gate" open><summary><span class="title">Admission gate</span> <span class="desc">The only ingress: resolve binds an envelope to the person, commit validates it against its Definition, composes identity, and appends through the ledger idempotently.</span></summary><div class="concept-body"><p class="labels"><span class="label label-type type-component">component</span> <span class="label label-tier">core</span> <span class="label label-basis">basis: code</span> <span class="label label-resource"><code>internal/gate/gate.go#New</code></span> <span class="label label-anchor">anchor <code>func New(l Ledger, defs Definitions, scopes TokenScopes, clock Clock, personID string, limits Limits) *Gate {</code></span></p><p><strong>Depends on</strong> <a class="ref ref-component" href="#components-store-ledger">Ledger store (internal/store/ledger)</a>, <a class="ref ref-component" href="#components-def">Definitions registry (internal/def)</a>, <a class="ref ref-component" href="#components-facet">Facet domain values (internal/facet)</a>, <a class="ref ref-component" href="#components-fold">Fold</a> <span class="label">group: kernel</span></p><p>Two calls, as the doctrine says: <code>Resolve</code> enforces association (binding and its assurance), <code>CommitBatch</code> enforces facet-compliance and token scope and writes.</p>
 <div class="scroll"><table><thead><tr><th>Pillar</th><th>Where</th></tr></thead><tbody><tr><td>Facet-compliant</td><td>the Definition&#x27;s closed JSON Schema, <code>validation_mode</code>, fact-time pointer and zone, series pointers</td></tr><tr><td>Authenticated</td><td>the token scopes: a source may inject only the types it is scoped for</td></tr><tr><td>Associated</td><td>binding to the one person, with assurance high / medium / review</td></tr></tbody></table></div>
 <p>What commit computes, per envelope: the <a class="ref ref-term" href="#terms-source-ref">source ref</a> from the Definition&#x27;s <code>identity_key</code> (refusing one the envelope carried that disagrees), the <code>facet_id</code> as uuidv5 of it, the fact-time promoted out of the payload, the series stamp, the content hash of the canonical payload. Then the outcome: no prior version is <code>admitted</code>; a prior version with the same hash is <code>no-op</code>; a different hash is <code>superseded</code> with a new artifact version. A batch of up to <code>MaxBatch</code> (49) envelopes is one transaction, so a refused envelope writes nothing for the whole batch. <code>MaxBatch</code> is a constant, not a config key: every importer cuts its batches to it, so a gate set lower would refuse their full batches, and it decides which events share an anam-time (card 151). The payload bound and the retry count are the two <code>gate.Limits</code> the daemon passes in from the config (<code>max_payload_bytes</code>, 300 KiB; <code>commit_retries</code>, 5); see <a class="ref ref-data-structure" href="#data-structures-limits">config limits</a>.</p>
 <p>The retry on a stale watermark lives here, not in the store, because a worker may already crash mid-batch and be re-run to known-good. <code>Retract</code> writes a tombstone event against the current version and no artifact. <code>Rehearse</code> and <code>RenameBatch</code> (card 140) carry a facet into another type as its next version: the prepared envelope is marked with the type it leaves, nothing on the wire can set the mark, and the disposition supersedes on a type change only under it, with the payload unchanged or not; every other path keeps the refusal of a changed type (card 105).</p>
@@ -672,7 +672,7 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   s6 --&gt;|&quot;a reference to bytes the library lacks&quot;| s7
   s6 --&gt;|&quot;every reference names held bytes&quot;| s8
 classDef workflow fill:#b8651b22,stroke:#b8651b,color:#111,stroke-width:1.5px;
-  class s1,s2,s3,s4,s5,s6,s7,s8 workflow;</pre></div></figure><div class="scroll"><table class="steps"><thead><tr><th>#</th><th>caller</th><th>actor</th><th>action</th><th>reads</th><th>writes</th><th>resource</th></tr></thead><tbody><tr><td>1</td><td>outside</td><td><a class="ref ref-component" href="#components-importer-documents">anam_documents</a></td><td>Every file&#x27;s sidecar gives its <code>date</code>; the importer measures the path, sha256, size and media type, and builds one <code>record.document</code> envelope per file. A missing sidecar stops the run. </td><td>—</td><td>—</td><td><code>docs/INBOX.md#Documents as facts of their own</code><br><small>anchor <code>Every file in the source folder has a sidecar beside it,</code></small></td></tr><tr><td>2</td><td>—</td><td><a class="ref ref-component" href="#components-importer-documents">anam_documents</a></td><td>Each <code>anam_documents.batch</code> event carries its envelopes and a <code>documents: [{path, file}]</code> list; the bytes stay on disk and are read only by <a class="ref ref-component" href="#components-anam-submit">anam_submit</a>. </td><td>—</td><td><a class="ref ref-data-structure" href="#data-structures-batch-event">Batch event</a></td><td><code>docs/INBOX.md#Documents as facts of their own</code><br><small>anchor <code>reads the share&#x27;s `documents/` folder, and `anam_submit` posts each file&#x27;s bytes to</code></small></td></tr><tr><td>3</td><td><a class="ref ref-component" href="#components-importer-documents">anam_documents</a></td><td><a class="ref ref-component" href="#components-anam-submit">anam_submit</a></td><td>For each entry it posts the raw bytes to <code>POST /v1/documents?ext=&lt;extension&gt;</code> under the importer&#x27;s token, at most <code>max_document_bytes</code> (64 MiB by default), before any envelope of the batch. In anam-importers <code>Client.store_document(name, data)</code> takes the extension from the name&#x27;s suffix and leaves off one Anam would refuse. </td><td><a class="ref ref-data-structure" href="#data-structures-batch-event">Batch event</a></td><td>—</td><td><code>docs/IMPORTERS.md#8.4a Documents</code><br><small>anchor <code>`POST /v1/documents?ext=&lt;extension&gt;`, body the raw bytes (at most `max_document_bytes`, 64 MiB by default),</code></small></td></tr><tr><td>4</td><td><a class="ref ref-component" href="#components-anam-submit">anam_submit</a></td><td><a class="ref ref-component" href="#components-daemon">Daemon</a></td><td><code>postDocument</code> refuses a token whose types do not include <code>record.document</code> (403) and an extension that is not letters and digits, at most 16 (400). It measures the sha256, size and media type (by extension) from the body. </td><td>—</td><td>—</td><td><code>internal/daemon/documents.go#postDocument</code><br><small>anchor <code>if !mayStore(imp) {</code></small></td></tr><tr><td>5</td><td>—</td><td><a class="ref ref-component" href="#components-daemon">Daemon</a></td><td>On the write queue, so one writer counts and places and a backup never copies half a file, <code>library.Store</code> writes <code>&lt;sha256&gt;.&lt;ext&gt;</code> through a temporary file renamed into place under an <code>os.Root</code> on the library, in the first folder along the root, <code>sha[:1]/</code>, <code>sha[:1]/sha[:2]/</code> that holds fewer than <code>library_folder_limit</code> files. New bytes are 201 and bytes already held are 200, each with <code>sha256</code>, <code>bytes</code>, <code>media_type</code> and <code>new</code>. Other bytes are another file, so there is no conflict and nothing is overwritten. </td><td>—</td><td>—</td><td><code>internal/library/library.go#Store</code><br><small>anchor <code>name := path.Join(dir, sum+ext)</code></small></td></tr><tr><td>6</td><td><a class="ref ref-component" href="#components-anam-submit">anam_submit</a></td><td><a class="ref ref-component" href="#components-importer-base">Importer base (anam_importer)</a></td><td>The batch goes to <code>POST /v1/envelopes</code> as any other. </td><td>—</td><td><a class="ref ref-data-structure" href="#data-structures-batch-submission">Batch submission</a></td><td><code>../anam-importers/anam_importer/client.py#submit</code><br><small>anchor <code>status, body = self._call(&quot;POST&quot;, &quot;/v1/envelopes&quot;, payload)</code></small></td></tr><tr><td>7</td><td><a class="ref ref-component" href="#components-importer-base">Importer base (anam_importer)</a></td><td><a class="ref ref-component" href="#components-daemon">Daemon</a></td><td>Inside the write and before the gate, <code>checkReferences</code> indexes the library once with <code>library.Index</code> and looks up each <code>record.document</code>&#x27;s sha256; a reference whose sha256 the library holds no bytes for refuses the batch, and nothing of it is admitted. The path plays no part in finding the bytes. <span class="label">branch: a reference to bytes the library lacks</span> <span class="label">ends</span></td><td>—</td><td>—</td><td><code>internal/daemon/documents.go#checkReferences</code><br><small>anchor <code>post the bytes to /v1/documents first</code></small></td></tr><tr><td>8</td><td><a class="ref ref-component" href="#components-daemon">Daemon</a></td><td><a class="ref ref-component" href="#components-gate">Admission gate</a></td><td>The gate admits the references as in <a class="ref ref-workflow" href="#workflows-admit-a-batch">admit a batch</a>. The <code>path</code> is the document&#x27;s name and identity: the same file resent is a no-op, and a rescan under the same path with other bytes supersedes the facet while the first bytes stay in the library. <span class="label">branch: every reference names held bytes</span> <span class="label">ends</span></td><td>—</td><td>—</td><td><code>internal/daemon/envelopes.go#postEnvelopes</code><br><small>anchor <code>if err := checkReferences(d.cfg.LibraryDir, envs); err != nil {</code></small></td></tr></tbody></table></div><p>Before card 102 the library was a folder Anam&#x27;s documents worker read in place, and something outside Anam put the files there. Now the bytes come in over the importer&#x27;s token like the envelopes do, so the library has one writer and a reference can be checked against the bytes it names. Card 150 named each stored file by its sha256, so a changed document no longer needs a new path: its new bytes are a new file and its facet supersedes. Where a file sits is the <a class="ref ref-component" href="#components-library">library</a>&#x27;s own business and never enters a fact. The inspector serves a reference&#x27;s bytes by sha256, confined to the library (see <a class="ref ref-component" href="#components-inspect">inspector</a>).</p>
+  class s1,s2,s3,s4,s5,s6,s7,s8 workflow;</pre></div></figure><div class="scroll"><table class="steps"><thead><tr><th>#</th><th>caller</th><th>actor</th><th>action</th><th>reads</th><th>writes</th><th>resource</th></tr></thead><tbody><tr><td>1</td><td>outside</td><td><a class="ref ref-component" href="#components-importer-documents">anam_documents</a></td><td>Every file&#x27;s sidecar gives its <code>date</code>; the importer measures the path, sha256, size and media type, and builds one <code>record.document</code> envelope per file. A missing sidecar stops the run. </td><td>—</td><td>—</td><td><code>docs/INBOX.md#Documents as facts of their own</code><br><small>anchor <code>Every file in the source folder has a sidecar beside it,</code></small></td></tr><tr><td>2</td><td>—</td><td><a class="ref ref-component" href="#components-importer-documents">anam_documents</a></td><td>Each <code>anam_documents.batch</code> event carries its envelopes and a <code>documents: [{path, file}]</code> list; the bytes stay on disk and are read only by <a class="ref ref-component" href="#components-anam-submit">anam_submit</a>. </td><td>—</td><td><a class="ref ref-data-structure" href="#data-structures-batch-event">Batch event</a></td><td><code>docs/INBOX.md#Documents as facts of their own</code><br><small>anchor <code>reads the share&#x27;s `documents/` folder, and `anam_submit` posts each file&#x27;s bytes to</code></small></td></tr><tr><td>3</td><td><a class="ref ref-component" href="#components-importer-documents">anam_documents</a></td><td><a class="ref ref-component" href="#components-anam-submit">anam_submit</a></td><td>For each entry it posts the raw bytes to <code>POST /v1/documents?ext=&lt;extension&gt;</code> under the importer&#x27;s token, at most <code>max_document_bytes</code> (64 MiB by default), before any envelope of the batch. In anam-importers <code>Client.store_document(name, data)</code> takes the extension from the name&#x27;s suffix and leaves off one Anam would refuse. </td><td><a class="ref ref-data-structure" href="#data-structures-batch-event">Batch event</a></td><td>—</td><td><code>docs/IMPORTERS.md#8.4a Documents</code><br><small>anchor <code>`POST /v1/documents?ext=&lt;extension&gt;`, body the raw bytes (at most `max_document_bytes`, 64 MiB by default),</code></small></td></tr><tr><td>4</td><td><a class="ref ref-component" href="#components-anam-submit">anam_submit</a></td><td><a class="ref ref-component" href="#components-daemon">Daemon</a></td><td><code>postDocument</code> refuses a token whose types do not include <code>record.document</code> (403) and an extension that is not letters and digits, at most 16 (400). It measures the sha256, size and media type (by extension) from the body. </td><td>—</td><td>—</td><td><code>internal/daemon/documents.go#postDocument</code><br><small>anchor <code>if !mayStore(imp) {</code></small></td></tr><tr><td>5</td><td>—</td><td><a class="ref ref-component" href="#components-daemon">Daemon</a></td><td>On the write queue, so one writer counts and places and a backup never copies half a file, <code>library.Store</code> writes <code>&lt;sha256&gt;.&lt;ext&gt;</code> through a temporary file renamed into place under an <code>os.Root</code> on the library, in the first folder along the root, <code>sha[:1]/</code>, <code>sha[:1]/sha[:2]/</code> that holds fewer than <code>library_folder_limit</code> files. New bytes are 201 and bytes already held are 200, each with <code>sha256</code>, <code>bytes</code>, <code>media_type</code> and <code>new</code>. Other bytes are another file, so there is no conflict and nothing is overwritten. </td><td>—</td><td>—</td><td><code>internal/library/library.go#Store</code><br><small>anchor <code>name := path.Join(dir, sum+ext)</code></small></td></tr><tr><td>6</td><td><a class="ref ref-component" href="#components-anam-submit">anam_submit</a></td><td><a class="ref ref-component" href="#components-importer-base">Importer base (anam_importer)</a></td><td>The batch goes to <code>POST /v1/envelopes</code> as any other. </td><td>—</td><td><a class="ref ref-data-structure" href="#data-structures-batch-submission">Batch submission</a></td><td><code>../anam-importers/anam_importer/client.py#submit</code><br><small>anchor <code>status, body = self._call(&quot;POST&quot;, &quot;/v1/envelopes&quot;, payload)</code></small></td></tr><tr><td>7</td><td><a class="ref ref-component" href="#components-importer-base">Importer base (anam_importer)</a></td><td><a class="ref ref-component" href="#components-daemon">Daemon</a></td><td>Inside the write and before the gate, <code>checkReferences</code> indexes the library once with <code>library.Index</code> and looks up each <code>record.document</code>&#x27;s sha256; a reference whose sha256 the library holds no bytes for refuses the batch, and nothing of it is admitted. The path plays no part in finding the bytes. <span class="label">branch: a reference to bytes the library lacks</span> <span class="label">ends</span></td><td>—</td><td>—</td><td><code>internal/daemon/documents.go#checkReferences</code><br><small>anchor <code>post the bytes to /v1/documents first</code></small></td></tr><tr><td>8</td><td><a class="ref ref-component" href="#components-daemon">Daemon</a></td><td><a class="ref ref-component" href="#components-gate">Admission gate</a></td><td>The gate admits the references as in <a class="ref ref-workflow" href="#workflows-admit-a-batch">admit a batch</a>. The <code>path</code> is the document&#x27;s name and identity: the same file resent is a no-op, and a rescan under the same path with other bytes supersedes the facet while the first bytes stay in the library. <span class="label">branch: every reference names held bytes</span> <span class="label">ends</span></td><td>—</td><td>—</td><td><code>internal/daemon/envelopes.go#admitBatch</code><br><small>anchor <code>if err := checkReferences(d.cfg.LibraryDir, b.envs); err != nil {</code></small></td></tr></tbody></table></div><p>Before card 102 the library was a folder Anam&#x27;s documents worker read in place, and something outside Anam put the files there. Now the bytes come in over the importer&#x27;s token like the envelopes do, so the library has one writer and a reference can be checked against the bytes it names. Card 150 named each stored file by its sha256, so a changed document no longer needs a new path: its new bytes are a new file and its facet supersedes. Where a file sits is the <a class="ref ref-component" href="#components-library">library</a>&#x27;s own business and never enters a fact. The inspector serves a reference&#x27;s bytes by sha256, confined to the library (see <a class="ref ref-component" href="#components-inspect">inspector</a>).</p>
 <p>Related: <a class="ref ref-invariant" href="#invariants-envelope-is-the-only-ingress">the Envelope is the only ingress</a>, <a class="ref ref-decision" href="#decisions-importers-live-outside-the-binary">importers live outside the binary</a>.</p><div class="used"><h4>Where else it is used</h4><ul><li><strong>mentioned by</strong> <a class="ref ref-component" href="#components-anam-submit">anam_submit</a>, <a class="ref ref-component" href="#components-daemon">Daemon</a>, <a class="ref ref-component" href="#components-importer-documents">anam_documents</a>, <a class="ref ref-component" href="#components-library">Library (internal/library)</a>, <a class="ref ref-invariant" href="#invariants-envelope-is-the-only-ingress">The Envelope is the only ingress</a></li></ul></div></div></details><details class="concept type-workflow" id="workflows-mint-checkpoints"><summary><span class="title">Mint checkpoints</span> <span class="desc">anam checkpoint over the daemon rebuilds only the buckets the events since the last run touched, writes a new version for each whose hash moved, and seals the log.</span></summary><div class="concept-body"><p class="labels"><span class="label label-type type-workflow">workflow</span> <span class="label label-tier">supporting</span> <span class="label label-basis">basis: code</span> <span class="label label-resource"><code>internal/mint/incremental.go#fromLastRun</code></span> <span class="label label-anchor">anchor <code>r, ok, err := d.Index.LastMintRun(ctx, int64(w))</code></span></p><p><strong>Trigger</strong> The operator runs <code>anam checkpoint</code> with <code>ANAM_SERVER</code> set; the daemon runs the same <code>mint.Report</code> on its own after importer batches and at start when behind.</p><figure class="diagram"><figcaption>Mint checkpoints: overview</figcaption><p class="diagram-note">14 steps, so the overview groups consecutive steps by actor; the detail follows in parts.</p><div class="scroll"><pre class="mermaid">flowchart TD
   r0[&quot;CLI (internal/app) (step 1)&quot;]
   r1[&quot;Client (internal/client) (step 2)&quot;]
@@ -945,11 +945,11 @@ classDef workflow fill:#b8651b22,stroke:#b8651b,color:#111,stroke-width:1.5px;
   index { }
   published { }
   contract { }
-  wire }o--o{ ledger : &quot;refers to&quot;
   wire }o--o{ contract : &quot;refers to&quot;
+  wire }o--o{ ledger : &quot;refers to&quot;
   ledger }o--o{ contract : &quot;refers to&quot;
-  index }o--o{ ledger : &quot;refers to&quot;
   index }o--o{ published : &quot;refers to&quot;
+  index }o--o{ ledger : &quot;refers to&quot;
   published }o--o{ ledger : &quot;refers to&quot;
   published }o--o{ contract : &quot;refers to&quot;</pre></div></figure>
 <figure class="diagram"><figcaption>Data structures: wire</figcaption><p class="diagram-note">Boxes outside the group are drawn where a member refers to them.</p><div class="scroll"><pre class="mermaid">erDiagram

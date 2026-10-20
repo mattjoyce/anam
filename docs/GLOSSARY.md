@@ -293,7 +293,10 @@ appears in provenance and cursors. See *Importer*.
 the Definition's declared `identity_key` and **never from the row's values**: `bp-csv:19:<excel_datetime>:1:<reading>`,
 *not* `bp-csv:…:<systolic>/<diastolic>/<pulse>`. The shape is `facet.SourceRef`: the source, then each
 identity value length-prefixed, so distinct tuples never share a ref whatever their values contain; the
-gate and every worker compose it through that one function. Basis for the `facet_id`. Braiding the
+gate and every worker compose it through that one function. Where the identity is one payload field
+whose text a writer must build (a dose's `id`), the Definition declares an `identity_template` and the gate
+fills or checks that field from it, so a form, a chat and an importer cannot spell it three ways (card 188).
+Basis for the `facet_id`. Braiding the
 values in would give a corrected reading a new `facet_id`, so it would enter as a new Facet and orphan
 the original rather than supersede it. **Identity says which fact; `content_hash` says whether it
 changed.** See *Content hash*, *Idempotency*, *Supersession*.

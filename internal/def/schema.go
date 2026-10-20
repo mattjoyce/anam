@@ -23,7 +23,8 @@ import (
 //   - Required means filled. A required property's schema refuses null, and a string
 //     one refuses "". A measurement the source left blank is not a measurement taken.
 //   - What keys and places a facet is required. The top-level fields behind the
-//     identity key, the fact time and the series key must be listed in required, so
+//     identity key, the fact time, the identity template's reads and the series key
+//     must be listed in required, so
 //     the schema cannot admit a payload the gate cannot key.
 //   - Self-contained. No $ref leaves the manifest, and the compiler loads nothing.
 

@@ -8,6 +8,13 @@ decisions is in `journal/`.
 
 ## 2026-10-20
 
+- A type's id rule can be declared in its Definition (card 188 S1). `meta.identity_template` is a
+  string such as `{source}:med/{/drug|slug}/dose/{/taken_at|2006-01-02T15:04}`: literal text, the
+  source, and payload fields by JSON pointer with an optional `slug` or time layout. `def.ComposeID`
+  builds the id from it for any writer. The gate fills the identity field when an envelope leaves it
+  out and refuses one whose field disagrees, naming both. `health.medication-dose` is v2 and declares
+  the rule its guidance used to state in words; the three melatonin doses on the record already match
+  it. A type with no template is unchanged.
 - The gate refuses to carry a facet that is not live (card 185). `Rehearse` and `RenameBatch` fold
   the facet's events and answer `ErrFacetNotLive` for a tombstoned facet, naming its id, type and
   status, and write nothing. Until now only the CLI's plan kept the 6,218 tombstoned facets dead on

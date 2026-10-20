@@ -30,8 +30,9 @@ BUNDLE = HERE / "bundle"
 
 # A resource path may point into a sibling repo. This is the one convention the
 # instructions do not define: a path under `../anam-importers/` is resolved in
-# that checkout, and must be tracked there.
-SIBLINGS = {"../anam-importers/": REPO.parent / "anam-importers"}
+# that checkout, and must be tracked there. The checkout sits beside this one unless
+# EXPLAINER_IMPORTERS_DIR names it, as it must from a worktree under another folder.
+SIBLINGS = {"../anam-importers/": Path(os.environ.get("EXPLAINER_IMPORTERS_DIR") or REPO.parent / "anam-importers")}
 
 TYPES = {
     "purpose": {"commit", "primary_workflow"},

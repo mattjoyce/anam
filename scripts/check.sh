@@ -45,6 +45,14 @@ fi
 # the gate, so the index a stranger follows is true (card 73).
 run scripts/check-links.sh
 
+# The explainer bundle cites tracked files in this repo and in anam-importers, beside this
+# checkout or at EXPLAINER_IMPORTERS_DIR. Without that checkout the citations cannot be read.
+if [ -d "${EXPLAINER_IMPORTERS_DIR:-../anam-importers}" ]; then
+  run python3 -B -I docs/explainer/check.py
+else
+  echo "anam-importers checkout not found — skipping the explainer check (set EXPLAINER_IMPORTERS_DIR)"
+fi
+
 run go vet ./...
 if command -v golangci-lint >/dev/null 2>&1; then run golangci-lint run ./...; else echo "golangci-lint not installed — skipping"; fi
 if command -v gosec >/dev/null 2>&1; then run gosec -severity medium -quiet ./...; else echo "gosec not installed — skipping"; fi

@@ -52,6 +52,9 @@ decisions is in `journal/`.
   and the ARCHITECTURE and MVP extension notes name the reserved ones in place of `calendar.*` and
   `mail.*`, SELF-LOG's type table leads with each type's family, and `projections/README.md`
   registers `heart.v2`, `sleep.v3` and `recent-life.v2` (card 147).
+- `scripts/check.sh` runs the explainer check (`docs/explainer/check.py`) after the link check. It
+  reads the importers checkout beside this one, or at `EXPLAINER_IMPORTERS_DIR`, which a worktree
+  under another folder must set; with no such checkout the gate says so and skips it (card 147).
 
 ## 2026-10-19
 

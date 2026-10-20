@@ -43,9 +43,10 @@ var (
 // timeout, and none waits on the write queue, so a busy ledger never holds a request.
 func (d *Daemon) routes() []route {
 	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
+	index := guardedIndex{ops: d.readOps, state: &d.index}
 	inspector := inspect.Handler(inspect.Deps{
 		Ledger: d.read, Timeout: d.cfg.Timeout, Buckets: buckets, Library: d.cfg.LibraryDir,
-		Definitions: d.defs.current.Load, Held: d.heldDefinitions, Checkpoints: d.readOps, Edges: guardedEdges{ops: d.readOps, state: &d.index},
+		Definitions: d.defs.current.Load, Held: d.heldDefinitions, Checkpoints: index, Edges: index,
 		Projections: d.projections.current.Load, CachedReads: d.cfg.InspectCachedReads,
 		Workbench: d.workbenchFor(),
 	})

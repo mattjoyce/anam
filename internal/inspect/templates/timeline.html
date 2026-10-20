@@ -39,6 +39,9 @@
   .buckets .sealed rect { fill: var(--h5); opacity: .7; }
   .buckets .behind rect { fill: var(--h3); stroke: var(--h3); stroke-dasharray: 2 1.5; }
   .buckets .never rect { fill: none; stroke: var(--axis); stroke-width: 1; }
+  .buckets .wrong rect { fill: #b3261e; }
+  .buckets .wrong text { fill: #fff; }
+  .cp-wrong { color: #b3261e; }
   .cp-behind { color: var(--h3); font-weight: 600; }
   .cp-never { color: var(--ink-muted); font-weight: 600; }
   .band .rowbg { fill: var(--row); }
@@ -118,7 +121,7 @@
 
 <p class="meta">watermark <strong>W = {{.W}}</strong> · {{.Total}} facets in the ledger · {{.Live}} live in the canonical
 <br><span class="mono dim">canonical {{.Hash}}</span>{{with .Checkpoints}}{{if .Have}}
-<br><span class="cp-summary">{{.Total}} bucket{{if ne .Total 1}}s{{end}}, {{.Sealed}} sealed{{if .Behind}}, <span class="cp-behind">{{.Behind}} behind</span>{{end}}{{if .Never}}, <span class="cp-never">{{.Never}} never minted</span>{{end}} at W = {{$.W}}{{if .HasRun}} · last mint run at W = {{.Run}}{{else}} · no mint run yet{{end}}{{if not .LogSealed}} · <strong>mint log unsealed</strong>: a mint did not finish, so reads fold in full until the next one{{end}}</span>{{end}}{{end}}</p>
+<br>{{if .Wrong}}<span class="cp-wrong">checkpoint strip not drawn: {{.Wrong}}. The timeline above is the ledger's and stands; the operator rebuilds the operational store by deleting the tracking file and restarting.</span>{{else}}<span class="cp-summary">{{.Total}} bucket{{if ne .Total 1}}s{{end}}, {{.Sealed}} sealed{{if .Behind}}, <span class="cp-behind">{{.Behind}} behind</span>{{end}}{{if .Never}}, <span class="cp-never">{{.Never}} never minted</span>{{end}} at W = {{$.W}}{{if .HasRun}} · last mint run at W = {{.Run}}{{else}} · no mint run yet{{end}}{{if not .LogSealed}} · <strong>mint log unsealed</strong>: a mint did not finish, so reads fold in full until the next one{{end}}</span>{{end}}{{end}}{{end}}</p>
 
 <div class="surface">
   <h2>capture — the ledger <span class="dim hint">({{if eq .Status ""}}the live facets at their fact time; the dead on request{{else if eq .Status "dead"}}the tombstoned and rejected alone, ghosted{{else}}every facet, marked at its folded status; the dead are ghosted{{end}})</span></h2>
@@ -135,7 +138,8 @@
     {{end}}
     <rect class="sel" id="sel" x="0" y="20" width="0" height="{{.Baseline}}" visibility="hidden" pointer-events="none"/>
   </svg>
-  {{if .Checkpoints.Have}}<svg class="buckets" viewBox="0 0 {{.BandW}} 14" role="img" aria-label="checkpoint buckets: sealed, behind or never minted">
+  {{if .Checkpoints.Wrong}}<svg class="buckets" viewBox="0 0 {{.BandW}} 14" role="img" aria-label="checkpoint strip: the operational index is wrong"><g class="wrong"><title>{{.Checkpoints.Wrong}}</title><rect x="0" y="2" width="{{.BandW}}" height="10" rx="1"/><text x="8" y="7" dy="4">checkpoints: the operational index is wrong, so the strip is not drawn</text></g></svg>
+  {{else if .Checkpoints.Have}}<svg class="buckets" viewBox="0 0 {{.BandW}} 14" role="img" aria-label="checkpoint buckets: sealed, behind or never minted">
     <text x="8" y="7" dy="4">checkpoints</text>
     {{range .Checkpoints.Buckets}}<a class="bucket {{.State}}" href="{{.Href}}"><title>{{.Title}}</title><rect x="{{.X}}" y="2" width="{{.Width}}" height="10" rx="1"/></a>
     {{end}}

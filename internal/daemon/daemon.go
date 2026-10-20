@@ -268,6 +268,22 @@ func (s *indexState) wrong() error {
 	return s.err
 }
 
+// guardedEdges is the edge index as the inspector reads it: the read-only ops handle
+// behind the daemon's index state, so a wrong index refuses the facet page the way it
+// refuses GET /v1/receipts/{hash}/facets/{facet_id}, rather than draw links the index
+// got wrong. The inspector knows nothing of "wrong": it is given a handle that refuses.
+type guardedEdges struct {
+	ops   *ops.DB
+	state *indexState
+}
+
+func (g guardedEdges) TouchingEdges(ctx context.Context, facetID string) (ops.Touching, error) {
+	if err := g.state.wrong(); err != nil {
+		return ops.Touching{}, err
+	}
+	return g.ops.TouchingEdges(ctx, facetID)
+}
+
 // Handler is the daemon's routes: /healthz and the API's description open to all,
 // and every other route behind a token whose role the route admits (routes).
 func (d *Daemon) Handler() http.Handler {

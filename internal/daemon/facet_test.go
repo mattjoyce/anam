@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/catchup"
 )
 
 // Card 91 with card 104: one facet as a receipt served it, beside the links the
@@ -68,4 +69,28 @@ func TestGetReceiptFacet_EntryWithItsLinks(t *testing.T) {
 	call(t, "GET", url+"/v1/receipts/"+pub.ReceiptHash+"/facets/"+noteID, testToken, "", http.StatusNotFound, nil)
 	call(t, "GET", url+"/v1/receipts/"+pub.ReceiptHash+"/facets/no-such-facet", testToken, "", http.StatusNotFound, nil)
 	call(t, "GET", url+"/v1/receipts/sha256:"+hex.EncodeToString(sum[:])+"/facets/"+w1, testToken, "", http.StatusNotFound, nil)
+}
+
+// The inspector's facet page reads the same edge index, behind the same index state:
+// once a catch-up has found the index wrong, the page refuses as the API's facet route
+// does, rather than draw the facet with links the index got wrong.
+func TestFacetPage_RefusesAWrongIndex(t *testing.T) {
+	cfg := newConfig(t)
+	dir := t.TempDir()
+	cfg.TokenFile = writeToken(t, dir, testToken)
+	sum := sha256.Sum256([]byte(importerToken))
+	cfg.ImportersFile = filepath.Join(dir, "importers.yaml")
+	body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [health.weight]\n", hex.EncodeToString(sum[:]))
+	if err := os.WriteFile(cfg.ImportersFile, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	d, url, _ := serveImporters(t, cfg)
+	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	var a api.Admission
+	call(t, "POST", url+"/v1/envelopes", importerToken, batch(weighIn("w-1", 80.5, weight.Version)), http.StatusOK, &a)
+	w1 := a.Results[0].FacetID
+
+	call(t, "GET", url+"/facet?id="+w1, testToken, "", http.StatusOK, nil)
+	d.index.set(catchup.ErrIndexAhead)
+	call(t, "GET", url+"/facet?id="+w1, testToken, "", http.StatusInternalServerError, nil)
 }

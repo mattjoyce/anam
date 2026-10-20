@@ -36,7 +36,7 @@ func TestManifests_CarryTheHistory(t *testing.T) {
 		"exercise.session":          {1, 2, 3, 4, 5},
 		"activity.exercise-session": {1},
 		"note.annotation":           {1, 2, 3},
-		"record.note":               {1},
+		"record.note":               {1, 2},
 		"med.started":               {4, 5},
 		"health.medication-started": {1},
 		"health.medication-dose":    {1, 2},

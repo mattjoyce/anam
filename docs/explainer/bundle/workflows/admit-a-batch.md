@@ -142,9 +142,9 @@ steps:
   - actor: /components/catchup.md
     caller: /components/daemon.md
     label: replay the new events into the index
-    action: Still inside the write and only when something changed, `catchUp` runs `Sync` under the long-write deadline (`long_write_timeout`). It pins the ledger id, reads the index's last seq, replays the events after it, folds each touched facet forward with the same `fold.Apply`, and lands index rows and the cursor in one ops transaction. A failure here leaves the index behind and never fails the batch.
+    action: Still inside the write and only when something changed, `catchUp` runs `Sync` under the long-write deadline (`long_write_timeout`). It pins the ledger id, reads the index's last seq, replays the events after it, folds each touched facet forward with the same `fold.Apply`, reads the ends each live edge facet's payload names (card 104), and lands index rows, edge rows and the cursor in one ops transaction. A failure here leaves the index behind and never fails the batch.
     reads: [/data-structures/anam-event.md]
-    writes: [/data-structures/facet-index-row.md]
+    writes: [/data-structures/facet-index-row.md, /data-structures/facet-edge-row.md]
     resource: internal/catchup/catchup.go#Sync
     anchor: "events, err := l.Replay(ctx, ledger.Watermark(last), head)"
   - actor: /components/store-ops.md

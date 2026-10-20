@@ -15,6 +15,6 @@ depends_on:
   - /components/span.md
 ---
 
-There is no transaction across the two files, so the index is never written in the same breath as the ledger. `Sync` reads the index's `last_seq`, replays the ledger's events after it, folds the state each leaves, stamps each facet's bucket from its fact-time, and writes [facet index rows](/data-structures/facet-index-row.md) and event index rows. An index ahead of the ledger is `ErrIndexAhead`, which the daemon refuses at start rather than serving from.
+There is no transaction across the two files, so the index is never written in the same breath as the ledger. `Sync` reads the index's `last_seq`, replays the ledger's events after it, folds the state each leaves, stamps each facet's bucket from its fact-time, and writes [facet index rows](/data-structures/facet-index-row.md), [edge index rows](/data-structures/facet-edge-row.md) read from each live edge facet's own payload (card 104), and event index rows. An index ahead of the ledger is `ErrIndexAhead`, which the daemon refuses at start rather than serving from.
 
 The daemon runs it as its first write and after every admission. `anam retract` does not run it, so after a local retraction the index is behind until the daemon's next start.

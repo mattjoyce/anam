@@ -43,7 +43,7 @@ One table in `api.go` names each route with the roles whose tokens open it (see 
 | `GET /v1/projections[/{name}[/{v}]]` | any | publish projection templates |
 | `GET /v1/snapshots/{id}` | any; an importer sees its own source's | the resend report: live, absent, carried |
 | `GET /v1/timeline`, `GET /v1/changes`, `GET /v1/status`, `GET /v1/checkpoints` | any | reads, bounded by `max_read_bytes` |
-| `POST /v1/receipts`, `GET /v1/receipts[/{hash}[/verify]]` | any | publish and verify; publishing writes artifacts only |
+| `POST /v1/receipts`, `GET /v1/receipts[/{hash}[/verify]]`, `GET /v1/receipts/{hash}/facets/{facet_id}` | any | publish, verify, and open one served facet beside its links from the [edge index](/data-structures/facet-edge-row.md) (cards 91, 104) |
 | `POST /v1/checkpoints` | operator | mint on the write queue |
 | `POST /v1/backups` | operator | `VACUUM INTO` both stores under `backup_dir` |
 | `/` | operator | the [inspector](/components/inspect.md) |

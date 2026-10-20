@@ -58,6 +58,7 @@ func (d *Daemon) routes() []route {
 		f("POST /v1/receipts", anyRole, d.postReceipt),
 		f("GET /v1/receipts/{hash}", anyRole, d.getReceipt),
 		f("GET /v1/receipts/{hash}/verify", anyRole, d.verifyReceipt),
+		f("GET /v1/receipts/{hash}/facets/{facet_id}", anyRole, d.getReceiptFacet),
 		f("GET /v1/query", anyRole, d.getQueryCatalogue),
 		f("POST /v1/query", anyRole, d.postQuery),
 		f("GET /v1/projections", anyRole, d.getProjections),
@@ -168,6 +169,42 @@ func (d *Daemon) getReceipt(w http.ResponseWriter, r *http.Request) {
 	// here; it is still on disk and still verifies.
 	if err := read.Fit(shown.Entries, d.cfg.MaxReadBytes,
 		"show it locally with anam receipt show, or publish a narrower read; verify needs no entries"); err != nil {
+		writeReadError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, shown)
+}
+
+// getReceiptFacet answers one facet as the receipt served it (card 91), with the
+// live edges touching it from the edge index (card 104). The two parts carry their
+// own watermarks: the entry is the receipt's, the links are the index's cursor when
+// they were read, and a wrong index refuses the whole answer rather than show the
+// entry with links absent, which would read as none.
+func (d *Daemon) getReceiptFacet(w http.ResponseWriter, r *http.Request) {
+	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, d.defs.current.Load(), d.projections.current.Load())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if err := d.index.wrong(); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	shown, err := read.Facet(deps, r.PathValue("hash"), r.PathValue("facet_id"))
+	if err != nil {
+		writeReadError(w, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
+	defer cancel()
+	touching, err := d.readOps.TouchingEdges(ctx, shown.Entry.FacetID)
+	if err != nil {
+		writeReadError(w, err)
+		return
+	}
+	shown.Links = read.LinksOf(touching, shown.Entry.FacetID)
+	if err := read.Fit(shown.Links.Edges, d.cfg.MaxReadBytes,
+		"ask the record through POST /v1/query with linked/2, which pages by the query's own narrowing"); err != nil {
 		writeReadError(w, err)
 		return
 	}
@@ -325,7 +362,7 @@ func writeReadError(w http.ResponseWriter, err error) {
 	case errors.As(err, &tooLarge):
 		writeJSON(w, http.StatusRequestEntityTooLarge,
 			api.Error{Error: err.Error(), Code: api.CodeTooLarge, TooLarge: &tooLarge.TooLarge})
-	case errors.Is(err, artifact.ErrNotFound):
+	case errors.Is(err, artifact.ErrNotFound), errors.Is(err, read.ErrNotServed):
 		writeError(w, http.StatusNotFound, err)
 	case errors.Is(err, read.ErrTooManyAbsent):
 		writeError(w, http.StatusRequestEntityTooLarge, err)

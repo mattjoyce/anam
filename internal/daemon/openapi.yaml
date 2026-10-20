@@ -281,6 +281,36 @@ paths:
         "404": { $ref: "#/components/responses/NoArtifact" }
         "409": { $ref: "#/components/responses/CannotHonour" }
         "504": { $ref: "#/components/responses/Timeout" }
+  /v1/receipts/{hash}/facets/{facet_id}:
+    get:
+      operationId: getReceiptFacet
+      tags: [receipts]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: FacetShown
+      summary: One facet as the receipt served it, with the links the record holds to it.
+      description: >-
+        The entry is the receipt's served value (card 91): the payload and envelope as
+        admitted, which its content hash covers, at the receipt's W. Beside it, links
+        (card 104): the live edge facets that name this facet on either side, read from
+        the edge index at the index's own watermark w, never written into the facet. A
+        facet the receipt did not serve is 404, since a facet id alone opens nothing a
+        projection did not serve; a receipt that served a frame or a query answer has no
+        entries to open, also 404. A wrong index refuses the whole answer.
+      parameters:
+        - { $ref: "#/components/parameters/ReceiptHash" }
+        - { $ref: "#/components/parameters/FacetID" }
+        - { $ref: "#/components/parameters/AnamTimeout" }
+      responses:
+        "200":
+          description: the entry and its links
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FacetShown" }
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NoArtifact" }
+        "413": { $ref: "#/components/responses/TooLarge" }
+        "504": { $ref: "#/components/responses/Timeout" }
   /v1/query:
     get:
       operationId: getQueryCatalogue
@@ -985,6 +1015,11 @@ components:
       in: path
       required: true
       schema: { type: string, pattern: "^sha256:[0-9a-f]{64}$" }
+    FacetID:
+      name: facet_id
+      in: path
+      required: true
+      schema: { type: string }
     ProjectionName:
       name: name
       in: path
@@ -1261,6 +1296,32 @@ components:
         entries: { type: array, items: { $ref: "#/components/schemas/Entry" } }
         frame: { $ref: "#/components/schemas/Frame" }
         answer: { $ref: "#/components/schemas/Answer" }
+    FacetShown:
+      type: object
+      required: [hash, receipt, entry, links]
+      properties:
+        hash: { type: string }
+        receipt: { $ref: "#/components/schemas/Receipt" }
+        entry: { $ref: "#/components/schemas/Entry" }
+        links: { $ref: "#/components/schemas/Links" }
+    Links:
+      type: object
+      description: the live edges touching the facet, at the edge index's watermark w; edges is empty when none touch it
+      required: [w, edges]
+      properties:
+        w: { type: integer, format: int64 }
+        edges: { type: array, items: { $ref: "#/components/schemas/Link" } }
+    Link:
+      type: object
+      description: one live edge facet (a record.note that joins facets) touching the facet shown
+      required: [edge, kind, at, side, from, to]
+      properties:
+        edge: { type: string, description: the edge facet's id }
+        kind: { type: string, description: what the join means, from the edge's Definition; about when the edge says none }
+        at: { type: string, description: the edge's fact-time, when it was asserted }
+        side: { type: string, enum: [from, to, both], description: which side the facet shown is on }
+        from: { type: array, items: { type: string } }
+        to: { type: array, items: { type: string } }
     Answer:
       type: object
       description: a query's answer, one relation's tuples sorted; a constant is a string, a number or a boolean

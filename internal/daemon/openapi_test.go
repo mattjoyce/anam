@@ -181,6 +181,7 @@ var apiTypes = map[string]func() any{
 	"Receipts":             func() any { return new(api.Receipts) },
 	"ReceiptShown":         func() any { return new(api.ReceiptShown) },
 	"ReceiptVerified":      func() any { return new(api.ReceiptVerified) },
+	"FacetShown":           func() any { return new(api.FacetShown) },
 	"Published":            func() any { return new(api.Published) },
 	"Projections":          func() any { return new(api.Projections) },
 	"RegisteredProjection": func() any { return new(api.RegisteredProjection) },

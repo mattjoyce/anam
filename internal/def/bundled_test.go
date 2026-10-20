@@ -297,7 +297,7 @@ func TestBundled_NoteAnnotationIsThePersonsWords(t *testing.T) {
 	if !ok {
 		t.Fatal("no bundled record.note")
 	}
-	if d.Version != 1 || d.FactTime.Pointer != "/at" || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" {
+	if d.Version != 2 || d.FactTime.Pointer != "/at" || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" {
 		t.Fatalf("v%d fact time %s identity %v", d.Version, d.FactTime.Pointer, d.IdentityKey)
 	}
 	decode := func(s string) map[string]any {
@@ -319,14 +319,31 @@ func TestBundled_NoteAnnotationIsThePersonsWords(t *testing.T) {
 		t.Errorf("a note that names no facet was refused: %v", err)
 	}
 	for name, payload := range map[string]string{
-		"about nothing":      strings.Replace(note, `["2c6f38a3-3db7-5e65-b933-9c59980e1c6c", "fe61ec2a-6d8b-56b0-8930-e3270f4ad44c"]`, `[]`, 1),
-		"not a facet id":     strings.Replace(note, `2c6f38a3-3db7-5e65-b933-9c59980e1c6c`, `the heart rate alert`, 1),
-		"the same id twice":  strings.Replace(note, `fe61ec2a-6d8b-56b0-8930-e3270f4ad44c`, `2c6f38a3-3db7-5e65-b933-9c59980e1c6c`, 1),
-		"empty text":         strings.Replace(note, `"During a large work meeting, presenting."`, `""`, 1),
-		"a field of its own": strings.Replace(note, `"text":`, `"mood": "tense", "text":`, 1),
+		"about nothing":          strings.Replace(note, `["2c6f38a3-3db7-5e65-b933-9c59980e1c6c", "fe61ec2a-6d8b-56b0-8930-e3270f4ad44c"]`, `[]`, 1),
+		"not a facet id":         strings.Replace(note, `2c6f38a3-3db7-5e65-b933-9c59980e1c6c`, `the heart rate alert`, 1),
+		"the same id twice":      strings.Replace(note, `fe61ec2a-6d8b-56b0-8930-e3270f4ad44c`, `2c6f38a3-3db7-5e65-b933-9c59980e1c6c`, 1),
+		"empty text":             strings.Replace(note, `"During a large work meeting, presenting."`, `""`, 1),
+		"a field of its own":     strings.Replace(note, `"text":`, `"mood": "tense", "text":`, 1),
+		"about and to both":      strings.Replace(note, `"about":`, `"to": ["7d1b2c3e-4f5a-5b6c-8d7e-9f0a1b2c3d4e"], "about":`, 1),
+		"a kind of its own":      strings.Replace(note, `"text":`, `"kind": "caused_by", "text":`, 1),
+		"neither words nor ends": `{"id": "note:2c6f38a3:9", "at": "2026-10-09 11:29"}`,
+		"a pin that is no hash":  strings.Replace(note, `"text":`, `"pins": {"2c6f38a3-3db7-5e65-b933-9c59980e1c6c": "3f1c"}, "text":`, 1),
 	} {
 		if err := d.Check(decode(payload)); err == nil {
 			t.Errorf("%s was admitted", name)
+		}
+	}
+	// v2 (card 104): the note is an edge. A v2 writer sends `to`; an edge may join
+	// facets with no words, name its from side, say its kind, and pin a version.
+	for name, payload := range map[string]string{
+		"to, the v2 name": strings.Replace(note, `"about":`, `"to":`, 1),
+		"an edge, no words": `{"id": "interp:1", "at": "2026-10-09 11:29", "kind": "interpreted_from",
+			"from": ["7d1b2c3e-4f5a-5b6c-8d7e-9f0a1b2c3d4e"], "to": ["2c6f38a3-3db7-5e65-b933-9c59980e1c6c"],
+			"pins": {"2c6f38a3-3db7-5e65-b933-9c59980e1c6c": "sha256:3f1c9a0e7b2d4c6f8a1e5b9d0c3f7a2e6b4d8c1f9e0a3b5d7c2f4e6a8b1d3c5e"}}`,
+		"kind said": strings.Replace(note, `"text":`, `"kind": "about", "text":`, 1),
+	} {
+		if err := d.Check(decode(payload)); err != nil {
+			t.Errorf("%s was refused: %v", name, err)
 		}
 	}
 }

@@ -44,7 +44,11 @@ import (
 // triggers in a version-6 file as in a new one, and a build that predates it never
 // reads it, so neither build can misread the other's file. It names the file's
 // layout, so it is never configurable (card 151).
-const schemaVersion = 7
+//
+// 7 -> 8 adds facet_edge (card 104). A table added without a bump would be empty in a
+// file that had already replayed past the edges it should hold, and for edges absent
+// does not mean none, so the pre-edge file refuses and is replayed.
+const schemaVersion = 8
 
 // ErrSchemaVersion is returned by Open for a database written by a different schema.
 var ErrSchemaVersion = errors.New("ops: schema version mismatch")
@@ -94,6 +98,19 @@ CREATE TABLE IF NOT EXISTS anam_event_index (
   artifact_version INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS anam_event_by_time ON anam_event_index (anam_time, seq);
+
+-- tier: derived — the edge index (card 104): one row per end of every live edge facet,
+-- the facet ids its payload names on its from and to sides, so "the live edges touching
+-- X" is one lookup. Derived from the edges' own payloads by catch-up, replaced whole
+-- for an edge at each of its versions, gone when it is tombstoned.
+CREATE TABLE IF NOT EXISTS facet_edge (
+  edge_id  TEXT NOT NULL,
+  kind     TEXT NOT NULL,
+  side     TEXT NOT NULL CHECK (side IN ('from', 'to')),
+  facet_id TEXT NOT NULL,
+  PRIMARY KEY (edge_id, side, facet_id)
+);
+CREATE INDEX IF NOT EXISTS facet_edge_by_facet ON facet_edge (facet_id);
 
 -- tier: derived — the checkpoint index: every mint of every span, append-only.
 -- covers_w is the watermark the value actually folded; value_hash addresses the

@@ -29,7 +29,7 @@ func TestOpenRefusesAWrongIndex(t *testing.T) {
 			}
 		}, ops.ErrLedgerChanged},
 		{"ahead of the ledger", func(t *testing.T, db *ops.DB) {
-			if err := db.ApplyReplay(context.Background(), 0, 7, nil, nil); err != nil {
+			if err := db.ApplyReplay(context.Background(), 0, 7, nil, nil, nil); err != nil {
 				t.Fatal(err)
 			}
 		}, catchup.ErrIndexAhead},

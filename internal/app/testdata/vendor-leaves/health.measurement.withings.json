@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "facet_type": "health.measurement.withings",
+    "definition_version": 1,
+    "kind": "reading",
+    "family": "body",
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "withings/measurement",
+    "schema_version": 2,
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02 15:04:05", "zone": "UTC"}
+    },
+    "identity_key": ["/withings_id", "/type"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One measurement as the Withings API returns it, through the anam_withings importer (source withings): every field is Withings' own text, and the measure is a Withings code in type (1 is weight, 6 fat ratio, 11 pulse), so a reader needs Withings' table to read it. This is the Withings leaf of health.measurement, Withings' own payload shape named for its vendor (anam card 192). Version 1 is health.measurement v4 under its leaf's name (anam card 195), every rule unchanged; card 195's rename (renames/vendor-leaves.json in anam) carried each facet across as the next version of itself.",
+    "type": "object",
+    "required": ["withings_id", "date", "type", "value", "unit"],
+    "properties": {
+      "attrib": {"type": "string", "minLength": 1, "pattern": "^[0-9]+$"},
+      "date": {"type": "string", "minLength": 1},
+      "deviceid": {"type": "string", "minLength": 1, "pattern": "^[0-9a-f]+$"},
+      "model": {"type": "string", "minLength": 1},
+      "timezone": {"type": "string", "minLength": 1},
+      "type": {"type": "string", "minLength": 1},
+      "unit": {"type": "string", "minLength": 1},
+      "value": {"type": "string", "minLength": 1, "pattern": "^-?[0-9]+(\\.[0-9]+)?$"},
+      "withings_id": {"type": "string", "minLength": 1}
+    },
+    "additionalProperties": false
+  }
+}

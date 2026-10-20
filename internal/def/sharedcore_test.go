@@ -127,7 +127,7 @@ func TestSharedCore_LeavesAgree(t *testing.T) {
 // only the words differ.
 func TestSharedCore_FailsOnADrift(t *testing.T) {
 	t.Parallel()
-	raw, err := os.ReadFile("manifests/activity.exercise-session.json")
+	raw, err := os.ReadFile("manifests/activity.exercise-session.garmin.json")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -130,7 +130,7 @@ fact, a substrate swap is a re-ingest, not a migration.
 - **Consent policy + classification-driven gating** — the attribute and a pass-through `Evaluate` exist;
   policy does not (`ARCHITECTURE.md` §10).
 - **Token rotation; multi-scope tokens; identity graph; merge** — not applicable / deferred.
-- **Non-health facets** (`calendar.*`, `mail.*`, `note.*`) — the model admits them; not built yet.
+- **The reserved domains** (`social.*`, `money.*`, `media.*`, `work.*`) — the model admits them; not built yet.
 - **Storage tiering / archival** — Anam is append-only and grows; deferred, tractable because it owns
   no facts.
 

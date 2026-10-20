@@ -73,7 +73,8 @@ carry only the fields its Definition declares, so a new field means a line in th
 rows a `trip`; those are the series keys, so `health.illness-ended` and `place.returned` close what
 `health.illness-started` and `place.departed` opened, and `anam timeline --at` shows what was open on a day.
 
-The three `med.*` regimen types are a **series** (`docs/SELF-LOG.md` §2): every row carries `drug` and
+The three regimen types, `health.medication-started`, `health.medication-dose-changed` and
+`health.medication-stopped`, are a **series** (`docs/SELF-LOG.md` §2): every row carries `drug` and
 `course`, and a restart after a stop is a new course number. `anam timeline --at <date>` answers "what
 was I on"; `anam serve meds` publishes the current regimen with a receipt.
 

@@ -82,17 +82,17 @@ A plain file you edit, one row per event, read by an importer like any other sou
 
 ## 4. The types
 
-| Namespace | Types | Shape | Series |
+| Family | Types | Shape | Series |
 |---|---|---|---|
-| `med` | `health.medication-started`, `health.medication-dose-changed`, `health.medication-stopped` | series of changes | drug + course; `health.medication-stopped` closes |
-| `med` | `health.medication-compliance` | point: a statement you make on a date about a period | none |
-| `lab` | `health.lab-result` | point per analyte, fact-time = draw date | analyte |
-| `doc` | `record.document` | the reference facet for a file or image (§5) | none |
-| `donation` | `health.donation` | point | none |
-| `illness` | `health.illness-started`, `health.illness-ended` | series for an illness | `illness.episode` keyed by `/episode`; `health.illness-ended` closes |
-| `travel` | `place.departed`, `place.arrived`, `place.returned` | series per trip; arrived is a leg within it | `travel.trip` keyed by `/trip`; `place.returned` closes |
-| `travel` | `place.flight` | point per flight leg: `from` and `to` as IATA codes, dated where it left, `date` carrying the departure airport's offset (`2018-10-10 +01:00`) | none; it carries `/trip` to group with its trip but stays outside the series |
-| `gym` | `activity.gym-visit` | point, generic or detailed | none |
+| `meds` | `health.medication-started`, `health.medication-dose-changed`, `health.medication-stopped` | series of changes | drug + course; `health.medication-stopped` closes |
+| `meds` | `health.medication-compliance` | point: a statement you make on a date about a period | none |
+| `labs` | `health.lab-result` | point per analyte, fact-time = draw date | analyte |
+| `documents` | `record.document` | the reference facet for a file or image (§5) | none |
+| `clinical` | `health.donation` | point | none |
+| `conditions` | `health.illness-started`, `health.illness-ended` | series for an illness | `illness.episode` keyed by `/episode`; `health.illness-ended` closes |
+| `trips` | `place.departed`, `place.arrived`, `place.returned` | series per trip; arrived is a leg within it | `travel.trip` keyed by `/trip`; `place.returned` closes |
+| `trips` | `place.flight` | point per flight leg: `from` and `to` as IATA codes, dated where it left, `date` carrying the departure airport's offset (`2018-10-10 +01:00`) | none; it carries `/trip` to group with its trip but stays outside the series |
+| `exercise` | `activity.gym-visit` | point, generic or detailed | none |
 
 A flight is evidence of a movement, not a state of the trip. Inside `travel.trip` a flight
 dated in Singapore would sort after a return dated the same day in Sydney and hold the trip open,

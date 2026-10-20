@@ -134,6 +134,11 @@ Adding a type is a Definition file, not code.
 
 ### Bundled with Anam
 
+Every type is named `domain.concept`, and the first word is one of eight: `health`, `activity`, `place`
+and `record` today, with `social`, `money`, `media` and `work` held for later. A new kind of fact joins
+one of them and never adds a ninth. `family` groups types within a domain, and `kind` says whether a type
+records a measure, a reading or an event.
+
 | Type | Version | family | kind | What it records | Identity | Fact time |
 |---|---|---|---|---|---|---|
 | `health.heart-rate-day` | 1 | vitals | measure | One figure for a day's heart rate, as an Open mHealth heart-rate body | `id`, `statistic` | interval start |

@@ -137,9 +137,9 @@ Two rules make this safe:
   it, so a number the source wrote as text stays text, checked by a pattern.
 
 Granularity is a choice: start coarse (one Facet per source fragment) and decompose only where real
-fact-times or finer access control earn the cut. Facet types are **dotted and namespaced** —
-`health.sleep`, `health.body-composition`, `health.heart-rate`, `health.blood-pressure`,
-`health.metric-group` — so new sources slot in cleanly (`calendar.event`, `mail.thread`, `note.zettel`).
+fact-times or finer access control earn the cut. Facet types are **dotted `domain.concept`** under a closed set of eight
+domains (`health.blood-pressure`, `health.body-composition`, `activity.steps`, `place.stay`,
+`record.note`), so new sources slot into a domain (`social.message`, `money.transaction`, `media.play`).
 
 ---
 
@@ -907,8 +907,8 @@ one or two projections plus a CLI timeline viewer, manual mint, and receipts. Re
 - **Consent policy and classification-driven gating** — attribute + pass-through gate only (§10).
 - **Storage management** — Anam is append-only and grows; an archive tier is deferred, tractable
   precisely because Anam owns no facts and can re-ingest.
-- **Extensibility to non-health facets** (`calendar.*`, `mail.*`, `note.*`) — the model already admits
-  them; they are simply not built yet.
+- **Extensibility to the reserved domains** (`social.*`, `money.*`, `media.*`, `work.*`) — the model already
+  admits them; they are simply not built yet.
 - **Last-known-value reads** (§5a) — built as the snapshot over the series stamp (2026-10-07). Not yet
   exposed on `timeline` or as a snapshot projection template; and a Definition that changes its series
   key reaches only facets admitted after the change, because admission is idempotent on content.

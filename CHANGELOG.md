@@ -48,6 +48,10 @@ decisions is in `journal/`.
   and 43 in history, `health.blood-pressure` at v6, `record.note` at v1. Its log has an entry for
   cards 139, 140, 147, 165, 168, 176 and 179, its anchor is c08bfb5, and the gap about the importers
   checkout is closed. The tracked `.pyc` under `docs/explainer` is removed (card 147).
+- The prose says the same: the GLOSSARY and README state the eight domains, AGENTS.md's naming table
+  and the ARCHITECTURE and MVP extension notes name the reserved ones in place of `calendar.*` and
+  `mail.*`, SELF-LOG's type table leads with each type's family, and `projections/README.md`
+  registers `heart.v2`, `sleep.v3` and `recent-life.v2` (card 147).
 
 ## 2026-10-19
 

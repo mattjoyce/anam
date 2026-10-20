@@ -3,7 +3,9 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"text/tabwriter"
 
@@ -141,7 +143,10 @@ func writeReceipts(cmd *cobra.Command, list api.Receipts) error {
 }
 
 func receiptShowCmd(cfgPath *string) *cobra.Command {
-	var asJSON bool
+	var (
+		asJSON bool
+		cursor string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "show <receipt-hash>",
@@ -166,11 +171,18 @@ so a tampered artifact is refused rather than displayed as if it were genuine.`,
 				if err != nil {
 					return err
 				}
-				shown, err = c.Receipt(cmd.Context(), args[0])
-				if err != nil {
+				if cursor != "" {
+					if shown, err = c.ReceiptPage(cmd.Context(), args[0], cursor); err != nil {
+						return err
+					}
+					writePage(cmd, shown.Page)
+				} else if shown, err = c.Receipt(cmd.Context(), args[0]); err != nil {
 					return err
 				}
 			} else {
+				if cursor != "" {
+					return errors.New("--cursor pages a receipt over the daemon; a local show reads the whole value")
+				}
 				store, err := artifact.New(cfg.ArtifactDir)
 				if err != nil {
 					return err
@@ -183,29 +195,34 @@ so a tampered artifact is refused rather than displayed as if it were genuine.`,
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "emit the served entries as JSON, exactly as published")
+	cmd.Flags().StringVar(&cursor, "cursor", "",
+		"show only the page this next_cursor names (over the daemon); without it every page is read and shown whole")
 	return cmd
 }
 
+// writePage says on stderr which portion of a receipt one page is, and the cursor
+// to the next, so stdout stays the page alone.
+func writePage(cmd *cobra.Command, p *api.Page) {
+	if p == nil {
+		return
+	}
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "page: facets %d to %d of %d\n", p.Offset+1, p.Offset+p.ReturnedCount, p.TotalCount)
+	if p.NextCursor != "" {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "next cursor: %s\n", p.NextCursor)
+	}
+}
+
 func writeReceipt(cmd *cobra.Command, shown api.ReceiptShown, asJSON bool) error {
-	r, entries := shown.Receipt, shown.Entries
 	out := cmd.OutOrStdout()
+	if shown.Receipt == nil {
+		// A page asked for by cursor: the receipt rode the first page.
+		return writeServed(out, shown, asJSON)
+	}
+	r := *shown.Receipt
 	if asJSON {
 		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%s v%d at W=%d, served %s\n",
 			r.Template, r.TemplateVersion, r.Watermark, r.ServedAt)
-		if shown.Answer != nil {
-			_, err := fmt.Fprintf(out, "%s\n", shown.Answer.Bytes())
-			return err
-		}
-		if shown.Frame != nil {
-			_, err := fmt.Fprintf(out, "%s\n", shown.Frame.Bytes())
-			return err
-		}
-		b, err := json.Marshal(entries)
-		if err != nil {
-			return fmt.Errorf("receipt show: marshal: %w", err)
-		}
-		_, err = fmt.Fprintf(out, "%s\n", b)
-		return err
+		return writeServed(out, shown, true)
 	}
 
 	_, _ = fmt.Fprintf(out, "%s v%d at W=%d, served %s\n", r.Template, r.TemplateVersion, r.Watermark, r.ServedAt)
@@ -220,6 +237,28 @@ func writeReceipt(cmd *cobra.Command, shown api.ReceiptShown, asJSON bool) error
 		_, _ = fmt.Fprintf(out, "  program    %s answered with %s v%d %s\n%s\n", p.Relation, p.RuleSet, p.RuleSetVersion, p.RuleSetHash, indent(p.Text))
 	}
 	_, _ = fmt.Fprintln(out)
+	return writeServed(out, shown, false)
+}
+
+// writeServed renders the served value a receipt names, or one page of it: as JSON,
+// exactly as published, or as a table.
+func writeServed(out io.Writer, shown api.ReceiptShown, asJSON bool) error {
+	if asJSON {
+		if shown.Answer != nil {
+			_, err := fmt.Fprintf(out, "%s\n", shown.Answer.Bytes())
+			return err
+		}
+		if shown.Frame != nil {
+			_, err := fmt.Fprintf(out, "%s\n", shown.Frame.Bytes())
+			return err
+		}
+		b, err := json.Marshal(shown.Entries)
+		if err != nil {
+			return fmt.Errorf("receipt show: marshal: %w", err)
+		}
+		_, err = fmt.Fprintf(out, "%s\n", b)
+		return err
+	}
 	if shown.Answer != nil {
 		return writeAnswer(out, *shown.Answer)
 	}
@@ -231,7 +270,7 @@ func writeReceipt(cmd *cobra.Command, shown api.ReceiptShown, asJSON bool) error
 
 	w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
 	_, _ = fmt.Fprintln(w, "FACT TIME\tTYPE\tSTATUS\tPAYLOAD")
-	for _, e := range entries {
+	for _, e := range shown.Entries {
 		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", e.FactTime, e.Type, e.Status, clipPayload(e.Payload))
 	}
 	return w.Flush()

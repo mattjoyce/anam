@@ -83,6 +83,12 @@ Four lenses compose over that read:
 				r := p.Receipt
 				_, err = fmt.Fprintf(cmd.ErrOrStderr(), "published %s v%d at W=%d: receipt %s\n",
 					r.Template, r.TemplateVersion, r.Watermark, p.ReceiptHash)
+				if err == nil && p.Page.NextCursor != "" {
+					// Published whole, answered a page at a time (card 92): say
+					// this is the first page and where the rest is.
+					_, err = fmt.Fprintf(cmd.ErrOrStderr(), "showing facets 1 to %d of %d; the whole read: anam receipt show %s\n",
+						p.Page.ReturnedCount, p.Page.TotalCount, p.ReceiptHash)
+				}
 				return err
 			}
 			t, err := readTimeline(cmd.Context(), cfg, q)

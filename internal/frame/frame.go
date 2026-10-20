@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/fold"
@@ -135,6 +136,31 @@ func (f *Frame) UnmarshalJSON(b []byte) error {
 	}
 	*f = Frame{Columns: p.Columns, Rows: p.Rows}
 	return f.seal()
+}
+
+// Page is the frame of rows [i, j): the same columns and those rows, sealed. A page
+// of a served frame is a portion of the receipted value (card 92); its own hash is
+// the page's, never the receipt's served hash.
+func (f Frame) Page(i, j int) (Frame, error) {
+	p := Frame{Columns: f.Columns, Rows: f.Rows[i:j]}
+	return p, p.seal()
+}
+
+// Join is the frame of pages read in order, as Page cut them: the columns they share
+// and their rows one after another, sealed. Pages of one served frame join back into
+// it, hash and all. Pages with other columns are not of one frame and are refused.
+func Join(pages ...Frame) (Frame, error) {
+	if len(pages) == 0 {
+		return Frame{}, errors.New("frame: no pages to join")
+	}
+	f := Frame{Columns: pages[0].Columns}
+	for _, p := range pages {
+		if !slices.Equal(p.Columns, f.Columns) {
+			return Frame{}, errors.New("frame: pages with other columns are not of one frame")
+		}
+		f.Rows = append(f.Rows, p.Rows...)
+	}
+	return f, f.seal()
 }
 
 // Len is how many rows the frame holds.

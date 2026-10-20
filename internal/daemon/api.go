@@ -156,21 +156,18 @@ func (d *Daemon) getReceipts(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, list)
 }
 
+// getReceipt answers a receipt and the value it served, a page at a time (card 92):
+// the first page without a cursor, the page ?cursor= names with one. Every page is
+// cut from the served artifact, so a receipt published locally, or before the bound,
+// pages like any other and still verifies.
 func (d *Daemon) getReceipt(w http.ResponseWriter, r *http.Request) {
 	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	shown, err := read.Receipt(deps, r.PathValue("hash"))
+	shown, err := read.ReceiptPage(deps, r.PathValue("hash"), r.URL.Query().Get("cursor"), d.cfg.MaxReadBytes)
 	if err != nil {
-		writeReadError(w, err)
-		return
-	}
-	// A receipt published locally, or before the bound, can be too large to show
-	// here; it is still on disk and still verifies.
-	if err := read.Fit(shown.Entries, d.cfg.MaxReadBytes,
-		"show it locally with anam receipt show, or publish a narrower read; verify needs no entries"); err != nil {
 		writeReadError(w, err)
 		return
 	}
@@ -353,12 +350,14 @@ func namedZone(zone string) error {
 }
 
 // writeReadError answers a failed read: 400 for a query that cannot be read as asked,
-// 404 for an artifact that is not there, 409 for a receipt this daemon cannot honour,
+// with code cursor_invalid for a cursor that names no page of its receipt, 404 for an artifact that is not there, 409 for a receipt this daemon cannot honour,
 // 413 for an answer over max_read_bytes, with its measure, 504 for a read that ran
 // out of time, 500 for anything else.
 func writeReadError(w http.ResponseWriter, err error) {
 	var tooLarge *read.TooLarge
 	switch {
+	case errors.Is(err, read.ErrCursor):
+		writeJSON(w, http.StatusBadRequest, api.Error{Error: err.Error(), Code: api.CodeCursorInvalid})
 	case errors.Is(err, read.ErrQuery), errors.Is(err, artifact.ErrInvalid):
 		writeError(w, http.StatusBadRequest, err)
 	case errors.As(err, &tooLarge):

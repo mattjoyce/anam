@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -76,33 +77,80 @@ func TestTimeline_OverTheBoundIsRefusedWithWhatToNarrowBy(t *testing.T) {
 	}
 }
 
-// A publish over the bound is refused before it files anything: no receipt appears,
-// and a narrower publish of the same projection goes through and verifies.
-func TestPublish_OverTheBoundFilesNothing(t *testing.T) {
+// A publish over the bound is filed once, whole, and answered a page at a time
+// (card 92): the CLI shows the first page and says where the rest is, the receipt
+// shows whole over the daemon as it does locally, and it verifies.
+func TestPublish_OverTheBoundPublishesOnceAndPages(t *testing.T) {
 	t.Parallel()
 	f := boundedFixture(t)
 
+	out, stderr, err := cli(t, f.remoteCfg, "timeline", "--projection", "bp", "--publish", "--json")
+	if err != nil {
+		t.Fatalf("a publish over the bound was refused: %v", err)
+	}
+	if !strings.Contains(stderr, "showing facets 1 to 1 of 3") {
+		t.Errorf("the publish does not say it shows the first page of three:\n%s", stderr)
+	}
+	if n := strings.Count(out, `"facet_id"`); n != 1 {
+		t.Errorf("the first page carries %d entries, want the one that fits:\n%s", n, out)
+	}
+	// --json puts the read's own hashes on stderr first; the receipt follows "receipt".
+	hash := receiptOf(t, stderr[strings.Index(stderr, ": receipt "):])
+	if list, _, err := cli(t, f.remoteCfg, "receipt", "list"); err != nil || strings.Count(list, "sha256:") != 1 {
+		t.Fatalf("want one receipt filed: %v\n%s", err, list)
+	}
+	whole := f.sameOutput(t, "receipt", "show", "--json", hash)
+	if n := strings.Count(whole, `"facet_id"`); n != 3 {
+		t.Errorf("show over the daemon read %d entries, want all 3 across its pages", n)
+	}
+	if out := f.sameOutput(t, "receipt", "verify", hash); !strings.Contains(out, "OK   reproduced") {
+		t.Errorf("the paged publish did not verify:\n%s", out)
+	}
+
+	// --cursor shows the one page it names, and says where the next is.
+	cfg, err := config.Load(f.remoteCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := newClient(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := c.ReceiptPage(context.Background(), hash, "")
+	if err != nil || first.Page == nil || first.Page.NextCursor == "" {
+		t.Fatalf("first page: %v %+v", err, first.Page)
+	}
+	page, stderr, err := cli(t, f.remoteCfg, "receipt", "show", "--json", "--cursor", first.Page.NextCursor, hash)
+	if err != nil {
+		t.Fatalf("receipt show --cursor: %v", err)
+	}
+	if n := strings.Count(page, `"facet_id"`); n != 1 || !strings.Contains(stderr, "facets 2 to 2 of 3") ||
+		!strings.Contains(stderr, "next cursor: ") {
+		t.Errorf("--cursor showed %d entries, stderr:\n%s", n, stderr)
+	}
+}
+
+// One facet over the bound alone is what no page can carry, so a publish holding one
+// is still refused, naming the facet, before anything is filed.
+func TestPublish_OneFacetOverTheBoundFilesNothing(t *testing.T) {
+	t.Parallel()
+	f := newRemoteFixtureWith(t, "UTC", func(t *testing.T, f remoteFixture, cfg *config.Config) {
+		cfg.MaxReadBytes = 40
+	})
+
 	_, _, err := cli(t, f.remoteCfg, "timeline", "--projection", "bp", "--publish")
-	refused := tooLarge(t, err, "the whole publish")
-	if got := strings.Join(refused.TooLarge.Narrow, " "); got != "type from to at fields" {
-		t.Errorf("narrow = %q, want what a projected read can still add", got)
+	refused := tooLarge(t, err, "a publish with a facet over the bound")
+	if refused.TooLarge.Matched != 1 || refused.TooLarge.FacetID == "" || !strings.Contains(err.Error(), "alone") {
+		t.Errorf("the refusal should name the one facet: %+v %v", refused.TooLarge, err)
 	}
 	if out, _, err := cli(t, f.remoteCfg, "receipt", "list"); err != nil || strings.Contains(out, "sha256:") {
 		t.Fatalf("a refused publish filed a receipt: %v\n%s", err, out)
 	}
-
-	_, stderr, err := cli(t, f.remoteCfg, "timeline", "--projection", "bp", "--to", "2026-01-31", "--publish")
-	if err != nil {
-		t.Fatalf("a publish within the bound was refused: %v", err)
-	}
-	if out := f.sameOutput(t, "receipt", "verify", receiptOf(t, stderr)); !strings.Contains(out, "OK   reproduced") {
-		t.Errorf("the narrower publish did not verify:\n%s", out)
-	}
 }
 
-// A receipt published locally, with no bound, can be too large to show over the
-// daemon; it is refused with where to read it, and it still verifies there.
-func TestReceipt_ShowOverTheBoundIsRefusedVerifyIsNot(t *testing.T) {
+// A receipt published locally, with no bound, is still read whole over the daemon,
+// page by page, and still verifies there.
+func TestReceipt_ShowOverTheBoundWalksEveryPage(t *testing.T) {
 	t.Parallel()
 	f := boundedFixture(t)
 
@@ -112,15 +160,11 @@ func TestReceipt_ShowOverTheBoundIsRefusedVerifyIsNot(t *testing.T) {
 	}
 	hash := receiptOf(t, stderr)
 
-	_, _, err = cli(t, f.remoteCfg, "receipt", "show", hash)
-	refused := tooLarge(t, err, "show over the daemon")
-	if refused.TooLarge.Narrow != nil || !strings.Contains(err.Error(), "locally") {
-		t.Errorf("a receipt's refusal should say to show it locally, not what to narrow: %v", err)
+	f.sameOutput(t, "receipt", "show", hash)
+	if n := strings.Count(f.sameOutput(t, "receipt", "show", "--json", hash), `"facet_id"`); n != 3 {
+		t.Errorf("show read %d entries, want 3", n)
 	}
 	if out, _, err := cli(t, f.remoteCfg, "receipt", "verify", hash); err != nil || !strings.Contains(out, "OK   reproduced") {
 		t.Errorf("verify over the daemon: %v\n%s", err, out)
-	}
-	if _, _, err := cli(t, f.cfgPath, "receipt", "show", hash); err != nil {
-		t.Errorf("show locally: %v", err)
 	}
 }

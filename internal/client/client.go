@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/frame"
 	"github.com/mattjoyce/anam/internal/token"
 )
 
@@ -216,10 +217,56 @@ func (c *Client) Receipts(ctx context.Context) (api.Receipts, error) {
 	return r, err
 }
 
-// Receipt reads one receipt and the value it served, from the artifacts alone.
+// Receipt reads one receipt and the whole value it served, from the artifacts alone.
+// The daemon answers a receipt a page at a time (card 92); Receipt reads every page
+// in order and joins them, so it answers what it always has, the whole value, and a
+// facet too large for any page is the daemon's refusal. Each page is cut from the
+// same artifact, so the join is the receipt's value whatever the ledger has learned
+// between pages.
 func (c *Client) Receipt(ctx context.Context, hash string) (api.ReceiptShown, error) {
+	shown, err := c.ReceiptPage(ctx, hash, "")
+	if err != nil || shown.Page == nil {
+		return shown, err
+	}
+	var frames []frame.Frame
+	if shown.Frame != nil {
+		frames = append(frames, *shown.Frame)
+	}
+	for next := shown.Page.NextCursor; next != ""; {
+		page, err := c.ReceiptPage(ctx, hash, next)
+		if err != nil {
+			return api.ReceiptShown{}, err
+		}
+		if page.Page == nil {
+			return api.ReceiptShown{}, fmt.Errorf("server %s: a page of %s came without its place in the receipt", c.server, hash)
+		}
+		shown.Entries = append(shown.Entries, page.Entries...)
+		if page.Frame != nil {
+			frames = append(frames, *page.Frame)
+		}
+		next = page.Page.NextCursor
+	}
+	if frames != nil {
+		fr, err := frame.Join(frames...)
+		if err != nil {
+			return api.ReceiptShown{}, fmt.Errorf("server %s: %w", c.server, err)
+		}
+		shown.Frame = &fr
+	}
+	shown.Page = &api.Page{ReturnedCount: shown.Page.TotalCount, TotalCount: shown.Page.TotalCount}
+	return shown, nil
+}
+
+// ReceiptPage reads one page of receipt hash's value: the page cursor names, a
+// next_cursor the daemon gave for the same receipt, or the first page when it is
+// empty (card 92). Only the first page carries the receipt.
+func (c *Client) ReceiptPage(ctx context.Context, hash, cursor string) (api.ReceiptShown, error) {
+	var q url.Values
+	if cursor != "" {
+		q = url.Values{"cursor": {cursor}}
+	}
 	var r api.ReceiptShown
-	_, err := c.do(ctx, c.timeout, http.MethodGet, "/v1/receipts/"+url.PathEscape(hash), nil, nil, &r)
+	_, err := c.do(ctx, c.timeout, http.MethodGet, "/v1/receipts/"+url.PathEscape(hash), q, nil, &r)
 	return r, err
 }
 

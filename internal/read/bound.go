@@ -22,6 +22,10 @@ type TooLarge struct {
 }
 
 func (e *TooLarge) Error() string {
+	if e.FacetID != "" {
+		return fmt.Sprintf("result too large: facet %s alone encodes to more than %d bytes (max_read_bytes); %s",
+			e.FacetID, e.MaxBytes, e.Hint)
+	}
 	return fmt.Sprintf("result too large: %d entries encode to more than %d bytes (max_read_bytes); %s",
 		e.Matched, e.MaxBytes, e.Hint)
 }
@@ -50,26 +54,92 @@ func Fit[E any](entries []E, limit int, hint string) error {
 // own encoding (HTML left as it is), stopping once the count passes limit. It returns
 // the count so far and whether it passed.
 func encodedSize[E any](entries []E, limit int) (int, bool) {
-	var w counter
-	enc := json.NewEncoder(&w)
-	enc.SetEscapeHTML(false)
+	s := newSizer()
 	n := 2 // the array's brackets
 	for i, e := range entries {
 		if i > 0 {
 			n++ // the comma
 		}
-		w.n = 0
-		if err := enc.Encode(e); err != nil {
-			// What cannot be encoded cannot be answered either; the handler finds
-			// that out when it writes, and this measure is not where to say so.
-			continue
-		}
-		n += w.n - 1 // Encode ends with a newline the array would not carry
+		n += s.size(e)
 		if n > limit {
 			return n, true
 		}
 	}
 	return n, false
+}
+
+// pageEnd is where the page of entries that starts at offset ends: past the most
+// whole entries from offset that encode, as a JSON array, within limit, and never
+// fewer than one; to the end when limit is zero. A page never cuts a facet, so an
+// entry over the limit on its own is refused with a *TooLarge naming its id from ids
+// (aligned with entries) and saying hint. The measure is Fit's.
+func pageEnd[E any](entries []E, ids []string, offset, limit int, hint string) (int, error) {
+	if limit <= 0 {
+		return len(entries), nil
+	}
+	s := newSizer()
+	n := 2
+	for i := offset; i < len(entries); i++ {
+		add := s.size(entries[i])
+		if i > offset {
+			add++
+		}
+		if n+add <= limit {
+			n += add
+			continue
+		}
+		if i > offset {
+			return i, nil
+		}
+		return 0, &TooLarge{
+			TooLarge: api.TooLarge{Matched: 1, Bytes: n + add, MaxBytes: limit, FacetID: ids[i]},
+			Hint:     hint,
+		}
+	}
+	return len(entries), nil
+}
+
+// fitEach refuses entries when any one of them, alone, encodes past limit: the one
+// thing paging cannot answer. It names the first such entry by its id in ids and
+// says hint. A limit of zero is no bound.
+func fitEach[E any](entries []E, ids []string, limit int, hint string) error {
+	if limit <= 0 {
+		return nil
+	}
+	s := newSizer()
+	for i, e := range entries {
+		if n := 2 + s.size(e); n > limit {
+			return &TooLarge{
+				TooLarge: api.TooLarge{Matched: 1, Bytes: n, MaxBytes: limit, FacetID: ids[i]},
+				Hint:     hint,
+			}
+		}
+	}
+	return nil
+}
+
+// sizer measures one value as the daemon encodes it, without its trailing newline.
+type sizer struct {
+	w   counter
+	enc *json.Encoder
+}
+
+func newSizer() *sizer {
+	s := &sizer{}
+	s.enc = json.NewEncoder(&s.w)
+	s.enc.SetEscapeHTML(false)
+	return s
+}
+
+// size is e's encoded length. What cannot be encoded cannot be answered either; the
+// handler finds that out when it writes, and this measure is not where to say so, so
+// it counts as nothing.
+func (s *sizer) size(e any) int {
+	s.w.n = 0
+	if err := s.enc.Encode(e); err != nil {
+		return 0
+	}
+	return s.w.n - 1 // Encode ends with a newline the array would not carry
 }
 
 // counter is an io.Writer that only counts.

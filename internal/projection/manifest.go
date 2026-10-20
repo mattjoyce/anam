@@ -18,7 +18,12 @@ import (
 // Embedded assets). They are the floor; the operator registers others over the API
 // (Register, WithRegistered), and a consumer still only selects (§9).
 //
-//go:embed manifests/*.json
+// manifests/<name>.json is each template's current version, the one a consumer
+// selecting by name is answered with. manifests/history/<name>.v<n>.json is every
+// earlier bundled version a receipt may name (card 147): held beside the current one,
+// so a receipt cut under it still verifies against exactly the template that served it.
+//
+//go:embed manifests/*.json manifests/history/*.json
 var manifestFS embed.FS
 
 // manifest mirrors the JSON layout. The required knobs are pointers so that "absent"
@@ -197,13 +202,12 @@ func Bundled() (*Registry, error) {
 
 	r := &Registry{held: make(map[string][]Template, len(entries))}
 	for _, e := range entries {
-		raw, err := manifestFS.ReadFile("manifests/" + e.Name())
-		if err != nil {
-			return nil, fmt.Errorf("projection: read bundled manifest %s: %w", e.Name(), err)
+		if e.IsDir() {
+			continue // history, read below against the current versions
 		}
-		t, err := Parse(raw)
+		t, err := bundledFile("manifests/" + e.Name())
 		if err != nil {
-			return nil, fmt.Errorf("projection: bundled manifest %s: %w", e.Name(), err)
+			return nil, err
 		}
 		if want := t.Name + ".json"; e.Name() != want {
 			return nil, fmt.Errorf("%w: manifest %s declares name %q (file must be named %s)",
@@ -214,7 +218,41 @@ func Bundled() (*Registry, error) {
 		}
 		r.held[t.Name] = []Template{t}
 	}
+	history, err := manifestFS.ReadDir("manifests/history")
+	if err != nil {
+		return nil, fmt.Errorf("projection: read bundled history: %w", err)
+	}
+	for _, e := range history {
+		t, err := bundledFile("manifests/history/" + e.Name())
+		if err != nil {
+			return nil, err
+		}
+		if want := fmt.Sprintf("%s.v%d.json", t.Name, t.Version); e.Name() != want {
+			return nil, fmt.Errorf("%w: history %s declares %s v%d (file must be named %s)",
+				ErrBadTemplate, e.Name(), t.Name, t.Version, want)
+		}
+		cur, ok := r.held[t.Name]
+		if !ok || t.Version >= cur[0].Version {
+			return nil, fmt.Errorf("%w: history %s is not an earlier version of a bundled template", ErrBadTemplate, e.Name())
+		}
+		if err := r.add(t); err != nil {
+			return nil, err
+		}
+	}
 	return r, nil
+}
+
+// bundledFile parses one embedded manifest.
+func bundledFile(path string) (Template, error) {
+	raw, err := manifestFS.ReadFile(path)
+	if err != nil {
+		return Template{}, fmt.Errorf("projection: read bundled manifest %s: %w", path, err)
+	}
+	t, err := Parse(raw)
+	if err != nil {
+		return Template{}, fmt.Errorf("projection: bundled manifest %s: %w", path, err)
+	}
+	return t, nil
 }
 
 // Lookup returns the newest version of the template a consumer selected. An unknown

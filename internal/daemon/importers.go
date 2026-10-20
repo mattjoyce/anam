@@ -26,7 +26,7 @@ func mayRegister(imp config.Principal, t facet.Type) bool {
 }
 
 // mayStore reports whether imp may post a document's bytes to the library: it lists
-// doc.reference. any_type reaches every facet type and not the library, which takes
+// record.document. any_type reaches every facet type and not the library, which takes
 // bytes only from a source that owns the references to them (card 177's audit).
 func mayStore(imp config.Principal) bool {
 	return lists(imp, docType)

@@ -1,0 +1,11 @@
+{
+  "name": "sleep",
+  "version": 3,
+  "description": "Sleep only: each night as Garmin scored it (health.sleep-episode), without the rest of the health record. v3 names the type under the taxonomy of card 147; v2 named sleep.episode, v1 health.sleep, which only the retired health ETL wrote.",
+  "types": ["health.sleep-episode"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

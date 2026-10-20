@@ -38,7 +38,7 @@ be asked.
   anam query run --projection everything -e '
     instant(At) :- entry(_, "health.blood-pressure", At, _, _, _, _).
     regimen(At, Drug) :- entry(_, "health.blood-pressure", At, _, _, _, _), current(E, At),
-                         entry(E, "med.started", _, _, _, _, _), attr(E, "/drug", Drug).'
+                         entry(E, "health.medication-started", _, _, _, _, _), attr(E, "/drug", Drug).'
 
 The program is -e, -f, or stdin.`,
 		Args: cobra.NoArgs,

@@ -1,0 +1,33 @@
+{
+  "meta": {
+    "facet_type": "place.arrived",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "trips",
+    "classification": "Confidential",
+    "validation_mode": "strict",
+    "source_schema": "records/place.arrived",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium",
+    "series": {"name": "travel.trip", "key": ["/trip"], "closes": false}
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Arriving at one place during a trip, a leg within the trip, one row in a records file (source records). It does not close the trip; values are the row's own text.",
+    "type": "object",
+    "required": ["id", "date", "trip"],
+    "properties": {
+      "basis": {"type": "string", "minLength": 1, "description": "Why the arrival date is believed, in the extraction's own words rather than the source's: the flight that brought Matt there, written as \"<flight> <from>-<to>, <d Mon>\", or \"hotel booking\" with its confirmation number where the source gave one. Absent on rows that rest on the stay dates alone.", "examples": ["ZX441 QXA-QXB, 5 Mar", "hotel booking"]},
+      "by": {"type": "string", "minLength": 1, "description": "How Matt reached the place when it was not by a flight leg: the service and where it went, as the source's evidence wrote it. Arrivals by air carry no by; their basis names the flight.", "examples": ["Coastal Rail to Porthaven"]},
+      "date": {"type": "string", "minLength": 1, "description": "The day of arrival at the place. Sydney local date, YYYY-MM-DD, as the records row writes it. This is the fact time. The records row does not carry the place's own zone.", "examples": ["2019-03-05"]},
+      "id": {"type": "string", "minLength": 1, "description": "The row id the records file assigns, chosen once. The travel history writes it as <origin>:<trip>/<kind>, with the date and a place or route appended where a trip has several rows of a kind. This is the identity.", "examples": ["travel:2019-03-westmere/arrived/2019-03-05/porthaven"]},
+      "place": {"type": "string", "minLength": 1, "description": "Where Matt arrived, usually \"city, country\", as written.", "examples": ["Porthaven, Westmere"]},
+      "stay": {"type": "string", "minLength": 1, "description": "Where Matt stayed and for which dates, free text as written.", "examples": ["Harbour View Hotel, 5 to 9 Mar"]},
+      "trip": {"type": "string", "minLength": 1, "description": "The trip key every row of one trip shares (departed, arrived, returned, flight), written by the extraction as the year and month of departure and a short slug. It names the travel.trip series.", "examples": ["2019-03-westmere"]}
+    },
+    "additionalProperties": false
+  }
+}

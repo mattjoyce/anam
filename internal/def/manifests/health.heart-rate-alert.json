@@ -1,7 +1,9 @@
 {
   "meta": {
     "facet_type": "health.heart-rate-alert",
-    "definition_version": 3,
+    "definition_version": 4,
+    "kind": "event",
+    "family": "vitals",
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "health-db/event",

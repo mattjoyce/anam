@@ -1,11 +1,11 @@
 ---
 type: gap
 title: The interpretation source is decided and not built
-description: Card 93 decided that a model's reading of a note is a second source of draft facts the person endorses; only the note half exists, as note.annotation v3, and no Definition, route or inspector view carries a standing or an endorsement.
+description: Card 93 decided that a model's reading of a note is a second source of draft facts the person endorses; only the note half exists, as record.note v3, and no Definition, route or inspector view carries a standing or an endorsement.
 timestamp: 2026-10-17T00:00:00Z
 looked_at:
   - docs/API.md
-  - internal/def/manifests/note.annotation.json
+  - internal/def/manifests/record.note.json
   - internal/def/manifests
 ---
 

@@ -1,0 +1,32 @@
+{
+  "meta": {
+    "facet_type": "record.document",
+    "definition_version": 1,
+    "family": "documents",
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "documents/reference",
+    "payload_kind": "reference",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}
+    },
+    "identity_key": ["/path"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One file in a documents library: a pointer to the bytes, which stay in the library and never enter the ledger. Written by the documents source (the default library beside the ledger, or a declared one), from the file itself and its .meta.yaml sidecar.",
+    "type": "object",
+    "required": ["path", "sha256", "media_type", "bytes", "date"],
+    "properties": {
+      "bytes": {"type": "number", "description": "The file's size in bytes, measured by the documents worker when it reads the file. Not from the sidecar, which may not set it.", "examples": [184320]},
+      "date": {"type": "string", "minLength": 1, "description": "The document's own date (not the day it was scanned or filed), the sidecar's date key, as YYYY-MM-DD in Sydney. Required: a file without it refuses the scan. This is the fact time.", "examples": ["2024-03-02"]},
+      "media_type": {"type": "string", "minLength": 1, "description": "The media type the worker names from the file's extension, parameters stripped; the bytes are not sniffed. application/octet-stream when the extension is unknown. Not from the sidecar.", "examples": ["application/pdf"]},
+      "note": {"type": "string", "minLength": 1, "description": "The sidecar's note key, free text written by whoever filed the document, verbatim.", "examples": ["scanned from the paper copy"]},
+      "path": {"type": "string", "minLength": 1, "description": "The file's path relative to the library root, with forward slashes; it may include subfolders. The root itself never enters the fact. This is the identity, so a renamed file is a new facet.", "examples": ["letters/2024-03-02_referral_letter.pdf"]},
+      "sha256": {"type": "string", "minLength": 1, "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 of the file's bytes as lower-case hex, computed by the worker. Changed bytes at the same path supersede the facet.", "examples": ["3f1c9a0e7b2d4c6f8a1e5b9d0c3f7a2e6b4d8c1f9e0a3b5d7c2f4e6a8b1d3c5e"]},
+      "title": {"type": "string", "minLength": 1, "description": "The sidecar's title key, free text written by whoever filed the document, verbatim.", "examples": ["Referral letter, 2 Mar 2024"]}
+    },
+    "additionalProperties": false
+  }
+}

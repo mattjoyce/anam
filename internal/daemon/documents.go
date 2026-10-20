@@ -21,19 +21,19 @@ import (
 // docType is the facet type a stored document is referenced by; an importer may post
 // documents only if it owns the references to them (mayStore). It names a bundled
 // type, so it is not configurable.
-const docType facet.Type = "doc.reference"
+const docType facet.Type = "record.document"
 
 // The ways a document post or a reference to one is refused.
 var (
 	// ErrDocumentExt: the ext parameter is not a plain file extension.
 	ErrDocumentExt = errors.New("daemon: not a plain file extension")
-	// ErrDocumentMissing: a doc.reference names a sha256 the library holds no bytes for.
+	// ErrDocumentMissing: a record.document names a sha256 the library holds no bytes for.
 	ErrDocumentMissing = errors.New("daemon: the library does not hold the document this reference names")
 )
 
 // postDocument stores one document's bytes in the library (cards 102, 150). Only
 // Anam writes the library: an importer hands it the bytes and is answered with the
-// sha256 a doc.reference names. The file is named by that sha256, so the same bytes
+// sha256 a record.document names. The file is named by that sha256, so the same bytes
 // again are unchanged, and other bytes are another file: a stored document is never
 // overwritten. Where in the library it sits is the library's own business.
 func (d *Daemon) postDocument(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +111,7 @@ func documentMediaType(ext string) string {
 	return "application/octet-stream"
 }
 
-// checkReferences refuses, before anything is admitted, every doc.reference in a
+// checkReferences refuses, before anything is admitted, every record.document in a
 // batch whose sha256 the library holds no bytes for (cards 102, 150). The reference
 // is a pointer, and a pointer to nothing is not a fact worth admitting. Its path is
 // the document's name and identity, and plays no part in finding the bytes.

@@ -1,5 +1,5 @@
 // Package library is Anam's store of document bytes (cards 102, 150): files named by
-// their sha256, written only by Anam, found by that name. A doc.reference facet names
+// their sha256, written only by Anam, found by that name. A record.document facet names
 // a document's bytes by sha256; where in the library the file sits is this package's
 // own business, decided when it is written and never changed.
 package library

@@ -33,7 +33,7 @@ importers:
     types: [health.weight]
   - source: garmin
     token_sha256: ` + hashB + `
-    types: [health.sleep, exercise.session]
+    types: [health.sleep, activity.exercise-session]
 `
 	t.Run("a valid file", func(t *testing.T) {
 		t.Parallel()
@@ -41,7 +41,7 @@ importers:
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(got) != 2 || got[1].Source != "garmin" || got[1].Types[1] != facet.Type("exercise.session") ||
+		if len(got) != 2 || got[1].Source != "garmin" || got[1].Types[1] != facet.Type("activity.exercise-session") ||
 			got[0].TokenSHA256 != hashA {
 			t.Fatalf("loaded %+v", got)
 		}
@@ -60,13 +60,13 @@ importers:
 		{"a source named twice", strings.Replace(valid, "source: garmin", "source: withings", 1)},
 		{"a shared token", strings.Replace(valid, hashB, hashA, 1)},
 		{"a name used twice", strings.Replace(valid, "source: garmin", "source: garmin\n    name: withings", 1)},
-		{"a type two importers name", strings.Replace(valid, "types: [health.sleep, exercise.session]", "types: [health.weight]", 1)},
+		{"a type two importers name", strings.Replace(valid, "types: [health.sleep, activity.exercise-session]", "types: [health.weight]", 1)},
 		{"no types", strings.Replace(valid, "types: [health.weight]", "types: []", 1)},
 		{"a type that is not namespaced", strings.Replace(valid, "types: [health.weight]", "types: [weight]", 1)},
 	}
 	t.Run("a bundled type two importers name", func(t *testing.T) {
 		t.Parallel()
-		body := strings.Replace(valid, "types: [health.sleep, exercise.session]", "types: [health.weight]", 1)
+		body := strings.Replace(valid, "types: [health.sleep, activity.exercise-session]", "types: [health.weight]", 1)
 		bundled := func(ty facet.Type) bool { return ty == "health.weight" }
 		got, err := config.LoadPrincipals(writeImporters(t, body), bundled)
 		if err != nil || len(got) != 2 {
@@ -96,7 +96,7 @@ principals:
     role: importer
     source: conversation
     token_sha256: ` + hashB + `
-    types: [note.annotation]
+    types: [record.note]
 importers:
   - source: withings
     token_sha256: ` + hashA + `
@@ -129,11 +129,11 @@ importers:
 		{"no role", strings.Replace(valid, "role: reader", "role: ''", 1)},
 		{"an unknown role", strings.Replace(valid, "role: reader", "role: admin", 1)},
 		{"a reader with a source", strings.Replace(valid, "role: reader", "role: reader\n    source: chat", 1)},
-		{"a reader with types", strings.Replace(valid, "role: reader", "role: reader\n    types: [note.annotation]", 1)},
+		{"a reader with types", strings.Replace(valid, "role: reader", "role: reader\n    types: [record.note]", 1)},
 		{"an importer with no source", strings.Replace(valid, "source: conversation", "source: ''", 1)},
 		{"a reader sharing an importer's token", strings.Replace(valid, hashC, hashA, 1)},
 		{"a name an importer takes by its source", strings.Replace(valid, "name: assistant", "name: withings", 1)},
-		{"any_type beside types", strings.Replace(valid, "types: [note.annotation]", "types: [note.annotation]\n    any_type: true", 1)},
+		{"any_type beside types", strings.Replace(valid, "types: [record.note]", "types: [record.note]\n    any_type: true", 1)},
 		{"a reader with any_type", strings.Replace(valid, "role: reader", "role: reader\n    any_type: true", 1)},
 	}
 	for _, c := range cases {
@@ -150,7 +150,7 @@ importers:
 	// another importer owns are not its concern.
 	t.Run("an importer with any_type", func(t *testing.T) {
 		t.Parallel()
-		body := strings.Replace(valid, "types: [note.annotation]", "any_type: true", 1)
+		body := strings.Replace(valid, "types: [record.note]", "any_type: true", 1)
 		got, err := config.LoadPrincipals(writeImporters(t, body), nil)
 		if err != nil {
 			t.Fatal(err)

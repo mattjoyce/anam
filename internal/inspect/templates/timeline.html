@@ -277,7 +277,7 @@
       note.hidden = false; document.getElementById('note-text').focus();
     });
 
-    // The note is a note.annotation (card 104) drafted as the records file the
+    // The note is a record.note (card 104) drafted as the records file the
     // person installs: `at` is the moment of drafting in the Definition's zone (card
     // 136: a note's fact time is when it was written; the facets it is about carry
     // their own), `about` every selected id, the text verbatim. Submitting it from
@@ -289,7 +289,7 @@
       const text = document.getElementById('note-text').value.trim();
       if (!text || selected.size === 0) { document.getElementById('note-text').focus(); return; }
       const ms = [...selected.values()].sort((a, b) => a.t - b.t);
-      const lines = ['records:', '  - type: note.annotation', `    id: note:${ms[0].id.slice(0, 8)}:1`,
+      const lines = ['records:', '  - type: record.note', `    id: note:${ms[0].id.slice(0, 8)}:1`,
                      `    at: "${atOf(Date.now())}"`, '    about:'];
       ms.forEach(m => lines.push(`      - ${m.id}`));
       lines.push(`    text: ${JSON.stringify(text)}`);

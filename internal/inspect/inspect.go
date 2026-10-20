@@ -51,7 +51,7 @@ type Server struct {
 	timeout time.Duration
 
 	// library is the default library's root: the folder that holds the bytes a
-	// doc.reference names by sha256. The inspector serves those bytes itself, confined
+	// record.document names by sha256. The inspector serves those bytes itself, confined
 	// to the root, so a reference facet opens as the document it points at. Empty
 	// means no library.
 	library string

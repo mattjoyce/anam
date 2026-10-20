@@ -15,13 +15,13 @@ import (
 // nothing, a refusal anywhere stops the run before anything is written, a rerun is
 // all no-op, and the first version stays, so anam-time is kept.
 
-// illnesses are three self-log illnesses as records. illness.started and
-// illness.ended share keying, series and schema, which is the shape of a rename:
+// illnesses are three self-log illnesses as records. health.illness-started and
+// health.illness-ended share keying, series and schema, which is the shape of a rename:
 // the type moves and nothing else does.
 var illnesses = []record{
-	{"illness.started", `{"id": "self-log:ill/flu/1", "date": "2026-03-04", "episode": "flu"}`},
-	{"illness.started", `{"id": "self-log:ill/cold/1", "date": "2026-05-10", "episode": "cold", "note": "mild"}`},
-	{"illness.started", `{"id": "self-log:ill/flu/2", "date": "2026-08-01", "episode": "flu"}`},
+	{"health.illness-started", `{"id": "self-log:ill/flu/1", "date": "2026-03-04", "episode": "flu"}`},
+	{"health.illness-started", `{"id": "self-log:ill/cold/1", "date": "2026-05-10", "episode": "cold", "note": "mild"}`},
+	{"health.illness-started", `{"id": "self-log:ill/flu/2", "date": "2026-08-01", "episode": "flu"}`},
 }
 
 func renameTableFile(t *testing.T, dir, name, body string) string {
@@ -47,14 +47,14 @@ func TestRename_CarriesFacetsAndKeepsTheFirstVersion(t *testing.T) {
 	t.Parallel()
 	f := newLedgerFixture(t)
 	before := f.admit(t, illnesses)
-	table := renameTableFile(t, f.dir, "renames.json", `{"renames": [{"from": "illness.started", "to": "illness.ended"}]}`)
+	table := renameTableFile(t, f.dir, "renames.json", `{"renames": [{"from": "health.illness-started", "to": "health.illness-ended"}]}`)
 
 	out, _, err := cli(t, f.cfgPath, "rename", "--table", table)
 	if err != nil {
 		t.Fatalf("dry run: %v\n%s", err, out)
 	}
-	if row := reportRow(t, out, "illness.started"); row[1] != "illness.ended" || row[2] != "3" || row[3] != "0" {
-		t.Errorf("dry run row %v, want illness.ended 3 0", row)
+	if row := reportRow(t, out, "health.illness-started"); row[1] != "health.illness-ended" || row[2] != "3" || row[3] != "0" {
+		t.Errorf("dry run row %v, want health.illness-ended 3 0", row)
 	}
 	if !strings.Contains(out, "dry run: nothing written") {
 		t.Errorf("the dry run did not say so:\n%s", out)
@@ -85,12 +85,12 @@ func TestRename_CarriesFacetsAndKeepsTheFirstVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cur.Type != "illness.ended" || cur.ArtifactVersion != 2 || cur.Provenance.Source != "records" {
-		t.Errorf("current is %s v%d from %s, want illness.ended v2 from records, under the same id", cur.Type, cur.ArtifactVersion, cur.Provenance.Source)
+	if cur.Type != "health.illness-ended" || cur.ArtifactVersion != 2 || cur.Provenance.Source != "records" {
+		t.Errorf("current is %s v%d from %s, want health.illness-ended v2 from records, under the same id", cur.Type, cur.ArtifactVersion, cur.Provenance.Source)
 	}
 	old, err := l.Version(ctx, id, 1)
-	if err != nil || old.Type != "illness.started" {
-		t.Errorf("v1 = %s, %v; want illness.started, kept as admitted", old.Type, err)
+	if err != nil || old.Type != "health.illness-started" {
+		t.Errorf("v1 = %s, %v; want health.illness-started, kept as admitted", old.Type, err)
 	}
 
 	// The run again finds nothing left under the old type, and writes nothing.
@@ -98,7 +98,7 @@ func TestRename_CarriesFacetsAndKeepsTheFirstVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("rerun: %v\n%s", err, out)
 	}
-	if row := reportRow(t, out, "illness.started"); row[2] != "0" || row[3] != "0" {
+	if row := reportRow(t, out, "health.illness-started"); row[2] != "0" || row[3] != "0" {
 		t.Errorf("rerun row %v, want nothing to carry", row)
 	}
 	if w := headOf(t, f.ledgerPath); w != before+3 {
@@ -112,19 +112,19 @@ func TestRename_CarriesFacetsAndKeepsTheFirstVersion(t *testing.T) {
 func TestRename_RefusesBeforeWriting(t *testing.T) {
 	t.Parallel()
 	f := newLedgerFixture(t)
-	trip := record{"travel.departed", `{"id": "self-log:trip/1/departed", "date": "2026-04-01", "trip": "tokyo", "destination": "Tokyo"}`}
+	trip := record{"place.departed", `{"id": "self-log:trip/1/departed", "date": "2026-04-01", "trip": "tokyo", "destination": "Tokyo"}`}
 	before := f.admit(t, append(append([]record{}, illnesses...), trip))
 
 	// health.weight is keyed by id and dated by date, as an illness is, but its layout
 	// carries the time of day: a different fact-time rule, so different keying.
-	mis := renameTableFile(t, f.dir, "mis.json", `{"renames": [{"from": "illness.started", "to": "health.weight"}]}`)
+	mis := renameTableFile(t, f.dir, "mis.json", `{"renames": [{"from": "health.illness-started", "to": "health.weight"}]}`)
 	if _, _, err := cli(t, f.cfgPath, "rename", "--table", mis, "--yes"); err == nil || !strings.Contains(err.Error(), "ids would not meet") {
 		t.Errorf("different keying: %v, want a refusal saying the ids would not meet", err)
 	}
 
-	// travel.arrived keys as travel.departed does but has no destination field, so the
+	// place.arrived keys as place.departed does but has no destination field, so the
 	// departure's payload fails its schema: reported per facet, nothing written.
-	bad := renameTableFile(t, f.dir, "bad.json", `{"renames": [{"from": "travel.departed", "to": "travel.arrived"}]}`)
+	bad := renameTableFile(t, f.dir, "bad.json", `{"renames": [{"from": "place.departed", "to": "place.arrived"}]}`)
 	out, _, err := cli(t, f.cfgPath, "rename", "--table", bad, "--yes")
 	if err == nil || !strings.Contains(err.Error(), "would refuse") {
 		t.Errorf("a payload the new schema refuses: %v\n%s", err, out)

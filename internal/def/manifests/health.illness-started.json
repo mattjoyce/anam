@@ -1,0 +1,30 @@
+{
+  "meta": {
+    "facet_type": "health.illness-started",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "conditions",
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "records/health.illness-started",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium",
+    "series": {"name": "illness.episode", "key": ["/episode"], "closes": false}
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The day an illness began, one row in a records file (source records). Opens an illness.episode series; values are the row's own text.",
+    "type": "object",
+    "required": ["id", "date", "episode"],
+    "properties": {
+      "date": {"type": "string", "minLength": 1, "description": "The day the illness began. Sydney local date, YYYY-MM-DD, as the records row writes it. This is the fact time.", "examples": ["2025-07-14"]},
+      "episode": {"type": "string", "minLength": 1, "description": "The episode key the rows of one illness share, written by hand; it names the illness.episode series this row belongs to. health.illness-ended with the same key closes it."},
+      "id": {"type": "string", "minLength": 1, "description": "The row id the records file assigns, chosen once and never derived from the content. This is the identity."},
+      "note": {"type": "string", "minLength": 1, "description": "Free text about the illness, as the row writes it.", "examples": ["sore throat and fever, stayed home"]}
+    },
+    "additionalProperties": false
+  }
+}

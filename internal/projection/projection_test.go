@@ -132,8 +132,16 @@ func TestBundled_ParsesBpAndSleep(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Bundled: %v", err)
 	}
-	if got, want := r.Names(), []string{"bp", "meds", "sleep"}; !reflect.DeepEqual(got, want) {
+	if got, want := r.Names(), []string{"bp", "doses", "meds", "sleep"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("bundled names = %v, want %v", got, want)
+	}
+	// Card 147: meds v2 names the types under the health domain, and v1 is held from
+	// manifests/history so a receipt that names it still verifies against it.
+	if cur, err := r.Lookup("meds"); err != nil || cur.Version != 2 {
+		t.Errorf("meds = v%d, %v; want v2 current", cur.Version, err)
+	}
+	if old, err := r.Version("meds", 1); err != nil || old.Types[0] != "med.started" {
+		t.Errorf("meds v1 = %+v, %v; want the history's template", old.Types, err)
 	}
 	for _, tmpl := range r.All() {
 		if tmpl.Version < 1 {

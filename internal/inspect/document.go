@@ -13,7 +13,7 @@ import (
 	"github.com/mattjoyce/anam/internal/library"
 )
 
-// Library documents: the bytes a doc.reference points at, found by their sha256,
+// Library documents: the bytes a record.document points at, found by their sha256,
 // served confined to the library root and isolated from the inspector's origin
 // (cards 106, 150).
 

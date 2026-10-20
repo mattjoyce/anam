@@ -8,6 +8,20 @@ decisions is in `journal/`.
 
 ## 2026-10-20
 
+- The taxonomy (card 147). Every bundled type is named `domain.concept` under one of eight closed
+  domains: `health`, `activity`, `place` and `record` in use, `social`, `money`, `media` and `work`
+  reserved. Twenty-four types are renamed (`med.started` is `health.medication-started`,
+  `sleep.episode` is `health.sleep-episode`, `travel.flight` is `place.flight`, `note.annotation` is
+  `record.note`, `doc.reference` is `record.document`, and so on, per `renames/taxonomy.json`) and
+  start again at v1 under the new name; the four kept (`health.blood-pressure`, `health.weight`,
+  `health.body-composition`, `health.heart-rate-alert`) are one version up. Every one declares
+  `kind` and `family`. The old names' Definitions stay in the bundled history, so an earlier version
+  of a facet still reads against its own words, and the three retired health-db types are left as
+  written. `health.medication-dose` is new (card 179): one dose taken at a moment, outside any
+  course, with a `doses` log projection; `meds` is v2 under the new names and its v1 is held from a
+  bundled history of its own, so a receipt that names it still verifies. The inspector's rows are
+  the declared families. Nothing is live until the rename run (card 140) carries the record over;
+  until then the daemon admits the new names only, and the importers and anam-mcp move with it.
 - `anam rename --table <json> [--yes]` carries every live facet of a type into another type as the
   next version of itself, through the gate: the same id, source, identity values, fact-time and
   payload, with the new Definition's classification and series. The old version stays, so

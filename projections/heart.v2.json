@@ -1,0 +1,11 @@
+{
+  "name": "heart",
+  "version": 2,
+  "description": "The heart: Garmin's daily resting, minimum and maximum heart rate, and every alert the watch raised, without the rest of the health record. v2 names the types under the taxonomy of card 147; v1 named health.heart-rate-daily.",
+  "types": ["health.heart-rate-day", "health.heart-rate-alert"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

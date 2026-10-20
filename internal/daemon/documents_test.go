@@ -30,7 +30,7 @@ func documentsConfig(t *testing.T) config.Config {
 	docSum := sha256.Sum256([]byte(docToken))
 	otherSum := sha256.Sum256([]byte(importerToken))
 	body := fmt.Sprintf("importers:\n"+
-		"  - source: documents\n    token_sha256: %s\n    types: [doc.reference]\n"+
+		"  - source: documents\n    token_sha256: %s\n    types: [record.document]\n"+
 		"  - source: test-import\n    token_sha256: %s\n    types: [health.weight]\n",
 		hex.EncodeToString(docSum[:]), hex.EncodeToString(otherSum[:]))
 	if err := os.WriteFile(cfg.ImportersFile, []byte(body), 0o600); err != nil {
@@ -40,7 +40,7 @@ func documentsConfig(t *testing.T) config.Config {
 }
 
 func reference(version int, path, sum string, size int) string {
-	return fmt.Sprintf(`{"type": "doc.reference", "definition_version": %d, "payload": {"path": %q, "sha256": %q, "media_type": "application/pdf", "bytes": %d, "date": "2026-01-30"}}`,
+	return fmt.Sprintf(`{"type": "record.document", "definition_version": %d, "payload": {"path": %q, "sha256": %q, "media_type": "application/pdf", "bytes": %d, "date": "2026-01-30"}}`,
 		version, path, sum, size)
 }
 
@@ -78,7 +78,7 @@ func TestPostDocument(t *testing.T) {
 	for _, bad := range []string{"../x", "p/df", "pdf.meta", "a b", strings.Repeat("x", 17)} {
 		post(docToken, bad, letter, http.StatusBadRequest)
 	}
-	post(importerToken, "pdf", letter, http.StatusForbidden) // may not submit doc.reference
+	post(importerToken, "pdf", letter, http.StatusForbidden) // may not submit record.document
 	call(t, "POST", base+"/v1/documents?ext=pdf", testToken, letter, http.StatusForbidden, nil)
 	if entries, _ := os.ReadDir(cfg.LibraryDir); len(entries) != 2 {
 		t.Errorf("the library holds %d entries, want the two documents (no temporaries)", len(entries))

@@ -53,7 +53,7 @@ func TestDocument_ServedFromTheLibraryAndConfinedToIt(t *testing.T) {
 		t.Fatalf("ledger.Create: %v", err)
 	}
 	t.Cleanup(func() { _ = l.Close() })
-	ref := seedFacet(t, facet.SourceRef("documents", "scans/report.pdf"), "doc.reference",
+	ref := seedFacet(t, facet.SourceRef("documents", "scans/report.pdf"), "record.document",
 		`{"path": "scans/report.pdf", "sha256": "`+sum+`", "media_type": "application/pdf", "bytes": 18, "date": "2026-01-30"}`)
 	ref.Descriptor.PayloadKind = facet.PayloadReference
 	if err := l.Admit(ctx, 0, ref, event(facet.EventAdmitted, ref, 1)); err != nil {

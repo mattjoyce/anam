@@ -1,0 +1,44 @@
+{
+  "meta": {
+    "facet_type": "health.lab-result",
+    "definition_version": 1,
+    "kind": "reading",
+    "family": "labs",
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "records/health.lab-result",
+    "time_semantics": {
+      "fact_time": {"pointer": "/collected", "layout": "2006-01-02 15:04", "zone": "Australia/Sydney"}
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One analyte's result from one blood or urine draw, as a pathology report printed it, read into a records file. Written by scripts/extract-acl-pathology.py for Australian Clinical Labs PDFs and by hand readings of other reports. value, range and unit are the report's text; value_num and flagged are derived from it by the extraction.",
+    "type": "object",
+    "required": ["id", "collected", "analyte", "value", "lab_number"],
+    "properties": {
+      "analyte": {"type": "string", "minLength": 1, "description": "The analyte's name as printed in the result row, with the report's flag asterisks removed and spaces collapsed by the extraction.", "examples": ["Potassium"]},
+      "collected": {"type": "string", "minLength": 1, "description": "When the sample was drawn, reformatted by the extraction from the report's DD/MM/YY to YYYY-MM-DD HH:MM in Sydney local time. A history column with no printed time takes one from the extractor's --known-times, or 00:00. This is the fact time.", "examples": ["2026-03-04 08:15"]},
+      "collection_type": {"type": "string", "minLength": 1, "description": "The glucose table's collection type column (such as fasting or random), as printed. Script only, glucose rows only."},
+      "fasting": {"type": "boolean", "description": "Whether the draw was fasting. Derived by the extraction: from the report's \"Fasting status\" line, or for glucose rows from collection_type. Absent when the report says nothing.", "examples": [true]},
+      "flag_as_printed": {"type": "string", "minLength": 1, "description": "The flag mark the report printed in the value column before the value, kept as printed. Hand readings only, written so far on rows printed against status_bands, where one asterisk and two asterisks both occur; the report prints no key, so what two marks say beyond one is not stated.", "examples": ["**"]},
+      "flagged": {"type": "boolean", "description": "True when the report marks the value as outside its range with an asterisk. Derived by the extraction from the printed mark; never false, absent when unmarked.", "examples": [true]},
+      "id": {"type": "string", "minLength": 1, "description": "Identity, chosen at extraction and deterministic from the content: the lab's prefix (acl or healthscope), the lab number, and the analyte as a slug, with a non-blood specimen prefixed (urine-albumin).", "examples": ["acl:12345678/potassium"]},
+      "lab": {"type": "string", "minLength": 1, "description": "The lab that did the work. The script writes \"Australian Clinical Labs\" for every record, a constant rather than text read from the report; hand readings write the lab's name as the report gives it.", "examples": ["Example Pathology"]},
+      "lab_number": {"type": "string", "minLength": 1, "description": "The lab's number for the draw, as printed (7 or 8 digits), kept as text. History columns quote earlier draws under their own numbers.", "examples": ["12345678"]},
+      "note": {"type": "string", "minLength": 1, "description": "A note by whoever read the report about this result (a row printed with no value, a doubtful digit). Not report text."},
+      "panel": {"type": "string", "minLength": 1, "description": "The panel heading the result was printed under, in the report's capitals.", "examples": ["GENERAL CHEMISTRY"]},
+      "range": {"type": "string", "minLength": 1, "description": "The reference range as printed in brackets after the value, brackets removed and spaces collapsed. Report text, never parsed.", "examples": ["3.5 - 5.2"]},
+      "source_note": {"type": "string", "minLength": 1, "description": "Where a result came from when it is not the report's own draw: written by a hand reading when only a later report's history column prints the row."},
+      "specimen": {"type": "string", "minLength": 1, "description": "The specimen as printed, usually in the report's capitals.", "examples": ["SERUM"]},
+      "status_bands": {"type": "string", "minLength": 1, "description": "The status table a report prints in place of a single reference range, condensed by the reader into one line: each band's label and bound, separated by semicolons, with the unit once at the end. The reader's condensation, labels shortened, not the report's layout. Hand readings only.", "examples": ["Good > 75; Fair-low 40-74; Low 20-39; Poor < 20 mg/L"]},
+      "time_unknown": {"type": "boolean", "description": "True when the report printed the collection day but no time, so the 00:00 in collected is a placeholder. Written by scripts/extract-acl-pathology.py; absent otherwise.", "examples": [true]},
+      "unit": {"type": "string", "minLength": 1, "description": "The unit as printed after the range. The script tidies the spacing in powers of ten (x10^9/L); otherwise report text.", "examples": ["mmol/L"]},
+      "value": {"type": "string", "minLength": 1, "description": "The result exactly as the report printed it, kept as text, including a comparator when there is one (\"< 0.5\"). This is the report's lexeme.", "examples": ["4.6"]},
+      "value_num": {"type": "number", "description": "The value as a number, parsed from value by the extraction (script or hand reading). Absent when value carries a comparator such as < or >, because the report gave a bound, not a number.", "examples": [4.6]}
+    },
+    "additionalProperties": false
+  }
+}

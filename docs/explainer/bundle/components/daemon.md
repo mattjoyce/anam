@@ -38,7 +38,7 @@ One table in `api.go` names each route with the roles whose tokens open it (see 
 | `POST /v1/envelopes` | importer | admit a batch through the gate; see [admit a batch](/workflows/admit-a-batch.md) |
 | `POST /v1/definitions` | importer | register Definitions for its own types; see [register a Definition](/workflows/register-a-definition.md) |
 | `GET /v1/definitions[/{type}[/{v}]]` | any | publish Definitions |
-| `POST /v1/documents?ext=` | importer with `doc.reference` | store one document's bytes in the [library](/components/library.md) as `<sha256>.<ext>` (cards 102, 150): 201 stored, 200 already held, 400 a bad extension, 403 a token without `doc.reference`; see [hand Anam a document](/workflows/hand-anam-a-document.md) |
+| `POST /v1/documents?ext=` | importer with `record.document` | store one document's bytes in the [library](/components/library.md) as `<sha256>.<ext>` (cards 102, 150): 201 stored, 200 already held, 400 a bad extension, 403 a token without `record.document`; see [hand Anam a document](/workflows/hand-anam-a-document.md) |
 | `POST /v1/projections` | operator | register a projection template (card 125); a registered version is immutable and every version stays readable for receipts |
 | `GET /v1/projections[/{name}[/{v}]]` | any | publish projection templates |
 | `GET /v1/snapshots/{id}` | any; an importer sees its own source's | the resend report: live, absent, carried |

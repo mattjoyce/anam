@@ -13,17 +13,17 @@ import (
 
 const medsTemplate = `{
   "name": "meds", "version": 1, "description": "the current regimen",
-  "types": ["med.started", "med.dose-changed", "med.stopped"],
+  "types": ["health.medication-started", "health.medication-dose-changed", "health.medication-stopped"],
   "statuses": ["admitted", "endorsed"],
   "max_classification": "Sensitive",
   "from": "", "to": "",
   "shape": "snapshot"
 }`
 
-// closer is the Definitions' word, stubbed: med.stopped closes.
+// closer is the Definitions' word, stubbed: health.medication-stopped closes.
 type closer struct{}
 
-func (closer) Closes(t facet.Type) bool { return t == "med.stopped" }
+func (closer) Closes(t facet.Type) bool { return t == "health.medication-stopped" }
 
 func seriesEntry(id string, typ facet.Type, factTime, series string) fold.Entry {
 	e := entry(id, typ, factTime, facet.StatusAdmitted, facet.ClassificationSensitive)
@@ -37,11 +37,11 @@ func seriesEntry(id string, typ facet.Type, factTime, series string) fold.Entry 
 func TestSnapshotShape_LatestPerSeriesWithReasons(t *testing.T) {
 	t.Parallel()
 	v, err := fold.NewValue([]fold.Entry{
-		seriesEntry("start-1", "med.started", "2026-03-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
-		seriesEntry("dose-1", "med.dose-changed", "2026-05-10T00:00:00.000000000Z", "med.regimen:ramipril:1"),
-		seriesEntry("stop-1", "med.stopped", "2026-08-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
-		seriesEntry("start-2", "med.started", "2026-10-01T00:00:00.000000000Z", "med.regimen:ramipril:2"),
-		seriesEntry("start-x", "med.started", "2026-04-01T00:00:00.000000000Z", "med.regimen:atorvastatin:1"),
+		seriesEntry("start-1", "health.medication-started", "2026-03-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
+		seriesEntry("dose-1", "health.medication-dose-changed", "2026-05-10T00:00:00.000000000Z", "med.regimen:ramipril:1"),
+		seriesEntry("stop-1", "health.medication-stopped", "2026-08-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
+		seriesEntry("start-2", "health.medication-started", "2026-10-01T00:00:00.000000000Z", "med.regimen:ramipril:2"),
+		seriesEntry("start-x", "health.medication-started", "2026-04-01T00:00:00.000000000Z", "med.regimen:atorvastatin:1"),
 	})
 	if err != nil {
 		t.Fatalf("NewValue: %v", err)
@@ -92,9 +92,9 @@ func TestSnapshotShape_LatestPerSeriesWithReasons(t *testing.T) {
 func TestSnapshotShape_WindowToIsTheAt(t *testing.T) {
 	t.Parallel()
 	v, err := fold.NewValue([]fold.Entry{
-		seriesEntry("start-1", "med.started", "2026-03-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
-		seriesEntry("dose-1", "med.dose-changed", "2026-05-10T00:00:00.000000000Z", "med.regimen:ramipril:1"),
-		seriesEntry("stop-1", "med.stopped", "2026-08-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
+		seriesEntry("start-1", "health.medication-started", "2026-03-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
+		seriesEntry("dose-1", "health.medication-dose-changed", "2026-05-10T00:00:00.000000000Z", "med.regimen:ramipril:1"),
+		seriesEntry("stop-1", "health.medication-stopped", "2026-08-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
 	})
 	if err != nil {
 		t.Fatalf("NewValue: %v", err)

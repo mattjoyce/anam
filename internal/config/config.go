@@ -44,7 +44,7 @@ type Config struct {
 
 	// LibraryDir is the default library: the folder of primary source documents the
 	// facts were extracted from. Anam alone writes it, each document's bytes named by
-	// their sha256 (card 150), and a doc.reference finds them by that name. It
+	// their sha256 (card 150), and a record.document finds them by that name. It
 	// defaults to `documents` beside the ledger, so the ledger's directory is the whole
 	// record and the backup unit. A folder that does not exist is an empty library,
 	// not an error.

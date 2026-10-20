@@ -26,13 +26,19 @@ func TestManifests_CarryTheHistory(t *testing.T) {
 		}
 		held[s.Type][s.Version] = true
 	}
+	// Card 147 renamed most types: a renamed type's every version stays in the
+	// history under its old name, since that is the name its facets' earlier versions
+	// were admitted under, and the new name starts at v1.
 	for typ, versions := range map[facet.Type][]int{
-		"health.blood-pressure": {1, 2, 3, 4, 5},
-		"health.measurement":    {1, 2},
-		"health.weight":         {1, 2, 3},
-		"exercise.session":      {1, 2, 3, 4, 5},
-		"note.annotation":       {1, 2, 3},
-		"med.started":           {4, 5},
+		"health.blood-pressure":     {1, 2, 3, 4, 5, 6},
+		"health.measurement":        {1, 2},
+		"health.weight":             {1, 2, 3, 4},
+		"exercise.session":          {1, 2, 3, 4, 5},
+		"activity.exercise-session": {1},
+		"note.annotation":           {1, 2, 3},
+		"record.note":               {1},
+		"med.started":               {4, 5},
+		"health.medication-started": {1},
 	} {
 		for _, v := range versions {
 			if !held[typ][v] {
@@ -45,8 +51,8 @@ func TestManifests_CarryTheHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bp, ok := reg.Lookup("health.blood-pressure"); !ok || bp.Version != 5 {
-		t.Errorf("Bundled bp = v%d, %v; want the current v5 alone", bp.Version, ok)
+	if bp, ok := reg.Lookup("health.blood-pressure"); !ok || bp.Version != 6 {
+		t.Errorf("Bundled bp = v%d, %v; want the current v6 alone", bp.Version, ok)
 	}
 	if _, ok := reg.Lookup("health.measurement"); ok {
 		t.Error("Bundled carries health.measurement, which left the bundle; its history must not bring it back")

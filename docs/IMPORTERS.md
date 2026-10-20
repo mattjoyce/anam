@@ -73,7 +73,7 @@ These make an importer correct in any language, without importing Anam's code.
    contract (`identity_key`, `time_semantics`, classification, validation mode) stays in `meta`.
    Health measures conform to a pinned [Open mHealth](https://www.openmhealth.org/) (IEEE 1752)
    schema where one exists, decided on 2026-10-08
-   ([journal note](../journal/notes/open-mhealth-is-the-payload-vocabulary-for-health-measures.md)). The first is `exercise.session` (card 56): an OMH `physical-activity`
+   ([journal note](../journal/notes/open-mhealth-is-the-payload-vocabulary-for-health-measures.md)). The first is `activity.exercise-session` (card 56): an OMH `physical-activity`
    payload, one type for Technogym, Strong and later Garmin, each shaping to the same Definition.
 3. **Validation becomes real.** Done (card 52). Every schema is closed: it declares each field with
    its type and refuses anything else, and `lenient` is gone. Once outside code writes payloads,
@@ -189,7 +189,7 @@ under them, and says so in its log. An importer that still sends the body the bi
 at its version, is answered unchanged (200), not refused, so the release and the importer's
 redeploy need no order between them (card 139); any other body of a bundled type is a 409. No two importers may name the same type unless the binary bundles it: a bundled
 type's Definitions come from Anam, so no importer can register a version that refuses another's
-envelopes, and any number may submit it, each under its own source (`exercise.session` from Garmin
+envelopes, and any number may submit it, each under its own source (`activity.exercise-session` from Garmin
 and Concept2). A release that drops a type two importers share refuses to start until one of them
 gives it up.
 
@@ -216,8 +216,8 @@ importers:
   every facet's identity keeps what the person asserts apart from what a device observed of the
   same kind. `types` and `any_type` together are refused at start. Two edges to know: `any_type`
   reaches facets and not the library, so `POST /v1/documents` stays with a source that lists
-  `doc.reference`; and a series is not source-stamped as an identity is, so in a snapshot read the
-  latest entry of a series wins whatever its source, and the person saying `med.stopped` closes
+  `record.document`; and a series is not source-stamped as an identity is, so in a snapshot read the
+  latest entry of a series wins whatever its source, and the person saying `health.medication-stopped` closes
   the course the records file started.
 - An importer's token opens `POST /v1/envelopes`, `POST /v1/documents` and `POST /v1/definitions`,
   and since card 89 every read a `reader` has: the record, receipts, Definitions, and its own
@@ -311,14 +311,14 @@ next batch waits on it.
 
 A document's bytes reach the library through Anam, never by an importer writing into Anam's
 directory (card 102). `POST /v1/documents?ext=<extension>`, body the raw bytes (at most `max_document_bytes`, 64 MiB by default),
-under an importer token whose `types` include `doc.reference`. The answer is `sha256` (hex),
+under an importer token whose `types` include `record.document`. The answer is `sha256` (hex),
 `bytes`, `media_type` (from the extension) and `new`. 201 stored; 200 the library already held
 these bytes; 400 an extension that is not letters and digits, at most 16; 403 a token that may not
-submit `doc.reference`. There is no conflict: Anam names the stored file by its sha256 (card 150),
+submit `record.document`. There is no conflict: Anam names the stored file by its sha256 (card 150),
 so other bytes are another file and nothing is overwritten. The extension only labels that file for
 a person browsing the library.
 
-Then the importer submits the `doc.reference` envelope as any other. Its `path` is the document's
+Then the importer submits the `record.document` envelope as any other. Its `path` is the document's
 name and identity, whatever the importer files it under; its `sha256` is how Anam finds the bytes.
 The same `path` with another `sha256`, a rescan, supersedes the facet, and the first scan's bytes
 stay for the facet version that names them. An envelope naming a `sha256` the library holds no
@@ -336,7 +336,7 @@ A stored file never moves; a lookup finds it by its name.
    so a refusal at the gate means the importer and Anam disagree, not that a row was malformed.
 3. Shape payloads only. Compose no identity, join nothing, summarise nothing (§2).
    A facet's identity is its source and its identity values, **not its type**, so an importer that
-   emits several types keeps their identities apart: a `sleep.episode` and a `health.step-count`
+   emits several types keeps their identities apart: a `health.sleep-episode` and an `activity.steps`
    from `garmin` for the same day must not both be keyed on the bare date (the Garmin ids are
    `sleep:<day>`, `steps:<day>`, `day:<day>`). The gate refuses an envelope whose facet id is held
    by a facet of another type, naming both types and the source_ref, and writes nothing (card 105).

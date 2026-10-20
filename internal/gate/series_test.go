@@ -16,11 +16,11 @@ import (
 
 const medStartedManifest = `{
   "meta": {
-    "facet_type": "med.started",
+    "facet_type": "health.medication-started",
     "definition_version": 1,
     "classification": "Sensitive",
     "validation_mode": "strict",
-    "source_schema": "records/med.started",
+    "source_schema": "records/health.medication-started",
     "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "UTC"}},
     "identity_key": ["/id"],
     "series": {"name": "med.regimen", "key": ["/drug", "/course"]}
@@ -46,12 +46,12 @@ func newMedGate(t *testing.T) (*gate.Gate, *ledger.Ledger) {
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
 	}
-	return gate.New(l, reg, gate.StaticScopes{"self-log": {"med.started"}}, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}), l
+	return gate.New(l, reg, gate.StaticScopes{"self-log": {"health.medication-started"}}, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}), l
 }
 
 func medEnvelope(payload string) facet.Envelope {
 	return facet.Envelope{
-		Type: "med.started", Source: "self-log", Injector: "self-log",
+		Type: "health.medication-started", Source: "self-log", Injector: "self-log",
 		SourceRef: facet.SourceRef("self-log", "m1"), Payload: []byte(payload),
 	}
 }

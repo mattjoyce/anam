@@ -26,7 +26,7 @@ Card 50 closes the importers move, at anam master after 3b97178.
 
 ## 2026-10-13, cards 105, 106, 136
 
-- Code: the gate refuses a facet changing type (`ErrTypeChanged`); library documents are sandboxed and active kinds are downloads; `note.annotation` v2 times a note by its writing.
+- Code: the gate refuses a facet changing type (`ErrTypeChanged`); library documents are sandboxed and active kinds are downloads; `record.note` v2 times a note by its writing.
 - Bundle: the inspector component notes the sandbox.
 
 ## 2026-10-13, card 108
@@ -47,7 +47,7 @@ Card 50 closes the importers move, at anam master after 3b97178.
 
 ## 2026-10-14, card 150
 
-- Code: `POST /v1/documents?ext=` replaces `?path=`; Anam names the stored file `<sha256>.<ext>`, so there is no 409 and nothing is overwritten. A doc.reference's `path` is its name and identity and its `sha256` finds the bytes; `checkReferences` refuses a sha256 the library does not hold. The new package `internal/library` (`Store`, `Find`, `Index`, `IsSHA256`) places a file by `library_folder_limit` and finds it by a walk; `storeDocument` became `library.Store`. The inspector serves `/document?sha256=&name=`. On anam-importers branch `card-150-sha256-library`, `Client.store_document(name, data)` posts `?ext=`.
+- Code: `POST /v1/documents?ext=` replaces `?path=`; Anam names the stored file `<sha256>.<ext>`, so there is no 409 and nothing is overwritten. A record.document's `path` is its name and identity and its `sha256` finds the bytes; `checkReferences` refuses a sha256 the library does not hold. The new package `internal/library` (`Store`, `Find`, `Index`, `IsSHA256`) places a file by `library_folder_limit` and finds it by a walk; `storeDocument` became `library.Store`. The inspector serves `/document?sha256=&name=`. On anam-importers branch `card-150-sha256-library`, `Client.store_document(name, data)` posts `?ext=`.
 - Bundle: the component `library` added; the workflow `hand-anam-a-document`, the daemon's route table, the inspector and `importer-documents` say what the code does now.
 
 ## 2026-10-14, card 110
@@ -62,7 +62,7 @@ Card 50 closes the importers move, at anam master after 3b97178.
 
 ## 2026-10-15, card 157
 
-- Code: `note.annotation` v3 makes `about` optional, so a note may name no facet yet; v1 and v2 now ship in `manifests/history` (v2 had been bumped without copying v1). Card 93's decision is recorded in docs/API.md §6: a conversation is an importer and its words a note, a model's reading a second source of drafts.
+- Code: `record.note` v3 makes `about` optional, so a note may name no facet yet; v1 and v2 now ship in `manifests/history` (v2 had been bumped without copying v1). Card 93's decision is recorded in docs/API.md §6: a conversation is an importer and its words a note, a model's reading a second source of drafts.
 - Bundle: the decision `a-persons-words-are-a-note-and-a-models-reading-is-a-draft` and the gap `the-interpretation-source-is-decided-and-not-built` added (only the note half is built); the Definition manifest and def pages say so; the API-doc gap points at API.md §2 and §6.
 
 ## 2026-10-15, card 89

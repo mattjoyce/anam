@@ -27,7 +27,7 @@ func TestDefinitions_IndexListsEveryType(t *testing.T) {
 	}
 	for _, want := range []string{
 		`href="/definition?type=health.blood-pressure"`,
-		`href="/definition?type=exercise.session"`,
+		`href="/definition?type=activity.exercise-session"`,
 		` of `, // the described count, "0 of 15"
 		`name="viewport"`,
 		`href="/definitions"`, // the shared nav
@@ -43,7 +43,7 @@ func TestDefinitions_IndexListsEveryType(t *testing.T) {
 func TestDefinition_PageMarksRolesOnTheirRows(t *testing.T) {
 	t.Parallel()
 	srv, _, _ := seededServer(t)
-	code, body := get(t, srv.URL+"/definition?type=exercise.session")
+	code, body := get(t, srv.URL+"/definition?type=activity.exercise-session")
 	if code != http.StatusOK {
 		t.Fatalf("GET /definition = %d: %s", code, body)
 	}
@@ -53,10 +53,10 @@ func TestDefinition_PageMarksRolesOnTheirRows(t *testing.T) {
 		`<span class="role">identity</span>`,
 		`described</span>`,
 		`class="j-key"`,
-		`href="/?type=exercise.session"`,
+		`href="/?type=activity.exercise-session"`,
 	} {
 		if !strings.Contains(body, want) {
-			t.Errorf("/definition?type=exercise.session lacks %q", want)
+			t.Errorf("/definition?type=activity.exercise-session lacks %q", want)
 		}
 	}
 	// blood pressure writes its numbers as text: the type says so, once, not as a regex.
@@ -71,13 +71,13 @@ func TestDefinition_PageMarksRolesOnTheirRows(t *testing.T) {
 func TestDefinition_PageShowsTheHandlingBlock(t *testing.T) {
 	t.Parallel()
 	srv, _, _ := seededServer(t)
-	code, body := get(t, srv.URL+"/definition?type=med.started")
+	code, body := get(t, srv.URL+"/definition?type=health.medication-started")
 	if code != http.StatusOK {
-		t.Fatalf("GET /definition?type=med.started = %d: %s", code, body)
+		t.Fatalf("GET /definition?type=health.medication-started = %d: %s", code, body)
 	}
 	for _, want := range []string{"<h2>handling", "one spelling per substance", "slugged with hyphens"} {
 		if !strings.Contains(body, want) {
-			t.Errorf("med.started's page lacks %q", want)
+			t.Errorf("health.medication-started's page lacks %q", want)
 		}
 	}
 	_, bp := get(t, srv.URL+"/definition?type=health.blood-pressure")

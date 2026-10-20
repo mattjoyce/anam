@@ -20,7 +20,14 @@ daemon's timeout; paging and receipted reads remain this proposal's work. The ro
 in `anam daemon --help`. An ingest operation that moved W carries `mint`, the mint the daemon ran
 after it (card 61): `w`, `full`, `from`, `minted`, `buckets`, or `error` when it failed, which
 fails nothing. `POST /v1/backups` (card 69) copies the record into `backup_dir` on the write
-queue and answers where, at what W, and how big. `POST /v1/envelopes` and the `/v1/definitions`
+queue and answers where, at what W, and how big. `POST /v1/facets/{id}/retract` (card 188, slice 3)
+tombstones one facet by hand, as the operator: the body is `{"source": "workbench"}`, the source the
+facet must belong to, and the answer is the tombstone's `seq`, the `artifact_version` it marks and the
+new `w`. It plans inside the write queue's one write, with the plan `anam retract <source> --facet <id>`
+applies, and refuses with 409 a facet of another source, a facet that is not live, and a source an
+importer declares and has completed a snapshot for (its next resend reconciles it); 404 for a facet the
+ledger does not hold. Like the other writes it is 403 to a browser on another site, and 503 while another
+write holds the queue. The artifact stays, and a read as of before the tombstone still shows the facet. `POST /v1/envelopes` and the `/v1/definitions`
 routes (card 53) are the importers' side, under importers' own tokens; their contract is
 [IMPORTERS.md](IMPORTERS.md) §8.
 

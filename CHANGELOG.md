@@ -15,6 +15,15 @@ decisions is in `journal/`.
   out and refuses one whose field disagrees, naming both. `health.medication-dose` is v2 and declares
   the rule its guidance used to state in words; the three melatonin doses on the record already match
   it. A type with no template is unchanged.
+- One facet of a source nobody resends can be retracted by hand (card 188, slice 3).
+  `anam retract <source> --facet <id>` shows the facet (id, type, version, fact-time, status) and
+  what the tombstone would do, and with `--yes` appends one tombstone through the gate.
+  `POST /v1/facets/{id}/retract` with `{"source": "..."}` does the same for the operator, behind
+  the same browser-origin guard as the other writes, and answers the tombstone's `seq` and the new `w`. Both
+  apply one plan (`internal/retract`) and refuse, by name, a facet of another source, a facet that is
+  not live, and a source an importer declares and has completed a snapshot for, which its next
+  resend reconciles. It serves `workbench` and `conversation`, which no importer resends. The button
+  on the facet page comes with the form slice.
 - The gate refuses to carry a facet that is not live (card 185). `Rehearse` and `RenameBatch` fold
   the facet's events and answer `ErrFacetNotLive` for a tombstoned facet, naming its id, type and
   status, and write nothing. Until now only the CLI's plan kept the 6,218 tombstoned facets dead on

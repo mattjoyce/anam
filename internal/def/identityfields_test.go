@@ -14,7 +14,7 @@ func TestIdentityFieldsOfATemplatedAndAPlainDefinition(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dose, _ := reg.Lookup("health.medication-dose")
+	dose, _ := reg.Lookup("health.medication.dose")
 	if got := dose.ComposedField(); got != "/id" {
 		t.Fatalf("ComposedField = %q, want /id", got)
 	}

@@ -124,3 +124,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: a rename table's row may carry `select` (`source`, a `pointer` and `prefix`, or both), so one table splits a type into leaves; every live facet of a split type must match exactly one row, or the dry run and the run refuse before writing. `internal/def/shared-core.json` and its test hold a split's shared fields identical across its leaves.
 - Bundle: the rename workflow gains the placing step, the loader's select rules and the report's SELECT column.
+
+## 2026-10-21, card 196
+
+- Code: twelve types take a third segment, one to one: `health.medication.started`, `.stopped`, `.dose`, `.dose-changed`, `.dose-missed` (was `-missed-dose`) and `.compliance`; `health.illness.started` and `.ended`; `place.trip.departed`, `.arrived`, `.returned` and `.flight`. Each starts at v1 and the old name's versions join `manifests/history`; the series are unchanged. `renames/kinds-segment.json` is the table. The bundled `meds` is v3 and `doses` v2, and `recent-life` v4 is registered from `projections/`. The projection loader accepts more than one history version of a template.
+- Bundle: the series and projection-template pages and the encoding decision name the new types.

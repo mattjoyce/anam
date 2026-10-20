@@ -148,13 +148,13 @@ func TestSourceTime_ADefinitionCarriesTheShapeOrIsRefused(t *testing.T) {
 var readsALocalClock = map[string]bool{
 	"activity.gym-visit": true, "health.blood-pressure": true, "health.body-composition": true,
 	"health.condition": true, "health.donation": true, "health.encounter": true,
-	"health.heart-rate": true, "health.illness-ended": true, "health.illness-started": true,
-	"health.lab-panel": true, "health.lab-result": true, "health.medication-compliance": true,
-	"health.medication-dose": true, "health.medication-dose-changed": true,
-	"health.medication-missed-dose": true, "health.medication-started": true,
-	"health.medication-stopped": true, "health.metric-group": true, "health.sleep": true,
-	"health.vision-prescription": true, "health.weight": true, "place.arrived": true,
-	"place.departed": true, "place.returned": true, "record.document": true, "record.edge": true,
+	"health.heart-rate": true, "health.illness.ended": true, "health.illness.started": true,
+	"health.lab-panel": true, "health.lab-result": true, "health.medication.compliance": true,
+	"health.medication.dose": true, "health.medication.dose-changed": true,
+	"health.medication.dose-missed": true, "health.medication.started": true,
+	"health.medication.stopped": true, "health.metric-group": true, "health.sleep": true,
+	"health.vision-prescription": true, "health.weight": true, "place.trip.arrived": true,
+	"place.trip.departed": true, "place.trip.returned": true, "record.document": true, "record.edge": true,
 }
 
 func TestSourceTime_EveryTypeReadingALocalClockSaysHow(t *testing.T) {

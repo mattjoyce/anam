@@ -63,29 +63,29 @@ records:
   unreadable folder is refused, and more than a tenth of the source in one run needs `--max-fraction`.
 
 Types today: `health.lab-result`, `health.lab-panel`, `health.condition`, `health.donation`, `health.weight`,
-`health.medication-missed-dose`, `health.medication-started`, `health.medication-dose-changed`, `health.medication-stopped`, `health.medication-compliance`,
-`health.illness-started`, `health.illness-ended`,
-`place.departed`, `place.arrived`, `place.returned`, `place.flight`, `health.encounter`, `activity.gym-visit`,
+`health.medication.dose-missed`, `health.medication.started`, `health.medication.dose-changed`, `health.medication.stopped`, `health.medication.compliance`,
+`health.illness.started`, `health.illness.ended`,
+`place.trip.departed`, `place.trip.arrived`, `place.trip.returned`, `place.trip.flight`, `health.encounter`, `activity.gym-visit`,
 `health.vision-prescription`, and `health.blood-pressure` for diary readings. Each is a manifest in
 `internal/def/manifests/`, strict, Sensitive (visits, gym, travel and the lens prescription
 Confidential). Each schema is closed: a records row may
 carry only the fields its Definition declares, so a new field means a line in the manifest first. Illness rows carry an `episode` and travel
-rows a `trip`; those are the series keys, so `health.illness-ended` and `place.returned` close what
-`health.illness-started` and `place.departed` opened, and `anam timeline --at` shows what was open on a day.
+rows a `trip`; those are the series keys, so `health.illness.ended` and `place.trip.returned` close what
+`health.illness.started` and `place.trip.departed` opened, and `anam timeline --at` shows what was open on a day.
 
-The three regimen types, `health.medication-started`, `health.medication-dose-changed` and
-`health.medication-stopped`, are a **series** (`docs/SELF-LOG.md` §2): every row carries `drug` and
+The three regimen types, `health.medication.started`, `health.medication.dose-changed` and
+`health.medication.stopped`, are a **series** (`docs/SELF-LOG.md` §2): every row carries `drug` and
 `course`, and a restart after a stop is a new course number. `anam timeline --at <date>` answers "what
 was I on"; `anam serve meds` publishes the current regimen with a receipt.
 
 ```yaml
-  - type: health.medication-started
+  - type: health.medication.started
     id: self-log:med/ramipril/1/started
     date: 2024-09-16
     drug: ramipril
     course: 1
     dose: 5 mg daily
-  - type: health.medication-stopped
+  - type: health.medication.stopped
     id: self-log:med/ramipril/1/stopped
     date: 2025-02-01
     drug: ramipril

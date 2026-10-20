@@ -158,24 +158,24 @@ records a measure, a reading or an event.
 | `health.lab-panel` | 1 | labs | event | One pathology request, the header of a draw's report | `id` | `collected` |
 | `health.lab-result` | 1 | labs | reading | One analyte's result from one draw | `id` | `collected` |
 | `health.condition` | 1 | conditions | event | A condition named in a document | `id` | `date` |
-| `health.illness-started` | 1 | conditions | event | The day an illness began | `id` | `date` |
-| `health.illness-ended` | 1 | conditions | event | The day an illness ended | `id` | `date` |
-| `health.medication-started` | 1 | meds | event | A medicine course starting | `id` | `date` |
-| `health.medication-dose-changed` | 1 | meds | event | A change of dose within a course | `id` | `date` |
-| `health.medication-stopped` | 1 | meds | event | A course ending | `id` | `date` |
-| `health.medication-dose` | 2 | meds | event | One dose of a medicine taken at a moment, outside any course | `id` | `taken_at` |
-| `health.medication-missed-dose` | 1 | meds | event | A dose the person says they missed | `id` | `date` |
-| `health.medication-compliance` | 1 | meds | measure | The person's own estimate of how well they kept to a course | `id` | `date` |
+| `health.illness.started` | 1 | conditions | event | The day an illness began (was `health.illness-started` v1 until card 196) | `id` | `date` |
+| `health.illness.ended` | 1 | conditions | event | The day an illness ended (was `health.illness-ended` v1 until card 196) | `id` | `date` |
+| `health.medication.started` | 1 | meds | event | A medicine course starting (was `health.medication-started` v1 until card 196) | `id` | `date` |
+| `health.medication.dose-changed` | 1 | meds | event | A change of dose within a course (was `health.medication-dose-changed` v1 until card 196) | `id` | `date` |
+| `health.medication.stopped` | 1 | meds | event | A course ending (was `health.medication-stopped` v1 until card 196) | `id` | `date` |
+| `health.medication.dose` | 1 | meds | event | One dose of a medicine taken at a moment, outside any course (was `health.medication-dose` up to v2 until card 196) | `id` | `taken_at` |
+| `health.medication.dose-missed` | 1 | meds | event | A dose the person says they missed (was `health.medication-missed-dose` v1 until card 196) | `id` | `date` |
+| `health.medication.compliance` | 1 | meds | measure | The person's own estimate of how well they kept to a course (was `health.medication-compliance` v1 until card 196) | `id` | `date` |
 | `health.encounter` | 1 | clinical | event | One appointment with a clinic or practitioner | `id` | `date` |
 | `health.donation` | 1 | clinical | event | One visit to give blood | `id` | `date` |
 | `health.vision-prescription` | 1 | clinical | reading | One lens prescription as an optometrist issued it, each eye as printed | `id` | `date` |
 | `activity.exercise-session` | 2 | exercise | event | One session of exercise, as an IEEE 1752 physical activity | `id` | session start |
 | `activity.gym-visit` | 1 | exercise | event | One gym visit | `id` | `date` |
 | `activity.steps` | 2 | movement | measure | One day's steps, as an Open mHealth step-count body | `id` | interval start |
-| `place.departed` | 1 | trips | event | Leaving home on a trip | `id` | `date` |
-| `place.flight` | 1 | trips | event | One flight leg | `id` | `date` |
-| `place.arrived` | 1 | trips | event | Arriving at one place during a trip | `id` | `date` |
-| `place.returned` | 1 | trips | event | Getting home from a trip | `id` | `date` |
+| `place.trip.departed` | 1 | trips | event | Leaving home on a trip (was `place.departed` v1 until card 196) | `id` | `date` |
+| `place.trip.flight` | 1 | trips | event | One flight leg (was `place.flight` v1 until card 196) | `id` | `date` |
+| `place.trip.arrived` | 1 | trips | event | Arriving at one place during a trip (was `place.arrived` v1 until card 196) | `id` | `date` |
+| `place.trip.returned` | 1 | trips | event | Getting home from a trip (was `place.returned` v1 until card 196) | `id` | `date` |
 | `record.edge` | 1 | notes | event | An edge joining facets, with or without words; a note in the person's own words is one (was `note.annotation` (v1 to v3), then `record.note` (v1, v2)) | `id` | `at` |
 | `record.document` | 1 | documents |  | A pointer to one file in the documents library; the bytes never enter the ledger | `path` | `date` |
 | `health.heart-rate` | 3 |  |  | A period's heart rate metrics (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |

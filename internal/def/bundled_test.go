@@ -57,7 +57,7 @@ func TestBundled_MedTypesShareTheRegimenSeries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Bundled: %v", err)
 	}
-	for _, typ := range []facet.Type{"health.medication-started", "health.medication-dose-changed", "health.medication-stopped"} {
+	for _, typ := range []facet.Type{"health.medication.started", "health.medication.dose-changed", "health.medication.stopped"} {
 		d, ok := reg.Lookup(typ)
 		if !ok {
 			t.Errorf("no bundled definition for %s", typ)
@@ -70,8 +70,8 @@ func TestBundled_MedTypesShareTheRegimenSeries(t *testing.T) {
 			t.Errorf("%s = %s %s, want Sensitive strict", typ, d.Classification, d.Mode)
 		}
 	}
-	if !reg.Closes("health.medication-stopped") || reg.Closes("health.medication-started") || reg.Closes("health.medication-dose-changed") {
-		t.Error("only health.medication-stopped closes the regimen")
+	if !reg.Closes("health.medication.stopped") || reg.Closes("health.medication.started") || reg.Closes("health.medication.dose-changed") {
+		t.Error("only health.medication.stopped closes the regimen")
 	}
 }
 
@@ -90,12 +90,12 @@ func TestBundled_LifeEventTypes(t *testing.T) {
 		series string
 		closes bool
 	}{
-		{"health.illness-started", facet.ClassificationSensitive, "illness.episode", false},
-		{"health.illness-ended", facet.ClassificationSensitive, "illness.episode", true},
-		{"place.departed", facet.ClassificationConfidential, "travel.trip", false},
-		{"place.arrived", facet.ClassificationConfidential, "travel.trip", false},
-		{"place.returned", facet.ClassificationConfidential, "travel.trip", true},
-		{"place.flight", facet.ClassificationConfidential, "", false},
+		{"health.illness.started", facet.ClassificationSensitive, "illness.episode", false},
+		{"health.illness.ended", facet.ClassificationSensitive, "illness.episode", true},
+		{"place.trip.departed", facet.ClassificationConfidential, "travel.trip", false},
+		{"place.trip.arrived", facet.ClassificationConfidential, "travel.trip", false},
+		{"place.trip.returned", facet.ClassificationConfidential, "travel.trip", true},
+		{"place.trip.flight", facet.ClassificationConfidential, "", false},
 		{"health.donation", facet.ClassificationSensitive, "", false},
 		{"activity.gym-visit", facet.ClassificationConfidential, "", false},
 	}
@@ -134,9 +134,9 @@ func TestBundled_FlightIsDatedWhereItLeft(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Bundled: %v", err)
 	}
-	d, ok := reg.Lookup("place.flight")
+	d, ok := reg.Lookup("place.trip.flight")
 	if !ok {
-		t.Fatal("no bundled definition for place.flight")
+		t.Fatal("no bundled definition for place.trip.flight")
 	}
 	cases := []struct{ date, want string }{
 		{"2018-10-10 +01:00", "2018-10-09T23:00:00Z"}, // SQ317 out of London, BST

@@ -1,0 +1,36 @@
+{
+  "meta": {
+    "facet_type": "place.trip.flight",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "trips",
+    "classification": "Confidential",
+    "validation_mode": "strict",
+    "source_schema": "records/place.trip.flight",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02 -07:00", "zone": "UTC"}
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One flight leg, one row in a records file (source records), written from itineraries and booking emails. A point beside its trip, outside the travel.trip series; values are the row's own text. Named place.trip.flight (v1) until card 196.",
+    "type": "object",
+    "required": ["id", "date", "trip", "from", "to"],
+    "properties": {
+      "airline": {"type": "string", "minLength": 1, "description": "The airline's name as written, given only on a leg whose flight number the source did not print: such a row carries airline in place of flight.", "examples": ["Westmere Airways"]},
+      "arrives": {"type": "string", "minLength": 1, "description": "The day the leg landed, as the source printed it, present only where it printed one (legs that land on a later day than they left). Usually YYYY-MM-DD with no offset, read as the arrival airport's local date: the source states no zone, but every dated value lands at home and matches its trip's place.trip.returned date. A phrase \"<d>/<d> <Mon> as printed\" where the source printed a two-day span for a leg with a stop (via), kept as printed rather than resolved to one day.", "examples": ["2019-03-05", "11/12 Mar as printed"]},
+      "booking": {"type": "string", "minLength": 1, "description": "The booking reference as written; two references joined by \" / \" when the leg was on two bookings.", "examples": ["K7QXZB"]},
+      "date": {"type": "string", "minLength": 1, "description": "The day the flight left, in the departure airport's local time, written as YYYY-MM-DD and that airport's UTC offset. The offset is part of the value, so a leg is placed where it left. This is the fact time.", "examples": ["2019-03-04 +08:00"]},
+      "flight": {"type": "string", "minLength": 1, "description": "The flight number as written; a connection on one ticket may be two numbers joined by \" / \".", "examples": ["ZX441"]},
+      "from": {"type": "string", "minLength": 1, "pattern": "^[A-Z]{3}$", "description": "The departure airport's IATA code, three upper-case letters.", "examples": ["QXA"]},
+      "id": {"type": "string", "minLength": 1, "description": "The row id the records file assigns, chosen once, written as <origin>:<trip>/flight/<departure date>/<from>-<to>. This is the identity.", "examples": ["travel:2019-03-westmere/flight/2019-03-04/QXA-QXB"]},
+      "note": {"type": "string", "minLength": 1, "description": "Free text about the leg, as written.", "examples": ["delayed 3 hours"]},
+      "to": {"type": "string", "minLength": 1, "pattern": "^[A-Z]{3}$", "description": "The arrival airport's IATA code, three upper-case letters.", "examples": ["QXB"]},
+      "trip": {"type": "string", "minLength": 1, "description": "The trip key of the trip this leg belongs to, the same text the trip's departed, arrived and returned rows carry. It groups the leg with the trip but does not place it in the series.", "examples": ["2019-03-westmere"]},
+      "via": {"type": "string", "minLength": 1, "description": "The IATA code of an airport the leg stopped at on the way, as written.", "examples": ["QXC"]}
+    },
+    "additionalProperties": false
+  }
+}

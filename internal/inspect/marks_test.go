@@ -175,7 +175,7 @@ func TestStyles_DeclaredKindAndFamilyWin(t *testing.T) {
 	reg, err := def.NewRegistry(
 		parse(manifest("test.pressure", "reading", "vitals")),
 		parse(manifest("test.harvest", "event", "garden")),
-		parse(manifest("health.medication-started", "event", "meds")),
+		parse(manifest("health.medication.started", "event", "meds")),
 	)
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
@@ -191,14 +191,14 @@ func TestStyles_DeclaredKindAndFamilyWin(t *testing.T) {
 	if got := st.of("test.harvest"); got.Family != "garden" || got.Kind != kindEvent || got.Shape != shapeDiamond || !st.isEvent("test.harvest") {
 		t.Errorf("declared event in an unknown family: got %+v", got)
 	}
-	if got := st.of("health.medication-started"); got.Shape != shapeTriUp || got.Family != "meds" {
+	if got := st.of("health.medication.started"); got.Shape != shapeTriUp || got.Family != "meds" {
 		t.Errorf("a table type whose Definition agrees keeps its shape, got %+v", got)
 	}
 	if got := newStyles(nil).of("test.pressure"); got.Family != otherFamilyID || got.Kind != kindMeasure {
 		t.Errorf("without a registry the table decides, got %+v", got)
 	}
 
-	rows := st.rowsFor([]facet.Type{"test.harvest", "health.medication-started", "test.pressure", "no.such"})
+	rows := st.rowsFor([]facet.Type{"test.harvest", "health.medication.started", "test.pressure", "no.such"})
 	var ids []string
 	for _, r := range rows {
 		ids = append(ids, r.Family)

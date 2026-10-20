@@ -65,7 +65,7 @@ func TestVerify_ReceiptServedUnderRetiredTypesStillReproduces(t *testing.T) {
 	var all []def.Definition
 	for _, m := range []string{
 		courseManifest("med.started", false), courseManifest("med.stopped", true),
-		courseManifest("health.medication-started", false), courseManifest("health.medication-stopped", true),
+		courseManifest("health.medication.started", false), courseManifest("health.medication.stopped", true),
 	} {
 		d, err := def.Parse([]byte(m))
 		if err != nil {
@@ -77,7 +77,7 @@ func TestVerify_ReceiptServedUnderRetiredTypesStillReproduces(t *testing.T) {
 	if err != nil {
 		t.Fatalf("def.NewRegistry: %v", err)
 	}
-	scopes := gate.StaticScopes{"records": {"med.started", "med.stopped", "health.medication-started", "health.medication-stopped"}}
+	scopes := gate.StaticScopes{"records": {"med.started", "med.stopped", "health.medication.started", "health.medication.stopped"}}
 	g := gate.New(l, before, scopes, clock.Real{}, person,
 		gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 
@@ -132,7 +132,7 @@ func TestVerify_ReceiptServedUnderRetiredTypesStillReproduces(t *testing.T) {
 	// The rename: every live facet becomes the next version of itself under the new
 	// name, after the receipt's watermark.
 	to := map[facet.Type]facet.Type{
-		"med.started": "health.medication-started", "med.stopped": "health.medication-stopped",
+		"med.started": "health.medication.started", "med.stopped": "health.medication.stopped",
 	}
 	var renames []gate.Rename
 	for _, id := range ids {
@@ -165,7 +165,7 @@ func TestVerify_ReceiptServedUnderRetiredTypesStillReproduces(t *testing.T) {
 	if !res.OK() {
 		t.Fatalf("a receipt served under the retired type names did not verify:\n%s", res.Summary())
 	}
-	if !slices.Contains(res.Notes, "replayed meds v1 from the held history; v2 is current") {
+	if !slices.Contains(res.Notes, "replayed meds v1 from the held history; v3 is current") {
 		t.Errorf("the verdict does not say which version was replayed: %q", res.Notes)
 	}
 }

@@ -13,7 +13,7 @@ import (
 )
 
 // The README's table of bundled Definitions is hand-written, and it had drifted
-// once (card 73's review found health.medication-started a version behind). This holds it to the
+// once (card 73's review found health.medication.started a version behind). This holds it to the
 // manifests: every bundled type is a row at its current version, every row is a
 // bundled type, and the count the prose states is the count on disk.
 func TestREADMETableMatchesTheBundledManifests(t *testing.T) {

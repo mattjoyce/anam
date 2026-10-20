@@ -22,4 +22,4 @@ references: []
 | `from`, `to` | present, may be empty | `[from, to)` in the clock layout |
 | `shape` | no | `log` (default) or `snapshot` |
 
-Three today, under `internal/projection/manifests`: `bp` v1 (log, health.blood-pressure), `sleep` v1 (log, health.sleep), `meds` v1 (snapshot, health.medication-started, health.medication-dose-changed, health.medication-stopped). All admit admitted and endorsed, up to Sensitive, over an unbounded window. The docs' claim that templates live in the operational store does not match (see [storage table in the architecture doc is stale](/gaps/storage-table-in-architecture-is-stale.md)).
+Three today, under `internal/projection/manifests`: `bp` v1 (log, health.blood-pressure), `sleep` v1 (log, health.sleep), `meds` v3 (snapshot, health.medication.started, health.medication.dose-changed, health.medication.stopped). All admit admitted and endorsed, up to Sensitive, over an unbounded window. The docs' claim that templates live in the operational store does not match (see [storage table in the architecture doc is stale](/gaps/storage-table-in-architecture-is-stale.md)).

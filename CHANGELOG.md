@@ -8,6 +8,20 @@ decisions is in `journal/`.
 
 ## 2026-10-21
 
+- The medication, illness and trip types take a third segment (card 196). Twelve types, one to one:
+  `health.medication-started`, `-stopped`, `-dose`, `-dose-changed`, `-compliance` become
+  `health.medication.started`, `.stopped`, `.dose`, `.dose-changed`, `.compliance`;
+  `health.medication-missed-dose` becomes `health.medication.dose-missed`; `health.illness-started`
+  and `-ended` become `health.illness.started` and `.ended`; `place.departed`, `.arrived`,
+  `.returned` and `.flight` become `place.trip.departed`, `.arrived`, `.returned` and `.flight`.
+  Each new type is v1, and the old name's versions stay in the Definition history, so every facet
+  admitted under an old name still reads. The series (`med.regimen`, `illness.episode`,
+  `travel.trip`) are unchanged. The operator runs `anam rename --table renames/kinds-segment.json`
+  (dry, then `--yes`, the daemon stopped), renames the types in the importers file's `types`
+  lists, registers `projections/recent-life.v4.json`, and retypes the records files with
+  `retype_records.py`. The bundled `meds` is v3 and `doses` is v2, with the same type lists under
+  the new names. A projection's bundled history may now hold more than one earlier version.
+
 - `record.note` is now `record.edge` (card 191): since card 104 the type joins facets, and a note is
   an edge of kind `about`. `record.edge` v1 is `record.note` v2 under the new name, and the old name's
   versions stay in the Definition history, so every facet admitted as `record.note` still reads.

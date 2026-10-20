@@ -1,0 +1,34 @@
+{
+  "meta": {
+    "facet_type": "health.medication.compliance",
+    "definition_version": 1,
+    "kind": "measure",
+    "family": "meds",
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "records/health.medication.compliance",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The person's own estimate of how well they kept to one course over a period, stated on a date (SELF-LOG.md section 6). Written by hand into a records file; Anam stores the figure and does not judge it, and a later estimate is a new facet, not a correction. No row has been written yet. Named health.medication.compliance (v1) until card 196.",
+    "type": "object",
+    "required": ["id", "date", "drug", "course", "period_start", "period_end", "estimate"],
+    "properties": {
+      "course": {"type": "number", "description": "Which course of the drug the estimate is about, as in the med.regimen series.", "examples": [1]},
+      "date": {"type": "string", "minLength": 1, "description": "The day the estimate was made, YYYY-MM-DD. This is the fact time, not the period.", "examples": ["2026-02-01"]},
+      "drug": {"type": "string", "minLength": 1, "description": "The generic drug name in lower case, matching the drug of the course's health.medication.started row.", "examples": ["examplazole"]},
+      "estimate": {"type": "number", "minimum": 0, "maximum": 1, "description": "The share of doses the person reckons they took over the period, as a fraction (0.95 for 95%). Their figure, not computed. The gate admits 0 to 1; internal/regimen derives an expected-dose schedule from it on demand and needs it above 0. Probable doses are never stored.", "examples": [0.95]},
+      "id": {"type": "string", "minLength": 1, "description": "Identity, chosen by the writer. No convention is fixed yet; the package tests use the self-log prefix, est, the drug, the course and a month.", "examples": ["self-log:est/examplazole/1/2026-01"]},
+      "note": {"type": "string", "minLength": 1, "description": "Anything the person said alongside the figure."},
+      "period_end": {"type": "string", "minLength": 1, "description": "The last day the estimate covers, YYYY-MM-DD, inclusive.", "examples": ["2026-01-31"]},
+      "period_start": {"type": "string", "minLength": 1, "description": "The first day the estimate covers, YYYY-MM-DD, inclusive.", "examples": ["2026-01-01"]},
+      "source_note": {"type": "string", "minLength": 1, "description": "Where the estimate was recorded and in what words. Writer's text."}
+    },
+    "additionalProperties": false
+  }
+}

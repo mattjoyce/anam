@@ -17,7 +17,7 @@ func medEntry(id, typ, factTime, series string) fold.Entry {
 	}
 }
 
-func closes(t facet.Type) bool { return t == "health.medication-stopped" }
+func closes(t facet.Type) bool { return t == "health.medication.stopped" }
 
 func ids(v fold.Value) []string {
 	var out []string
@@ -49,10 +49,10 @@ func TestSnapshot_LatestPerSeriesAndClosing(t *testing.T) {
 		course2 = "med.regimen:ramipril:2"
 	)
 	v, err := fold.NewValue([]fold.Entry{
-		medEntry("start-1", "health.medication-started", "2026-03-01T00:00:00.000000000Z", course1),
-		medEntry("dose-1", "health.medication-dose-changed", "2026-05-10T00:00:00.000000000Z", course1),
-		medEntry("stop-1", "health.medication-stopped", "2026-08-01T00:00:00.000000000Z", course1),
-		medEntry("start-2", "health.medication-started", "2026-10-01T00:00:00.000000000Z", course2),
+		medEntry("start-1", "health.medication.started", "2026-03-01T00:00:00.000000000Z", course1),
+		medEntry("dose-1", "health.medication.dose-changed", "2026-05-10T00:00:00.000000000Z", course1),
+		medEntry("stop-1", "health.medication.stopped", "2026-08-01T00:00:00.000000000Z", course1),
+		medEntry("start-2", "health.medication.started", "2026-10-01T00:00:00.000000000Z", course2),
 		medEntry("weight", "health.weight", "2026-06-01T00:00:00.000000000Z", ""),
 	})
 	if err != nil {
@@ -89,8 +89,8 @@ func TestSnapshot_LatestPerSeriesAndClosing(t *testing.T) {
 func TestSnapshot_IsAValue(t *testing.T) {
 	t.Parallel()
 	v, err := fold.NewValue([]fold.Entry{
-		medEntry("start-1", "health.medication-started", "2026-03-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
-		medEntry("stop-1", "health.medication-stopped", "2026-08-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
+		medEntry("start-1", "health.medication.started", "2026-03-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
+		medEntry("stop-1", "health.medication.stopped", "2026-08-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
 	})
 	if err != nil {
 		t.Fatalf("NewValue: %v", err)
@@ -117,7 +117,7 @@ func TestEntry_NoSeriesIsAbsentFromTheBytes(t *testing.T) {
 	if got := string(v.Bytes()); contains(got, "series") {
 		t.Errorf("an entry without a series carries the key: %s", got)
 	}
-	s, _ := fold.NewValue([]fold.Entry{medEntry("m", "health.medication-started", "2026-06-01T00:00:00.000000000Z", "med.regimen:x:1")})
+	s, _ := fold.NewValue([]fold.Entry{medEntry("m", "health.medication.started", "2026-06-01T00:00:00.000000000Z", "med.regimen:x:1")})
 	if got := string(s.Bytes()); !contains(got, `"series":"med.regimen:x:1"`) {
 		t.Errorf("a stamped entry does not carry its series: %s", got)
 	}
@@ -139,8 +139,8 @@ func contains(s, sub string) bool {
 func TestUntil_CutsAtOrBefore(t *testing.T) {
 	t.Parallel()
 	v, err := fold.NewValue([]fold.Entry{
-		medEntry("start-1", "health.medication-started", "2026-03-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
-		medEntry("stop-1", "health.medication-stopped", "2026-08-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
+		medEntry("start-1", "health.medication.started", "2026-03-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
+		medEntry("stop-1", "health.medication.stopped", "2026-08-01T00:00:00.000000000Z", "med.regimen:ramipril:1"),
 	})
 	if err != nil {
 		t.Fatalf("NewValue: %v", err)

@@ -60,7 +60,7 @@ func TestPostProjections(t *testing.T) {
 	if b := seen["bp"]; b.Origin != api.OriginRegistered || b.Current != 2 || len(b.Versions) != 2 {
 		t.Errorf("bp listed as %+v", b)
 	}
-	if m := seen["meds"]; m.Origin != api.OriginBundled || m.Current != 2 || len(m.Versions) != 2 {
+	if m := seen["meds"]; m.Origin != api.OriginBundled || m.Current != 3 || len(m.Versions) != 3 {
 		t.Errorf("meds listed as %+v", m)
 	}
 	var body map[string]any

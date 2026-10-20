@@ -12,11 +12,11 @@ import (
 
 const medStartedManifest = `{
   "meta": {
-    "facet_type": "health.medication-started",
+    "facet_type": "health.medication.started",
     "definition_version": 1,
     "classification": "Sensitive",
     "validation_mode": "strict",
-    "source_schema": "records/health.medication-started",
+    "source_schema": "records/health.medication.started",
     "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "UTC"}},
     "identity_key": ["/id"],
     "series": {"name": "med.regimen", "key": ["/drug", "/course"]}
@@ -29,11 +29,11 @@ const medStartedManifest = `{
 
 const medStoppedManifest = `{
   "meta": {
-    "facet_type": "health.medication-stopped",
+    "facet_type": "health.medication.stopped",
     "definition_version": 1,
     "classification": "Sensitive",
     "validation_mode": "strict",
-    "source_schema": "records/health.medication-stopped",
+    "source_schema": "records/health.medication.stopped",
     "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "UTC"}},
     "identity_key": ["/id"],
     "series": {"name": "med.regimen", "key": ["/drug", "/course"], "closes": true}
@@ -50,10 +50,10 @@ func TestSeries_ParsesAndComposesTheStamp(t *testing.T) {
 	stopped := mustParse(t, medStoppedManifest)
 
 	if started.Series == nil || started.Series.Closes {
-		t.Fatalf("health.medication-started series = %+v, want an open series", started.Series)
+		t.Fatalf("health.medication.started series = %+v, want an open series", started.Series)
 	}
 	if stopped.Series == nil || !stopped.Series.Closes {
-		t.Fatalf("health.medication-stopped series = %+v, want a closing series", stopped.Series)
+		t.Fatalf("health.medication.stopped series = %+v, want a closing series", stopped.Series)
 	}
 
 	doc := mustDecode(t, `{"id": "r1", "date": "2026-03-01", "drug": "ramipril", "course": 1}`)
@@ -155,8 +155,8 @@ func TestRegistry_RefusesAFamilyKeyedTwoWays(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
 	}
-	if !reg.Closes("health.medication-stopped") || reg.Closes("health.medication-started") || reg.Closes("health.blood-pressure") || reg.Closes("no.such") {
-		t.Error("Closes: only health.medication-stopped closes")
+	if !reg.Closes("health.medication.stopped") || reg.Closes("health.medication.started") || reg.Closes("health.blood-pressure") || reg.Closes("no.such") {
+		t.Error("Closes: only health.medication.stopped closes")
 	}
 }
 

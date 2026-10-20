@@ -11,6 +11,13 @@ the run is unchanged.
   `health.metric-group`, tombstoned at card 55, are not in it and stay as they are.
 - `record-edge.json`: card 191, `record.note` to `record.edge`, the note that card 104 made an edge.
   Its own table, because `taxonomy.json` already arrives at `record.note` and a table is one step.
+- `kinds-segment.json`: card 196, twelve 1:1 renames that give the medication, illness and trip
+  types their third segment (`health.medication-started` to `health.medication.started`,
+  `health.medication-missed-dose` to `health.medication.dose-missed`, `health.illness-ended` to
+  `health.illness.ended`, `place.flight` to `place.trip.flight`, and the rest alike). Its own
+  table, because `taxonomy.json` arrives at the hyphenated names and a table is one step. The
+  `med.regimen`, `illness.episode` and `travel.trip` series are stamped by each Definition and move
+  with it, so a read through the `meds` projection is the same before and after.
 
 ## The table
 

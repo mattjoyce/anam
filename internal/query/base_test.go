@@ -46,20 +46,20 @@ func TestNewBase_AttrLeavesResolve(t *testing.T) {
 func TestNewBase_EntryAndCloses(t *testing.T) {
 	t.Parallel()
 	v, versions := value(t,
-		entry("m1", "health.medication-started", day("2026-03-01"), "med.regimen:ramipril:1", `{"id": "m1", "date": "2026-03-01", "drug": "ramipril", "course": 1}`),
+		entry("m1", "health.medication.started", day("2026-03-01"), "med.regimen:ramipril:1", `{"id": "m1", "date": "2026-03-01", "drug": "ramipril", "course": 1}`),
 		entry("w1", "health.weight", day("2026-04-01"), "", `{"measured_at": "x", "kg": 80}`),
 	)
 	versions["w1"] = 3
 	got := rows(run(t, v, versions, `e(E, T, F, S, St, Src, V) :- entry(E, T, F, S, St, Src, V).`, "e"))
 	want := []string{
-		"m1 health.medication-started " + day("2026-03-01") + " med.regimen:ramipril:1 admitted self-log 1",
+		"m1 health.medication.started " + day("2026-03-01") + " med.regimen:ramipril:1 admitted self-log 1",
 		"w1 health.weight " + day("2026-04-01") + "  admitted self-log 3",
 	}
 	if !same(got, want) {
 		t.Errorf("entry = %v, want %v", got, want)
 	}
-	if got := rows(run(t, v, versions, `c(T) :- closes(T).`, "c")); !same(got, []string{"health.medication-stopped"}) {
-		t.Errorf("closes = %v, want [health.medication-stopped]", got)
+	if got := rows(run(t, v, versions, `c(T) :- closes(T).`, "c")); !same(got, []string{"health.medication.stopped"}) {
+		t.Errorf("closes = %v, want [health.medication.stopped]", got)
 	}
 	// A verbatim type declares no schema, so none of its fields can be named (the
 	// fields' own rule, card 138); its served payload still has leaves a variable
@@ -76,7 +76,7 @@ func TestNewBase_EntryAndCloses(t *testing.T) {
 // come from one watermark.
 func TestNewBase_RefusesAnEntryNotInTheFold(t *testing.T) {
 	t.Parallel()
-	v, versions := value(t, entry("m1", "health.medication-started", day("2026-03-01"), "", `{}`))
+	v, versions := value(t, entry("m1", "health.medication.started", day("2026-03-01"), "", `{}`))
 	delete(versions, "m1")
 	_, err := query.NewBase(v, versions, registry(t))
 	if !errors.Is(err, query.ErrBase) {

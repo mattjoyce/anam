@@ -25,14 +25,14 @@ that runs March to June, stored as one fact dated March, is invisible to a May q
 
 **An interval is a series of point facts.** Started, changed, stopped, each with its own fact-time,
 each immutable, each a row in the source. The kind of change goes in the **facet type**, so it is
-metadata and the fold tells them apart without opening a payload: `health.medication-started`, `health.medication-dose-changed`,
-`health.medication-stopped`.
+metadata and the fold tells them apart without opening a payload: `health.medication.started`, `health.medication.dose-changed`,
+`health.medication.stopped`.
 
 **The series key says which facts are the same thing over time.** Identity is too fine (every change
 has its own id) and type is too coarse. A Definition declares a series **family** and the pointers
 that name one series within it, the drug and the course, and the gate stamps `<family>:<values>` into
 metadata at capture, as it stamps classification today. A Definition also declares whether its type
-**closes** a series (`health.medication-stopped`), so "a stop ends the regimen" is data in the Definition, not a rule
+**closes** a series (`health.medication.stopped`), so "a stop ends the regimen" is data in the Definition, not a rule
 in the read. Built 2026-10-07 (card 15; the design pass is `journal/notes/series-key.md`):
 
 ```json
@@ -84,14 +84,14 @@ A plain file you edit, one row per event, read by an importer like any other sou
 
 | Family | Types | Shape | Series |
 |---|---|---|---|
-| `meds` | `health.medication-started`, `health.medication-dose-changed`, `health.medication-stopped` | series of changes | drug + course; `health.medication-stopped` closes |
-| `meds` | `health.medication-compliance` | point: a statement you make on a date about a period | none |
+| `meds` | `health.medication.started`, `health.medication.dose-changed`, `health.medication.stopped` | series of changes | drug + course; `health.medication.stopped` closes |
+| `meds` | `health.medication.compliance` | point: a statement you make on a date about a period | none |
 | `labs` | `health.lab-result` | point per analyte, fact-time = draw date | analyte |
 | `documents` | `record.document` | the reference facet for a file or image (§5) | none |
 | `clinical` | `health.donation` | point | none |
-| `conditions` | `health.illness-started`, `health.illness-ended` | series for an illness | `illness.episode` keyed by `/episode`; `health.illness-ended` closes |
-| `trips` | `place.departed`, `place.arrived`, `place.returned` | series per trip; arrived is a leg within it | `travel.trip` keyed by `/trip`; `place.returned` closes |
-| `trips` | `place.flight` | point per flight leg: `from` and `to` as IATA codes, dated where it left, `date` carrying the departure airport's offset (`2018-10-10 +01:00`) | none; it carries `/trip` to group with its trip but stays outside the series |
+| `conditions` | `health.illness.started`, `health.illness.ended` | series for an illness | `illness.episode` keyed by `/episode`; `health.illness.ended` closes |
+| `trips` | `place.trip.departed`, `place.trip.arrived`, `place.trip.returned` | series per trip; arrived is a leg within it | `travel.trip` keyed by `/trip`; `place.trip.returned` closes |
+| `trips` | `place.trip.flight` | point per flight leg: `from` and `to` as IATA codes, dated where it left, `date` carrying the departure airport's offset (`2018-10-10 +01:00`) | none; it carries `/trip` to group with its trip but stays outside the series |
 | `exercise` | `activity.gym-visit` | point, generic or detailed | none |
 
 A flight is evidence of a movement, not a state of the trip. Inside `travel.trip` a flight
@@ -124,11 +124,11 @@ no model, and their results are ordinary admitted facts.
 
 ## 6. Prescriptions and compliance
 
-A prescription document is a `record.document`. The regimen it describes is `health.medication-started` rows in the
+A prescription document is a `record.document`. The regimen it describes is `health.medication.started` rows in the
 self-log, each pointing at the document. The document is evidence; the row is the fact.
 
 Your estimate, "95% compliant on this one", is **also a fact**: you said it, on a date, about a
-period. `health.medication-compliance` carries the number, the period, and the course it is about. Anam
+period. `health.medication.compliance` carries the number, the period, and the course it is about. Anam
 stores it and does not judge it. A later estimate is a new facet, not a correction.
 
 **Probable doses are not stored.** Seeding a `took-it` facet per day at p = 0.95 would store 365
@@ -144,14 +144,14 @@ by status from world facts. Do that on demand, not by default.
 1. ✅ **Series key and closing type** in the Definition, stamped at capture (card 15, 2026-10-07).
 2. ✅ **The self-log source**: format, row identity, capture worker (card 22, 2026-10-06).
 3. ✅ **Medication types and the snapshot read**, with a snapshot projection and `--at` (card 23,
-   2026-10-07): `health.medication-started` / `health.medication-dose-changed` / `health.medication-stopped`, the `meds` template (shape
+   2026-10-07): `health.medication.started` / `health.medication.dose-changed` / `health.medication.stopped`, the `meds` template (shape
    `snapshot`), `timeline --at`. The inspector's projection page shows the same verdicts.
 4. ✅ **Life events** as self-log types: donation, illness, travel, gym (card 27, 2026-10-07;
-   illness and travel are series, closed by `health.illness-ended` and `place.returned`).
+   illness and travel are series, closed by `health.illness.ended` and `place.trip.returned`).
 5. ✅ **Reference payload kind** and a folder source (card 24, 2026-10-07): `record.document`, the
    `documents` worker over a folder with `<file>.meta.yaml` sidecars carrying the date.
 6. **Lab results** from text files first, then images via a `proposed` extractor (card 25).
-7. ✅ **Compliance estimates** (card 26, 2026-10-07): `health.medication-compliance`, the estimate bounded
+7. ✅ **Compliance estimates** (card 26, 2026-10-07): `health.medication.compliance`, the estimate bounded
    to (0, 1] at the gate; `internal/regimen.Expected` is the soft schedule, and a test holds that the
    watermark does not move when it is computed.
 
@@ -168,7 +168,7 @@ by status from world facts. Do that on demand, not by default.
 
 - ~~Whether a series key is one declaration or two (group and course).~~ One declaration, with a
   family name and an ordered key; the course is a key element, so a restart is a new series (2026-10-07).
-- ~~Whether `place.arrived` closes a trip only when the destination is home, which reads a payload,
-  or whether the trip is closed by a distinct `place.returned` type.~~ The type: `place.returned`
-  closes, `place.arrived` is a leg within the trip (2026-10-07).
+- ~~Whether `place.trip.arrived` closes a trip only when the destination is home, which reads a payload,
+  or whether the trip is closed by a distinct `place.trip.returned` type.~~ The type: `place.trip.returned`
+  closes, `place.trip.arrived` is a leg within the trip (2026-10-07).
 - Where the self-log file lives and how it reaches the ThinkPad gateway's hourly ingest.

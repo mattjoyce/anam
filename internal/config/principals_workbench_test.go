@@ -19,7 +19,7 @@ importers:
     token_sha256: ` + hashA + `
     types: [health.weight]
   - source: workbench
-    types: [health.medication-dose, health.weight]
+    types: [health.medication.dose, health.weight]
 `
 	t.Run("a workbench with no token", func(t *testing.T) {
 		t.Parallel()
@@ -29,7 +29,7 @@ importers:
 		}
 		wb := got[1]
 		if wb.Source != config.WorkbenchSource || wb.Name != "workbench" || wb.Role != config.RoleImporter ||
-			wb.TokenSHA256 != "" || len(wb.Types) != 2 || wb.Types[0] != facet.Type("health.medication-dose") {
+			wb.TokenSHA256 != "" || len(wb.Types) != 2 || wb.Types[0] != facet.Type("health.medication.dose") {
 			t.Fatalf("loaded %+v", wb)
 		}
 	})
@@ -45,9 +45,9 @@ importers:
 
 	cases := []struct{ name, body string }{
 		{"a token", strings.Replace(valid, "source: workbench", "source: workbench\n    token_sha256: "+hashB, 1)},
-		{"any_type", strings.Replace(valid, "types: [health.medication-dose, health.weight]", "any_type: true", 1)},
-		{"no types", strings.Replace(valid, "types: [health.medication-dose, health.weight]", "types: []", 1)},
-		{"a type that is not namespaced", strings.Replace(valid, "health.medication-dose", "dose", 1)},
+		{"any_type", strings.Replace(valid, "types: [health.medication.dose, health.weight]", "any_type: true", 1)},
+		{"no types", strings.Replace(valid, "types: [health.medication.dose, health.weight]", "types: []", 1)},
+		{"a type that is not namespaced", strings.Replace(valid, "health.medication.dose", "dose", 1)},
 		{"another role", strings.Replace(valid, "importers:", "principals:\n  - name: wb\n    role: reader\n    source: workbench\n    types: [health.weight]\nimporters:", 1)},
 		{"the operator's name", strings.Replace(valid, "source: workbench", "source: workbench\n    name: operator", 1)},
 		{"the source named twice", valid + "  - source: workbench\n    types: [health.weight]\n"},

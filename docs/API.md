@@ -578,7 +578,7 @@ domain rule, and the record's correctness never depends on its process state.
 | Client | Where | Contract |
 |---|---|---|
 | CLI | `anam` with `ANAM_SERVER` set | The daemon's `/v1` routes, rendering the same values as local reads |
-| Inspector | the daemon's `/` pages | A diagnostic view; it yields to this design |
+| Inspector | the daemon's `/` pages | A diagnostic view, and the Anam Workbench's forms to enter, correct and retract a fact by hand (`/entry`, `/retract`, over the same writes as `POST /v1/entry` and the retract route; card 188); it yields to this design |
 | Importers | the `anam-importers` repository | [IMPORTERS.md](IMPORTERS.md) §8 |
 | MCP adapter | the `anam-mcp` repository | Its tool mapping, model-facing descriptions, resources and scenarios live there |
 

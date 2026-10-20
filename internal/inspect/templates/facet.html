@@ -27,6 +27,14 @@
   <tr><th>payload</th><td>{{.Facet.Descriptor.PayloadKind}} · {{.Facet.Descriptor.MediaType}} · schema {{.Facet.Descriptor.SourceSchema}} v{{.Facet.Descriptor.SchemaVersion}}</td></tr>
 </table>
 
+{{if or .CanEdit .CanRetract}}
+<div class="actions">
+  {{if .CanEdit}}<a class="button" href="/entry?type={{.Facet.Type}}&edit={{.Facet.ID}}">Edit</a>{{end}}
+  {{if .CanRetract}}<form method="post" action="/retract" onsubmit="return confirm('Retract this entry? It is tombstoned, not deleted: the record keeps the entry and the retraction.')"><input type="hidden" name="id" value="{{.Facet.ID}}"><button type="submit">Retract</button></form>{{end}}
+  <span class="dim">entered by hand in the Workbench</span>
+</div>
+{{end}}
+
 {{if gt .Latest 1}}<p class="meta">artifact versions: {{$id := .Facet.ID}}{{$v := .Facet.ArtifactVersion}}{{$latest := .Latest}}{{range $i, $n := .Versions}}{{if $i}} · {{end}}{{if eq $n $v}}<strong>v{{$n}}</strong>{{else}}<a href="/facet?id={{$id}}&v={{$n}}">v{{$n}}</a>{{end}}{{if eq $n $latest}} <span class="dim">(newest)</span>{{end}}{{end}}</p>{{end}}
 
 {{if .Changes}}

@@ -57,6 +57,8 @@ type defSummary struct {
 	Family    string
 	Fields    int
 	Described int
+	// Enterable is set for a type the Workbench enters by hand (card 188).
+	Enterable bool
 }
 
 func (s *Server) definitionsIndex(w http.ResponseWriter, r *http.Request) {
@@ -75,7 +77,7 @@ func (s *Server) definitionsIndex(w http.ResponseWriter, r *http.Request) {
 	var rows []defSummary
 	for _, d := range reg.All() {
 		row := defSummary{Type: d.Type, Current: d.Version, Origin: origin[d.Type], Classification: d.Classification,
-			Kind: d.Kind, Family: d.Family}
+			Kind: d.Kind, Family: d.Family, Enterable: s.enterable(d.Type)}
 		for v := range bodies[d.Type] {
 			row.Versions = append(row.Versions, v)
 		}
@@ -88,7 +90,12 @@ func (s *Server) definitionsIndex(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, row)
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].Type < rows[j].Type })
-	render(w, "definitions.html", struct{ Definitions []defSummary }{rows})
+	render(w, "definitions.html", struct {
+		Definitions []defSummary
+		// Bench is set when this inspector has a Workbench at all; without one the
+		// Enter column says so rather than offering links that do not exist.
+		Bench bool
+	}{rows, s.bench != nil})
 }
 
 // definitionData is one Definition at one version.
@@ -108,6 +115,10 @@ type definitionData struct {
 	// block, highlighted; both empty when the Definition declares none (card 166).
 	Guidance string
 	Handling []jsonToken
+
+	// EnterURL is the form for this type when the Workbench enters it and this is its
+	// current version; empty otherwise.
+	EnterURL string
 }
 
 // handlingOf splits a Definition's handling block for the page: the `guidance` key's
@@ -200,6 +211,9 @@ func (s *Server) definitionPage(w http.ResponseWriter, r *http.Request) {
 	}
 	data.Described = described(data.Fields)
 	data.Description = schemaDescription(body)
+	if s.enterable(t) && v == data.Current {
+		data.EnterURL = "/entry?type=" + url.QueryEscape(string(t))
+	}
 	render(w, "definition.html", data)
 }
 

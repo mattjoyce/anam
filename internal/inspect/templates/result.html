@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>anam: {{.Heading}}</title>
+{{template "style.html"}}
+</head>
+<body>
+<header>
+  <h1><span class="kind kind-{{.Kind}}">{{.Heading}}</span></h1>
+  {{template "nav.html"}}
+</header>
+
+{{range .Lines}}<p>{{.}}</p>
+{{end}}
+<p>{{range $i, $l := .Links}}{{if $i}} · {{end}}<a href="{{$l.Href}}">{{$l.Text}}</a>{{end}}</p>
+</body>
+</html>

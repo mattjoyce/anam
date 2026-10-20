@@ -47,6 +47,7 @@ func (d *Daemon) routes() []route {
 		Ledger: d.read, Timeout: d.cfg.Timeout, Buckets: buckets, Library: d.cfg.LibraryDir,
 		Definitions: d.defs.current.Load, Held: d.heldDefinitions, Checkpoints: d.readOps,
 		Projections: d.projections.current.Load, CachedReads: d.cfg.InspectCachedReads,
+		Workbench: d.workbenchFor(),
 	})
 	f := func(pattern string, roles []config.Role, h http.HandlerFunc) route { return route{pattern, roles, h} }
 	return []route{

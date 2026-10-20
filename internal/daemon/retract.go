@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/clock"
@@ -54,31 +55,7 @@ func (d *Daemon) postFacetRetract(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, errors.New("retraction: source is required"))
 		return
 	}
-	id := r.PathValue("id")
-
-	var out api.Retraction
-	err := d.TryWrite(r.Context(), d.timeout(r), func(ctx context.Context, s Stores) error {
-		plan, err := retract.PlanFacet(ctx, s.Ledger, s.Ops, d.importerSources(), req.Source, id)
-		if err != nil {
-			return err
-		}
-		reg := d.defs.current.Load()
-		// A tombstone admits nothing, so the gate needs no scopes for it.
-		g := gate.New(s.Ledger, reg, gate.StaticScopes{}, clock.Real{}, d.cfg.PersonID, gateLimits(d.cfg))
-		res, head, err := g.Retract(ctx, id)
-		if err != nil {
-			return err
-		}
-		out = api.Retraction{
-			FacetID: id, Source: req.Source, Type: string(plan.Facet.Type),
-			ArtifactVersion: res.ArtifactVersion, Outcome: string(res.Outcome), W: int64(head),
-		}
-		if res.Outcome == gate.OutcomeTombstoned {
-			out.Seq = int64(head)
-			d.catchUp(ctx, s)
-		}
-		return nil
-	})
+	out, err := d.retractFacet(r.Context(), req.Source, r.PathValue("id"), d.timeout(r))
 
 	switch {
 	case errors.Is(err, ledger.ErrNotFound):
@@ -93,9 +70,40 @@ func (d *Daemon) postFacetRetract(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		writeError(w, http.StatusInternalServerError, err)
 	default:
-		if out.Seq != 0 {
-			d.requestMint()
-		}
 		writeJSON(w, http.StatusOK, out)
 	}
+}
+
+// retractFacet plans and applies the tombstone of one facet of source, inside the
+// write queue within budget, and asks for a mint when it wrote one. The route and the
+// Workbench's pages both call it. An error is the plan's, the gate's or the queue's,
+// for the caller to map.
+func (d *Daemon) retractFacet(ctx context.Context, source, id string, budget time.Duration) (api.Retraction, error) {
+	var out api.Retraction
+	err := d.TryWrite(ctx, budget, func(ctx context.Context, s Stores) error {
+		plan, err := retract.PlanFacet(ctx, s.Ledger, s.Ops, d.importerSources(), source, id)
+		if err != nil {
+			return err
+		}
+		reg := d.defs.current.Load()
+		// A tombstone admits nothing, so the gate needs no scopes for it.
+		g := gate.New(s.Ledger, reg, gate.StaticScopes{}, clock.Real{}, d.cfg.PersonID, gateLimits(d.cfg))
+		res, head, err := g.Retract(ctx, id)
+		if err != nil {
+			return err
+		}
+		out = api.Retraction{
+			FacetID: id, Source: source, Type: string(plan.Facet.Type),
+			ArtifactVersion: res.ArtifactVersion, Outcome: string(res.Outcome), W: int64(head),
+		}
+		if res.Outcome == gate.OutcomeTombstoned {
+			out.Seq = int64(head)
+			d.catchUp(ctx, s)
+		}
+		return nil
+	})
+	if err == nil && out.Seq != 0 {
+		d.requestMint()
+	}
+	return out, err
 }

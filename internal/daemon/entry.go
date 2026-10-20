@@ -1,10 +1,12 @@
 package daemon
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/facet"
@@ -43,12 +45,7 @@ func (d *Daemon) postEntry(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	who := *d.workbench
-	env := facet.Envelope{
-		Type: facet.Type(req.Type), Source: who.Source, Injector: who.Source,
-		Payload: req.Payload, DefinitionVersion: req.DefinitionVersion,
-	}
-	a, err := d.admitBatch(r.Context(), who, intake{envs: []facet.Envelope{env}}, d.timeout(r))
+	out, err := d.enter(r.Context(), req, d.timeout(r))
 	var refused *gate.Refused
 	if errors.As(err, &refused) && errors.Is(err, gate.ErrDefinitionVersion) {
 		// The form was drawn from a Definition that is no longer in force. The gate said
@@ -60,13 +57,30 @@ func (d *Daemon) postEntry(w http.ResponseWriter, r *http.Request) {
 	if d.writeAdmitError(w, err) {
 		return
 	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// enter admits one entry as the workbench principal through admitBatch and says what
+// the gate did. The route and the Workbench's pages both call it, so there is one
+// way in; the workbench must be declared, which the caller has checked. An error is
+// the gate's or the queue's, for the caller to map.
+func (d *Daemon) enter(ctx context.Context, req api.EntryRequest, budget time.Duration) (api.Entry, error) {
+	who := *d.workbench
+	env := facet.Envelope{
+		Type: facet.Type(req.Type), Source: who.Source, Injector: who.Source,
+		Payload: req.Payload, DefinitionVersion: req.DefinitionVersion,
+	}
+	a, err := d.admitBatch(ctx, who, intake{envs: []facet.Envelope{env}}, budget)
+	if err != nil {
+		return api.Entry{}, err
+	}
 	res := a.Results[0]
 	out := api.Entry{Outcome: res.Outcome, FacetID: res.FacetID, ArtifactVersion: res.ArtifactVersion, W: a.W}
 	if a.Changed > 0 {
 		// One envelope, one event, written under the write queue: it is the newest.
 		out.Seq = a.W
 	}
-	writeJSON(w, http.StatusOK, out)
+	return out, nil
 }
 
 // decodeEntry reads an entry's body: the three fields and nothing else, as one

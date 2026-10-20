@@ -38,6 +38,19 @@
   /* long pointers wrap in the two tables that hold them; wide lists scroll sideways instead */
   table.kv td.mono, table.kv td .mono, table.fields td.mono, table.fields td .mono { overflow-wrap: anywhere; }
   .role { font-family: system-ui, sans-serif; }
+  /* the Workbench's entry form and its buttons */
+  form.entry .field { display: grid; grid-template-columns: 12rem 1fr; gap: .15rem .75rem; margin: .8rem 0; }
+  form.entry label { font-weight: 600; padding-top: .25rem; }
+  form.entry input, form.entry select { font: inherit; padding: .2rem .4rem; max-width: 28rem; }
+  form.entry input[readonly] { opacity: .7; }
+  form.entry .hint, form.entry .problem { grid-column: 2; font-size: .85rem; }
+  form.entry .problem, .message { color: #b3261e; }
+  form.entry .bad input, form.entry .bad select { border-color: #b3261e; }
+  .message { border: 1px solid currentColor; border-radius: 6px; padding: .5rem .8rem; }
+  details.guidance { margin: 1rem 0; } details.guidance p { margin: .4rem 0; }
+  .actions { display: flex; gap: .75rem; align-items: center; margin: 1rem 0 0; }
+  .actions form { margin: 0; } .actions button, .actions .button { font: inherit; padding: .2rem .7rem; cursor: pointer; }
+  @media (max-width: 40rem) { form.entry .field { grid-template-columns: 1fr; } form.entry .hint, form.entry .problem { grid-column: 1; } }
   @media (max-width: 40rem) {
     body { margin: 1rem auto; font-size: 14px; }
     header { flex-direction: column; }

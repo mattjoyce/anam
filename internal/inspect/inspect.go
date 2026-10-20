@@ -72,6 +72,10 @@ type Server struct {
 	// timeline (card 21); nil means there is none to show.
 	checkpoints Checkpoints
 
+	// edges is the edge index, read-only, for the links section of the facet page
+	// (card 104); nil means there is no index to read, and the page says so.
+	edges Edges
+
 	// projections answers the templates held, bundled and registered (card 125), for
 	// the projection page; nil means the bundled ones.
 	projections func() *projection.Registry
@@ -105,8 +109,9 @@ type Server struct {
 // against, asked at each page so a registration shows at once; nil means the bundled
 // ones alone. Held answers every version held of each, for the Definitions pages; nil
 // means the bundled manifests. Checkpoints is the checkpoint log for the bucket strip
-// under the timeline; nil draws no strip. Projections answers the templates held; nil
-// means the bundled ones.
+// under the timeline; nil draws no strip. Edges is the edge index for the links
+// section of the facet page; nil says there is no index to read. Projections answers
+// the templates held; nil means the bundled ones.
 type Deps struct {
 	Ledger      Ledger
 	Timeout     time.Duration
@@ -115,6 +120,7 @@ type Deps struct {
 	Definitions func() *def.Registry
 	Held        HeldDefinitions
 	Checkpoints Checkpoints
+	Edges       Edges
 	Projections func() *projection.Registry
 	// Workbench lets the pages enter, correct and retract facets by hand, through the
 	// daemon's write; nil leaves the inspector read-only (a standalone `anam inspect`).
@@ -128,7 +134,7 @@ type Deps struct {
 func Handler(d Deps) http.Handler {
 	s := &Server{
 		ledger: d.Ledger, timeout: d.Timeout, buckets: d.Buckets, library: d.Library,
-		defs: d.Definitions, heldDefs: d.Held, checkpoints: d.Checkpoints, projections: d.Projections,
+		defs: d.Definitions, heldDefs: d.Held, checkpoints: d.Checkpoints, edges: d.Edges, projections: d.Projections,
 		cachedReads: d.CachedReads, bench: d.Workbench,
 	}
 	mux := http.NewServeMux()

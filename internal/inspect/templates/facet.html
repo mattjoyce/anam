@@ -80,6 +80,35 @@
 {{template "track.html" .Track}}
 {{end}}
 
+{{if .Links.Note}}
+<h2>links</h2>
+<p class="meta">{{.Links.Note}}</p>
+{{else if not .Links.Links}}
+<h2>links <span class="dim">live edges touching this facet, from the edge index at W = {{.Links.W}}</span></h2>
+<p class="meta">no edges touch this facet.</p>
+{{else}}
+<h2>links <span class="dim">live edges touching this facet, from the edge index at W = {{.Links.W}}</span></h2>
+<div class="scroll">
+<table>
+  <thead><tr><th>kind</th><th>side</th><th>asserted</th><th>from</th><th>to</th><th>text</th><th>edge</th></tr></thead>
+  <tbody>
+    {{$this := .Facet.ID}}
+    {{range .Links.Links}}
+    <tr>
+      <td>{{.Kind}}</td>
+      <td>{{.Side}}</td>
+      <td class="mono">{{.At}}</td>
+      <td class="mono">{{range $i, $f := .From}}{{if $i}}<br>{{end}}{{if eq $f $this}}<strong>this facet</strong>{{else}}<a href="/facet?id={{$f}}">{{$f}}</a>{{end}}{{else}}<span class="dim">—</span>{{end}}</td>
+      <td class="mono">{{range $i, $f := .To}}{{if $i}}<br>{{end}}{{if eq $f $this}}<strong>this facet</strong>{{else}}<a href="/facet?id={{$f}}">{{$f}}</a>{{end}}{{else}}<span class="dim">—</span>{{end}}</td>
+      <td>{{if .Text}}{{.Text}}{{else}}<span class="dim">no text</span>{{end}}</td>
+      <td class="mono"><a href="/facet?id={{.Edge}}">{{.Edge}}</a></td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}
+
 <h2>payload <span class="dim">{{if eq (print .Facet.Descriptor.PayloadKind) "reference"}}(a reference: the bytes stay in the library, at this path and hash){{else if .BytesNotHeld}}(a link: a file Anam remembers but does not hold){{else}}(verbatim, canonical bytes){{end}}</span></h2>
 {{if .DocumentURL}}<p><a href="{{.DocumentURL}}">open the document</a> <span class="dim">served from the default library, bytes as they are</span></p>{{end}}
 {{if .BytesNotHeld}}<p class="dim">The bytes are not held: this facet records that a file with this name, hash and date was seen where it lives, and Anam serves nothing from there. The sha256 names bytes outside Anam.</p>{{end}}

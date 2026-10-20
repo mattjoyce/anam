@@ -45,7 +45,7 @@ func (d *Daemon) routes() []route {
 	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
 	inspector := inspect.Handler(inspect.Deps{
 		Ledger: d.read, Timeout: d.cfg.Timeout, Buckets: buckets, Library: d.cfg.LibraryDir,
-		Definitions: d.defs.current.Load, Held: d.heldDefinitions, Checkpoints: d.readOps,
+		Definitions: d.defs.current.Load, Held: d.heldDefinitions, Checkpoints: d.readOps, Edges: d.readOps,
 		Projections: d.projections.current.Load, CachedReads: d.cfg.InspectCachedReads,
 		Workbench: d.workbenchFor(),
 	})

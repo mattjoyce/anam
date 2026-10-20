@@ -44,6 +44,10 @@ type facetData struct {
 	// Track is a place.track facet's hour drawn (card 133); nil otherwise.
 	Track *trackView
 
+	// Links is the live edges touching the facet, read from the edge index through
+	// the same code as the API's links part (card 104).
+	Links linksData
+
 	// DefinitionURL is the Definition the facet was admitted under; CurrentDefinition
 	// is the version in force now, so the page can say when they differ.
 	DefinitionURL     string
@@ -164,8 +168,14 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, rowsNote := s.payloadRows(ctx, f)
+	links, err := s.facetLinks(ctx, id)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
 	canEdit, canRetract := s.workbenchActions(f, latest.ArtifactVersion, status)
 	render(w, "facet.html", facetData{
+		Links:             links,
 		CanEdit:           canEdit,
 		CanRetract:        canRetract,
 		DefinitionURL:     defURL,

@@ -1,8 +1,8 @@
 ---
 type: component
 title: Inspector (internal/inspect)
-description: "The web harness over the full fold, the Anam Workbench: timeline, facets, events, projections and definitions, the default library's bytes confined to its root, and forms that enter, correct and retract a fact by hand."
-timestamp: 2026-10-17T00:00:00Z
+description: "The web harness over the full fold, the Anam Workbench: timeline, facets with the edges touching them, events, projections and definitions, the default library's bytes confined to its root, and forms that enter, correct and retract a fact by hand."
+timestamp: 2026-10-21T00:00:00Z
 resource: internal/inspect/inspect.go#Handler
 anchor: "func Handler(d Deps) http.Handler {"
 basis: code
@@ -24,6 +24,10 @@ A diagnostic tool that also writes (see "Entering a fact by hand" below), and it
 Since 2026-10-13 (card 21) the timeline carries a checkpoint strip under the band: one segment per leaf bucket of the mint's layout, sealed, behind or never minted by the one hash comparison of the bucket's value at W against the log's head, computed for the page and dropped. The daemon hands the inspector its read-only ops handle for that; `anam inspect` over a bare ledger draws no strip.
 
 Since 2026-10-13 (card 106) every library document is served in a CSP sandbox with neither scripts nor the origin, and HTML, XHTML, SVG and XML files are downloads rather than inline previews: a document is untrusted material, and the inspector shares its origin with the API, so an active file shown inline could have read the record as the operator.
+
+## Links on the facet page
+
+Since 2026-10-21 (card 104, slice 3) the facet page carries a links section: the live edges touching the facet, each with its kind, which side the facet is on (from, to or both), the moment it was asserted, every facet id on each side as a link, the edge itself as a link, and for a note (kind `about`) its text. The page reads them through the same code the API's `GET /v1/receipts/{hash}/facets/{facet_id}` answers from, `read.LinksOf` over the edge index (`facet_edge` in the operational store), so the page and the API cannot drift. The daemon hands the inspector its read-only ops handle as `Edges`, the way it hands `Checkpoints`; `anam inspect` over a bare ledger is given none and the page says there is no index to read, which is not the same as no edges. The edges carry their own watermark, the index's cursor when they were read, shown beside the heading, as in the API's answer. The text is the edge facet's own, read from the ledger by the edge's id, since the index holds ends and not words. Links are never written into a facet: the payload stays the entirety of the facet, and the page draws the derived part beside it.
 
 ## Entering a fact by hand
 

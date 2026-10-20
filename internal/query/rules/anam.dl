@@ -34,14 +34,15 @@ closed(E, At) :- latest(E, At), entry(E, Type, _, _, _, _, _), closes(Type).
 current(E, At) :- before(E, At), not displaced(E, At), not closed(E, At).
 
 % edge_to(E, F): the edge E names F on its to side (card 104). An edge is a
-% record.note whose payload joins facets: `to` lists the facet ids on that side, and
-% `about`, the v1 name, is the same side. The kind is the edge's `/kind` attr, and an
-% edge with none is of kind about: the person's words about the facets in `to`.
-edge_to(E, F) :- entry(E, "record.note", _, _, _, _, _), attr(E, P, F), P > "/to/", P < "/to0".
-edge_to(E, F) :- entry(E, "record.note", _, _, _, _, _), attr(E, P, F), P > "/about/", P < "/about0".
+% record.edge whose payload joins facets: `to` lists the facet ids on that side, and
+% `about`, record.note v1's name, is the same side. The kind is the edge's `/kind`
+% attr, and an edge with none is of kind about: the person's words about the facets
+% in `to`.
+edge_to(E, F) :- entry(E, "record.edge", _, _, _, _, _), attr(E, P, F), P > "/to/", P < "/to0".
+edge_to(E, F) :- entry(E, "record.edge", _, _, _, _, _), attr(E, P, F), P > "/about/", P < "/about0".
 
 % edge_from(E, F): the edge E names F on its from side.
-edge_from(E, F) :- entry(E, "record.note", _, _, _, _, _), attr(E, P, F), P > "/from/", P < "/from0".
+edge_from(E, F) :- entry(E, "record.edge", _, _, _, _, _), attr(E, P, F), P > "/from/", P < "/from0".
 
 % linked(E, F): the edge E names F on either side, so the edges touching F are the E
 % with linked(E, F). The same relation the facet read answers as a facet's links,

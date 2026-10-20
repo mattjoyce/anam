@@ -1,0 +1,8 @@
+{
+  "renames": [
+    {
+      "from": "record.note",
+      "to": "record.edge"
+    }
+  ]
+}

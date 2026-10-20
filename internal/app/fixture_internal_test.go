@@ -52,6 +52,13 @@ func admitRecords(ctx context.Context, l *ledger.Ledger, recs []record) (ledger.
 	if err != nil {
 		return 0, err
 	}
+	return admitUnder(ctx, l, defs, recs)
+}
+
+// admitUnder is admitRecords under the Definitions in defs, so a test can admit a type
+// the binary no longer bundles, as a ledger written before a rename holds it.
+func admitUnder(ctx context.Context, l *ledger.Ledger, defs *def.Registry, recs []record) (ledger.Watermark, error) {
+	var err error
 	types := make([]facet.Type, len(recs))
 	envs := make([]facet.Envelope, len(recs))
 	bindings := make([]facet.Binding, len(recs))

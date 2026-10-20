@@ -19,7 +19,7 @@ references:
 
 | Column | Meaning |
 |---|---|
-| `edge_id` | the edge facet's id, a `record.note` whose payload joins facets (card 104) |
+| `edge_id` | the edge facet's id, a `record.edge` whose payload joins facets (cards 104, 191) |
 | `kind` | what the join means, as the edge's `kind` says it; `about` when it says none |
 | `side` | `from` or `to`: which list of the payload the facet id came from; `about`, the v1 name, is the `to` side |
 | `facet_id` | one facet id the edge names on that side |

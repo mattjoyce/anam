@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
@@ -149,4 +150,101 @@ func TestRename_RefusesBeforeWriting(t *testing.T) {
 			t.Errorf("%s: the table was accepted", name)
 		}
 	}
+}
+
+// Card 191: renames/record-edge.json carries the notes a ledger holds as record.note,
+// admitted under the Definition the binary now keeps only in its history, into
+// record.edge. A note in v1's shape (`about`) and an edge in v2's (`from`, `to`, a
+// kind) both arrive unchanged, and what was admitted as record.note reads the same
+// as-of before the run.
+func TestRename_TheTableCarriesRecordNoteToRecordEdge(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	f := newLedgerFixture(t)
+	notes := []record{
+		{"record.note", `{"id": "note:2c6f38a3:1", "at": "2026-10-12 22:14", "about": ["2c6f38a3-3db7-5e65-b933-9c59980e1c6c"], "text": "During a large work meeting."}`},
+		{"record.note", `{"id": "interp:1", "at": "2026-10-13 09:00", "kind": "interpreted_from", "from": ["7d1b2c3e-4f5a-5b6c-8d7e-9f0a1b2c3d4e"], "to": ["2c6f38a3-3db7-5e65-b933-9c59980e1c6c"]}`},
+	}
+	old := heldNote(t)
+	l, err := ledger.Open(ctx, f.ledgerPath, "matt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := admitUnder(ctx, l, old, notes)
+	if err != nil {
+		t.Fatalf("admit as record.note: %v", err)
+	}
+	ids := []string{facet.NewID(facet.SourceRef("records", "note:2c6f38a3:1")), facet.NewID(facet.SourceRef("records", "interp:1"))}
+	was := map[string]facet.Facet{}
+	for _, id := range ids {
+		if was[id], err = l.CurrentVersion(ctx, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := l.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	table := filepath.Join("..", "..", "renames", "record-edge.json")
+	out, _, err := cli(t, f.cfgPath, "rename", "--table", table)
+	if err != nil {
+		t.Fatalf("dry run: %v\n%s", err, out)
+	}
+	if row := reportRow(t, out, "record.note"); row[1] != "record.edge" || row[2] != "2" || row[3] != "0" {
+		t.Errorf("dry run row %v, want record.edge 2 0", row)
+	}
+	if out, _, err = cli(t, f.cfgPath, "rename", "--table", table, "--yes"); err != nil {
+		t.Fatalf("--yes: %v\n%s", err, out)
+	}
+	if w := headOf(t, f.ledgerPath); w != before+2 {
+		t.Errorf("W %d, want %d: one event per note carried", w, before+2)
+	}
+
+	l, err = ledger.Open(ctx, f.ledgerPath, "matt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = l.Close() }()
+	for _, id := range ids {
+		cur, err := l.CurrentVersion(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cur.Type != "record.edge" || cur.ArtifactVersion != 2 || string(cur.Payload.Bytes()) != string(was[id].Payload.Bytes()) {
+			t.Errorf("%s is %s v%d, want record.edge v2 with the payload unchanged", id, cur.Type, cur.ArtifactVersion)
+		}
+		v1, err := l.Version(ctx, id, 1)
+		if err != nil || v1.Type != "record.note" || v1.Descriptor.ContentHash != was[id].Descriptor.ContentHash {
+			t.Errorf("%s v1 = %s %s, %v; want record.note as admitted", id, v1.Type, v1.Descriptor.ContentHash, err)
+		}
+		evs, err := l.FacetEvents(ctx, id, before)
+		if err != nil || len(evs) != 1 || evs[0].ArtifactVersion != 1 {
+			t.Errorf("%s as-of W %d: %d events, %v; want its one admission", id, before, len(evs), err)
+		}
+	}
+}
+
+// heldNote is a registry holding record.note as the binary's history keeps it, the
+// newest version a facet was admitted under before card 191.
+func heldNote(t *testing.T) *def.Registry {
+	t.Helper()
+	held, err := def.History()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range held {
+		if s.Type == "record.note" && s.Version == 2 {
+			d, err := def.Parse(s.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			reg, err := def.NewRegistry(d)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return reg
+		}
+	}
+	t.Fatal("no record.note v2 in the history")
+	return nil
 }

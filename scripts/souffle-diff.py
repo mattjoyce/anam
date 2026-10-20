@@ -63,10 +63,10 @@ closed(E, At) :- latest(E, At), entry(E, Type, _, _, _, _, _), closes(Type).
 .decl current(e:symbol, at:symbol)
 current(E, At) :- before(E, At), !displaced(E, At), !closed(E, At).
 .decl edge_to(e:symbol, f:symbol)
-edge_to(E, F) :- entry(E, "record.note", _, _, _, _, _), attr(E, P, F), match("/to/.*", P).
-edge_to(E, F) :- entry(E, "record.note", _, _, _, _, _), attr(E, P, F), match("/about/.*", P).
+edge_to(E, F) :- entry(E, "record.edge", _, _, _, _, _), attr(E, P, F), match("/to/.*", P).
+edge_to(E, F) :- entry(E, "record.edge", _, _, _, _, _), attr(E, P, F), match("/about/.*", P).
 .decl edge_from(e:symbol, f:symbol)
-edge_from(E, F) :- entry(E, "record.note", _, _, _, _, _), attr(E, P, F), match("/from/.*", P).
+edge_from(E, F) :- entry(E, "record.edge", _, _, _, _, _), attr(E, P, F), match("/from/.*", P).
 .decl linked(e:symbol, f:symbol)
 linked(E, F) :- edge_to(E, F).
 linked(E, F) :- edge_from(E, F).

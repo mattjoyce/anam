@@ -25,7 +25,7 @@ func TestGetReceiptFacet_EntryWithItsLinks(t *testing.T) {
 	cfg.TokenFile = writeToken(t, dir, testToken)
 	sum := sha256.Sum256([]byte(importerToken))
 	cfg.ImportersFile = filepath.Join(dir, "importers.yaml")
-	body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [health.weight, record.note]\n", hex.EncodeToString(sum[:]))
+	body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [health.weight, record.edge]\n", hex.EncodeToString(sum[:]))
 	if err := os.WriteFile(cfg.ImportersFile, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -33,11 +33,11 @@ func TestGetReceiptFacet_EntryWithItsLinks(t *testing.T) {
 	call(t, "POST", url+"/v1/projections", testToken, weightsV1, http.StatusCreated, nil)
 
 	weight, _ := d.defs.current.Load().Lookup("health.weight")
-	note, _ := d.defs.current.Load().Lookup("record.note")
+	note, _ := d.defs.current.Load().Lookup("record.edge")
 	var a api.Admission
 	call(t, "POST", url+"/v1/envelopes", importerToken, batch(weighIn("w-1", 80.5, weight.Version), weighIn("w-2", 80.1, weight.Version)), http.StatusOK, &a)
 	w1, w2 := a.Results[0].FacetID, a.Results[1].FacetID
-	noteEnv := fmt.Sprintf(`{"type": "record.note", "definition_version": %d,
+	noteEnv := fmt.Sprintf(`{"type": "record.edge", "definition_version": %d,
 		"payload": {"id": "note:1", "at": "2026-10-09 08:00", "to": [%q], "text": "Fasted, after the run."}}`, note.Version, w1)
 	call(t, "POST", url+"/v1/envelopes", importerToken, batch(noteEnv), http.StatusOK, &a)
 	noteID := a.Results[0].FacetID

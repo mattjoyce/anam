@@ -75,6 +75,9 @@ These make an importer correct in any language, without importing Anam's code.
    schema where one exists, decided on 2026-10-08
    ([journal note](../journal/notes/open-mhealth-is-the-payload-vocabulary-for-health-measures.md)). The first is `activity.exercise-session` (card 56): an OMH `physical-activity`
    payload, one type for Technogym, Strong and later Garmin, each shaping to the same Definition.
+   Card 195 split it into a leaf per vendor (`activity.exercise-session.garmin`, `.concept2`,
+   `.technogym` and `.strong`): the IEEE body and a shared core on each, with only that vendor's
+   own fields beside it.
 3. **Validation becomes real.** Done (card 52). Every schema is closed: it declares each field with
    its type and refuses anything else, and `lenient` is gone. Once outside code writes payloads,
    facet-compliance is the guard, and each Definition states exactly what a valid payload is.
@@ -196,8 +199,8 @@ under them, and says so in its log. An importer that still sends the body the bi
 at its version, is answered unchanged (200), not refused, so the release and the importer's
 redeploy need no order between them (card 139); any other body of a bundled type is a 409. No two importers may name the same type unless the binary bundles it: a bundled
 type's Definitions come from Anam, so no importer can register a version that refuses another's
-envelopes, and any number may submit it, each under its own source (`activity.exercise-session` from Garmin
-and Concept2). A release that drops a type two importers share refuses to start until one of them
+envelopes, and any number may submit it, each under its own source (Garmin and Concept2 both sent
+`activity.exercise-session` until card 195 gave each its own leaf). A release that drops a type two importers share refuses to start until one of them
 gives it up.
 
 ### 8.2 Tokens
@@ -285,6 +288,16 @@ importer reads the source's offset where there is one, and `anam_importer.clock.
 refuses the same cases in Python before it sends. Garmin's types carry it now; the types still read
 from a Sydney wall clock without it are listed in `internal/def/sourcetime_test.go`, and that list
 only shrinks.
+
+A vendor's own payload shape is named for its vendor, at the leaf after the concept (card 192):
+Garmin's sessions and days are `activity.exercise-session.garmin` and `activity.day.garmin`,
+Withings' rows `health.measurement.withings`, a DreamStation's sessions
+`health.cpap-session.dreamstation` (card 195). A new source of the same concept is a new leaf with
+the shared core and its own fields, never a wider type. A reader asks across the leaves by the
+prefix, `activity.exercise-session.` (card 193). The importer that registers a type renames it by a
+rename table (`renames/`), registering the leaf before the run; a leaf's first version may place its
+facets by a new fact-time rule, as `activity.day.garmin` reads the start of the day Garmin counted
+where `activity.day` read the date at Sydney midnight.
 
 A manifest may carry a third block, `handling`, beside `meta` and `schema` (card 166). It holds what
 every writer and reader of the type must agree on for its facts to mean the same thing and the schema
@@ -388,7 +401,7 @@ An importer never tombstones. It says what its source still holds, and the opera
 it no longer does (card 78; Matt, 2026-10-10).
 
 - **A snapshot.** A resend-everything run labels each batch as one part of a snapshot:
-  `{"snapshot": {"id": "<run id>", "part": 3, "parts": 27, "types": ["health.measurement"]}, "envelopes": [...]}`.
+  `{"snapshot": {"id": "<run id>", "part": 3, "parts": 27, "types": ["health.measurement.withings"]}, "envelopes": [...]}`.
   The id is the importer's and fresh for each run (1 to 128 of letters, digits and `. _ : -`). Every
   type must be the importer's, and every envelope in the part one of them. A part admits exactly as a
   batch does; the answer carries `snapshot: {parts_admitted, complete}`. Parts may come in any order

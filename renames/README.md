@@ -18,6 +18,14 @@ the run is unchanged.
   table, because `taxonomy.json` arrives at the hyphenated names and a table is one step. The
   `med.regimen`, `illness.episode` and `travel.trip` series are stamped by each Definition and move
   with it, so a read through the `meds` projection is the same before and after.
+- `vendor-leaves.json`: card 195, vendor-shaped types take the vendor leaf (card 192's rule). Four
+  rows split `activity.exercise-session` by the payload id's prefix into the bundled leaves
+  `activity.exercise-session.garmin` (`garmin:session:`), `.concept2` (`concept2:session:`),
+  `.technogym` (`technogym:`) and `.strong` (`strong:session:`). Three plain rows rename the types
+  the importers register: `activity.day` to `activity.day.garmin`, `health.measurement` to
+  `health.measurement.withings` and `health.cpap-session` to `health.cpap-session.dreamstation`.
+  `activity.day.garmin` reads its fact time at the start of the day Garmin counted, so the run
+  re-places the days the watch spent outside Sydney's offset (card 197).
 
 ## The table
 
@@ -44,9 +52,15 @@ A split's leaves repeat the fields they share, since a manifest cannot reference
 and a def test holds the schema at each one identical across the leaves, description and
 examples aside.
 
-A table names types the binary bundles or the daemon holds as registered, so the importers' new
-Definitions (`health.cpap-session`, `activity.day`, `place.stay`, `place.track`) are registered
-before the run. The run is dry by default and reports what the gate would refuse; `--yes` writes,
+A table names types the binary bundles or the daemon holds as registered, so an importer's new
+Definitions are registered before the run, under that importer's token (`activity.day.garmin`,
+`health.measurement.withings` and `health.cpap-session.dreamstation` for `vendor-leaves.json`).
+
+The type arrived at must compose ids from the same identity key as the type left, or the ids would
+not meet, and the run refuses before it asks the gate anything. Its fact-time rule may differ
+(card 195): the gate places each carried facet by the rule of the type it arrives at, the facet's
+earlier versions keep theirs, and the dry run names each such rename and how many of its facets
+move in fact time. The run is dry by default and reports what the gate would refuse; `--yes` writes,
 with the daemon stopped.
 
 ```sh

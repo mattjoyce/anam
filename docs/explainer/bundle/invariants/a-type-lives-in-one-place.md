@@ -20,4 +20,4 @@ tested_by:
   - internal/config/principals_test.go#TestLoadPrincipals
 ---
 
-docs/IMPORTERS.md §8.1, refined in card 122. A bundled type's Definitions come from Anam, so no importer can register a version that refuses another's envelopes, and each may submit it under its own source (`activity.exercise-session` from Garmin and Concept2). The bundled set is the predicate `LoadPrincipals` takes, so the ownership check moves with each release.
+docs/IMPORTERS.md §8.1, refined in card 122. A bundled type's Definitions come from Anam, so no importer can register a version that refuses another's envelopes, and each may submit it under its own source (Garmin and Concept2 both sent `activity.exercise-session` until card 195 gave each its own leaf). The bundled set is the predicate `LoadPrincipals` takes, so the ownership check moves with each release.

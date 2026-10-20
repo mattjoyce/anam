@@ -8,6 +8,21 @@ decisions is in `journal/`.
 
 ## 2026-10-21
 
+- Vendor-shaped types take the vendor leaf (card 195). `activity.exercise-session` splits into four
+  bundled leaves, `activity.exercise-session.garmin`, `.concept2`, `.technogym` and `.strong`, each v1
+  with the shared core (`id`, `activity_name`, `effective_time_frame`, `source`) and only the fields
+  its vendor writes; the old name's v1 and v2 stay in the Definition history. The importers rename
+  `activity.day`, `health.measurement` and `health.cpap-session` to `activity.day.garmin`,
+  `health.measurement.withings` and `health.cpap-session.dreamstation`, registered before the run.
+  `activity.day.garmin` reads its fact time at the start of the day Garmin counted, so a day the
+  watch spent at another offset moves to its own midnight (card 197). `anam rename` now compares
+  the identity key alone: a type arrived at may place facets by another fact-time rule, and the
+  dry run names each such row and how many facets move. The operator runs `anam rename --table
+  renames/vendor-leaves.json` (dry, then `--yes`, the daemon stopped), renames the types in the
+  importers file's `types` lists, registers `projections/recent-life.v5.json` (exercise by the
+  prefix `activity.exercise-session.`), and retypes the records files with `retype_records.py`.
+  `scripts/pipeline-staleness.sh` reads the Garmin day and Withings leaves.
+
 - The medication, illness and trip types take a third segment (card 196). Twelve types, one to one:
   `health.medication-started`, `-stopped`, `-dose`, `-dose-changed`, `-compliance` become
   `health.medication.started`, `.stopped`, `.dose`, `.dose-changed`, `.compliance`;

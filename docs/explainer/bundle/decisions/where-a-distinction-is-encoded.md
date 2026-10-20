@@ -43,7 +43,7 @@ The list runs from dearest to cheapest. Start at the bottom and promote a distin
 - A type with no live facets and no writer is history. It is marked superseded (card 184), not renamed.
 
 **Examples.**
-- Exercise sessions split by vendor. A Garmin session and a Concept2 session carry different payload shapes, so each is its own type under `activity.exercise-session`, not one type with a `vendor` field.
+- Exercise sessions split by vendor. A Garmin session and a Concept2 session carry different payload shapes, so each is its own type under `activity.exercise-session`, not one type with a `vendor` field. Card 195 split them into four leaves, and renamed `activity.day`, `health.measurement` and `health.cpap-session` to their vendor's leaf.
 - Medication started and stopped as separate types. Stopped closes a series, and the fold reads that from the Definition, so it cannot be a `status` field on one type.
 - Rowing against walking is a payload field, `activity_name`. Both are an exercise session of one shape, so a split would only cost a rename run per new sport.
 - `family: meds` is meta. It groups the medication types for a reader and changes no shape, so it needs neither a segment nor a field.

@@ -342,6 +342,14 @@ artifact version). It advances the watermark like any mutation. The Facet stays 
 *Ledger* forever, marked; it is absent from the *Canonical* value by construction. See *Ledger*,
 *Canonical*, *Status*.
 
+**Vendor leaf** — A third segment that names the vendor whose own payload shape a type is (card 192):
+`activity.exercise-session.garmin`, `.concept2`, `.technogym` and `.strong`, `activity.day.garmin`,
+`health.measurement.withings`, `health.cpap-session.dreamstation` (card 195). A vendor's shape takes the leaf even
+with one vendor; a standard shape (Open mHealth, IEEE 1752) takes none. A concept split into leaves keeps a
+shared core, the fields every leaf carries with one meaning, which `internal/def/shared-core.json` names and a test
+holds identical. A reader asks across the leaves by the prefix (`activity.exercise-session.`, card 193). See
+*Facet type*.
+
 **Watermark** — An anam-time marker pinning "what was known" at a point — the basis for checkpoints and
 receipts. `W` is the **stream watermark**: the `seq` of the newest anam-event, advanced by *every*
 anam-event that can change the live-set (including a pure status transition). It is read from the

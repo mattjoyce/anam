@@ -134,7 +134,7 @@ drops it from the current value and never from the ledger.
 
 Every fact is a **facet** of a named type, and each type has a versioned **Definition**: a JSON
 Schema, which field names the facet, and which field says when it was true. Definitions are
-immutable once published, so a change is a new version. Anam bundles the 32 below, and importers
+immutable once published, so a change is a new version. Anam bundles the 35 below, and importers
 register more. A running daemon lists what it holds at `GET /v1/definitions` and in the
 inspector's definitions page; the bundled files are in
 [`internal/def/manifests/`](internal/def/manifests/), and the gate checks this table against them.
@@ -169,7 +169,10 @@ records a measure, a reading or an event.
 | `health.encounter` | 1 | clinical | event | One appointment with a clinic or practitioner | `id` | `date` |
 | `health.donation` | 1 | clinical | event | One visit to give blood | `id` | `date` |
 | `health.vision-prescription` | 1 | clinical | reading | One lens prescription as an optometrist issued it, each eye as printed | `id` | `date` |
-| `activity.exercise-session` | 2 | exercise | event | One session of exercise, as an IEEE 1752 physical activity | `id` | session start |
+| `activity.exercise-session.garmin` | 1 | exercise | event | One session a Garmin watch recorded, as an IEEE 1752 physical activity (was `activity.exercise-session` up to v2 until card 195) | `id` | session start |
+| `activity.exercise-session.concept2` | 1 | exercise | event | One workout the Concept2 Logbook holds, as an IEEE 1752 physical activity (likewise) | `id` | session start |
+| `activity.exercise-session.technogym` | 1 | exercise | event | One indoor session on a Technogym machine, as an IEEE 1752 physical activity (likewise) | `id` | session start |
+| `activity.exercise-session.strong` | 1 | exercise | event | One Strong app workout, as an IEEE 1752 physical activity (likewise) | `id` | session start |
 | `activity.gym-visit` | 1 | exercise | event | One gym visit | `id` | `date` |
 | `activity.steps` | 2 | movement | measure | One day's steps, as an Open mHealth step-count body | `id` | interval start |
 | `place.trip.departed` | 1 | trips | event | Leaving home on a trip (was `place.departed` v1 until card 196) | `id` | `date` |
@@ -190,9 +193,9 @@ them to the daemon on first use. Their versions are that repository's to state; 
 
 | Type | What it records | Importer |
 |---|---|---|
-| `health.measurement` | One Withings measurement | withings |
-| `activity.day` | One day of a Garmin watch's daily summary | garmin |
-| `health.cpap-session` | One therapy session from a DreamStation card | dreamstation |
+| `health.measurement.withings` | One Withings measurement (was `health.measurement` until card 195) | withings |
+| `activity.day.garmin` | One day of a Garmin watch's daily summary (was `activity.day` until card 195) | garmin |
+| `health.cpap-session.dreamstation` | One therapy session from a DreamStation card (was `health.cpap-session` until card 195) | dreamstation |
 | `place.track` | One UTC hour of a phone's positions | owntracks |
 | `place.stay` | One place a phone stayed, named from OpenStreetMap | stays |
 

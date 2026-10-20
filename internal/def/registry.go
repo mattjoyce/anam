@@ -1,6 +1,7 @@
 package def
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -11,6 +12,13 @@ import (
 // those importers registered.
 type Registry struct {
 	byType map[facet.Type]Definition
+
+	// retired holds the types the binary's history names that no Definition in force
+	// does, mapped to whether their newest history version closes a series. Only
+	// Closes reads it: the gate admits nothing under a retired type, but a replay of
+	// a read served before the type was renamed (card 147) must still know that a
+	// stop closed its course (card 187).
+	retired map[facet.Type]bool
 }
 
 // NewRegistry collects definitions, rejecting duplicate types: two contracts for one
@@ -19,6 +27,11 @@ type Registry struct {
 // same series for the same thing, or a stop could never close what a start opened.
 func NewRegistry(defs ...Definition) (*Registry, error) {
 	r := &Registry{byType: make(map[facet.Type]Definition, len(defs))}
+	retired, err := retiredCloses()
+	if err != nil {
+		return nil, err
+	}
+	r.retired = retired
 	families := map[string]Definition{}
 	for _, d := range defs {
 		if _, dup := r.byType[d.Type]; dup {
@@ -39,10 +52,45 @@ func NewRegistry(defs ...Definition) (*Registry, error) {
 }
 
 // Closes reports whether a facet of type t ends the series it belongs to. A type with
-// no Definition, or no series, closes nothing.
+// no Definition in force answers as its newest history version did, so a ledger read
+// as-of before a rename still closes what it closed then (card 187); a type with no
+// series, or with no Definition anywhere, closes nothing.
 func (r *Registry) Closes(t facet.Type) bool {
-	d, ok := r.byType[t]
-	return ok && d.Series != nil && d.Series.Closes
+	if d, ok := r.byType[t]; ok {
+		return d.Series != nil && d.Series.Closes
+	}
+	return r.retired[t]
+}
+
+// retiredCloses reads, for every type the history carries, whether its newest history
+// version closes a series. A history body is words, not a contract, so only the one
+// field is read. Types a registry holds a Definition for are ignored at lookup, not
+// here, so the answer does not depend on which Definitions the registry was given.
+func retiredCloses() (map[facet.Type]bool, error) {
+	history, err := History()
+	if err != nil {
+		return nil, err
+	}
+	newest := map[facet.Type]int{}
+	out := map[facet.Type]bool{}
+	for _, h := range history {
+		if h.Version <= newest[h.Type] {
+			continue
+		}
+		var m struct {
+			Meta struct {
+				Series *struct {
+					Closes bool `json:"closes"`
+				} `json:"series"`
+			} `json:"meta"`
+		}
+		if err := json.Unmarshal(h.Body, &m); err != nil {
+			return nil, fmt.Errorf("%w: history %s v%d: %v", ErrBadManifest, h.Type, h.Version, err)
+		}
+		newest[h.Type] = h.Version
+		out[h.Type] = m.Meta.Series != nil && m.Meta.Series.Closes
+	}
+	return out, nil
 }
 
 // Identify is the source_ref the gate admits an envelope under: its Definition's

@@ -8,6 +8,13 @@ decisions is in `journal/`.
 
 ## 2026-10-20
 
+- Verify reproduces a read served under an old type name (card 187). After the rename a receipt
+  served before it, such as the two `meds` v1 receipts, failed to verify with one extra facet: the
+  replay no longer knew that `med.stopped` closes a course, because the Definitions in force name
+  only the new types, so the stopped course read as open. A type with no Definition in force now
+  answers `closes` as its newest bundled history version did. The gate still admits nothing under
+  a retired type. Verify also says in its notes when it replayed an earlier version of the
+  template than the current one.
 - The taxonomy (card 147). Every bundled type is named `domain.concept` under one of eight closed
   domains: `health`, `activity`, `place` and `record` in use, `social`, `money`, `media` and `work`
   reserved. Twenty-four types are renamed (`med.started` is `health.medication-started`,

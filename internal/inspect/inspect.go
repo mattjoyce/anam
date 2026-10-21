@@ -80,6 +80,10 @@ type Server struct {
 	// the projection page; nil means the bundled ones.
 	projections func() *projection.Registry
 
+	// maxReadBytes bounds a program the selection page runs, as max_read_bytes bounds
+	// POST /v1/query (card 199); zero is no bound.
+	maxReadBytes int
+
 	// bench is the Workbench the daemon supplies for entering facets by hand; nil means
 	// the inspector only reads, and the entry routes do not exist (card 188).
 	bench Workbench
@@ -128,6 +132,10 @@ type Deps struct {
 	// CachedReads is how many historical folds the inspector keeps
 	// (inspect_cached_reads); zero keeps none.
 	CachedReads int
+	// MaxReadBytes bounds the derivation and the answer of a program the selection
+	// page runs (max_read_bytes, the bound POST /v1/query answers within); zero is no
+	// bound.
+	MaxReadBytes int
 }
 
 // Handler returns the inspector's routes on a fresh mux.
@@ -135,7 +143,7 @@ func Handler(d Deps) http.Handler {
 	s := &Server{
 		ledger: d.Ledger, timeout: d.Timeout, buckets: d.Buckets, library: d.Library,
 		defs: d.Definitions, heldDefs: d.Held, checkpoints: d.Checkpoints, edges: d.Edges, projections: d.Projections,
-		cachedReads: d.CachedReads, bench: d.Workbench,
+		cachedReads: d.CachedReads, bench: d.Workbench, maxReadBytes: d.MaxReadBytes,
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.timeline)
@@ -145,6 +153,7 @@ func Handler(d Deps) http.Handler {
 	mux.HandleFunc("GET /location", s.location)
 	mux.HandleFunc("GET /events", s.events)
 	mux.HandleFunc("GET /projection", s.projectionPage)
+	mux.HandleFunc("GET /select", s.selectPage)
 	mux.HandleFunc("GET /document", s.document)
 	mux.HandleFunc("GET /definitions", s.definitionsIndex)
 	mux.HandleFunc("GET /definition", s.definitionPage)

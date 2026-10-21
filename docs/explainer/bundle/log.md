@@ -139,3 +139,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: the inspector's projection page opens on a per-type summary (served, excluded, superseded) and draws rows only on request, `?type=&show=` with `from`, `to` and `asof`, at most 500. The superseded count is derived from the fold's states and reads no version; `fold.DisplacedWhere` reads the versions of one type's facets for the rows view.
 - Bundle: the inspector component gains a section on the projection page.
+
+## 2026-10-21, card 199
+
+- Code: `internal/selection` is the shared filter, fact-time from and to, type or prefix, source, standing, and ticks and exclusions by facet id. It compiles to a Datalog program defining `pick/1` (a tick is `pick("<id>")`, an exclusion `unpick("<id>")`, a prefix two lexical bounds, no pointer named) and parses back only when the program is one it writes. A real-ledger test holds the program's answer equal to the filter's own predicate. The inspector's `GET /select` builds a selection with it: criteria in any order with their counts, matches by type with readings of one moment folded into a row, a basket that travels in the address with each item's side, the program live in a textarea, and a program outside the grammar run as text with the criteria off. `read.Evaluate` is the query read's evaluation without its receipt, and the page runs through it within `max_read_bytes`. The projection page's rows view selects by the same filter.
+- Bundle: a selection component page; the inspector component gains a section on the selection page; the read component names `Evaluate`.

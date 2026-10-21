@@ -207,7 +207,7 @@ func formState(body string) url.Values {
 		q.Add(m[1], html.UnescapeString(m[2]))
 	}
 	for _, name := range []string{"from", "to"} {
-		if m := regexp.MustCompile(`name="` + name + `" id="` + name + `" placeholder="YYYY-MM-DD" value="([^"]*)"`).FindStringSubmatch(form); m != nil && m[1] != "" {
+		if m := regexp.MustCompile(`type="date" name="` + name + `" id="` + name + `" value="([^"]*)"`).FindStringSubmatch(form); m != nil && m[1] != "" {
 			q.Set(name, html.UnescapeString(m[1]))
 		}
 	}

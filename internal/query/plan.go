@@ -216,14 +216,9 @@ func checkPointer(p string, defs Definitions) error {
 // ask about, say. Reached silently it would be empty and the answer wrong; a query
 // that never reaches it needs no definition.
 func checkDefined(programs []Program, rules []Rule, arities map[string]int, schema Schema) error {
-	defined, reads := map[string]bool{}, map[string][]string{}
+	defined, reads := map[string]bool{}, bodyReads(rules)
 	for _, r := range rules {
 		defined[r.Head.Name] = true
-		for _, l := range r.Body {
-			if l.Atom != nil {
-				reads[r.Head.Name] = append(reads[r.Head.Name], l.Atom.Name)
-			}
-		}
 	}
 	if len(programs) == 0 {
 		return nil
@@ -236,6 +231,20 @@ func checkDefined(programs []Program, rules []Rule, arities map[string]int, sche
 		}
 	}
 	return nil
+}
+
+// bodyReads maps each derived relation to the relations its rules' bodies read,
+// negated or not.
+func bodyReads(rules []Rule) map[string][]string {
+	reads := map[string][]string{}
+	for _, r := range rules {
+		for _, l := range r.Body {
+			if l.Atom != nil {
+				reads[r.Head.Name] = append(reads[r.Head.Name], l.Atom.Name)
+			}
+		}
+	}
+	return reads
 }
 
 // reach is the first undefined relation reachable from name, or "".

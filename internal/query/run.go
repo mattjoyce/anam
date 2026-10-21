@@ -25,7 +25,7 @@ func Run(ctx context.Context, served fold.Value, versions map[string]int, defs D
 	if err != nil {
 		return Answer{}, rules, err
 	}
-	base, err := NewBase(served, versions, defs)
+	base, err := NewBase(served, versions, defs, ReadsAttr([]string{relation}, rules.Program, prog))
 	if err != nil {
 		return Answer{}, rules, err
 	}

@@ -78,7 +78,7 @@ func TestNewBase_RefusesAnEntryNotInTheFold(t *testing.T) {
 	t.Parallel()
 	v, versions := value(t, entry("m1", "health.medication.started", day("2026-03-01"), "", `{}`))
 	delete(versions, "m1")
-	_, err := query.NewBase(v, versions, registry(t))
+	_, err := query.NewBase(v, versions, registry(t), false)
 	if !errors.Is(err, query.ErrBase) {
 		t.Errorf("NewBase = %v, want ErrBase", err)
 	}

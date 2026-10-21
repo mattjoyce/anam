@@ -92,6 +92,8 @@ anam timeline --from 2026-06-01 --to 2026-06-30 --type health.blood-pressure
 - `anam query describe` and `anam query run --projection <name> -e '<program>'` (`--dry-run` derives
   only) are the query, local or over the daemon. Describe first, since the program is written against
   the relations and pointers it lists.
+  `docs/QUERY.md` is the reference (relations, bundled rules, what is refused) and holds worked
+  questions to copy, each run by a test; read it before writing a program from scratch.
 - With a server set, `init`, `serve <projection>`, `retract` and `daemon` refuse: they open local
   files the daemon owns. Unset `ANAM_SERVER` to run them as maintenance, with the daemon stopped.
   A bare `anam serve` only lists the bundled projections and needs neither. To publish a read

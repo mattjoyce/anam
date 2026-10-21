@@ -28,6 +28,7 @@ func Main(ctx context.Context, build string) error {
 
 func genCmd() *cobra.Command {
 	var shape, dir string
+	var seed int64
 	budget := 0
 	cmd := &cobra.Command{
 		Use:   "gen",
@@ -61,6 +62,7 @@ Shapes: ` + shapeList(),
 	}
 	cmd.Flags().StringVar(&shape, "shape", "S", "the shape to build")
 	cmd.Flags().StringVar(&dir, "dir", "", "an empty directory to build it in")
+	cmd.Flags().Int64Var(&seed, "seed", 42, "random seed for deterministic generation")
 	cmd.Flags().IntVar(&budget, "budget", 0, "checkpoint_budget in bytes for the mint; 0 is the fixed monthly width")
 	_ = cmd.MarkFlagRequired("dir")
 	return cmd

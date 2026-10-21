@@ -1,6 +1,6 @@
 module github.com/mattjoyce/anam
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/go-viper/mapstructure/v2 v2.5.0
@@ -26,6 +26,7 @@ require (
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
+	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e // indirect
 	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	modernc.org/libc v1.73.4 // indirect

@@ -66,6 +66,7 @@ func Shapes() map[string]Shape {
 		"S": {Name: "S", Months: 36, PerMonth: 500, CorrectEvery: 20, Retract: 20, TailNew: 300, TailCorrect: 30, Start: start},
 		"M": {Name: "M", Months: 60, PerMonth: 2000, CorrectEvery: 20, Retract: 20, TailNew: 300, TailCorrect: 30, Start: start},
 		"L": {Name: "L", Months: 120, PerMonth: 5000, CorrectEvery: 20, Retract: 20, TailNew: 300, TailCorrect: 30, Start: start},
+		"realistic": {Name: "realistic", Months: 48, PerMonth: 1000, CorrectEvery: 50, Retract: 50, TailNew: 500, TailCorrect: 50, Start: start},
 	}
 }
 
@@ -104,11 +105,31 @@ func Generate(ctx context.Context, dir string, sh Shape, progress func(string)) 
 	if err != nil {
 		return err
 	}
+	
+	// Set up gate with scopes for all sources we'll use in the realistic shape
+	scopes := gate.StaticScopes{
+		source:                    {factType},
+		"withings":                {"health.weight", "health.measurement.withings", "health.sleep-episode"},
+		"garmin":                  {"activity.steps", "activity.day.garmin", "health.heart-rate.day", "health.heart-rate-alert", "activity.exercise-session.garmin"},
+		"dreamstation":            {"health.cpap-session.dreamstation"},
+		"concept2":                {"activity.exercise-session.concept2"},
+		"technogym":               {"activity.exercise-session.technogym"},
+		"strong":                  {"activity.exercise-session.strong"},
+		"pathology":               {"health.lab-result", "health.lab-panel"},
+		"travel-app":              {"place.trip.departed", "place.trip.flight", "place.trip.arrived", "place.trip.returned"},
+		"med-app":                 {"health.medication.dose", "health.medication.started", "health.medication.stopped"},
+	}
+	
 	clk := &stepClock{}
-	g := gate.New(l, defs, gate.StaticScopes{source: {factType}}, clk, Person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
+	g := gate.New(l, defs, scopes, clk, Person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	loc, err := time.LoadLocation(zone)
 	if err != nil {
 		return err
+	}
+
+	// If this is the realistic shape, generate a comprehensive faux record
+	if sh.Name == "realistic" {
+		return GenerateFauxRecord(ctx, progress)
 	}
 
 	base := readings(sh, loc)

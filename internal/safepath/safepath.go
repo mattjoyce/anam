@@ -53,6 +53,11 @@ func Expand(path string) (string, error) {
 // resolved to the real file, which must exist and be a regular file. The returned
 // path is the one that will actually be opened — no symlink swap between check
 // and use can point it anywhere the resolution didn't already see.
+//
+// The check is confined as well as resolved: the file is stat'ed through a root
+// opened on its own directory, with the name alone. Nothing in the path can walk
+// out of that directory between the resolution and the check, because the check
+// never names a path — it names a file beside the directory it was resolved in.
 func ResolveFile(path string) (string, error) {
 	abs, err := Expand(path)
 	if err != nil {
@@ -62,7 +67,13 @@ func ResolveFile(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("safepath: resolve %q: %w", abs, err)
 	}
-	info, err := os.Stat(real)
+	dir, name := filepath.Dir(real), filepath.Base(real)
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return "", fmt.Errorf("safepath: open root %q: %w", dir, err)
+	}
+	defer func() { _ = root.Close() }()
+	info, err := root.Stat(name)
 	if err != nil {
 		return "", fmt.Errorf("safepath: stat %q: %w", real, err)
 	}

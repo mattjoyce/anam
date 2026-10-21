@@ -179,7 +179,7 @@ func (st selectState) addSides(q url.Values) {
 }
 
 // URL is the state's address on this page.
-func (st selectState) URL() string { return "/select?" + st.query().Encode() }
+func (st selectState) URL() string { return address("/select", st.query()) }
 
 // with is a copy of the state changed by edit, the fromSide set copied too.
 func (st selectState) with(edit func(*selectState)) selectState {
@@ -207,7 +207,7 @@ func (s *Server) selectPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, ok := q["shown"]; ok {
-		http.Redirect(w, r, applyTicks(st, q).URL(), http.StatusSeeOther)
+		http.Redirect(w, r, address("/select", applyTicks(st, q).query()), http.StatusSeeOther)
 		return
 	}
 	var saved *selection.Saved
@@ -226,7 +226,7 @@ func (s *Server) selectPage(w http.ResponseWriter, r *http.Request) {
 		if f, err := selection.Parse(st.program); err == nil {
 			// Within the grammar: the chips are drawn from it.
 			next := st.with(func(c *selectState) { c.filter, c.program = f, "" })
-			http.Redirect(w, r, next.URL(), http.StatusSeeOther)
+			http.Redirect(w, r, address("/select", next.query()), http.StatusSeeOther)
 			return
 		}
 	}

@@ -196,8 +196,8 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 	// A bare "/" opens the default view when one is kept (card 135); the redirect
 	// keeps the URL honest about what is drawn.
 	stored := defaultView(r)
-	if r.URL.RawQuery == "" && stored != "" {
-		http.Redirect(w, r, "/?"+stored, http.StatusSeeOther)
+	if r.URL.RawQuery == "" && len(stored) > 0 {
+		http.Redirect(w, r, address("/", stored), http.StatusSeeOther)
 		return
 	}
 
@@ -254,9 +254,9 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 			data.Checkpoints = bucketStrip(states, summary, res, from, to, data)
 		}
 	}
-	data.Query = cleanView(r.URL.RawQuery)
-	data.HasDefault = stored != ""
-	data.IsDefault = stored != "" && stored == data.Query
+	data.Query = address("", cleanView(r.URL.RawQuery))
+	data.HasDefault = len(stored) > 0
+	data.IsDefault = data.HasDefault && address("", stored) == data.Query
 	render(w, "timeline.html", data)
 }
 

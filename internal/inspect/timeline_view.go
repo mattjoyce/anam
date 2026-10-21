@@ -19,11 +19,11 @@ var viewKeys = map[string]bool{"from": true, "to": true, "type": true, "status":
 
 // cleanView keeps the known keys of a query, in a fixed order, so a stored view is
 // exactly a timeline view and nothing a page could be sent to. "view=whole" has
-// no keys left, and the empty string means no default.
-func cleanView(raw string) string {
+// no keys left, and an empty view means no default.
+func cleanView(raw string) url.Values {
 	q, err := url.ParseQuery(raw)
 	if err != nil {
-		return ""
+		return nil
 	}
 	out := url.Values{}
 	for k, vs := range q {
@@ -37,18 +37,18 @@ func cleanView(raw string) string {
 	for k := range out {
 		sort.Strings(out[k])
 	}
-	return out.Encode()
+	return out
 }
 
-// defaultView reads the stored default, cleaned; "" when there is none.
-func defaultView(r *http.Request) string {
+// defaultView reads the stored default, cleaned; nothing when there is none.
+func defaultView(r *http.Request) url.Values {
 	c, err := r.Cookie(viewCookie)
 	if err != nil {
-		return ""
+		return nil
 	}
 	raw, err := url.QueryUnescape(c.Value)
 	if err != nil {
-		return ""
+		return nil
 	}
 	return cleanView(raw)
 }
@@ -66,9 +66,9 @@ func (s *Server) setDefaultView(w http.ResponseWriter, r *http.Request) {
 	view := cleanView(r.PostForm.Get("view"))
 	c := &http.Cookie{
 		Name: viewCookie, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode,
-		Value: url.QueryEscape(view), MaxAge: 365 * 24 * 60 * 60,
+		Value: url.QueryEscape(address("", view)), MaxAge: 365 * 24 * 60 * 60,
 	}
-	if view == "" {
+	if len(view) == 0 {
 		c.MaxAge = -1
 	}
 	http.SetCookie(w, c)

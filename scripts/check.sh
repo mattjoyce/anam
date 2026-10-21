@@ -55,6 +55,10 @@ fi
 
 run go vet ./...
 if command -v golangci-lint >/dev/null 2>&1; then run golangci-lint run ./...; else echo "golangci-lint not installed — skipping"; fi
+# gosec: the gate is held to v2.24.0 and passes clean under it. v2.29.0 adds the taint rules G703,
+# G710 and G124. G703 and G710 are fixed. G124, the inspector's default-view cookie without the
+# Secure flag (internal/inspect/timeline_view.go), is open until Matt decides, so a v2.29.0 run
+# reports that one finding and nothing else.
 if command -v gosec >/dev/null 2>&1; then run gosec -severity medium -quiet ./...; else echo "gosec not installed — skipping"; fi
 # The suite is integration-heavy by choice (AGENTS.md: real components over mocks).
 # Every ledger and every operational store under test is a file in that test's own temp

@@ -199,30 +199,10 @@ func (s *Server) entryPage(w http.ResponseWriter, r *http.Request) {
 	renderStatus(w, entryStatus(data), "entry.html", data)
 }
 
-// fillFromFacet loads the facet being corrected into the form. Only a live facet of
-// this type that the Workbench itself entered can be corrected here.
+// fillFromFacet loads the facet being corrected into the form.
 func (s *Server) fillFromFacet(ctx context.Context, w http.ResponseWriter, form *entryForm, t facet.Type, id string) bool {
-	f, err := s.ledger.CurrentVersion(ctx, id)
-	if err != nil {
-		notFoundOr500(w, err)
-		return false
-	}
-	switch {
-	case f.Type != t:
-		http.Error(w, fmt.Sprintf("facet %s is a %s, not a %s", id, f.Type, t), http.StatusConflict)
-		return false
-	case f.Provenance.Source != s.bench.Source():
-		http.Error(w, fmt.Sprintf("facet %s came from %s: only a fact entered here, as %s, is corrected here",
-			id, f.Provenance.Source, s.bench.Source()), http.StatusConflict)
-		return false
-	}
-	_, status, err := s.facetEvents(ctx, id)
-	if err != nil {
-		httpError(w, err)
-		return false
-	}
-	if status != facet.StatusAdmitted && status != facet.StatusEndorsed {
-		http.Error(w, fmt.Sprintf("facet %s is %s, not live, so there is nothing to correct", id, status), http.StatusConflict)
+	f, ok := s.correctable(ctx, w, t, id)
+	if !ok {
 		return false
 	}
 	if err := form.fill(f.Payload.Bytes()); err != nil {
@@ -230,6 +210,36 @@ func (s *Server) fillFromFacet(ctx context.Context, w http.ResponseWriter, form 
 		return false
 	}
 	return true
+}
+
+// correctable is the current version of a facet the Workbench may correct: a live
+// facet of type t that the Workbench itself entered. It answers the request itself and
+// returns false for any other.
+func (s *Server) correctable(ctx context.Context, w http.ResponseWriter, t facet.Type, id string) (facet.Facet, bool) {
+	f, err := s.ledger.CurrentVersion(ctx, id)
+	if err != nil {
+		notFoundOr500(w, err)
+		return facet.Facet{}, false
+	}
+	switch {
+	case f.Type != t:
+		http.Error(w, fmt.Sprintf("facet %s is a %s, not a %s", id, f.Type, t), http.StatusConflict)
+		return facet.Facet{}, false
+	case f.Provenance.Source != s.bench.Source():
+		http.Error(w, fmt.Sprintf("facet %s came from %s: only a fact entered here, as %s, is corrected here",
+			id, f.Provenance.Source, s.bench.Source()), http.StatusConflict)
+		return facet.Facet{}, false
+	}
+	_, status, err := s.facetEvents(ctx, id)
+	if err != nil {
+		httpError(w, err)
+		return facet.Facet{}, false
+	}
+	if status != facet.StatusAdmitted && status != facet.StatusEndorsed {
+		http.Error(w, fmt.Sprintf("facet %s is %s, not live, so there is nothing to correct", id, status), http.StatusConflict)
+		return facet.Facet{}, false
+	}
+	return f, true
 }
 
 // entryStatus is the status a form page is answered with: 422 for a type with no form.

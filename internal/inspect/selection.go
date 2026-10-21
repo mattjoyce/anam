@@ -26,8 +26,8 @@ import (
 // The page only reads. Every state is an address: the criteria, the basket of ticked
 // facets with each one's side, and the exclusions travel in the query string, so back
 // and reload keep them. A form post of the checkboxes is answered with a redirect to
-// the address of the new state. The selection is handed on by a link that card 202's
-// link form will consume.
+// the address of the new state. The selection is handed on by a link to card 202's
+// link form, GET /link.
 
 // selectState is one address of the page.
 type selectState struct {
@@ -36,6 +36,9 @@ type selectState struct {
 	fromSide map[string]bool
 	// program is a hand-edited program, "" while the criteria make it.
 	program string
+	// edit is the link being edited (card 202), carried through to the handoff so the
+	// link form saves a new version of it rather than a new link; "" for a new one.
+	edit string
 }
 
 var errBadSelect = errors.New("bad selection")
@@ -43,7 +46,7 @@ var errBadSelect = errors.New("bad selection")
 // stateOf reads the address. A date bound is a whole day; a fact-time lexeme is an
 // exact bound, which is how a hand-edited bound off midnight stays a chip.
 func stateOf(q url.Values) (selectState, error) {
-	st := selectState{proj: q.Get("p"), program: q.Get("program"), fromSide: map[string]bool{}}
+	st := selectState{proj: q.Get("p"), program: q.Get("program"), edit: q.Get("edit"), fromSide: map[string]bool{}}
 	if st.proj == "" {
 		st.proj = canonicalName
 	}
@@ -136,6 +139,9 @@ func (st selectState) query() url.Values {
 	f := st.filter
 	if st.proj != canonicalName {
 		q.Set("p", st.proj)
+	}
+	if st.edit != "" {
+		q.Set("edit", st.edit)
 	}
 	if st.program != "" {
 		q.Set("program", st.program)

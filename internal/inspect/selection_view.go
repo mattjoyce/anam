@@ -298,13 +298,17 @@ func (d *selectData) fillBasket(st selectState, rows []selection.Row) {
 	}
 }
 
-// handoff is the address that hands the selection on: the program, the projection
-// it was read through, and the basket with each item's side. Card 202's link form
-// will answer it; until then the address is the selection.
+// handoff is the address that hands the selection on to the link form (card 202): the
+// program, the projection it was read through, the basket with each item's side, and
+// the link being edited, if any. The form resolves the program to facet ids when it
+// opens.
 func handoff(st selectState, program string) string {
 	q := url.Values{"program": {program}}
 	if st.proj != canonicalName {
 		q.Set("p", st.proj)
+	}
+	if st.edit != "" {
+		q.Set("edit", st.edit)
 	}
 	q["tick"] = st.filter.Ticks
 	st.addSides(q)
@@ -352,5 +356,8 @@ func (d selectData) Superseded() bool { return d.State.filter.Standing == select
 
 // CriteriaURL is the page at the same projection with no program and no criteria.
 func (d selectData) CriteriaURL() string {
-	return selectState{proj: d.State.proj}.URL()
+	return selectState{proj: d.State.proj, edit: d.State.edit}.URL()
 }
+
+// Editing is the link the selection will be handed back to, or "" for a new link.
+func (d selectData) Editing() string { return d.State.edit }

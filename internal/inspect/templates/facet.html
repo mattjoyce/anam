@@ -29,7 +29,7 @@
 
 {{if or .CanEdit .CanRetract}}
 <div class="actions">
-  {{if .CanEdit}}<a class="button" href="/entry?type={{.Facet.Type}}&edit={{.Facet.ID}}">Edit</a>{{end}}
+  {{if and .CanEdit .IsLink}}<a class="button" href="/link?edit={{.Facet.ID}}">edit this link</a>{{else if .CanEdit}}<a class="button" href="/entry?type={{.Facet.Type}}&edit={{.Facet.ID}}">Edit</a>{{end}}
   {{if .CanRetract}}<form method="post" action="/retract" onsubmit="return confirm('Retract this entry? It is tombstoned, not deleted: the record keeps the entry and the retraction.')"><input type="hidden" name="id" value="{{.Facet.ID}}"><button type="submit">Retract</button></form>{{end}}
   <span class="dim">entered by hand in the Workbench</span>
 </div>
@@ -80,6 +80,7 @@
 {{template "track.html" .Track}}
 {{end}}
 
+{{if .CanLink}}<p class="actions"><a href="/select?tick={{.Facet.ID}}">link this…</a> <span class="dim">opens the selection page with this facet in the basket: add the others there, then use the selection to write the link</span></p>{{end}}
 {{if .Links.Note}}
 <h2>links</h2>
 <p class="meta">{{.Links.Note}}</p>

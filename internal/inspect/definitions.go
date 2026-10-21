@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 )
@@ -57,8 +58,10 @@ type defSummary struct {
 	Family    string
 	Fields    int
 	Described int
-	// Enterable is set for a type the Workbench enters by hand (card 188).
+	// Enterable is set for a type the Workbench enters by hand (card 188), and
+	// EnterURL is its form.
 	Enterable bool
+	EnterURL  string
 }
 
 func (s *Server) definitionsIndex(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +80,7 @@ func (s *Server) definitionsIndex(w http.ResponseWriter, r *http.Request) {
 	var rows []defSummary
 	for _, d := range reg.All() {
 		row := defSummary{Type: d.Type, Current: d.Version, Origin: origin[d.Type], Classification: d.Classification,
-			Kind: d.Kind, Family: d.Family, Enterable: s.enterable(d.Type)}
+			Kind: d.Kind, Family: d.Family, Enterable: s.enterable(d.Type), EnterURL: enterURL(d.Type)}
 		for v := range bodies[d.Type] {
 			row.Versions = append(row.Versions, v)
 		}
@@ -212,7 +215,7 @@ func (s *Server) definitionPage(w http.ResponseWriter, r *http.Request) {
 	data.Described = described(data.Fields)
 	data.Description = schemaDescription(body)
 	if s.enterable(t) && v == data.Current {
-		data.EnterURL = "/entry?type=" + url.QueryEscape(string(t))
+		data.EnterURL = enterURL(t)
 	}
 	render(w, "definition.html", data)
 }
@@ -411,4 +414,14 @@ func schemaDescription(body []byte) string {
 	}
 	_ = json.Unmarshal(body, &m) // already parsed by def.Parse; a miss is an empty line
 	return m.Schema.Description
+}
+
+// enterURL is the form that enters a fact of type t by hand: the link form for
+// record.edge, whose sides are lists the entry form does not draw (card 202), the entry
+// form drawn from the Definition for any other.
+func enterURL(t facet.Type) string {
+	if t == catchup.EdgeType {
+		return "/link"
+	}
+	return "/entry?type=" + url.QueryEscape(string(t))
 }

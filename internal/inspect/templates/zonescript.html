@@ -1,0 +1,44 @@
+{{define "zonescript.html"}}
+<script>
+  // The fact names the zone it was said in (card 198): the browser's own, sent with
+  // basis source, and the offset the typed wall clock has in it, filled as it is typed
+  // when that is one offset. A wall clock the zone skips or repeats gets none, and the
+  // person types it, rather than this page choosing. A correction keeps its zone.
+  // A fact-time control marked data-now starts at this minute when it is empty: the
+  // link form's moment is when the link is written (card 202).
+  (function () {
+    var form = document.querySelector('form.entry'), zone = document.getElementById('zone'), offset = document.getElementById('offset');
+    var here = '';
+    try { here = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+    if (!form || !here) return;
+    if (!zone.value) {
+      zone.value = here;
+      document.getElementById('zone-line').textContent = 'The offset from UTC the time had in ' + here + ', your browser\'s zone, filled as you type the time.';
+    }
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    function wall(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+    function offsetAt(v) {
+      var m = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/.exec(v);
+      if (!m) return '';
+      var want = m[1] + '-' + m[2] + '-' + m[3] + 'T' + (m[4] || '00') + ':' + (m[5] || '00');
+      var d = new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0));
+      if (wall(d) !== want) return ''; // the zone skips it
+      var off = -d.getTimezoneOffset();
+      for (var i = 0, hs = [-3, 3]; i < hs.length; i++) {
+        var other = -new Date(d.getTime() + hs[i] * 3600e3).getTimezoneOffset();
+        if (other !== off && wall(new Date(d.getTime() + (off - other) * 60000)) === want) return ''; // it repeats
+      }
+      var a = Math.abs(off);
+      return (off < 0 ? '-' : '+') + pad(Math.floor(a / 60)) + ':' + pad(a % 60);
+    }
+    var t = form.querySelector('[data-fact-time]');
+    if (t && !t.value && t.hasAttribute('data-now')) t.value = wall(new Date());
+    function fill() {
+      if (zone.value !== here || !t || !t.value) return;
+      offset.value = offsetAt(t.value);
+    }
+    if (t) { t.addEventListener('change', fill); t.addEventListener('input', fill); }
+    if (!offset.value) fill();
+  })();
+</script>
+{{end}}

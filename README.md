@@ -134,7 +134,7 @@ drops it from the current value and never from the ledger.
 
 Every fact is a **facet** of a named type, and each type has a versioned **Definition**: a JSON
 Schema, which field names the facet, and which field says when it was true. Definitions are
-immutable once published, so a change is a new version. Anam bundles the 35 below, and importers
+immutable once published, so a change is a new version. Anam bundles the 36 below, and importers
 register more. A running daemon lists what it holds at `GET /v1/definitions` and in the
 inspector's definitions page; the bundled files are in
 [`internal/def/manifests/`](internal/def/manifests/), and the gate checks this table against them.
@@ -149,7 +149,7 @@ records a measure, a reading or an event.
 
 | Type | Version | family | kind | What it records | Identity | Fact time |
 |---|---|---|---|---|---|---|
-| `health.heart-rate-day` | 2 | vitals | measure | One figure for a day's heart rate, as an Open mHealth heart-rate body | `id`, `statistic` | interval start |
+| `health.heart-rate.day` | 1 | vitals | measure | One day's resting, minimum and maximum heart rate as one fact (replaces `health.heart-rate-day`'s three a day, card 205) | `id` | interval start |
 | `health.heart-rate-alert` | 5 | vitals | event | One abnormal high heart rate alert from a watch | `source`, `kind`, `fact_time` | `fact_time` |
 | `health.blood-pressure` | 7 | vitals | reading | One blood pressure reading, as an Open mHealth body | `date_excel`, `reading` | `date_excel` |
 | `health.weight` | 5 | body | reading | One body weight | `id` | `date` |
@@ -181,6 +181,7 @@ records a measure, a reading or an event.
 | `place.trip.returned` | 1 | trips | event | Getting home from a trip (was `place.returned` v1 until card 196) | `id` | `date` |
 | `record.edge` | 2 | notes | event | An edge joining facets, with or without words; a note in the person's own words is one (was `note.annotation` (v1 to v3), then `record.note` (v1, v2)) | `id` | `at` |
 | `record.document` | 2 | documents |  | A pointer to one file in the documents library; the bytes never enter the ledger | `path` | `date` |
+| `health.heart-rate-day` | 2 | vitals | measure | One figure for a day's heart rate, as an Open mHealth heart-rate body (replaced by `health.heart-rate.day` at card 205; the garmin importer's snapshot leaves it absent, the operator retracts it, and it is kept for reads as-of before) | `id`, `statistic` | interval start |
 | `health.heart-rate` | 3 |  |  | A period's heart rate metrics (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
 | `health.sleep` | 3 |  |  | A period's sleep metrics (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
 | `health.metric-group` | 3 |  |  | A period's metrics for the health groups with no type of their own (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |

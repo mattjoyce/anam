@@ -159,3 +159,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: the fact names its zone. `time_semantics.fact_time` may carry a `zone_pointer`; `source_time` gains shape v2 with a required `offset`; an id template placeholder may end in `?`. `record.edge` v2 and `health.medication.dose` v2 require `source_time` and are read at its offset; `health.weight` v5 declares it, since records sends weight without it. The dose's template appends `{/source_time/offset?}`. `def.Guard` and `def.Register` hold `identity_template` too, and accept two widenings proved from the stored versions. The Workbench form sends the browser's zone and an offset field the page fills. History holds 74. `record.edge` and `health.medication.dose` leave the source-time list.
 - Bundle: the def and gate component pages, the add-a-definition-version change path and the Definition manifest page say so.
+
+## 2026-10-22, card 205
+
+- Code: `health.heart-rate.day` v1 is bundled, one fact a day with `resting`, `minimum` and `maximum` as optional `{value, unit}` fields, keyed on the day and placed at the start of the interval Garmin counted, with `source_time` in card 197's shape. `health.heart-rate-day` stays bundled for the facts admitted under it. `projections/heart.v3.json` names the new type. The Garmin importer's poll names both types in its snapshot, so `anam retract garmin` retires the old facts; `TestRetract_ASnapshotThatNamesAnOldTypeRetiresItsFacts` proves it over a real ledger.
+- Bundle: the placement decision says the hyphenated name left by a new type, not a rename.

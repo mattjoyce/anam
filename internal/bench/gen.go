@@ -129,7 +129,7 @@ func Generate(ctx context.Context, dir string, sh Shape, progress func(string)) 
 
 	// If this is the realistic shape, generate a comprehensive faux record
 	if sh.Name == "realistic" {
-		return GenerateFauxRecord(ctx, progress)
+		return GenerateFauxRecord(ctx, l, g, clk, progress)
 	}
 
 	base := readings(sh, loc)

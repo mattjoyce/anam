@@ -1,7 +1,7 @@
 ---
 type: component
 title: Inspector (internal/inspect)
-description: "The web harness over the full fold, the Anam Workbench: timeline, facets with the edges touching them, events, projections and definitions, the default library's bytes confined to its root, and forms that enter, correct and retract a fact by hand."
+description: "The web harness over the full fold, the Anam Workbench: timeline, facets with the edges touching them, events, projections, the selection builder and definitions, the default library's bytes confined to its root, and forms that enter, correct and retract a fact by hand."
 timestamp: 2026-10-21T00:00:00Z
 resource: internal/inspect/inspect.go#Handler
 anchor: "func Handler(d Deps) http.Handler {"
@@ -17,9 +17,11 @@ depends_on:
   - /components/mint.md
   - /components/store-ops.md
   - /components/library.md
+  - /components/selection.md
+  - /components/read.md
 ---
 
-A diagnostic tool that also writes (see "Entering a fact by hand" below), and it keeps the full fold rather than reading from checkpoints. Routes: `/`, `/facets`, `/facet`, `/events`, `/projection`, `/document?sha256=<sum>&name=<file name>`, `/definitions`, `/definition`. `/document` finds the file by its sha256 with `library.Find` and opens it under an `os.Root` on the library, so a symlink that points out gets the same 404 as a sum that is not a sha256 or a file that is not there. The `name`, the base of the reference's `path`, only names the download in `Content-Disposition` (card 150). Mounted inside the daemon as the operator role's route (the inspector shows the whole record unprojected, so no reader or importer token opens it), or standalone with `anam inspect`. The number of historical as-of folds it keeps is `inspect_cached_reads` (4 by default, 0 keeps none), a bound on its memory however many instants a person clicks through (card 151).
+A diagnostic tool that also writes (see "Entering a fact by hand" below), and it keeps the full fold rather than reading from checkpoints. Routes: `/`, `/facets`, `/facet`, `/events`, `/projection`, `/select`, `/document?sha256=<sum>&name=<file name>`, `/definitions`, `/definition`. `/document` finds the file by its sha256 with `library.Find` and opens it under an `os.Root` on the library, so a symlink that points out gets the same 404 as a sum that is not a sha256 or a file that is not there. The `name`, the base of the reference's `path`, only names the download in `Content-Disposition` (card 150). Mounted inside the daemon as the operator role's route (the inspector shows the whole record unprojected, so no reader or importer token opens it), or standalone with `anam inspect`. The number of historical as-of folds it keeps is `inspect_cached_reads` (4 by default, 0 keeps none), a bound on its memory however many instants a person clicks through (card 151).
 
 Since 2026-10-13 (card 21) the timeline carries a checkpoint strip under the band: one segment per leaf bucket of the mint's layout, sealed, behind or never minted by the one hash comparison of the bucket's value at W against the log's head, computed for the page and dropped. The daemon hands the inspector its read-only ops handle for that; `anam inspect` over a bare ledger draws no strip.
 
@@ -34,6 +36,19 @@ Since 2026-10-21 (card 104, slice 3) the facet page carries a links section: the
 Since 2026-10-21 (card 201) `GET /projection?p=<name>` opens on a summary, not on every row. It draws the header (watermark, the canonical and served hashes, the projection and as-of controls) and one line per facet type with three counts, served, excluded and superseded. Served and excluded come from `projection.Explain` over the live value the page already holds, so the verdict words are the ones `anam timeline --explain` gives. Superseded comes from the fold's per-facet state alone: a facet at version n has n-1 earlier versions, and a facet that is no longer live has its current version out of force as well, which is the count `fold.Displaced` lists, reached without reading a version from the ledger. A renamed facet's earlier versions count under its current type, because the fold does not hold what type an earlier version had. A facet that is no longer live has no type in the fold, so those are counted together on a line named `(not live)`. Each count is a link that opens its rows.
 
 The rows view is `?p=<name>&type=<type>&show=served|excluded|superseded`, with `from` and `to` as dates on fact time (both ends included) and `asof` as before. It draws that type's rows of that standing, earliest first, at most 500, and when more match it says "Showing the earliest 500 of N" and asks for a narrower window. Only the superseded standing reads versions from the ledger, through `fold.DisplacedWhere` limited to that type's facets; the page before card 201 read all of them for every projection and drew about 45,000 rows. The as-of control works in both views and the links keep it. An unknown `show` or a date that is not YYYY-MM-DD is a 400.
+
+## The selection page
+
+Since 2026-10-21 (card 199) `GET /select` builds a Datalog selection with the shared filter (the [selection component](/components/selection.md)). The program is the value; the criteria and the boxes are a view of it. Every state is an address, so back and reload keep it:
+
+- `p`, the projection the selection reads through, `canonical` by default, chosen as on the projection page; the value is the one `serve.Derive` serves, the query read's own.
+- `from` and `to`, each a date (a `to` date is the whole day) or a whole fact-time, which is how a hand-edited bound off midnight stays a criterion; `type` and `source`, each repeated; `standing`, `live` unless `superseded`.
+- `tick`, the basket, repeated; `fromside`, the ticks on the from side (to is the default); `untick`, the exclusions.
+- `program`, a hand-edited program, in place of all of the criteria and the basket.
+
+The criteria form adds any criterion in any order, each criterion is a chip with the count the criteria up to it match and a link that removes it, and the matches are listed by type, the readings of one type, source and fact time folded into one row with a box per facet. A box is ticked while the program picks the facet. The boxes post back to the page, which answers with a redirect to the address of the new state: a match left unticked becomes an exclusion, and "keep the ticked in the basket" makes each ticked match a tick, so it stays when the criteria change. With more than 500 rows the page lists none, states the count and asks for another criterion; a derivation over `max_read_bytes` is refused the same way. The program shows below in a textarea. A submitted program that `selection.Parse` reads redirects to the address of its criteria; any other runs as text through `read.Evaluate`, the same evaluation `POST /v1/query` makes without its receipt, within the same `max_read_bytes`, and the page turns the criteria and boxes off and says why. The page only reads. "Use this selection" links to `/link` with the program, the projection and the basket with its sides, for card 202's link form to take up.
+
+The projection page's rows view selects its type, window and standing through the same `selection.Filter`, so the two pages admit by one predicate.
 
 ## Entering a fact by hand
 

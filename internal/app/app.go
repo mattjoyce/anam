@@ -118,7 +118,7 @@ func inspectCmd(cfgPath *string) *cobra.Command {
 				cfg.LedgerPath, cfg.PersonID, listen)
 			return inspect.Serve(cmd.Context(), listen, inspect.Deps{
 				Ledger: l, Timeout: cfg.Timeout, Buckets: buckets, Library: cfg.LibraryDir,
-				CachedReads: cfg.InspectCachedReads,
+				CachedReads: cfg.InspectCachedReads, MaxReadBytes: cfg.MaxReadBytes,
 			}, cfg.HTTPReadHeaderTimeout, cfg.ShutdownGrace)
 		},
 	}

@@ -82,19 +82,31 @@ func nodeAt(tree map[string]any, p string) (node map[string]any, at string, ok b
 }
 
 // isContainer reports whether a schema node holds other fields rather than a value:
-// an object or an array, by its declared type or by the members it declares.
+// an object or an array, by its declared type or by the members it declares. A node
+// that may hold a scalar is not a container: the pointer may still bind for that
+// value, so it is not refused.
 func isContainer(node map[string]any) bool {
-	switch node["type"] {
-	case "object", "array":
-		return true
+	types := TypesOf(node)
+	if len(types) == 0 {
+		// No declared type: the value could be a leaf, so the pointer may bind,
+		// unless the node declares members, which makes it plainly a container.
+		if props, _ := node["properties"].(map[string]any); props != nil {
+			return true
+		}
+		if items, _ := node["items"].(map[string]any); items != nil {
+			return true
+		}
+		return false
 	}
-	if props, _ := node["properties"].(map[string]any); props != nil {
-		return true
+	for _, t := range types {
+		switch t {
+		case "object", "array", "null":
+			// A container, or no value at all. Neither is a leaf.
+		default:
+			return false
+		}
 	}
-	if items, _ := node["items"].(map[string]any); items != nil {
-		return true
-	}
-	return false
+	return true
 }
 
 // leavesOf lists the pointers beneath a container that hold a value: its scalar

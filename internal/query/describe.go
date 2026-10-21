@@ -105,7 +105,7 @@ var baseRelations = []Relation{
 	{Name: RelEntry, Arity: 7, Kind: "base", Args: []string{"E", "Type", "FactTime", "Series", "Status", "Source", "DefinitionVersion"},
 		Doc: "one served facet's envelope: id, type, fact-time, series (\"\" for none), status, source, and the Definition version it was admitted under"},
 	{Name: RelAttr, Arity: 3, Kind: "base", Args: []string{"E", "Pointer", "Value"},
-		Doc: "every scalar leaf of a served payload by its JSON pointer; a null is no value, a container is its leaves; a constant pointer must be one some Definition declares"},
+		Doc: "every scalar leaf of a served payload by its JSON pointer; a null is no value and a container is not a value either, so ask for the leaves beneath it; a constant pointer must be one some Definition declares and not one that names a container"},
 	{Name: RelCloses, Arity: 1, Kind: "base", Args: []string{"Type"},
 		Doc: "the types whose Definition closes a series"},
 	{Name: RelInstant, Arity: 1, Kind: "parameter", Args: []string{"At"},

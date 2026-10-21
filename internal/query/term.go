@@ -9,7 +9,8 @@ import (
 )
 
 // Kind is the type of a constant. A query sees the three scalar kinds JSON has, and
-// nothing else: a container at a pointer is not a value, its leaves are.
+// nothing else: a container at a pointer is not a value, and the leaves beneath it
+// are.
 type Kind uint8
 
 // The kinds, in the order constants of different kinds sort.

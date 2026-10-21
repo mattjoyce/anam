@@ -64,7 +64,7 @@ Four relations are known before the program says anything.
 | Relation | Arguments | Meaning |
 |---|---|---|
 | `entry/7` | `E, Type, FactTime, Series, Status, Source, DefinitionVersion` | One served facet's envelope. `Series` is `""` for a facet that stands alone. `DefinitionVersion` is the version the payload was admitted under. |
-| `attr/3` | `E, Pointer, Value` | Every scalar leaf of a served payload, by its JSON pointer (RFC 6901, so `/cuff/arm`, `/tags/0`). A null is no value and a container is its leaves. Numbers are numbers, strings strings, `true` and `false` booleans. |
+| `attr/3` | `E, Pointer, Value` | Every scalar leaf of a served payload, by its JSON pointer (RFC 6901, so `/cuff/arm`, `/tags/0`). A null is no value, and a container is not a value either: ask for the leaves beneath it. Numbers are numbers, strings strings, `true` and `false` booleans. |
 | `closes/1` | `Type` | The types whose Definition closes a series. |
 | `instant/1` | `At` | A parameter. The program defines it, as facts or as a rule, and the bundled rules read it. |
 
@@ -83,8 +83,12 @@ been.
 
 A constant pointer in `attr/3` must be a field some Definition declares. `attr(E, "/systolic", V)`
 runs. `attr(E, "/nope", V)` is refused before anything is read, because a name no type declares could
-only ever be empty. A variable in the pointer position reaches every leaf, including the ones of a
-type that declares no schema.
+only ever be empty. A pointer that names a container is refused too, when every Definition that
+declares it declares it as one: `attr` holds leaves and a container holds none, so the program would
+answer empty forever and say nothing. The refusal names the leaves to ask for instead, so
+`attr(E, "/cuff", V)` is refused with `/cuff/arm` in the message. A pointer that names a container in
+one type and a field in another is not refused: the field binds for the type that has one. A variable
+in the pointer position reaches every leaf, including the ones of a type that declares no schema.
 
 The catalogue lists each type's pointers by Definition version, so write a program against it.
 

@@ -36,7 +36,7 @@ func TestBug_AttrPointerToAContainerIsRefused(t *testing.T) {
 		`cuff(E, A) :- entry(E, "health.blood-pressure", _, _, _, _, _), attr(E, "/cuff", A).`, "cuff")
 	if err == nil {
 		t.Fatal("the engine accepted attr(E, \"/cuff\", A): /cuff names a container and attr holds only " +
-			"scalar leaves, so the program can never bind and answers empty — the shape checkDefined refuses: " +
+			"scalar leaves, so the program can never bind and answers empty. That is the shape checkDefined refuses: " +
 			"\"reached silently it would be empty and the answer wrong\"")
 	}
 	if !strings.Contains(err.Error(), "/cuff") {

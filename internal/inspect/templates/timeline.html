@@ -49,6 +49,10 @@
   .band .pt path { stroke: var(--ring); stroke-width: 1; }
   .band .pt:hover path { stroke: currentColor; stroke-width: 1.5; }
   .band .dead path, .band .dead line, .band .dead text { opacity: .3; }
+  /* a saved selection highlighted among the rest (card 206): the rest fade, its own ringed */
+  .band .faded path, .band .faded line, .band .faded text { opacity: .15; }
+  .band .pt.picked path { stroke: currentColor; stroke-width: 1.8; }
+  .band .run.picked line { stroke-width: 4; }
   /* a run: two end marks joined by a line in the lane's hue, the count above (card 135) */
   .band .run line { stroke-width: 3; stroke-linecap: round; }
   .band .run:hover line { stroke-width: 5; }
@@ -123,6 +127,13 @@
 <br><span class="mono dim">canonical {{.Hash}}</span>{{with .Checkpoints}}{{if .Have}}
 <br>{{if .Wrong}}<span class="cp-wrong">checkpoint strip not drawn: {{.Wrong}}. The timeline above is the ledger's and stands; the operator rebuilds the operational store by deleting the tracking file and restarting.</span>{{else}}<span class="cp-summary">{{.Total}} bucket{{if ne .Total 1}}s{{end}}, {{.Sealed}} sealed{{if .Behind}}, <span class="cp-behind">{{.Behind}} behind</span>{{end}}{{if .Never}}, <span class="cp-never">{{.Never}} never minted</span>{{end}} at W = {{$.W}}{{if .HasRun}} · last mint run at W = {{.Run}}{{else}} · no mint run yet{{end}}{{if not .LogSealed}} · <strong>mint log unsealed</strong>: a mint did not finish, so reads fold in full until the next one{{end}}</span>{{end}}{{end}}{{end}}</p>
 
+{{with .Sel}}<p class="note selection-drawn" id="sel-drawn"><strong id="sel-header">selection sel:{{.Code}}, {{.Count}} facet{{if ne .Count 1}}s{{end}}</strong>
+  {{if .TooLarge}}<br><span id="sel-too-large">This selection is too large to run over this window: {{.TooLarge}}. Narrow the window, by dragging a span on the band or zooming in, and it runs again over less.</span>
+  {{else if .Problem}}<br><span id="sel-problem">The program could not be run: {{.Problem}}</span>{{end}}
+  <br>{{if .Highlight}}<a href="{{$.SelNav.Only}}" id="sel-only">draw it alone</a> · <span>highlighted among the rest</span>{{else}}<span>drawn alone</span> · <a href="{{$.SelNav.Highlight}}" id="sel-highlight">highlight it among the rest</a>{{end}}
+  · <a href="{{$.SelNav.Select}}">open it on the select page</a> · <a href="{{$.SelNav.Clear}}" id="sel-clear-view">the timeline without it</a>
+  <span class="dim">the program runs over the canonical's facets in the window</span></p>{{end}}
+
 <div class="surface">
   <h2>capture — the ledger <span class="dim hint">({{if eq .Status ""}}the live facets at their fact time; the dead on request{{else if eq .Status "dead"}}the tombstoned and rejected alone, ghosted{{else}}every facet, marked at its folded status; the dead are ghosted{{end}})</span></h2>
 
@@ -133,8 +144,8 @@
     {{range .Ticks}}<line class="tick" x1="{{.X}}" y1="20" x2="{{.X}}" y2="{{$.Baseline}}"/>
     <text x="{{.X}}" y="{{$.Baseline}}" dy="16" text-anchor="middle">{{.Label}}</text>{{end}}
     <line class="baseline" x1="{{.PlotLeft}}" y1="{{.Baseline}}" x2="{{.PlotRight}}" y2="{{.Baseline}}"/>
-    {{range .Runs}}<a class="run{{if not .Live}} dead{{end}}" href="{{.Href}}"><title>{{.Title}}</title><line class="{{.Hue}}" x1="{{.X1}}" y1="{{.Y}}" x2="{{.X2}}" y2="{{.Y}}"/><path class="{{.Hue}}" d="{{.First}}"/><path class="{{.Hue}}" d="{{.Last}}"/>{{if .Label}}<text x="{{.LabelX}}" y="{{.LabelBaseline}}" text-anchor="middle">{{.Label}}</text>{{end}}</a>
-    {{end}}{{range .Points}}<a class="pt{{if not .Live}} dead{{end}}" href="/facet?id={{.ID}}" data-x="{{.X}}" data-y="{{.Y}}" data-t="{{.MS}}" data-title="{{.Title}}"><path class="{{.Hue}}" d="{{.Path}}"><title>{{.Title}}</title></path></a>
+    {{range .Runs}}<a class="run{{if not .Live}} dead{{end}}{{if .Picked}} picked{{end}}{{if .Faded}} faded{{end}}" href="{{.Href}}"><title>{{.Title}}</title><line class="{{.Hue}}" x1="{{.X1}}" y1="{{.Y}}" x2="{{.X2}}" y2="{{.Y}}"/><path class="{{.Hue}}" d="{{.First}}"/><path class="{{.Hue}}" d="{{.Last}}"/>{{if .Label}}<text x="{{.LabelX}}" y="{{.LabelBaseline}}" text-anchor="middle">{{.Label}}</text>{{end}}</a>
+    {{end}}{{range .Points}}<a class="pt{{if not .Live}} dead{{end}}{{if .Picked}} picked{{end}}{{if .Faded}} faded{{end}}" href="/facet?id={{.ID}}" data-x="{{.X}}" data-y="{{.Y}}" data-t="{{.MS}}" data-title="{{.Title}}"><path class="{{.Hue}}" d="{{.Path}}"><title>{{.Title}}</title></path></a>
     {{end}}
     <rect class="sel" id="sel" x="0" y="20" width="0" height="{{.Baseline}}" visibility="hidden" pointer-events="none"/>
   </svg>
@@ -173,6 +184,7 @@
       {{if .DeadHidden}}<a class="dim" href="{{.Nav.AllStatus}}" id="dead-hidden">{{.Dead}} dead hidden</a>{{end}}
       {{if ne .Status ""}}<input type="hidden" name="status" value="{{.Status}}">{{end}}
       {{if .None}}<input type="hidden" name="type" value="none">{{end}}
+      {{with .Sel}}<input type="hidden" name="sel" value="{{.Code}}">{{if .Highlight}}<input type="hidden" name="selmode" value="highlight">{{end}}{{end}}
     </div>
     <div class="legend">
       {{range $g := .Legend}}<fieldset class="fam">

@@ -131,6 +131,18 @@ is 400 with a message that says what to change; a derivation or an answer over `
 of a type declare and others do not. `anam query run` and `anam query describe` are the CLI, local
 or over the daemon. [QUERY.md](QUERY.md) is the reference, with worked questions.
 
+**Saved selections (2026-10-22, card 206).** `POST /v1/selections` takes `{"program": "..."}` and
+answers 201 with `{"code", "hash", "url", "program"}`: the program filed as an artifact of kind
+`selection`, addressed by the SHA-256 of its canonical text (a chip program in its one layout, any
+other trimmed), and its code, the first 8 hex of that hash, lengthened at save to the shortest unique
+prefix when another saved selection shares the 8. `url` is the timeline drawing the selection, a
+path on the daemon (`/?sel=<code>`). `GET /v1/selections/{code}` answers the same shape; the code may
+carry `sel:`. Saving writes an artifact only, never the ledger, so every role may save, as every role
+may publish a receipt. 400 is text that is not a program or a string that is not a code, 404 a code
+nothing was saved under, 409 a prefix that starts two saved selections. The inspector's timeline,
+select page and link form take `?sel=<code>` ([QUERY.md](QUERY.md#saved-selections)); anam-mcp's
+`save_selection` and `open_selection` are the tools.
+
 This document proposes the application API that every client shares: the CLI, the inspector,
 importers, and conversational clients (§8). The two conversational features are **chat with my
 record** and **log this**. The API supplies record operations and evidence; the conversational

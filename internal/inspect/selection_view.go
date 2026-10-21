@@ -39,6 +39,10 @@ type selectData struct {
 	Excluded        []basketItem
 	Handoff         string
 	Limit           int
+	// CanSave says the page can save its program under a code (card 206); Saved is
+	// the saved selection the page was opened at, nil when it was not.
+	CanSave bool
+	Saved   *savedView
 	// Types and Sources are what the served value holds, offered as the criteria's
 	// suggestions.
 	Types, Sources []string

@@ -42,6 +42,12 @@ func pid(ref string) string { return facet.NewID("sel:" + ref) }
 
 func selectServer(t *testing.T) *httptest.Server {
 	t.Helper()
+	return selectServerWith(t, func(*inspect.Deps) {})
+}
+
+// selectServerWith is selectServer with its Deps changed by edit.
+func selectServerWith(t *testing.T, edit func(*inspect.Deps)) *httptest.Server {
+	t.Helper()
 	ctx := context.Background()
 	l, err := ledger.Create(ctx, filepath.Join(t.TempDir(), "ledger.db"), person)
 	if err != nil {
@@ -56,7 +62,9 @@ func selectServer(t *testing.T) *httptest.Server {
 			t.Fatalf("Admit %s: %v", p.ref, err)
 		}
 	}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, MaxReadBytes: 512 << 10}))
+	deps := inspect.Deps{Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, MaxReadBytes: 512 << 10}
+	edit(&deps)
+	srv := httptest.NewServer(inspect.Handler(deps))
 	t.Cleanup(srv.Close)
 	return srv
 }

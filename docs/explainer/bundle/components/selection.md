@@ -1,8 +1,8 @@
 ---
 type: component
 title: Selection (internal/selection)
-description: "The shared filter: fact-time from and to, type or prefix, source, standing, and facets ticked or unticked by hand, as one Go value that compiles to a Datalog pick/1 program and parses back only when the program is one it writes."
-timestamp: 2026-10-21T00:00:00Z
+description: "The shared filter: fact-time from and to, type or prefix, source, standing, and facets ticked or unticked by hand, as one Go value that compiles to a Datalog pick/1 program and parses back only when the program is one it writes; and the store that saves a program under a short code."
+timestamp: 2026-10-22T00:00:00Z
 resource: internal/selection/program.go#Program
 anchor: "func (f Filter) Program() (string, error) {"
 basis: code
@@ -23,4 +23,12 @@ The filter has two readings, and `TestEquality_ProgramIsThePredicate` holds them
 
 `Parse` reads a program back to the filter only when it is one `Program` writes, rule for rule: layout, comments and the order of the rules do not matter, anything else does. It extracts a candidate filter, writes that filter's program, and compares the two sets of rules; a join, a recursion, an `attr`, a constant in an `entry` slot or a bare date is `ErrNotChips`, and the error names the line. `Parse(f.Program())` is `f.Canonical()` for every filter `Validate` accepts (`TestRoundTrip`).
 
-The consumers resolve the program differently. The inspector's selection page draws the criteria from it and runs it through `read.Evaluate`, the evaluation `POST /v1/query` makes, without a receipt. The projection page's rows view (card 201) selects its type, window and standing by `Matches`. The link form (card 202) will resolve it to ids once, when an edge is saved, and migrate (card 200) will keep a query receipt beside its run.
+The consumers resolve the program differently. The inspector's selection page draws the criteria from it and runs it through `read.Evaluate`, the evaluation `POST /v1/query` makes, without a receipt. The projection page's rows view (card 201) selects its type, window and standing by `Matches`. The link form (card 202) resolves it to ids once, when it opens, and migrate (card 200) will keep a query receipt beside its run.
+
+## Saved selections and their codes
+
+Since 2026-10-22 (card 206) `selection.Store` (`saved.go`) saves a program under a short code, over the artifact store's `Put`, `Get` and `List`. `CanonicalText` is what a program is saved and hashed as: `Program` of what `Parse` reads off it when it is within the grammar, so another layout or rule order is the same selection, and otherwise the text trimmed. `Save` refuses text that is empty or does not parse (`ErrNotProgram`) and files the canonical text as an artifact of kind `selection`, addressed by its SHA-256. The code is the first `CodeLen` (8) hex digits of that hash, written `sel:<code>`.
+
+When another saved selection already shares those 8 digits, the new code lengthens to the shortest prefix of its hash no other saved selection shares, and the lengthened code is filed first, as a small JSON artifact of kind `selection-code` (`{"code", "hash"}`): which of two colliding selections came first is a fact the hashes cannot say, so it is written down once. The first keeps its 8 digits. Saving again answers the code already given and writes nothing new. `Open` resolves a code: a filed code names its selection; 8 digits name the one saved selection starting with them that did not lengthen; a longer code that was never filed is read as a prefix of a hash. No match is `ErrNoCode`, two is `ErrAmbiguous`, and a string that cannot be a code is `ErrBadCode`. The test finds two tick programs whose hashes share `f7c90470` and holds that the later one's code is `f7c90470d` and both still open.
+
+A code names the program, not its results: as the record grows the same code may select more. The artifacts are authored, not derived, so a backup carries them with the receipts. The file name ends `.json` as every artifact's does, though a selection's bytes are its Datalog text.

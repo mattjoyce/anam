@@ -346,6 +346,41 @@ A program a person edits past what the chips can express (a join, a recursion, a
 as text. `selection.Parse` reads a program back to criteria only when the builder could have written
 it, and says so when it could not.
 
+## Saved selections
+
+A selection is handed on as its program, and since card 206 also as a short code. "Save this
+selection" on the select page, or `POST /v1/selections` with `{"program": "..."}`, files the program
+as an artifact of kind `selection`, addressed by the SHA-256 of its canonical text, and answers its
+code, written `sel:<code>`. The canonical text is what `selection.Parse` then `Program` write for a
+program within the chip grammar, so the same selection written in another layout or rule order has
+the same code; any other program is saved as its text, trimmed.
+
+The code is the first 8 hex digits of the hash. At save, if another saved selection shares those 8,
+the new one's code lengthens to the shortest prefix of its hash that no other saved selection shares,
+and that lengthened code is filed as a second small artifact, kind `selection-code`, since which of
+the two came first is not something the hashes can say. The first one keeps its 8 digits. A code is
+written once and never rewritten, so it never changes meaning. Saving the same program again writes
+nothing and answers the same code.
+
+A code names the program, not its results. As the record grows the same code may select more; a
+receipt is what pins the results at a watermark.
+
+| Where | What it takes |
+|---|---|
+| `GET /select?sel=<code>` | the program, with the chips filled when it is within the grammar |
+| `GET /?sel=<code>` | the timeline drawing only the facets the program selects in the window; `selmode=highlight` draws every facet with the selection's picked out |
+| `GET /link?sel=<code>` | the link form, its basket filled from the program as `program=` fills it |
+| `GET /v1/selections/{code}` | `{code, hash, url, program}`, for any role |
+| anam-mcp | `save_selection` and `open_selection` |
+
+The timeline runs the program through `read.Evaluate`, as the select page does, over the canonical's
+facets whose fact time lies in the window, bounded by `max_read_bytes`. Over the bound it says so and
+asks for a narrower window, which runs the program over less. Its header reads "selection
+sel:<code>, N facets". A code nothing was saved under is a 404 page that says so, never an empty
+timeline. A code may be given with or without `sel:`; 8 digits name the selection first saved under
+them, and a longer code names the one it was lengthened to, or the one saved selection whose hash it
+starts.
+
 ## Where each thing lives
 
 | Thing | Where |
@@ -355,4 +390,5 @@ it, and says so when it could not.
 | The query read and its receipt | `internal/read/query.go`, `internal/serve/query.go` |
 | The routes | `internal/daemon/query.go`, described in `GET /v1/openapi.yaml` |
 | The selection builder | `internal/selection` |
+| Saved selections and their codes | `internal/selection/saved.go`; the pages in `internal/inspect/selection_saved.go`; the routes in `internal/daemon/selections.go` |
 | This page's tests | `internal/query/docs_test.go` |

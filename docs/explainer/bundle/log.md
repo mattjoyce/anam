@@ -169,3 +169,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: `health.heart-rate.day` v1 is bundled, one fact a day with `resting`, `minimum` and `maximum` as optional `{value, unit}` fields, keyed on the day and placed at the start of the interval Garmin counted, with `source_time` in card 197's shape. `health.heart-rate-day` stays bundled for the facts admitted under it. `projections/heart.v3.json` names the new type. The Garmin importer's poll names both types in its snapshot, so `anam retract garmin` retires the old facts; `TestRetract_ASnapshotThatNamesAnOldTypeRetiresItsFacts` proves it over a real ledger.
 - Bundle: the placement decision says the hyphenated name left by a new type, not a rename.
+
+## 2026-10-22, card 206
+
+- Code: a selection has a short code. `selection.Store` files a program as an artifact of kind `selection`, addressed by the SHA-256 of its canonical text, under the code `sel:` and its first 8 hex digits, lengthened at save to the shortest unique prefix when another saved selection shares them, the lengthened code filed as a `selection-code` artifact. The select page saves (`POST /select/save`); `/select`, `/` and `/link` take `?sel=<code>`, the timeline drawing the selection alone or highlighted (`selmode`) within the window and `max_read_bytes`, and an unknown code is a 404 page. `POST /v1/selections` and `GET /v1/selections/{code}` for any role. anam-mcp has `save_selection` and `open_selection`.
+- Bundle: the selection component has a section on saved selections and their codes; the inspector component has one on the save and on `?sel=` across its pages.

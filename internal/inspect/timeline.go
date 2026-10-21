@@ -49,6 +49,9 @@ type tlPoint struct {
 	// re-deriving the layout.
 	X, Y float64
 	MS   int64
+	// Picked and Faded mark a saved selection drawn among the rest (card 206): the
+	// facets it selects, and every other one.
+	Picked, Faded bool
 }
 
 type tlTick struct {
@@ -140,6 +143,16 @@ type timelineData struct {
 	// 21): every leaf bucket of the checkpoint layout at its state against the
 	// log. Have is false when the inspector was given no log.
 	Checkpoints tlCheckpoints
+
+	// Sel is the saved selection drawn (card 206), nil for none; SelNav its links.
+	Sel    *tlSelection
+	SelNav tlSelNav
+	ref    selRef
+}
+
+// tlSelNav is the selection's links: the window drawn the other way, and without it.
+type tlSelNav struct {
+	Only, Highlight, Clear, Select string
 }
 
 // tlCheckpoints summarises the checkpoint log at W and carries the buckets that
@@ -191,7 +204,8 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), s.timeout)
 	defer cancel()
 
-	status, err := parseStatus(r.URL.Query().Get("status"))
+	q := r.URL.Query()
+	status, err := parseStatus(q.Get("status"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -207,10 +221,17 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	from, to, zoomed, err := parseWindow(r.URL.Query().Get("from"), r.URL.Query().Get("to"), all)
+	from, to, zoomed, err := parseWindow(q.Get("from"), q.Get("to"), all)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+	var sel *tlSelection
+	if code := q.Get("sel"); code != "" {
+		var ok bool
+		if sel, all, from, to, ok = s.drawSelection(ctx, w, q, res, all, from, to, zoomed); !ok {
+			return
+		}
 	}
 
 	// The Definitions in force say what each type is (kind, family; card 176), so a
@@ -220,7 +241,7 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err)
 		return
 	}
-	data := buildTimeline(newStyles(reg), res, all, from, to, zoomed, r.URL.Query()["type"], status)
+	data := buildTimeline(newStyles(reg), res, all, from, to, zoomed, q["type"], status, sel)
 	if s.checkpoints != nil {
 		states, summary, err := checkpointStates(ctx, s.checkpoints, res, s.buckets)
 		switch {
@@ -326,7 +347,7 @@ func parseInstant(s string) (t time.Time, dateOnly bool, err error) {
 	return t, false, nil
 }
 
-func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.Time, zoomed bool, typeQ []string, status statusFilter) timelineData {
+func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.Time, zoomed bool, typeQ []string, status statusFilter, sel *tlSelection) timelineData {
 	x := func(t time.Time) float64 {
 		frac := float64(t.Sub(from)) / float64(to.Sub(from))
 		return bandLeft + frac*(bandW-bandLeft-bandRight)
@@ -355,7 +376,8 @@ func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.
 		}
 	}
 	show, selected, none := typeFilter(typeQ, types)
-	view := tlView{Types: selected, None: none, Status: status}
+	ref := sel.ref()
+	view := tlView{Types: selected, None: none, Status: status, Sel: ref}
 
 	// Rows come from every type in the ledger, not the filtered few, so a filter
 	// hides marks without moving the rows that are left.
@@ -378,6 +400,7 @@ func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.
 		Filtered: selected != nil || none, None: none, Status: status,
 		Dead: len(res.States) - len(res.Live), DeadHidden: !status.wantsDead() && len(res.States) > len(res.Live),
 		Nav: navLinks(from, to, view),
+		Sel: sel, ref: ref,
 	}
 	if zoomed {
 		data.From = from.UTC().Format(time.RFC3339)
@@ -390,18 +413,21 @@ func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.
 		}
 	}
 	sort.Slice(events, func(i, j int) bool { return events[i] < events[j] })
-	data.Nav.AllTypes = windowLink(from, to, zoomed, tlView{Status: status})
-	data.Nav.EventsOnly = windowLink(from, to, zoomed, tlView{Types: events, Status: status})
-	data.Nav.NoTypes = windowLink(from, to, zoomed, tlView{None: true, Status: status})
-	data.Nav.AllStatus = windowLink(from, to, zoomed, tlView{Types: selected, None: none, Status: statusAll})
-	data.Nav.LiveOnly = windowLink(from, to, zoomed, tlView{Types: selected, None: none})
-	data.Nav.DeadOnly = windowLink(from, to, zoomed, tlView{Types: selected, None: none, Status: statusDead})
+	data.Nav.AllTypes = windowLink(from, to, zoomed, tlView{Status: status, Sel: ref})
+	data.Nav.EventsOnly = windowLink(from, to, zoomed, tlView{Types: events, Status: status, Sel: ref})
+	data.Nav.NoTypes = windowLink(from, to, zoomed, tlView{None: true, Status: status, Sel: ref})
+	data.Nav.AllStatus = windowLink(from, to, zoomed, tlView{Types: selected, None: none, Status: statusAll, Sel: ref})
+	data.Nav.LiveOnly = windowLink(from, to, zoomed, tlView{Types: selected, None: none, Sel: ref})
+	data.Nav.DeadOnly = windowLink(from, to, zoomed, tlView{Types: selected, None: none, Status: statusDead, Sel: ref})
+	if sel != nil {
+		data.SelNav = selNav(from, to, zoomed, view)
+	}
 
 	// Each lane (a type, live or dead) collects its marks in time order; runs are
 	// found per lane, so a dead stretch never hides inside a live one.
 	type laneKey struct {
-		typ  facet.Type
-		live bool
+		typ          facet.Type
+		live, picked bool
 	}
 	lanes := map[laneKey][]laneMark{}
 	var laneOrder []laneKey
@@ -418,7 +444,8 @@ func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.
 		mark := st.markClass(f.Type)
 		when := f.FactTime.UTC().Format("2006-01-02 15:04Z")
 		px, py := x(f.FactTime), yOf[f.Type]
-		key := laneKey{f.Type, state.Live()}
+		picked := sel != nil && sel.Picked[f.ID]
+		key := laneKey{f.Type, state.Live(), picked}
 		if _, ok := lanes[key]; !ok {
 			laneOrder = append(laneOrder, key)
 		}
@@ -428,8 +455,12 @@ func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.
 			Title: fmt.Sprintf("%s · %s · v%d %s · %s",
 				when, f.Type, f.ArtifactVersion, state.Status, f.Provenance.SourceRef),
 			X: px, Y: py, MS: f.FactTime.UnixMilli(),
+			Picked: picked && sel.Highlight(), Faded: !picked && sel.Highlight(),
 		}})
 		data.Shown++
+		if picked {
+			sel.Count++
+		}
 		if state.Live() {
 			data.Strip = append(data.Strip, tlStripEntry{
 				ID: f.ID, Type: f.Type, Hue: hue, Title: when + " · " + string(f.Type),
@@ -469,7 +500,7 @@ func bucketStrip(states []bucketState, summary tlCheckpoints, res fold.Result, f
 		frac := float64(t.Sub(from)) / float64(to.Sub(from))
 		return data.PlotLeft + frac*(data.PlotRight-data.PlotLeft)
 	}
-	view := tlView{Status: data.Status}
+	view := tlView{Status: data.Status, Sel: data.ref}
 	for _, st := range states {
 		lo, hi := st.Bucket.From(), st.Bucket.To()
 		if lo.Before(from) {
@@ -557,7 +588,7 @@ func tallyStrip(st styles, strip []tlStripEntry, types []facet.Type, from, to ti
 		}
 		tally = append(tally, tlTally{
 			Type: t, Hue: hueClass(st.of(t).Family), Count: n,
-			Href: windowLink(from, to, zoomed, tlView{Types: []facet.Type{t}, Status: view.Status}),
+			Href: windowLink(from, to, zoomed, tlView{Types: []facet.Type{t}, Status: view.Status, Sel: view.Sel}),
 		})
 	}
 	return tally

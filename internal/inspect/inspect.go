@@ -1,7 +1,9 @@
 // Package inspect serves the web view over the ledger, the Anam Workbench: pages that
 // read what Anam holds (MVP.md §3), and, when the daemon hands it a Workbench, forms
 // that enter, correct and retract a fact by hand through the gate (card 188). The
-// read pages never write; the entry routes are their own handlers (workbench.go).
+// read pages never write; the entry routes are their own handlers (workbench.go), and
+// so is the select page's save, which files a program as an artifact under a short
+// code and never touches the ledger (card 206, selection_saved.go).
 //
 // Since R4 the fold exists, so the inspector renders both of Anam's surfaces under
 // their own names (§7): the landing page is the capture→compose picture — the
@@ -84,6 +86,10 @@ type Server struct {
 	// POST /v1/query (card 199); zero is no bound.
 	maxReadBytes int
 
+	// selections saves and opens selections by their short code (card 206); nil
+	// means this inspector keeps none, and ?sel= answers so.
+	selections Selections
+
 	// bench is the Workbench the daemon supplies for entering facets by hand; nil means
 	// the inspector only reads, and the entry routes do not exist (card 188).
 	bench Workbench
@@ -129,6 +135,9 @@ type Deps struct {
 	// Workbench lets the pages enter, correct and retract facets by hand, through the
 	// daemon's write; nil leaves the inspector read-only (a standalone `anam inspect`).
 	Workbench Workbench
+	// Selections saves a selection's program under a short code and opens it again
+	// (card 206); nil leaves the pages without saved selections.
+	Selections Selections
 	// CachedReads is how many historical folds the inspector keeps
 	// (inspect_cached_reads); zero keeps none.
 	CachedReads int
@@ -143,7 +152,7 @@ func Handler(d Deps) http.Handler {
 	s := &Server{
 		ledger: d.Ledger, timeout: d.Timeout, buckets: d.Buckets, library: d.Library,
 		defs: d.Definitions, heldDefs: d.Held, checkpoints: d.Checkpoints, edges: d.Edges, projections: d.Projections,
-		cachedReads: d.CachedReads, bench: d.Workbench, maxReadBytes: d.MaxReadBytes,
+		cachedReads: d.CachedReads, bench: d.Workbench, maxReadBytes: d.MaxReadBytes, selections: d.Selections,
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.timeline)
@@ -157,6 +166,9 @@ func Handler(d Deps) http.Handler {
 	mux.HandleFunc("GET /document", s.document)
 	mux.HandleFunc("GET /definitions", s.definitionsIndex)
 	mux.HandleFunc("GET /definition", s.definitionPage)
+	if s.selections != nil {
+		mux.HandleFunc("POST /select/save", s.saveSelection)
+	}
 	if s.bench != nil {
 		mux.HandleFunc("GET /entry", s.entryPage)
 		mux.HandleFunc("POST /entry", s.entrySubmit)

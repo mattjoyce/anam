@@ -28,8 +28,8 @@ type route struct {
 	handler http.Handler
 }
 
-// Who may call a route. Reading the record, and publishing a read, which writes
-// artifacts and never the ledger, is every role's. Submitting is an importer's alone:
+// Who may call a route. Reading the record, and publishing a read or saving a
+// selection, which write artifacts and never the ledger, is every role's. Submitting is an importer's alone:
 // an envelope is admitted as its importer's source, and the operator is no source.
 // Running the daemon is the operator's, and so is the inspector, which shows the
 // whole record unprojected.
@@ -48,7 +48,7 @@ func (d *Daemon) routes() []route {
 		Ledger: d.read, Timeout: d.cfg.Timeout, Buckets: buckets, Library: d.cfg.LibraryDir,
 		Definitions: d.defs.current.Load, Held: d.heldDefinitions, Checkpoints: index, Edges: index,
 		Projections: d.projections.current.Load, CachedReads: d.cfg.InspectCachedReads,
-		Workbench: d.workbenchFor(), MaxReadBytes: d.cfg.MaxReadBytes,
+		Workbench: d.workbenchFor(), MaxReadBytes: d.cfg.MaxReadBytes, Selections: d.selections,
 	})
 	f := func(pattern string, roles []config.Role, h http.HandlerFunc) route { return route{pattern, roles, h} }
 	return []route{
@@ -61,6 +61,8 @@ func (d *Daemon) routes() []route {
 		f("GET /v1/receipts/{hash}", anyRole, d.getReceipt),
 		f("GET /v1/receipts/{hash}/verify", anyRole, d.verifyReceipt),
 		f("GET /v1/receipts/{hash}/facets/{facet_id}", anyRole, d.getReceiptFacet),
+		f("POST /v1/selections", anyRole, d.postSelection),
+		f("GET /v1/selections/{code}", anyRole, d.getSelection),
 		f("GET /v1/query", anyRole, d.getQueryCatalogue),
 		f("POST /v1/query", anyRole, d.postQuery),
 		f("GET /v1/projections", anyRole, d.getProjections),

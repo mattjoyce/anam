@@ -1,7 +1,7 @@
 ---
 type: workflow
 title: Migrate to a fresh ledger
-description: anam migrate --from old --to new --yes carries the live facets of one ledger into a new ledger through the gate, each under the Definition version it was admitted under, so ids, hashes and fact times are the old ones and anam-time restarts at the cut.
+description: anam migrate --from old --to new --yes carries the live facets of one ledger into a new ledger through the gate, each under the type's current Definition version when it comes out the same, otherwise under the one it was admitted under, so ids, hashes and fact times are the old ones and anam-time restarts at the cut.
 timestamp: 2026-10-22T00:00:00Z
 resource: internal/app/migrate.go#migrateCmd
 anchor: "func migrateCmd(cfgPath *string) *cobra.Command {"
@@ -48,14 +48,14 @@ steps:
   - actor: /components/gate.md
     caller: /components/cli.md
     label: vet each facet
-    action: "`VetCarry` runs every pillar that needs no ledger read against the version the facet was admitted under: scope, Definition, assurance floor, size, schema, identity, and the facet it would build. The plan holds that facet to the one read: the same id, content hash, fact time, series, classification, descriptor, Definition version and binding, or the facet is refused. Into an empty ledger these pillars are all that can refuse."
+    action: "`VetCarry` runs every pillar that needs no ledger read against one Definition version: scope, Definition, assurance floor, size, schema, identity, and the facet it would build. The plan asks it of the type's current version first and accepts that if the facet built has the same id, content hash, fact time, series, classification, descriptor and binding as the one read, so only the Definition version differs (a move, flagged in the report). If not, it asks again of the version the facet was admitted under and holds it to the same. A facet neither carries is refused. Into an empty ledger these pillars are all that can refuse."
     resource: internal/gate/carry.go#VetCarry
     anchor: "return g.build(p, 1)"
   - actor: /components/cli.md
     label: the report
-    action: "The old head and how many facets are live, then per type and source how many would be carried and how many refused, one line for each group of refusals with a reason, and a line for each `record.edge` end the selection does not carry, with what the old ledger holds of it. Any refusal ends the run with nothing written, even with `--yes`."
+    action: "The old head and how many facets are live, then per type and source how many would be carried, how many of those move to the current Definition version and how many keep their own, and how many refused, a line for each group moved or kept, one line for each group of refusals with a reason, and a line for each `record.edge` end the selection does not carry, with what the old ledger holds of it. Any refusal ends the run with nothing written, even with `--yes`."
     resource: internal/app/migrate.go#writeMigratePlan
-    anchor: '"TYPE\tSOURCE\tCARRY\tREFUSED"'
+    anchor: '"TYPE\tSOURCE\tCARRY\tMOVED\tOWN\tREFUSED"'
   - actor: /components/cli.md
     branch: without --yes
     label: dry run, nothing written
@@ -79,7 +79,7 @@ steps:
   - actor: /components/gate.md
     caller: /components/cli.md
     label: carry them, in blocks
-    action: "`CarryBatch` prepares a block of at most `MaxBatch` facets against the versions they were admitted under, then writes it as `CommitBatch` does: the head read once, one transaction, retried on a stale watermark. Each facet is a first admission with its source, injector, source ref, binding and payload as stored, so its id, hash and fact time come out as they were; the block shares one anam-time."
+    action: "`CarryBatch` prepares a block of at most `MaxBatch` facets against the versions the plan chose for them, then writes it as `CommitBatch` does: the head read once, one transaction, retried on a stale watermark. Each facet is a first admission with its source, injector, source ref, binding and payload as stored, so its id, hash and fact time come out as they were; the block shares one anam-time."
     resource: internal/gate/carry.go#CarryBatch
     anchor: "g.prepareCarry(carries[i])"
   - actor: /components/fold.md
@@ -96,10 +96,10 @@ steps:
     anchor: "is selected now and was not"
 ---
 
-Card 200. The alternative, re-importing every source into a fresh ledger (the [rebuild](rebuild-the-record.md)), needs each importer's source and resends what the ledger already holds; this reads the ledger. A facet's id is its source and identity values and its content hash is over its payload alone, so carrying it unchanged through the gate gives the id and hash it had. The fact time is read from the payload by the Definition version it was admitted under, which is why the carry is held to that version and not the one in force.
+Card 200. The alternative, re-importing every source into a fresh ledger (the [rebuild](rebuild-the-record.md)), needs each importer's source and resends what the ledger already holds; this reads the ledger. A facet's id is its source and identity values and its content hash is over its payload alone, so carrying it unchanged through the gate gives the id and hash it had. The fact time is read from the payload by a Definition version, so the carry holds a facet to the current version only when the facet built comes out identical, and otherwise to the version it was admitted under.
 
 Anam-time restarts: every facet is admitted at the cut, one event each, so the new ledger's W is the number of facets carried and no as-of read before the cut can be answered from it. The old pair, kept read-only, answers those, and every old receipt. The operational store catches up by replay when a daemon starts on the new ledger.
 
 The gate's concession is scoped by the call, as the rename's is. `CarryBatch` and `VetCarry` resolve the Definition from a `Held` the gate was given with `Holding`; a gate built without one refuses a carry, and nothing on the wire sets a version, so the API's refusal of an envelope shaped to another version stands.
 
-A facet admitted under a version that does not parse as a contract today cannot be carried faithfully, and the plan refuses it. The 1,600 live `health.weight` facets from `records` are admitted under v1, whose words use the retired `lenient` mode (card 52). They are the one refusal on the live ledger copy of 2026-10-22, and the card names the options.
+A facet admitted under a version that does not parse as a contract today cannot be held to it, so the plan tries the current version, and refuses the facet only if that fails too. The 1,600 live `health.weight` facets from `records` are admitted under v1, whose words use the retired `lenient` mode (card 52). Their payloads pass the current version with the same id, hash and fact time, so they move to it, flagged "moved from v1" (Matt, 2026-10-22). The proof after `--yes` holds identity to id, content hash, fact time and status, and reports the moves apart.

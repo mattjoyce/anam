@@ -29,9 +29,11 @@ func migrateCmd(cfgPath *string) *cobra.Command {
 		Short: "carry the live facets of one ledger into a fresh ledger, through the gate",
 		Long: `Migrate reads an old ledger and its operational store, read-only, and carries the
 live facets of the ledger into a new ledger and operational store that must not exist.
-Every facet arrives under its own type, source, source ref, binding and payload,
-held to the Definition version it was admitted under, so its id, content hash and
-fact time are the ones it had. Superseded versions and tombstoned facets are not
+Every facet arrives under its own type, source, source ref, binding and payload, so
+its id, content hash and fact time are the ones it had. It is held to the type's
+current Definition version first and carried under it if its payload passes and the
+facet comes out identical, flagged as moved; otherwise it is carried under the version
+it was admitted under. Superseded versions and tombstoned facets are not
 carried. Every registered Definition and projection of the old store is written to the
 new one first, so every version a carried facet was admitted under is held.
 
@@ -41,7 +43,8 @@ A record.edge that names a facet the selection does not carry is still carried, 
 the report lists each such link.
 
 Without --yes it is a dry run: it prints, per type and source, how many facets it would
-carry and how many the gate would refuse, and writes nothing. With --yes it creates the
+carry (how many moved to the current version, how many keep their own) and how many
+the gate would refuse, and writes nothing. With --yes it creates the
 new files, carries the selection, then proves the new ledger's live facets equal the
 selection and that a dry run against the new ledger would carry the same set. If any
 facet would be refused, a real run writes nothing.`,
@@ -207,41 +210,22 @@ func writeMigratePlan(out io.Writer, plan migrate.Plan, program bool) {
 		how = "the facets the program picks"
 	}
 	_, _ = fmt.Fprintf(out, "old ledger at W %d: %d live facets; selection is %s: %d facets\n", plan.W, plan.Live, how, len(plan.Items))
-	type key struct {
-		typ    facet.Type
-		source string
-	}
-	carry, refused := map[key]int{}, map[key]int{}
-	var keys []key
-	for _, it := range plan.Items {
-		k := key{it.Facet.Type, it.Facet.Provenance.Source}
-		if _, seen := carry[k]; !seen {
-			if _, seen := refused[k]; !seen {
-				keys = append(keys, k)
-			}
-		}
-		if it.Fate == migrate.FateCarry {
-			carry[k]++
-		} else {
-			refused[k]++
-		}
-	}
-	sort.Slice(keys, func(i, j int) bool {
-		if keys[i].typ != keys[j].typ {
-			return keys[i].typ < keys[j].typ
-		}
-		return keys[i].source < keys[j].source
-	})
 	w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "TYPE\tSOURCE\tCARRY\tREFUSED")
-	totalCarry, totalRefused := 0, 0
-	for _, k := range keys {
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%d\n", k.typ, k.source, carry[k], refused[k])
-		totalCarry += carry[k]
-		totalRefused += refused[k]
+	_, _ = fmt.Fprintln(w, "TYPE\tSOURCE\tCARRY\tMOVED\tOWN\tREFUSED")
+	var total migrate.Row
+	for _, r := range plan.Tally() {
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%d\t%d\t%d\n", r.Type, r.Source, r.Carry(), r.Moved, r.Own, r.Refused)
+		total.Moved += r.Moved
+		total.Own += r.Own
+		total.Refused += r.Refused
 	}
-	_, _ = fmt.Fprintf(w, "total\t\t%d\t%d\n", totalCarry, totalRefused)
+	_, _ = fmt.Fprintf(w, "total\t\t%d\t%d\t%d\t%d\n", total.Carry(), total.Moved, total.Own, total.Refused)
 	_ = w.Flush()
+	_, _ = fmt.Fprintln(out, "MOVED is carried under the type's current Definition version, which it passes with the same id, content hash, fact time and descriptor; OWN under the version it was admitted under.")
+	writeMoves(out, "moved", plan.Moves())
+	for _, k := range plan.Kept() {
+		_, _ = fmt.Fprintf(out, "kept %d %s from %s under its own v%d: %s\n", k.N, k.Type, k.Source, k.Version, k.Why)
+	}
 	writeRefusals(out, plan)
 	for _, l := range plan.Links {
 		_, _ = fmt.Fprintf(out, "link to a facet not carried: %s (%s) %s %s, %s\n",
@@ -249,6 +233,15 @@ func writeMigratePlan(out io.Writer, plan migrate.Plan, program bool) {
 	}
 	for _, id := range plan.NotLive {
 		_, _ = fmt.Fprintf(out, "picked but not live, not carried: %s\n", id)
+	}
+}
+
+// writeMoves lists the facets carried under the current Definition version although
+// they were admitted under an earlier one, one line per type, source and version they
+// came from. The dry run and the proof print the same lines.
+func writeMoves(out io.Writer, label string, moves []migrate.Move) {
+	for _, m := range moves {
+		_, _ = fmt.Fprintf(out, "%s %d %s from %s, moved from v%d to the current v%d\n", label, m.N, m.Type, m.Source, m.From, m.To)
 	}
 }
 
@@ -305,6 +298,12 @@ func writeProof(out io.Writer, plan migrate.Plan, proof migrate.Proof, src migra
 	if proof.Equal() {
 		_, _ = fmt.Fprintf(out, "proof: the new ledger's %d live facets equal the selection's %d, facet for facet by id, content hash, fact time and status\n",
 			proof.Live, len(plan.Items))
+		n := 0
+		for _, m := range proof.Moves {
+			n += m.N
+		}
+		_, _ = fmt.Fprintf(out, "proof: %d facets carry a definition version other than the one they were admitted under, apart from that identity\n", n)
+		writeMoves(out, "proof: moved", proof.Moves)
 		return
 	}
 	_, _ = fmt.Fprintf(out, "proof FAILED: the new ledger holds %d live facets, the selection %d\n", proof.Live, len(plan.Items))

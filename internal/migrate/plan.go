@@ -66,6 +66,19 @@ type Item struct {
 	Status facet.Status
 	Fate   Fate
 	Reason string
+
+	// Under is the Definition version the facet is carried under: the type's current
+	// version when the facet comes out identical under it (Moved), otherwise the
+	// version it was admitted under. It is set when Fate is FateCarry.
+	Under int
+	// Moved is true when Under is the current version and the facet was admitted under
+	// an earlier one. The facet read from the old ledger keeps its own version.
+	Moved bool
+	// NotCurrent says why the facet was not moved though the type has a later current
+	// version: that version is not held as a contract, or does not pass the payload, or
+	// would not give the same facet. Empty when the facet was moved or was admitted
+	// under the current version already.
+	NotCurrent string
 }
 
 // Link is a record.edge in the selection that names a facet the selection does not
@@ -149,8 +162,7 @@ func Read(ctx context.Context, src Source, program string, p Params) (Plan, erro
 	g := carryGate(plan, picked, p, nil)
 	for _, f := range picked {
 		it := Item{Facet: f, Status: res.States[f.ID].Status}
-		it.Fate, it.Reason = vet(g, held, it)
-		plan.Items = append(plan.Items, it)
+		plan.Items = append(plan.Items, vet(g, held, current, it))
 	}
 	if plan.Links, err = danglingLinks(plan.Items, res.States); err != nil {
 		return Plan{}, err
@@ -236,16 +248,17 @@ func selectFacets(ctx context.Context, res fold.Result, current *def.Registry, p
 }
 
 // carryOf is a stored facet offered to a fresh ledger as itself: its type, source,
-// injector, source ref and payload, its binding, and the Definition version it was
-// admitted under.
-func carryOf(f facet.Facet) gate.Carry {
+// injector, source ref and payload, its binding, and the Definition version it is held
+// to, which is the one it was admitted under or, when it comes out the same, the
+// current one.
+func carryOf(f facet.Facet, version int) gate.Carry {
 	return gate.Carry{
 		Env: facet.Envelope{
 			Type: f.Type, Source: f.Provenance.Source, Injector: f.Provenance.Injector,
 			SourceRef: f.Provenance.SourceRef, Payload: f.Payload.Bytes(),
 		},
 		Binding:           f.Binding,
-		DefinitionVersion: f.DefinitionVersion,
+		DefinitionVersion: version,
 	}
 }
 
@@ -256,30 +269,63 @@ func carryGate(plan Plan, facets []facet.Facet, p Params, l gate.Ledger) *gate.G
 	return gate.New(l, plan.current, scopesOf(facets), clock.Real{}, p.Person, p.Limits).Holding(plan.held)
 }
 
-// vet asks the gate what it would make of a facet, and holds the answer to the facet
-// that was read: a carry that would give another id, hash, fact time or classification
-// is a refusal, because the new ledger would not hold the same fact.
-func vet(g *gate.Gate, held *def.Versions, it Item) (Fate, string) {
+// vet asks the gate what it would make of a facet and decides the version it is
+// carried under (Matt, 2026-10-22). The type's current version is tried first, held
+// exactly as the carry holds a version: the facet is accepted under it only if its id,
+// content hash, fact time, series, classification and descriptor all come out as the
+// facet read from the old ledger, so only the definition version number differs. If the
+// current version does not hold the payload, or is not held as a contract, the facet is
+// carried under the version it was admitted under, as before. A facet neither version
+// carries faithfully is refused, because the new ledger would not hold the same fact.
+func vet(g *gate.Gate, held *def.Versions, current *def.Registry, it Item) Item {
 	f := it.Facet
 	if it.Status != facet.StatusAdmitted {
-		return FateRefused, fmt.Sprintf("its status is %q, and the gate admits only a first sight", it.Status)
+		it.Fate, it.Reason = FateRefused, fmt.Sprintf("its status is %q, and the gate admits only a first sight", it.Status)
+		return it
 	}
-	if _, ok := held.At(f.Type, f.DefinitionVersion); !ok {
-		return FateRefused, held.Why(f.Type, f.DefinitionVersion)
+	if cur, ok := current.Lookup(f.Type); ok && cur.Version != f.DefinitionVersion {
+		switch why := tryUnder(g, held, f, cur.Version); why {
+		case "":
+			it.Fate, it.Under, it.Moved = FateCarry, cur.Version, true
+			return it
+		default:
+			it.NotCurrent = fmt.Sprintf("v%d is current and %s", cur.Version, why)
+		}
 	}
-	got, err := g.VetCarry(carryOf(f))
+	if why := tryUnder(g, held, f, f.DefinitionVersion); why != "" {
+		it.Fate, it.Reason = FateRefused, why
+		if it.NotCurrent != "" {
+			it.Reason += "; and " + it.NotCurrent
+		}
+		return it
+	}
+	it.Fate, it.Under = FateCarry, f.DefinitionVersion
+	return it
+}
+
+// tryUnder holds the facet to one Definition version, as the carry will, and answers
+// why it cannot be carried under it, or empty when the gate would build the facet that
+// was read, whose definition version is the version asked.
+func tryUnder(g *gate.Gate, held *def.Versions, f facet.Facet, version int) string {
+	if _, ok := held.At(f.Type, version); !ok {
+		return held.Why(f.Type, version)
+	}
+	got, err := g.VetCarry(carryOf(f, version))
 	if err != nil {
-		return FateRefused, err.Error()
+		return err.Error()
+	}
+	if got.DefinitionVersion != version {
+		return fmt.Sprintf("the gate held it to v%d, not v%d", got.DefinitionVersion, version)
 	}
 	if why := differs(f, got); why != "" {
-		return FateRefused, "the gate would make another facet of it: " + why
+		return "the gate would make another facet of it: " + why
 	}
-	return FateCarry, ""
+	return ""
 }
 
 // differs names the first way the facet the gate would build is not the facet read.
-// Version and the moment of admission are the carry's own; everything else is the
-// fact.
+// The definition version and the moment of admission are the carry's own; everything
+// else is the fact.
 func differs(old, got facet.Facet) string {
 	switch {
 	case got.ID != old.ID:
@@ -294,8 +340,6 @@ func differs(old, got facet.Facet) string {
 		return fmt.Sprintf("classification %s, not %s", got.Classification, old.Classification)
 	case got.Descriptor != old.Descriptor:
 		return fmt.Sprintf("descriptor %+v, not %+v", got.Descriptor, old.Descriptor)
-	case got.DefinitionVersion != old.DefinitionVersion:
-		return fmt.Sprintf("definition v%d, not v%d", got.DefinitionVersion, old.DefinitionVersion)
 	case got.Binding != old.Binding:
 		return fmt.Sprintf("binding %+v, not %+v", got.Binding, old.Binding)
 	}

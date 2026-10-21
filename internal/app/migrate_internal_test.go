@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -155,7 +156,7 @@ type migrationFixture struct {
 	ledgerFixture
 	store                     string
 	dead, kept, changed       string // a tombstoned reading, one left alone, one corrected
-	atV1, movedToV2, atV2     string // test.reading facets: left at v1, v1 then v2, v2
+	atV1, movedToV2, atV2     string // test.reading facets: left at v1 (moved to v2 on the carry), v1 then v2, v2
 	edge                      string
 	newLedger, newStore       string
 	oldLedgerSum, oldStoreSum [32]byte
@@ -257,8 +258,9 @@ func TestMigrate_DryRunReportsAndWritesNothing(t *testing.T) {
 		t.Fatalf("dry run: %v\n%s", err, out)
 	}
 	for _, want := range []string{
-		"health.blood-pressure  bp-csv  1  0", "health.blood-pressure  records  2  0", "test.reading  records  3  0",
-		"record.edge  records  1  0", "total  7  0", "dry run: nothing written",
+		"health.blood-pressure  bp-csv  1  0  1  0", "health.blood-pressure  records  2  0  2  0", "test.reading  records  3  1  2  0",
+		"record.edge  records  1  0  1  0", "total  7  1  6  0", "dry run: nothing written",
+		"moved 1 test.reading from records, moved from v1 to the current v2",
 		"link to a facet not carried: records:9:note:t1:1", f.dead + ", tombstoned",
 	} {
 		if !strings.Contains(squash(out), squash(want)) {
@@ -289,7 +291,8 @@ func TestMigrate_CarriesLiveCurrentVersionsUnderTheirDefinitionVersion(t *testin
 	if err != nil {
 		t.Fatalf("--yes: %v\n%s", err, out)
 	}
-	for _, want := range []string{"carried 7 facets", "W old", "W new 7", "proof: the new ledger's 7 live facets equal the selection's 7", "idempotent"} {
+	for _, want := range []string{"carried 7 facets", "W old", "W new 7", "proof: the new ledger's 7 live facets equal the selection's 7", "idempotent",
+		"proof: moved 1 test.reading from records, moved from v1 to the current v2"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("--yes did not say %q:\n%s", want, out)
 		}
@@ -311,7 +314,7 @@ func TestMigrate_CarriesLiveCurrentVersionsUnderTheirDefinitionVersion(t *testin
 			t.Errorf("%s (%s) is live in the old ledger and missing from the new", of.ID, of.Type)
 		case nf.Descriptor.ContentHash != of.Descriptor.ContentHash || !nf.FactTime.Equal(of.FactTime):
 			t.Errorf("%s: hash %s fact time %s, was %s %s", of.ID, nf.Descriptor.ContentHash, nf.FactTime, of.Descriptor.ContentHash, of.FactTime)
-		case nf.DefinitionVersion != of.DefinitionVersion || nf.Type != of.Type || nf.Provenance != of.Provenance || nf.Binding != of.Binding:
+		case (nf.DefinitionVersion != of.DefinitionVersion && of.ID != f.atV1) || nf.Type != of.Type || nf.Provenance != of.Provenance || nf.Binding != of.Binding:
 			t.Errorf("%s: carried as %s v%d from %+v, was %s v%d from %+v", of.ID, nf.Type, nf.DefinitionVersion, nf.Provenance, of.Type, of.DefinitionVersion, of.Provenance)
 		case nf.ArtifactVersion != 1:
 			t.Errorf("%s is at artifact version %d, want the one version carried", of.ID, nf.ArtifactVersion)
@@ -323,9 +326,9 @@ func TestMigrate_CarriesLiveCurrentVersionsUnderTheirDefinitionVersion(t *testin
 	if got := byID[f.changed].Descriptor.ContentHash; got != currentHash(t, old, f.changed) {
 		t.Errorf("the corrected reading arrived with hash %s, not its current version's", got)
 	}
-	// The reading left at v1 arrives under v1, though the gate would admit its payload
-	// under v2 today; the one corrected under v2 and the one admitted at v2 arrive at v2.
-	for id, want := range map[string]int{f.atV1: 1, f.movedToV2: 2, f.atV2: 2} {
+	// The reading left at v1 passes v2, the type's current version, with the same id,
+	// hash and fact time, so it moves to v2; the other two were admitted under v2.
+	for id, want := range map[string]int{f.atV1: 2, f.movedToV2: 2, f.atV2: 2} {
 		if got := byID[id].DefinitionVersion; got != want {
 			t.Errorf("%s arrived under definition v%d, want v%d", id, got, want)
 		}
@@ -432,13 +435,49 @@ func TestMigrate_RefusesAnExistingTarget(t *testing.T) {
 	}
 }
 
-// A facet admitted under a Definition version the old store does not hold as a contract
-// cannot be carried faithfully, so the dry run names it and a real run writes nothing.
-func TestMigrate_RefusesAFacetWhoseDefinitionVersionIsNotHeld(t *testing.T) {
+// A facet admitted under a Definition version the old store does not hold as a contract,
+// whose payload the current version does not pass either, cannot be carried faithfully
+// under either, so the dry run names it and a real run writes nothing.
+func TestMigrate_RefusesAFacetThatNeitherVersionCarries(t *testing.T) {
 	t.Parallel()
 	f := newLedgerFixture(t)
-	admitAs(t, f.ledgerPath, "records", registryAt(t, readingV1), []record{{"test.reading", readingPayload("2026-04-01T08:00:00Z", 1, "")}})
-	// The store registers v2 only: v1 is not held anywhere.
+	admitAs(t, f.ledgerPath, "records", registryAt(t, readingV1), []record{{"test.reading", readingPayload("2026-04-01T08:00:00Z", 500, "")}})
+	// The store registers v2 only, and v2 caps the level: v1 is not held anywhere, and
+	// the current version does not pass the payload.
+	registerOnly(t, f, 2, readingV3)
+
+	newLedger := filepath.Join(f.dir, "new", "ledger.db")
+	args := []string{"migrate", "--from", f.ledgerPath, "--from-store", filepath.Join(f.dir, "tracking.db"),
+		"--to", newLedger, "--to-store", filepath.Join(f.dir, "new", "tracking.db")}
+	for _, extra := range [][]string{nil, {"--yes"}} {
+		out, _, err := cli(t, f.cfgPath, append(args, extra...)...)
+		if err == nil || !strings.Contains(err.Error(), "1 facets the gate would refuse") ||
+			!strings.Contains(out, "refused 1 test.reading from records at v1") || !strings.Contains(out, "no Definition of test.reading at v1 is held") ||
+			!strings.Contains(out, "v2 is current and") {
+			t.Errorf("migrate %v: %v\n%s", extra, err, out)
+		}
+	}
+	if _, err := os.Stat(newLedger); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("a refused run made the new ledger (%v)", err)
+	}
+}
+
+// readingV3 is v2 of test.reading with a ceiling on the level: a payload above it does
+// not pass. It is written as version 3 or as version 2 by the tests that need it.
+var readingV3 = strings.NewReplacer(`"definition_version": 2`, `"definition_version": 3`,
+	`"level": {"type": "number"}`, `"level": {"type": "number", "maximum": 100}`).Replace(readingV2)
+
+var versionField = regexp.MustCompile(`"definition_version": \d+`)
+
+// bodyAt is a test.reading body re-numbered to version n.
+func bodyAt(body string, n int) string {
+	return versionField.ReplaceAllString(body, fmt.Sprintf(`"definition_version": %d`, n))
+}
+
+// registerOnly writes one test.reading body into the fixture's operational store at
+// version n, and nothing else.
+func registerOnly(t *testing.T, f ledgerFixture, n int, body string) {
+	t.Helper()
 	ctx := context.Background()
 	buckets, err := config.Config{BucketWidth: span.Default}.Buckets()
 	if err != nil {
@@ -448,22 +487,175 @@ func TestMigrate_RefusesAFacetWhoseDefinitionVersionIsNotHeld(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.RegisterDefinition(ctx, ops.DefinitionRow{Type: "test.reading", Version: 2, Body: readingV2}, "2026-10-22T00:00:00.000000000Z"); err != nil {
+	defer func() { _ = db.Close() }()
+	if err := db.RegisterDefinition(ctx, ops.DefinitionRow{Type: "test.reading", Version: n, Body: bodyAt(body, n)}, "2026-10-22T00:00:00.000000000Z"); err != nil {
 		t.Fatal(err)
 	}
-	_ = db.Close()
+}
 
-	newLedger := filepath.Join(f.dir, "new", "ledger.db")
-	args := []string{"migrate", "--from", f.ledgerPath, "--from-store", filepath.Join(f.dir, "tracking.db"),
-		"--to", newLedger, "--to-store", filepath.Join(f.dir, "new", "tracking.db")}
-	for _, extra := range [][]string{nil, {"--yes"}} {
-		out, _, err := cli(t, f.cfgPath, append(args, extra...)...)
-		if err == nil || !strings.Contains(err.Error(), "1 facets the gate would refuse") ||
-			!strings.Contains(out, "refused 1 test.reading from records at v1") || !strings.Contains(out, "no Definition of test.reading at v1 is held") {
-			t.Errorf("migrate %v: %v\n%s", extra, err, out)
+// versionFixture is an old ledger of test.reading at three versions, v3 current, with
+// the store registering v1 as the words of the format card 52 retired (validation mode
+// "lenient"), which no longer parse, as health.weight v1 is.
+type versionFixture struct {
+	ledgerFixture
+	passesV3FromV1, passesV3FromV2, failsV3, atV3 string
+	newLedger, newStore                           string
+}
+
+func newVersionFixture(t *testing.T, lenientV1 bool) versionFixture {
+	t.Helper()
+	f := versionFixture{ledgerFixture: newLedgerFixture(t)}
+	f.newLedger, f.newStore = filepath.Join(f.dir, "new", "ledger.db"), filepath.Join(f.dir, "new", "tracking.db")
+	v1, v2, v3 := registryAt(t, readingV1), registryAt(t, readingV1, readingV2), registryAt(t, readingV1, readingV2, readingV3)
+	admitAs(t, f.ledgerPath, "records", v1, []record{
+		{"test.reading", readingPayload("2026-04-01T08:00:00Z", 5, "")},
+		{"test.reading", readingPayload("2026-04-02T08:00:00Z", 500, "")},
+	})
+	admitAs(t, f.ledgerPath, "records", v2, []record{{"test.reading", readingPayload("2026-04-03T08:00:00Z", 6, "two")}})
+	admitAs(t, f.ledgerPath, "records", v3, []record{{"test.reading", readingPayload("2026-04-04T08:00:00Z", 7, "three")}})
+	f.passesV3FromV1, f.failsV3 = idOf("records", "2026-04-01T08:00:00Z"), idOf("records", "2026-04-02T08:00:00Z")
+	f.passesV3FromV2, f.atV3 = idOf("records", "2026-04-03T08:00:00Z"), idOf("records", "2026-04-04T08:00:00Z")
+	v1Body := readingV1
+	if lenientV1 {
+		v1Body = strings.Replace(readingV1, `"strict"`, `"lenient"`, 1)
+	}
+	registerOnly(t, f.ledgerFixture, 1, v1Body)
+	registerOnly(t, f.ledgerFixture, 2, readingV2)
+	registerOnly(t, f.ledgerFixture, 3, readingV3)
+	return f
+}
+
+func (f versionFixture) migrate(t *testing.T, extra ...string) (string, error) {
+	t.Helper()
+	args := append([]string{"migrate", "--from", f.ledgerPath, "--from-store", filepath.Join(f.dir, "tracking.db"),
+		"--to", f.newLedger, "--to-store", f.newStore}, extra...)
+	out, _, err := cli(t, f.cfgPath, args...)
+	return out, err
+}
+
+// definitionVersions is the version each live facet of a ledger sits under.
+func definitionVersions(t *testing.T, path string) map[string]int {
+	t.Helper()
+	got := map[string]int{}
+	for _, lf := range foldOf(t, path).Live {
+		got[lf.ID] = lf.DefinitionVersion
+	}
+	return got
+}
+
+// The rule (Matt, 2026-10-22): a fact is carried under the type's current Definition
+// version when its payload passes it and comes out identical, flagged in the report;
+// otherwise under the version it was admitted under.
+func TestMigrate_CarriesUnderTheCurrentVersionWhenItComesOutTheSame(t *testing.T) {
+	t.Parallel()
+	f := newVersionFixture(t, false)
+	oldHashes := map[string]string{}
+	for _, lf := range foldOf(t, f.ledgerPath).Live {
+		oldHashes[lf.ID] = lf.Descriptor.ContentHash
+	}
+
+	out, err := f.migrate(t)
+	if err != nil {
+		t.Fatalf("dry run: %v\n%s", err, out)
+	}
+	// The report counts: four carried, two moved (one from v1, one from v2), one kept
+	// under v1 because it does not pass v3, one admitted under v3 already.
+	for _, want := range []string{
+		"test.reading records 4 2 2 0", "total 4 2 2 0",
+		"moved 1 test.reading from records, moved from v1 to the current v3",
+		"moved 1 test.reading from records, moved from v2 to the current v3",
+		"kept 1 test.reading from records under its own v1: v3 is current and",
+	} {
+		if !strings.Contains(squash(out), squash(want)) {
+			t.Errorf("the dry run lacks %q:\n%s", want, out)
 		}
 	}
-	if _, err := os.Stat(newLedger); !errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(f.newLedger); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the dry run made the new ledger (%v)", err)
+	}
+
+	out, err = f.migrate(t, "--yes")
+	if err != nil {
+		t.Fatalf("--yes: %v\n%s", err, out)
+	}
+	for _, want := range []string{
+		"proof: the new ledger's 4 live facets equal the selection's 4, facet for facet by id, content hash, fact time and status",
+		"proof: 2 facets carry a definition version other than the one they were admitted under",
+		"proof: moved 1 test.reading from records, moved from v1 to the current v3",
+		"proof: moved 1 test.reading from records, moved from v2 to the current v3",
+		"idempotent",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("--yes did not say %q:\n%s", want, out)
+		}
+	}
+	got := definitionVersions(t, f.newLedger)
+	for id, want := range map[string]int{f.passesV3FromV1: 3, f.passesV3FromV2: 3, f.failsV3: 1, f.atV3: 3} {
+		if got[id] != want {
+			t.Errorf("%s arrived under definition v%d, want v%d", id, got[id], want)
+		}
+	}
+	for _, nf := range foldOf(t, f.newLedger).Live {
+		if nf.Descriptor.ContentHash != oldHashes[nf.ID] {
+			t.Errorf("%s: content hash %s, was %s: only the definition version may differ", nf.ID, nf.Descriptor.ContentHash, oldHashes[nf.ID])
+		}
+	}
+}
+
+// With v1 held as words that do not parse, the reading above the v3 ceiling is carried
+// under neither version, and the run is refused whole, though the other readings move.
+func TestMigrate_AFactNoVersionCarriesRefusesTheRunAndWritesNothing(t *testing.T) {
+	t.Parallel()
+	f := newVersionFixture(t, true)
+
+	for _, extra := range [][]string{nil, {"--yes"}} {
+		out, err := f.migrate(t, extra...)
+		if err == nil || !strings.Contains(err.Error(), "1 facets the gate would refuse") {
+			t.Errorf("migrate %v: %v, want one refusal\n%s", extra, err, out)
+		}
+		for _, want := range []string{
+			"test.reading records 3 2 1 1", "refused 1 test.reading from records at v1",
+			"do not parse as a contract", "v3 is current and",
+			"moved 1 test.reading from records, moved from v1 to the current v3",
+		} {
+			if !strings.Contains(squash(out), squash(want)) {
+				t.Errorf("migrate %v lacks %q:\n%s", extra, want, out)
+			}
+		}
+	}
+	if _, err := os.Stat(f.newLedger); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("a refused run made the new ledger (%v)", err)
+	}
+}
+
+// The case of the 1,600 weights: the version a fact was admitted under no longer parses,
+// so it cannot be held to, but its payload passes the current version, so it moves.
+func TestMigrate_AnUnparseableAdmittedVersionMovesWhenTheCurrentOnePasses(t *testing.T) {
+	t.Parallel()
+	f := newLedgerFixture(t)
+	// Both readings are admitted under v1 and pass v2; the store holds v1 as words that
+	// do not parse, as health.weight v1 is.
+	admitAs(t, f.ledgerPath, "records", registryAt(t, readingV1), []record{
+		{"test.reading", readingPayload("2026-04-01T08:00:00Z", 1, "")},
+		{"test.reading", readingPayload("2026-04-02T08:00:00Z", 2, "")},
+	})
+	registerOnly(t, f, 1, strings.Replace(readingV1, `"strict"`, `"lenient"`, 1))
+	registerOnly(t, f, 2, readingV2)
+	vf := versionFixture{ledgerFixture: f,
+		newLedger: filepath.Join(f.dir, "new", "ledger.db"), newStore: filepath.Join(f.dir, "new", "tracking.db")}
+
+	out, err := vf.migrate(t, "--yes")
+	if err != nil {
+		t.Fatalf("--yes: %v\n%s", err, out)
+	}
+	for _, want := range []string{"test.reading records 2 2 0 0", "proof: moved 2 test.reading from records, moved from v1 to the current v2", "carried 2 facets"} {
+		if !strings.Contains(squash(out), squash(want)) {
+			t.Errorf("--yes lacks %q:\n%s", want, out)
+		}
+	}
+	for id, v := range definitionVersions(t, vf.newLedger) {
+		if v != 2 {
+			t.Errorf("%s arrived under v%d, want v2", id, v)
+		}
 	}
 }

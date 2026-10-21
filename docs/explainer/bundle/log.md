@@ -149,3 +149,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: the importers say how their clocks were read. Seven bundled types move a version, identity and fact time unchanged: `activity.exercise-session.concept2`, `activity.exercise-session.strong` and `record.document` v2 require `source_time`; `health.blood-pressure` v7, `activity.exercise-session.technogym`, `health.lab-result` and `health.lab-panel` v2 declare it. History holds 71. `record.document` leaves the source-time list.
 - Bundle: the importer base says `load` sends every version oldest first; the bp_csv page and index name v7; the Definition manifest page counts 71 in history.
+
+## 2026-10-21, cards 203 and 189
+
+- Code: `query.ReadsAttr` decides whether a query needs `attr/3` by walking the rules from the relation it answers, and `NewBase` builds the relation only then (card 203). `docs/QUERY.md` is the query reference with worked questions that `internal/query/docs_test.go` runs against a real ledger (card 189).
+- Bundle: the gap `the-query-surface-is-decided-and-not-built` removed, false since card 173 was built; the `query` term says what is built and points at the decision and `docs/QUERY.md`.

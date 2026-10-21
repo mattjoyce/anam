@@ -129,7 +129,7 @@ pointers at each Definition version held, and the rules with their text. A progr
 is 400 with a message that says what to change; a derivation or an answer over `max_read_bytes` is
 413 with `instant`, `projection` and `program` as `narrow`. `warnings` names a pointer some versions
 of a type declare and others do not. `anam query run` and `anam query describe` are the CLI, local
-or over the daemon.
+or over the daemon. [QUERY.md](QUERY.md) is the reference, with worked questions.
 
 This document proposes the application API that every client shares: the CLI, the inspector,
 importers, and conversational clients (§8). The two conversational features are **chat with my

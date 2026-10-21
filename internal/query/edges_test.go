@@ -43,8 +43,10 @@ func edgeHarness(t *testing.T) *harness {
 		t.Fatalf("def.NewRegistry: %v", err)
 	}
 	scopes := gate.StaticScopes{
-		"bp-csv":  {"health.blood-pressure"},
-		"records": {"record.edge"},
+		"bp-csv":    {"health.blood-pressure"},
+		"records":   {"record.edge"},
+		"self-log":  {"health.medication.started", "health.medication.dose-changed", "health.medication.stopped"},
+		"health-db": {"health.weight"},
 	}
 	tmpl, err := projection.Parse([]byte(strings.Replace(logTemplate, `"health.blood-pressure",`, `"health.blood-pressure", "record.edge",`, 1)))
 	if err != nil {

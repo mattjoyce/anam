@@ -52,7 +52,7 @@ as a basic-auth password, and the daemon may listen on any address. Without it t
 daemon listens on loopback only.
 
 Every source reaches the record through an importer; the daemon reads no source
-itself (card 119).
+itself.
 
 SIGTERM or Ctrl-C stops it: requests in flight finish, the running write finishes
 or reaches its deadline, and the stores are closed.`,

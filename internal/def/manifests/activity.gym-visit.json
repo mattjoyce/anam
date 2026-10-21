@@ -15,7 +15,7 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "One gym visit, from a records file: the statement that a visit happened, with as much detail as the source has. The Strong extract (scripts/extract-strong-csv.py) wrote one per workout until card 56 moved Strong to activity.exercise-session; a hand-kept row may say no more than the day. Values are the source's own.",
+    "description": "One gym visit, from a records file: the statement that a visit happened, with as much detail as the source has. The Strong extract (scripts/extract-strong-csv.py) wrote one per workout until Strong moved to activity.exercise-session; a hand-kept row may say no more than the day. Values are the source's own.",
     "type": "object",
     "required": ["id", "date"],
     "properties": {

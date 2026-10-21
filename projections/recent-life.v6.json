@@ -1,0 +1,23 @@
+{
+  "name": "recent-life",
+  "version": 6,
+  "description": "Recent daily life for an assistant: travel, places stayed, exercise, sleep, steps, illness and notes. It does not serve medicines, laboratory results, conditions, blood pressure, heart rate, documents or hourly location tracks. The reader sets the time window, usually the last seven days. The type list is the boundary, because most of these types are Sensitive. v6 names the same types as v5 and only rewords this description. v5 named exercise by the prefix activity.exercise-session., every vendor's leaf; v4 named the trip and illness types with their third segment; v3 named notes record.edge; v2 named the types under the domain taxonomy.",
+  "types": [
+    "place.trip.departed",
+    "place.trip.flight",
+    "place.trip.arrived",
+    "place.trip.returned",
+    "place.stay",
+    "activity.exercise-session.",
+    "health.sleep-episode",
+    "activity.steps",
+    "health.illness.started",
+    "health.illness.ended",
+    "record.edge"
+  ],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

@@ -30,7 +30,7 @@
   /* a drag on the band is a gesture, not a text selection: the row labels and
      tick labels would otherwise highlight as the box is drawn. */
   .band { width: 100%; height: auto; display: block; touch-action: pan-y; cursor: crosshair; user-select: none; -webkit-user-select: none; }
-  /* the checkpoint strip (card 21): one segment per leaf bucket of the mint's
+  /* the checkpoint strip: one segment per leaf bucket of the mint's
      layout, in the band's x scale. Fill carries the state and the title says it. */
   .buckets { width: 100%; height: auto; display: block; margin-top: 2px; }
   .buckets text { fill: var(--ink-muted); font: 9px system-ui, sans-serif; }
@@ -49,11 +49,11 @@
   .band .pt path { stroke: var(--ring); stroke-width: 1; }
   .band .pt:hover path { stroke: currentColor; stroke-width: 1.5; }
   .band .dead path, .band .dead line, .band .dead text { opacity: .3; }
-  /* a saved selection highlighted among the rest (card 206): the rest fade, its own ringed */
+  /* a saved selection highlighted among the rest: the rest fade, its own ringed */
   .band .faded path, .band .faded line, .band .faded text { opacity: .15; }
   .band .pt.picked path { stroke: currentColor; stroke-width: 1.8; }
   .band .run.picked line { stroke-width: 4; }
-  /* a run: two end marks joined by a line in the lane's hue, the count above (card 135) */
+  /* a run: two end marks joined by a line in the lane's hue, the count above */
   .band .run line { stroke-width: 3; stroke-linecap: round; }
   .band .run:hover line { stroke-width: 5; }
   .band .run text { font-size: 9px; }
@@ -208,7 +208,7 @@
       <strong><span id="sel-count">0</span> selected</strong>
       <button type="button" id="sel-clear">clear</button>
       <button type="button" id="sel-annotate">annotate</button>
-      <span class="dim hint">shift-drag a box or ctrl-click marks · a note is a fact about these facets, appended beside them (card 104)</span>
+      <span class="dim hint">shift-drag a box or ctrl-click marks · a note is a fact about these facets, appended beside them</span>
     </div>
     <ul class="sel-list mono" id="sel-list"></ul>
     <div class="note" id="note" hidden>
@@ -216,7 +216,7 @@
       <div class="row">
         <button type="button" id="note-draft">draft the note</button>
         <button type="button" id="note-copy" hidden>copy</button>
-        <span class="dim hint">drafted as a records file for <span class="mono">private/records/notes.yaml</span>; the next ingest admits it. Writing it from here waits on card 93.</span>
+        <span class="dim hint">drafted as a records file for <span class="mono">private/records/notes.yaml</span>; the next ingest admits it. Writing it from here is not built yet.</span>
       </div>
       <pre class="mono" id="note-yaml" hidden></pre>
     </div>
@@ -257,7 +257,7 @@
     };
     const toTime = x => new Date(from + (x - left) / (right - left) * (to - from));
 
-    // Selection (card 132): a shift-drag box selects the marks inside it, a
+    // Selection: a shift-drag box selects the marks inside it, a
     // ctrl-click (cmd on a Mac) toggles one. It lives in the page alone: every
     // pan or zoom is a new read, and the selection is a gesture, not state.
     const marks = [...band.querySelectorAll('a.pt')];
@@ -293,11 +293,11 @@
       note.hidden = false; document.getElementById('note-text').focus();
     });
 
-    // The note is a record.edge (cards 104, 191) drafted as the records file the
-    // person installs: `at` is the moment of drafting in the Definition's zone (card
-    // 136: a note's fact time is when it was written; the facets it is about carry
+    // The note is a record.edge drafted as the records file the
+    // person installs: `at` is the moment of drafting in the Definition's zone (a
+    // note's fact time is when it was written; the facets it is about carry
     // their own), `to` every selected id, the text verbatim. Submitting it from
-    // here is card 93's decision.
+    // here is not built.
     const sydney = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
     const atOf = ms => { const p = {}; sydney.formatToParts(new Date(ms)).forEach(x => { p[x.type] = x.value; });
                          return `${p.year}-${p.month}-${p.day} ${p.hour === '24' ? '00' : p.hour}:${p.minute}`; };

@@ -15,7 +15,7 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "One flight leg, one row in a records file (source records), written from itineraries and booking emails. A point beside its trip, outside the travel.trip series; values are the row's own text. Named place.trip.flight (v1) until card 196.",
+    "description": "One flight leg, one row in a records file (source records), written from itineraries and booking emails. A point beside its trip, outside the travel.trip series; values are the row's own text. Named place.flight (v1) until its name gained a third segment.",
     "type": "object",
     "required": ["id", "date", "trip", "from", "to"],
     "properties": {

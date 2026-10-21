@@ -8,6 +8,18 @@ decisions is in `journal/`.
 
 ## 2026-10-21
 
+- The importers say how their clocks were read (card 198, the importer half). New bundled versions,
+  each identity and fact-time rule unchanged: `activity.exercise-session.concept2` v2,
+  `activity.exercise-session.strong` v2 and `record.document` v2 require `source_time`;
+  `health.blood-pressure` v7, `activity.exercise-session.technogym` v2, `health.lab-result` v2 and
+  `health.lab-panel` v2 declare it without requiring it, since records files written by hand, and
+  Technogym's, which has no export left, still send none. The old bodies join the Definition
+  history. The importers carry `health.blood-pressure` v7 and the Concept2 leaf v2 byte for byte,
+  and register every version of the types they emit, oldest first. Deploy anam first, with the
+  records, documents, Concept2 and bp_csv importers paused across it, and regenerate the Strong
+  records file with the new `strong_csv.py` before records resumes: the Strong leaf now refuses a
+  record without `source_time`. `record.document` leaves the list in `internal/def/sourcetime_test.go`.
+
 - Vendor-shaped types take the vendor leaf (card 195). `activity.exercise-session` splits into four
   bundled leaves, `activity.exercise-session.garmin`, `.concept2`, `.technogym` and `.strong`, each v1
   with the shared core (`id`, `activity_name`, `effective_time_frame`, `source`) and only the fields

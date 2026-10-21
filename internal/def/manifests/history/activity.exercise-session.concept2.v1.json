@@ -1,0 +1,185 @@
+{
+  "meta": {
+    "facet_type": "activity.exercise-session.concept2",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "exercise",
+    "classification": "Confidential",
+    "validation_mode": "strict",
+    "source_schema": "ieee-1752/physical-activity-1.0",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/effective_time_frame/time_interval/start_date_time",
+        "layout": "2006-01-02T15:04:05Z07:00",
+        "zone": "Australia/Sydney"
+      }
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One workout the Concept2 Logbook holds, shaped as an IEEE 1752 physical-activity-1.0 payload with the Logbook's other figures beside it in snake_case. The anam_concept2 importer sends each result, read from the Logbook API: the monitor's result as ErgData synced it, splits or intervals and every stroke included, or a result entered by hand on the web, which carries totals only. Values are the Logbook's own, apart from the start time and activity name, which the importer derives. A Garmin watch worn on the rower records the same row on the Garmin leaf, so a sum across the leaves counts that time twice. This is the Concept2 leaf of activity.exercise-session: Concept2's own payload shape, named for its vendor (card 192), so a reader asks about exercise across the leaves by the prefix activity.exercise-session. and knows which shape each fact has. Version 1 is activity.exercise-session v2 cut to the fields Concept2 writes, each with the same rules, and its facets came across in card 195's rename (renames/vendor-leaves.json), each the next version of itself with its payload unchanged. The shared core, id, activity_name, effective_time_frame and source, is the same on all four leaves of activity.exercise-session (internal/def/shared-core.json).",
+    "type": "object",
+    "required": ["id", "activity_name", "effective_time_frame"],
+    "properties": {
+      "activity_name": {
+        "type": "string",
+        "description": "The IEEE 1752 activity name, mapped by the importer from the result's type: rower to rowing.machine, bike to biking.stationary, water to rowing, and any other erg (skierg, dynamic, slides, paddle, snow, multierg) to other; erg_type keeps what the Logbook wrote.",
+        "examples": ["rowing.machine"],
+        "enum": [
+          "aerobics", "archery", "badminton", "baseball", "basketball", "biathlon", "biking",
+          "biking.hand", "biking.mountain", "biking.road", "biking.spinning", "biking.stationary",
+          "biking.utility", "boxing", "calisthenics", "circuit_training", "cricket", "crossfit", "curling",
+          "dancing", "diving", "elevator", "elliptical", "ergometer", "escalator", "fencing",
+          "football.american", "football.australian", "football.soccer", "frisbee_disc", "gardening",
+          "golf", "guided_breathing", "gymnastics", "handball", "interval_training.high_intensity",
+          "hiking", "hockey", "horseback_riding", "housework", "ice_skating", "interval_training",
+          "in_vehicle", "jump_rope", "kayaking", "kettlebell_training", "kickboxing", "kick_scooter",
+          "kitesurfing", "martial_arts", "meditation", "martial_arts.mixed", "on_foot", "other", "p90x",
+          "paragliding", "pilates", "polo", "racquetball", "rock_climbing", "rowing", "rowing.machine",
+          "rugby", "running", "running.jogging", "running.sand", "running.treadmill", "sailing",
+          "scuba_diving", "skateboarding", "skating", "skating.cross", "skating.indoor", "skating.inline",
+          "skiing", "skiing.back_country", "skiing.cross_country", "skiing.downhill", "skiing.kite",
+          "skiing.roller", "sledding", "sleep", "sleep.awake", "sleep.deep", "sleep.light", "sleep.rem",
+          "snowboarding", "snowmobile", "snowshoeing", "softball", "squash", "stair_climbing",
+          "stair_climbing.machine", "standup_paddleboarding", "still", "strength_training", "surfing",
+          "swimming", "swimming.open_water", "swimming.pool", "table_tennis", "team_sports", "tennis",
+          "tilting", "treadmill", "unknown", "volleyball", "volleyball.beach", "volleyball.indoor",
+          "wakeboarding", "walking", "walking.fitness", "walking.nordic", "walking.paced",
+          "walking.stroller", "walking.treadmill", "water_polo", "weightlifting", "wheelchair",
+          "windsurfing", "yoga", "zumba"
+        ]
+      },
+      "average_cadence": {
+        "type": "object",
+        "description": "Average stroke rate, as an IEEE 1752 cadence: the Logbook's stroke_rate.",
+        "examples": [{"value": 24.5, "unit": "strokes/min"}],
+        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"strokes/min\", set by the importer."}, "value": {"type": "number", "description": "The source's average stroke rate, as reported."}},
+        "required": ["unit", "value"],
+        "additionalProperties": false
+      },
+      "avg_hr_bpm": {"type": "number", "description": "Average heart rate in beats per minute: the Logbook's heart_rate.average, which the importer leaves out when it reads zero, the monitor's figure for no heart rate belt.", "examples": [132]},
+      "base_movement_quantity": {
+        "type": "object",
+        "description": "The stroke count, as an IEEE 1752 movement count: the Logbook's stroke_count.",
+        "examples": [{"value": 612, "unit": "strokes"}],
+        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"strokes\", set by the importer."}, "value": {"type": "number", "description": "The source's stroke count, as reported."}},
+        "required": ["unit", "value"],
+        "additionalProperties": false
+      },
+      "distance": {
+        "type": "object",
+        "description": "Distance rowed in metres: the Logbook's distance.",
+        "examples": [{"value": 5000, "unit": "m"}],
+        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"m\", set by the importer."}, "value": {"type": "number", "description": "The source's distance, as reported."}},
+        "required": ["unit", "value"],
+        "additionalProperties": false
+      },
+      "comments": {"type": "string", "minLength": 1, "description": "Concept2's comments on the result, verbatim, as entered in the Logbook. Absent when empty.", "examples": ["Easy steady state"]},
+      "drag_factor": {"type": "number", "description": "The rower's drag setting, as reported: the Logbook's drag_factor.", "examples": [107]},
+      "duration": {
+        "type": "object",
+        "description": "The session's net duration in seconds: the result's time, which the Logbook gives in tenths of a second and the importer writes in seconds, the same figure the interval's duration holds.",
+        "examples": [{"value": 1260.5, "unit": "sec"}],
+        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"sec\", set by the importer."}, "value": {"type": "number", "description": "The source's duration, as reported."}},
+        "required": ["unit", "value"],
+        "additionalProperties": false
+      },
+      "ending_hr_bpm": {"type": "number", "description": "Concept2's heart_rate.ending, beats per minute at the end of the workout. Left out when it reads zero.", "examples": [169]},
+      "erg_type": {"type": "string", "minLength": 1, "description": "Concept2's type, the erg the result was rowed on as the Logbook names it: rower, skierg, bike, dynamic, slides, paddle, water, snow or multierg.", "examples": ["rower"]},
+      "effective_time_frame": {
+        "type": "object",
+        "description": "When the session happened, as an IEEE 1752 time interval.",
+        "examples": [{"time_interval": {"start_date_time": "2026-10-04T04:11:37Z", "duration": {"value": 1200, "unit": "sec"}}}],
+        "properties": {
+          "time_interval": {
+            "type": "object",
+            "description": "The session's start and length.",
+            "properties": {
+              "duration": {
+                "type": "object",
+                "description": "The session's length in seconds: the result's time, the work time without the rest between intervals.",
+                "examples": [{"value": 1260.5, "unit": "sec"}],
+                "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"sec\", set by the importer."}, "value": {"type": "number", "description": "Seconds, a whole or decimal number."}},
+                "required": ["unit", "value"],
+                "additionalProperties": false
+              },
+              "start_date_time": {"type": "string", "minLength": 1, "description": "The start, ISO 8601 with offset, to the second, derived by the importer: the result's date_utc (the monitor's end of workout) minus its time, a UTC instant written with Z, or, for a result entered on the web, which has no date_utc and a date at midnight, that date as Sydney midnight, and start_time_known says which. This is the fact time.", "examples": ["2026-01-24T18:21:08+11:00"]}
+            },
+            "required": ["duration", "start_date_time"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["time_interval"],
+        "additionalProperties": false
+      },
+      "id": {"type": "string", "minLength": 1, "description": "concept2:session: and the Logbook's result id.", "examples": ["concept2:session:50445680"]},
+      "kcal_burned": {
+        "type": "object",
+        "description": "Energy burned in kcal: the Logbook's calories_total.",
+        "examples": [{"value": 312, "unit": "kcal"}],
+        "properties": {"unit": {"type": "string", "minLength": 1, "description": "Always \"kcal\", set by the importer."}, "value": {"type": "number", "description": "The source's calories, as reported."}},
+        "required": ["unit", "value"],
+        "additionalProperties": false
+      },
+      "logbook_date": {"type": "string", "minLength": 1, "description": "Concept2's date, verbatim: the monitor's end of workout as a local wall clock time, \"YYYY-MM-DD HH:MM:SS\", or the day with a midnight time for a result entered on the web.", "examples": ["2026-10-04 15:21:00"]},
+      "logbook_source": {"type": "string", "minLength": 1, "description": "Concept2's source, how the result reached the Logbook: \"ErgData Android\", \"ErgData iOS\", \"Concept2 Utility\" or \"Web\" for one entered by hand.", "examples": ["ErgData Android"]},
+      "logbook_timezone": {"type": "string", "minLength": 1, "description": "Concept2's timezone, the IANA zone logbook_date is in. Absent on a result entered on the web, where the Logbook holds none.", "examples": ["Australia/Sydney"]},
+      "max_hr_bpm": {"type": "number", "description": "Peak heart rate in beats per minute: the Logbook's heart_rate.max, which the importer leaves out when it reads zero, as the monitor writes it even on a result whose splits carry a maximum.", "examples": [151]},
+      "ranked": {"type": "boolean", "description": "Concept2's ranked, whether the result counts in the Logbook's rankings.", "examples": [false]},
+      "rest_distance_m": {"type": "number", "description": "Concept2's rest_distance, metres rowed during the rests of an interval workout. Interval workouts only.", "examples": [217]},
+      "rest_time_sec": {"type": "number", "description": "Concept2's rest_time, the rest between the intervals of an interval workout in seconds, given by the Logbook in tenths of a second. Interval workouts only.", "examples": [120]},
+      "source": {"type": "string", "minLength": 1, "description": "Which app the session came from: always \"Concept2 Logbook\", written by the importer.", "examples": ["Concept2 Logbook"]},
+      "splits": {
+        "type": "array",
+        "description": "Per-split measures for the workout, in the Logbook's order: its splits, or its intervals for an interval workout, each with the rest that followed it.",
+        "items": {
+          "type": "object",
+          "description": "One split, each measure a plain number.",
+          "examples": [{"position": 1, "duration_sec": 300, "distance_m": 1079, "kcal": 64, "watt_minutes": 682, "avg_spm": 23, "avg_hr_bpm": 142, "min_hr_bpm": 93, "max_hr_bpm": 162, "ending_hr_bpm": 161}],
+          "properties": {
+            "avg_hr_bpm": {"type": "number", "description": "Average heart rate for the split, beats per minute: the Logbook's heart_rate.average."},
+            "avg_spm": {"type": "number", "description": "Average stroke rate for the split, strokes per minute: the Logbook's stroke_rate."},
+            "distance_m": {"type": "number", "description": "Distance for the split, metres: the Logbook's distance."},
+            "duration_sec": {"type": "number", "description": "Duration of the split, seconds: the Logbook's time, given in tenths of a second, written in seconds."},
+            "ending_hr_bpm": {"type": "number", "description": "Concept2's heart_rate.ending for the split, beats per minute at its end. Left out when it reads zero."},
+            "kcal": {"type": "number", "description": "Calories for the split, kcal: the Logbook's calories_total."},
+            "max_hr_bpm": {"type": "number", "description": "Concept2's heart_rate.max for the split, beats per minute. Left out when it reads zero."},
+            "min_hr_bpm": {"type": "number", "description": "Concept2's heart_rate.min for the split, beats per minute. Left out when it reads zero."},
+            "position": {"type": "number", "description": "The split's position in the workout, from 1, in the Logbook's order."},
+            "rest_hr_bpm": {"type": "number", "description": "Concept2's heart_rate.rest, beats per minute at the end of the rest after an interval. Intervals only, left out when it reads zero."},
+            "rest_time_sec": {"type": "number", "description": "Concept2's rest_time for an interval, the rest that followed it in seconds. Intervals only."},
+            "watt_minutes": {"type": "number", "description": "Concept2's wattminutes_total for the split, work done in watt-minutes."}
+          },
+          "required": ["duration_sec", "position"],
+          "additionalProperties": false
+        }
+      },
+      "start_time_known": {"type": "boolean", "description": "Whether the start is the monitor's: true for a Concept2 result ErgData synced, false for one entered on the web, whose start is the day it names at Sydney midnight.", "examples": [true]},
+      "stroke_series": {
+        "type": "array",
+        "description": "Every stroke of the workout as the monitor recorded it, in order: Concept2's stroke data for the result, each figure converted by the importer from the Logbook's units. Only on results that carry stroke data.",
+        "items": {
+          "type": "object",
+          "description": "One stroke, from the Logbook's t (tenths of a second), d (decimetres), p (tenths of a second per 500 m), spm and hr.",
+          "examples": [{"time_sec": 3.6, "distance_m": 6.5, "pace_500m_sec": 282.2, "spm": 23, "hr_bpm": 94}],
+          "properties": {
+            "distance_m": {"type": "number", "description": "Distance rowed so far at this stroke, metres: the Logbook's d, decimetres, divided by 10."},
+            "hr_bpm": {"type": "number", "description": "Heart rate at this stroke, beats per minute: the Logbook's hr, left out when it reads zero."},
+            "pace_500m_sec": {"type": "number", "description": "Pace at this stroke, seconds per 500 m: the Logbook's p, tenths of a second, divided by 10."},
+            "spm": {"type": "number", "description": "Stroke rate at this stroke, strokes per minute: the Logbook's spm."},
+            "time_sec": {"type": "number", "description": "Elapsed work time at this stroke, seconds: the Logbook's t, tenths of a second, divided by 10."}
+          },
+          "required": ["distance_m", "time_sec"],
+          "additionalProperties": false
+        }
+      },
+      "verified": {"type": "boolean", "description": "Concept2's verified, whether the monitor sent the result (true) or a person entered it (false).", "examples": [true]},
+      "watt_minutes": {"type": "number", "description": "Concept2's wattminutes_total, the work done in watt-minutes as the monitor computed it.", "examples": [4092]},
+      "weight_class": {"type": "string", "minLength": 1, "description": "Concept2's weight_class, the Logbook's weight class for the result: \"H\" (heavyweight) or \"L\" (lightweight).", "examples": ["H"]},
+      "workout_type": {"type": "string", "minLength": 1, "description": "Concept2's workout_type, the monitor's workout mode as the Logbook names it, such as JustRow, FixedDistanceSplits, FixedTimeSplits, FixedDistanceInterval, FixedTimeInterval or VariableInterval, or unknown for a result entered on the web.", "examples": ["JustRow"]}
+    },
+    "additionalProperties": false
+  }
+}

@@ -43,8 +43,8 @@ func TestDescribe_FromTheBundledDefinitions(t *testing.T) {
 			bp = ta
 		}
 	}
-	if bp.Current != 6 || len(bp.Versions) != 6 {
-		t.Fatalf("blood-pressure = current v%d, %d versions; want v6 with six versions", bp.Current, len(bp.Versions))
+	if bp.Current != 7 || len(bp.Versions) != 7 {
+		t.Fatalf("blood-pressure = current v%d, %d versions; want v7 with seven versions", bp.Current, len(bp.Versions))
 	}
 	for _, v := range bp.Versions {
 		if v.Version == 5 && !strings.Contains(strings.Join(v.Pointers, " "), "/systolic_blood_pressure/value") {

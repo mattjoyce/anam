@@ -154,7 +154,7 @@ var readsALocalClock = map[string]bool{
 	"health.medication.dose-missed": true, "health.medication.started": true,
 	"health.medication.stopped": true, "health.metric-group": true, "health.sleep": true,
 	"health.vision-prescription": true, "health.weight": true, "place.trip.arrived": true,
-	"place.trip.departed": true, "place.trip.returned": true, "record.document": true, "record.edge": true,
+	"place.trip.departed": true, "place.trip.returned": true, "record.edge": true,
 }
 
 func TestSourceTime_EveryTypeReadingALocalClockSaysHow(t *testing.T) {
@@ -195,6 +195,60 @@ func TestSourceTime_EveryTypeReadingALocalClockSaysHow(t *testing.T) {
 	for typ := range readsALocalClock {
 		if _, ok := reg.Lookup(facet.Type(typ)); !ok {
 			t.Errorf("%s is listed and not bundled: take it off the list", typ)
+		}
+	}
+}
+
+// Card 198: the importers' types say how their clocks were read. A type whose every
+// writer sends source_time requires it; one also written by hand into a records file,
+// or whose source has no export left to extract again, declares it without requiring
+// it, so its old payloads still admit.
+func TestSourceTime_TheImportersTypesCarryIt(t *testing.T) {
+	t.Parallel()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := def.Manifests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for typ, want := range map[facet.Type]struct {
+		version  int
+		required bool
+	}{
+		"activity.exercise-session.concept2":  {2, true},
+		"activity.exercise-session.strong":    {2, true},
+		"record.document":                     {2, true},
+		"activity.exercise-session.technogym": {2, false},
+		"health.blood-pressure":               {7, false},
+		"health.lab-result":                   {2, false},
+		"health.lab-panel":                    {2, false},
+	} {
+		d, ok := reg.Lookup(typ)
+		if !ok || d.Version != want.version {
+			t.Errorf("%s = v%d, %v; want v%d", typ, d.Version, ok, want.version)
+			continue
+		}
+		for _, s := range stored {
+			if s.Type != typ || s.Version != d.Version {
+				continue
+			}
+			var m struct {
+				Schema struct {
+					Required   []string                   `json:"required"`
+					Properties map[string]json.RawMessage `json:"properties"`
+				} `json:"schema"`
+			}
+			if err := json.Unmarshal(s.Body, &m); err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := m.Schema.Properties[def.SourceTimeField]; !ok {
+				t.Errorf("%s v%d does not declare %s", typ, d.Version, def.SourceTimeField)
+			}
+			if got := slices.Contains(m.Schema.Required, def.SourceTimeField); got != want.required {
+				t.Errorf("%s v%d requires %s = %v, want %v", typ, d.Version, def.SourceTimeField, got, want.required)
+			}
 		}
 	}
 }

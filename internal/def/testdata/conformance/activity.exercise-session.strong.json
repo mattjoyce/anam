@@ -1,4 +1,5 @@
 {"id": "strong:session:2024-03-06T06:00:00", "activity_name": "strength_training",
+ "source_time": {"value": "2024-03-06 06:00:00", "zone": "Australia/Sydney", "basis": "configuration"},
  "effective_time_frame": {"time_interval": {"start_date_time": "2024-03-06T06:00:00+11:00", "duration": {"value": 10800, "unit": "sec"}}},
  "source": "Strong", "workout_name": "Morning Workout", "reported_duration_sec": 20000, "duration_capped": true,
  "exercises": ["Seated Row (Machine)", "Rowing (Machine)"],

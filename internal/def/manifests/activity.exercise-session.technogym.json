@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "activity.exercise-session.technogym",
-    "definition_version": 1,
+    "definition_version": 2,
     "kind": "event",
     "family": "exercise",
     "classification": "Confidential",
@@ -19,7 +19,7 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "One indoor session on a Technogym machine (rower or stair climber), shaped as an IEEE 1752 physical-activity-1.0 payload with Technogym's other measures beside it in snake_case. The extractor records/extract/technogym_json.py in anam-importers writes a records file from a Technogym mywellness export, one record per session, and the records importer sends it. Values are Technogym's own, apart from the start time and activity name, which the extractor derives. A Garmin Cardio session often spans the machine sessions done during it, so a sum across the leaves counts that time twice. This is the Technogym leaf of activity.exercise-session: Technogym's own payload shape, named for its vendor (card 192), so a reader asks about exercise across the leaves by the prefix activity.exercise-session. and knows which shape each fact has. Version 1 is activity.exercise-session v2 cut to the fields Technogym writes, each with the same rules, and its facets came across in card 195's rename (renames/vendor-leaves.json), each the next version of itself with its payload unchanged. The shared core, id, activity_name, effective_time_frame and source, is the same on all four leaves of activity.exercise-session (internal/def/shared-core.json).",
+    "description": "One indoor session on a Technogym machine (rower or stair climber), shaped as an IEEE 1752 physical-activity-1.0 payload with Technogym's other measures beside it in snake_case. The extractor records/extract/technogym_json.py in anam-importers writes a records file from a Technogym mywellness export, one record per session, and the records importer sends it. Values are Technogym's own, apart from the start time and activity name, which the extractor derives. A Garmin Cardio session often spans the machine sessions done during it, so a sum across the leaves counts that time twice. This is the Technogym leaf of activity.exercise-session: Technogym's own payload shape, named for its vendor (card 192), so a reader asks about exercise across the leaves by the prefix activity.exercise-session. and knows which shape each fact has. Version 1 is activity.exercise-session v2 cut to the fields Technogym writes, each with the same rules, and its facets came across in card 195's rename (renames/vendor-leaves.json), each the next version of itself with its payload unchanged. The shared core, id, activity_name, effective_time_frame and source, is the same on all four leaves of activity.exercise-session (internal/def/shared-core.json). Version 2 adds source_time (card 198), declared and not required, every other rule unchanged.",
     "type": "object",
     "required": ["id", "activity_name", "effective_time_frame"],
     "properties": {
@@ -162,7 +162,8 @@
         }
       },
       "user_weight_kg": {"type": "number", "description": "Technogym's UserWeight, the body weight entered on the machine, in kilograms."},
-      "vo2": {"type": "number", "description": "Technogym's Vo2, estimated oxygen uptake in ml/kg/min: it is exactly 3.5 times the session's MET rate (1 MET = 3.5 ml/kg/min), so it is derived, not measured. The export has it on stair climber sessions only."}
+      "vo2": {"type": "number", "description": "Technogym's Vo2, estimated oxygen uptake in ml/kg/min: it is exactly 3.5 times the session's MET rate (1 MET = 3.5 ml/kg/min), so it is derived, not measured. The export has it on stair climber sessions only."},
+      "source_time": {"type": "object", "description": "How Technogym's clock was read (card 198): value is Technogym's on, when the session ended, with the offset Technogym wrote (basis source); the start is on less the session's Duration, so value is the end and not the fact time. Not required: the records were extracted before card 198, and Technogym has no export left to extract again.", "required": ["value", "zone", "basis"], "additionalProperties": false, "properties": {"value": {"type": "string", "minLength": 1, "description": "The fact time as the source supplied it, as text and never rewritten: a date, a wall clock, an RFC 3339 string, or an epoch as its digits.", "examples": ["2026-10-17", "2026-10-20T20:00:00+11:00", "1792269840000"]}, "zone": {"type": "string", "minLength": 1, "pattern": "^([A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$", "description": "The zone value is read in, and nothing else: an IANA name when one is known, UTC for a value that is UTC, else a fixed offset +HH:MM or -HH:MM. The gate refuses a name that is no zone.", "examples": ["Australia/Sydney", "UTC", "+01:00"]}, "basis": {"type": "string", "enum": ["source", "configuration", "assumption"], "description": "Who decided the zone. source: the source supplied it with the value, or the value is UTC by the source's own definition. configuration: a setting a person made for this source names it. assumption: the importer or writer chose it, with nothing behind it but its own default or the Definition's zone, and logged that it did."}}}
     },
     "additionalProperties": false
   }

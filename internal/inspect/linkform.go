@@ -137,17 +137,27 @@ func (d linkData) SideProblem() string {
 	if !noFromSide[d.Kind] {
 		return ""
 	}
-	var from []string
-	for _, it := range d.Items {
-		if it.Keep && it.From {
-			from = append(from, it.ID)
-		}
-	}
+	from := d.fromSide()
 	if len(from) == 0 {
 		return ""
 	}
 	return fmt.Sprintf("A link of kind %s has no from side: it is your words about the facets on the to side. "+
 		"Move %s to the to side, or choose a kind that takes a from side.", d.Kind, strings.Join(from, ", "))
+}
+
+// fromSide is the ids of the kept items on the from side, its tests plain ifs as
+// pinned's are.
+func (d linkData) fromSide() []string {
+	var from []string
+	for _, it := range d.Items {
+		if !it.Keep {
+			continue
+		}
+		if it.From {
+			from = append(from, it.ID)
+		}
+	}
+	return from
 }
 
 // SelectURL opens the selection page with this basket, each facet on its side, to add

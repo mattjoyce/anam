@@ -185,15 +185,12 @@ func (lf *linkForm) payload(d *linkData, vals url.Values, stored edgeValue) (jso
 // already. A stale pin is moved to the current version for the person to check.
 func pinProblem(d *linkData, stored edgeValue) string {
 	var gone, moved []string
-	for i := range d.Items {
+	for _, i := range d.pinned() {
 		it := &d.Items[i]
-		if !it.Keep || !it.Pin {
-			continue
-		}
-		switch {
-		case !it.Held:
+		switch pinState(*it, stored.Pins[it.ID]) {
+		case pinGone:
 			gone = append(gone, it.ID)
-		case it.Hash != it.Current && it.Hash != stored.Pins[it.ID]:
+		case pinMoved:
 			moved = append(moved, it.ID)
 			it.Hash = it.Current
 		}
@@ -207,4 +204,42 @@ func pinProblem(d *linkData, stored edgeValue) string {
 			"check it, then save again.", strings.Join(moved, ", "))
 	}
 	return ""
+}
+
+// The states of a pin: it names a version that can be written, a facet the ledger
+// does not hold, or a version that is no longer current.
+const (
+	pinGood = iota
+	pinGone
+	pinMoved
+)
+
+// pinState is what a pin on it names. A version other than the current one is good
+// only when the edited link pins it already (was).
+func pinState(it linkItem, was string) int {
+	if !it.Held {
+		return pinGone
+	}
+	if it.Hash == it.Current {
+		return pinGood
+	}
+	if it.Hash == was {
+		return pinGood
+	}
+	return pinMoved
+}
+
+// pinned is the indexes of the items kept in the link with their pin ticked. Its
+// skips are plain ifs: gosec's analysis stalls on a loop with a compound one.
+func (d linkData) pinned() []int {
+	var out []int
+	for i, it := range d.Items {
+		if !it.Keep {
+			continue
+		}
+		if it.Pin {
+			out = append(out, i)
+		}
+	}
+	return out
 }

@@ -135,6 +135,14 @@ Two rules make this safe:
   declared; a source with a second shape gets a second Definition. `validation_mode` is `strict`
   (the schema as written) or `verbatim` (no schema). Validation reads the payload and never rewrites
   it, so a number the source wrote as text stays text, checked by a pattern.
+- A new version may not change what a facet **is**: its identity rule (`identity_key` and
+  `identity_template`) and its fact-time rule (pointer, layout, zone). `def.Guard` refuses such a
+  binary at start and `def.Register` such an importer, because admitted facets would keep the id
+  and instant the old rule gave them. Two widenings are not changes (card 198): a fact time may gain
+  a `zone_pointer`, so a fact names the zone its wall clock was said in, and an id template may gain
+  optional placeholders at its end (`{/source_time/offset?}`). Each reads a field that no stored
+  version of the type let a payload carry (a strict version's closed schema did not declare it, and
+  no version was verbatim), so every admitted facet reads the same instant and composes the same id.
 
 Granularity is a choice: start coarse (one Facet per source fragment) and decompose only where real
 fact-times or finer access control earn the cut. Facet types are **dotted `domain.concept[.specialisation…]`** under a closed set of eight

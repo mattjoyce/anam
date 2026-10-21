@@ -19,7 +19,7 @@ Two calls, as the doctrine says: `Resolve` enforces association (binding and its
 
 | Pillar | Where |
 |---|---|
-| Facet-compliant | the Definition's closed JSON Schema, `validation_mode`, fact-time pointer and zone, series pointers |
+| Facet-compliant | the Definition's closed JSON Schema, `validation_mode`, fact-time pointer and zone (or the zone the fact names at its `zone_pointer`, card 198), series pointers |
 | Authenticated | the token scopes: a source may inject only the types it is scoped for |
 | Associated | binding to the one person, with assurance high / medium / review |
 

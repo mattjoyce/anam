@@ -149,3 +149,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: the importers say how their clocks were read. Seven bundled types move a version, identity and fact time unchanged: `activity.exercise-session.concept2`, `activity.exercise-session.strong` and `record.document` v2 require `source_time`; `health.blood-pressure` v7, `activity.exercise-session.technogym`, `health.lab-result` and `health.lab-panel` v2 declare it. History holds 71. `record.document` leaves the source-time list.
 - Bundle: the importer base says `load` sends every version oldest first; the bp_csv page and index name v7; the Definition manifest page counts 71 in history.
+
+## 2026-10-21, card 198 (the writers)
+
+- Code: the fact names its zone. `time_semantics.fact_time` may carry a `zone_pointer`; `source_time` gains shape v2 with a required `offset`; an id template placeholder may end in `?`. `record.edge` v2 and `health.medication.dose` v2 require `source_time` and are read at its offset; `health.weight` v5 declares it, since records sends weight without it. The dose's template appends `{/source_time/offset?}`. `def.Guard` and `def.Register` hold `identity_template` too, and accept two widenings proved from the stored versions. The Workbench form sends the browser's zone and an offset field the page fills. History holds 74. `record.edge` and `health.medication.dose` leave the source-time list.
+- Bundle: the def and gate component pages, the add-a-definition-version change path and the Definition manifest page say so.

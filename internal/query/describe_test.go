@@ -149,7 +149,7 @@ func TestEvaluate_BoundsTheDerivation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	base, err := query.NewBase(v, versions, defs)
+	base, err := query.NewBase(v, versions, defs, true)
 	if err != nil {
 		t.Fatal(err)
 	}

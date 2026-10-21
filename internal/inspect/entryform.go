@@ -102,7 +102,7 @@ func drawForm(body []byte, d def.Definition, lock bool) (entryForm, error) {
 		}
 	}
 	var undrawn []string
-	for _, name := range orderedNames(props, required, strings.TrimPrefix(d.FactTime.Pointer, "/")) {
+	for _, name := range form.drawable(orderedNames(props, required, strings.TrimPrefix(d.FactTime.Pointer, "/")), required) {
 		ptr := "/" + name
 		if ptr == d.ComposedField() {
 			continue // the gate composes it from the Definition's rule
@@ -110,9 +110,6 @@ func drawForm(body []byte, d def.Definition, lock bool) (entryForm, error) {
 		// source_time is the form's to fill, from the browser's zone, when the fact
 		// time reads its zone; an optional one the fact time does not read is not
 		// sent. A required one with no zone pointer falls through and is refused.
-		if name == def.SourceTimeField && (form.Zoned || !required[name]) {
-			continue
-		}
 		sub, _ := props[name].(map[string]any)
 		field, why := form.draw(name, sub, required[name])
 		if why != "" {

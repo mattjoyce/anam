@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/mattjoyce/anam/internal/def"
 )
 
 // A zoned form (card 198): the Definition's fact time reads the zone a fact names, so
@@ -71,4 +73,31 @@ func (f *entryForm) wallLoc() *time.Location {
 		return time.UTC
 	}
 	return f.loc
+}
+
+// skipsSourceTime says the form draws no field for the property name: source_time is
+// the form's to fill when the fact time reads its zone, and an optional one the fact
+// time does not read is not sent. A required one with no zone pointer is drawn, and
+// refused as the nested object it is.
+func (f *entryForm) skipsSourceTime(name string, required bool) bool {
+	if name != def.SourceTimeField {
+		return false
+	}
+	if f.Zoned {
+		return true
+	}
+	return !required
+}
+
+// drawable is names without the source_time the form fills rather than draws. It is a
+// loop of its own, not a skip in drawForm's: gosec's analysis stalls on that loop with
+// one more way out of it.
+func (f *entryForm) drawable(names []string, required map[string]bool) []string {
+	out := make([]string, 0, len(names))
+	for _, n := range names {
+		if !f.skipsSourceTime(n, required[n]) {
+			out = append(out, n)
+		}
+	}
+	return out
 }

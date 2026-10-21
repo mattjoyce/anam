@@ -44,7 +44,7 @@ const (
 // their config root.
 //
 // A returned path of "" means: load defaults, read no file. A returned path is the
-// file that will be read — expanded, absolute, symlinks resolved — so what a
+// file that will be read, expanded, absolute and with symlinks resolved, so what a
 // caller reports is what it opened.
 func Resolve(explicit string) (string, Origin, error) {
 	if explicit != "" {
@@ -82,7 +82,7 @@ func Resolve(explicit string) (string, Origin, error) {
 }
 
 // mustExist resolves an operator-supplied path and requires it to be a file that
-// is there, returning the path that will be opened — the real one, so a caller
+// is there, returning the path that will be opened. That is the real one, so a caller
 // reports the same string it read and no symlink can be swapped between the
 // check and the read.
 //

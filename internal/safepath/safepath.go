@@ -57,7 +57,7 @@ func Expand(path string) (string, error) {
 // The check is confined as well as resolved: the file is stat'ed through a root
 // opened on its own directory, with the name alone. Nothing in the path can walk
 // out of that directory between the resolution and the check, because the check
-// never names a path — it names a file beside the directory it was resolved in.
+// never names a path. It names a file beside the directory it was resolved in.
 func ResolveFile(path string) (string, error) {
 	abs, err := Expand(path)
 	if err != nil {

@@ -13,7 +13,7 @@ import (
 // isolate points the user config directory at a temp directory and clears
 // $ANAM_CONFIG, so a test never reads the developer's real config. It returns
 // the temp root and the file Resolve will look for: os.UserConfigDir decides
-// where that is, and it is not $XDG_CONFIG_HOME everywhere — on macOS it is
+// where that is, and it is not $XDG_CONFIG_HOME everywhere: on macOS it is
 // ~/Library/Application Support.
 func isolate(t *testing.T) (root, candidate string) {
 	t.Helper()

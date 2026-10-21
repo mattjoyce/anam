@@ -20,8 +20,8 @@ const (
 )
 
 // Const is one constant: a string, a number or a boolean. A number keeps the exact
-// decimal the record holds — 1792269840000 stays 1792269840000, where a float64
-// rounded it to 1.79226984e+12 and made it the same number as its neighbour — and
+// decimal the record holds: 1792269840000 stays 1792269840000, where a float64
+// rounded it to 1.79226984e+12 and made it the same number as its neighbour, and
 // one canonical form, so that 1 and 1.0 are the same constant and hash the same.
 type Const struct {
 	kind Kind

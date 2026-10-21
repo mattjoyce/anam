@@ -7,8 +7,8 @@ import (
 )
 
 // number is an exact decimal: the significant digits of a value and the power of
-// ten they are scaled by. It keeps what the record holds — 1792269840000 stays
-// 1792269840000 — where a float64 rounded it to 1.79226984e+12 and made it the
+// ten they are scaled by. It keeps what the record holds. 1792269840000 stays
+// 1792269840000, where a float64 rounded it to 1.79226984e+12 and made it the
 // same number as its neighbour. It compares exactly, so two numbers a float64
 // cannot tell apart stay two numbers.
 //

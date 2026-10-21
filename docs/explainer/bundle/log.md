@@ -134,3 +134,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: vendor-shaped types take the vendor leaf (card 192). `activity.exercise-session` (v2, 58 fields) splits into four bundled leaves at v1, `.garmin` (21 fields), `.concept2` (28), `.technogym` (29) and `.strong` (10), each the shared core (`/id`, `/activity_name`, `/effective_time_frame`, `/source`, named in `internal/def/shared-core.json`) and the fields its vendor writes; the old name's v1 and v2 stay in `manifests/history`. The importers rename `activity.day`, `health.measurement` and `health.cpap-session` to `activity.day.garmin`, `health.measurement.withings` and `health.cpap-session.dreamstation`. `renames/vendor-leaves.json` is the table: four rows select on `/id`'s prefix, three are plain. A rename's keying check compares the identity key only: `activity.day.garmin` reads its fact time at the start of the day Garmin counted, and the dry run names the rows whose rule moves facets. `recent-life` v5 names the prefix `activity.exercise-session.`.
 - Bundle: the rename workflow, the def component, the Definition manifest page (35 bundled, 64 in history), the register workflow, the one-place invariant, the Open mHealth and encoding decisions and the importer pages name the leaves.
+
+## 2026-10-21, card 201
+
+- Code: the inspector's projection page opens on a per-type summary (served, excluded, superseded) and draws rows only on request, `?type=&show=` with `from`, `to` and `asof`, at most 500. The superseded count is derived from the fold's states and reads no version; `fold.DisplacedWhere` reads the versions of one type's facets for the rows view.
+- Bundle: the inspector component gains a section on the projection page.

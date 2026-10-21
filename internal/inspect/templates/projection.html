@@ -17,6 +17,7 @@
   .stand-superseded { color: #7a5c00; }
   tr.is-excluded td { opacity: .6; }
   .hashes { font-size: .8rem; margin-top: 1rem; }
+  td.num, th.num { text-align: right; }
   .hashes code { font-family: ui-monospace, monospace; }
 </style>
 </head>
@@ -45,8 +46,21 @@
     <label for="asof">as-of (anam-time, UTC)</label>
     <input type="datetime-local" name="asof" id="asof" step="1" value="{{.AsOf}}">
   </div>
+  {{if .Type}}
+  <input type="hidden" name="type" value="{{.Type}}">
+  <input type="hidden" name="show" value="{{.Show}}">
+  <div>
+    <label for="from">from (fact time)</label>
+    <input type="date" name="from" id="from" value="{{.From}}">
+  </div>
+  <div>
+    <label for="to">to (fact time)</label>
+    <input type="date" name="to" id="to" value="{{.To}}">
+  </div>
+  {{end}}
   <div><button type="submit">read</button></div>
-  {{if .AsOfSet}}<div><a href="/projection?p={{.Selected}}">back to now</a></div>{{end}}
+  {{if .AsOfSet}}<div><a href="{{.NowLink}}">back to now</a></div>{{end}}
+  {{if .Type}}<div><a href="{{.SummaryLink}}">back to the summary</a></div>{{end}}
 </form>
 
 <div class="tally">
@@ -71,6 +85,37 @@
 </p>
 {{end}}
 
+{{if not .Type}}
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>type</th><th class="num">served</th><th class="num">excluded</th><th class="num">superseded</th></tr>
+  </thead>
+  <tbody>
+    {{range .Summary}}
+    <tr>
+      <td>{{.Type}}</td>
+      <td class="num">{{if .Served}}<a href="{{$.Link .Type "served"}}">{{.Served}}</a>{{else}}<span class="dim">0</span>{{end}}</td>
+      <td class="num">{{if .Excluded}}<a href="{{$.Link .Type "excluded"}}">{{.Excluded}}</a>{{else}}<span class="dim">0</span>{{end}}</td>
+      <td class="num">{{if .Superseded}}<a href="{{$.Link .Type "superseded"}}">{{.Superseded}}</a>{{else}}<span class="dim">0</span>{{end}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="4" class="dim">nothing at this watermark — Anam knew nothing yet</td></tr>
+    {{end}}
+  </tbody>
+</table>
+</div>
+<p class="meta dim">
+  A count opens that type's rows. Superseded counts every version no longer in force under the
+  facet's current type, so a renamed facet's earlier versions are counted under its new type;
+  facets that are no longer live are counted together as <em>(not live)</em>.
+</p>
+{{else}}
+<p class="meta">
+  <strong>{{.Type}}</strong>, {{.Show}}: {{.RowsTotal}} row{{if ne .RowsTotal 1}}s{{end}}{{if or .From .To}} in this window{{end}}.
+  {{if .Truncated}}<strong class="limit">Showing the earliest {{len .Rows}} of {{.RowsTotal}}.</strong>
+  Narrow the window with from and to to see the rest.{{end}}
+</p>
 <div class="scroll">
 <table>
   <thead>
@@ -87,10 +132,11 @@
       <td class="mono"><a href="/facet?id={{.ID}}">{{.SourceRef}}</a></td>
     </tr>
     {{else}}
-    <tr><td colspan="6" class="dim">nothing at this watermark — Anam knew nothing yet</td></tr>
+    <tr><td colspan="6" class="dim">no rows of this standing{{if or .From .To}} in this window{{end}}</td></tr>
     {{end}}
   </tbody>
 </table>
 </div>
+{{end}}
 </body>
 </html>

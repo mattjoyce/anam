@@ -38,8 +38,19 @@ type Displacement struct {
 // the record has been corrected, not to how large it is — a person with no corrections
 // pays nothing here.
 func Displaced(ctx context.Context, l Ledger, res Result) ([]Displacement, error) {
+	return DisplacedWhere(ctx, l, res, func(string) bool { return true })
+}
+
+// DisplacedWhere is Displaced narrowed to the facets keep accepts, so a caller that
+// wants one type's history reads that type's versions and not the whole record's. The
+// facets it does keep give exactly the rows Displaced gives for them, in the same
+// order, because Displaced is this with every facet kept.
+func DisplacedWhere(ctx context.Context, l Ledger, res Result, keep func(facetID string) bool) ([]Displacement, error) {
 	var out []Displacement
 	for id, st := range res.States {
+		if !keep(id) {
+			continue
+		}
 		if !st.Live() {
 			f, err := l.Version(ctx, id, st.Version)
 			if err != nil {

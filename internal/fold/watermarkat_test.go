@@ -217,3 +217,46 @@ func TestDisplaced_IncludesTheDeadCurrentVersion(t *testing.T) {
 		t.Errorf("version = %d, want 1", got[0].Version)
 	}
 }
+
+// DisplacedWhere reads only the facets it is asked for, and gives for them the rows
+// Displaced gives, so a per-type view and the whole-record view cannot disagree.
+func TestDisplacedWhere_ReadsOnlyTheFacetsKept(t *testing.T) {
+	t.Parallel()
+	g, l := newHarness(t)
+	ctx := context.Background()
+
+	src := source{
+		"2026-01-24T06:30:00Z": `"systolic": 118, "diastolic": 76`,
+		"2026-01-25T06:30:00Z": `"systolic": 121, "diastolic": 79`,
+	}
+	src.ingest(t, g)
+	src["2026-01-24T06:30:00Z"] = `"systolic": 117, "diastolic": 75`
+	src["2026-01-25T06:30:00Z"] = `"systolic": 122, "diastolic": 80`
+	src.ingest(t, g)
+
+	res, err := fold.Read(ctx, l)
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	all, err := fold.Displaced(ctx, l, res)
+	if err != nil {
+		t.Fatalf("Displaced: %v", err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("Displaced returned %d, want 2", len(all))
+	}
+
+	one := all[0].Facet.ID
+	got, err := fold.DisplacedWhere(ctx, l, res, func(id string) bool { return id == one })
+	if err != nil {
+		t.Fatalf("DisplacedWhere: %v", err)
+	}
+	if len(got) != 1 || got[0].Facet.ID != one || got[0].Version != all[0].Version {
+		t.Errorf("DisplacedWhere(one facet) = %+v, want only %s v%d", got, one, all[0].Version)
+	}
+
+	none, err := fold.DisplacedWhere(ctx, l, res, func(string) bool { return false })
+	if err != nil || len(none) != 0 {
+		t.Errorf("DisplacedWhere(nothing) = %d rows, %v; want none", len(none), err)
+	}
+}

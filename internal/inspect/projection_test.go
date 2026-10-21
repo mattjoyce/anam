@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -104,21 +106,25 @@ func TestProjectionPage_Canonical(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("GET /projection = %d\n%s", code, body)
 	}
-	for _, want := range []string{"anam projections", "canonical", "bp", "sleep", "as-of"} {
+	for _, want := range []string{"anam projections", "canonical", "bp", "sleep", "as-of", "superseded"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page does not mention %q", want)
 		}
 	}
-	// One live bp (at v2), one tombstoned hr; displaced v1 and the dead hr are the
-	// two superseded rows.
-	if !strings.Contains(body, "superseded") {
-		t.Error("no superseded rows rendered")
+	// The summary counts the versions no longer in force; it does not list them.
+	if strings.Contains(body, "displaced by v2") {
+		t.Error("the summary drew a superseded row")
 	}
-	if !strings.Contains(body, "displaced by v2") {
-		t.Errorf("the displaced version is not explained:\n%s", body)
+
+	// One live bp (at v2), one tombstoned hr: the displaced v1 is the bp's superseded
+	// row, and the dead hr is the (not live) line's.
+	_, rows := get(t, srv.URL+"/projection?type=health.blood-pressure&show=superseded")
+	if !strings.Contains(rows, "displaced by v2") {
+		t.Errorf("the displaced version is not explained:\n%s", rows)
 	}
-	if !strings.Contains(body, "not live: tombstoned") {
-		t.Error("the tombstoned facet is not explained")
+	_, dead := get(t, srv.URL+"/projection?type="+url.QueryEscape("(not live)")+"&show=superseded")
+	if !strings.Contains(dead, "not live: tombstoned") {
+		t.Errorf("the tombstoned facet is not explained:\n%s", dead)
 	}
 }
 
@@ -131,11 +137,12 @@ func TestProjectionPage_SwitchingTemplateChangesTheVerdicts(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("GET /projection?p=bp = %d", code)
 	}
+	_, bpRows := get(t, srv.URL+"/projection?p=bp&type=health.sleep&show=excluded")
 	// The live sleep facet is what the type knob excludes here. The tombstoned
 	// heart-rate never reaches the template at all — the canonical is live-only by
 	// construction, so a dead facet is a superseded row, not an exclusion.
-	if !strings.Contains(bp, "type not in the allow-list") {
-		t.Errorf("bp does not explain why the live sleep facet is out:\n%s", bp)
+	if !strings.Contains(bpRows, "type not in the allow-list") {
+		t.Errorf("bp does not explain why the live sleep facet is out:\n%s", bpRows)
 	}
 	if !strings.Contains(bp, "health.blood-pressure") {
 		t.Error("bp does not show the reading it serves")
@@ -148,7 +155,8 @@ func TestProjectionPage_SwitchingTemplateChangesTheVerdicts(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("GET /projection?p=sleep = %d", code)
 	}
-	if !strings.Contains(sleepBody, "type not in the allow-list") {
+	_, sleepRows := get(t, srv.URL+"/projection?p=sleep&type=health.blood-pressure&show=excluded")
+	if !strings.Contains(sleepRows, "type not in the allow-list") {
 		t.Error("sleep does not explain its exclusions")
 	}
 	if bp == sleepBody {
@@ -201,17 +209,19 @@ func TestProjectionPage_AsOfShowsWhatItStoodOnThen(t *testing.T) {
 	if !strings.Contains(before, ">2</strong> watermark") && !strings.Contains(before, "<strong>2</strong>") {
 		t.Errorf("as-of the 11th should read W=2:\n%s", before)
 	}
-	if strings.Contains(before, "displaced by v2") {
-		t.Error("as-of the 11th, nothing had been displaced yet")
+	// Nothing had been displaced or tombstoned yet, so no type has a superseded count
+	// to open; now both have happened.
+	if got := summaryCounts(t, before); got["health.blood-pressure"].superseded != 0 || got[notLiveType].link != "" {
+		t.Errorf("as-of the 11th the summary counts superseded versions: %+v", got)
 	}
-	if strings.Contains(before, "not live: tombstoned") {
-		t.Error("as-of the 11th, nothing had been tombstoned yet")
-	}
-
-	// Now: both have happened.
 	_, now := get(t, srv.URL+"/projection?p=bp")
-	if !strings.Contains(now, "displaced by v2") || !strings.Contains(now, "not live: tombstoned") {
-		t.Error("the head view lost the supersession or the tombstone")
+	if got := summaryCounts(t, now); got["health.blood-pressure"].superseded != 1 || got[notLiveType].superseded != 1 {
+		t.Errorf("the head summary lost the supersession or the tombstone: %+v", got)
+	}
+	// The as-of survives into the rows view, which then reads the same past.
+	_, thenRows := get(t, srv.URL+"/projection?p=bp&type=health.blood-pressure&show=served&asof=2026-07-11T00:00:00Z")
+	if !strings.Contains(thenRows, ">v1<") || strings.Contains(thenRows, ">v2<") {
+		t.Errorf("as-of the 11th the rows view should show the reading at v1:\n%s", thenRows)
 	}
 
 	// And before anything was admitted, the honest answer is an empty projection
@@ -235,7 +245,11 @@ func TestProjectionPage_RejectsBadInput(t *testing.T) {
 	// The form's datetime-local value carries seconds and no zone; each spelling
 	// reads the same instant as the RFC 3339 one, so the page is the same apart
 	// from the value echoed back into the input.
-	same := func(body, asof string) string { return strings.ReplaceAll(body, `value="`+asof+`"`, "") }
+	// The summary's links carry the as-of as typed, so they differ by spelling too.
+	asofParam := regexp.MustCompile(`asof=[^&"]*`)
+	same := func(body, asof string) string {
+		return asofParam.ReplaceAllString(strings.ReplaceAll(body, `value="`+asof+`"`, ""), "asof=")
+	}
 	_, ref := get(t, srv.URL+"/projection?p=bp&asof=2026-07-11T00:00:00Z")
 	for _, local := range []string{"2026-07-11T00:00:00", "2026-07-11T00:00"} {
 		code, body := get(t, srv.URL+"/projection?p=bp&asof="+local)
@@ -245,5 +259,10 @@ func TestProjectionPage_RejectsBadInput(t *testing.T) {
 	}
 	if code, _ := get(t, srv.URL+"/projection?asof=last-tuesday"); code != 400 {
 		t.Errorf("unparseable as-of = %d, want 400", code)
+	}
+	for _, bad := range []string{"type=health.sleep&show=bogus", "type=health.sleep&from=yesterday", "type=health.sleep&to=2026-13-40"} {
+		if code, _ := get(t, srv.URL+"/projection?"+bad); code != 400 {
+			t.Errorf("%s = %d, want 400", bad, code)
+		}
 	}
 }

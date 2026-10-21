@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sort"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/clock"
@@ -56,10 +55,18 @@ type projectionData struct {
 	// snapshot-shaped template.
 	series projection.Series
 
+	// Summary is the default view: one line per type. Rows is the rows view, and
+	// only that view: a type's rows of one standing, at most rowLimit of them.
+	Summary     []typeSummary
 	Rows        []projVerdictRow
 	NServed     int
 	NExcluded   int
 	NSuperseded int
+
+	// The rows view's request. Type is empty in the summary view.
+	Type, Show, From, To string
+	// RowsTotal is how many rows match, whether or not all are drawn.
+	RowsTotal int
 }
 
 func (s *Server) projectionPage(w http.ResponseWriter, r *http.Request) {
@@ -77,10 +84,17 @@ func (s *Server) projectionPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	vw, err := viewOf(r.URL.Query())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	data := projectionData{
 		series:   defs,
 		Names:    append([]string{"canonical"}, templates.Names()...),
 		Selected: r.URL.Query().Get("p"),
+		Type:     vw.typ, Show: vw.show, From: vw.rawFrom, To: vw.rawTo,
 	}
 	if data.Selected == "" {
 		data.Selected = "canonical"
@@ -111,7 +125,7 @@ func (s *Server) projectionPage(w http.ResponseWriter, r *http.Request) {
 		}
 		data.Template = &t
 	}
-	if err := data.fill(ctx, s.ledger, res); err != nil {
+	if err := data.fill(ctx, s.ledger, res, vw); err != nil {
 		httpError(w, err)
 		return
 	}
@@ -156,85 +170,53 @@ func (s *Server) readForQuery(ctx context.Context, asof string, data *projection
 	return s.readAt(ctx, w)
 }
 
-// fill computes the verdict rows: live facets judged by the template, then every
-// version no longer in force.
-func (d *projectionData) fill(ctx context.Context, l Ledger, res fold.Result) error {
-	if err := d.judgeLive(res); err != nil {
-		return err
-	}
-
-	// Versions no longer in force. Neither reaches a template — the canonical is
-	// live-only by construction (§9) — so they carry their own standing rather than an
-	// exclusion reason. Derived by the fold, so this page and `anam timeline --explain`
-	// cannot give different answers.
-	displaced, err := fold.Displaced(ctx, l, res)
-	if err != nil {
-		return err
-	}
-	d.NSuperseded = len(displaced)
-	for _, x := range displaced {
-		d.Rows = append(d.Rows, displacedRow(x))
-	}
-
-	sort.Slice(d.Rows, func(i, j int) bool {
-		a, b := d.Rows[i], d.Rows[j]
-		switch {
-		case a.FactTime != b.FactTime:
-			return a.FactTime < b.FactTime
-		case a.ID != b.ID:
-			return a.ID < b.ID
-		default:
-			return a.Version < b.Version
-		}
-	})
-	return nil
-}
-
 // judgeLive puts every live facet through the template, or marks them all served when
-// no template is selected — the canonical is the un-narrowed read.
-func (d *projectionData) judgeLive(res fold.Result) error {
-	if d.Template != nil {
-		verdicts, err := projection.Explain(res.Value, *d.Template, consent.Open{}, d.series)
-		if err != nil {
-			return err
-		}
-		served, err := projection.Apply(res.Value, *d.Template, consent.Open{}, d.series)
-		if err != nil {
-			return err
-		}
-		d.ServedHash, d.Served = served.Hash(), served.Len()
-
-		for _, x := range verdicts {
-			standing, why := "served", ""
-			if !x.Reason.Served() {
-				standing, why = "excluded", string(x.Reason)
-				if x.Detail != "" {
-					why += ": " + x.Detail
-				}
-				d.NExcluded++
-			} else {
-				d.NServed++
-			}
-			d.Rows = append(d.Rows, projVerdictRow{
-				FactTime: x.Entry.FactTime, Type: x.Entry.Type,
-				Version:  res.States[x.Entry.FacetID].Version,
-				Standing: standing, Why: why,
-				SourceRef: x.Entry.SourceRef, ID: x.Entry.FacetID,
-			})
-		}
-	} else {
+// no template is selected, since the canonical is the un-narrowed read. It returns the
+// verdict of each, and sets the served counts and hash.
+func (d *projectionData) judgeLive(res fold.Result) ([]projVerdictRow, error) {
+	var rows []projVerdictRow
+	if d.Template == nil {
 		d.ServedHash, d.Served = res.Value.Hash(), res.Value.Len()
 		for _, e := range res.Value.Entries() {
 			d.NServed++
-			d.Rows = append(d.Rows, projVerdictRow{
+			rows = append(rows, projVerdictRow{
 				FactTime: e.FactTime, Type: e.Type,
 				Version: res.States[e.FacetID].Version, Standing: "served",
 				SourceRef: e.SourceRef, ID: e.FacetID,
 			})
 		}
+		return rows, nil
 	}
 
-	return nil
+	verdicts, err := projection.Explain(res.Value, *d.Template, consent.Open{}, d.series)
+	if err != nil {
+		return nil, err
+	}
+	served, err := projection.Apply(res.Value, *d.Template, consent.Open{}, d.series)
+	if err != nil {
+		return nil, err
+	}
+	d.ServedHash, d.Served = served.Hash(), served.Len()
+
+	for _, x := range verdicts {
+		standing, why := "served", ""
+		if !x.Reason.Served() {
+			standing, why = "excluded", string(x.Reason)
+			if x.Detail != "" {
+				why += ": " + x.Detail
+			}
+			d.NExcluded++
+		} else {
+			d.NServed++
+		}
+		rows = append(rows, projVerdictRow{
+			FactTime: x.Entry.FactTime, Type: x.Entry.Type,
+			Version:  res.States[x.Entry.FacetID].Version,
+			Standing: standing, Why: why,
+			SourceRef: x.Entry.SourceRef, ID: x.Entry.FacetID,
+		})
+	}
+	return rows, nil
 }
 
 func displacedRow(d fold.Displacement) projVerdictRow {

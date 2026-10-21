@@ -1,0 +1,291 @@
+package inspect
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/consent"
+	"github.com/mattjoyce/anam/internal/fold"
+	"github.com/mattjoyce/anam/internal/selection"
+	"github.com/mattjoyce/anam/internal/serve"
+)
+
+// The selection page (card 199): GET /select builds a Datalog selection. Criteria are
+// added and removed in any order, the matches are listed grouped by type with a
+// checkbox per facet, and the program the criteria and the ticks make is shown live
+// and can be edited as text. The program is the value; the chips and checkboxes are a
+// view of it, drawn only while it is within the chip grammar (selection.Parse).
+//
+// The page only reads. Every state is an address: the criteria, the basket of ticked
+// facets with each one's side, and the exclusions travel in the query string, so back
+// and reload keep them. A form post of the checkboxes is answered with a redirect to
+// the address of the new state. The selection is handed on by a link that card 202's
+// link form will consume.
+
+// selectState is one address of the page.
+type selectState struct {
+	proj     string
+	filter   selection.Filter
+	fromSide map[string]bool
+	// program is a hand-edited program, "" while the criteria make it.
+	program string
+}
+
+var errBadSelect = errors.New("bad selection")
+
+// stateOf reads the address. A date bound is a whole day; a fact-time lexeme is an
+// exact bound, which is how a hand-edited bound off midnight stays a chip.
+func stateOf(q url.Values) (selectState, error) {
+	st := selectState{proj: q.Get("p"), program: q.Get("program"), fromSide: map[string]bool{}}
+	if st.proj == "" {
+		st.proj = canonicalName
+	}
+	f := selection.Filter{
+		Types: values(q["type"]), Sources: values(q["source"]), Standing: selection.Standing(q.Get("standing")),
+		Ticks: values(q["tick"]), Exclusions: values(q["untick"]),
+	}
+	var err error
+	if f.From, err = bound(q.Get("from"), false); err != nil {
+		return st, err
+	}
+	if f.To, err = bound(q.Get("to"), true); err != nil {
+		return st, err
+	}
+	if err := f.Validate(); err != nil {
+		return st, fmt.Errorf("%w: %v", errBadSelect, err)
+	}
+	st.filter = f.Canonical()
+	ticked := index(st.filter.Ticks)
+	for _, id := range values(q["fromside"]) {
+		if ticked[id] {
+			st.fromSide[id] = true
+		}
+	}
+	return st, nil
+}
+
+const canonicalName = "canonical"
+
+// bound reads a from or to: a date, a fact-time lexeme, or nothing. A to date is the
+// whole day, so its bound is the next midnight.
+func bound(s string, upper bool) (string, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", nil
+	}
+	if _, err := time.Parse(time.DateOnly, s); err != nil {
+		return s, nil // a lexeme, or Validate says why it is not
+	}
+	var lo, hi string
+	var err error
+	if upper {
+		_, hi, err = selection.Days("", s)
+	} else {
+		lo, _, err = selection.Days(s, "")
+	}
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", errBadSelect, err)
+	}
+	return lo + hi, nil
+}
+
+// dayOf writes a bound back as the address and the form show it: a midnight as its
+// date (a to bound as the day before, since a to date is the whole day), anything
+// else as the lexeme itself.
+func dayOf(lexeme string, upper bool) string {
+	t, err := clock.Parse(lexeme)
+	if err != nil || !t.Equal(t.Truncate(24*time.Hour)) {
+		return lexeme
+	}
+	if upper {
+		t = t.AddDate(0, 0, -1)
+	}
+	return t.Format(time.DateOnly)
+}
+
+// values is xs without the empty values a form's blank inputs send.
+func values(xs []string) []string {
+	var out []string
+	for _, x := range xs {
+		if x = strings.TrimSpace(x); x != "" {
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
+func index(xs []string) map[string]bool {
+	m := make(map[string]bool, len(xs))
+	for _, x := range xs {
+		m[x] = true
+	}
+	return m
+}
+
+// query is the state's address. The criteria and the basket are written in one
+// order, so one state has one address however it was reached.
+func (st selectState) query() url.Values {
+	q := url.Values{}
+	f := st.filter
+	if st.proj != canonicalName {
+		q.Set("p", st.proj)
+	}
+	if st.program != "" {
+		q.Set("program", st.program)
+		st.addSides(q)
+		return q
+	}
+	if f.From != "" {
+		q.Set("from", dayOf(f.From, false))
+	}
+	if f.To != "" {
+		q.Set("to", dayOf(f.To, true))
+	}
+	q["type"], q["source"] = f.Types, f.Sources
+	if f.Standing == selection.Superseded {
+		q.Set("standing", string(f.Standing))
+	}
+	q["tick"], q["untick"] = f.Ticks, f.Exclusions
+	st.addSides(q)
+	for k, v := range q {
+		if len(v) == 0 {
+			delete(q, k)
+		}
+	}
+	return q
+}
+
+func (st selectState) addSides(q url.Values) {
+	for _, id := range st.filter.Ticks {
+		if st.fromSide[id] {
+			q.Add("fromside", id)
+		}
+	}
+}
+
+// URL is the state's address on this page.
+func (st selectState) URL() string { return "/select?" + st.query().Encode() }
+
+// with is a copy of the state changed by edit, the fromSide set copied too.
+func (st selectState) with(edit func(*selectState)) selectState {
+	c := st
+	c.fromSide = make(map[string]bool, len(st.fromSide))
+	for k, v := range st.fromSide {
+		c.fromSide[k] = v
+	}
+	c.filter.Types = append([]string(nil), st.filter.Types...)
+	c.filter.Sources = append([]string(nil), st.filter.Sources...)
+	c.filter.Ticks = append([]string(nil), st.filter.Ticks...)
+	c.filter.Exclusions = append([]string(nil), st.filter.Exclusions...)
+	edit(&c)
+	c.filter = c.filter.Canonical()
+	return c
+}
+
+func (s *Server) selectPage(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), s.timeout)
+	defer cancel()
+	q := r.URL.Query()
+	st, err := stateOf(q)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if _, ok := q["shown"]; ok {
+		http.Redirect(w, r, applyTicks(st, q).URL(), http.StatusSeeOther)
+		return
+	}
+	if st.program != "" {
+		if f, err := selection.Parse(st.program); err == nil {
+			// Within the grammar: the chips are drawn from it.
+			next := st.with(func(c *selectState) { c.filter, c.program = f, "" })
+			http.Redirect(w, r, next.URL(), http.StatusSeeOther)
+			return
+		}
+	}
+	served, res, err := s.servedFor(ctx, st.proj)
+	switch {
+	case errors.Is(err, errUnknownProjection):
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	case err != nil:
+		httpError(w, err)
+		return
+	}
+	data, err := s.selectData(ctx, st, served, res)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+	render(w, "select.html", data)
+}
+
+// applyTicks reads the checkboxes posted back: a listed facet left unticked is an
+// exclusion, and dropped from the ticks; a ticked one is not excluded. "keep" also
+// puts every ticked one in the basket, so it outlives the criteria that found it.
+func applyTicks(st selectState, q url.Values) selectState {
+	on := index(q["on"])
+	keep := q.Get("act") == "keep"
+	return st.with(func(c *selectState) {
+		ex, ticks := index(c.filter.Exclusions), index(c.filter.Ticks)
+		for _, id := range values(q["shown"]) {
+			switch {
+			case !on[id]:
+				ex[id], ticks[id] = true, false
+				delete(c.fromSide, id)
+			case keep:
+				ex[id], ticks[id] = false, true
+			default:
+				ex[id] = false
+			}
+		}
+		c.filter.Exclusions, c.filter.Ticks = setOf(ex), setOf(ticks)
+	})
+}
+
+// setOf is the members of m marked true, sorted.
+func setOf(m map[string]bool) []string {
+	var out []string
+	for k, v := range m {
+		if v {
+			out = append(out, k)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+var errUnknownProjection = errors.New("unknown projection")
+
+// servedFor is the value a projection serves at the head, the way the query read
+// derives it (serve.Derive), or the canonical itself, which is the un-narrowed read.
+func (s *Server) servedFor(ctx context.Context, name string) (fold.Value, fold.Result, error) {
+	res, err := s.read(ctx)
+	if err != nil {
+		return fold.Value{}, fold.Result{}, err
+	}
+	if name == canonicalName {
+		return res.Value, res, nil
+	}
+	templates, err := s.templates()
+	if err != nil {
+		return fold.Value{}, fold.Result{}, err
+	}
+	t, err := templates.Lookup(name)
+	if err != nil {
+		return fold.Value{}, fold.Result{}, fmt.Errorf("%w: %v", errUnknownProjection, err)
+	}
+	defs, err := s.definitions()
+	if err != nil {
+		return fold.Value{}, fold.Result{}, err
+	}
+	served, err := serve.Derive(res.Value, t, consent.Open{}, defs, "")
+	return served, res, err
+}

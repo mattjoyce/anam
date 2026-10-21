@@ -18,7 +18,7 @@
 * [Facet domain values (internal/facet)](facet.md) - The value types everything else speaks in: Facet, AnamEvent, Envelope, the five event kinds, and SourceRef, the one function that composes identity.
 * [Fold](fold.md) - Derives each facet's current status from its anam-events in seq order and builds the canonical value, sorted and hashed.
 * [Importer base (anam_importer)](importer-base.md) - The shared Python package every importer starts from: the ductile protocol, Definitions and local validation, envelopes and batches, and the HTTP client.
-* [Inspector (internal/inspect)](inspect.md) - The read-only web harness over the full fold: timeline, facets, events, projections and definitions, plus the default library's bytes confined to its root.
+* [Inspector (internal/inspect)](inspect.md) - The web harness over the full fold, the Anam Workbench: timeline, facets with the edges touching them, events, projections, the selection builder and definitions, the default library's bytes confined to its root, and forms that enter, correct and retract a fact by hand.
 * [Ledger store (internal/store/ledger)](store-ledger.md) - The append-only SQLite file: facet artifacts, anam-events and ledger_meta, with triggers that refuse update and delete for every writer.
 * [Library (internal/library)](library.md) - Anam's store of document bytes: files named <sha256>.<ext>, written only by Anam, placed by a folder limit and found again by a walk for the name.
 * [Mint](mint.md) - Writes bucket checkpoints after each change, starting from the last run and touching only the buckets the tail dirtied; also the composed reads that start from those checkpoints.
@@ -27,4 +27,5 @@
 * [Projection](projection.md) - Applies a template, bundled or registered, to a canonical value, metadata filters only, and explains each facet's verdict by the knob that decided it.
 * [Read (internal/read)](read.md) - The read API behind timeline, changes, publish and the snapshot report: parses the query, picks composed or full fold, narrows, and bounds the answer.
 * [Receipt (internal/receipt)](receipt.md) - The receipt record and its proofs: validate, deterministic bytes, and compare a re-derived value with what the file holds.
+* [Selection (internal/selection)](selection.md) - The shared filter: fact-time from and to, type or prefix, source, standing, and facets ticked or unticked by hand, as one Go value that compiles to a Datalog pick/1 program and parses back only when the program is one it writes.
 * [Serve (internal/serve)](serve.md) - Publishes a projection: canonical at head, prune, write the served value then its receipt, and verifies a receipt by re-deriving.

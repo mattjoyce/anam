@@ -19,7 +19,7 @@ Each table is annotated with its tier in the schema.
 | Tier | Tables | Comes back from |
 |---|---|---|
 | derived | `facet_index`, `facet_edge`, `anam_event_index`, `checkpoint` (+ `span_head` view), `checkpoint_size`, `mint_run`, `mint_seal`, `sync` | replaying the ledger, then minting |
-| provisioned | `definition` (bundled, every version), `registered_definition` (immutable by trigger) | the binary, and each importer registering again |
+| provisioned | `definition` (bundled, every version), `registered_definition` (immutable by trigger) | the binary, and each importer registering again; `anam migrate` copies the registered rows to a new store with their registration moments (card 200) |
 | authored | `meta` (schema_version, bucket_width, ledger_id) | the file itself |
 | disposable | `snapshot`, `snapshot_part`, `snapshot_facet` | the importer's next resend |
 

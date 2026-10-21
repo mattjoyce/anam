@@ -183,7 +183,30 @@ func (g *Gate) commitPrepared(ctx context.Context, ps []prepared) ([]Result, led
 // prepare runs every pillar that needs no ledger read and derives identity and
 // integrity — everything Commit does before its first Head.
 func (g *Gate) prepare(env facet.Envelope, binding facet.Binding) (prepared, error) {
-	env, d, doc, err := g.admitChecks(env, binding)
+	return g.prepareWith(env, binding, g.current)
+}
+
+// resolver is how a prepare finds the Definition an envelope is held to: the type's
+// current one for a commit, the version a facet was admitted under for a carry.
+type resolver func(env facet.Envelope) (def.Definition, error)
+
+// current is the resolver of a commit: the type's Definition in force, which an
+// envelope that names a version must have been shaped to.
+func (g *Gate) current(env facet.Envelope) (def.Definition, error) {
+	d, ok := g.defs.Lookup(env.Type)
+	if !ok {
+		return def.Definition{}, fmt.Errorf("%w: %s", ErrNoDefinition, env.Type)
+	}
+	if env.DefinitionVersion != 0 && env.DefinitionVersion != d.Version {
+		return def.Definition{}, fmt.Errorf("%w: shaped to v%d, %s is v%d",
+			ErrDefinitionVersion, env.DefinitionVersion, env.Type, d.Version)
+	}
+	return d, nil
+}
+
+// prepareWith is prepare against the Definition resolve finds.
+func (g *Gate) prepareWith(env facet.Envelope, binding facet.Binding, resolve resolver) (prepared, error) {
+	env, d, doc, err := g.admitChecks(env, binding, resolve)
 	if err != nil {
 		return prepared{}, err
 	}
@@ -285,7 +308,7 @@ type disposition struct {
 
 // admitChecks runs the pillars that need no ledger read: structure, token scope,
 // definition existence and version, assurance floor, size, and compliance.
-func (g *Gate) admitChecks(env facet.Envelope, binding facet.Binding) (facet.Envelope, def.Definition, any, error) {
+func (g *Gate) admitChecks(env facet.Envelope, binding facet.Binding, resolve resolver) (facet.Envelope, def.Definition, any, error) {
 	if err := env.Validate(); err != nil {
 		return facet.Envelope{}, def.Definition{}, nil, err
 	}
@@ -295,13 +318,9 @@ func (g *Gate) admitChecks(env facet.Envelope, binding facet.Binding) (facet.Env
 	if !g.scopes.Allowed(env.Source, env.Type) {
 		return facet.Envelope{}, def.Definition{}, nil, fmt.Errorf("%w: %s → %s", ErrNotAuthorized, env.Source, env.Type)
 	}
-	d, ok := g.defs.Lookup(env.Type)
-	if !ok {
-		return facet.Envelope{}, def.Definition{}, nil, fmt.Errorf("%w: %s", ErrNoDefinition, env.Type)
-	}
-	if env.DefinitionVersion != 0 && env.DefinitionVersion != d.Version {
-		return facet.Envelope{}, def.Definition{}, nil, fmt.Errorf("%w: shaped to v%d, %s is v%d",
-			ErrDefinitionVersion, env.DefinitionVersion, env.Type, d.Version)
+	d, err := resolve(env)
+	if err != nil {
+		return facet.Envelope{}, def.Definition{}, nil, err
 	}
 	if assuranceRank(binding.Assurance) < assuranceRank(d.MinAssurance) {
 		return facet.Envelope{}, def.Definition{}, nil, fmt.Errorf("%w: %s < %s", ErrAssuranceBelowFloor, binding.Assurance, d.MinAssurance)

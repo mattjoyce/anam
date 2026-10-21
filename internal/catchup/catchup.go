@@ -148,7 +148,7 @@ func advance(ctx context.Context, l Ledger, o Ops, events []facet.AnamEvent, buc
 			Version: st.Version, Status: st.Status, ContentHash: f.Descriptor.ContentHash,
 		})
 		if f.Type == EdgeType && st.Status != facet.StatusTombstoned {
-			ends, err := edgeEnds(f)
+			ends, err := EdgeEnds(f)
 			if err != nil {
 				return nil, nil, fmt.Errorf("%w: facet %s v%d: %v", fold.ErrCorruptStream, id, st.Version, err)
 			}
@@ -165,11 +165,12 @@ func advance(ctx context.Context, l Ledger, o Ops, events []facet.AnamEvent, buc
 // fields and nothing else. A test holds the bundled Definition to declaring them.
 const EdgeType facet.Type = "record.edge"
 
-// edgeEnds reads the ends an edge facet's payload names, one row per facet id per
-// side. A payload that does not decode, or whose ends are not lists of strings, is
+// EdgeEnds reads the ends an edge facet's payload names, one row per facet id per
+// side. The migration (card 200) reads them to name a link whose end it does not
+// carry. A payload that does not decode, or whose ends are not lists of strings, is
 // not an admitted value of the Definition, so the stream is corrupt rather than the
 // index a guess.
-func edgeEnds(f facet.Facet) ([]ops.EdgeRow, error) {
+func EdgeEnds(f facet.Facet) ([]ops.EdgeRow, error) {
 	doc, err := def.Decode(f.Payload.Bytes())
 	if err != nil {
 		return nil, err

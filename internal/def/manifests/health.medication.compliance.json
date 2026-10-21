@@ -15,7 +15,7 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "The person's own estimate of how well they kept to one course over a period, stated on a date (SELF-LOG.md section 6). Written by hand into a records file; Anam stores the figure and does not judge it, and a later estimate is a new facet, not a correction. No row has been written yet. Named health.medication.compliance (v1) until card 196.",
+    "description": "The person's own estimate of how well they kept to one course over a period, stated on a date (SELF-LOG.md section 6). Written by hand into a records file; Anam stores the figure and does not judge it, and a later estimate is a new facet, not a correction. No row has been written yet. Named health.medication-compliance (v1) until its name gained a third segment.",
     "type": "object",
     "required": ["id", "date", "drug", "course", "period_start", "period_end", "estimate"],
     "properties": {

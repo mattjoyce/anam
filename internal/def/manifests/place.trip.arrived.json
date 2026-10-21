@@ -16,7 +16,7 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "Arriving at one place during a trip, a leg within the trip, one row in a records file (source records). It does not close the trip; values are the row's own text. Named place.trip.arrived (v1) until card 196.",
+    "description": "Arriving at one place during a trip, a leg within the trip, one row in a records file (source records). It does not close the trip; values are the row's own text. Named place.arrived (v1) until its name gained a third segment.",
     "type": "object",
     "required": ["id", "date", "trip"],
     "properties": {

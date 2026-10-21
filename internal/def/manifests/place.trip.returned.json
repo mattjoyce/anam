@@ -16,7 +16,7 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "Getting home from a trip, one row in a records file (source records). Closes the travel.trip series; values are the row's own text. Named place.trip.returned (v1) until card 196.",
+    "description": "Getting home from a trip, one row in a records file (source records). Closes the travel.trip series; values are the row's own text. Named place.returned (v1) until its name gained a third segment.",
     "type": "object",
     "required": ["id", "date", "trip"],
     "properties": {

@@ -1,11 +1,11 @@
 {{define "zonescript.html"}}
 <script>
-  // The fact names the zone it was said in (card 198): the browser's own, sent with
+  // The fact names the zone it was said in: the browser's own, sent with
   // basis source, and the offset the typed wall clock has in it, filled as it is typed
   // when that is one offset. A wall clock the zone skips or repeats gets none, and the
   // person types it, rather than this page choosing. A correction keeps its zone.
   // A fact-time control marked data-now starts at this minute when it is empty: the
-  // link form's moment is when the link is written (card 202).
+  // link form's moment is when the link is written.
   (function () {
     var form = document.querySelector('form.entry'), zone = document.getElementById('zone'), offset = document.getElementById('offset');
     var here = '';

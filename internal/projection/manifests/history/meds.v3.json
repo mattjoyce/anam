@@ -1,0 +1,11 @@
+{
+  "name": "meds",
+  "version": 3,
+  "description": "The current regimen — the latest statement about each medication course, with stopped courses gone. Serve it at a fact-time bound for 'what was I on, on that day'. Version 2 named the types under the health domain (card 147); version 3 gives them the third segment (card 196). A single dose (health.medication.dose) is not a regimen statement and stays out, so the list names the three regimen types and not the prefix health.medication., which would bring in doses, missed doses and compliance.",
+  "types": ["health.medication.started", "health.medication.dose-changed", "health.medication.stopped"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "snapshot"
+}

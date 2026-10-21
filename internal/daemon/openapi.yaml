@@ -1,5 +1,5 @@
 openapi: 3.1.0
-# The daemon's API, hand-written (card 49). internal/daemon/openapi_test.go holds it
+# The daemon's API, hand-written. internal/daemon/openapi_test.go holds it
 # to the mux: every route in routes() is a path here with the same roles, every path
 # here is a route, and every example decodes into the internal/api type it names
 # (x-anam-type). docs/API.md is the prose; this file is the shapes.
@@ -254,7 +254,7 @@ paths:
         as an artifact with a receipt that names exactly the entries served at W.
         Writes artifacts only, never the ledger. The parameters are the timeline's;
         projection is required. A read too large for one answer is filed once, whole,
-        and answered a page at a time (card 92): entries (or the frame's rows) and
+        and answered a page at a time: entries (or the frame's rows) and
         versions are the first page, shown is the whole count, and page.next_cursor
         reads the next page from GET /v1/receipts/{hash}. 413 only when one facet
         alone is over max_read_bytes, which no page can carry; nothing is filed.
@@ -329,7 +329,7 @@ paths:
       summary: A receipt and the value it served, a page at a time, from the artifacts alone.
       description: >-
         Without a cursor, the receipt and the first page of its value; with one, the
-        page it names, carrying hash and page but not the receipt again (card 92).
+        page it names, carrying hash and page but not the receipt again.
         Every page is whole facets cut to max_read_bytes from the served artifact the
         receipt hashes, never a new read, so walking next_cursor to the end gives back
         exactly the receipt's facet_ids in order. A frame pages by rows, every page
@@ -404,9 +404,8 @@ paths:
       x-anam-type: FacetShown
       summary: One facet as the receipt served it, with the links the record holds to it.
       description: >-
-        The entry is the receipt's served value (card 91): the payload and envelope as
-        admitted, which its content hash covers, at the receipt's W. Beside it, links
-        (card 104): the live edge facets that name this facet on either side, read from
+        The entry is the receipt's served value: the payload and envelope as
+        admitted, which its content hash covers, at the receipt's W. Beside it, `links` holds the live edge facets that name this facet on either side, read from
         the edge index at the index's own watermark w, never written into the facet. A
         facet the receipt did not serve is 404, since a facet id alone opens nothing a
         projection did not serve; a receipt that served a frame or a query answer has no
@@ -435,7 +434,7 @@ paths:
       summary: Save a selection program under a short code.
       description: >-
         Files the program as an artifact addressed by the SHA-256 of its canonical text
-        (card 206) and answers its code: the first eight hex digits of that hash, or the
+        and answers its code: the first eight hex digits of that hash, or the
         shortest longer prefix no other saved selection shares. A program within the
         selection page's chip grammar is saved in that grammar's one layout, so the
         same selection written another way has the same code; any other program is
@@ -474,7 +473,7 @@ paths:
       x-anam-type: Selection
       summary: The program a selection code names.
       description: >-
-        The saved selection a code names (card 206). The code may be written with or
+        The saved selection a code names. The code may be written with or
         without sel:. Eight digits name the selection first saved under them; a longer
         code names the one it was lengthened to, or the one saved selection whose hash
         it starts. 404 for a code nothing was saved under, 409 for a prefix that starts
@@ -513,7 +512,7 @@ paths:
       x-anam-type: QueryCatalogue
       summary: What a query can be written against.
       description: >-
-        The introspection an agent reads before writing a Datalog program (card 173):
+        The introspection an agent reads before writing a Datalog program:
         the base relations and the instant parameter, the exact fact-time lexeme, every
         type's payload pointers at every Definition version held, and the bundled rule
         set with its hash, its text and the relations it defines. Reads no facet.
@@ -555,7 +554,7 @@ paths:
       x-anam-type: QueryAnswer
       summary: Run a Datalog program through a projection, answered with a receipt.
       description: >-
-        The third read (ARCHITECTURE.md §9, card 173). The program runs over what the
+        The third read (ARCHITECTURE.md §9). The program runs over what the
         named projection serves at the head, or at as_of or w, built on the bundled
         rules; the named relation is the answer, a sorted relation that hashes. The
         answer is filed with a receipt naming the projection, the rule set and the
@@ -1080,7 +1079,7 @@ paths:
       x-anam-type: Entry
       summary: Enter one fact by hand, as the workbench source.
       description: >-
-        The Workbench's write (card 188). The operator's token opens it, and the daemon
+        The Workbench's write. The operator's token opens it, and the daemon
         submits the one envelope as the workbench principal the importers file declares
         (`source: workbench`, no token, `types` its allow-list): no importer token
         reaches a browser. It is a route over the same write as POST /v1/envelopes, so
@@ -1335,12 +1334,12 @@ components:
         bytes: { type: integer, description: what the entries encode to, counted up to the bound }
         max_bytes: { type: integer }
         narrow: { type: array, items: { type: string }, description: query parameters not yet used }
-        facet_id: { type: string, description: the one facet over the bound alone, when a published read is refused for it (card 92) }
+        facet_id: { type: string, description: the one facet over the bound alone, when a published read is refused for it }
         next_cursor: { type: string, description: on a page refused for its first facet, the page after it }
     Page:
       type: object
       description: >-
-        which portion of a receipted value an answer carries (card 92): the receipt's
+        which portion of a receipted value an answer carries: the receipt's
         facets from offset, returned_count of them, of total_count; next_cursor reads
         the next page, absent on the last
       required: [offset, returned_count, total_count]
@@ -1500,7 +1499,7 @@ components:
         program: { $ref: "#/components/schemas/ReceiptProgram" }
     ReceiptProgram:
       type: object
-      description: the query a receipt answers (card 173); the template is the projection it ran through
+      description: the query a receipt answers; the template is the projection it ran through
       required: [rule_set, rule_set_version, rule_set_hash, text, relation]
       properties:
         rule_set: { type: string }

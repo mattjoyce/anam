@@ -103,7 +103,7 @@
       },
       "source_time": {
         "type": "object",
-        "description": "How Garmin's day was read (card 197): value is its date as Garmin Connect files it, read in the offset the day began at (basis source); a day Garmin gave no interval for is read in Australia/Sydney instead (basis assumption), and the importer logs it.",
+        "description": "How Garmin's day was read: value is its date as Garmin Connect files it, read in the offset the day began at (basis source); a day Garmin gave no interval for is read in Australia/Sydney instead (basis assumption), and the importer logs it.",
         "required": [
           "value",
           "zone",

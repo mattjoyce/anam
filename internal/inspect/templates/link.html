@@ -91,7 +91,7 @@
 {{template "zonescript.html"}}
 {{if not .Edit}}<script>
   // A note about a facet follows it, so kind about starts unpinned and the others
-  // pinned (card 199). Changing the kind moves the pins with it until one is touched.
+  // pinned. Changing the kind moves the pins with it until one is touched.
   (function () {
     var kind = document.getElementById('kind'), pins = document.querySelectorAll('[data-pin]'), touched = false;
     for (var i = 0; i < pins.length; i++) pins[i].addEventListener('change', function () { touched = true; });

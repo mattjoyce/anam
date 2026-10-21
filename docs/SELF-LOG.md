@@ -33,7 +33,7 @@ has its own id) and type is too coarse. A Definition declares a series **family*
 that name one series within it, the drug and the course, and the gate stamps `<family>:<values>` into
 metadata at capture, as it stamps classification today. A Definition also declares whether its type
 **closes** a series (`health.medication.stopped`), so "a stop ends the regimen" is data in the Definition, not a rule
-in the read. Built 2026-10-07 (card 15; the design pass is `journal/notes/series-key.md`):
+in the read. Built 2026-10-07 (the design pass is `journal/notes/series-key.md`):
 
 ```json
 "series": {"name": "med.regimen", "key": ["/drug", "/course"], "closes": false}
@@ -67,17 +67,17 @@ A plain file you edit, one row per event, read by an importer like any other sou
   line number. `source_ref = self-log:<row_id>`. Editing a row's fields supersedes the facet;
   deleting a row does not tombstone it by itself: `anam retract <source>` reports the rows the
   source has dropped, from the importer's newest whole resend, and tombstones them only with `--yes`
-  (card 17, 2026-10-07), so a wrong row is
+  (since 2026-10-07), so a wrong row is
   corrected in place, and a row that should never have been is retracted on purpose.
 - **Fact-time is the row's date**, the day the thing happened, as you record it. A row added late is
   a backfill and re-opens its bucket, which is the system working.
-- **Validation is closed** for every self-log type (card 52). A row carries as much or as little as
+- **Validation is closed** for every self-log type. A row carries as much or as little as
   you know of the fields its Definition declares: "Went to the gym" is a row, and "Went to the gym,
   45 minutes, legs" is the same row with more. A field the Definition does not declare is refused,
   so a new kind of detail is a line in the manifest first.
 - **Classification** is Sensitive for everything medical; travel and gym can be Confidential.
 - Format: **records files**, one YAML per source document, read by the `anam_records` importer
-  (decided and built 2026-10-06, moved out of the binary by card 119; `INBOX.md` is the runbook). A hand-kept log is one records file
+  (decided and built 2026-10-06, since moved out of the binary into `anam-importers`; `INBOX.md` is the runbook). A hand-kept log is one records file
   whose document is the log itself.
 
 ## 4. The types
@@ -96,7 +96,7 @@ A plain file you edit, one row per event, read by an importer like any other sou
 
 A flight is evidence of a movement, not a state of the trip. Inside `travel.trip` a flight
 dated in Singapore would sort after a return dated the same day in Sydney and hold the trip open,
-so the trip's state is departed, arrived and returned, and flights stand beside it (card 35). Detailed gym
+so the trip's state is departed, arrived and returned, and flights stand beside it. Detailed gym
 data that a device already records (Garmin activities) stays with its device source; `activity.gym-visit` is
 your word that you went, and the two can be correlated later, never merged.
 
@@ -141,17 +141,16 @@ by status from world facts. Do that on demand, not by default.
 
 ## 7. Build order
 
-1. ✅ **Series key and closing type** in the Definition, stamped at capture (card 15, 2026-10-07).
-2. ✅ **The self-log source**: format, row identity, capture worker (card 22, 2026-10-06).
-3. ✅ **Medication types and the snapshot read**, with a snapshot projection and `--at` (card 23,
-   2026-10-07): `health.medication.started` / `health.medication.dose-changed` / `health.medication.stopped`, the `meds` template (shape
+1. ✅ **Series key and closing type** in the Definition, stamped at capture (2026-10-07).
+2. ✅ **The self-log source**: format, row identity, capture worker (2026-10-06).
+3. ✅ **Medication types and the snapshot read**, with a snapshot projection and `--at` (2026-10-07): `health.medication.started` / `health.medication.dose-changed` / `health.medication.stopped`, the `meds` template (shape
    `snapshot`), `timeline --at`. The inspector's projection page shows the same verdicts.
-4. ✅ **Life events** as self-log types: donation, illness, travel, gym (card 27, 2026-10-07;
+4. ✅ **Life events** as self-log types: donation, illness, travel, gym (2026-10-07;
    illness and travel are series, closed by `health.illness.ended` and `place.trip.returned`).
-5. ✅ **Reference payload kind** and a folder source (card 24, 2026-10-07): `record.document`, the
+5. ✅ **Reference payload kind** and a folder source (2026-10-07): `record.document`, the
    `documents` worker over a folder with `<file>.meta.yaml` sidecars carrying the date.
-6. **Lab results** from text files first, then images via a `proposed` extractor (card 25).
-7. ✅ **Compliance estimates** (card 26, 2026-10-07): `health.medication.compliance`, the estimate bounded
+6. **Lab results** from text files first, then images via a `proposed` extractor.
+7. ✅ **Compliance estimates** (2026-10-07): `health.medication.compliance`, the estimate bounded
    to (0, 1] at the gate; `internal/regimen.Expected` is the soft schedule, and a test holds that the
    watermark does not move when it is computed.
 

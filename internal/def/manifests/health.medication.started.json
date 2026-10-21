@@ -19,7 +19,7 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "A medicine course starting, one row in the med.regimen series. Written into records files by hand, by reading My Health Record dispensing screenshots or from the person's own word. Named health.medication.started (v1) until card 196.",
+    "description": "A medicine course starting, one row in the med.regimen series. Written into records files by hand, by reading My Health Record dispensing screenshots or from the person's own word. Named health.medication-started (v1) until its name gained a third segment.",
     "type": "object",
     "required": ["id", "date", "drug", "course"],
     "properties": {

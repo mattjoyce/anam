@@ -252,8 +252,8 @@ the receipts naming it** (an Anam clock). Deliberately *not* an anam-event — b
 nothing Anam knows — so it lives in the published-artifact tier and is lost with it. See *Receipt*,
 *Anam-event*.
 
-**Query** — The third read, after the timeline and *Fields* (decided 2026-10-17, card 173; not yet
-built): a Datalog program evaluated over the *Fold* at a watermark, **through a *Projection***. The
+**Query** — The third read, after the timeline and *Fields* (decided 2026-10-17, built 2026-10-19, card 173;
+reference in [QUERY.md](QUERY.md)): a Datalog program evaluated over the *Fold* at a watermark, **through a *Projection***. The
 projection decides which whole facets the query may see; the query relates them: joins across types
 along *Fact-time*, selection by any payload field the served Definition's schema names, aggregates,
 windows. Base relations are the *Envelope* (`entry/7`, with `definition_version`) and the payload

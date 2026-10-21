@@ -529,3 +529,74 @@ rebuilt record, built by the same path a live rebuild takes.
 **The drill's record.** 2026-10-14, from the ThinkPad, records and documents from the Library share
 against v0.308-775ffb9: 2,939 facets in 18 types, every facet id, content hash and status equal to
 the live record's, in about 17 seconds of polls and submits. The six importers on unraid are the morning's run.
+
+### 8.9 Migrating to a fresh ledger
+
+A rebuild (8.8) asks every importer for its source again. When the churn is in the ledger and the
+sources are fine (superseded versions, retired types, a night of resends), `anam migrate` (card 200)
+carries what is live now from the old ledger into a new one, so nothing is re-imported. It reads the
+old pair, `ledger.db` and `tracking.db`, read-only, and the new pair must not exist.
+
+```
+anam migrate --from <old ledger.db> --from-store <old tracking.db> \
+             --to <new ledger.db> --to-store <new tracking.db> \
+             [--program <file defining pick/1>] [--yes]
+```
+
+It needs `person_id` like any command (`ANAM_PERSON_ID`), and touches no daemon.
+
+**What it carries.** Every live facet of the old ledger at its head, as it folds: the current version
+of each, under its own type, source, source ref, binding and payload, through the gate. Superseded
+versions and tombstoned facets are not carried. Each facet is held to the Definition version it was
+admitted under, so its id, content hash and fact time come out as they were; the old store's
+registered Definitions and projections are written to the new store first, so every such version is
+held. With `--program`, only the facets that a Datalog program's `pick/1` selects over the whole
+live value (no projection narrowing) are carried; the selection page's programs (docs/QUERY.md) work
+as they are. A `record.edge` that names a facet the selection does not carry is still carried, and
+the dry run lists each such end as "link to a facet not carried". Carrying that facet later
+reconnects it, since a facet's id derives from its identity.
+
+**The dry run** is the default. It prints, per type and source, how many facets it would carry and
+how many the gate would refuse, with the reason for each group, and writes nothing, not even the new
+files. A facet is refused when its status is not a first sight, when no Definition is held at the
+version it was admitted under as a contract that parses today, or when the gate would make another
+facet of it (a different id, hash, fact time, series, classification or descriptor). If anything is
+refused, `--yes` writes nothing either.
+
+**`--yes`** creates the new ledger as `anam init` does and the new store, writes the registered rows,
+admits the facets in blocks of `gate.MaxBatch`, then prints the proof: the new ledger's live facets
+equal the selection, facet for facet by id, content hash, fact time and status; W old and W new; the
+old and new file sizes; and a second dry run with the new pair as `--from`, which must select the
+same set (the carry is idempotent). A run that fails partway removes the files it made.
+
+**What it cannot carry.** A facet admitted under a Definition version that no longer parses as a
+contract. The binary keeps older bundled versions as history words, and a body from before card 52
+(`validation_mode: "lenient"`) is not a Definition today. The 1,600 live `health.weight` facets of
+the live record are admitted under such a v1. They are named in the dry run and block a run that
+selects them, so carry them by a program that leaves them out, or decide with the owner of the data
+how they cross (the card lists the options).
+
+**What it cannot bring back.** Anam-time. Every facet is admitted at the cut, one event each, so the
+new ledger's W is the number of facets carried, no as-of read before the cut can be answered from it,
+and the receipts naming the old W verify only against the old file.
+
+**The procedure for the live record.**
+
+1. Pause every importer, or hold admission, so the ledger does not move while the files are copied.
+2. Back up (`POST /v1/backups`) and note W.
+3. Stop the daemon.
+4. `anam migrate` from the live pair to new file names, first without `--yes`, and read the report:
+   counts per type and source, no refusals, the links listed. Then run it with `--yes`.
+5. Check the proof the run prints, and that W new is the count carried.
+6. Swap the files: keep the old pair, made read-only, beside the new one as the archive, and put the
+   new pair at the live paths.
+7. Start the daemon. Catch-up replays the new ledger into the new operational store, and the
+   daemon provisions the bundled Definitions; the registered ones are already there.
+8. Resume the importers. An importer that resends what is live finds it a no-op; one that resends
+   something the migration did not carry admits it as new.
+
+Rehearse on a copy first: run `anam migrate` on a backup, start a daemon on the new pair on a spare
+port, and compare `GET /v1/coverage` and a projection's timeline with a daemon on a copy of the old
+pair. The 2026-10-22 rehearsal on the backup at W 61829 (14,633 live facets) carried 13,033 facets
+in about 7 seconds, W 13,033, a ledger of 14.4 MB from 57.9 MB, equal by id, hash and status, with
+coverage per type and the `meds` and `heart` timelines identical on both.

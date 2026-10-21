@@ -41,10 +41,16 @@ func (r *Refused) Unwrap() []error {
 // failed rather than the first, so whoever sent it can mend them all before sending
 // it again.
 func (g *Gate) prepareAll(envs []facet.Envelope, bindings []facet.Binding) ([]prepared, error) {
+	return g.prepareEach(envs, func(i int) (prepared, error) { return g.prepare(envs[i], bindings[i]) })
+}
+
+// prepareEach prepares every envelope through prep, refusing the batch with every
+// failure at once and with any two envelopes that are one facet.
+func (g *Gate) prepareEach(envs []facet.Envelope, prep func(i int) (prepared, error)) ([]prepared, error) {
 	var refused Refused
 	ps := make([]prepared, len(envs))
 	for i, env := range envs {
-		p, err := g.prepare(env, bindings[i])
+		p, err := prep(i)
 		if err != nil {
 			refused.Envelopes = append(refused.Envelopes, RefusedEnvelope{Index: i, Type: env.Type, Err: err})
 			continue

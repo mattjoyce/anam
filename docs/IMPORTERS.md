@@ -547,8 +547,11 @@ It needs `person_id` like any command (`ANAM_PERSON_ID`), and touches no daemon.
 
 **What it carries.** Every live facet of the old ledger at its head, as it folds: the current version
 of each, under its own type, source, source ref, binding and payload, through the gate. Superseded
-versions and tombstoned facets are not carried. Each facet is held to the Definition version it was
-admitted under, so its id, content hash and fact time come out as they were; the old store's
+versions and tombstoned facets are not carried. Each facet is held to the type's current Definition
+version first, and is carried under it only if its payload passes and its id, content hash, fact time,
+series, classification and descriptor all come out as they were, so only the definition version
+number differs (Matt, 2026-10-22). Otherwise it is carried under the version it was admitted under,
+as before. The old store's
 registered Definitions and projections are written to the new store first, so every such version is
 held. With `--program`, only the facets that a Datalog program's `pick/1` selects over the whole
 live value (no projection narrowing) are carried; the selection page's programs (docs/QUERY.md) work
@@ -556,25 +559,31 @@ as they are. A `record.edge` that names a facet the selection does not carry is 
 the dry run lists each such end as "link to a facet not carried". Carrying that facet later
 reconnects it, since a facet's id derives from its identity.
 
-**The dry run** is the default. It prints, per type and source, how many facets it would carry and
-how many the gate would refuse, with the reason for each group, and writes nothing, not even the new
-files. A facet is refused when its status is not a first sight, when no Definition is held at the
-version it was admitted under as a contract that parses today, or when the gate would make another
-facet of it (a different id, hash, fact time, series, classification or descriptor). If anything is
-refused, `--yes` writes nothing either.
+**The dry run** is the default. It prints, per type and source, how many facets it would carry, how many of
+those move to the current version (MOVED) and how many stay under their own (OWN), and how many the
+gate would refuse. A line follows for each group that moves, "moved from v1 to the current v5", and
+for each group kept under an older version, with why the current one did not take it. It writes
+nothing, not even the new files. A facet is refused when its status is not a first sight, or when
+neither the current version nor the one it was admitted under carries it: no Definition is held at
+that version as a contract that parses today, or the gate would make another facet of it (a different
+id, hash, fact time, series, classification or descriptor). If anything is refused, `--yes` writes
+nothing either.
 
 **`--yes`** creates the new ledger as `anam init` does and the new store, writes the registered rows,
 admits the facets in blocks of `gate.MaxBatch`, then prints the proof: the new ledger's live facets
 equal the selection, facet for facet by id, content hash, fact time and status; W old and W new; the
 old and new file sizes; and a second dry run with the new pair as `--from`, which must select the
-same set (the carry is idempotent). A run that fails partway removes the files it made.
+same set (the carry is idempotent). The proof holds identity to id, content hash, fact time and
+status, and reports the definition version moves apart, with the same lines the dry run printed. A
+run that fails partway removes the files it made.
 
-**What it cannot carry.** A facet admitted under a Definition version that no longer parses as a
-contract. The binary keeps older bundled versions as history words, and a body from before card 52
-(`validation_mode: "lenient"`) is not a Definition today. The 1,600 live `health.weight` facets of
-the live record are admitted under such a v1. They are named in the dry run and block a run that
-selects them, so carry them by a program that leaves them out, or decide with the owner of the data
-how they cross (the card lists the options).
+**What it cannot carry.** A facet that neither version carries. A Definition version that no longer
+parses as a contract cannot be held to: the binary keeps older bundled versions as history words, and
+a body from before card 52 (`validation_mode: "lenient"`) is not a Definition today. The 1,600 live
+`health.weight` facets of the live record are admitted under such a v1, but their payloads pass the
+current version with the same id, hash and fact time, so they move to it and are flagged "moved from
+v1". A facet whose own version does not parse and whose payload the current version does not pass is
+named in the dry run and blocks a run that selects it.
 
 **What it cannot bring back.** Anam-time. Every facet is admitted at the cut, one event each, so the
 new ledger's W is the number of facets carried, no as-of read before the cut can be answered from it,

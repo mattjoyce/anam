@@ -117,8 +117,8 @@ func Carry(ctx context.Context, plan Plan, to Target, p Params) (done Carried, e
 	for start := 0; start < len(facets); start += gate.MaxBatch {
 		end := min(start+gate.MaxBatch, len(facets))
 		batch := make([]gate.Carry, 0, end-start)
-		for _, f := range facets[start:end] {
-			batch = append(batch, carryOf(f))
+		for i, f := range facets[start:end] {
+			batch = append(batch, carryOf(f, plan.Items[start+i].Under))
 		}
 		bctx, bcancel := context.WithTimeout(rctx, p.Timeout)
 		results, w, berr := g.CarryBatch(bctx, batch)
@@ -173,6 +173,11 @@ type Proof struct {
 	// W is the new ledger's head, Live its live facets.
 	W    ledger.Watermark
 	Live int
+	// Moves are the definition version moves the new ledger holds, read from its own
+	// facets against the ones read from the old: the facets that arrived under a
+	// version other than the one they were admitted under. They are reported apart
+	// from the identity check, and each must be the version the plan chose.
+	Moves []Move
 	// Mismatches are the ways the new ledger's live facets differ from the selection,
 	// at most a screenful. Empty is equal, facet for facet.
 	Mismatches []string
@@ -186,7 +191,10 @@ const maxMismatches = 10
 
 // Prove reads the new ledger read-only, folds it, and holds its live facets to the
 // plan's selection, facet for facet by id, content hash, fact time and status. A live
-// facet the selection lacks and a selected facet the ledger lacks both count.
+// facet the selection lacks and a selected facet the ledger lacks both count. The
+// definition version a facet arrived under is held to the one the plan chose, and the
+// facets that arrived under another version than they were admitted under are
+// reported as moves; the version is not part of a fact's identity.
 func Prove(ctx context.Context, plan Plan, newLedger string, p Params) (Proof, error) {
 	octx, cancel := context.WithTimeout(ctx, p.Timeout)
 	l, err := ledger.OpenReadOnly(octx, newLedger, p.Person)
@@ -212,6 +220,7 @@ func Prove(ctx context.Context, plan Plan, newLedger string, p Params) (Proof, e
 	for _, it := range plan.Items {
 		want[it.Facet.ID] = it
 	}
+	var moved []movedFacet
 	for _, f := range res.Live {
 		it, ok := want[f.ID]
 		switch {
@@ -224,11 +233,17 @@ func Prove(ctx context.Context, plan Plan, newLedger string, p Params) (Proof, e
 			add("%s fact time %s, selected %s", f.ID, clock.Format(f.FactTime), clock.Format(it.Facet.FactTime))
 		case res.States[f.ID].Status != it.Status:
 			add("%s status %s, selected %s", f.ID, res.States[f.ID].Status, it.Status)
+		case f.DefinitionVersion != it.Under:
+			add("%s arrived under definition v%d, the plan chose v%d", f.ID, f.DefinitionVersion, it.Under)
+		}
+		if f.DefinitionVersion != it.Facet.DefinitionVersion {
+			moved = append(moved, movedFacet{f.Type, f.Provenance.Source, it.Facet.DefinitionVersion, f.DefinitionVersion})
 		}
 		delete(want, f.ID)
 	}
 	for id, it := range want {
 		add("%s (%s) was selected and is not live in the new ledger", id, it.Facet.Type)
 	}
+	pr.Moves = groupMoves(moved)
 	return pr, nil
 }

@@ -89,7 +89,7 @@ listen: 127.0.0.1:8787
 # importers_file: ~/.config/anam/importers.yaml
 
 # Bounds one long write inside the daemon: an index replay, a backup, the mint at
-# start. Its old name, ingest_timeout (ANAM_INGEST_TIMEOUT), is still read with a
+# start. Also each phase of `anam migrate`: the fold of the old ledger, the carry. Its old name, ingest_timeout (ANAM_INGEST_TIMEOUT), is still read with a
 # warning; the two set differently are refused.
 long_write_timeout: 15m
 
@@ -133,7 +133,7 @@ max_read_bytes: 524288
 # How many backups to keep: two weeks of nightly ones.
 backup_keep: 14
 
-# --- limits (card 151) ----------------------------------------------------------
+# --- limits ----------------------------------------------------------
 # Every value below is Anam's opinionated default and a choice you can make
 # differently. Each is range-checked at start, so a bad one stops the daemon or the
 # CLI there and not at the first request that uses it. Durations are Go durations

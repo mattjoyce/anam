@@ -53,7 +53,7 @@ that is corrected. See *Ledger*, *Fold*, *Checkpoint*.
 
 **Capture worker** — The MVP's name for what is now an *importer*: an external, pluggable client that
 reads a source and submits envelopes to the ingest gate. In the MVP: `health-db` and `bp-csv`, compiled
-in; since 2026-10-11 every vendor source is an importer outside the binary, and since card 119 every
+in; since 2026-10-11 every vendor source is an importer outside the binary, and now every
 source is (`docs/IMPORTERS.md`).
 **Out of the kernel.** See *Source*, *Envelope*.
 
@@ -73,7 +73,7 @@ never kept between requests, or it becomes a stale place. Soft equals hard by ha
 means *never minted*. A soft checkpoint bounds no replay and is not what the doctrine means by
 "checkpoint". Distinct from a *Derived span*, which composes either kind over a range the person
 names. The inspector's strip under the timeline band draws every leaf bucket of the mint's layout in
-one of the three states, computed for the page and dropped (card 21, 2026-10-13); its header line
+one of the three states, computed for the page and dropped (2026-10-13); its header line
 counts them and names the last mint run. "Sealed" is also said of the *mint log* as a whole: every
 checkpoint belongs to a recorded run; an unsealed log means a mint did not finish, and reads fold in
 full until the next one. See *Checkpoint, hard*, *Mint*, *Span*.
@@ -132,7 +132,7 @@ ordered and a span filtered without anything ever parsing a payload. Narrowed wi
 is a *derived span* and **not** an as-of. Contrast *Anam-time*; see *Bitemporal*, *Span*.
 
 A wall clock the zone skips or repeats at a daylight-saving change names no single instant, and the
-gate refuses it rather than choose (card 197). How the source's clock was read is the payload's
+gate refuses it rather than choose. How the source's clock was read is the payload's
 *Source time*.
 
 **Series** — Which facets are repeated statements about one thing over time, so that a *Snapshot*
@@ -198,17 +198,17 @@ the world (the sources are). See *Canonical*, *Tombstone*.
 **Mint** — Adaptive checkpointing, **per minted span**, whose only job is to **bound read-time replay
 depth** — not freshness (the Ledger is always current, so a read replays to the head). Cadence is
 time-OR-size-OR-rate; a quiet bucket mints nothing. Automatic after every ingest that moves W since
-2026-10-09 (card 61), and `POST /v1/checkpoints` by hand. See *Checkpoint*, *Bucket span*.
+2026-10-09, and `POST /v1/checkpoints` by hand. See *Checkpoint*, *Bucket span*.
 
 **Library** — The folder beside the ledger (`documents/`, `library_dir`) that holds document bytes.
-Only Anam writes it (`POST /v1/documents`, card 102), and it names each file by its sha256 (card 150),
+Only Anam writes it (`POST /v1/documents`), and it names each file by its sha256,
 in subfolders of the sha256's first characters once a folder holds `library_folder_limit` files. A
 `record.document` Facet's payload is the document's **name** (its `path`, the identity), sha256, size,
 media type and the date its sidecar gives it; the sha256 finds the bytes. The folder never enters a
 fact. The share's private folder is the **inbox**, not a library. See *Native reference*.
 
 **Native reference** — A reference Facet's payload: a pointer to a document in its *Library*, resolved
-live by the inspector from the library root. Built in card 24 as `record.document`.
+live by the inspector from the library root. Built as `record.document`.
 
 **Operational store** — The SQLite database holding Anam's own state: Facet Definitions, projection
 templates, token scopes, the facet and anam-event indexes, the span registry and per-span `V`/`Wᵥ`, the
@@ -221,7 +221,7 @@ must stay provably derived (`ARCHITECTURE.md` §8). See *Ledger*, *Sync cursor*.
 **Person** — The storage **substrate**: all facets partitioned onto one **timeline**, in a ledger
 file pinned to that person's id. In Anam there is exactly one person and **no identity graph, no merge**. See *Timeline*.
 
-**Fields** — A temporary subset of a type's schema that a read names (decided 2026-10-12, card 138): JSON
+**Fields** — A temporary subset of a type's schema that a read names (decided 2026-10-12): JSON
 pointers into the payload, so only those come back. Fields only **take away**: they are applied after the
 projection and narrowing, to whole facets those already admitted, so they can neither resurrect nor exclude
 a facet, and never show a field a projection would not have served. The envelope is always whole; the
@@ -240,7 +240,7 @@ include/exclude; **never reshapes, never generates**. Materialised as a content-
 *selects*, never defines; it may name the *Fields* it wants of what the projection serves, which only
 narrows, or run a *Query* over it, which relates what it served and never widens it. The operator
 defines: templates are **bundled** with the binary (the floor) or **registered**
-over the API (card 125, 2026-10-13), each version immutable and every version held readable, since a
+over the API (2026-10-13), each version immutable and every version held readable, since a
 receipt names the version and its hash. Tombstone visibility is **not** a knob — the Canonical is live-only; a reader wanting tombstones
 queries the *Ledger*. See *Fields*, *Receipt*, *Canonical*.
 
@@ -252,7 +252,7 @@ the receipts naming it** (an Anam clock). Deliberately *not* an anam-event — b
 nothing Anam knows — so it lives in the published-artifact tier and is lost with it. See *Receipt*,
 *Anam-event*.
 
-**Query** — The third read, after the timeline and *Fields* (decided 2026-10-17, built 2026-10-19, card 173;
+**Query** — The third read, after the timeline and *Fields* (decided 2026-10-17, built 2026-10-19;
 reference in [QUERY.md](QUERY.md)): a Datalog program evaluated over the *Fold* at a watermark, **through a *Projection***. The
 projection decides which whole facets the query may see; the query relates them: joins across types
 along *Fact-time*, selection by any payload field the served Definition's schema names, aggregates,
@@ -268,7 +268,7 @@ read may. See *Fields*, *Projection*, *Receipt*.
 watermark, template version, definition-set version, `served_at`, optional span, and since 2026-10-07
 the `ledger_id` the watermark counts in (a verify against another ledger says so instead of failing), and
 since 2026-10-10 an optional `query`: the snapshot, window and type a read narrowed the projection by, as
-resolved instants, which a verify replays (card 87). A Facet's
+resolved instants, which a verify replays. A Facet's
 *published time* is the earliest `served_at` over the receipts naming it — publication is recorded here,
 never as an anam-event. See *Projection*, *Anam-event*.
 
@@ -295,7 +295,7 @@ Anam-time becomes historically meaningful only when ingest is incremental. Contr
 **Source** — A capture origin, named **lower-case hyphenated**: `garmin`, `bp-csv`. The identity that
 appears in provenance and cursors. See *Importer*.
 
-**Source time** — The payload's `source_time` (card 197): the fact time as the source supplied it
+**Source time** — The payload's `source_time`: the fact time as the source supplied it
 (`value`), the zone that value is read in (`zone`, an IANA name, `UTC` or a fixed offset), and who
 decided that zone (`basis`: `source`, `configuration` or `assumption`). It sits beside *Fact-time*,
 which stays the one UTC instant the gate derives, so a reader can tell an offset the source supplied
@@ -310,7 +310,7 @@ the Definition's declared `identity_key` and **never from the row's values**: `b
 identity value length-prefixed, so distinct tuples never share a ref whatever their values contain; the
 gate and every worker compose it through that one function. Where the identity is one payload field
 whose text a writer must build (a dose's `id`), the Definition declares an `identity_template` and the gate
-fills or checks that field from it, so a form, a chat and an importer cannot spell it three ways (card 188).
+fills or checks that field from it, so a form, a chat and an importer cannot spell it three ways.
 Basis for the `facet_id`. Braiding the
 values in would give a corrected reading a new `facet_id`, so it would enter as a new Facet and orphan
 the original rather than supersede it. **Identity says which fact; `content_hash` says whether it
@@ -342,12 +342,12 @@ artifact version). It advances the watermark like any mutation. The Facet stays 
 *Ledger* forever, marked; it is absent from the *Canonical* value by construction. See *Ledger*,
 *Canonical*, *Status*.
 
-**Vendor leaf** — A third segment that names the vendor whose own payload shape a type is (card 192):
+**Vendor leaf** — A third segment that names the vendor whose own payload shape a type is:
 `activity.exercise-session.garmin`, `.concept2`, `.technogym` and `.strong`, `activity.day.garmin`,
-`health.measurement.withings`, `health.cpap-session.dreamstation` (card 195). A vendor's shape takes the leaf even
+`health.measurement.withings`, `health.cpap-session.dreamstation`. A vendor's shape takes the leaf even
 with one vendor; a standard shape (Open mHealth, IEEE 1752) takes none. A concept split into leaves keeps a
 shared core, the fields every leaf carries with one meaning, which `internal/def/shared-core.json` names and a test
-holds identical. A reader asks across the leaves by the prefix (`activity.exercise-session.`, card 193). See
+holds identical. A reader asks across the leaves by the prefix (`activity.exercise-session.`). See
 *Facet type*.
 
 **Watermark** — An anam-time marker pinning "what was known" at a point — the basis for checkpoints and

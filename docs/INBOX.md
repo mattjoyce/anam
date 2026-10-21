@@ -26,13 +26,13 @@ How a document dropped on the share becomes facets, and what each step promises.
 ```
 
 The two sources reach the record through their importers on the gateway, `anam_records` and
-`anam_documents` (card 119). The sources sit on the Library share because the gateway cannot read
+`anam_documents`. The sources sit on the Library share because the gateway cannot read
 `anam/private`. Anam reads no folder itself.
 
 The clone of this repo on the share ignores `private/`. Nothing in it is ever committed. The library
 is the primary source: a records file is an extraction from a document that is in the library, with
 the hash its `document.sha256` records; its `document.name` is the document's path under
-`documents/`, its name and identity. The library itself names each file by its sha256 (card 150).
+`documents/`, its name and identity. The library itself names each file by its sha256.
 
 ## Records: the one shape every document becomes
 
@@ -121,7 +121,7 @@ folder is config and never enters a fact, and every path is relative to it.
 There are two ways to make a document a fact, and the difference is who keeps the bytes. Use
 `record.document` for a primary document handed to the library: the bytes are posted to Anam, the
 library is their backup, and a receipt over the facet can always reach them. Use `record.link`
-(card 165, from `anam_links` in anam-importers) for a file that belongs to another tool and stays
+(from `anam_links` in anam-importers) for a file that belongs to another tool and stays
 where it lives, a note in a vault, a photo in a camera roll, a screenshot: the facet records that a
 file with this name, sha256, size and date was seen under a declared folder, and Anam takes no
 bytes, follows no path and serves nothing from the folder. A `record.link` whose sha256 the
@@ -133,8 +133,7 @@ was recorded of the file at that time, and never the bytes.
 
 ## Extractors
 
-The extractors live in `anam-importers` under `records/extract` (card 58; Anam's copies went with
-card 119). Run them from that repo.
+The extractors live in `anam-importers` under `records/extract`. Anam holds no copies. Run them from that repo.
 
 **ACL pathology PDFs** (Australian Clinical Labs, PDFsharp e-results) are deterministic:
 

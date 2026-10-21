@@ -275,7 +275,7 @@
       },
       "source_time": {
         "type": "object",
-        "description": "How the night's start was read (card 197). Garmin: value is the GMT epoch of the start in milliseconds, as Garmin's sleep JSON writes it, read in UTC (basis source).",
+        "description": "How the night's start was read. Garmin: value is the GMT epoch of the start in milliseconds, as Garmin's sleep JSON writes it, read in UTC (basis source).",
         "required": [
           "value",
           "zone",

@@ -21,7 +21,7 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "One day's heart rate: its resting, minimum and maximum figures as one fact, in Anam's own shape, since Open mHealth has no body for one day's several statistics. It replaces health.heart-rate-day, which held the same figures as three facts a day, one Open mHealth heart-rate-2.0 body each (card 205). A day the source gave no figure for is a day without that field; a day needs at least one. Garmin writes them through the anam_garmin importer (source garmin): resting from GarminDB's resting_hr table, minimum and maximum from its daily_summary.",
+    "description": "One day's heart rate: its resting, minimum and maximum figures as one fact, in Anam's own shape, since Open mHealth has no body for one day's several statistics. It replaces health.heart-rate-day, which held the same figures as three facts a day, one Open mHealth heart-rate-2.0 body each. A day the source gave no figure for is a day without that field; a day needs at least one. Garmin writes them through the anam_garmin importer (source garmin): resting from GarminDB's resting_hr table, minimum and maximum from its daily_summary.",
     "type": "object",
     "required": [
       "id",
@@ -171,7 +171,7 @@
       },
       "source_time": {
         "type": "object",
-        "description": "How Garmin's day was read (card 197): value is its date as Garmin Connect files it, read in the offset the day began at (basis source); a day Garmin gave no interval for is read in Australia/Sydney instead (basis assumption), and the importer logs it.",
+        "description": "How Garmin's day was read: value is its date as Garmin Connect files it, read in the offset the day began at (basis source); a day Garmin gave no interval for is read in Australia/Sydney instead (basis assumption), and the importer logs it.",
         "required": [
           "value",
           "zone",

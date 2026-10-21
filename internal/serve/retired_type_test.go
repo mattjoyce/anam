@@ -165,7 +165,7 @@ func TestVerify_ReceiptServedUnderRetiredTypesStillReproduces(t *testing.T) {
 	if !res.OK() {
 		t.Fatalf("a receipt served under the retired type names did not verify:\n%s", res.Summary())
 	}
-	if !slices.Contains(res.Notes, "replayed meds v1 from the held history; v3 is current") {
+	if !slices.Contains(res.Notes, "replayed meds v1 from the held history; v4 is current") {
 		t.Errorf("the verdict does not say which version was replayed: %q", res.Notes)
 	}
 }

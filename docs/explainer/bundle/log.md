@@ -174,3 +174,13 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: a selection has a short code. `selection.Store` files a program as an artifact of kind `selection`, addressed by the SHA-256 of its canonical text, under the code `sel:` and its first 8 hex digits, lengthened at save to the shortest unique prefix when another saved selection shares them, the lengthened code filed as a `selection-code` artifact. The select page saves (`POST /select/save`); `/select`, `/` and `/link` take `?sel=<code>`, the timeline drawing the selection alone or highlighted (`selmode`) within the window and `max_read_bytes`, and an unknown code is a 404 page. `POST /v1/selections` and `GET /v1/selections/{code}` for any role. anam-mcp has `save_selection` and `open_selection`.
 - Bundle: the selection component has a section on saved selections and their codes; the inspector component has one on the save and on `?sel=` across its pages.
+
+## 2026-10-22, card 200
+
+- Code: `anam migrate` carries the live facets of one ledger into a fresh one. The old ledger and operational store are opened read-only; the new pair must not exist. The selection is every live facet at its head, folded by the one fold, or those a program's `pick/1` selects over the canonical. Each is admitted through the gate by `CarryBatch`, held to the Definition version it was admitted under (`Holding`, `def.Versions`), so the id, hash and fact time are the old ones; the registered Definitions and projections are copied first (`ops.ReadRegistered`, `CarryRegistered`). A dry run reports per type and source and writes nothing; a refusal anywhere stops a real run. A `record.edge` end the selection does not carry is listed. After `--yes` the command proves the new ledger's live facets equal the selection and that a dry run against it selects the same set. `catchup.EdgeEnds` is exported for the links. `long_write_timeout` also bounds each phase.
+- Bundle: the workflow `migrate-to-a-fresh-ledger`, a `migrate` row on the CLI page, the gate and store-ops pages.
+
+## 2026-10-22, card 200 (current version)
+
+- Code: `anam migrate` carries a facet under the type's current Definition version when its payload passes it and the facet built has the same id, content hash, fact time, series, classification, descriptor and binding as the one read; otherwise under the version it was admitted under, as before; a facet neither carries is refused. The dry run prints MOVED and OWN per type and source and a line per group moved or kept; the proof reports the moves apart from the identity check. Matt's decision of 2026-10-22.
+- Bundle: the migrate workflow and the IMPORTERS section 8.9 describe the rule.

@@ -93,8 +93,9 @@ type Config struct {
 	BackupKeep int `mapstructure:"backup_keep"`
 
 	// LongWriteTimeout bounds one long write inside the daemon: a replay of the
-	// ledger into the index, a backup, the mint at start. Timeout still bounds each
-	// call within it. Until card 156 the key was ingest_timeout, from when it bounded
+	// ledger into the index, a backup, the mint at start. It also bounds each phase
+	// of anam migrate (card 200): the fold of the old ledger, the carry. Timeout
+	// still bounds each call within it. Until card 156 the key was ingest_timeout, from when it bounded
 	// an ingest run; Load still reads that name, and ANAM_INGEST_TIMEOUT, as an alias.
 	LongWriteTimeout time.Duration `mapstructure:"long_write_timeout"`
 

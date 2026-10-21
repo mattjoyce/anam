@@ -2,6 +2,9 @@ package def_test
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -402,6 +405,29 @@ func TestBundledVisionPrescription(t *testing.T) {
 	} {
 		if err := d.Check(decode(payload)); err == nil {
 			t.Errorf("%s was admitted", name)
+		}
+	}
+}
+
+// A Definition's words are read by people and agents as what the type is. They say
+// the thing itself and never which kanban card made it; the frozen history keeps the
+// words as they were.
+func TestBundled_WordsNameNoCard(t *testing.T) {
+	t.Parallel()
+	cardRef := regexp.MustCompile(`(?i)\bcards?[ -]\d`)
+	for _, dir := range []string{"manifests", "sourcetime"} {
+		files, err := filepath.Glob(filepath.Join(dir, "*.json"))
+		if err != nil || len(files) == 0 {
+			t.Fatalf("glob %s: %v (%d files)", dir, err, len(files))
+		}
+		for _, f := range files {
+			raw, err := os.ReadFile(f)
+			if err != nil {
+				t.Fatalf("read %s: %v", f, err)
+			}
+			if loc := cardRef.FindIndex(raw); loc != nil {
+				t.Errorf("%s names a card: %q", f, raw[max(0, loc[0]-40):loc[1]+20])
+			}
 		}
 	}
 }

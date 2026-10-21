@@ -141,8 +141,15 @@ func TestBundled_ParsesBpAndSleep(t *testing.T) {
 	// Card 147: meds v2 names the types under the health domain, and card 196 gave them
 	// their third segment in v3. Every earlier version is held from manifests/history so a
 	// receipt that names it still verifies against it.
-	if cur, err := r.Lookup("meds"); err != nil || cur.Version != 3 || cur.Types[0] != "health.medication.started" {
-		t.Errorf("meds = v%d %v, %v; want v3 current, naming health.medication.started", cur.Version, cur.Types, err)
+	if cur, err := r.Lookup("meds"); err != nil || cur.Version != 4 || cur.Types[0] != "health.medication.started" {
+		t.Errorf("meds = v%d %v, %v; want v4 current, naming health.medication.started", cur.Version, cur.Types, err)
+	}
+	// v4 only rewords v3's description: the same types, statuses and shape, so a
+	// receipt cut through v3 replays through the same filter.
+	cur, _ := r.Lookup("meds")
+	if old, err := r.Version("meds", 3); err != nil || !reflect.DeepEqual(old.Types, cur.Types) || old.Shape != cur.Shape ||
+		old.MaxClassification != cur.MaxClassification || old.Description == cur.Description {
+		t.Errorf("meds v3 = %+v, %v; want the same filter as v4 under its own description", old, err)
 	}
 	if old, err := r.Version("meds", 2); err != nil || old.Types[0] != "health.medication-started" {
 		t.Errorf("meds v2 = %+v, %v; want the history's template", old.Types, err)
@@ -150,8 +157,13 @@ func TestBundled_ParsesBpAndSleep(t *testing.T) {
 	if old, err := r.Version("meds", 1); err != nil || old.Types[0] != "med.started" {
 		t.Errorf("meds v1 = %+v, %v; want the history's template", old.Types, err)
 	}
-	if cur, err := r.Lookup("doses"); err != nil || cur.Version != 2 || cur.Types[0] != "health.medication.dose" {
-		t.Errorf("doses = v%d %v, %v; want v2 current, naming health.medication.dose", cur.Version, cur.Types, err)
+	if cur, err := r.Lookup("doses"); err != nil || cur.Version != 3 || cur.Types[0] != "health.medication.dose" {
+		t.Errorf("doses = v%d %v, %v; want v3 current, naming health.medication.dose", cur.Version, cur.Types, err)
+	}
+	curDoses, _ := r.Lookup("doses")
+	if old, err := r.Version("doses", 2); err != nil || !reflect.DeepEqual(old.Types, curDoses.Types) || old.Shape != curDoses.Shape ||
+		old.MaxClassification != curDoses.MaxClassification || old.Description == curDoses.Description {
+		t.Errorf("doses v2 = %+v, %v; want the same filter as v3 under its own description", old, err)
 	}
 	if old, err := r.Version("doses", 1); err != nil || old.Types[0] != "health.medication-dose" {
 		t.Errorf("doses v1 = %+v, %v; want the history's template", old.Types, err)

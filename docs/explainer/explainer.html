@@ -339,17 +339,17 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   n_components_backup[&quot;Backup (internal/backup)&quot;]
   n_components_config[&quot;Config (internal/config)&quot;]
   n_components_inspect[&quot;Inspector (internal/inspect)&quot;]
-  n_components_projection[&quot;Projection&quot;]
-  n_components_mint[&quot;Mint&quot;]
-  n_components_span[&quot;Buckets (internal/span)&quot;]
   n_components_selection[&quot;Selection (internal/selection)&quot;]
   n_components_def[&quot;Definitions registry (internal/def)&quot;]
-  n_components_store_ops[&quot;Operational store (internal/store/ops)&quot;]
-  n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
-  n_components_facet[&quot;Facet domain values (internal/facet)&quot;]
+  n_components_mint[&quot;Mint&quot;]
   n_components_read[&quot;Read (internal/read)&quot;]
   n_components_library[&quot;Library (internal/library)&quot;]
+  n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
+  n_components_facet[&quot;Facet domain values (internal/facet)&quot;]
   n_components_fold[&quot;Fold&quot;]
+  n_components_projection[&quot;Projection&quot;]
+  n_components_store_ops[&quot;Operational store (internal/store/ops)&quot;]
+  n_components_span[&quot;Buckets (internal/span)&quot;]
   n_components_backup --&gt; n_components_store_ledger
   n_components_config --&gt; n_components_span
   n_components_config --&gt; n_components_facet
@@ -366,19 +366,19 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   click n_components_backup &quot;#components-backup&quot;
   click n_components_config &quot;#components-config&quot;
   click n_components_inspect &quot;#components-inspect&quot;
-  click n_components_projection &quot;#components-projection&quot;
-  click n_components_mint &quot;#components-mint&quot;
-  click n_components_span &quot;#components-span&quot;
   click n_components_selection &quot;#components-selection&quot;
   click n_components_def &quot;#components-def&quot;
-  click n_components_store_ops &quot;#components-store-ops&quot;
-  click n_components_store_ledger &quot;#components-store-ledger&quot;
-  click n_components_facet &quot;#components-facet&quot;
+  click n_components_mint &quot;#components-mint&quot;
   click n_components_read &quot;#components-read&quot;
   click n_components_library &quot;#components-library&quot;
+  click n_components_store_ledger &quot;#components-store-ledger&quot;
+  click n_components_facet &quot;#components-facet&quot;
   click n_components_fold &quot;#components-fold&quot;
+  click n_components_projection &quot;#components-projection&quot;
+  click n_components_store_ops &quot;#components-store-ops&quot;
+  click n_components_span &quot;#components-span&quot;
 classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
-  class n_components_backup,n_components_config,n_components_inspect,n_components_projection,n_components_mint,n_components_span,n_components_selection,n_components_def,n_components_store_ops,n_components_store_ledger,n_components_facet,n_components_read,n_components_library,n_components_fold component;</pre></div></figure>
+  class n_components_backup,n_components_config,n_components_inspect,n_components_selection,n_components_def,n_components_mint,n_components_read,n_components_library,n_components_store_ledger,n_components_facet,n_components_fold,n_components_projection,n_components_store_ops,n_components_span component;</pre></div></figure>
 <figure class="diagram"><figcaption>Components: derived</figcaption><p class="diagram-note">Boxes outside the group are drawn where a member depends on them.</p><div class="scroll"><pre class="mermaid">graph LR
   n_components_catchup[&quot;Catch-up (internal/catchup)&quot;]
   n_components_fold[&quot;Fold&quot;]
@@ -387,12 +387,12 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   n_components_selection[&quot;Selection (internal/selection)&quot;]
   n_components_span[&quot;Buckets (internal/span)&quot;]
   n_components_store_ops[&quot;Operational store (internal/store/ops)&quot;]
-  n_components_projection[&quot;Projection&quot;]
+  n_components_store_artifact[&quot;Artifact store (internal/store/artifact)&quot;]
   n_components_def[&quot;Definitions registry (internal/def)&quot;]
   n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
-  n_components_facet[&quot;Facet domain values (internal/facet)&quot;]
-  n_components_store_artifact[&quot;Artifact store (internal/store/artifact)&quot;]
   n_components_serve[&quot;Serve (internal/serve)&quot;]
+  n_components_facet[&quot;Facet domain values (internal/facet)&quot;]
+  n_components_projection[&quot;Projection&quot;]
   n_components_catchup --&gt; n_components_store_ledger
   n_components_catchup --&gt; n_components_store_ops
   n_components_catchup --&gt; n_components_fold
@@ -424,32 +424,32 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   click n_components_selection &quot;#components-selection&quot;
   click n_components_span &quot;#components-span&quot;
   click n_components_store_ops &quot;#components-store-ops&quot;
-  click n_components_projection &quot;#components-projection&quot;
+  click n_components_store_artifact &quot;#components-store-artifact&quot;
   click n_components_def &quot;#components-def&quot;
   click n_components_store_ledger &quot;#components-store-ledger&quot;
-  click n_components_facet &quot;#components-facet&quot;
-  click n_components_store_artifact &quot;#components-store-artifact&quot;
   click n_components_serve &quot;#components-serve&quot;
+  click n_components_facet &quot;#components-facet&quot;
+  click n_components_projection &quot;#components-projection&quot;
 classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
-  class n_components_catchup,n_components_fold,n_components_mint,n_components_read,n_components_selection,n_components_span,n_components_store_ops,n_components_projection,n_components_def,n_components_store_ledger,n_components_facet,n_components_store_artifact,n_components_serve component;</pre></div></figure>
+  class n_components_catchup,n_components_fold,n_components_mint,n_components_read,n_components_selection,n_components_span,n_components_store_ops,n_components_store_artifact,n_components_def,n_components_store_ledger,n_components_serve,n_components_facet,n_components_projection component;</pre></div></figure>
 <figure class="diagram"><figcaption>Components: entry</figcaption><p class="diagram-note">Boxes outside the group are drawn where a member depends on them.</p><div class="scroll"><pre class="mermaid">graph LR
   n_components_cli[&quot;CLI (internal/app)&quot;]
   n_components_client[&quot;Client (internal/client)&quot;]
   n_components_daemon[&quot;Daemon&quot;]
   n_components_principals[&quot;Principals and roles (internal/daemon auth)&quot;]
+  n_components_catchup[&quot;Catch-up (internal/catchup)&quot;]
   n_components_mint[&quot;Mint&quot;]
-  n_components_gate[&quot;Admission gate&quot;]
+  n_components_read[&quot;Read (internal/read)&quot;]
+  n_components_store_artifact[&quot;Artifact store (internal/store/artifact)&quot;]
   n_components_def[&quot;Definitions registry (internal/def)&quot;]
-  n_components_store_ops[&quot;Operational store (internal/store/ops)&quot;]
-  n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
+  n_components_gate[&quot;Admission gate&quot;]
   n_components_config[&quot;Config (internal/config)&quot;]
   n_components_library[&quot;Library (internal/library)&quot;]
-  n_components_store_artifact[&quot;Artifact store (internal/store/artifact)&quot;]
-  n_components_catchup[&quot;Catch-up (internal/catchup)&quot;]
   n_components_inspect[&quot;Inspector (internal/inspect)&quot;]
-  n_components_backup[&quot;Backup (internal/backup)&quot;]
-  n_components_read[&quot;Read (internal/read)&quot;]
+  n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
   n_components_serve[&quot;Serve (internal/serve)&quot;]
+  n_components_backup[&quot;Backup (internal/backup)&quot;]
+  n_components_store_ops[&quot;Operational store (internal/store/ops)&quot;]
   n_components_cli --&gt; n_components_daemon
   n_components_cli --&gt; n_components_client
   n_components_cli --&gt; n_components_config
@@ -481,21 +481,21 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   click n_components_client &quot;#components-client&quot;
   click n_components_daemon &quot;#components-daemon&quot;
   click n_components_principals &quot;#components-principals&quot;
+  click n_components_catchup &quot;#components-catchup&quot;
   click n_components_mint &quot;#components-mint&quot;
-  click n_components_gate &quot;#components-gate&quot;
+  click n_components_read &quot;#components-read&quot;
+  click n_components_store_artifact &quot;#components-store-artifact&quot;
   click n_components_def &quot;#components-def&quot;
-  click n_components_store_ops &quot;#components-store-ops&quot;
-  click n_components_store_ledger &quot;#components-store-ledger&quot;
+  click n_components_gate &quot;#components-gate&quot;
   click n_components_config &quot;#components-config&quot;
   click n_components_library &quot;#components-library&quot;
-  click n_components_store_artifact &quot;#components-store-artifact&quot;
-  click n_components_catchup &quot;#components-catchup&quot;
   click n_components_inspect &quot;#components-inspect&quot;
-  click n_components_backup &quot;#components-backup&quot;
-  click n_components_read &quot;#components-read&quot;
+  click n_components_store_ledger &quot;#components-store-ledger&quot;
   click n_components_serve &quot;#components-serve&quot;
+  click n_components_backup &quot;#components-backup&quot;
+  click n_components_store_ops &quot;#components-store-ops&quot;
 classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
-  class n_components_cli,n_components_client,n_components_daemon,n_components_principals,n_components_mint,n_components_gate,n_components_def,n_components_store_ops,n_components_store_ledger,n_components_config,n_components_library,n_components_store_artifact,n_components_catchup,n_components_inspect,n_components_backup,n_components_read,n_components_serve component;</pre></div></figure>
+  class n_components_cli,n_components_client,n_components_daemon,n_components_principals,n_components_catchup,n_components_mint,n_components_read,n_components_store_artifact,n_components_def,n_components_gate,n_components_config,n_components_library,n_components_inspect,n_components_store_ledger,n_components_serve,n_components_backup,n_components_store_ops component;</pre></div></figure>
 <figure class="diagram"><figcaption>Components: kernel</figcaption><p class="diagram-note">Boxes outside the group are drawn where a member depends on them.</p><div class="scroll"><pre class="mermaid">graph LR
   n_components_def[&quot;Definitions registry (internal/def)&quot;]
   n_components_facet[&quot;Facet domain values (internal/facet)&quot;]
@@ -521,8 +521,8 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   n_components_receipt[&quot;Receipt (internal/receipt)&quot;]
   n_components_serve[&quot;Serve (internal/serve)&quot;]
   n_components_store_artifact[&quot;Artifact store (internal/store/artifact)&quot;]
-  n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
   n_components_mint[&quot;Mint&quot;]
+  n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
   n_components_facet[&quot;Facet domain values (internal/facet)&quot;]
   n_components_fold[&quot;Fold&quot;]
   n_components_projection --&gt; n_components_fold
@@ -538,12 +538,12 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   click n_components_receipt &quot;#components-receipt&quot;
   click n_components_serve &quot;#components-serve&quot;
   click n_components_store_artifact &quot;#components-store-artifact&quot;
-  click n_components_store_ledger &quot;#components-store-ledger&quot;
   click n_components_mint &quot;#components-mint&quot;
+  click n_components_store_ledger &quot;#components-store-ledger&quot;
   click n_components_facet &quot;#components-facet&quot;
   click n_components_fold &quot;#components-fold&quot;
 classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
-  class n_components_library,n_components_projection,n_components_receipt,n_components_serve,n_components_store_artifact,n_components_store_ledger,n_components_mint,n_components_facet,n_components_fold component;</pre></div></figure><details class="concept type-component" id="components-gate" open><summary><span class="title">Admission gate</span> <span class="desc">The only ingress: resolve binds an envelope to the person, commit validates it against its Definition, composes identity, and appends through the ledger idempotently.</span></summary><div class="concept-body"><p class="labels"><span class="label label-type type-component">component</span> <span class="label label-tier">core</span> <span class="label label-basis">basis: code</span> <span class="label label-resource"><code>internal/gate/gate.go#New</code></span> <span class="label label-anchor">anchor <code>func New(l Ledger, defs Definitions, scopes TokenScopes, clock Clock, personID string, limits Limits) *Gate {</code></span></p><p><strong>Depends on</strong> <a class="ref ref-component" href="#components-store-ledger">Ledger store (internal/store/ledger)</a>, <a class="ref ref-component" href="#components-def">Definitions registry (internal/def)</a>, <a class="ref ref-component" href="#components-facet">Facet domain values (internal/facet)</a>, <a class="ref ref-component" href="#components-fold">Fold</a> <span class="label">group: kernel</span></p><p>Two calls, as the doctrine says: <code>Resolve</code> enforces association (binding and its assurance), <code>CommitBatch</code> enforces facet-compliance and token scope and writes.</p>
+  class n_components_library,n_components_projection,n_components_receipt,n_components_serve,n_components_store_artifact,n_components_mint,n_components_store_ledger,n_components_facet,n_components_fold component;</pre></div></figure><details class="concept type-component" id="components-gate" open><summary><span class="title">Admission gate</span> <span class="desc">The only ingress: resolve binds an envelope to the person, commit validates it against its Definition, composes identity, and appends through the ledger idempotently.</span></summary><div class="concept-body"><p class="labels"><span class="label label-type type-component">component</span> <span class="label label-tier">core</span> <span class="label label-basis">basis: code</span> <span class="label label-resource"><code>internal/gate/gate.go#New</code></span> <span class="label label-anchor">anchor <code>func New(l Ledger, defs Definitions, scopes TokenScopes, clock Clock, personID string, limits Limits) *Gate {</code></span></p><p><strong>Depends on</strong> <a class="ref ref-component" href="#components-store-ledger">Ledger store (internal/store/ledger)</a>, <a class="ref ref-component" href="#components-def">Definitions registry (internal/def)</a>, <a class="ref ref-component" href="#components-facet">Facet domain values (internal/facet)</a>, <a class="ref ref-component" href="#components-fold">Fold</a> <span class="label">group: kernel</span></p><p>Two calls, as the doctrine says: <code>Resolve</code> enforces association (binding and its assurance), <code>CommitBatch</code> enforces facet-compliance and token scope and writes.</p>
 <div class="scroll"><table><thead><tr><th>Pillar</th><th>Where</th></tr></thead><tbody><tr><td>Facet-compliant</td><td>the Definition&#x27;s closed JSON Schema, <code>validation_mode</code>, fact-time pointer and zone (or the zone the fact names at its <code>zone_pointer</code>, card 198), series pointers</td></tr><tr><td>Authenticated</td><td>the token scopes: a source may inject only the types it is scoped for</td></tr><tr><td>Associated</td><td>binding to the one person, with assurance high / medium / review</td></tr></tbody></table></div>
 <p>What commit computes, per envelope: the <a class="ref ref-term" href="#terms-source-ref">source ref</a> from the Definition&#x27;s <code>identity_key</code> (refusing one the envelope carried that disagrees), the <code>facet_id</code> as uuidv5 of it, the fact-time promoted out of the payload, the series stamp, the content hash of the canonical payload. Then the outcome: no prior version is <code>admitted</code>; a prior version with the same hash is <code>no-op</code>; a different hash is <code>superseded</code> with a new artifact version. A batch of up to <code>MaxBatch</code> (49) envelopes is one transaction, so a refused envelope writes nothing for the whole batch. <code>MaxBatch</code> is a constant, not a config key: every importer cuts its batches to it, so a gate set lower would refuse their full batches, and it decides which events share an anam-time (card 151). The payload bound and the retry count are the two <code>gate.Limits</code> the daemon passes in from the config (<code>max_payload_bytes</code>, 300 KiB; <code>commit_retries</code>, 5); see <a class="ref ref-data-structure" href="#data-structures-limits">config limits</a>.</p>
 <p>The retry on a stale watermark lives here, not in the store, because a worker may already crash mid-batch and be re-run to known-good. <code>Retract</code> writes a tombstone event against the current version and no artifact. <code>Rehearse</code> and <code>RenameBatch</code> (card 140) carry a facet into another type as its next version: the prepared envelope is marked with the type it leaves, nothing on the wire can set the mark, and the disposition supersedes on a type change only under it, with the payload unchanged or not; every other path keeps the refusal of a changed type (card 105).</p>

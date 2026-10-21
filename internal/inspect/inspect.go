@@ -161,6 +161,8 @@ func Handler(d Deps) http.Handler {
 		mux.HandleFunc("GET /entry", s.entryPage)
 		mux.HandleFunc("POST /entry", s.entrySubmit)
 		mux.HandleFunc("POST /retract", s.retractSubmit)
+		mux.HandleFunc("GET /link", s.linkPage)
+		mux.HandleFunc("POST /link", s.linkSubmit)
 	}
 	return mux
 }

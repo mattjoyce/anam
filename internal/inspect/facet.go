@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -66,6 +67,10 @@ type facetData struct {
 	// Workbench entered, and on no other (card 188).
 	CanEdit    bool
 	CanRetract bool
+	// IsLink says the facet is a record.edge, so Edit opens the link form, not the
+	// entry form (card 202). CanLink offers "link this…" when the Workbench enters links.
+	IsLink  bool
+	CanLink bool
 }
 
 // facetAt resolves the version the page shows: the newest, or the one ?v= names,
@@ -178,6 +183,8 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 		Links:             links,
 		CanEdit:           canEdit,
 		CanRetract:        canRetract,
+		IsLink:            f.Type == catchup.EdgeType,
+		CanLink:           s.enterable(catchup.EdgeType),
 		DefinitionURL:     defURL,
 		CurrentDefinition: currentDef,
 		Rows:              rows,

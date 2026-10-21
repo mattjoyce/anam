@@ -6,6 +6,23 @@ of the API must do or may expect, newest first, by the day they merged. Each nam
 kanban board, which holds the reasoning. The full history is `git log`; the story behind the
 decisions is in `journal/`.
 
+## 2026-10-22
+
+- The Workbench writes links by hand (card 202). `GET /link` on the inspector draws one `record.edge`
+  from a basket of facets, each on its side, with a kind, the person's words, a "link to this
+  version" pin per facet and the moment in the browser's zone; `POST /link` saves it as source
+  `workbench`. A new link's id is `workbench:edge:` and 16 hex of the SHA-256 of its kind, sorted
+  sides and moment with offset, so the same link saved twice is one fact; an edit keeps the id. The
+  selection page's "Use this selection" opens it, and a facet page offers "link this…" and, on a
+  Workbench link, "edit this link". The form is refused until the importers file lists the type for
+  the workbench principal:
+
+  ```yaml
+  importers:
+    - source: workbench
+      types: [health.medication.dose, record.edge]
+  ```
+
 ## 2026-10-21
 
 - The importers say how their clocks were read (card 198, the importer half). New bundled versions,

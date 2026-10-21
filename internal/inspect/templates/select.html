@@ -32,6 +32,7 @@
   want in the basket while you look for the rest. The selection is a Datalog program, shown below; the criteria
   and boxes are a view of it. The page only reads.
 </p>
+{{if .Editing}}<p class="note">Changing the facets of the link <a class="mono" href="/facet?id={{.Editing}}">{{.Editing}}</a>. "Use this selection" takes this basket back to it; saving there writes a new version of the same link.</p>{{end}}
 
 {{if .Chips}}
 <form class="controls" method="get" action="/select">
@@ -160,7 +161,7 @@
       <span class="dim">A program the criteria could make draws the criteria again; any other runs as text over what the projection serves.</span></p>
   </form>
   <p><a id="handoff" href="{{.Handoff}}">use this selection</a>
-    <span class="dim">carries the program, the projection and the basket with each item's side; the link form (card 202) takes it from there.</span></p>
+    <span class="dim">opens the link form with what the program selects, each facet on its side, to write one link between them with your words on it.</span></p>
 </section>
 </body>
 </html>

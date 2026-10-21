@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>anam: {{if .Edit}}edit a link{{else}}link facets{{end}}</title>
+{{template "style.html"}}
+<style>
+  table.basket td, table.basket th { vertical-align: middle; }
+  textarea.words { width: 100%; min-height: 5rem; font: inherit; }
+  .note { padding: .6rem .9rem; border-left: 3px solid #7a5c00; margin: 1rem 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>{{if .Edit}}edit a link{{else}}link facets{{end}}</h1>
+  {{template "nav.html"}}
+</header>
+
+<p class="meta">
+  One link (<span class="mono">record.edge</span>) joins the facets below, each on its side, with your words on it.
+  The facets are not changed: the link is its own fact, entered by hand in the Workbench, and each facet's page lists it.
+  Drawn from <a href="{{.DefinitionURL}}">definition v{{.Version}}</a>; the gate checks what you save against it again.
+</p>
+
+{{if .Message}}<p class="message" role="alert"><strong>Not saved.</strong> {{.Message}}{{if .Notice}}<br>{{.Notice}}{{end}}</p>{{end}}
+{{if .Problem}}<p class="message" role="alert">{{.Problem}}</p>{{end}}
+{{if .Edit}}<p class="meta">Editing <a class="mono" href="/facet?id={{.Edit}}">{{.Edit}}</a>. Saving writes a new version of this link, with the same id, whatever you change here; to undo it, retract it from its page.</p>{{end}}
+{{with .SideProblem}}{{if not $.Message}}<p class="note" id="side-problem">{{.}}</p>{{end}}{{end}}
+
+<form method="post" action="/link" class="entry">
+  <input type="hidden" name="v" value="{{.Version}}">
+  {{if .Edit}}<input type="hidden" name="edit" value="{{.Edit}}">{{end}}
+
+  <h2>facets <span class="dim">{{.Count}} in the link</span></h2>
+  {{if .Items}}
+  <div class="scroll">
+  <table class="basket">
+    <thead><tr><th>in the link</th><th>side</th><th>facet</th><th>type</th><th>fact time</th><th>link to this version</th></tr></thead>
+    <tbody>
+    {{range .Items}}
+    <tr>
+      <td><input type="hidden" name="item" value="{{.ID}}"><input type="checkbox" name="keep" value="{{.ID}}"{{if .Keep}} checked{{end}} aria-label="keep {{.ID}} in the link"></td>
+      <td><select name="side.{{.ID}}" aria-label="side of {{.ID}}"><option value="to"{{if not .From}} selected{{end}}>to</option><option value="from"{{if .From}} selected{{end}}>from</option></select></td>
+      <td class="mono"><a href="/facet?id={{.ID}}">{{.ID}}</a></td>
+      {{if .Held}}<td>{{.Type}}</td><td class="mono">{{.FactTime}}</td>{{else}}<td colspan="2" class="dim">not held: Anam has no facet with this id</td>{{end}}
+      <td><input type="hidden" name="hash.{{.ID}}" value="{{.Hash}}"><label><input type="checkbox" name="pin" value="{{.ID}}" data-pin{{if .Pin}} checked{{end}}> <span class="mono dim">{{.ShortHash}}</span></label></td>
+    </tr>
+    {{end}}
+    </tbody>
+  </table>
+  </div>
+  {{else}}
+  <p class="meta">No facets yet. A link may carry only words, but most join facets: find them on the selection page.</p>
+  {{end}}
+  <p><a href="{{.SelectURL}}">add or remove facets on the selection page</a> <span class="dim">keeps each facet's side; the words below are not carried there</span></p>
+
+  <div class="field">
+    <label for="kind">kind <span class="role">required</span></label>
+    <select id="kind" name="kind">{{$kind := .Kind}}{{range .Kinds}}<option value="{{.}}"{{if eq . $kind}} selected{{end}}>{{.}}</option>{{end}}</select>
+    <span class="hint">What the join means, from the Definition's list. about: your words about the facets on the to side, with nothing on the from side. A link to a version stays on that version; one without follows the facet through its corrections.</span>
+  </div>
+
+  <div class="field">
+    <label for="text">text</label>
+    <textarea class="words" id="text" name="text" placeholder="During a large work meeting, presenting.">{{.Text}}</textarea>
+    <span class="hint">Your words, kept verbatim.</span>
+  </div>
+
+  <div class="field">
+    <label for="at">at <span class="role">required</span></label>
+    <input id="at" name="at" type="datetime-local" value="{{.At}}" required data-fact-time data-now>
+    <span class="hint">The moment the link is asserted, now unless you say otherwise, read in your browser's zone.</span>
+  </div>
+  <input type="hidden" id="zone" name="zone" value="{{.Zone}}">
+  <div class="field{{if .OffsetProblem}} bad{{end}}">
+    <label for="offset">offset <span class="role">required</span></label>
+    <input id="offset" name="offset" type="text" value="{{.Offset}}" placeholder="+01:00" pattern="[+\-][0-2][0-9]:[0-5][0-9]">
+    {{if .OffsetProblem}}<span class="problem">{{.OffsetProblem}}</span>{{end}}
+    <span class="hint" id="zone-line">{{if .Zone}}The offset from UTC the moment had in {{.Zone}}.{{else}}The offset from UTC the moment had where you were. The page fills it from your browser's zone when it can.{{end}}</span>
+  </div>
+
+  {{if .Confirm}}
+  <div class="field">
+    <label><input type="checkbox" name="confirm" value="yes" required{{if .Confirmed}} checked{{end}}> link all {{.Count}} facets</label>
+    <span class="hint">More than {{.ConfirmAbove}} facets: the selection page starts its matches ticked, so check the list above before saving.</span>
+  </div>
+  {{end}}
+  {{if .Edit}}<p class="hint">The link keeps its id, so saving is a new version of it.</p>{{else}}<p class="hint">Anam names the link by its kind, its sides and its moment, so saving the same link twice is one link.</p>{{end}}
+  <p><button type="submit">{{if .Edit}}Save a new version{{else}}Save the link{{end}}</button></p>
+</form>
+{{template "zonescript.html"}}
+{{if not .Edit}}<script>
+  // A note about a facet follows it, so kind about starts unpinned and the others
+  // pinned (card 199). Changing the kind moves the pins with it until one is touched.
+  (function () {
+    var kind = document.getElementById('kind'), pins = document.querySelectorAll('[data-pin]'), touched = false;
+    for (var i = 0; i < pins.length; i++) pins[i].addEventListener('change', function () { touched = true; });
+    if (kind) kind.addEventListener('change', function () {
+      if (touched) return;
+      for (var i = 0; i < pins.length; i++) pins[i].checked = kind.value !== 'about';
+    });
+  })();
+</script>{{end}}
+</body>
+</html>

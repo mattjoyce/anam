@@ -159,3 +159,9 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: the fact names its zone. `time_semantics.fact_time` may carry a `zone_pointer`; `source_time` gains shape v2 with a required `offset`; an id template placeholder may end in `?`. `record.edge` v2 and `health.medication.dose` v2 require `source_time` and are read at its offset; `health.weight` v5 declares it, since records sends weight without it. The dose's template appends `{/source_time/offset?}`. `def.Guard` and `def.Register` hold `identity_template` too, and accept two widenings proved from the stored versions. The Workbench form sends the browser's zone and an offset field the page fills. History holds 74. `record.edge` and `health.medication.dose` leave the source-time list.
 - Bundle: the def and gate component pages, the add-a-definition-version change path and the Definition manifest page say so.
+
+## 2026-10-22, card 202
+
+- Code: the Workbench's link form. `GET /link` draws one `record.edge` from a basket (`tick`, `fromside`, or the selection page's `program` resolved to ids when it opens, or `edit` of a Workbench link); `POST /link` saves it through the Workbench's entry, with the id `workbench:edge:` and 16 hex of the SHA-256 of the kind, the sorted sides and the moment with its offset, kept on every edit. The facet page offers "link this…" and "edit this link"; the selection page's "Use this selection" now opens the form and carries an edit through. The zone script is shared by both forms.
+- Bundle: the inspector component has a section on the link form and its id rule, and the selection page's handoff names it.
+

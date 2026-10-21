@@ -117,7 +117,7 @@ func (d Definition) checkSourceTime(doc any) error {
 	if err := validZone(zone); err != nil {
 		return fmt.Errorf("%w: %s zone: %v", ErrNotCompliant, SourceTimeField, err)
 	}
-	return nil
+	return d.zoneKeepsOffset(doc, zone)
 }
 
 // maxOffset is the widest offset from UTC any zone keeps (+14:00). Not configurable:
@@ -132,14 +132,8 @@ func validZone(s string) error {
 	case s == "" || s == "Local":
 		return fmt.Errorf("%q names no zone", s)
 	case s[0] == '+' || s[0] == '-':
-		t, err := time.Parse("-07:00", s)
-		if err != nil {
-			return fmt.Errorf("%q is not an offset +HH:MM or -HH:MM", s)
-		}
-		if _, off := t.Zone(); time.Duration(off)*time.Second > maxOffset || time.Duration(-off)*time.Second > maxOffset {
-			return fmt.Errorf("%q is wider than any zone's offset", s)
-		}
-		return nil
+		_, _, err := offsetSeconds(s)
+		return err
 	}
 	if _, err := time.LoadLocation(s); err != nil {
 		return fmt.Errorf("%q is not an IANA zone: %v", s, err)

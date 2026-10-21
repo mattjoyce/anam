@@ -18,8 +18,10 @@ func TestIdentityFieldsOfATemplatedAndAPlainDefinition(t *testing.T) {
 	if got := dose.ComposedField(); got != "/id" {
 		t.Fatalf("ComposedField = %q, want /id", got)
 	}
-	if got := strings.Join(dose.IdentityFields(), ","); got != "/drug,/taken_at" {
-		t.Fatalf("IdentityFields = %q, want /drug,/taken_at (the id itself is composed, not supplied)", got)
+	// The offset is the optional segment card 198 added: when a dose names it, it
+	// decides the facet too.
+	if got := strings.Join(dose.IdentityFields(), ","); got != "/drug,/taken_at,/source_time/offset" {
+		t.Fatalf("IdentityFields = %q, want /drug,/taken_at,/source_time/offset (the id itself is composed, not supplied)", got)
 	}
 	weight, _ := reg.Lookup("health.weight")
 	if got := weight.ComposedField(); got != "" {

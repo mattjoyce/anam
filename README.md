@@ -152,7 +152,7 @@ records a measure, a reading or an event.
 | `health.heart-rate-day` | 2 | vitals | measure | One figure for a day's heart rate, as an Open mHealth heart-rate body | `id`, `statistic` | interval start |
 | `health.heart-rate-alert` | 5 | vitals | event | One abnormal high heart rate alert from a watch | `source`, `kind`, `fact_time` | `fact_time` |
 | `health.blood-pressure` | 7 | vitals | reading | One blood pressure reading, as an Open mHealth body | `date_excel`, `reading` | `date_excel` |
-| `health.weight` | 4 | body | reading | One body weight | `id` | `date` |
+| `health.weight` | 5 | body | reading | One body weight | `id` | `date` |
 | `health.body-composition` | 4 | body | measure | A period's body metrics (fat, muscle and the rest) | `group`, `period_type`, `period_start` | `period_start` |
 | `health.sleep-episode` | 2 | sleep | measure | One sleep episode, as an IEEE 1752 sleep-episode body | `id` | interval start |
 | `health.lab-panel` | 2 | labs | event | One pathology request, the header of a draw's report | `id` | `collected` |
@@ -163,7 +163,7 @@ records a measure, a reading or an event.
 | `health.medication.started` | 1 | meds | event | A medicine course starting (was `health.medication-started` v1 until card 196) | `id` | `date` |
 | `health.medication.dose-changed` | 1 | meds | event | A change of dose within a course (was `health.medication-dose-changed` v1 until card 196) | `id` | `date` |
 | `health.medication.stopped` | 1 | meds | event | A course ending (was `health.medication-stopped` v1 until card 196) | `id` | `date` |
-| `health.medication.dose` | 1 | meds | event | One dose of a medicine taken at a moment, outside any course (was `health.medication-dose` up to v2 until card 196) | `id` | `taken_at` |
+| `health.medication.dose` | 2 | meds | event | One dose of a medicine taken at a moment, outside any course (was `health.medication-dose` up to v2 until card 196) | `id` | `taken_at` |
 | `health.medication.dose-missed` | 1 | meds | event | A dose the person says they missed (was `health.medication-missed-dose` v1 until card 196) | `id` | `date` |
 | `health.medication.compliance` | 1 | meds | measure | The person's own estimate of how well they kept to a course (was `health.medication-compliance` v1 until card 196) | `id` | `date` |
 | `health.encounter` | 1 | clinical | event | One appointment with a clinic or practitioner | `id` | `date` |
@@ -179,7 +179,7 @@ records a measure, a reading or an event.
 | `place.trip.flight` | 1 | trips | event | One flight leg (was `place.flight` v1 until card 196) | `id` | `date` |
 | `place.trip.arrived` | 1 | trips | event | Arriving at one place during a trip (was `place.arrived` v1 until card 196) | `id` | `date` |
 | `place.trip.returned` | 1 | trips | event | Getting home from a trip (was `place.returned` v1 until card 196) | `id` | `date` |
-| `record.edge` | 1 | notes | event | An edge joining facets, with or without words; a note in the person's own words is one (was `note.annotation` (v1 to v3), then `record.note` (v1, v2)) | `id` | `at` |
+| `record.edge` | 2 | notes | event | An edge joining facets, with or without words; a note in the person's own words is one (was `note.annotation` (v1 to v3), then `record.note` (v1, v2)) | `id` | `at` |
 | `record.document` | 2 | documents |  | A pointer to one file in the documents library; the bytes never enter the ledger | `path` | `date` |
 | `health.heart-rate` | 3 |  |  | A period's heart rate metrics (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
 | `health.sleep` | 3 |  |  | A period's sleep metrics (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |

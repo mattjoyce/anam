@@ -116,6 +116,11 @@ type entryData struct {
 	IDRule        string
 	DefinitionURL string
 	Fields        []formField
+	// Zoned says the form sends source_time from the browser's zone (card 198); Zone
+	// and Offset are what it carries already: a correction's, or what was posted.
+	Zoned         bool
+	Zone, Offset  string
+	OffsetProblem string
 	// Edit is the facet being corrected, or "" for a new entry.
 	Edit string
 	// NotDrawn says why there is no form; Message is what the last save answered;
@@ -190,7 +195,7 @@ func (s *Server) entryPage(w http.ResponseWriter, r *http.Request) {
 		}
 		data.Edit = edit
 	}
-	data.Fields = form.Fields
+	data.Fields, data.Zoned, data.Zone, data.Offset = form.Fields, form.Zoned, form.Zone, form.Offset
 	renderStatus(w, entryStatus(data), "entry.html", data)
 }
 
@@ -273,7 +278,8 @@ func (s *Server) entrySubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	payload, typed := form.read(r.PostForm)
-	data.Fields = form.Fields
+	data.Fields, data.Zoned, data.Zone, data.Offset = form.Fields, form.Zoned, form.Zone, form.Offset
+	data.OffsetProblem = form.OffsetProblem
 	if !typed {
 		data.Message = "Some values are not what their fields take. Nothing was sent."
 		renderStatus(w, http.StatusUnprocessableEntity, "entry.html", data)

@@ -298,7 +298,7 @@ func TestBundled_NoteAnnotationIsThePersonsWords(t *testing.T) {
 	if !ok {
 		t.Fatal("no bundled record.edge")
 	}
-	if d.Version != 1 || d.FactTime.Pointer != "/at" || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" {
+	if d.Version != 2 || d.FactTime.Pointer != "/at" || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" {
 		t.Fatalf("v%d fact time %s identity %v", d.Version, d.FactTime.Pointer, d.IdentityKey)
 	}
 	decode := func(s string) map[string]any {
@@ -309,7 +309,9 @@ func TestBundled_NoteAnnotationIsThePersonsWords(t *testing.T) {
 		}
 		return m
 	}
+	// v2 of record.edge (card 198) requires source_time: the zone the note was said in.
 	note := `{"id": "note:2c6f38a3:1", "at": "2026-10-09 11:29",
+		"source_time": {"value": "2026-10-09 11:29", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"},
 		"about": ["2c6f38a3-3db7-5e65-b933-9c59980e1c6c", "fe61ec2a-6d8b-56b0-8930-e3270f4ad44c"],
 		"text": "During a large work meeting, presenting."}`
 	if err := d.Check(decode(note)); err != nil {
@@ -338,7 +340,7 @@ func TestBundled_NoteAnnotationIsThePersonsWords(t *testing.T) {
 	// facets with no words, name its from side, say its kind, and pin a version.
 	for name, payload := range map[string]string{
 		"to, the v2 name": strings.Replace(note, `"about":`, `"to":`, 1),
-		"an edge, no words": `{"id": "interp:1", "at": "2026-10-09 11:29", "kind": "interpreted_from",
+		"an edge, no words": `{"id": "interp:1", "at": "2026-10-09 11:29", "source_time": {"value": "2026-10-09 11:29", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kind": "interpreted_from",
 			"from": ["7d1b2c3e-4f5a-5b6c-8d7e-9f0a1b2c3d4e"], "to": ["2c6f38a3-3db7-5e65-b933-9c59980e1c6c"],
 			"pins": {"2c6f38a3-3db7-5e65-b933-9c59980e1c6c": "sha256:3f1c9a0e7b2d4c6f8a1e5b9d0c3f7a2e6b4d8c1f9e0a3b5d7c2f4e6a8b1d3c5e"}}`,
 		"kind said": strings.Replace(note, `"text":`, `"kind": "about", "text":`, 1),

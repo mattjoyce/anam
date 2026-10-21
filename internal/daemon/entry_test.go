@@ -34,7 +34,7 @@ func workbenchConfig(t *testing.T) (serve func() (*Daemon, string)) {
 // doseEntry is an entry body for a melatonin dose at the minute taken, with no id.
 func doseEntry(version int, taken string, amount float64) string {
 	return fmt.Sprintf(`{"type": "health.medication.dose", "definition_version": %d,
-		"payload": {"drug": "melatonin", "amount": %v, "unit": "mg", "taken_at": %q, "reason": "to help sleep"}}`,
+		"payload": {"drug": "melatonin", "amount": %v, "unit": "mg", "taken_at": %q, "reason": "to help sleep", "source_time": {"value": "%[3]s", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}}}`,
 		version, amount, taken)
 }
 
@@ -49,7 +49,7 @@ func TestPostEntryAdmitsADoseAsTheWorkbench(t *testing.T) {
 
 	var got api.Entry
 	call(t, "POST", url+"/v1/entry", testToken, doseEntry(v, "2026-10-19 22:00", 5), http.StatusOK, &got)
-	wantID := facet.NewID(facet.SourceRef("workbench", "workbench:med/melatonin/dose/2026-10-19T22:00"))
+	wantID := facet.NewID(facet.SourceRef("workbench", "workbench:med/melatonin/dose/2026-10-19T22:00+11:00"))
 	if got.Outcome != "admitted" || got.FacetID != wantID || got.ArtifactVersion != 1 || got.Seq != 1 || got.W != 1 {
 		t.Fatalf("first entry = %+v, want admitted %s at version 1, seq 1, W 1", got, wantID)
 	}
@@ -60,7 +60,7 @@ func TestPostEntryAdmitsADoseAsTheWorkbench(t *testing.T) {
 	if f.Provenance.Source != "workbench" || f.Provenance.Injector != "workbench" {
 		t.Fatalf("provenance = %+v, want source and injector workbench", f.Provenance)
 	}
-	if want := facet.SourceRef("workbench", "workbench:med/melatonin/dose/2026-10-19T22:00"); f.Provenance.SourceRef != want {
+	if want := facet.SourceRef("workbench", "workbench:med/melatonin/dose/2026-10-19T22:00+11:00"); f.Provenance.SourceRef != want {
 		t.Fatalf("source_ref = %q, want %q", f.Provenance.SourceRef, want)
 	}
 
@@ -112,10 +112,10 @@ func TestPostEntryRefusesAsAnImporterWouldBe(t *testing.T) {
 			`{"type": "health.weight", "definition_version": 3, "payload": {"id": "w", "date": "2026-10-09 07:30", "kg": 80}}`,
 			http.StatusUnprocessableEntity, "source not authorized"},
 		{"a payload the Definition refuses",
-			fmt.Sprintf(`{"type": "health.medication.dose", "definition_version": %d, "payload": {"drug": "melatonin", "amount": "five", "unit": "mg", "taken_at": "2026-10-19 22:00"}}`, v),
+			fmt.Sprintf(`{"type": "health.medication.dose", "definition_version": %d, "payload": {"drug": "melatonin", "amount": "five", "unit": "mg", "taken_at": "2026-10-19 22:00", "source_time": {"value": "2026-10-19 22:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}}}`, v),
 			http.StatusUnprocessableEntity, "not compliant"},
 		{"an id that disagrees with the rule",
-			fmt.Sprintf(`{"type": "health.medication.dose", "definition_version": %d, "payload": {"id": "workbench:med/melatonin/dose/other", "drug": "melatonin", "amount": 5, "unit": "mg", "taken_at": "2026-10-19 22:00"}}`, v),
+			fmt.Sprintf(`{"type": "health.medication.dose", "definition_version": %d, "payload": {"id": "workbench:med/melatonin/dose/other", "drug": "melatonin", "amount": 5, "unit": "mg", "taken_at": "2026-10-19 22:00", "source_time": {"value": "2026-10-19 22:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}}}`, v),
 			http.StatusUnprocessableEntity, "identity"},
 		{"a definition version that is not in force", doseEntry(v+1, "2026-10-19 22:00", 5),
 			http.StatusConflict, "another definition version"},
@@ -149,7 +149,7 @@ func TestPostEntryTakesOnlyTheThreeFields(t *testing.T) {
 	d, url := serve()
 	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
 	v := dose.Version
-	payload := `{"drug": "melatonin", "amount": 5, "unit": "mg", "taken_at": "2026-10-19 22:00"}`
+	payload := `{"drug": "melatonin", "amount": 5, "unit": "mg", "taken_at": "2026-10-19 22:00", "source_time": {"value": "2026-10-19 22:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}}`
 
 	for name, body := range map[string]string{
 		"a source":                  fmt.Sprintf(`{"type": "health.medication.dose", "definition_version": %d, "source": "garmin", "payload": %s}`, v, payload),

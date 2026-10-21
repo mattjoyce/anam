@@ -154,3 +154,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: `query.ReadsAttr` decides whether a query needs `attr/3` by walking the rules from the relation it answers, and `NewBase` builds the relation only then (card 203). `docs/QUERY.md` is the query reference with worked questions that `internal/query/docs_test.go` runs against a real ledger (card 189).
 - Bundle: the gap `the-query-surface-is-decided-and-not-built` removed, false since card 173 was built; the `query` term says what is built and points at the decision and `docs/QUERY.md`.
+
+## 2026-10-21, card 198 (the writers)
+
+- Code: the fact names its zone. `time_semantics.fact_time` may carry a `zone_pointer`; `source_time` gains shape v2 with a required `offset`; an id template placeholder may end in `?`. `record.edge` v2 and `health.medication.dose` v2 require `source_time` and are read at its offset; `health.weight` v5 declares it, since records sends weight without it. The dose's template appends `{/source_time/offset?}`. `def.Guard` and `def.Register` hold `identity_template` too, and accept two widenings proved from the stored versions. The Workbench form sends the browser's zone and an offset field the page fills. History holds 74. `record.edge` and `health.medication.dose` leave the source-time list.
+- Bundle: the def and gate component pages, the add-a-definition-version change path and the Definition manifest page say so.

@@ -1,35 +1,37 @@
 {
   "meta": {
     "facet_type": "health.medication.dose",
-    "definition_version": 1,
+    "definition_version": 2,
     "kind": "event",
     "family": "meds",
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "records/health.medication.dose",
     "time_semantics": {
-      "fact_time": {"pointer": "/taken_at", "layout": "2006-01-02 15:04", "zone": "Australia/Sydney"}
+      "fact_time": {"pointer": "/taken_at", "layout": "2006-01-02 15:04", "zone": "Australia/Sydney",
+        "zone_pointer": "/source_time/offset"}
     },
     "identity_key": ["/id"],
-    "identity_template": "{source}:med/{/drug|slug}/dose/{/taken_at|2006-01-02T15:04}",
+    "identity_template": "{source}:med/{/drug|slug}/dose/{/taken_at|2006-01-02T15:04}{/source_time/offset?}",
     "min_binding_assurance": "medium"
   },
   "handling": {
-    "guidance": "One dose, taken at a moment: a fact that an intake happened, not a statement about a course. drug is the generic name in lower case, the one spelling health.medication.started fixes for the substance (melatonin, paracetamol), so a dose and its regimen share the drug's name. amount and unit are the quantity taken as the pack states it (5 and mg), never a daily total. taken_at is when it was taken, to the minute, in Australia/Sydney; a time worked out rather than read (bedtime, with the hour unknown) is still the time, and source_note says how. course ties the dose to a known regimen's course and is left out for an as-needed or one-off dose; reason says why it was taken when there is no course. The id is declared in identity_template, <source>:med/<drug-slug>/dose/<taken_at as YYYY-MM-DDTHH:MM>, and every writer builds it from there: leave id out and Anam fills it; send it and it must match. A dose never appears in the meds regimen projection; the doses projection reads them back at their time."
+    "guidance": "One dose, taken at a moment: a fact that an intake happened, not a statement about a course. drug is the generic name in lower case, the one spelling health.medication.started fixes for the substance (melatonin, paracetamol), so a dose and its regimen share the drug's name. amount and unit are the quantity taken as the pack states it (5 and mg), never a daily total. taken_at is when it was taken, to the minute, as a wall clock in Australia/Sydney, or at the offset source_time names; a time worked out rather than read (bedtime, with the hour unknown) is still the time, and source_note says how. course ties the dose to a known regimen's course and is left out for an as-needed or one-off dose; reason says why it was taken when there is no course. The id is declared in identity_template, <source>:med/<drug-slug>/dose/<taken_at as YYYY-MM-DDTHH:MM>, then source_time's offset (+01:00), which every dose names from v2 (one recorded before has none and keeps its id), so one local minute in two zones is two doses, and every writer builds it from there: leave id out and Anam fills it; send it and it must match. A dose never appears in the meds regimen projection; the doses projection reads them back at their time."
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "description": "One dose of a medicine taken at a moment, as a point fact outside the regimen series. Written from the person's own word, through a conversation or a records file. Named health.medication.dose (v2) until card 196.",
     "type": "object",
-    "required": ["id", "taken_at", "drug", "amount", "unit"],
+    "required": ["id", "taken_at", "drug", "amount", "unit", "source_time"],
     "properties": {
+      "source_time": {"type": "object", "description": "How the fact time, `taken_at`, was read (card 198): value is the wall clock as said, zone the zone it was said in (an IANA name when the writer knows one, else the offset again), offset the offset from UTC it had then, and basis who decided the zone (source when the person's own client or browser names it, configuration when the writer's setting does). The fact time is `taken_at` read at offset. Every value admitted before this version has none and was read in Australia/Sydney.", "required": ["value", "zone", "offset", "basis"], "additionalProperties": false, "properties": {"value": {"type": "string", "minLength": 1, "description": "The fact time as the source supplied it, as text and never rewritten: a date, a wall clock, an RFC 3339 string, or an epoch as its digits.", "examples": ["2026-10-17", "2026-10-20T20:00:00+11:00", "1792269840000"]}, "zone": {"type": "string", "minLength": 1, "pattern": "^([A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$", "description": "The zone value is read in, and nothing else: an IANA name when one is known, UTC for a value that is UTC, else a fixed offset +HH:MM or -HH:MM. The gate refuses a name that is no zone.", "examples": ["Australia/Sydney", "UTC", "+01:00"]}, "offset": {"type": "string", "pattern": "^[+-]([01][0-9]|2[0-3]):[0-5][0-9]$", "description": "The offset from UTC value had at that moment in zone, +HH:MM or -HH:MM, which names one instant even in an hour the zone repeats. A writer that cannot tell it refuses rather than guess.", "examples": ["+01:00", "+11:00"]}, "basis": {"type": "string", "enum": ["source", "configuration", "assumption"], "description": "Who decided the zone. source: the source supplied it with the value, or the value is UTC by the source's own definition. configuration: a setting a person made for this source names it. assumption: the importer or writer chose it, with nothing behind it but its own default or the Definition's zone, and logged that it did."}}},
       "amount": {"type": "number", "exclusiveMinimum": 0, "description": "The quantity taken, in unit: the strength on the pack times what was taken.", "examples": [5]},
       "course": {"type": "number", "description": "The course of this drug the dose belongs to, counting as the regimen does, when the dose is part of a known course. Left out for an as-needed or one-off dose. An annotation the reader may use, not a reference the gate enforces.", "examples": [1]},
       "drug": {"type": "string", "minLength": 1, "description": "The generic drug name in lower case, as the regimen's writer normalised it, so a dose and its course share one spelling.", "examples": ["melatonin"]},
-      "id": {"type": "string", "minLength": 1, "description": "Identity, composed from the rest by the Definition's identity_template: the source prefix, then med, the drug, dose and the moment. A writer may leave it out and Anam fills it; one that sends it must send exactly the composition.", "examples": ["conversation:med/melatonin/dose/2026-10-17T22:30"]},
+      "id": {"type": "string", "minLength": 1, "description": "Identity, composed from the rest by the Definition's identity_template: the source prefix, then med, the drug, dose and the moment, and the offset source_time names (a dose admitted before v2 has none). A writer may leave it out and Anam fills it; one that sends it must send exactly the composition.", "examples": ["conversation:med/melatonin/dose/2026-10-17T22:30"]},
       "reason": {"type": "string", "minLength": 1, "description": "Why it was taken, for a dose that belongs to no course, in the person's words.", "examples": ["for sleep"]},
       "source_note": {"type": "string", "minLength": 1, "description": "How the dose was recorded and what the time rests on: said in conversation the next morning, read from a diary, worked out from bedtime. Reader's text, not the source's."},
-      "taken_at": {"type": "string", "minLength": 1, "description": "When the dose was taken, YYYY-MM-DD HH:MM in Australia/Sydney. This is the fact time.", "examples": ["2026-10-17 22:30"]},
+      "taken_at": {"type": "string", "minLength": 1, "description": "When the dose was taken, YYYY-MM-DD HH:MM in Australia/Sydney, or at the offset source_time names. This is the fact time.", "examples": ["2026-10-17 22:30"]},
       "unit": {"type": "string", "minLength": 1, "description": "The unit of amount, as the pack states it.", "examples": ["mg"]}
     },
     "additionalProperties": false

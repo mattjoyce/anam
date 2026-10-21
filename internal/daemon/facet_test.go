@@ -38,7 +38,7 @@ func TestGetReceiptFacet_EntryWithItsLinks(t *testing.T) {
 	call(t, "POST", url+"/v1/envelopes", importerToken, batch(weighIn("w-1", 80.5, weight.Version), weighIn("w-2", 80.1, weight.Version)), http.StatusOK, &a)
 	w1, w2 := a.Results[0].FacetID, a.Results[1].FacetID
 	noteEnv := fmt.Sprintf(`{"type": "record.edge", "definition_version": %d,
-		"payload": {"id": "note:1", "at": "2026-10-09 08:00", "to": [%q], "text": "Fasted, after the run."}}`, note.Version, w1)
+		"payload": {"id": "note:1", "at": "2026-10-09 08:00", "to": [%q], "text": "Fasted, after the run.", "source_time": {"value": "2026-10-09 08:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}}}`, note.Version, w1)
 	call(t, "POST", url+"/v1/envelopes", importerToken, batch(noteEnv), http.StatusOK, &a)
 	noteID := a.Results[0].FacetID
 

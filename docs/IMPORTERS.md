@@ -296,10 +296,27 @@ key (`configuration`) or the Definition's zone (`assumption`); links by where it
 documents and the pathology extractor in Sydney (`assumption`); the Fitbit sleep and Strong
 extractors in the zone they are given (`configuration`). A source that gives the end of a session,
 as Concept2 and Technogym do, keeps the end as `value` and its Definition says so. A writer may
-read a wall clock only in the zone its Definition's fact time names, so a configured zone other
-than that one is refused until a fact can name its own zone. The types still read from a Sydney
-wall clock without requiring it are listed in `internal/def/sourcetime_test.go`, and that list
-only shrinks.
+read a wall clock only in the zone its Definition's fact time names, unless the fact time names its
+own zone. The types still read from a Sydney wall clock without requiring it are listed in
+`internal/def/sourcetime_test.go`, and that list only shrinks.
+
+A fact may name its own zone (card 198). `time_semantics.fact_time` may carry a `zone_pointer`, a
+field of `source_time`; a payload that holds a zone there is read in it, and one that holds none in
+the Definition's zone, as before. The self-report types point it at `source_time.offset`, which the
+second shape, `internal/def/sourcetime/v2.json`, adds and requires: the offset from UTC the wall
+clock had where it was said, which names one instant even in an hour the zone repeats, beside
+`zone`, the IANA name where the writer knows it (else the offset again). The gate refuses an offset
+the named zone does not keep at that wall clock: London never showed 01:30 on 29 March 2026, and
+never sat at +05:00. `record.edge` v2 and `health.medication.dose` v2 require it: the conversation
+writer and the Workbench send it with `basis: source` when the person's client or browser names the
+zone, else anam-mcp's `ANAM_ZONE` with `basis: configuration`, and a writer that cannot tell the
+offset refuses rather than guess. `health.weight` v5 declares it without requiring it, since
+records sends 1,600 weigh-ins without it, and a date-only type stays a local date. The dose's
+`identity_template` ends `{/source_time/offset?}`, an optional placeholder that renders nothing
+when the field is absent, so a dose recorded before keeps its id and one local minute in two zones
+is two doses. The guard lets a version add a `zone_pointer`, and append optional placeholders to an
+id template, because no stored version of the type let a payload carry the field they read
+([ARCHITECTURE.md](ARCHITECTURE.md) §3a).
 
 A vendor's own payload shape is named for its vendor, at the leaf after the concept (card 192):
 Garmin's sessions and days are `activity.exercise-session.garmin` and `activity.day.garmin`,

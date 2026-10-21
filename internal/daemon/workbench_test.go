@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/facet"
@@ -81,7 +82,7 @@ func doseForm(version int, taken, amount string) url.Values {
 	return url.Values{
 		"type": {"health.medication.dose"}, "v": {strconv.Itoa(version)},
 		"f.drug": {"melatonin"}, "f.amount": {amount}, "f.unit": {"mg"},
-		"f.taken_at": {taken}, "f.reason": {"to help sleep"},
+		"f.taken_at": {taken}, "f.reason": {"to help sleep"}, "zone": {"Australia/Sydney"}, "offset": {"+11:00"},
 	}
 }
 
@@ -162,14 +163,59 @@ func TestDoseFormIsDrawnFromTheDefinition(t *testing.T) {
 	for _, want := range []string{
 		`name="v" value="` + strconv.Itoa(dose.Version) + `"`,         // the version it was drawn from
 		"One dose, taken at a moment: a fact that an intake happened", // the guidance, word for word
-		"greater than 0",                // exclusiveMinimum as a hint
-		"read as Australia/Sydney time", // the declared zone
-		dose.IdentityTemplate,           // the id rule is shown, not rebuilt
+		"greater than 0", // exclusiveMinimum as a hint
+		"or as Australia/Sydney time without one", // the declared zone, when the browser names none
+		`<input type="hidden" id="zone" name="zone" value="">`,
+		`<input id="offset" name="offset" type="text" value=""`,
+		"Intl.DateTimeFormat().resolvedOptions().timeZone", // the page fills the zone from the browser
+		dose.IdentityTemplate,                              // the id rule is shown, not rebuilt
 		"Anam builds the id from the Definition",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the form lacks %q", want)
 		}
+	}
+}
+
+// The form sends the zone the browser is in (card 198): a London dose at 18:00 with the
+// offset the page read lands at 17:00Z, says how its clock was read, and takes the
+// offset into its id; a correction carries the zone it was said in.
+func TestTheFormSendsTheBrowsersZone(t *testing.T) {
+	d, base := workbenchServing(t, "health.medication.dose")
+	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
+	form := doseForm(dose.Version, "2026-10-19T18:00", "5")
+	form.Set("zone", "Europe/London")
+	form.Set("offset", "+01:00")
+	status, body := page(t, "POST", base+"/entry", form, nil)
+	key := "workbench:med/melatonin/dose/2026-10-19T18:00+01:00"
+	wantID := facet.NewID(facet.SourceRef("workbench", key))
+	if status != http.StatusOK || !strings.Contains(body, "admitted") || !strings.Contains(body, wantID) {
+		t.Fatalf("save = %d, want %s admitted:\n%s", status, wantID, body)
+	}
+	f, err := d.read.CurrentVersion(context.Background(), wantID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := f.FactTime.UTC().Format(time.RFC3339); got != "2026-10-19T17:00:00Z" {
+		t.Errorf("fact time = %s, want 2026-10-19T17:00:00Z, 18:00 in London", got)
+	}
+	for _, want := range []string{`"id":"` + key + `"`, `"taken_at":"2026-10-19 18:00"`,
+		`"source_time":{"basis":"source","offset":"+01:00","value":"2026-10-19 18:00","zone":"Europe/London"}`} {
+		if !strings.Contains(string(f.Payload.Bytes()), want) {
+			t.Errorf("payload %s lacks %s", f.Payload.Bytes(), want)
+		}
+	}
+
+	_, edit := page(t, "GET", base+"/entry?type=health.medication.dose&edit="+wantID, nil, nil)
+	for _, want := range []string{`name="zone" value="Europe/London"`, `name="offset" type="text" value="&#43;01:00"`, "the zone this fact was said in"} {
+		if !strings.Contains(edit, want) {
+			t.Errorf("the correction form lacks %s:\n%s", want, edit)
+		}
+	}
+	form.Set("edit", wantID)
+	form.Set("f.amount", "10")
+	if status, body := page(t, "POST", base+"/entry", form, nil); status != http.StatusOK || !strings.Contains(body, "superseded") {
+		t.Fatalf("correction = %d, want superseded:\n%s", status, body)
 	}
 }
 
@@ -198,7 +244,7 @@ func TestSubmittingTheFormLandsTheDose(t *testing.T) {
 	d, base := workbenchServing(t, "health.medication.dose")
 	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
 	v := dose.Version
-	wantID := facet.NewID(facet.SourceRef("workbench", "workbench:med/melatonin/dose/2026-10-19T22:00"))
+	wantID := facet.NewID(facet.SourceRef("workbench", "workbench:med/melatonin/dose/2026-10-19T22:00+11:00"))
 
 	status, body := page(t, "POST", base+"/entry", doseForm(v, "2026-10-19T22:00", "5"), nil)
 	if status != http.StatusOK || !strings.Contains(body, "admitted") || !strings.Contains(body, `href="/facet?id=`+wantID+`"`) {
@@ -212,7 +258,7 @@ func TestSubmittingTheFormLandsTheDose(t *testing.T) {
 		t.Fatalf("source = %q, want workbench", f.Provenance.Source)
 	}
 	for _, want := range []string{`"taken_at":"2026-10-19 22:00"`, `"amount":5`, `"unit":"mg"`, `"drug":"melatonin"`,
-		`"id":"workbench:med/melatonin/dose/2026-10-19T22:00"`, `"reason":"to help sleep"`} {
+		`"id":"workbench:med/melatonin/dose/2026-10-19T22:00+11:00"`, `"reason":"to help sleep"`} {
 		if !strings.Contains(string(f.Payload.Bytes()), want) {
 			t.Errorf("payload %s lacks %s", f.Payload.Bytes(), want)
 		}
@@ -273,7 +319,7 @@ func TestEditAndRetractAreForTheWorkbenchsOwnFacets(t *testing.T) {
 	d, base := workbenchServing(t, "health.medication.dose")
 	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
 	v := dose.Version
-	wantID := facet.NewID(facet.SourceRef("workbench", "workbench:med/melatonin/dose/2026-10-19T22:00"))
+	wantID := facet.NewID(facet.SourceRef("workbench", "workbench:med/melatonin/dose/2026-10-19T22:00+11:00"))
 	page(t, "POST", base+"/entry", doseForm(v, "2026-10-19T22:00", "5"), nil)
 
 	_, facetPage := page(t, "GET", base+"/facet?id="+wantID, nil, nil)

@@ -187,7 +187,7 @@ func TestBundled_OnlyTheDoseDeclaresATemplate(t *testing.T) {
 			t.Errorf("%s declares a template: %v, want %v", d.Type, got, want)
 		}
 	}
-	if d := doseDef(t); d.Version != 1 {
-		t.Errorf("health.medication.dose is v%d, want 1", d.Version)
+	if d := doseDef(t); d.Version != 2 {
+		t.Errorf("health.medication.dose is v%d, want 2", d.Version)
 	}
 }

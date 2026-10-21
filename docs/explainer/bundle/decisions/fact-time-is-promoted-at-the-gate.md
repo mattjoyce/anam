@@ -4,7 +4,7 @@ title: Fact-time is promoted out of the payload at the gate
 description: The Definition's time_semantics pointer, Go layout and IANA zone turn a payload field into a first-class UTC column, so the timeline orders and filters without opening a payload.
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/def/check.go#FactTimeOf
-anchor: "t, err := time.ParseInLocation(tf.Layout, s, d.loc)"
+anchor: "t, err := time.ParseInLocation(tf.Layout, s, loc)"
 basis: docs
 tier: supporting
 alternatives:

@@ -22,8 +22,8 @@ func lazyFixture(t *testing.T) (*harness, fold.Value, map[string]int) {
 	for _, e := range v.Entries() {
 		reading = e.FacetID
 	}
-	h.admit(t, "records", "record.edge", "note:1", `{"id": "note:1", "at": "2026-04-10 18:00", "about": ["`+reading+`"], "text": "Before the dentist."}`)
-	h.admit(t, "records", "record.edge", "interp:1", `{"id": "interp:1", "at": "2026-04-11 09:00", "kind": "interpreted_from", "from": ["`+reading+`"], "to": ["`+reading+`"]}`)
+	h.admit(t, "records", "record.edge", "note:1", `{"id": "note:1", "at": "2026-04-10 18:00", "source_time": {"value": "2026-04-10 18:00", "zone": "Australia/Sydney", "offset": "+10:00", "basis": "source"}, "about": ["`+reading+`"], "text": "Before the dentist."}`)
+	h.admit(t, "records", "record.edge", "interp:1", `{"id": "interp:1", "at": "2026-04-11 09:00", "source_time": {"value": "2026-04-11 09:00", "zone": "Australia/Sydney", "offset": "+10:00", "basis": "source"}, "kind": "interpreted_from", "from": ["`+reading+`"], "to": ["`+reading+`"]}`)
 	v, versions, _ := h.served(t)
 	return h, v, versions
 }

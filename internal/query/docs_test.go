@@ -102,7 +102,7 @@ func TestDocs_WorkedQuestionsRunAgainstARealLedger(t *testing.T) {
 	if reading == "" {
 		t.Fatal("the April reading is not served")
 	}
-	h.admit(t, "records", "record.edge", "note:1", `{"id": "note:1", "at": "2026-04-10 18:00", "about": ["`+reading+`"], "text": "Before the dentist."}`)
+	h.admit(t, "records", "record.edge", "note:1", `{"id": "note:1", "at": "2026-04-10 18:00", "source_time": {"value": "2026-04-10 18:00", "zone": "Australia/Sydney", "offset": "+10:00", "basis": "source"}, "about": ["`+reading+`"], "text": "Before the dentist."}`)
 	v, versions, _ := h.served(t)
 
 	blocks := docBlocks(t)

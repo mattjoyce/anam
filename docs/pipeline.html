@@ -106,7 +106,7 @@
   <rect class="box" x="392" y="30" width="286" height="56" rx="8" fill="var(--work)"/>
   <text class="ttl" x="535" y="50" text-anchor="middle">anam_garmin</text>
   <text class="sub" x="535" y="65" text-anchor="middle">handle: the changed days · poll: everything, weekly</text>
-  <text class="sub" x="535" y="79" text-anchor="middle">health.sleep-episode · heart-rate-daily · step-count · activity.day.garmin · session · alert</text>
+  <text class="sub" x="535" y="79" text-anchor="middle">health.sleep-episode · heart-rate.day · step-count · activity.day.garmin · session · alert</text>
 
   <!-- Withings -->
   <rect class="box" x="8" y="100" width="130" height="56" rx="8" fill="var(--source)"/>
@@ -226,7 +226,7 @@
   <li><strong>Collect from Garmin</strong>
     The <code>garmindb</code> container on unraid runs its own cron, four times a day. It downloads from Garmin Connect into <code>healthdata/garmin/DBs/</code> (<code>garmin.db</code>, <code>garmin_summary.db</code>, the activity databases) and keeps every FIT file. The <code>garmin</code> plugin in the gateway checks <code>garmin.db</code>'s modification time every 30 minutes and raises <code>health.new_data</code> with the days that changed.</li>
   <li><strong>Import from Garmin</strong>
-    Pipeline <code>anam-garmin-sync</code> runs <code>anam_garmin</code> on that event (<code>handle</code>, the changed days) and weekly by cron (<code>poll</code>, everything, labelled a snapshot so Anam knows the resend finished). It shapes nights to <code>health.sleep-episode</code>, daily heart rate to <code>health.heart-rate-day</code>, steps to <code>activity.steps</code>, the rest of the day to <code>activity.day.garmin</code>, activities to <code>activity.exercise-session.garmin</code>, and reads the FIT files for <code>health.heart-rate-alert</code>. Live since 11 October (card 55).</li>
+    Pipeline <code>anam-garmin-sync</code> runs <code>anam_garmin</code> on that event (<code>handle</code>, the changed days) and weekly by cron (<code>poll</code>, everything, labelled a snapshot so Anam knows the resend finished). It shapes nights to <code>health.sleep-episode</code>, daily heart rate to <code>health.heart-rate.day</code>, steps to <code>activity.steps</code>, the rest of the day to <code>activity.day.garmin</code>, activities to <code>activity.exercise-session.garmin</code>, and reads the FIT files for <code>health.heart-rate-alert</code>. Live since 11 October (card 55).</li>
   <li><strong>Withings</strong>
     The <code>withings</code> plugin polls the Withings cloud every six hours into <code>withings.db</code> and raises one event per new measurement. <code>anam_withings</code> shapes each to <code>health.measurement.withings</code> and posts it; a weigh-in reaches the ledger in seconds. Live since 10 October (card 54).</li>
   <li><strong>Blood pressure</strong>
@@ -265,7 +265,7 @@
 <table>
   <thead><tr><th>Source</th><th>Types</th><th>Grain</th><th>Trigger</th></tr></thead>
   <tbody>
-    <tr><td>Garmin</td><td><code>health.sleep-episode</code>, <code>health.heart-rate-day</code>, <code>activity.steps</code>, <code>activity.day.garmin</code>, <code>activity.exercise-session.garmin</code>, <code>health.heart-rate-alert</code></td><td>a night, a day's figure, a day, a session, an alert</td><td>event, weekly poll</td></tr>
+    <tr><td>Garmin</td><td><code>health.sleep-episode</code>, <code>health.heart-rate.day</code>, <code>activity.steps</code>, <code>activity.day.garmin</code>, <code>activity.exercise-session.garmin</code>, <code>health.heart-rate-alert</code></td><td>a night, a day's figure, a day, a session, an alert</td><td>event, weekly poll</td></tr>
     <tr><td>Withings</td><td><code>health.measurement.withings</code></td><td>every measurement</td><td>event</td></tr>
     <tr><td>Blood pressure export</td><td><code>health.blood-pressure</code></td><td>every reading</td><td>a new file</td></tr>
     <tr><td>DreamStation</td><td><code>health.cpap-session.dreamstation</code></td><td>every device session</td><td>the card copy's <code>LAST.TXT</code></td></tr>

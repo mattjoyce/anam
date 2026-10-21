@@ -469,6 +469,13 @@ it no longer does (card 78; Matt, 2026-10-10).
   and a read as of before the retirement still shows every facet (card 120). The order of a
   cut-over is therefore: the new importer's complete snapshot admits and reports 0 absent, the old
   source's declaration comes out, then `--retired`.
+- **Retiring a type.** When an importer stops sending a type it still owns, because a new type
+  holds the same facts in another shape (card 205: Garmin's three `health.heart-rate-day` facts a
+  day became one `health.heart-rate.day`), its complete resend keeps naming the old type in the
+  snapshot's `types` and carries none of it. Every live facet of the old type is then absent, and
+  `anam retract <source>` tombstones them by the plan above; `--retired` does not apply, since the
+  source is still declared. The importer's principal keeps the old type in its `types` for as
+  long as the importer names it, or the snapshot is refused.
 - **The alert.** An importer whose complete snapshot reports `absent` above zero raises a ductile
   event so the gateway tells the operator; Anam sends nothing itself.
 

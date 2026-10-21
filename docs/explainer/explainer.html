@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>anam-202 explainer</title>
+<title>anam explainer</title>
 <style>
 /* Explainer stylesheet. All presentation lives here; render.py inlines it.
    Colour means one thing: concept type. The --type-* tokens below are the
@@ -197,7 +197,7 @@ nav.side a:hover { text-decoration: underline; }
 <body>
 <nav class="side"><p class="nav-title">On this page</p><ul><li><a href="#map">Map</a></li><li><a href="#core">Core concepts</a></li><li><a href="#component-map">Component diagram</a></li><li><a href="#primary-workflow">Primary workflow</a></li><li><a href="#gap-map">Gaps</a></li><li><a href="#sec-purpose">Purpose</a></li><li><a href="#sec-term" class="ref-term">Terms</a></li><li><a href="#sec-component" class="ref-component">Components</a></li><li><a href="#sec-workflow" class="ref-workflow">Workflows</a></li><li><a href="#sec-data-structure" class="ref-data-structure">Data structures</a></li><li><a href="#sec-decision" class="ref-decision">Decisions</a></li><li><a href="#sec-invariant" class="ref-invariant">Invariants</a></li><li><a href="#sec-change-path" class="ref-change-path">Change paths</a></li><li><a href="#sec-gap" class="ref-gap">Gaps</a></li><li><a href="#sec-log">Recent changes</a></li></ul><p class="nav-title">Core</p><ul><li><a class="ref ref-component" href="#components-gate">Admission gate</a></li><li><a class="ref ref-component" href="#components-fold">Fold</a></li><li><a class="ref ref-component" href="#components-store-ledger">Ledger store (internal/store/ledger)</a></li><li><a class="ref ref-workflow" href="#workflows-admit-a-batch">Admit a batch</a></li><li><a class="ref ref-decision" href="#decisions-importers-live-outside-the-binary">Importers live outside the binary, as ductile plugins</a></li><li><a class="ref ref-invariant" href="#invariants-owns-no-source-fact">Anam owns no source fact</a></li><li><a class="ref ref-invariant" href="#invariants-status-is-derived-never-stored">Current status is derived by the fold, never stored on the artifact</a></li><li><a class="ref ref-invariant" href="#invariants-commit-is-idempotent-and-atomic">commit is idempotent and atomic</a></li></ul></nav>
 <main>
-<section id="map" class="map"><header><h1>anam-202 explainer</h1><p class="meta">commit <code>c08bfb5</code> (2026-10-20) · generated 2026-10-22 · 169 concepts · 0 inferred, 0 local · 17 gaps</p><p class="legend"><span class="label label-type type-purpose">purpose</span> <span class="label label-type type-term">Terms</span> <span class="label label-type type-component">Components</span> <span class="label label-type type-workflow">Workflows</span> <span class="label label-type type-data-structure">Data structures</span> <span class="label label-type type-decision">Decisions</span> <span class="label label-type type-invariant">Invariants</span> <span class="label label-type type-change-path">Change paths</span> <span class="label label-type type-gap">Gaps</span> <button type="button" id="expand-all">Expand all</button></p></header><h2 id="purpose-heading">Anam, a personal longitudinal record</h2><p class="purpose-desc">One person&#x27;s whole-life timeline of facts, assembled verbatim from the systems that already hold their data, owning none of it, with a receipt for everything it shows.</p><div class="not-do"><h3>What it does not do</h3><ul>
+<section id="map" class="map"><header><h1>anam explainer</h1><p class="meta">commit <code>c08bfb5</code> (2026-10-20) · generated 2026-10-22 · 169 concepts · 0 inferred, 0 local · 17 gaps</p><p class="legend"><span class="label label-type type-purpose">purpose</span> <span class="label label-type type-term">Terms</span> <span class="label label-type type-component">Components</span> <span class="label label-type type-workflow">Workflows</span> <span class="label label-type type-data-structure">Data structures</span> <span class="label label-type type-decision">Decisions</span> <span class="label label-type type-invariant">Invariants</span> <span class="label label-type type-change-path">Change paths</span> <span class="label label-type type-gap">Gaps</span> <button type="button" id="expand-all">Expand all</button></p></header><h2 id="purpose-heading">Anam, a personal longitudinal record</h2><p class="purpose-desc">One person&#x27;s whole-life timeline of facts, assembled verbatim from the systems that already hold their data, owning none of it, with a receipt for everything it shows.</p><div class="not-do"><h3>What it does not do</h3><ul>
 <li>It owns no source fact. Every payload is verbatim from its source and rebuildable; delete Anam and no fact is lost. It does own the continuity, the composed order, which is re-derivable but held nowhere else.
 </li>
 <li>It never parses a payload into a canonical schema, never joins and never summarises. Weekly averages are projections or derived facts, not admitted facts.
@@ -339,18 +339,18 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   n_components_backup[&quot;Backup (internal/backup)&quot;]
   n_components_config[&quot;Config (internal/config)&quot;]
   n_components_inspect[&quot;Inspector (internal/inspect)&quot;]
-  n_components_fold[&quot;Fold&quot;]
-  n_components_store_ops[&quot;Operational store (internal/store/ops)&quot;]
-  n_components_selection[&quot;Selection (internal/selection)&quot;]
-  n_components_catchup[&quot;Catch-up (internal/catchup)&quot;]
-  n_components_library[&quot;Library (internal/library)&quot;]
-  n_components_span[&quot;Buckets (internal/span)&quot;]
-  n_components_projection[&quot;Projection&quot;]
-  n_components_def[&quot;Definitions registry (internal/def)&quot;]
-  n_components_mint[&quot;Mint&quot;]
-  n_components_read[&quot;Read (internal/read)&quot;]
-  n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
   n_components_facet[&quot;Facet domain values (internal/facet)&quot;]
+  n_components_selection[&quot;Selection (internal/selection)&quot;]
+  n_components_fold[&quot;Fold&quot;]
+  n_components_def[&quot;Definitions registry (internal/def)&quot;]
+  n_components_read[&quot;Read (internal/read)&quot;]
+  n_components_store_ops[&quot;Operational store (internal/store/ops)&quot;]
+  n_components_library[&quot;Library (internal/library)&quot;]
+  n_components_mint[&quot;Mint&quot;]
+  n_components_catchup[&quot;Catch-up (internal/catchup)&quot;]
+  n_components_projection[&quot;Projection&quot;]
+  n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
+  n_components_span[&quot;Buckets (internal/span)&quot;]
   n_components_backup --&gt; n_components_store_ledger
   n_components_config --&gt; n_components_span
   n_components_config --&gt; n_components_facet
@@ -368,20 +368,20 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   click n_components_backup &quot;#components-backup&quot;
   click n_components_config &quot;#components-config&quot;
   click n_components_inspect &quot;#components-inspect&quot;
-  click n_components_fold &quot;#components-fold&quot;
-  click n_components_store_ops &quot;#components-store-ops&quot;
-  click n_components_selection &quot;#components-selection&quot;
-  click n_components_catchup &quot;#components-catchup&quot;
-  click n_components_library &quot;#components-library&quot;
-  click n_components_span &quot;#components-span&quot;
-  click n_components_projection &quot;#components-projection&quot;
-  click n_components_def &quot;#components-def&quot;
-  click n_components_mint &quot;#components-mint&quot;
-  click n_components_read &quot;#components-read&quot;
-  click n_components_store_ledger &quot;#components-store-ledger&quot;
   click n_components_facet &quot;#components-facet&quot;
+  click n_components_selection &quot;#components-selection&quot;
+  click n_components_fold &quot;#components-fold&quot;
+  click n_components_def &quot;#components-def&quot;
+  click n_components_read &quot;#components-read&quot;
+  click n_components_store_ops &quot;#components-store-ops&quot;
+  click n_components_library &quot;#components-library&quot;
+  click n_components_mint &quot;#components-mint&quot;
+  click n_components_catchup &quot;#components-catchup&quot;
+  click n_components_projection &quot;#components-projection&quot;
+  click n_components_store_ledger &quot;#components-store-ledger&quot;
+  click n_components_span &quot;#components-span&quot;
 classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
-  class n_components_backup,n_components_config,n_components_inspect,n_components_fold,n_components_store_ops,n_components_selection,n_components_catchup,n_components_library,n_components_span,n_components_projection,n_components_def,n_components_mint,n_components_read,n_components_store_ledger,n_components_facet component;</pre></div></figure>
+  class n_components_backup,n_components_config,n_components_inspect,n_components_facet,n_components_selection,n_components_fold,n_components_def,n_components_read,n_components_store_ops,n_components_library,n_components_mint,n_components_catchup,n_components_projection,n_components_store_ledger,n_components_span component;</pre></div></figure>
 <figure class="diagram"><figcaption>Components: derived</figcaption><p class="diagram-note">Boxes outside the group are drawn where a member depends on them.</p><div class="scroll"><pre class="mermaid">graph LR
   n_components_catchup[&quot;Catch-up (internal/catchup)&quot;]
   n_components_fold[&quot;Fold&quot;]
@@ -390,12 +390,12 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   n_components_selection[&quot;Selection (internal/selection)&quot;]
   n_components_span[&quot;Buckets (internal/span)&quot;]
   n_components_store_ops[&quot;Operational store (internal/store/ops)&quot;]
-  n_components_store_artifact[&quot;Artifact store (internal/store/artifact)&quot;]
+  n_components_facet[&quot;Facet domain values (internal/facet)&quot;]
   n_components_def[&quot;Definitions registry (internal/def)&quot;]
-  n_components_projection[&quot;Projection&quot;]
   n_components_serve[&quot;Serve (internal/serve)&quot;]
   n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
-  n_components_facet[&quot;Facet domain values (internal/facet)&quot;]
+  n_components_projection[&quot;Projection&quot;]
+  n_components_store_artifact[&quot;Artifact store (internal/store/artifact)&quot;]
   n_components_catchup --&gt; n_components_store_ledger
   n_components_catchup --&gt; n_components_store_ops
   n_components_catchup --&gt; n_components_fold
@@ -427,32 +427,32 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   click n_components_selection &quot;#components-selection&quot;
   click n_components_span &quot;#components-span&quot;
   click n_components_store_ops &quot;#components-store-ops&quot;
-  click n_components_store_artifact &quot;#components-store-artifact&quot;
+  click n_components_facet &quot;#components-facet&quot;
   click n_components_def &quot;#components-def&quot;
-  click n_components_projection &quot;#components-projection&quot;
   click n_components_serve &quot;#components-serve&quot;
   click n_components_store_ledger &quot;#components-store-ledger&quot;
-  click n_components_facet &quot;#components-facet&quot;
+  click n_components_projection &quot;#components-projection&quot;
+  click n_components_store_artifact &quot;#components-store-artifact&quot;
 classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
-  class n_components_catchup,n_components_fold,n_components_mint,n_components_read,n_components_selection,n_components_span,n_components_store_ops,n_components_store_artifact,n_components_def,n_components_projection,n_components_serve,n_components_store_ledger,n_components_facet component;</pre></div></figure>
+  class n_components_catchup,n_components_fold,n_components_mint,n_components_read,n_components_selection,n_components_span,n_components_store_ops,n_components_facet,n_components_def,n_components_serve,n_components_store_ledger,n_components_projection,n_components_store_artifact component;</pre></div></figure>
 <figure class="diagram"><figcaption>Components: entry</figcaption><p class="diagram-note">Boxes outside the group are drawn where a member depends on them.</p><div class="scroll"><pre class="mermaid">graph LR
   n_components_cli[&quot;CLI (internal/app)&quot;]
   n_components_client[&quot;Client (internal/client)&quot;]
   n_components_daemon[&quot;Daemon&quot;]
   n_components_principals[&quot;Principals and roles (internal/daemon auth)&quot;]
-  n_components_store_ops[&quot;Operational store (internal/store/ops)&quot;]
-  n_components_config[&quot;Config (internal/config)&quot;]
-  n_components_store_artifact[&quot;Artifact store (internal/store/artifact)&quot;]
-  n_components_catchup[&quot;Catch-up (internal/catchup)&quot;]
-  n_components_library[&quot;Library (internal/library)&quot;]
-  n_components_def[&quot;Definitions registry (internal/def)&quot;]
-  n_components_mint[&quot;Mint&quot;]
   n_components_backup[&quot;Backup (internal/backup)&quot;]
+  n_components_inspect[&quot;Inspector (internal/inspect)&quot;]
+  n_components_def[&quot;Definitions registry (internal/def)&quot;]
   n_components_read[&quot;Read (internal/read)&quot;]
   n_components_serve[&quot;Serve (internal/serve)&quot;]
+  n_components_store_ops[&quot;Operational store (internal/store/ops)&quot;]
+  n_components_mint[&quot;Mint&quot;]
+  n_components_catchup[&quot;Catch-up (internal/catchup)&quot;]
+  n_components_library[&quot;Library (internal/library)&quot;]
   n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
-  n_components_inspect[&quot;Inspector (internal/inspect)&quot;]
+  n_components_store_artifact[&quot;Artifact store (internal/store/artifact)&quot;]
   n_components_gate[&quot;Admission gate&quot;]
+  n_components_config[&quot;Config (internal/config)&quot;]
   n_components_cli --&gt; n_components_daemon
   n_components_cli --&gt; n_components_client
   n_components_cli --&gt; n_components_config
@@ -484,21 +484,21 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   click n_components_client &quot;#components-client&quot;
   click n_components_daemon &quot;#components-daemon&quot;
   click n_components_principals &quot;#components-principals&quot;
-  click n_components_store_ops &quot;#components-store-ops&quot;
-  click n_components_config &quot;#components-config&quot;
-  click n_components_store_artifact &quot;#components-store-artifact&quot;
-  click n_components_catchup &quot;#components-catchup&quot;
-  click n_components_library &quot;#components-library&quot;
-  click n_components_def &quot;#components-def&quot;
-  click n_components_mint &quot;#components-mint&quot;
   click n_components_backup &quot;#components-backup&quot;
+  click n_components_inspect &quot;#components-inspect&quot;
+  click n_components_def &quot;#components-def&quot;
   click n_components_read &quot;#components-read&quot;
   click n_components_serve &quot;#components-serve&quot;
+  click n_components_store_ops &quot;#components-store-ops&quot;
+  click n_components_mint &quot;#components-mint&quot;
+  click n_components_catchup &quot;#components-catchup&quot;
+  click n_components_library &quot;#components-library&quot;
   click n_components_store_ledger &quot;#components-store-ledger&quot;
-  click n_components_inspect &quot;#components-inspect&quot;
+  click n_components_store_artifact &quot;#components-store-artifact&quot;
   click n_components_gate &quot;#components-gate&quot;
+  click n_components_config &quot;#components-config&quot;
 classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
-  class n_components_cli,n_components_client,n_components_daemon,n_components_principals,n_components_store_ops,n_components_config,n_components_store_artifact,n_components_catchup,n_components_library,n_components_def,n_components_mint,n_components_backup,n_components_read,n_components_serve,n_components_store_ledger,n_components_inspect,n_components_gate component;</pre></div></figure>
+  class n_components_cli,n_components_client,n_components_daemon,n_components_principals,n_components_backup,n_components_inspect,n_components_def,n_components_read,n_components_serve,n_components_store_ops,n_components_mint,n_components_catchup,n_components_library,n_components_store_ledger,n_components_store_artifact,n_components_gate,n_components_config component;</pre></div></figure>
 <figure class="diagram"><figcaption>Components: kernel</figcaption><p class="diagram-note">Boxes outside the group are drawn where a member depends on them.</p><div class="scroll"><pre class="mermaid">graph LR
   n_components_def[&quot;Definitions registry (internal/def)&quot;]
   n_components_facet[&quot;Facet domain values (internal/facet)&quot;]
@@ -525,9 +525,9 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   n_components_serve[&quot;Serve (internal/serve)&quot;]
   n_components_store_artifact[&quot;Artifact store (internal/store/artifact)&quot;]
   n_components_facet[&quot;Facet domain values (internal/facet)&quot;]
-  n_components_mint[&quot;Mint&quot;]
-  n_components_fold[&quot;Fold&quot;]
   n_components_store_ledger[&quot;Ledger store (internal/store/ledger)&quot;]
+  n_components_fold[&quot;Fold&quot;]
+  n_components_mint[&quot;Mint&quot;]
   n_components_projection --&gt; n_components_fold
   n_components_projection --&gt; n_components_facet
   n_components_serve --&gt; n_components_mint
@@ -542,11 +542,11 @@ classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
   click n_components_serve &quot;#components-serve&quot;
   click n_components_store_artifact &quot;#components-store-artifact&quot;
   click n_components_facet &quot;#components-facet&quot;
-  click n_components_mint &quot;#components-mint&quot;
-  click n_components_fold &quot;#components-fold&quot;
   click n_components_store_ledger &quot;#components-store-ledger&quot;
+  click n_components_fold &quot;#components-fold&quot;
+  click n_components_mint &quot;#components-mint&quot;
 classDef component fill:#1f6f8b22,stroke:#1f6f8b,color:#111,stroke-width:1.5px;
-  class n_components_library,n_components_projection,n_components_receipt,n_components_serve,n_components_store_artifact,n_components_facet,n_components_mint,n_components_fold,n_components_store_ledger component;</pre></div></figure><details class="concept type-component" id="components-gate" open><summary><span class="title">Admission gate</span> <span class="desc">The only ingress: resolve binds an envelope to the person, commit validates it against its Definition, composes identity, and appends through the ledger idempotently.</span></summary><div class="concept-body"><p class="labels"><span class="label label-type type-component">component</span> <span class="label label-tier">core</span> <span class="label label-basis">basis: code</span> <span class="label label-resource"><code>internal/gate/gate.go#New</code></span> <span class="label label-anchor">anchor <code>func New(l Ledger, defs Definitions, scopes TokenScopes, clock Clock, personID string, limits Limits) *Gate {</code></span></p><p><strong>Depends on</strong> <a class="ref ref-component" href="#components-store-ledger">Ledger store (internal/store/ledger)</a>, <a class="ref ref-component" href="#components-def">Definitions registry (internal/def)</a>, <a class="ref ref-component" href="#components-facet">Facet domain values (internal/facet)</a>, <a class="ref ref-component" href="#components-fold">Fold</a> <span class="label">group: kernel</span></p><p>Two calls, as the doctrine says: <code>Resolve</code> enforces association (binding and its assurance), <code>CommitBatch</code> enforces facet-compliance and token scope and writes.</p>
+  class n_components_library,n_components_projection,n_components_receipt,n_components_serve,n_components_store_artifact,n_components_facet,n_components_store_ledger,n_components_fold,n_components_mint component;</pre></div></figure><details class="concept type-component" id="components-gate" open><summary><span class="title">Admission gate</span> <span class="desc">The only ingress: resolve binds an envelope to the person, commit validates it against its Definition, composes identity, and appends through the ledger idempotently.</span></summary><div class="concept-body"><p class="labels"><span class="label label-type type-component">component</span> <span class="label label-tier">core</span> <span class="label label-basis">basis: code</span> <span class="label label-resource"><code>internal/gate/gate.go#New</code></span> <span class="label label-anchor">anchor <code>func New(l Ledger, defs Definitions, scopes TokenScopes, clock Clock, personID string, limits Limits) *Gate {</code></span></p><p><strong>Depends on</strong> <a class="ref ref-component" href="#components-store-ledger">Ledger store (internal/store/ledger)</a>, <a class="ref ref-component" href="#components-def">Definitions registry (internal/def)</a>, <a class="ref ref-component" href="#components-facet">Facet domain values (internal/facet)</a>, <a class="ref ref-component" href="#components-fold">Fold</a> <span class="label">group: kernel</span></p><p>Two calls, as the doctrine says: <code>Resolve</code> enforces association (binding and its assurance), <code>CommitBatch</code> enforces facet-compliance and token scope and writes.</p>
 <div class="scroll"><table><thead><tr><th>Pillar</th><th>Where</th></tr></thead><tbody><tr><td>Facet-compliant</td><td>the Definition&#x27;s closed JSON Schema, <code>validation_mode</code>, fact-time pointer and zone (or the zone the fact names at its <code>zone_pointer</code>, card 198), series pointers</td></tr><tr><td>Authenticated</td><td>the token scopes: a source may inject only the types it is scoped for</td></tr><tr><td>Associated</td><td>binding to the one person, with assurance high / medium / review</td></tr></tbody></table></div>
 <p>What commit computes, per envelope: the <a class="ref ref-term" href="#terms-source-ref">source ref</a> from the Definition&#x27;s <code>identity_key</code> (refusing one the envelope carried that disagrees), the <code>facet_id</code> as uuidv5 of it, the fact-time promoted out of the payload, the series stamp, the content hash of the canonical payload. Then the outcome: no prior version is <code>admitted</code>; a prior version with the same hash is <code>no-op</code>; a different hash is <code>superseded</code> with a new artifact version. A batch of up to <code>MaxBatch</code> (49) envelopes is one transaction, so a refused envelope writes nothing for the whole batch. <code>MaxBatch</code> is a constant, not a config key: every importer cuts its batches to it, so a gate set lower would refuse their full batches, and it decides which events share an anam-time (card 151). The payload bound and the retry count are the two <code>gate.Limits</code> the daemon passes in from the config (<code>max_payload_bytes</code>, 300 KiB; <code>commit_retries</code>, 5); see <a class="ref ref-data-structure" href="#data-structures-limits">config limits</a>.</p>
 <p>The retry on a stale watermark lives here, not in the store, because a worker may already crash mid-batch and be re-run to known-good. <code>Retract</code> writes a tombstone event against the current version and no artifact. <code>Rehearse</code> and <code>RenameBatch</code> (card 140) carry a facet into another type as its next version: the prepared envelope is marked with the type it leaves, nothing on the wire can set the mark, and the disposition supersedes on a type change only under it, with the payload unchanged or not; every other path keeps the refusal of a changed type (card 105).</p>
@@ -1017,8 +1017,8 @@ classDef workflow fill:#b8651b22,stroke:#b8651b,color:#111,stroke-width:1.5px;
   index { }
   published { }
   contract { }
-  wire }o--o{ ledger : &quot;refers to&quot;
   wire }o--o{ contract : &quot;refers to&quot;
+  wire }o--o{ ledger : &quot;refers to&quot;
   ledger }o--o{ contract : &quot;refers to&quot;
   index }o--o{ ledger : &quot;refers to&quot;
   index }o--o{ published : &quot;refers to&quot;
@@ -1143,7 +1143,7 @@ principals:
 </li>
 </ul>
 <p><strong>Why.</strong> Each place up the list is dearer to change and harder to undo, so the cheap place that works is the right place. A rule that says so gives the same answer each time a new kind of fact arrives, where before it was whatever the last type did.</p>
-<p><strong>What it costs.</strong> The cheap places are the ones a reader cannot select by in the store, since the store never opens a payload. A distinction that readers will filter on every day has to be argued up, and that argument is a judgement the rule narrows and does not remove. The existing hyphenated names (<code>health.heart-rate-day</code>) keep their shape until a rename card moves them; the medication, illness and trip names left theirs in card 196.</p><div class="used"><h4>Where else it is used</h4><ul><li><strong>mentioned by</strong> <a class="ref ref-data-structure" href="#data-structures-definition-manifest">Definition manifest</a></li></ul></div></div></details><details class="concept type-decision" id="decisions-a-hard-coded-value-is-a-default-or-an-invariant"><summary><span class="title">A hard-coded value is a default or an invariant</span> <span class="desc">A value someone could reasonably choose differently is a config key with a shipped default and a range check; a value whose change breaks correctness or a contract stays a constant with a comment saying why; no test hook changes either.</span></summary><div class="concept-body"><p class="labels"><span class="label label-type type-decision">decision</span> <span class="label label-tier">supporting</span> <span class="label label-basis">basis: code</span> <span class="label label-resource"><code>internal/config/limits.go#Limits</code></span> <span class="label label-anchor">anchor <code>type Limits struct {</code></span></p><h4>Alternatives</h4><ul><li>Leave each number where it was first needed (the waits, bounds and sizes sat as constants in the daemon, gate, client and inspector, so running Anam differently meant editing code)</li><li>Make every constant a key (would let someone set <code>MaxBatch</code> below what the importers send, or a token shorter than the floor, and break the contract from a config file)</li><li>A package variable a test overwrites (refused; a value a test must change is a default, set the way a person would, and one it must not change is an invariant)</li></ul>
+<p><strong>What it costs.</strong> The cheap places are the ones a reader cannot select by in the store, since the store never opens a payload. A distinction that readers will filter on every day has to be argued up, and that argument is a judgement the rule narrows and does not remove. The existing hyphenated names keep their shape until a card moves them; the medication, illness and trip names left theirs in card 196. <code>health.heart-rate-day</code> left its in card 205 by a new type, not a rename: <code>health.heart-rate.day</code> holds a day&#x27;s three figures as one fact, a different shape, and the old type&#x27;s facts are retired by the Garmin importer&#x27;s snapshot.</p><div class="used"><h4>Where else it is used</h4><ul><li><strong>mentioned by</strong> <a class="ref ref-data-structure" href="#data-structures-definition-manifest">Definition manifest</a></li></ul></div></div></details><details class="concept type-decision" id="decisions-a-hard-coded-value-is-a-default-or-an-invariant"><summary><span class="title">A hard-coded value is a default or an invariant</span> <span class="desc">A value someone could reasonably choose differently is a config key with a shipped default and a range check; a value whose change breaks correctness or a contract stays a constant with a comment saying why; no test hook changes either.</span></summary><div class="concept-body"><p class="labels"><span class="label label-type type-decision">decision</span> <span class="label label-tier">supporting</span> <span class="label label-basis">basis: code</span> <span class="label label-resource"><code>internal/config/limits.go#Limits</code></span> <span class="label label-anchor">anchor <code>type Limits struct {</code></span></p><h4>Alternatives</h4><ul><li>Leave each number where it was first needed (the waits, bounds and sizes sat as constants in the daemon, gate, client and inspector, so running Anam differently meant editing code)</li><li>Make every constant a key (would let someone set <code>MaxBatch</code> below what the importers send, or a token shorter than the floor, and break the contract from a config file)</li><li>A package variable a test overwrites (refused; a value a test must change is a default, set the way a person would, and one it must not change is an invariant)</li></ul>
 <p><strong>Affects</strong> <a class="ref ref-component" href="#components-config">Config (internal/config)</a>, <a class="ref ref-component" href="#components-daemon">Daemon</a>, <a class="ref ref-component" href="#components-gate">Admission gate</a>, <a class="ref ref-component" href="#components-client">Client (internal/client)</a>, <a class="ref ref-component" href="#components-inspect">Inspector (internal/inspect)</a>, <a class="ref ref-data-structure" href="#data-structures-limits">Config limits</a></p>
 <p><strong>Tested by</strong> <code>internal/config/limits_test.go#TestLimitsOverrideAndRange</code>, <code>internal/config/limits_test.go#TestDefaultLimits</code></p><p><strong>Context.</strong> Card 151, from Matt&#x27;s direction that someone running Anam makes their own choices and Anam ships opinionated defaults. The rule is in AGENTS.md (&quot;Defaults and invariants&quot;).</p>
 <p><strong>Choice.</strong> A default is a snake_case key whose default is a <code>Default…</code> constant in <code>internal/config</code> with a comment saying why that number; <code>Load</code> range-checks it, it reaches the code as a parameter from the one <code>Config</code> loaded at start and is never read from a global or the environment deep in the code, and it is listed in <code>config.example.yaml</code>. An invariant stays a constant with a comment saying why it is not configurable. The invariants card 151 named are <code>gate.MaxBatch</code> (49), the <code>Anam-Timeout</code> header, the snapshot id&#x27;s shape, <code>clock.Width</code>, the token&#x27;s 32-character floor, the roles, file modes and the library&#x27;s folder naming. A store&#x27;s internal tuning that changes no result a person meets, and a page&#x27;s geometry, are neither.</p>
@@ -1595,6 +1595,13 @@ principals:
 <li>Code: the Workbench&#x27;s link form. <code>GET /link</code> draws one <code>record.edge</code> from a basket (<code>tick</code>, <code>fromside</code>, or the selection page&#x27;s <code>program</code> resolved to ids when it opens, or <code>edit</code> of a Workbench link); <code>POST /link</code> saves it through the Workbench&#x27;s entry, with the id <code>workbench:edge:</code> and 16 hex of the SHA-256 of the kind, the sorted sides and the moment with its offset, kept on every edit. The facet page offers &quot;link this…&quot; and &quot;edit this link&quot;; the selection page&#x27;s &quot;Use this selection&quot; now opens the form and carries an edit through. The zone script is shared by both forms.
 </li>
 <li>Bundle: the inspector component has a section on the link form and its id rule, and the selection page&#x27;s handoff names it.
+</li>
+</ul>
+<h4>2026-10-22, card 205</h4>
+<ul>
+<li>Code: <code>health.heart-rate.day</code> v1 is bundled, one fact a day with <code>resting</code>, <code>minimum</code> and <code>maximum</code> as optional <code>{value, unit}</code> fields, keyed on the day and placed at the start of the interval Garmin counted, with <code>source_time</code> in card 197&#x27;s shape. <code>health.heart-rate-day</code> stays bundled for the facts admitted under it. <code>projections/heart.v3.json</code> names the new type. The Garmin importer&#x27;s poll names both types in its snapshot, so <code>anam retract garmin</code> retires the old facts; <code>TestRetract_ASnapshotThatNamesAnOldTypeRetiresItsFacts</code> proves it over a real ledger.
+</li>
+<li>Bundle: the placement decision says the hyphenated name left by a new type, not a rename.
 </li>
 </ul></div></section>
 </main>

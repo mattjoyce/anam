@@ -40,6 +40,7 @@ type formField struct {
 	Kind        string // the JSON type: string, number, integer or boolean
 	Required    bool
 	Locked      bool
+	FactTime    bool // the fact-time field, whose wall clock the page reads an offset for
 	Description string
 	Placeholder string
 	Hints       []string
@@ -55,6 +56,12 @@ type entryForm struct {
 	loc    *time.Location
 	layout string
 	timeAt string
+	// Zoned says the Definition's fact time reads the zone a fact names (card 198), so
+	// the form sends source_time without drawing it: Zone and Offset are hidden
+	// fields the page fills from the browser, or from the facet being corrected.
+	Zoned         bool
+	Zone, Offset  string
+	OffsetProblem string
 }
 
 // timeInput is the layout a datetime-local control writes, and dateInput a date's.
@@ -86,7 +93,7 @@ func drawForm(body []byte, d def.Definition, lock bool) (entryForm, error) {
 	if err != nil {
 		return entryForm{}, errNotDrawn(fmt.Sprintf("The fact-time zone %q cannot be loaded: %v.", d.FactTime.Zone, err))
 	}
-	form := entryForm{timeAt: d.FactTime.Pointer, layout: d.FactTime.Layout, loc: loc}
+	form := entryForm{timeAt: d.FactTime.Pointer, layout: d.FactTime.Layout, loc: loc, Zoned: d.FactTime.ZonePointer != ""}
 	required := stringSet(m.Schema["required"])
 	locked := map[string]bool{}
 	if lock {
@@ -99,6 +106,12 @@ func drawForm(body []byte, d def.Definition, lock bool) (entryForm, error) {
 		ptr := "/" + name
 		if ptr == d.ComposedField() {
 			continue // the gate composes it from the Definition's rule
+		}
+		// source_time is the form's to fill, from the browser's zone, when the fact
+		// time reads its zone; an optional one the fact time does not read is not
+		// sent. A required one with no zone pointer falls through and is refused.
+		if name == def.SourceTimeField && (form.Zoned || !required[name]) {
+			continue
 		}
 		sub, _ := props[name].(map[string]any)
 		field, why := form.draw(name, sub, required[name])
@@ -190,6 +203,10 @@ func (f entryForm) draw(name string, sub map[string]any, required bool) (formFie
 		field.Input, field.Step = "number", "any"
 	case kind == "integer":
 		field.Input, field.Step = "number", "1"
+	case field.Pointer == f.timeAt && kind == "string" && f.Zoned:
+		field.FactTime = true
+		field.Input = timeControl(f.layout)
+		field.Hints = append(field.Hints, "read in your browser's zone, or as "+f.loc.String()+" time without one")
 	case field.Pointer == f.timeAt && kind == "string":
 		field.Input = timeControl(f.layout)
 		field.Hints = append(field.Hints, "read as "+f.loc.String()+" time")
@@ -263,6 +280,14 @@ func (f *entryForm) fill(payload []byte) error {
 		}
 		fld.Value = f.textOf(fld, raw)
 	}
+	// A correction keeps the zone the fact was said in, and its offset, which a dose's
+	// id reads: corrected from elsewhere, it is still the same fact.
+	if raw, ok := stored[def.SourceTimeField]; ok && f.Zoned {
+		var st struct{ Zone, Offset string }
+		if json.Unmarshal(raw, &st) == nil {
+			f.Zone, f.Offset = st.Zone, st.Offset
+		}
+	}
 	return nil
 }
 
@@ -274,7 +299,7 @@ func (f *entryForm) textOf(fld *formField, raw json.RawMessage) string {
 		text = s
 	}
 	if fld.Pointer == f.timeAt && (fld.Input == "datetime-local" || fld.Input == "date") {
-		t, err := time.ParseInLocation(f.layout, text, f.loc)
+		t, err := time.ParseInLocation(f.layout, text, f.wallLoc())
 		if err != nil {
 			fld.Problem = fmt.Sprintf("the stored value %q is not in the layout %q", text, f.layout)
 			return ""
@@ -320,6 +345,13 @@ func (f *entryForm) read(vals url.Values) (json.RawMessage, bool) {
 	if !ok {
 		return nil, false
 	}
+	st, ok := f.sourceTime(vals, payload)
+	if !ok {
+		return nil, false
+	}
+	if st != nil {
+		payload[def.SourceTimeField] = st
+	}
 	out, err := json.Marshal(payload)
 	if err != nil {
 		return nil, false // a map of raw JSON values always marshals
@@ -355,15 +387,17 @@ func (f *entryForm) encode(fld *formField) (json.RawMessage, error) {
 	return json.Marshal(fld.Value)
 }
 
-// encodeTime reads the control's value as a time in the Definition's zone and writes
-// it in the Definition's layout, so the page never guesses a format.
+// encodeTime reads the control's value as a time and writes it in the Definition's
+// layout, so the page never guesses a format. A zoneless layout keeps the wall clock's
+// digits as typed, which the gate reads in the zone the fact names; a layout with an
+// offset writes the Definition zone's.
 func (f *entryForm) encodeTime(fld *formField) (json.RawMessage, error) {
 	in := []string{timeInput, timeInput + ":05"}
 	if fld.Input == "date" {
 		in = []string{dateInput}
 	}
 	for _, layout := range in {
-		if t, err := time.ParseInLocation(layout, fld.Value, f.loc); err == nil {
+		if t, err := time.ParseInLocation(layout, fld.Value, f.wallLoc()); err == nil {
 			return json.Marshal(t.Format(f.layout))
 		}
 	}

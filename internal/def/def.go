@@ -49,10 +49,19 @@ const (
 // is required: a source's export writes the clock on the wall where the person stood,
 // and reading it as UTC puts every fact hours from where it happened. A layout that
 // carries its own offset is unaffected by the zone.
+//
+// ZonePointer, optional, lets the fact name its own zone (card 198): when the payload
+// holds a zone there (an offset +HH:MM, or an IANA name), the wall clock is read in it,
+// and when it holds none, Zone applies as before. The self-report types point it at
+// source_time's offset, which names one instant even in an hour the zone repeats. It
+// is for a zoneless layout: a value that carries its own offset needs none. It is the
+// one addition a later version may make to a type's fact time (Guard), since no fact
+// admitted before carries it.
 type TimeField struct {
-	Pointer string `json:"pointer"`
-	Layout  string `json:"layout"`
-	Zone    string `json:"zone"`
+	Pointer     string `json:"pointer"`
+	Layout      string `json:"layout"`
+	Zone        string `json:"zone"`
+	ZonePointer string `json:"zone_pointer,omitempty"`
 }
 
 // Series says which facets of this type are repeated statements about one thing
@@ -257,6 +266,12 @@ func Parse(raw []byte) (Definition, error) {
 		if err := checkSourceTimeShape(d.tree); err != nil {
 			return Definition{}, err
 		}
+		if err := d.declaresOptional(); err != nil {
+			return Definition{}, err
+		}
+	case d.FactTime.ZonePointer != "" || len(optionalPointers(d.idParts)) > 0:
+		return Definition{}, fmt.Errorf("%w: a verbatim type declares no fields, so it cannot name an optional one "+
+			"(a zone_pointer or an optional id placeholder)", ErrBadManifest)
 	}
 	loc, err := time.LoadLocation(d.FactTime.Zone)
 	if err != nil {
@@ -295,6 +310,9 @@ func (d Definition) validate() error {
 		if err := checkPointerSyntax(p); err != nil {
 			return fmt.Errorf("%w: %v", ErrBadManifest, err)
 		}
+	}
+	if err := d.validateZonePointers(); err != nil {
+		return err
 	}
 	return d.validateSeries()
 }

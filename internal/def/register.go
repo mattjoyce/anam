@@ -64,11 +64,17 @@ func Register(body []byte, stored, registered []Stored, bundled *Registry) (Regi
 	if d.Version < newest.Version {
 		return Registration{}, fmt.Errorf("%w: %s v%d, newest is v%d", ErrVersionBehind, d.Type, d.Version, newest.Version)
 	}
-	old, err := keyingOf(newest.Body)
-	if err != nil {
-		return Registration{}, fmt.Errorf("def: held definition %s v%d: %w", newest.Type, newest.Version, err)
+	var prior []Stored
+	for _, s := range append(append([]Stored(nil), stored...), registered...) {
+		if s.Type == d.Type {
+			prior = append(prior, s)
+		}
 	}
-	if err := sameKeying(old, keying{IdentityKey: d.IdentityKey, FactTime: d.FactTime}); err != nil {
+	_, err = holdsKeying(prior, keyingOfDef(d))
+	if errors.Is(err, ErrBadManifest) {
+		return Registration{}, fmt.Errorf("def: held definition %s: %w", d.Type, err)
+	}
+	if err != nil {
 		return Registration{}, fmt.Errorf("%w: %s v%d → v%d: %v", ErrKeyed, d.Type, newest.Version, d.Version, err)
 	}
 	return Registration{Definition: d, New: true}, nil

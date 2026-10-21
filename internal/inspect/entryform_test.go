@@ -3,6 +3,7 @@ package inspect
 import (
 	"encoding/json"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -176,5 +177,115 @@ func TestDrawFormRefusesNestedSchemas(t *testing.T) {
 				t.Errorf("the dose is not drawn: %v", err)
 			}
 		}
+	}
+}
+
+// Card 198 gave each self-report type timed by a wall clock a version whose fact time
+// reads the offset the fact names, from source_time, which the form cannot draw. So the form fills it rather than
+// drawing it, and every type that drew at its version before still draws, now zoned.
+func TestEveryTypeThatDrewStillDrawsOnceZoned(t *testing.T) {
+	t.Parallel()
+	manifests, err := def.Manifests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	bodies := map[string][]byte{}
+	for _, m := range manifests {
+		bodies[string(m.Type)+"@"+strconv.Itoa(m.Version)] = m.Body
+	}
+	zoned := 0
+	for _, d := range reg.All() {
+		if d.FactTime.ZonePointer == "" {
+			continue
+		}
+		zoned++
+		before, ok := bodies[string(d.Type)+"@"+strconv.Itoa(d.Version-1)]
+		if !ok {
+			continue
+		}
+		old, err := def.Parse(before)
+		if err != nil {
+			continue // an older format than Parse reads: never drawn by this page
+		}
+		if _, err := drawForm(before, old, false); err != nil {
+			continue // it did not draw before either
+		}
+		form, err := drawForm(bodies[string(d.Type)+"@"+strconv.Itoa(d.Version)], d, false)
+		if err != nil {
+			t.Errorf("%s v%d drew at v%d and does not now: %v", d.Type, d.Version, d.Version-1, err)
+			continue
+		}
+		if !form.Zoned {
+			t.Errorf("%s v%d's form does not send the zone", d.Type, d.Version)
+		}
+		for _, f := range form.Fields {
+			if f.Name == def.SourceTimeField {
+				t.Errorf("%s v%d draws source_time", d.Type, d.Version)
+			}
+		}
+	}
+	if zoned < 3 {
+		t.Errorf("%d bundled types read a zone from the fact, want the three self-report types timed by a wall clock", zoned)
+	}
+}
+
+// A zoned form sends source_time from the fields the browser fills, keeps the wall
+// clock's digits as typed even where Sydney skips them, and sends nothing, saying why,
+// when it has no offset.
+func TestAZonedFormSendsTheBrowsersZone(t *testing.T) {
+	t.Parallel()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, _ := reg.Lookup("health.medication.dose")
+	manifests, err := def.Manifests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body []byte
+	for _, m := range manifests {
+		if m.Type == d.Type && m.Version == d.Version {
+			body = m.Body
+		}
+	}
+	vals := url.Values{"f.drug": {"melatonin"}, "f.amount": {"5"}, "f.unit": {"mg"}}
+	for _, c := range []struct {
+		name, taken, zone, offset string
+		want                      string
+	}{
+		{"London, with the offset", "2026-10-19T18:00", "Europe/London", "+01:00",
+			`"source_time":{"basis":"source","offset":"+01:00","value":"2026-10-19 18:00","zone":"Europe/London"}`},
+		{"an offset and no zone: the offset names it", "2026-10-19T18:00", "", "+01:00",
+			`"source_time":{"basis":"source","offset":"+01:00","value":"2026-10-19 18:00","zone":"+01:00"}`},
+		{"a wall clock Sydney skips keeps its digits", "2026-10-04T02:30", "Europe/London", "+01:00",
+			`"taken_at":"2026-10-04 02:30"`},
+	} {
+		form, err := drawForm(body, d, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		v := url.Values{}
+		for k, x := range vals {
+			v[k] = x
+		}
+		v.Set("f.taken_at", c.taken)
+		v.Set("zone", c.zone)
+		v.Set("offset", c.offset)
+		payload, ok := form.read(v)
+		if !ok || !strings.Contains(string(payload), c.want) {
+			t.Errorf("%s: payload %s (ok %v) lacks %s", c.name, payload, ok, c.want)
+		}
+	}
+	form, _ := drawForm(body, d, false)
+	vals.Set("f.taken_at", "2026-10-19T18:00")
+	vals.Set("zone", "Europe/London")
+	payload, ok := form.read(vals)
+	if ok || payload != nil || !strings.Contains(form.OffsetProblem, "Anam needs the offset") {
+		t.Errorf("no offset posted: payload %s, ok %v, problem %q; want nothing sent and the reason", payload, ok, form.OffsetProblem)
 	}
 }

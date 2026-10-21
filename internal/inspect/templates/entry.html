@@ -35,15 +35,65 @@
       {{$value := .Value}}{{range .Options}}<option value="{{.Text}}"{{if and .Text (eq .Text $value)}} selected{{end}}>{{.Text}}</option>{{end}}
     </select>
     {{else}}
-    <input id="f.{{.Name}}" name="f.{{.Name}}" type="{{if eq .Input "select"}}text{{else}}{{.Input}}{{end}}"{{if .Step}} step="{{.Step}}"{{end}} value="{{.Value}}"{{if .Placeholder}} placeholder="{{.Placeholder}}"{{end}}{{if .Required}} required{{end}}{{if .Locked}} readonly{{end}}>
+    <input id="f.{{.Name}}" name="f.{{.Name}}" type="{{if eq .Input "select"}}text{{else}}{{.Input}}{{end}}"{{if .Step}} step="{{.Step}}"{{end}} value="{{.Value}}"{{if .Placeholder}} placeholder="{{.Placeholder}}"{{end}}{{if .Required}} required{{end}}{{if .Locked}} readonly{{end}}{{if .FactTime}} data-fact-time{{end}}>
     {{end}}
     {{if .Problem}}<span class="problem">{{.Problem}}</span>{{end}}
     <span class="hint">{{.Description}}{{range .Hints}} <span class="dim">({{.}})</span>{{end}}</span>
   </div>
   {{end}}
+  {{if .Zoned}}
+  <input type="hidden" id="zone" name="zone" value="{{.Zone}}">
+  <div class="field{{if .OffsetProblem}} bad{{end}}">
+    <label for="offset">offset <span class="role">required</span></label>
+    <input id="offset" name="offset" type="text" value="{{.Offset}}" placeholder="+01:00" pattern="[+\-][0-2][0-9]:[0-5][0-9]">
+    {{if .OffsetProblem}}<span class="problem">{{.OffsetProblem}}</span>{{end}}
+    <span class="hint" id="zone-line">{{if .Zone}}The offset from UTC the time had in {{.Zone}}, the zone this fact was said in.{{else}}The offset from UTC the time had where you were. The page fills it from your browser's zone when it can.{{end}}</span>
+  </div>
+  {{end}}
   {{if .IDRule}}<p class="hint">Anam builds the id from the Definition's own rule, <span class="mono">{{.IDRule}}</span>, so there is no id field.</p>{{end}}
   <p><button type="submit">{{if .Edit}}Save a new version{{else}}Save{{end}}</button></p>
 </form>
+{{if .Zoned}}
+<script>
+  // The fact names the zone it was said in (card 198): the browser's own, sent with
+  // basis source, and the offset the typed wall clock has in it, filled as it is typed
+  // when that is one offset. A wall clock the zone skips or repeats gets none, and the
+  // person types it, rather than this page choosing. A correction keeps its zone.
+  (function () {
+    var form = document.querySelector('form.entry'), zone = document.getElementById('zone'), offset = document.getElementById('offset');
+    var here = '';
+    try { here = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+    if (!form || !here) return;
+    if (!zone.value) {
+      zone.value = here;
+      document.getElementById('zone-line').textContent = 'The offset from UTC the time had in ' + here + ', your browser\'s zone, filled as you type the time.';
+    }
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    function wall(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+    function offsetAt(v) {
+      var m = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/.exec(v);
+      if (!m) return '';
+      var want = m[1] + '-' + m[2] + '-' + m[3] + 'T' + (m[4] || '00') + ':' + (m[5] || '00');
+      var d = new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0));
+      if (wall(d) !== want) return ''; // the zone skips it
+      var off = -d.getTimezoneOffset();
+      for (var i = 0, hs = [-3, 3]; i < hs.length; i++) {
+        var other = -new Date(d.getTime() + hs[i] * 3600e3).getTimezoneOffset();
+        if (other !== off && wall(new Date(d.getTime() + (off - other) * 60000)) === want) return ''; // it repeats
+      }
+      var a = Math.abs(off);
+      return (off < 0 ? '-' : '+') + pad(Math.floor(a / 60)) + ':' + pad(a % 60);
+    }
+    var t = form.querySelector('[data-fact-time]');
+    function fill() {
+      if (zone.value !== here || !t || !t.value) return;
+      offset.value = offsetAt(t.value);
+    }
+    if (t) { t.addEventListener('change', fill); t.addEventListener('input', fill); }
+    if (!offset.value) fill();
+  })();
+</script>
+{{end}}
 {{end}}
 </body>
 </html>

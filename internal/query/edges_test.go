@@ -80,9 +80,9 @@ func TestEdges_LinkedFromTheServedPayloads(t *testing.T) {
 	a, b := ids[0], ids[1]
 
 	// A v1 note about a; a v2 edge from b to a, kind said; a note that names nothing.
-	h.admit(t, "records", "record.edge", "note:1", `{"id": "note:1", "at": "2026-04-10 18:00", "about": ["`+a+`"], "text": "Before the dentist."}`)
-	h.admit(t, "records", "record.edge", "interp:1", `{"id": "interp:1", "at": "2026-04-11 09:00", "kind": "interpreted_from", "from": ["`+b+`"], "to": ["`+a+`"]}`)
-	h.admit(t, "records", "record.edge", "note:2", `{"id": "note:2", "at": "2026-04-12 09:00", "text": "A free account."}`)
+	h.admit(t, "records", "record.edge", "note:1", `{"id": "note:1", "at": "2026-04-10 18:00", "source_time": {"value": "2026-04-10 18:00", "zone": "Australia/Sydney", "offset": "+10:00", "basis": "source"}, "about": ["`+a+`"], "text": "Before the dentist."}`)
+	h.admit(t, "records", "record.edge", "interp:1", `{"id": "interp:1", "at": "2026-04-11 09:00", "source_time": {"value": "2026-04-11 09:00", "zone": "Australia/Sydney", "offset": "+10:00", "basis": "source"}, "kind": "interpreted_from", "from": ["`+b+`"], "to": ["`+a+`"]}`)
+	h.admit(t, "records", "record.edge", "note:2", `{"id": "note:2", "at": "2026-04-12 09:00", "source_time": {"value": "2026-04-12 09:00", "zone": "Australia/Sydney", "offset": "+10:00", "basis": "source"}, "text": "A free account."}`)
 	v, versions, _ := h.served(t)
 	byRef := map[string]string{}
 	for _, e := range v.Entries() {

@@ -39,9 +39,10 @@ func doseEnvelope(payload string) facet.Envelope {
 }
 
 const (
-	doseID      = "conversation:med/melatonin/dose/2026-10-17T22:00"
-	doseWithout = `{"taken_at": "2026-10-17 22:00", "drug": "melatonin", "amount": 5, "unit": "mg"}`
-	doseWith    = `{"id": "` + doseID + `", "taken_at": "2026-10-17 22:00", "drug": "melatonin", "amount": 5, "unit": "mg"}`
+	doseID      = "conversation:med/melatonin/dose/2026-10-17T22:00+11:00"
+	doseClock   = `"source_time": {"value": "2026-10-17 22:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}`
+	doseWithout = `{"taken_at": "2026-10-17 22:00", "drug": "melatonin", "amount": 5, "unit": "mg", ` + doseClock + `}`
+	doseWith    = `{"id": "` + doseID + `", "taken_at": "2026-10-17 22:00", "drug": "melatonin", "amount": 5, "unit": "mg", ` + doseClock + `}`
 )
 
 func commitDose(t *testing.T, g *gate.Gate, payload string) (gate.Result, error) {

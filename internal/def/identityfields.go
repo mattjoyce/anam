@@ -28,8 +28,8 @@ func (d Definition) IdentityFields() []string {
 	for _, p := range d.IdentityKey {
 		add(p)
 	}
-	for _, p := range templatePointers(d.idParts) {
-		add(p)
+	for _, p := range d.idParts {
+		add(p.pointer) // an optional placeholder's too: its value names the facet when it is there
 	}
 	return out
 }

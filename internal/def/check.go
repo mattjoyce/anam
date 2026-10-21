@@ -60,19 +60,26 @@ func (d Definition) timeAt(doc any, tf TimeField) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, fmt.Errorf("%w: time %s: %v", ErrNotCompliant, tf.Pointer, err)
 	}
-	// The source's clock is read in the Definition's zone. A layout that carries its
-	// own offset keeps it; a zoneless one, which is what every local export writes,
-	// lands at the instant the person lived it rather than ten hours away.
-	t, err := time.ParseInLocation(tf.Layout, s, d.loc)
+	// The source's clock is read in the zone the fact names, or the Definition's. A
+	// layout that carries its own offset keeps it; a zoneless one, which is what every
+	// local export writes, lands at the instant the person lived it rather than ten
+	// hours away.
+	loc, err := d.zoneOf(doc)
+	if err != nil {
+		return time.Time{}, err
+	}
+	t, err := time.ParseInLocation(tf.Layout, s, loc)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("%w: time %s value %q does not parse as %q", ErrNotCompliant, tf.Pointer, s, tf.Layout)
 	}
+	if !zoneless(tf.Layout) {
+		return t.UTC(), nil
+	}
 	// A wall clock the zone skips or repeats names no one instant, and the gate does
-	// not choose one for the source (card 197).
-	if zoneless(tf.Layout) {
-		if err := oneInstant(tf.Layout, s, t, d.loc); err != nil {
-			return time.Time{}, fmt.Errorf("%w: time %s value %q %v", ErrNotCompliant, tf.Pointer, s, err)
-		}
+	// not choose one for the source (card 197). A fixed offset the fact names
+	// (card 198) never skips or repeats one.
+	if err := oneInstant(tf.Layout, s, t, loc); err != nil {
+		return time.Time{}, fmt.Errorf("%w: time %s value %q %v", ErrNotCompliant, tf.Pointer, s, err)
 	}
 	return t.UTC(), nil
 }

@@ -25,9 +25,16 @@ import (
 //	{/pointer|<layout>}   a time field, read in the fact-time layout and zone and
 //	                      written in the Go time layout given; allowed only on the
 //	                      fact-time pointer
+//	{/pointer?}           optional: the scalar, or nothing when the payload holds
+//	                      no value there (card 198); slug may come before the ?
 //
 // So `{source}:med/{/drug|slug}/dose/{/taken_at|2006-01-02T15:04}` composes
-// `conversation:med/melatonin/dose/2026-10-17T22:00`. There is no escape: a brace is
+// `conversation:med/melatonin/dose/2026-10-17T22:00`. Appending
+// `{/source_time/offset?}` composes the same id for a dose that names no zone, and
+// `conversation:med/melatonin/dose/2026-10-17T22:00+01:00` for one that names London's
+// summer offset, so the same local minute in two zones is two doses. Every field a
+// placeholder reads must be required except an optional one's, which the schema
+// must declare. There is no escape: a brace is
 // always a placeholder, and a pointer or layout may not hold `{`, `}` or `|`.
 //
 // The template composes the value of the type's one identity_key field, which must
@@ -52,6 +59,7 @@ type idPart struct {
 	pointer   string
 	slug      bool
 	timeStyle string // the output layout; "" when none
+	optional  bool   // renders nothing when the pointer holds no value
 }
 
 // parseTemplate splits a template into parts. It checks the shape only; what the
@@ -90,7 +98,23 @@ func parseTemplate(tpl string) ([]idPart, error) {
 }
 
 func parsePlaceholder(body string) (idPart, error) {
-	ptr, transform, hasTransform := strings.Cut(body, "|")
+	spec, optional := strings.CutSuffix(body, "?")
+	p, err := parseSpec(spec, body)
+	if err != nil || !optional {
+		return p, err
+	}
+	switch {
+	case p.source:
+		return idPart{}, fmt.Errorf("{source?}: the source is always there")
+	case p.timeStyle != "":
+		return idPart{}, fmt.Errorf("{%s}: a time is the fact time, which is never optional", body)
+	}
+	p.optional = true
+	return p, nil
+}
+
+func parseSpec(spec, body string) (idPart, error) {
+	ptr, transform, hasTransform := strings.Cut(spec, "|")
 	if strings.Contains(transform, "|") {
 		return idPart{}, fmt.Errorf("{%s} has more than one transform", body)
 	}
@@ -151,11 +175,23 @@ func (d Definition) checkTemplate(parts []idPart) error {
 	return nil
 }
 
-// templatePointers is the payload pointers the template reads.
+// templatePointers is the payload pointers the template must read: every one but an
+// optional placeholder's, which the schema need not require.
 func templatePointers(parts []idPart) []string {
 	var out []string
 	for _, p := range parts {
-		if p.pointer != "" {
+		if p.pointer != "" && !p.optional {
+			out = append(out, p.pointer)
+		}
+	}
+	return out
+}
+
+// optionalPointers is the pointers the template's optional placeholders read.
+func optionalPointers(parts []idPart) []string {
+	var out []string
+	for _, p := range parts {
+		if p.optional {
 			out = append(out, p.pointer)
 		}
 	}
@@ -205,6 +241,9 @@ func (d Definition) composeID(source string, doc any) (string, error) {
 // idValue reads and transforms one pointer placeholder.
 func (d Definition) idValue(p idPart, doc any) (string, error) {
 	v, err := resolve(doc, p.pointer)
+	if err != nil && p.optional {
+		return "", nil // an optional placeholder with no value renders nothing
+	}
 	if err != nil {
 		return "", fmt.Errorf("%w: identity_template %s: %v", ErrNotCompliant, p.pointer, err)
 	}
@@ -216,7 +255,13 @@ func (d Definition) idValue(p idPart, doc any) (string, error) {
 	case p.slug:
 		s = slugify(s)
 	case p.timeStyle != "":
-		t, err := time.ParseInLocation(d.FactTime.Layout, s, d.loc)
+		// The wall clock is read in the zone the fact time is, so the id's time is
+		// the one the person said, wherever they said it.
+		loc, err := d.zoneOf(doc)
+		if err != nil {
+			return "", err
+		}
+		t, err := time.ParseInLocation(d.FactTime.Layout, s, loc)
 		if err != nil {
 			return "", fmt.Errorf("%w: identity_template %s: %q is not a time in layout %q",
 				ErrNotCompliant, p.pointer, s, d.FactTime.Layout)

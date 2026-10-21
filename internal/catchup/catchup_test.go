@@ -122,7 +122,8 @@ func commitNote(t *testing.T, g *gate.Gate, id, payload string) gate.Result {
 	env := facet.Envelope{
 		Type: catchup.EdgeType, Source: "records", Injector: "records",
 		SourceRef: facet.SourceRef("records", id),
-		Payload:   []byte(`{"id": "` + id + `", "at": "2026-10-09 11:29", ` + payload + `}`),
+		Payload: []byte(`{"id": "` + id + `", "at": "2026-10-09 11:29", ` +
+			`"source_time": {"value": "2026-10-09 11:29", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, ` + payload + `}`),
 	}
 	binding, err := g.Resolve(env)
 	if err != nil {

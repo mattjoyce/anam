@@ -150,11 +150,11 @@ var readsALocalClock = map[string]bool{
 	"health.condition": true, "health.donation": true, "health.encounter": true,
 	"health.heart-rate": true, "health.illness.ended": true, "health.illness.started": true,
 	"health.lab-panel": true, "health.lab-result": true, "health.medication.compliance": true,
-	"health.medication.dose": true, "health.medication.dose-changed": true,
-	"health.medication.dose-missed": true, "health.medication.started": true,
+	"health.medication.dose-changed": true,
+	"health.medication.dose-missed":  true, "health.medication.started": true,
 	"health.medication.stopped": true, "health.metric-group": true, "health.sleep": true,
 	"health.vision-prescription": true, "health.weight": true, "place.trip.arrived": true,
-	"place.trip.departed": true, "place.trip.returned": true, "record.edge": true,
+	"place.trip.departed": true, "place.trip.returned": true,
 }
 
 func TestSourceTime_EveryTypeReadingALocalClockSaysHow(t *testing.T) {

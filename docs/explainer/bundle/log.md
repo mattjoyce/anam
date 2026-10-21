@@ -165,6 +165,11 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 - Code: the Workbench's link form. `GET /link` draws one `record.edge` from a basket (`tick`, `fromside`, or the selection page's `program` resolved to ids when it opens, or `edit` of a Workbench link); `POST /link` saves it through the Workbench's entry, with the id `workbench:edge:` and 16 hex of the SHA-256 of the kind, the sorted sides and the moment with its offset, kept on every edit. The facet page offers "link this…" and "edit this link"; the selection page's "Use this selection" now opens the form and carries an edit through. The zone script is shared by both forms.
 - Bundle: the inspector component has a section on the link form and its id rule, and the selection page's handoff names it.
 
+## 2026-10-22, card 205
+
+- Code: `health.heart-rate.day` v1 is bundled, one fact a day with `resting`, `minimum` and `maximum` as optional `{value, unit}` fields, keyed on the day and placed at the start of the interval Garmin counted, with `source_time` in card 197's shape. `health.heart-rate-day` stays bundled for the facts admitted under it. `projections/heart.v3.json` names the new type. The Garmin importer's poll names both types in its snapshot, so `anam retract garmin` retires the old facts; `TestRetract_ASnapshotThatNamesAnOldTypeRetiresItsFacts` proves it over a real ledger.
+- Bundle: the placement decision says the hyphenated name left by a new type, not a rename.
+
 ## 2026-10-22, card 206
 
 - Code: a selection has a short code. `selection.Store` files a program as an artifact of kind `selection`, addressed by the SHA-256 of its canonical text, under the code `sel:` and its first 8 hex digits, lengthened at save to the shortest unique prefix when another saved selection shares them, the lengthened code filed as a `selection-code` artifact. The select page saves (`POST /select/save`); `/select`, `/` and `/link` take `?sel=<code>`, the timeline drawing the selection alone or highlighted (`selmode`) within the window and `max_read_bytes`, and an unknown code is a 404 page. `POST /v1/selections` and `GET /v1/selections/{code}` for any role. anam-mcp has `save_selection` and `open_selection`.

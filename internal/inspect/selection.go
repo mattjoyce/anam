@@ -23,7 +23,9 @@ import (
 // and can be edited as text. The program is the value; the chips and checkboxes are a
 // view of it, drawn only while it is within the chip grammar (selection.Parse).
 //
-// The page only reads. Every state is an address: the criteria, the basket of ticked
+// The page reads, and writes one thing: "save" files the program as an artifact under
+// a short code (card 206, selection_saved.go), and ?sel=<code> opens it again, the
+// chips drawn when it is within the grammar. Every state is an address: the criteria, the basket of ticked
 // facets with each one's side, and the exclusions travel in the query string, so back
 // and reload keep them. A form post of the checkboxes is answered with a redirect to
 // the address of the new state. The selection is handed on by a link to card 202's
@@ -208,7 +210,19 @@ func (s *Server) selectPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, applyTicks(st, q).URL(), http.StatusSeeOther)
 		return
 	}
-	if st.program != "" {
+	var saved *selection.Saved
+	if code := q.Get("sel"); code != "" {
+		sv, ok := s.openSelection(w, code)
+		if !ok {
+			return
+		}
+		saved = &sv
+		st.filter, st.program = selection.Filter{Standing: selection.Live}, sv.Program
+		if f, err := selection.Parse(sv.Program); err == nil {
+			st.filter, st.program = f, "" // within the grammar: the chips are drawn from it
+		}
+	}
+	if st.program != "" && saved == nil {
 		if f, err := selection.Parse(st.program); err == nil {
 			// Within the grammar: the chips are drawn from it.
 			next := st.with(func(c *selectState) { c.filter, c.program = f, "" })
@@ -229,6 +243,11 @@ func (s *Server) selectPage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		httpError(w, err)
 		return
+	}
+	data.CanSave = s.selections != nil
+	if saved != nil {
+		v := savedViewOf(*saved)
+		data.Saved = &v
 	}
 	render(w, "select.html", data)
 }

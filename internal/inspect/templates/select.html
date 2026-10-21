@@ -19,6 +19,7 @@
   .basket li { margin: .2rem 0; }
   .side { font-size: .8rem; padding: 0 .4rem; border-radius: 4px; border: 1px solid color-mix(in srgb, currentColor 30%, transparent); }
   section { margin-top: 1.5rem; }
+  input.code { font-size: 1rem; padding: .1rem .3rem; }
 </style>
 </head>
 <body>
@@ -32,6 +33,10 @@
   want in the basket while you look for the rest. The selection is a Datalog program, shown below; the criteria
   and boxes are a view of it. The page only reads.
 </p>
+{{with .Saved}}<p class="note saved" id="saved">Saved as <input class="code mono" id="saved-code" type="text" readonly value="{{.Ref}}" size="{{len .Ref}}" onclick="this.select()">
+  <a href="{{.SelectURL}}" id="saved-select">this selection</a> · open it <a href="{{.TimelineURL}}" id="saved-timeline">on the timeline</a>
+  (<a href="{{.HighlightURL}}">highlighted among the rest</a>) · <a href="{{.LinkURL}}" id="saved-link">in the link form</a>
+  <br><span class="dim">The code names the program, not what it selects today: as the record grows, the same code may select more. <span class="mono">{{.Hash}}</span></span></p>{{end}}
 {{if .Editing}}<p class="note">Changing the facets of the link <a class="mono" href="/facet?id={{.Editing}}">{{.Editing}}</a>. "Use this selection" takes this basket back to it; saving there writes a new version of the same link.</p>{{end}}
 
 {{if .Chips}}
@@ -160,6 +165,13 @@
     <p><button type="submit">run the program</button>
       <span class="dim">A program the criteria could make draws the criteria again; any other runs as text over what the projection serves.</span></p>
   </form>
+  {{if .CanSave}}<form method="post" action="/select/save" id="save">
+    <input type="hidden" name="program" value="{{.Program}}">
+    {{if ne .Selected "canonical"}}<input type="hidden" name="p" value="{{.Selected}}">{{end}}
+    {{if .Editing}}<input type="hidden" name="edit" value="{{.Editing}}">{{end}}
+    <p><button type="submit">save this selection</button>
+      <span class="dim">gives the program a short code, <span class="mono">sel:</span> and eight hex digits, that the timeline, the link form and Claude open. The same program always has the same code.</span></p>
+  </form>{{end}}
   <p><a id="handoff" href="{{.Handoff}}">use this selection</a>
     <span class="dim">opens the link form with what the program selects, each facet on its side, to write one link between them with your words on it.</span></p>
 </section>

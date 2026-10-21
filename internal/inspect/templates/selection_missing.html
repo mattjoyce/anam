@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>anam — no such selection</title>
+{{template "style.html"}}
+</head>
+<body>
+<header>
+  <h1>anam selection</h1>
+  {{template "nav.html"}}
+</header>
+<p class="note" id="missing">No saved selection opens as <span class="mono">sel:{{.Code}}</span>. {{.Message}}</p>
+<p class="meta">A code is given when a selection is saved on the <a href="/select">select page</a>, or by POST /v1/selections.</p>
+</body>
+</html>

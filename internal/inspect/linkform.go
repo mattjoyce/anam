@@ -269,8 +269,8 @@ func (lf linkForm) takes(kind string) bool {
 	return false
 }
 
-// linkPage is GET /link: the form, with the basket its query string names (program, p,
-// tick, fromside, and kind), or with ?edit=<facet id> the link being edited, its sides
+// linkPage is GET /link: the form, with the basket its query string names (program or
+// sel, p, tick, fromside, and kind), or with ?edit=<facet id> the link being edited, its sides
 // replaced by the basket when the selection page hands one back.
 func (s *Server) linkPage(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), s.timeout)
@@ -291,6 +291,14 @@ func (s *Server) linkPage(w http.ResponseWriter, r *http.Request) {
 		data.Edit, pins = edit, stored.Pins
 	} else if k := q.Get("kind"); lf.takes(k) {
 		data.Kind = k
+	}
+	if code := q.Get("sel"); code != "" {
+		// A saved selection (card 206) fills the basket as its program does.
+		saved, ok := s.openSelection(w, code)
+		if !ok {
+			return
+		}
+		q.Set("program", saved.Program)
 	}
 	if q.Has("tick") || q.Has("program") {
 		ids, problem, err := s.basketOf(ctx, q)

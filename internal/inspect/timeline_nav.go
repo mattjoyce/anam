@@ -68,9 +68,21 @@ type tlView struct {
 	Types  []facet.Type
 	None   bool
 	Status statusFilter
+	// Sel is the saved selection drawn (card 206), the zero value for none.
+	Sel selRef
 }
 
+// selRef is a saved selection as a timeline link carries it: its code and how it is
+// drawn.
+type selRef struct{ Code, Mode string }
+
 func (v tlView) addTo(q url.Values) {
+	if v.Sel.Code != "" {
+		q.Set("sel", v.Sel.Code)
+		if v.Sel.Mode == selHighlight {
+			q.Set("selmode", selHighlight)
+		}
+	}
 	for _, t := range v.Types {
 		q.Add("type", string(t))
 	}

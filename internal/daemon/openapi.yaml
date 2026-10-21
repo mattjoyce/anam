@@ -426,6 +426,85 @@ paths:
         "404": { $ref: "#/components/responses/NoArtifact" }
         "413": { $ref: "#/components/responses/TooLarge" }
         "504": { $ref: "#/components/responses/Timeout" }
+  /v1/selections:
+    post:
+      operationId: postSelection
+      tags: [record]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: Selection
+      summary: Save a selection program under a short code.
+      description: >-
+        Files the program as an artifact addressed by the SHA-256 of its canonical text
+        (card 206) and answers its code: the first eight hex digits of that hash, or the
+        shortest longer prefix no other saved selection shares. A program within the
+        selection page's chip grammar is saved in that grammar's one layout, so the
+        same selection written another way has the same code; any other program is
+        saved as its text, trimmed. Saving the same program again writes nothing and
+        answers the same code. Writes an artifact only, never the ledger, so every role
+        may save. The code names the program, not its results: the timeline at url
+        runs it over the record as it stands when opened.
+      parameters:
+        - { $ref: "#/components/parameters/AnamTimeout" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SelectionRequest" }
+            example:
+              program: "pick/1.\npick(E) :- entry(E, T, _, _, _, _, _),\n    T = \"health.weight\".\n"
+      responses:
+        "201":
+          description: the saved selection and its code
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Selection" }
+              example:
+                code: 3f9a0c1e
+                hash: sha256:3f9a0c1e8d2b47a6c5e1f0d9b8a7c6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9
+                url: /?sel=3f9a0c1e
+                program: "% An Anam selection (card 199): pick/1 holds the facets it selects.\npick/1.\npick(E) :- entry(E, T, _, _, _, _, _),\n    T = \"health.weight\".\n"
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "413": { $ref: "#/components/responses/BodyTooLarge" }
+  /v1/selections/{code}:
+    get:
+      operationId: getSelection
+      tags: [record]
+      x-anam-roles: [reader, importer, operator]
+      x-anam-type: Selection
+      summary: The program a selection code names.
+      description: >-
+        The saved selection a code names (card 206). The code may be written with or
+        without sel:. Eight digits name the selection first saved under them; a longer
+        code names the one it was lengthened to, or the one saved selection whose hash
+        it starts. 404 for a code nothing was saved under, 409 for a prefix that starts
+        more than one.
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+          description: "the code, eight hex digits or more, with or without sel:"
+        - { $ref: "#/components/parameters/AnamTimeout" }
+      responses:
+        "200":
+          description: the saved selection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Selection" }
+              example:
+                code: 3f9a0c1e
+                hash: sha256:3f9a0c1e8d2b47a6c5e1f0d9b8a7c6e5d4c3b2a1f0e9d8c7b6a5f4e3d2c1b0a9
+                url: /?sel=3f9a0c1e
+                program: "pick(E) :- linked(E, \"7d2c0a9e-0d1b-5c3e-9f4a-2b6c8d0e1f3a\")."
+        "400": { $ref: "#/components/responses/BadQuery" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: a prefix that starts more than one saved selection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /v1/query:
     get:
       operationId: getQueryCatalogue
@@ -1494,6 +1573,19 @@ components:
       properties:
         relation: { type: string }
         tuples: { type: array, items: { type: array, items: {} } }
+    SelectionRequest:
+      type: object
+      required: [program]
+      properties:
+        program: { type: string, description: "the selection's program, Anam's Datalog defining pick/1" }
+    Selection:
+      type: object
+      required: [code, hash, url, program]
+      properties:
+        code: { type: string, description: "eight hex digits of hash, or more when another saved selection shares them; written sel:<code>" }
+        hash: { type: string, description: "the SHA-256 of program, sha256:<64 hex>, the artifact's address" }
+        url: { type: string, description: "the timeline drawing the selection, a path on the daemon's address" }
+        program: { type: string, description: the text saved, a chip program in its canonical layout }
     QueryRequest:
       type: object
       required: [projection, text, relation]

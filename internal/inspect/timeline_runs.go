@@ -32,6 +32,7 @@ type tlRun struct {
 	First, Last   string // the two end marks' paths
 	Hue           string
 	Live          bool
+	Picked, Faded bool // a saved selection's, or not, drawn among the rest (card 206)
 	Count         int
 	Label         string // the count, or "" when the run is too narrow to carry it
 	Title, Href   string
@@ -88,6 +89,7 @@ func makeRun(group []laneMark, view tlView) tlRun {
 		X1: first.point.X, X2: last.point.X, Y: first.point.Y,
 		First: first.point.Path, Last: last.point.Path,
 		Hue: first.point.Hue, Live: first.point.Live, Count: len(group),
+		Picked: first.point.Picked, Faded: first.point.Faded,
 		Href: spanLink(first.at.Add(-pad), last.at.Add(pad), view),
 		Title: fmt.Sprintf("%d × %s · %s to %s · click to zoom in", len(group), first.typ,
 			first.at.UTC().Format("2006-01-02 15:04Z"), last.at.UTC().Format("2006-01-02 15:04Z")),

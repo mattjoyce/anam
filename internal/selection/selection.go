@@ -11,7 +11,9 @@
 // Program could have written, and says so when it is not, so a hand-edited program
 // beyond the chips (a join, a recursion, an attr) still runs, as text.
 //
-// Everything here is read-side and disposable: it reads rows and writes nothing.
+// Everything here is read-side and disposable: it reads rows and writes nothing,
+// but for Store (saved.go, card 206), which files a program as an artifact under a
+// short code.
 package selection
 
 import (

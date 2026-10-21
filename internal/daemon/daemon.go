@@ -29,6 +29,7 @@ import (
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/inspect"
+	"github.com/mattjoyce/anam/internal/selection"
 	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
@@ -89,6 +90,8 @@ type Daemon struct {
 	readOps *ops.DB
 	// artifacts is the published-artifact tier: checkpoint values and receipts.
 	artifacts *artifact.Store
+	// selections are the saved selections (card 206), filed in artifacts.
+	selections *selection.Store
 	// index is whether the operational index is wrong rather than merely behind.
 	index indexState
 	// sources is what the daemon has seen of each importer since it started.
@@ -213,6 +216,7 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		read:        r,
 		readOps:     readOps,
 		artifacts:   artifacts,
+		selections:  selection.NewStore(artifacts),
 		sources:     newSources(),
 		principals:  whom,
 		workbench:   workbench,

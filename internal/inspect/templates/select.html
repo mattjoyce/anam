@@ -31,7 +31,7 @@
 <p class="meta">
   Build a selection of facets: add criteria in any order, tick and untick what they find, and keep what you
   want in the basket while you look for the rest. The selection is a Datalog program, shown below; the criteria
-  and boxes are a view of it. The page only reads.
+  and boxes are a view of it. The page only reads, but for "save this selection", which files the program under a short code.
 </p>
 {{with .Saved}}<p class="note saved" id="saved">Saved as <input class="code mono" id="saved-code" type="text" readonly value="{{.Ref}}" size="{{len .Ref}}" onclick="this.select()">
   <a href="{{.SelectURL}}" id="saved-select">this selection</a> · open it <a href="{{.TimelineURL}}" id="saved-timeline">on the timeline</a>

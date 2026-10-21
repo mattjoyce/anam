@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"net/url"
 	"sort"
-	"time"
 
-	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
+	"github.com/mattjoyce/anam/internal/selection"
 )
 
 // The projection page's two views. The summary is one line per type and costs no
@@ -68,12 +67,14 @@ func (d projectionData) query() url.Values {
 	return q
 }
 
-// view is the rows view's request, read from the query string.
+// view is the rows view's request, read from the query string. Its type, window and
+// standing are a selection.Filter, the predicate the selection page selects by (card
+// 199), so the two pages cannot disagree on what a window or a prefix admits.
 type view struct {
 	typ, show string
-	from, to  string // fact-time bounds as clock.Format strings; to is exclusive
 	rawFrom   string
 	rawTo     string
+	filter    selection.Filter
 }
 
 var errBadView = errors.New("bad view")
@@ -83,34 +84,25 @@ func viewOf(q url.Values) (view, error) {
 	if v.typ == "" {
 		return v, nil
 	}
+	standing := selection.Live
 	switch v.show {
 	case "":
 		v.show = "served"
-	case "served", "excluded", "superseded":
+	case "served", "excluded":
+	case "superseded":
+		standing = selection.Superseded
 	default:
 		return v, fmt.Errorf("%w: show %q is not served, excluded or superseded", errBadView, v.show)
 	}
-	if v.rawFrom != "" {
-		t, err := time.Parse(time.DateOnly, v.rawFrom)
-		if err != nil {
-			return v, fmt.Errorf("%w: from %q is not YYYY-MM-DD", errBadView, v.rawFrom)
-		}
-		v.from = clock.Format(t)
+	// The whole of the last day, so "to 2026-07-05" includes the 5th.
+	from, to, err := selection.Days(v.rawFrom, v.rawTo)
+	if err != nil {
+		return v, fmt.Errorf("%w: %v", errBadView, err)
 	}
-	if v.rawTo != "" {
-		t, err := time.Parse(time.DateOnly, v.rawTo)
-		if err != nil {
-			return v, fmt.Errorf("%w: to %q is not YYYY-MM-DD", errBadView, v.rawTo)
-		}
-		// The whole of the last day, so "to 2026-07-05" includes the 5th.
-		v.to = clock.Format(t.AddDate(0, 0, 1))
-	}
+	// The type is matched as the filter matches one, so a prefix opens every type
+	// under it; "(not live)" is no pattern and matches only itself.
+	v.filter = selection.Filter{From: from, To: to, Types: []string{v.typ}, Standing: standing}
 	return v, nil
-}
-
-// in reports whether a fact time falls inside the window.
-func (v view) in(factTime string) bool {
-	return (v.from == "" || factTime >= v.from) && (v.to == "" || factTime < v.to)
 }
 
 // fill answers the request. The summary is counts and nothing is read from the
@@ -198,24 +190,26 @@ func (d *projectionData) fillRows(ctx context.Context, l Ledger, res fold.Result
 		for _, e := range res.Value.Entries() {
 			typeOf[e.FacetID] = e.Type
 		}
-		keep := func(id string) bool {
+		current := func(id string) facet.Type {
 			if st := res.States[id]; !st.Live() {
-				return v.typ == notLive
+				return notLive
 			}
-			return string(typeOf[id]) == v.typ
+			return typeOf[id]
 		}
+		keep := func(id string) bool { return v.filter.MatchesType(current(id)) }
 		displaced, err := fold.DisplacedWhere(ctx, l, res, keep)
 		if err != nil {
 			return err
 		}
 		for _, x := range displaced {
-			if r := displacedRow(x); v.in(r.FactTime) {
+			r := displacedRow(x)
+			if v.filter.Matches(selection.Row{ID: r.ID, Type: current(r.ID), FactTime: r.FactTime, Live: false}) {
 				rows = append(rows, r)
 			}
 		}
 	} else {
 		for _, r := range live {
-			if string(r.Type) == v.typ && r.Standing == v.show && v.in(r.FactTime) {
+			if r.Standing == v.show && v.filter.Matches(selection.Row{ID: r.ID, Type: r.Type, FactTime: r.FactTime, Live: true}) {
 				rows = append(rows, r)
 			}
 		}

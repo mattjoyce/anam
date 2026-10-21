@@ -10,6 +10,7 @@ import (
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/consent"
 	"github.com/mattjoyce/anam/internal/def"
+	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/query"
@@ -75,11 +76,8 @@ func Query(ctx context.Context, src Source, d serve.Deps, q api.QueryRequest, li
 		return api.QueryAnswer{}, err
 	}
 	defs, t, res, served, w, v := st.defs, st.tmpl, st.res, st.served, st.w, st.view
-	ans, rules, err := query.Run(ctx, served, query.Versions(res.Live), defs, q.Text, q.Relation, limit)
+	ans, rules, err := Evaluate(ctx, served, res.Live, defs, q.Text, q.Relation, limit)
 	if err != nil {
-		return api.QueryAnswer{}, asReadError(err)
-	}
-	if err := fitAnswer(ans, limit); err != nil {
 		return api.QueryAnswer{}, err
 	}
 	held, err := src.held()
@@ -104,6 +102,25 @@ func Query(ctx context.Context, src Source, d serve.Deps, q api.QueryRequest, li
 		Answer:               ans, Hash: ans.Hash(), Warnings: warnings,
 		ReceiptHash: out.ReceiptHash, Receipt: out.Receipt, Written: out.Written,
 	}, nil
+}
+
+// Evaluate is the query read's evaluation without its receipt: text run over served,
+// a value a projection served from the fold whose live facets are live, within limit
+// (the derivation and the answer both; zero is no bound), and relation answered. A bad
+// program is the reader's error and a derivation or answer over the bound is a
+// *TooLarge, as Query refuses them. The inspector's selection page (card 199) runs a
+// program through here, so the page and POST /v1/query answer one program alike.
+func Evaluate(ctx context.Context, served fold.Value, live []facet.Facet, defs query.Definitions,
+	text, relation string, limit int,
+) (query.Answer, query.RuleSet, error) {
+	ans, rules, err := query.Run(ctx, served, query.Versions(live), defs, text, relation, limit)
+	if err != nil {
+		return query.Answer{}, rules, asReadError(err)
+	}
+	if err := fitAnswer(ans, limit); err != nil {
+		return query.Answer{}, rules, err
+	}
+	return ans, rules, nil
 }
 
 // standing is what a query stands on: the Definitions, the projection, the full fold

@@ -28,7 +28,10 @@ import (
 // definitions folders.
 
 // vendorSessions are one session per vendor, each with the fields its importer or
-// extractor writes, in activity.exercise-session v2's shape.
+// extractor writes, in activity.exercise-session v2's shape. The Concept2 and Strong
+// sessions say how their clocks were read, as their leaves require from v2 (card
+// 198); the live ones crossed at v1, before it, so the table now carries only a
+// session that says so.
 var vendorSessions = []record{
 	{"activity.exercise-session", `{"id": "garmin:session:2026-10-20T09:02:36Z", "activity_name": "walking", "source": "Garmin",
 		"effective_time_frame": {"time_interval": {"start_date_time": "2026-10-20T09:02:36Z", "duration": {"value": 1830.2, "unit": "sec"}}},
@@ -38,6 +41,7 @@ var vendorSessions = []record{
 		"avg_hr_bpm": 101, "max_hr_bpm": 122, "training_effect_aerobic": 1.4, "training_load": 12}`},
 	{"activity.exercise-session", `{"id": "concept2:session:50445680", "activity_name": "rowing.machine", "source": "Concept2 Logbook",
 		"effective_time_frame": {"time_interval": {"start_date_time": "2026-10-04T04:11:37Z", "duration": {"value": 600, "unit": "sec"}}},
+		"source_time": {"value": "2026-10-04 04:21:37", "zone": "UTC", "basis": "source"},
 		"duration": {"value": 600, "unit": "sec"}, "start_time_known": true, "distance": {"value": 2210, "unit": "m"},
 		"average_cadence": {"value": 22, "unit": "strokes/min"}, "drag_factor": 118, "watt_minutes": 1203, "erg_type": "rower",
 		"workout_type": "FixedTimeSplits", "logbook_source": "ErgData Android", "logbook_date": "2026-10-04 15:21:37",
@@ -52,6 +56,7 @@ var vendorSessions = []record{
 		"splits": [{"position": 1, "duration_sec": 252, "distance_m": 1000, "kcal": 62, "strokes": 122, "avg_spm": 24, "avg_power_w": 148, "level": 6}]}`},
 	{"activity.exercise-session", `{"id": "strong:session:2020-11-09T06:46:22", "activity_name": "strength_training", "source": "Strong",
 		"effective_time_frame": {"time_interval": {"start_date_time": "2020-11-09T06:46:22+11:00", "duration": {"value": 611, "unit": "sec"}}},
+		"source_time": {"value": "2020-11-09 06:46:22", "zone": "Australia/Sydney", "basis": "configuration"},
 		"workout_name": "Morning Workout", "reported_duration_sec": 611, "exercises": ["Bench Press (Barbell)"],
 		"sets": [{"exercise": "Bench Press (Barbell)", "set": "1", "kg": 60, "reps": 8}]}`},
 }

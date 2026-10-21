@@ -19,10 +19,12 @@ import (
 // sessionOf is an exercise session with the given payload id, a minimal payload
 // activity.exercise-session took and each of its leaves takes. The binary keeps the
 // type only in its history since card 195 split it, so the tests admit sessions
-// under that (admitHeld).
+// under that (admitHeld). Each says how its clock was read, since the Concept2 and
+// Strong leaves require it from their v2 (card 198).
 func sessionOf(id, start string) record {
 	return record{"activity.exercise-session", `{"id": "` + id + `", "activity_name": "rowing.machine", ` +
-		`"effective_time_frame": {"time_interval": {"start_date_time": "` + start + `", "duration": {"value": 1200, "unit": "sec"}}}}`}
+		`"effective_time_frame": {"time_interval": {"start_date_time": "` + start + `", "duration": {"value": 1200, "unit": "sec"}}}, ` +
+		`"source_time": {"value": "` + start + `", "zone": "+11:00", "basis": "source"}}`}
 }
 
 // sessions are four sessions, one per source's payload id prefix, as the live

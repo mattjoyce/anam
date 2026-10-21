@@ -149,7 +149,7 @@ records a measure, a reading or an event.
 
 | Type | Version | family | kind | What it records | Identity | Fact time |
 |---|---|---|---|---|---|---|
-| `health.heart-rate.day` | 1 | vitals | measure | One day's resting, minimum and maximum heart rate as one fact (replaces `health.heart-rate-day`'s three a day, card 205) | `id` | interval start |
+| `health.heart-rate.day` | 1 | vitals | measure | One day's resting, minimum and maximum heart rate as one fact (replaces `health.heart-rate-day`'s three a day) | `id` | interval start |
 | `health.heart-rate-alert` | 5 | vitals | event | One abnormal high heart rate alert from a watch | `source`, `kind`, `fact_time` | `fact_time` |
 | `health.blood-pressure` | 7 | vitals | reading | One blood pressure reading, as an Open mHealth body | `date_excel`, `reading` | `date_excel` |
 | `health.weight` | 5 | body | reading | One body weight | `id` | `date` |
@@ -158,33 +158,33 @@ records a measure, a reading or an event.
 | `health.lab-panel` | 2 | labs | event | One pathology request, the header of a draw's report | `id` | `collected` |
 | `health.lab-result` | 2 | labs | reading | One analyte's result from one draw | `id` | `collected` |
 | `health.condition` | 1 | conditions | event | A condition named in a document | `id` | `date` |
-| `health.illness.started` | 1 | conditions | event | The day an illness began (was `health.illness-started` v1 until card 196) | `id` | `date` |
-| `health.illness.ended` | 1 | conditions | event | The day an illness ended (was `health.illness-ended` v1 until card 196) | `id` | `date` |
-| `health.medication.started` | 1 | meds | event | A medicine course starting (was `health.medication-started` v1 until card 196) | `id` | `date` |
-| `health.medication.dose-changed` | 1 | meds | event | A change of dose within a course (was `health.medication-dose-changed` v1 until card 196) | `id` | `date` |
-| `health.medication.stopped` | 1 | meds | event | A course ending (was `health.medication-stopped` v1 until card 196) | `id` | `date` |
-| `health.medication.dose` | 2 | meds | event | One dose of a medicine taken at a moment, outside any course (was `health.medication-dose` up to v2 until card 196) | `id` | `taken_at` |
-| `health.medication.dose-missed` | 1 | meds | event | A dose the person says they missed (was `health.medication-missed-dose` v1 until card 196) | `id` | `date` |
-| `health.medication.compliance` | 1 | meds | measure | The person's own estimate of how well they kept to a course (was `health.medication-compliance` v1 until card 196) | `id` | `date` |
+| `health.illness.started` | 1 | conditions | event | The day an illness began (was `health.illness-started` v1, before the names took a third segment) | `id` | `date` |
+| `health.illness.ended` | 1 | conditions | event | The day an illness ended (was `health.illness-ended` v1, before the names took a third segment) | `id` | `date` |
+| `health.medication.started` | 1 | meds | event | A medicine course starting (was `health.medication-started` v1, before the names took a third segment) | `id` | `date` |
+| `health.medication.dose-changed` | 1 | meds | event | A change of dose within a course (was `health.medication-dose-changed` v1, before the names took a third segment) | `id` | `date` |
+| `health.medication.stopped` | 1 | meds | event | A course ending (was `health.medication-stopped` v1, before the names took a third segment) | `id` | `date` |
+| `health.medication.dose` | 2 | meds | event | One dose of a medicine taken at a moment, outside any course (was `health.medication-dose` up to v2, before the names took a third segment) | `id` | `taken_at` |
+| `health.medication.dose-missed` | 1 | meds | event | A dose the person says they missed (was `health.medication-missed-dose` v1, before the names took a third segment) | `id` | `date` |
+| `health.medication.compliance` | 1 | meds | measure | The person's own estimate of how well they kept to a course (was `health.medication-compliance` v1, before the names took a third segment) | `id` | `date` |
 | `health.encounter` | 1 | clinical | event | One appointment with a clinic or practitioner | `id` | `date` |
 | `health.donation` | 1 | clinical | event | One visit to give blood | `id` | `date` |
 | `health.vision-prescription` | 1 | clinical | reading | One lens prescription as an optometrist issued it, each eye as printed | `id` | `date` |
-| `activity.exercise-session.garmin` | 1 | exercise | event | One session a Garmin watch recorded, as an IEEE 1752 physical activity (was `activity.exercise-session` up to v2 until card 195) | `id` | session start |
+| `activity.exercise-session.garmin` | 1 | exercise | event | One session a Garmin watch recorded, as an IEEE 1752 physical activity (was `activity.exercise-session` up to v2, before each vendor had its own leaf) | `id` | session start |
 | `activity.exercise-session.concept2` | 2 | exercise | event | One workout the Concept2 Logbook holds, as an IEEE 1752 physical activity (likewise) | `id` | session start |
 | `activity.exercise-session.technogym` | 2 | exercise | event | One indoor session on a Technogym machine, as an IEEE 1752 physical activity (likewise) | `id` | session start |
 | `activity.exercise-session.strong` | 2 | exercise | event | One Strong app workout, as an IEEE 1752 physical activity (likewise) | `id` | session start |
 | `activity.gym-visit` | 1 | exercise | event | One gym visit | `id` | `date` |
 | `activity.steps` | 2 | movement | measure | One day's steps, as an Open mHealth step-count body | `id` | interval start |
-| `place.trip.departed` | 1 | trips | event | Leaving home on a trip (was `place.departed` v1 until card 196) | `id` | `date` |
-| `place.trip.flight` | 1 | trips | event | One flight leg (was `place.flight` v1 until card 196) | `id` | `date` |
-| `place.trip.arrived` | 1 | trips | event | Arriving at one place during a trip (was `place.arrived` v1 until card 196) | `id` | `date` |
-| `place.trip.returned` | 1 | trips | event | Getting home from a trip (was `place.returned` v1 until card 196) | `id` | `date` |
+| `place.trip.departed` | 1 | trips | event | Leaving home on a trip (was `place.departed` v1, before the names took a third segment) | `id` | `date` |
+| `place.trip.flight` | 1 | trips | event | One flight leg (was `place.flight` v1, before the names took a third segment) | `id` | `date` |
+| `place.trip.arrived` | 1 | trips | event | Arriving at one place during a trip (was `place.arrived` v1, before the names took a third segment) | `id` | `date` |
+| `place.trip.returned` | 1 | trips | event | Getting home from a trip (was `place.returned` v1, before the names took a third segment) | `id` | `date` |
 | `record.edge` | 2 | notes | event | An edge joining facets, with or without words; a note in the person's own words is one (was `note.annotation` (v1 to v3), then `record.note` (v1, v2)) | `id` | `at` |
 | `record.document` | 2 | documents |  | A pointer to one file in the documents library; the bytes never enter the ledger | `path` | `date` |
-| `health.heart-rate-day` | 2 | vitals | measure | One figure for a day's heart rate, as an Open mHealth heart-rate body (replaced by `health.heart-rate.day` at card 205; the garmin importer's snapshot leaves it absent, the operator retracts it, and it is kept for reads as-of before) | `id`, `statistic` | interval start |
-| `health.heart-rate` | 3 |  |  | A period's heart rate metrics (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
-| `health.sleep` | 3 |  |  | A period's sleep metrics (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
-| `health.metric-group` | 3 |  |  | A period's metrics for the health groups with no type of their own (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
+| `health.heart-rate-day` | 2 | vitals | measure | One figure for a day's heart rate, as an Open mHealth heart-rate body (replaced by `health.heart-rate.day`; the garmin importer's snapshot leaves it absent, the operator retracts it, and it is kept for reads as-of before) | `id`, `statistic` | interval start |
+| `health.heart-rate` | 3 |  |  | A period's heart rate metrics (retired; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
+| `health.sleep` | 3 |  |  | A period's sleep metrics (retired; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
+| `health.metric-group` | 3 |  |  | A period's metrics for the health groups with no type of their own (retired; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
 
 ### Registered by importers
 
@@ -194,9 +194,9 @@ them to the daemon on first use. Their versions are that repository's to state; 
 
 | Type | What it records | Importer |
 |---|---|---|
-| `health.measurement.withings` | One Withings measurement (was `health.measurement` until card 195) | withings |
-| `activity.day.garmin` | One day of a Garmin watch's daily summary (was `activity.day` until card 195) | garmin |
-| `health.cpap-session.dreamstation` | One therapy session from a DreamStation card (was `health.cpap-session` until card 195) | dreamstation |
+| `health.measurement.withings` | One Withings measurement (was `health.measurement`, before each vendor had its own leaf) | withings |
+| `activity.day.garmin` | One day of a Garmin watch's daily summary (was `activity.day`, before each vendor had its own leaf) | garmin |
+| `health.cpap-session.dreamstation` | One therapy session from a DreamStation card (was `health.cpap-session`, before each vendor had its own leaf) | dreamstation |
 | `place.track` | One UTC hour of a phone's positions | owntracks |
 | `place.stay` | One place a phone stayed, named from OpenStreetMap | stays |
 

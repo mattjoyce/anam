@@ -15,7 +15,7 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "A dose the person says they missed, as a point fact. Written into records files by hand, so far from a blood pressure diary's missed-medication mark. Named health.medication.dose-missed (v1) until card 196.",
+    "description": "A dose the person says they missed, as a point fact. Written into records files by hand, so far from a blood pressure diary's missed-medication mark. Named health.medication-missed-dose (v1) until its name gained a third segment.",
     "type": "object",
     "required": ["id", "date"],
     "properties": {

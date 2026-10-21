@@ -92,3 +92,16 @@ func TestSetVersionOf_IndependentOfMapOrder(t *testing.T) {
 		}
 	}
 }
+
+// A description is part of the manifest's bytes, so rewording one in place moves the
+// set version a new receipt records. What that does to a receipt already cut is held
+// in internal/serve (a moved set is a note, not a failure).
+func TestSetVersion_MovesWhenADescriptionIsReworded(t *testing.T) {
+	t.Parallel()
+
+	before := []byte(`{"meta":{"facet_type":"x.y"},"schema":{"description":"made by a card"}}`)
+	after := []byte(`{"meta":{"facet_type":"x.y"},"schema":{"description":"says what it is"}}`)
+	if a, b := def.SetVersionOf(map[string][]byte{"x.y.json": before}), def.SetVersionOf(map[string][]byte{"x.y.json": after}); a == b {
+		t.Errorf("rewording a description left the set version at %s", a)
+	}
+}

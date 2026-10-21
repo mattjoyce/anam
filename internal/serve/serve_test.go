@@ -2,6 +2,8 @@ package serve_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -427,4 +429,44 @@ func servedIDs(t *testing.T, servedBytes []byte) []string {
 		ids = append(ids, e.FacetID)
 	}
 	return ids
+}
+
+// Rewording a bundled Definition's description in place changes the manifest's bytes,
+// and so the definition-set version a new receipt records (TestSetVersion_MovesWhenA
+// DescriptionIsReworded holds that half in internal/def). A receipt cut before the edit
+// still verifies, with a note that the set has moved: a description governs what a
+// person reads, not what was admitted or how the fold reads it.
+func TestVerify_RewordedDescriptionKeepsAnOlderReceiptVerifying(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	h.seed(t)
+	ctx := context.Background()
+
+	out, err := serve.Run(ctx, h.deps, "bp", false)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	digest := func(manifest string) string {
+		sum := sha256.Sum256([]byte(manifest))
+		return "sha256:" + hex.EncodeToString(sum[:])
+	}
+	older := digest(`{"schema":{"description":"made by a card"}}`)
+	newer := digest(`{"schema":{"description":"a reading of blood pressure"}}`)
+	if older == newer {
+		t.Fatal("the reworded manifest hashes the same as the original")
+	}
+
+	deps := h.deps
+	deps.DefinitionSetVersion = newer
+	_, res, err := serve.Verify(ctx, deps, out.ReceiptHash)
+	if err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+	if !res.OK() {
+		t.Errorf("a receipt cut before a description was reworded no longer verifies:\n%s", res.Summary())
+	}
+	if len(res.Notes) != 1 || !strings.Contains(res.Notes[0], "definition set has moved") {
+		t.Errorf("the move was not reported: %v", res.Notes)
+	}
 }

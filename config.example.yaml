@@ -133,7 +133,7 @@ max_read_bytes: 524288
 # How many backups to keep: two weeks of nightly ones.
 backup_keep: 14
 
-# --- limits (card 151) ----------------------------------------------------------
+# --- limits ----------------------------------------------------------
 # Every value below is Anam's opinionated default and a choice you can make
 # differently. Each is range-checked at start, so a bad one stops the daemon or the
 # CLI there and not at the first request that uses it. Durations are Go durations

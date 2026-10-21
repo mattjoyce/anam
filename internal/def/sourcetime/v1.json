@@ -1,6 +1,6 @@
 {
   "type": "object",
-  "description": "How the source's clock was read (card 197): the fact time as the source supplied it, the zone it is read in, and who decided that zone. fact_time stays the one UTC instant the gate derives.",
+  "description": "How the source's clock was read: the fact time as the source supplied it, the zone it is read in, and who decided that zone. fact_time stays the one UTC instant the gate derives.",
   "required": ["value", "zone", "basis"],
   "additionalProperties": false,
   "properties": {

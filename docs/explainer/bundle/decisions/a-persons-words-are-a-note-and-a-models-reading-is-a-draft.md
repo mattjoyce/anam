@@ -4,7 +4,7 @@ title: A person's words are a note, and a model's reading is a draft
 description: "A conversation is an importer; the person's words are saved at once and verbatim as a record.edge under source conversation, which may name no facet yet; a model's reading is a second source whose facts are drafts the person endorses by a new version."
 timestamp: 2026-10-17T00:00:00Z
 resource: docs/API.md#Writing
-anchor: "which may name no facet yet (`note.annotation` v3, card 157)"
+anchor: "which may name no facet yet (`note.annotation` v3)"
 basis: docs
 tier: supporting
 alternatives:

@@ -119,7 +119,7 @@ the answer wrong. A query that never reaches them needs no definition.
 
 The edge rules read `attr/3`. A program that reads only `entry/7` and `closes/1` does not pay for it.
 `attr/3` has a tuple for every scalar leaf of every served payload, so the evaluator builds it only
-when the relation the program answers reaches `attr`, directly or through a bundled rule (card 203).
+when the relation the program answers reaches `attr`, directly or through a bundled rule.
 The answer is the same either way.
 
 ## What the language does not do
@@ -321,7 +321,7 @@ declared but has no rules or facts
 
 ## The selection builder's programs
 
-The Workbench's selection page (card 199) writes a program from the criteria a person adds, and the
+The Workbench's selection page writes a program from the criteria a person adds, and the
 program text is what the selection is handed on as. Every one defines `pick/1`, the facets selected,
 over `entry/7`. It is one rule per pair of a type pattern and a source the criteria name, so the rules'
 union reads "any of these types, from any of these sources". A fact-time window, a standing, and
@@ -348,7 +348,7 @@ it, and says so when it could not.
 
 ## Saved selections
 
-A selection is handed on as its program, and since card 206 also as a short code. "Save this
+A selection is handed on as its program, and also as a short code. "Save this
 selection" on the select page, or `POST /v1/selections` with `{"program": "..."}`, files the program
 as an artifact of kind `selection`, addressed by the SHA-256 of its canonical text, and answers its
 code, written `sel:<code>`. The canonical text is what `selection.Parse` then `Program` write for a

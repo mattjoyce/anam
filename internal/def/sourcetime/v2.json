@@ -1,6 +1,6 @@
 {
   "type": "object",
-  "description": "How a wall clock was read (cards 197 and 198): the fact time as it was said, the zone it was said in, the offset from UTC it had at that moment, and who decided the zone. A type whose fact time reads the offset is placed by it; fact_time stays the one UTC instant the gate derives.",
+  "description": "How a wall clock was read: the fact time as it was said, the zone it was said in, the offset from UTC it had at that moment, and who decided the zone. A type whose fact time reads the offset is placed by it; fact_time stays the one UTC instant the gate derives.",
   "required": ["value", "zone", "offset", "basis"],
   "additionalProperties": false,
   "properties": {

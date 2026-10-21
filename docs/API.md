@@ -1,16 +1,16 @@
 # Anam API — operating the record and reading it
 
 Design proposal · 2026-10-07 · documentation only; these APIs are not implemented.
-Split 2026-10-10 (card 72): the MCP mapping moved to the `anam-mcp` repository (§8).
+Split 2026-10-10: the MCP mapping moved to the `anam-mcp` repository (§8).
 
-**The shapes are in the spec (2026-10-19, card 49).** `internal/daemon/openapi.yaml` describes every
+**The shapes are in the spec (2026-10-19).** `internal/daemon/openapi.yaml` describes every
 route the daemon serves, with its roles, parameters, bodies and status codes, and a test holds it to
 the mux: a route added without a path there, or a path without a route, fails `scripts/check.sh`,
 and every example decodes into its `internal/api` type. A running daemon serves it at
 `GET /v1/openapi.yaml` without a token. This document stays the prose: why the routes are what they
 are, and what is still proposed.
 
-**What runs today (2026-10-08, cards 42–45).** `anam daemon` serves an interim `/v1` surface
+**What runs today (2026-10-08).** `anam daemon` serves an interim `/v1` surface
 that carries the CLI's existing reads, not the `ReadRecord` contract below: `status`, `ingest`
 and `operations/{id}`, `timeline`, `changes`, `receipts` (list, show, verify) and `checkpoints`
 (list, mint). Each answers with a value from `internal/api`, the same value the CLI computes
@@ -18,9 +18,9 @@ from local files, so the CLI renders one type either way. With `server` set (`AN
 `--server`) the CLI asks the daemon and opens no local file. Reads are whole, bounded by the
 daemon's timeout; paging and receipted reads remain this proposal's work. The route list is
 in `anam daemon --help`. An ingest operation that moved W carries `mint`, the mint the daemon ran
-after it (card 61): `w`, `full`, `from`, `minted`, `buckets`, or `error` when it failed, which
-fails nothing. `POST /v1/backups` (card 69) copies the record into `backup_dir` on the write
-queue and answers where, at what W, and how big. `POST /v1/facets/{id}/retract` (card 188, slice 3)
+after it: `w`, `full`, `from`, `minted`, `buckets`, or `error` when it failed, which
+fails nothing. `POST /v1/backups` copies the record into `backup_dir` on the write
+queue and answers where, at what W, and how big. `POST /v1/facets/{id}/retract`
 tombstones one facet by hand, as the operator: the body is `{"source": "workbench"}`, the source the
 facet must belong to, and the answer is the tombstone's `seq`, the `artifact_version` it marks and the
 new `w`. It plans inside the write queue's one write, with the plan `anam retract <source> --facet <id>`
@@ -28,7 +28,7 @@ applies, and refuses with 409 a facet of another source, a facet that is not liv
 importer declares and has completed a snapshot for (its next resend reconciles it); 404 for a facet the
 ledger does not hold. Like the other writes it is 403 to a browser on another site, and 503 while another
 write holds the queue. The artifact stays, and a read as of before the tombstone still shows the facet.
-`POST /v1/entry` (card 188, slice 2) enters one fact by hand, as the operator, for the Workbench. The
+`POST /v1/entry` enters one fact by hand, as the operator, for the Workbench. The
 body is `{"type", "definition_version", "payload"}` and nothing else: no source, injector or id. The daemon
 submits the one envelope as the `workbench` principal the importers file declares (a source with no token and
 `types` as its allow-list; [IMPORTERS.md](IMPORTERS.md) §8.2), through the same write as `POST /v1/envelopes`,
@@ -41,32 +41,31 @@ version in force; 422 with the gate's reasons, verbatim, for a type outside the 
 the Definition refuses; 403 to any role but the operator and to a browser on another site; 503 while another
 write holds the queue. A fact entered this way is under source `workbench`; `source`, not `source_schema`, is
 where a fact came from. `POST /v1/envelopes` and the `/v1/definitions`
-routes (card 53) are the importers' side, under importers' own tokens; their contract is
+routes are the importers' side, under importers' own tokens; their contract is
 [IMPORTERS.md](IMPORTERS.md) §8.
 
-**Type prefixes (2026-10-21, card 193).** A projection template's `types` entries and the timeline's
+**Type prefixes (2026-10-21).** A projection template's `types` entries and the timeline's
 `type` parameter each take an exact facet type or a prefix ending in `.`, such as
 `activity.exercise-session.`. A prefix matches every type under it at a segment boundary and nowhere
 else: `health.heart-rate.` matches `health.heart-rate.day` but not `health.heart-rate-variability` or
 `health.heart-rate`. One predicate does the matching for the projection, the timeline and a receipt's
 replay. A malformed `type` (a bare domain such as `health.`, a double dot, a wildcard) is a 400.
 
-**Receipted reads (2026-10-10, card 87).** `POST /v1/receipts` takes a timeline query that names
+**Receipted reads (2026-10-10).** `POST /v1/receipts` takes a timeline query that names
 a projection, reads it as `GET /v1/timeline` would, and files what it shows with a receipt. The
 receipt records W and the resolved narrowing (`query`: `at`, `from`, `before`, `type`), and
 `/v1/receipts/{hash}/verify` replays it. Reads also take `w`, a watermark, in place of `as_of`, so a
 follow-up stands on a cited read's knowledge. This is the first piece of §5's receipted reads;
-paging is card 92, below. Evidence by facet is `GET /v1/receipts/{hash}/facets/{facet_id}` (card 91,
-2026-10-21): one facet as the receipt served it, the payload and envelope as admitted, beside
-`links`, the live edge facets that name it on either side (card 104), read from the edge index at
+paging is under Paged published reads, below. Evidence by facet is `GET /v1/receipts/{hash}/facets/{facet_id}` (2026-10-21): one facet as the receipt served it, the payload and envelope as admitted, beside
+`links`, the live edge facets that name it on either side, read from the edge index at
 the index's own watermark and never written into the facet. A facet the receipt did not serve is
 404, since a facet id alone opens nothing a projection did not serve.
 
-**Bounded reads (2026-10-11, card 88).** The daemon answers a read within `max_read_bytes`
+**Bounded reads (2026-10-11).** The daemon answers a read within `max_read_bytes`
 (`ANAM_MAX_READ_BYTES`, default 512 KiB, §3's budget; 0 is no bound), measured over the entries it
 would answer with, encoded as it sends them, whole facets only. `GET /v1/timeline`, `POST
 /v1/receipts` and `GET /v1/receipts/{hash}` refused a larger answer with 413 (the two receipt routes
-page instead since card 92, below) and a body a program can
+page instead since paged reads, below) and a body a program can
 act on: `code: result_too_large`, and `too_large` with `matched` (how many entries), `bytes` (counted
 up to the bound), `max_bytes`, and `narrow`, the query parameters still unused (`type`, `from`, `to`,
 `at`, `projection`). A refused publish files nothing. A receipt too large to show still verifies,
@@ -74,12 +73,12 @@ and shows locally. A local read, the operator at their own files, has no bound. 
 whole before the refusal: the bound protects the answer and the client's context, not the daemon's
 work.
 
-**Paged published reads (2026-10-21, card 92).** A published read too large for one answer is no
+**Paged published reads (2026-10-21).** A published read too large for one answer is no
 longer refused: `POST /v1/receipts` files the whole value and its receipt once, and answers the
 first page, with `page` (`offset`, `returned_count`, `total_count`, `next_cursor`); `shown` is the
 whole count. `GET /v1/receipts/{hash}?cursor=…` reads each later page, and without a cursor answers
 the first page, so a small receipt reads as before, with a `page` that has no `next_cursor`. A page
-is whole facets, as many from its offset as fit `max_read_bytes` by card 88's measure, cut from the
+is whole facets, as many from its offset as fit `max_read_bytes` by the same measure, cut from the
 served artifact the receipt hashes: never a new read, so walking `next_cursor` to the end gives back
 exactly the receipt's `facet_ids`, in order, whatever Anam learned in between. A frame pages by rows,
 with every column on every page. The receipt rides the first page only; a later page carries `hash`
@@ -90,15 +89,15 @@ and its own `facet_ids` are the check. 413 is left for one facet over the bound 
 can carry: a publish holding one files nothing, and `too_large.facet_id` names it; a page that starts
 at one (a receipt published locally, or under a larger bound) names it with the `next_cursor` past
 it, and the facet opens alone at `/v1/receipts/{hash}/facets/{facet_id}`. A query receipt's answer
-(card 173) is one relation and is not paged. Dropping the total refusal on a publish adds no work
-the daemon was not already doing: the fold and the projection ran whole before card 88's refusal
+is one relation and is not paged. Dropping the total refusal on a publish adds no work
+the daemon was not already doing: the fold and the projection ran whole before the size refusal
 too, and the value it files is the record's own, content-addressed, so publishing the same read
 again files a new receipt and no second value. Each page re-reads the served file, so walking n
 pages reads it n times. The CLI's `anam receipt show` reads every page and shows the whole receipt,
 or one page with `--cursor`; `anam timeline --publish` over the daemon shows the first page and
 names the receipt to show for the rest.
 
-**Fields (2026-10-12, card 138; built the same day).** A read may name its **fields**: a
+**Fields (2026-10-12; built the same day).** A read may name its **fields**: a
 temporary subset of the type's schema, as JSON pointers, and nothing else of the payload comes
 back. The envelope (type, fact-time, status, provenance, hash) is always whole. Fields only narrow:
 they are applied after the projection and the narrowing above, to what those already admitted, so a
@@ -111,10 +110,10 @@ the fields beside `query`, the served hash is over the frame's bytes, and `narro
 when a read is refused as too large. This amends the sentence below, §5's "cannot request selected
 payload fields", and ARCHITECTURE.md §9. Computing over fields (joins, selection by a payload
 value, aggregates, windows) is not this either: it is the query, `anam query` and `/v1/query`, a
-Datalog program run through a projection (decided 2026-10-17, card 173, ARCHITECTURE.md §9; built
+Datalog program run through a projection (decided 2026-10-17, ARCHITECTURE.md §9; built
 2026-10-19, below). Blending projections stays a later contract.
 
-**The query (2026-10-19, card 173).** `POST /v1/query` takes a JSON body: `projection` (required;
+**The query (2026-10-19).** `POST /v1/query` takes a JSON body: `projection` (required;
 the projection decides which whole facets the query may see), `text`, a Datalog program in Anam's
 own small syntax built on the bundled rules (`current/2`, `displaced/2`), `relation`, the derived
 relation to answer, `as_of` or `w` as a timeline read takes them, and `dry_run`. The base relations
@@ -131,7 +130,7 @@ is 400 with a message that says what to change; a derivation or an answer over `
 of a type declare and others do not. `anam query run` and `anam query describe` are the CLI, local
 or over the daemon. [QUERY.md](QUERY.md) is the reference, with worked questions.
 
-**Saved selections (2026-10-22, card 206).** `POST /v1/selections` takes `{"program": "..."}` and
+**Saved selections (2026-10-22).** `POST /v1/selections` takes `{"program": "..."}` and
 answers 201 with `{"code", "hash", "url", "program"}`: the program filed as an artifact of kind
 `selection`, addressed by the SHA-256 of its canonical text (a chip program in its one layout, any
 other trimmed), and its code, the first 8 hex of that hash, lengthened at save to the shortest unique
@@ -237,7 +236,7 @@ The server is configured for one person. Caller requests cannot choose a differe
 path, a source directory, or an arbitrary executable. Operation context carries the authenticated
 actor, allowed capabilities, configured zone, deadline, and request ID; those are not model claims.
 
-### Principals and roles (card 89)
+### Principals and roles
 
 Every caller is a principal: a name, a role, and the SHA-256 of its token. The daemon holds the
 hashes and never a token. The operator is the principal whose token is in `token_file`, named
@@ -247,8 +246,8 @@ or under `importers`, the file's first shape, where each entry is an importer na
 | Role | Opens |
 |---|---|
 | `reader` | Every read: status, timeline, changes, receipts and their verification, projections, checkpoints, Definitions, snapshots. Publishing a read (`POST /v1/receipts`), which writes artifacts and never the ledger |
-| `importer` | A reader's routes, and envelopes, documents and Definition registration, as its one source and for its types only. With `any_type` in place of `types` it submits every type the daemon knows, registers none and stores no document (card 177). It sees only its own source's snapshots |
-| `operator` | A reader's routes, and minting, backups, projection templates and the inspector. It submits no envelopes, since it is no source; it enters facts by hand at `POST /v1/entry`, which the daemon admits as the `workbench` source (card 188) |
+| `importer` | A reader's routes, and envelopes, documents and Definition registration, as its one source and for its types only. With `any_type` in place of `types` it submits every type the daemon knows, registers none and stores no document. It sees only its own source's snapshots |
+| `operator` | A reader's routes, and minting, backups, projection templates and the inspector. It submits no envelopes, since it is no source; it enters facts by hand at `POST /v1/entry`, which the daemon admits as the `workbench` source |
 
 A route names the roles it admits, in one table (`internal/daemon/api.go`), and a test sends a
 token of each role to every route. No token, or one the daemon does not know, is 401; a token whose
@@ -307,15 +306,15 @@ unbounded computation or storage. Large operator work uses an operation handle.
 | Operation | Inputs | Result |
 |---|---|---|
 | `DescribeRecord` | Optional governed scope | API version, person label, current time/zone, ledger position, enabled capabilities, limits, known limitations |
-| `ListProjections` | Cursor | Authorized template IDs, versions, descriptions, supported read modes and parameters. Built 2026-10-13 as `GET /v1/projections` (card 125): name, origin, newest version, every version held, description, types, shape, hash |
+| `ListProjections` | Cursor | Authorized template IDs, versions, descriptions, supported read modes and parameters. Built 2026-10-13 as `GET /v1/projections`: name, origin, newest version, every version held, description, types, shape, hash |
 | `GetProjection` | Template ID/version | Immutable definition, type coverage, restrictions, examples, supported narrowing. Built as `GET /v1/projections/{name}[/{version}]`, the manifest as canonical JSON; `POST /v1/projections` registers one under the operator's token, 201 new, 200 the same body again, 409 another body at a held version or a version behind, 422 a bad manifest or a type with no Definition |
 | `ListFacetTypes` | Optional projection, cursor | Available types, human descriptions, read/write eligibility, definition versions |
-| `GetFacetDefinition` | Type/version | Identity and time contracts, classification, validation rules, payload schema, examples, series semantics if supported, and the `handling` block verbatim when the type declares one (card 166) |
-| `GetCoverage` | Projection, optional window and pinned position | Observed counts and date ranges by type/source, freshness observations, gaps only where justified. Built 2026-10-21 as `GET /v1/coverage` (card 90), any role: at the head, `?w=` or `?as_of=`, optionally `?projection=`, each type's live count, earliest and latest fact-time, and each source's share, with `w`, `ledger_id` and the canonical hash, so the same W gives the same answer. No window yet |
+| `GetFacetDefinition` | Type/version | Identity and time contracts, classification, validation rules, payload schema, examples, series semantics if supported, and the `handling` block verbatim when the type declares one |
+| `GetCoverage` | Projection, optional window and pinned position | Observed counts and date ranges by type/source, freshness observations, gaps only where justified. Built 2026-10-21 as `GET /v1/coverage`, any role: at the head, `?w=` or `?as_of=`, optionally `?projection=`, each type's live count, earliest and latest fact-time, and each source's share, with `w`, `ledger_id` and the canonical hash, so the same W gives the same answer. No window yet |
 
 Definition discovery is important because payloads vary. An agent needs to know that a lab result
 may carry a unit and reference range, or that a medication change needs a course reference. Today's
-closed JSON Schema definitions (card 52) give field names and types, which is not yet a complete
+closed JSON Schema definitions give field names and types, which is not yet a complete
 authoring interface. Authorable types need
 descriptions, field types, examples, precision rules, and writable-field guidance. Missing schema
 knowledge must be reported rather than guessed into an invented normalized payload.
@@ -325,12 +324,12 @@ Coverage distinguishes `observed_fact_time_range`, `last_successful_capture`, `l
 the source declares a coverage contract. The receipt watermark proves a ledger position, not source
 freshness. Discovery itself is scoped: disallowed types and counts must not leak through a catalog.
 
-As built (card 90) the split runs along the route. `GET /v1/coverage` is the record at a W: the
+As built the split runs along the route. `GET /v1/coverage` is the record at a W: the
 observed counts and fact-time ranges, a value any later read at that W reproduces. Freshness
 (`last_scan_at`, `last_admission_at`) is `GET /v1/status`'s, daemon state since it started rather
 than a fact at a W. The two stay apart. Scoping is not built: a reader is as wide as the operator on
-reads, so coverage shows every type to every role, as the timeline does (card 89 leaves narrowing a
-reader to projections for later).
+reads, so coverage shows every type to every role, as the timeline does (narrowing a
+reader to projections is left for later).
 
 ## 5. Reading: one explicit query, one stable evidence set
 
@@ -469,13 +468,13 @@ source-file associations. Do not imply every facet already has a ledger-attested
 
 ## 6. Writing: make “log this” reliable
 
-**Decided since (card 93, 2026-10-15); the records-file route below is overtaken.** A conversation is
+**Decided since (2026-10-15); the records-file route below is overtaken.** A conversation is
 an importer like any other, posting envelopes under its own token (§8 of `docs/IMPORTERS.md`); no
 records file sits between it and the gate. The person's words are saved at once and verbatim as a
-`record.edge` (the type's lineage: `note.annotation` (v1 to v3), then `record.note` (v1, v2), now `record.edge`) under source `conversation`, which may name no facet yet (`note.annotation` v3, card 157). A model's
+`record.edge` (the type's lineage: `note.annotation` (v1 to v3), then `record.note` (v1, v2), now `record.edge`) under source `conversation`, which may name no facet yet (`note.annotation` v3). A model's
 reading of those words is a second source, `interpretation`, whose facts link back to the exact note
 version and carry `standing: draft | endorsed | rejected`; the person endorses or rejects a draft
-with a new version, and nothing is deleted (cards 158 to 161). The operations and the concurrency
+with a new version, and nothing is deleted. The operations and the concurrency
 protocol below are kept for their reasoning; the envelope path gives idempotency and correction by
 itself.
 
@@ -633,7 +632,7 @@ domain rule, and the record's correctness never depends on its process state.
 | Client | Where | Contract |
 |---|---|---|
 | CLI | `anam` with `ANAM_SERVER` set | The daemon's `/v1` routes, rendering the same values as local reads |
-| Inspector | the daemon's `/` pages | A diagnostic view, and the Anam Workbench's forms to enter, correct and retract a fact by hand (`/entry`, `/retract`, over the same writes as `POST /v1/entry` and the retract route; card 188); it yields to this design |
+| Inspector | the daemon's `/` pages | A diagnostic view, and the Anam Workbench's forms to enter, correct and retract a fact by hand (`/entry`, `/retract`, over the same writes as `POST /v1/entry` and the retract route); it yields to this design |
 | Importers | the `anam-importers` repository | [IMPORTERS.md](IMPORTERS.md) §8 |
 | MCP adapter | the `anam-mcp` repository | Its tool mapping, model-facing descriptions, resources and scenarios live there |
 

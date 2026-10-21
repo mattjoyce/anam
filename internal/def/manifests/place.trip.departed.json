@@ -16,7 +16,7 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "Leaving home on a trip, one row in a records file (source records), written from itineraries, bookings and emails. Opens a travel.trip series; values are the row's own text. Named place.trip.departed (v1) until card 196.",
+    "description": "Leaving home on a trip, one row in a records file (source records), written from itineraries, bookings and emails. Opens a travel.trip series; values are the row's own text. Named place.departed (v1) until its name gained a third segment.",
     "type": "object",
     "required": ["id", "date", "trip"],
     "properties": {

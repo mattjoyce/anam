@@ -16,7 +16,7 @@
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "A medicine course ending, which closes its med.regimen series. Written into records files by hand, from My Health Record screenshots or the person's own word. Named health.medication.stopped (v1) until card 196.",
+    "description": "A medicine course ending, which closes its med.regimen series. Written into records files by hand, from My Health Record screenshots or the person's own word. Named health.medication-stopped (v1) until its name gained a third segment.",
     "type": "object",
     "required": ["id", "date", "drug", "course"],
     "properties": {

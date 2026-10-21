@@ -151,12 +151,12 @@ records a measure, a reading or an event.
 |---|---|---|---|---|---|---|
 | `health.heart-rate-day` | 2 | vitals | measure | One figure for a day's heart rate, as an Open mHealth heart-rate body | `id`, `statistic` | interval start |
 | `health.heart-rate-alert` | 5 | vitals | event | One abnormal high heart rate alert from a watch | `source`, `kind`, `fact_time` | `fact_time` |
-| `health.blood-pressure` | 6 | vitals | reading | One blood pressure reading, as an Open mHealth body | `date_excel`, `reading` | `date_excel` |
+| `health.blood-pressure` | 7 | vitals | reading | One blood pressure reading, as an Open mHealth body | `date_excel`, `reading` | `date_excel` |
 | `health.weight` | 4 | body | reading | One body weight | `id` | `date` |
 | `health.body-composition` | 4 | body | measure | A period's body metrics (fat, muscle and the rest) | `group`, `period_type`, `period_start` | `period_start` |
 | `health.sleep-episode` | 2 | sleep | measure | One sleep episode, as an IEEE 1752 sleep-episode body | `id` | interval start |
-| `health.lab-panel` | 1 | labs | event | One pathology request, the header of a draw's report | `id` | `collected` |
-| `health.lab-result` | 1 | labs | reading | One analyte's result from one draw | `id` | `collected` |
+| `health.lab-panel` | 2 | labs | event | One pathology request, the header of a draw's report | `id` | `collected` |
+| `health.lab-result` | 2 | labs | reading | One analyte's result from one draw | `id` | `collected` |
 | `health.condition` | 1 | conditions | event | A condition named in a document | `id` | `date` |
 | `health.illness.started` | 1 | conditions | event | The day an illness began (was `health.illness-started` v1 until card 196) | `id` | `date` |
 | `health.illness.ended` | 1 | conditions | event | The day an illness ended (was `health.illness-ended` v1 until card 196) | `id` | `date` |
@@ -170,9 +170,9 @@ records a measure, a reading or an event.
 | `health.donation` | 1 | clinical | event | One visit to give blood | `id` | `date` |
 | `health.vision-prescription` | 1 | clinical | reading | One lens prescription as an optometrist issued it, each eye as printed | `id` | `date` |
 | `activity.exercise-session.garmin` | 1 | exercise | event | One session a Garmin watch recorded, as an IEEE 1752 physical activity (was `activity.exercise-session` up to v2 until card 195) | `id` | session start |
-| `activity.exercise-session.concept2` | 1 | exercise | event | One workout the Concept2 Logbook holds, as an IEEE 1752 physical activity (likewise) | `id` | session start |
-| `activity.exercise-session.technogym` | 1 | exercise | event | One indoor session on a Technogym machine, as an IEEE 1752 physical activity (likewise) | `id` | session start |
-| `activity.exercise-session.strong` | 1 | exercise | event | One Strong app workout, as an IEEE 1752 physical activity (likewise) | `id` | session start |
+| `activity.exercise-session.concept2` | 2 | exercise | event | One workout the Concept2 Logbook holds, as an IEEE 1752 physical activity (likewise) | `id` | session start |
+| `activity.exercise-session.technogym` | 2 | exercise | event | One indoor session on a Technogym machine, as an IEEE 1752 physical activity (likewise) | `id` | session start |
+| `activity.exercise-session.strong` | 2 | exercise | event | One Strong app workout, as an IEEE 1752 physical activity (likewise) | `id` | session start |
 | `activity.gym-visit` | 1 | exercise | event | One gym visit | `id` | `date` |
 | `activity.steps` | 2 | movement | measure | One day's steps, as an Open mHealth step-count body | `id` | interval start |
 | `place.trip.departed` | 1 | trips | event | Leaving home on a trip (was `place.departed` v1 until card 196) | `id` | `date` |
@@ -180,7 +180,7 @@ records a measure, a reading or an event.
 | `place.trip.arrived` | 1 | trips | event | Arriving at one place during a trip (was `place.arrived` v1 until card 196) | `id` | `date` |
 | `place.trip.returned` | 1 | trips | event | Getting home from a trip (was `place.returned` v1 until card 196) | `id` | `date` |
 | `record.edge` | 1 | notes | event | An edge joining facets, with or without words; a note in the person's own words is one (was `note.annotation` (v1 to v3), then `record.note` (v1, v2)) | `id` | `at` |
-| `record.document` | 1 | documents |  | A pointer to one file in the documents library; the bytes never enter the ledger | `path` | `date` |
+| `record.document` | 2 | documents |  | A pointer to one file in the documents library; the bytes never enter the ledger | `path` | `date` |
 | `health.heart-rate` | 3 |  |  | A period's heart rate metrics (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
 | `health.sleep` | 3 |  |  | A period's sleep metrics (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
 | `health.metric-group` | 3 |  |  | A period's metrics for the health groups with no type of their own (retired at card 55; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |

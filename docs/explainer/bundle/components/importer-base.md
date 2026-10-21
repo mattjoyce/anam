@@ -14,7 +14,7 @@ depends_on: []
 | Module | Gives |
 |---|---|
 | `ductile.py` | protocol 2: one JSON request on stdin, one JSON response on stdout; `Failure(message, retry)` for a source that failed; every exception becomes a structured error |
-| `definitions.py` | `load` the folder's `definitions/*.json`, `Definition.errors` with jsonschema, `ensure_published` (GET the version, POST only on 404, stop on a different body) |
+| `definitions.py` | `load` the folder's `definitions/*.json` and, under `definitions/history/`, every earlier version of those types, sent oldest first (card 198), `Definition.errors` with jsonschema, `ensure_published` (GET the version, POST only on 404, stop on a different body) |
 | `envelopes.py` | `envelope` (type, version, payload, asserted_person, and nothing else), `check` before anything leaves, `batches` at `MAX_BATCH = 49`, `snapshot_parts` |
 | `client.py` | `Client` over `http.client`: bearer token, one deadline over the whole call, 8 MiB answer cap, no redirect followed, a 200 accepted only as a whole [admission receipt](/data-structures/admission-response.md) |
 

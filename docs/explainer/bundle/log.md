@@ -139,3 +139,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: the inspector's projection page opens on a per-type summary (served, excluded, superseded) and draws rows only on request, `?type=&show=` with `from`, `to` and `asof`, at most 500. The superseded count is derived from the fold's states and reads no version; `fold.DisplacedWhere` reads the versions of one type's facets for the rows view.
 - Bundle: the inspector component gains a section on the projection page.
+
+## 2026-10-21, card 198
+
+- Code: the importers say how their clocks were read. Seven bundled types move a version, identity and fact time unchanged: `activity.exercise-session.concept2`, `activity.exercise-session.strong` and `record.document` v2 require `source_time`; `health.blood-pressure` v7, `activity.exercise-session.technogym`, `health.lab-result` and `health.lab-panel` v2 declare it. History holds 71. `record.document` leaves the source-time list.
+- Bundle: the importer base says `load` sends every version oldest first; the bp_csv page and index name v7; the Definition manifest page counts 71 in history.

@@ -50,6 +50,13 @@ func TestManifests_CarryTheHistory(t *testing.T) {
 		"health.illness.ended":      {1},
 		"place.departed":            {1},
 		"place.trip.departed":       {1},
+		// Card 198: source_time's versions.
+		"record.document":                     {1},
+		"health.lab-result":                   {1},
+		"health.lab-panel":                    {1},
+		"activity.exercise-session.concept2":  {1},
+		"activity.exercise-session.strong":    {1},
+		"activity.exercise-session.technogym": {1},
 	} {
 		for _, v := range versions {
 			if !held[typ][v] {
@@ -62,8 +69,8 @@ func TestManifests_CarryTheHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bp, ok := reg.Lookup("health.blood-pressure"); !ok || bp.Version != 6 {
-		t.Errorf("Bundled bp = v%d, %v; want the current v6 alone", bp.Version, ok)
+	if bp, ok := reg.Lookup("health.blood-pressure"); !ok || bp.Version != 7 {
+		t.Errorf("Bundled bp = v%d, %v; want the current v7 alone", bp.Version, ok)
 	}
 	if _, ok := reg.Lookup("record.note"); ok {
 		t.Error("Bundled carries record.note, which is record.edge since card 191")

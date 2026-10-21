@@ -1,4 +1,5 @@
 {"id": "technogym:2024-03-05T07:30:00.0000000+11:00", "activity_name": "rowing.machine",
+ "source_time": {"value": "2024-03-05T07:30:00.0000000+11:00", "zone": "+11:00", "basis": "source"},
  "effective_time_frame": {"time_interval": {"start_date_time": "2024-03-05T07:00:00+11:00", "duration": {"value": 1800, "unit": "sec"}}},
  "duration": {"value": 1800, "unit": "sec"}, "distance": {"value": 6000, "unit": "m"},
  "kcal_burned": {"value": 300, "unit": "kcal"}, "base_movement_quantity": {"value": 700, "unit": "strokes"},

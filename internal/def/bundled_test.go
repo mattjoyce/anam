@@ -233,8 +233,9 @@ func TestBundled_LabResultAdmitsAnUntimedDraw(t *testing.T) {
 // source's own fields beside it. Its identity and fact time are v3's, so the guard
 // passes and the readings supersede in place; a v3-shaped payload is refused. Card
 // 97: v5 names the six export columns v4 refused, as text, so one ticked checkbox
-// no longer stops the export. Card 147: v6 is v5 declaring kind and family. The
-// bundled file is byte for byte the importer's.
+// no longer stops the export. Card 147: v6 is v5 declaring kind and family. Card
+// 198: v7 declares source_time, not required. The bundled file is byte for byte the
+// importer's.
 func TestBundled_BloodPressureIsAnOMHBody(t *testing.T) {
 	t.Parallel()
 	reg, err := def.Bundled()
@@ -245,7 +246,7 @@ func TestBundled_BloodPressureIsAnOMHBody(t *testing.T) {
 	if !ok {
 		t.Fatal("no bundled health.blood-pressure")
 	}
-	if d.Version != 6 || d.FactTime.Pointer != "/date_excel" || len(d.IdentityKey) != 2 || d.Kind != def.KindReading || d.Family != "vitals" {
+	if d.Version != 7 || d.FactTime.Pointer != "/date_excel" || len(d.IdentityKey) != 2 || d.Kind != def.KindReading || d.Family != "vitals" {
 		t.Fatalf("v%d fact time %s identity %v", d.Version, d.FactTime.Pointer, d.IdentityKey)
 	}
 	decode := func(s string) map[string]any {

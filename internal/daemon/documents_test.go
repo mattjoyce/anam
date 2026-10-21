@@ -40,7 +40,7 @@ func documentsConfig(t *testing.T) config.Config {
 }
 
 func reference(version int, path, sum string, size int) string {
-	return fmt.Sprintf(`{"type": "record.document", "definition_version": %d, "payload": {"path": %q, "sha256": %q, "media_type": "application/pdf", "bytes": %d, "date": "2026-01-30"}}`,
+	return fmt.Sprintf(`{"type": "record.document", "definition_version": %d, "payload": {"path": %q, "sha256": %q, "media_type": "application/pdf", "bytes": %d, "date": "2026-01-30", "source_time": {"value": "2026-01-30", "zone": "Australia/Sydney", "basis": "assumption"}}}`,
 		version, path, sum, size)
 }
 

@@ -17,8 +17,8 @@ func TestDefinitionHistorySurvivesAFreshStore(t *testing.T) {
 	var list api.Definitions
 	call(t, "GET", url+"/v1/definitions", testToken, "", http.StatusOK, &list)
 	for _, s := range list.Definitions {
-		if s.Type == "health.blood-pressure" && len(s.Versions) != 6 {
-			t.Errorf("health.blood-pressure versions = %v, want 1 to 6", s.Versions)
+		if s.Type == "health.blood-pressure" && len(s.Versions) != 7 {
+			t.Errorf("health.blood-pressure versions = %v, want 1 to 7", s.Versions)
 		}
 	}
 	var body map[string]any

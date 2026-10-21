@@ -266,8 +266,11 @@ importers:
 Every version is held, and a rebuilt operational store holds them again: the versions Anam's own
 bundle ever carried are provisioned from the binary (`internal/def/manifests/history`, card 111),
 and an importer's versions come back because the importer keeps every version it has ever emitted
-in its Definitions folder and registers them all at start (§8.5 rule 1); a folder that drops an old
-version loses the words its facets were admitted under.
+of the types it emits now, the current one in `definitions/<type>.json` and each earlier one in
+`definitions/history/<type>.v<n>.json`, and registers them all, each type's oldest first, since a
+version older than one held is refused (§8.5 rule 1, card 198). A folder that drops an old version
+loses the words its facets were admitted under. History kept under a type's old name, which a
+rename carried away, is the binary's to provision and is not registered.
 
 A registered version is immutable, and "same body" compares canonical JSON, so reformatting the file
 is harmless. A change is a new version, which may change the schema, classification or series freely
@@ -285,8 +288,17 @@ does not exist. A daily aggregate's interval is the Open mHealth `effective_time
 the source counted, each end at its own offset. A Definition whose fact time is a zoneless wall clock
 gets that clock refused when its zone skips or repeats it (a daylight-saving gap or overlap): the
 importer reads the source's offset where there is one, and `anam_importer.clock.local_instant`
-refuses the same cases in Python before it sends. Garmin's types carry it now; the types still read
-from a Sydney wall clock without it are listed in `internal/def/sourcetime_test.go`, and that list
+refuses the same cases in Python before it sends, leaving the record out with a log line, so the
+run is no snapshot. Every importer sends it (card 198): Garmin, Withings, DreamStation, OwnTracks
+and stays with a UTC instant or epoch (`source`); Concept2 with `date_utc` (`source`), or a web
+entry's date in the Logbook's own zone (`source`) or Sydney (`assumption`); bp_csv with its `zone`
+key (`configuration`) or the Definition's zone (`assumption`); links by where its date came from;
+documents and the pathology extractor in Sydney (`assumption`); the Fitbit sleep and Strong
+extractors in the zone they are given (`configuration`). A source that gives the end of a session,
+as Concept2 and Technogym do, keeps the end as `value` and its Definition says so. A writer may
+read a wall clock only in the zone its Definition's fact time names, so a configured zone other
+than that one is refused until a fact can name its own zone. The types still read from a Sydney
+wall clock without requiring it are listed in `internal/def/sourcetime_test.go`, and that list
 only shrinks.
 
 A vendor's own payload shape is named for its vendor, at the leaf after the concept (card 192):
@@ -381,7 +393,8 @@ A stored file never moves; a lookup finds it by its name.
 
 ### 8.5 What an importer must do
 
-1. Register every Definition in its folder at start, and stop if one is refused.
+1. Register every Definition in its folder, every version of each type it emits, oldest first, and
+   stop if one is refused.
 2. Validate each payload locally against its Definition's `schema` with a stock JSON Schema library,
    so a refusal at the gate means the importer and Anam disagree, not that a row was malformed.
 3. Shape payloads only. Compose no identity, join nothing, summarise nothing (§2).

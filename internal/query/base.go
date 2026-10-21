@@ -17,7 +17,8 @@ const (
 	// one served facet's envelope. Series is "" for a facet that stands alone.
 	RelEntry = "entry"
 	// RelAttr is attr(E, Pointer, Value): every scalar leaf of a served payload, by
-	// its JSON pointer. A null is no value; a container is its leaves.
+	// its JSON pointer. A null is no value; a container is not a value either, so
+	// ask for its leaves.
 	RelAttr = "attr"
 	// RelCloses is closes(Type): the types whose Definition closes a series.
 	RelCloses = "closes"

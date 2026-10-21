@@ -29,7 +29,39 @@ func (d Definition) HasPointer(p string) error {
 	if d.tree == nil {
 		return fmt.Errorf("%w: %s declares no schema, so its fields cannot be named", ErrPointer, d.Type)
 	}
-	node := d.tree
+	if _, at, ok := nodeAt(d.tree, p); !ok {
+		return fmt.Errorf("%w: %s declares no field %s (no %q at that level)", ErrPointer, d.Type, p, at)
+	}
+	return nil
+}
+
+// ContainerAt reports whether the schema declares the pointer as a container: an
+// object or an array, which holds no value of its own. The leaves are the pointers
+// beneath it that hold a value, and they are the pointers a read can name instead.
+// A container the schema does not describe (a free-form object) has no leaves to
+// name, and the list is empty.
+func (d Definition) ContainerAt(p string) (container bool, leaves []string, err error) {
+	if err := checkPointerSyntax(p); err != nil {
+		return false, nil, err
+	}
+	if d.tree == nil {
+		return false, nil, fmt.Errorf("%w: %s declares no schema, so its fields cannot be named", ErrPointer, d.Type)
+	}
+	node, _, ok := nodeAt(d.tree, p)
+	if !ok {
+		return false, nil, fmt.Errorf("%w: %s declares no field %s", ErrPointer, d.Type, p)
+	}
+	if !isContainer(node) {
+		return false, nil, nil
+	}
+	return true, leavesOf(node, p), nil
+}
+
+// nodeAt walks the schema to the node the pointer names: a property at each object
+// token, an item at each array index. The token it stopped at is returned too, so
+// the caller can say which one was not found.
+func nodeAt(tree map[string]any, p string) (node map[string]any, at string, ok bool) {
+	node = tree
 	for _, token := range strings.Split(p[1:], "/") {
 		token = strings.ReplaceAll(strings.ReplaceAll(token, "~1", "/"), "~0", "~")
 		if props, _ := node["properties"].(map[string]any); props != nil {
@@ -44,9 +76,56 @@ func (d Definition) HasPointer(p string) error {
 				continue
 			}
 		}
-		return fmt.Errorf("%w: %s declares no field %s (no %q at that level)", ErrPointer, d.Type, p, token)
+		return nil, token, false
 	}
-	return nil
+	return node, "", true
+}
+
+// isContainer reports whether a schema node holds other fields rather than a value:
+// an object or an array, by its declared type or by the members it declares.
+func isContainer(node map[string]any) bool {
+	switch node["type"] {
+	case "object", "array":
+		return true
+	}
+	if props, _ := node["properties"].(map[string]any); props != nil {
+		return true
+	}
+	if items, _ := node["items"].(map[string]any); items != nil {
+		return true
+	}
+	return false
+}
+
+// leavesOf lists the pointers beneath a container that hold a value: its scalar
+// members, each as a JSON pointer, an array's members at index 0 (any index
+// resolves).
+func leavesOf(node map[string]any, prefix string) []string {
+	var out []string
+	if props, _ := node["properties"].(map[string]any); props != nil {
+		keys := make([]string, 0, len(props))
+		for k := range props {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			p := prefix + "/" + escapeToken(k)
+			sub, _ := props[k].(map[string]any)
+			if isContainer(sub) {
+				out = append(out, leavesOf(sub, p)...)
+				continue
+			}
+			out = append(out, p)
+		}
+	}
+	if items, _ := node["items"].(map[string]any); items != nil {
+		p := prefix + "/0"
+		if isContainer(items) {
+			return append(out, leavesOf(items, p)...)
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 // Pointers lists the fields the schema declares, as JSON pointers: each property in
@@ -85,7 +164,7 @@ func pointersOf(node map[string]any, prefix string) []string {
 		}
 		sort.Strings(keys)
 		for _, k := range keys {
-			p := prefix + "/" + strings.ReplaceAll(strings.ReplaceAll(k, "~", "~0"), "/", "~1")
+			p := prefix + "/" + escapeToken(k)
 			out = append(out, p)
 			if sub, ok := props[k].(map[string]any); ok {
 				out = append(out, pointersOf(sub, p)...)
@@ -98,4 +177,9 @@ func pointersOf(node map[string]any, prefix string) []string {
 		out = append(out, pointersOf(items, p)...)
 	}
 	return out
+}
+
+// escapeToken writes a member's name as a JSON pointer token (RFC 6901).
+func escapeToken(k string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(k, "~", "~0"), "/", "~1")
 }

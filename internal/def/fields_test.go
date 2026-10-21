@@ -2,6 +2,7 @@ package def_test
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -34,6 +35,32 @@ const nestedManifest = `{
   }
 }`
 
+// An open object: its members are keyed by the payload, so the schema declares what
+// each member holds and not what it is called.
+const openManifest = `{
+  "meta": {
+    "facet_type": "exercise.metrics",
+    "definition_version": 1,
+    "classification": "Normal",
+    "validation_mode": "strict",
+    "source_schema": "erg/metrics",
+    "time_semantics": {
+      "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
+    },
+    "identity_key": ["/measured_at"]
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["measured_at"],
+    "properties": {
+      "measured_at": {"type": "string", "minLength": 1},
+      "metrics": {"type": "object", "additionalProperties": {"type": "number"}}
+    },
+    "additionalProperties": false
+  }
+}`
+
 // A field is one the schema declares: a property at each object token, an item at
 // each array index. Anything else is refused by name, so a read that names it fails
 // before anything is read.
@@ -57,6 +84,54 @@ func TestHasPointer_WalksTheSchema(t *testing.T) {
 		if !errors.Is(err, def.ErrPointer) || !strings.Contains(err.Error(), tt.want) {
 			t.Errorf("HasPointer(%q) = %v, want ErrPointer saying %q", tt.p, err, tt.want)
 		}
+	}
+}
+
+// A container holds no value of its own: the leaves beneath it do. The schema says
+// which is which, and names the leaves, so a read that asks for a container can be
+// told the ones to ask for instead.
+func TestContainerAt_NamesTheLeavesUnderAContainer(t *testing.T) {
+	t.Parallel()
+	d := mustParse(t, nestedManifest)
+	for _, c := range []struct {
+		pointer   string
+		container bool
+		leaves    []string
+	}{
+		{"/measured_at", false, nil},
+		{"/distance", true, []string{"/distance/unit", "/distance/value"}},
+		{"/distance/value", false, nil},
+		{"/splits", true, []string{"/splits/0/m"}},
+		{"/a~1b", false, nil},
+	} {
+		container, leaves, err := d.ContainerAt(c.pointer)
+		if err != nil {
+			t.Errorf("ContainerAt(%s) = %v", c.pointer, err)
+			continue
+		}
+		if container != c.container {
+			t.Errorf("ContainerAt(%s) container = %v, want %v", c.pointer, container, c.container)
+		}
+		if !slices.Equal(leaves, c.leaves) {
+			t.Errorf("ContainerAt(%s) leaves = %v, want %v", c.pointer, leaves, c.leaves)
+		}
+	}
+}
+
+// A container whose members are open keys has leaves, but no leaf can be named:
+// the names come from the payload, not from the schema.
+func TestContainerAt_AnOpenObjectNamesNoLeaf(t *testing.T) {
+	t.Parallel()
+	d := mustParse(t, openManifest)
+	container, leaves, err := d.ContainerAt("/metrics")
+	if err != nil {
+		t.Fatalf("ContainerAt(/metrics) = %v", err)
+	}
+	if !container {
+		t.Error("ContainerAt(/metrics) container = false, want true")
+	}
+	if len(leaves) != 0 {
+		t.Errorf("ContainerAt(/metrics) leaves = %v, want none", leaves)
 	}
 }
 

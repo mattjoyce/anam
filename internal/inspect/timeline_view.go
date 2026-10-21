@@ -64,7 +64,10 @@ func (s *Server) setDefaultView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	view := cleanView(r.PostForm.Get("view"))
-	c := &http.Cookie{
+	// No Secure flag: the daemon serves plain HTTP on the LAN and the tailnet, and a browser
+	// never stores a Secure cookie from an insecure origin, so the default view would be lost.
+	// The cookie holds only a view query, never a credential. Approved by Matt, 2026-10-22.
+	c := &http.Cookie{ // #nosec G124 -- plain HTTP origin; the cookie holds a view query, not a credential
 		Name: viewCookie, Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode,
 		Value: url.QueryEscape(address("", view)), MaxAge: 365 * 24 * 60 * 60,
 	}

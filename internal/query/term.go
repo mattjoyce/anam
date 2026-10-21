@@ -19,13 +19,14 @@ const (
 	KindBool
 )
 
-// Const is one constant: a string, a number or a boolean. Numbers are float64, as
-// JSON readers commonly take them, and keep one canonical lexeme so that 1 and 1.0
-// are the same constant and hash the same.
+// Const is one constant: a string, a number or a boolean. A number keeps the exact
+// decimal the record holds — 1792269840000 stays 1792269840000, where a float64
+// rounded it to 1.79226984e+12 and made it the same number as its neighbour — and
+// one canonical form, so that 1 and 1.0 are the same constant and hash the same.
 type Const struct {
 	kind Kind
 	s    string
-	n    float64
+	num  number
 }
 
 // String makes a string constant.
@@ -34,13 +35,14 @@ func String(s string) Const { return Const{kind: KindString, s: s} }
 // Bool makes a boolean constant.
 func Bool(b bool) Const { return Const{kind: KindBool, s: strconv.FormatBool(b)} }
 
-// Number makes a number constant from a JSON lexeme.
+// Number makes a number constant from a JSON lexeme. The value is exact: the
+// lexeme is read as the decimal it is, not as a float64 that rounds it.
 func Number(lexeme string) (Const, error) {
-	n, err := strconv.ParseFloat(lexeme, 64)
+	n, err := parseNumber(lexeme)
 	if err != nil {
-		return Const{}, fmt.Errorf("%w: %q is not a number", ErrSyntax, lexeme)
+		return Const{}, fmt.Errorf("%w: %v", ErrSyntax, err)
 	}
-	return Const{kind: KindNumber, s: strconv.FormatFloat(n, 'g', -1, 64), n: n}, nil
+	return Const{kind: KindNumber, s: n.text(), num: n}, nil
 }
 
 // Kind reports the constant's kind.
@@ -87,25 +89,23 @@ func (c *Const) UnmarshalJSON(b []byte) error {
 // key is the constant's identity for sets and joins. The kind prefix keeps the
 // string "1" apart from the number 1.
 func (c Const) key() string {
+	if c.kind == KindNumber {
+		return string(rune('0'+c.kind)) + c.num.key()
+	}
 	return string(rune('0'+c.kind)) + c.s
 }
 
 // compare orders two constants of one kind: strings lexically (fact-times are
-// fixed-width, so that is chronological), numbers numerically, false before true.
-// ok is false when the kinds differ: they are unequal, and not ordered.
+// fixed-width, so that is chronological), numbers numerically and exactly, false
+// before true. ok is false when the kinds differ: they are unequal, and not
+// ordered.
 func compare(a, b Const) (cmp int, ok bool) {
 	if a.kind != b.kind {
 		return 0, false
 	}
 	switch a.kind {
 	case KindNumber:
-		switch {
-		case a.n < b.n:
-			return -1, true
-		case a.n > b.n:
-			return 1, true
-		}
-		return 0, true
+		return a.num.cmp(b.num), true
 	default:
 		return strings.Compare(a.s, b.s), true
 	}

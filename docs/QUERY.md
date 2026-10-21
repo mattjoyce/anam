@@ -79,6 +79,14 @@ whole lexeme. A bare date sorts before every entry of its day and asks a questio
 program that writes `instant("2026-06-15")` is refused, and the message gives the lexeme it should have
 been.
 
+### Numbers
+
+A number is the exact decimal the record holds, and it answers as that decimal written out: an
+integer in full (`1792269840000`, not `1.79226984e+12`). One value has one form, so `1` and `1.0` are
+one number and answer the same. Numbers compare by value and exactly: `9007199254740992` and
+`9007199254740993` are two numbers, though a float64 holds them as one. A number whose written-out
+form would run past 64 digits answers in scientific form, which is exact as well.
+
 ### Pointers
 
 A constant pointer in `attr/3` must be a field some Definition declares. `attr(E, "/systolic", V)`

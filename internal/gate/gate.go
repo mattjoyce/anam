@@ -132,6 +132,10 @@ type Gate struct {
 	personID string
 
 	limits Limits
+
+	// held answers a Definition at a version, for a carry (carry.go). Nil on every
+	// gate but one a migration builds with Holding.
+	held Held
 }
 
 // Limits are the gate's two opinionated defaults, given by whoever builds it from the

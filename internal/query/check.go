@@ -44,7 +44,8 @@ func Check(ctx context.Context, v fold.Value, versions map[string]int, defs Defi
 	if err != nil {
 		return Report{}, err
 	}
-	base, err := NewBase(v, versions, defs)
+	// The check reads current/2 alone, which never reaches attr/3.
+	base, err := NewBase(v, versions, defs, ReadsAttr([]string{"current"}, rules.Program))
 	if err != nil {
 		return Report{}, err
 	}

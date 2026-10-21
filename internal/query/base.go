@@ -58,10 +58,55 @@ func Versions(live []facet.Facet) map[string]int {
 	return out
 }
 
+// Len is how many tuples the base holds for relation, zero for a name it does not
+// have.
+func (b Base) Len(relation string) int {
+	if r, ok := b.relations[relation]; ok {
+		return len(r.tuples)
+	}
+	return 0
+}
+
+// ReadsAttr is the one decision on whether a query needs attr/3 built: it reports
+// whether any of roots, the relations the caller will read an answer from, reaches
+// attr/3 through the rules of programs. It walks each root's rules and the rules of
+// every relation their bodies read, negated or not. attr/3 is the base relation that
+// costs a tuple per scalar leaf of every served payload, so a program that reads only
+// entry/7 and closes/1 does not pay for it. A root that is attr itself reaches it. The
+// bundled set reads attr in edge_to/2 and edge_from/2, so a program reaching those,
+// or linked/2 through them, gets it. The walk is by relation name, so it errs toward
+// building: a rule that mentions attr/3 anywhere along the way counts, even if no row
+// of it could fire. Rules of relations no root reaches may read an unbuilt attr/3 and
+// derive less than they would; they are not what the caller reads.
+func ReadsAttr(roots []string, programs ...Program) bool {
+	var rules []Rule
+	for _, p := range programs {
+		rules = append(rules, p.Rules...)
+	}
+	reads := bodyReads(rules)
+	seen := map[string]bool{}
+	stack := append([]string(nil), roots...)
+	for len(stack) > 0 {
+		name := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		if name == RelAttr {
+			return true
+		}
+		stack = append(stack, reads[name]...)
+	}
+	return false
+}
+
 // NewBase builds the base relations over served, a value a projection returned,
 // with versions from the same fold (Versions). A served entry the fold does not hold
-// is refused: the value and the versions must be from one watermark.
-func NewBase(served fold.Value, versions map[string]int, defs Definitions) (Base, error) {
+// is refused: the value and the versions must be from one watermark. attr/3 is built
+// only when withAttr is set (ReadsAttr decides): left unbuilt it is an empty relation,
+// and a rule that reads it derives nothing.
+func NewBase(served fold.Value, versions map[string]int, defs Definitions, withAttr bool) (Base, error) {
 	b := Base{relations: map[string]*relation{
 		RelEntry:  newRelation(),
 		RelAttr:   newRelation(),
@@ -78,6 +123,9 @@ func NewBase(served fold.Value, versions map[string]int, defs Definitions) (Base
 		}
 		b.relations[RelEntry].add(Tuple{String(e.FacetID), String(string(e.Type)), String(e.FactTime),
 			String(e.Series), String(string(e.Status)), String(e.Source), version})
+		if !withAttr {
+			continue
+		}
 		doc, err := def.Decode(e.Payload)
 		if err != nil {
 			return Base{}, fmt.Errorf("%w: facet %s: %v", ErrBase, e.FacetID, err)

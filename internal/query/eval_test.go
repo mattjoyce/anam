@@ -115,7 +115,7 @@ func tryRun(v fold.Value, versions map[string]int, defs *def.Registry, text, rel
 	if err != nil {
 		return query.Answer{}, err
 	}
-	base, err := query.NewBase(v, versions, defs)
+	base, err := query.NewBase(v, versions, defs, query.ReadsAttr([]string{relation}, rules.Program, prog))
 	if err != nil {
 		return query.Answer{}, err
 	}
@@ -251,7 +251,7 @@ func TestEvaluate_HonoursTheDeadline(t *testing.T) {
 		t.Fatalf("Parse: %v", err)
 	}
 	defs := registry(t)
-	base, err := query.NewBase(v, versions, defs)
+	base, err := query.NewBase(v, versions, defs, true)
 	if err != nil {
 		t.Fatalf("NewBase: %v", err)
 	}

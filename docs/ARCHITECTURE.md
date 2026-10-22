@@ -323,7 +323,7 @@ operator stop one source's admission, or every source's, without touching a toke
 envelopes and Definition registrations are refused with 503 and a `Retry-After`, and nothing of it is
 admitted. The hold is read *inside* the write, so a hold and an admission are one order: a hold set
 before the batch's turn is seen, and one set after it is not. A hold the write cannot read refuses
-the batch too — an admission that cannot see a hold must not admit. It is authored state in the
+the batch too: an admission that cannot see a hold must not admit. It is authored state in the
 operational store, so it outlives a restart of the daemon. The `workbench` is never held: a hand
 entry is the operator's own, not an importer's submission.
 

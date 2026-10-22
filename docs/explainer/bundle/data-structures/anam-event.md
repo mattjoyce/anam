@@ -3,7 +3,7 @@ type: data-structure
 title: Anam-event row
 description: "One row per change in Anam's knowledge: a gapless seq, one of five kinds, the facet and artifact version it concerns, and anam-time."
 timestamp: 2026-10-11T00:00:00Z
-resource: internal/store/ledger/schema.go#schema
+resource: internal/store/ledger/ledger.sql#anam_event
 anchor: "seq                    INTEGER PRIMARY KEY CHECK (seq >= 1),"
 basis: code
 tier: supporting

@@ -3,6 +3,7 @@ package ledger
 import (
 	"context"
 	"database/sql"
+	_ "embed" // go:embed for the migration files
 	"fmt"
 	"strconv"
 	"strings"
@@ -30,8 +31,14 @@ type migration struct {
 	rebuild string
 }
 
+// migration0002 is the step to schema 2, in migrations/0002.sql. Schema 3 has no file:
+// it changed no SQL, and its step is the rebuild text below.
+//
+//go:embed migrations/0002.sql
+var migration0002 string
+
 var migrations = []migration{
-	{to: 2, ddl: `ALTER TABLE facet ADD COLUMN series TEXT NOT NULL DEFAULT ''`},
+	{to: 2, ddl: migration0002},
 	{to: 3, rebuild: "schema 3 changed how a facet's id is composed from its source row and the zone " +
 		"its fact-time is read in; the rows in a schema 2 file were keyed and placed by the old rules. " +
 		"Move this file aside (it stays the record of what Anam knew until now), run `anam init` at " +

@@ -3,11 +3,11 @@ type: invariant
 title: Metadata and payload are separated; the payload is opaque
 description: Anam governs and projections filter on the facet's attributes and descriptor; the payload is verbatim, immutable, stored as bytes and never parsed into a canonical schema.
 timestamp: 2026-10-11T00:00:00Z
-resource: internal/store/ledger/schema.go#schema
+resource: internal/store/ledger/ledger.sql#facet
 anchor: "payload            BLOB    NOT NULL,"
 basis: code
 tier: supporting
-enforced_at: internal/store/ledger/schema.go#schema
+enforced_at: internal/store/ledger/ledger.sql#facet
 enforced_anchor: "payload            BLOB    NOT NULL,"
 applies_to:
   - /components/store-ledger.md

@@ -7,7 +7,7 @@ resource: internal/fold/fold.go#Apply
 anchor: "abbreviated to facet.Status(ev.Kind): that conversion compiles"
 basis: code
 tier: core
-enforced_at: internal/store/ledger/schema.go#schema
+enforced_at: internal/store/ledger/ledger.sql#facet
 enforced_anchor: "payload            BLOB    NOT NULL,"
 applies_to:
   - /components/fold.md

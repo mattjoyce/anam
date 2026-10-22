@@ -4,7 +4,7 @@ title: facet_index is written by catch-up but read by no read path
 description: The schema comment says the timeline, type filter and bucket membership live here; the timeline in this tree composes from checkpoints or folds the ledger, and only anam changes reads the derived indexes.
 timestamp: 2026-10-11T00:00:00Z
 looked_at:
-  - internal/store/ops/ops.go
+  - internal/store/ops/ops.sql
   - internal/read/timeline.go
   - internal/read/changes.go
   - internal/mint/window.go

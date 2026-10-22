@@ -3,11 +3,11 @@ type: invariant
 title: "W is the anam-event sequence itself: one number, gapless, never stored"
 description: The watermark is MAX(seq); a trigger lets an event take only the next seq; every event kind advances it, a pure status transition included.
 timestamp: 2026-10-11T00:00:00Z
-resource: internal/store/ledger/schema.go#schema
+resource: internal/store/ledger/ledger.sql#anam_event_seq_follows
 anchor: "WHEN NEW.seq IS NOT (SELECT COALESCE(MAX(seq), 0) + 1 FROM anam_event)"
 basis: code
 tier: supporting
-enforced_at: internal/store/ledger/schema.go#schema
+enforced_at: internal/store/ledger/ledger.sql#anam_event_seq_follows
 enforced_anchor: "WHEN NEW.seq IS NOT (SELECT COALESCE(MAX(seq), 0) + 1 FROM anam_event)"
 applies_to:
   - /components/store-ledger.md

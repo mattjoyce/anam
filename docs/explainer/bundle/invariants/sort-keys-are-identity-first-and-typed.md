@@ -3,11 +3,11 @@ type: invariant
 title: Sort keys are identity-first, and integers are typed
 description: An artifact's key carries facet_id then artifact_version, never fact_time; version and seq are INTEGER columns so they order numerically; times are fixed-width UTC text.
 timestamp: 2026-10-11T00:00:00Z
-resource: internal/store/ledger/schema.go#schema
+resource: internal/store/ledger/ledger.sql#facet
 anchor: "PRIMARY KEY (facet_id, artifact_version)"
 basis: code
 tier: supporting
-enforced_at: internal/store/ledger/schema.go#schema
+enforced_at: internal/store/ledger/ledger.sql#facet
 enforced_anchor: "PRIMARY KEY (facet_id, artifact_version)"
 applies_to:
   - /components/store-ledger.md

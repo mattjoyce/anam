@@ -3,11 +3,11 @@ type: invariant
 title: A registered Definition version is immutable
 description: Once held, a version's body never changes; the operational store's triggers refuse update and delete, and a different body at a held version is a 409.
 timestamp: 2026-10-11T00:00:00Z
-resource: internal/store/ops/ops.go#registered_definition_no_update
+resource: internal/store/ops/ops.sql#registered_definition_no_update
 anchor: "registered_definition is immutable"
 basis: code
 tier: detail
-enforced_at: internal/store/ops/ops.go#registered_definition_no_update
+enforced_at: internal/store/ops/ops.sql#registered_definition_no_update
 enforced_anchor: "registered_definition is immutable"
 applies_to:
   - /components/store-ops.md

@@ -33,7 +33,7 @@ steps:
     label: check the token and the extension
     action: "`postDocument` refuses a token whose types do not include `record.document` (403) and an extension that is not letters and digits, at most 16 (400). It measures the sha256, size and media type (by extension) from the body."
     resource: internal/daemon/documents.go#postDocument
-    anchor: "if !mayStore(imp) {"
+    anchor: "if !policy.MayStoreDocument(imp) {"
   - actor: /components/daemon.md
     label: store the bytes as a value
     action: "On the write queue, so one writer counts and places and a backup never copies half a file, `library.Store` writes `<sha256>.<ext>` through a temporary file renamed into place under an `os.Root` on the library, in the first folder along the root, `sha[:1]/`, `sha[:1]/sha[:2]/` that holds fewer than `library_folder_limit` files. New bytes are 201 and bytes already held are 200, each with `sha256`, `bytes`, `media_type` and `new`. Other bytes are another file, so there is no conflict and nothing is overwritten."

@@ -9,8 +9,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mattjoyce/anam/internal/config"
-	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
+	"github.com/mattjoyce/anam/internal/policy"
 	"github.com/mattjoyce/anam/internal/read"
 )
 
@@ -57,18 +57,12 @@ func refuseDeclared(cmd *cobra.Command, cfg config.Config, source string) error 
 		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "importers: no importers file configured, so no importer declares the source")
 		return nil
 	}
-	reg, err := def.Bundled()
+	file, err := importersFile(cfg)
 	if err != nil {
 		return err
 	}
-	importers, err := config.LoadPrincipals(cfg.ImportersFile, reg.Has)
-	if err != nil {
-		return err
-	}
-	for _, imp := range importers {
-		if imp.Source == source {
-			return fmt.Errorf("%s is still declared as an importer; remove it from %s before retiring it", source, cfg.ImportersFile)
-		}
+	if !policy.MayRetire(file, source) {
+		return fmt.Errorf("%s is still declared as an importer; remove it from %s before retiring it", source, cfg.ImportersFile)
 	}
 	return nil
 }

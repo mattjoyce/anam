@@ -15,6 +15,7 @@ import (
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
+	"github.com/mattjoyce/anam/internal/policy"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
@@ -85,7 +86,7 @@ func (d *Daemon) admitBatch(ctx context.Context, who config.Principal, b intake,
 		// A held source admits nothing. The check is inside the write, where the hold
 		// and this admission are one order: a hold set before this write is seen, and
 		// one set after it is not.
-		if err := checkHold(ctx, s.Ops, who.Source); err != nil {
+		if err := checkHold(ctx, s.Ops, who); err != nil {
 			return err
 		}
 		// A part that does not belong to the run its id names, or that was already
@@ -101,7 +102,7 @@ func (d *Daemon) admitBatch(ctx context.Context, who config.Principal, b intake,
 		// Inside the write, where a registration cannot land between this and the
 		// admission.
 		reg := d.defs.current.Load()
-		g := gate.New(s.Ledger, reg, scopesOf(who), clock.Real{}, d.cfg.PersonID, gateLimits(d.cfg))
+		g := gate.New(s.Ledger, reg, policy.ScopesOf(who), clock.Real{}, d.cfg.PersonID, gateLimits(d.cfg))
 		bindings := make([]facet.Binding, len(b.envs))
 		for i, env := range b.envs {
 			// A malformed envelope binds to nothing; the gate's first check refuses it

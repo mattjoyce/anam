@@ -16,12 +16,13 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
 	"github.com/mattjoyce/anam/internal/library"
+	"github.com/mattjoyce/anam/internal/policy"
 )
 
 // docType is the facet type a stored document is referenced by; an importer may post
-// documents only if it owns the references to them (mayStore). It names a bundled
-// type, so it is not configurable.
-const docType facet.Type = "record.document"
+// documents only if it owns the references to them (policy.MayStoreDocument). It names
+// a bundled type, so it is not configurable.
+const docType = policy.DocumentType
 
 // The ways a document post or a reference to one is refused.
 var (
@@ -38,7 +39,7 @@ var (
 // overwritten. Where in the library it sits is the library's own business.
 func (d *Daemon) postDocument(w http.ResponseWriter, r *http.Request) {
 	imp := principalOf(r)
-	if !mayStore(imp) {
+	if !policy.MayStoreDocument(imp) {
 		writeError(w, http.StatusForbidden, fmt.Errorf("%s does not own %s, so may not store documents", imp.Source, docType))
 		return
 	}

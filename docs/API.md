@@ -167,9 +167,13 @@ token must name a projection and cannot use `explain` (400), since a receipt is 
 served. A read too large for one answer comes a page at a time, from `GET /v1/receipts/{hash}`,
 where an unrecorded token would get a 413. `POST /v1/query` names the principal on the receipt it
 already files; `dry_run` still files nothing, for every token, so a recording token can still try a
-program unrecorded. A recording token opens only the receipts that name it (`GET /v1/receipts/{hash}`
-and `/facets/{facet_id}` are 403 for another's), because opening another's value would be a read no
-receipt records. Filing is part of the read: if the receipt cannot be written the read fails with
+program unrecorded: the receipt log covers real reads, and a dry run files nothing (decided
+2026-10-22, with no rule against it). A recording token opens and verifies only the receipts that
+name it (`GET /v1/receipts/{hash}`, `/facets/{facet_id}` and `/verify` are 403 for another's), because
+opening another's value would be a read no receipt records, and a verify answers the receipt's facet
+ids and query text. It lists only those too: `GET /v1/receipts` without `principal`, or with its own
+name, lists the receipts that name it, and naming another principal is 403. The operator and every
+other token list, open and verify any receipt. Filing is part of the read: if the receipt cannot be written the read fails with
 a 5xx and returns no facets, as `POST /v1/receipts` does. When it cannot be written because another
 writer holds the operational store past its busy wait, the read answers `503` with a `Retry-After`, as a
 busy write queue does, and is safe to send again. Any other token's reads are unchanged, and

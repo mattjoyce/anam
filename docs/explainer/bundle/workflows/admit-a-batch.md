@@ -78,7 +78,7 @@ steps:
     action: "`admit` hashes the presented token with SHA-256 (`who`) and looks it up in the map loaded from the importers file at start. `POST /v1/envelopes` admits the importer role only, so the operator's or a reader's token is a 403 naming its principal and role; an unknown token is a 401. The importer's source and types ride on the request context."
     reads: [/data-structures/importers-file.md]
     resource: internal/daemon/auth.go#admit
-    anchor: "case !slices.Contains(roles, who.Role):"
+    anchor: "switch policy.Allow(policy.Request{Caller: who, Known: ok, Roles: roles}) {"
   - actor: /components/daemon.md
     label: decode one bounded submission
     action: "`decodeSubmission` reads the body under a bound of 49 payloads plus 1 MiB (about 16 MB at the default `max_payload_bytes`), refuses unknown fields (a `source` key is a 400, the token names the source), requires 1 to 49 envelopes and a `definition_version`, and requires exactly one JSON value: anything after it is a 400, whitespace past the bound a 413. Nothing is queued yet."

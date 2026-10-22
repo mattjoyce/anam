@@ -13,7 +13,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
@@ -60,12 +59,13 @@ type Plan struct {
 }
 
 // PlanFacet decides whether facetID may be retracted by hand as a facet of source, and
-// returns what that would do. declared lists the sources the importers file names; an
-// importer's source that has completed a snapshot is refused (ErrReconciled), a facet
+// returns what that would do. outright is the policy's answer for the source
+// (policy.MayRetract): when it is false an importer declares the source, and a source
+// that has completed a snapshot is refused (ErrReconciled), a facet
 // of any other source is refused (ErrWrongSource), and a facet that is not live is
 // refused (ErrNotLive). A facet the ledger does not hold is ledger.ErrNotFound.
 // Nothing is written.
-func PlanFacet(ctx context.Context, l Ledger, snaps Snapshots, declared []string, source, facetID string) (Plan, error) {
+func PlanFacet(ctx context.Context, l Ledger, snaps Snapshots, outright bool, source, facetID string) (Plan, error) {
 	f, err := l.CurrentVersion(ctx, facetID)
 	if err != nil {
 		return Plan{}, err
@@ -74,7 +74,7 @@ func PlanFacet(ctx context.Context, l Ledger, snaps Snapshots, declared []string
 		return Plan{}, fmt.Errorf("%w: %s is a %s from source %s, not %s",
 			ErrWrongSource, facetID, f.Type, f.Provenance.Source, source)
 	}
-	if slices.Contains(declared, source) {
+	if !outright {
 		snap, ok, err := snaps.NewestCompleteSnapshot(ctx, source)
 		if err != nil {
 			return Plan{}, err

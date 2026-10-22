@@ -130,6 +130,20 @@ is 400 with a message that says what to change; a derivation or an answer over `
 of a type declare and others do not. `anam query run` and `anam query describe` are the CLI, local
 or over the daemon. [QUERY.md](QUERY.md) is the reference, with worked questions.
 
+**An inline projection (2026-10-22).** `projection` in a query takes a name, as above, or a
+template object, so an assistant can ask a one-off question without an operator registering a
+projection first. The object has a manifest's fields less its `name`, `version` and `description`:
+`types`, `statuses` and `max_classification` (required), and `from`, `to` and `shape`. The loader
+that checks a registered manifest checks it, so a mistake is 400 and the message names the field, as
+does a type with no Definition. It has no name; it is known by its content hash. The answer and its
+receipt call it `inline` at version 1, and the receipt carries `template_inline: true` with the hash
+in `template_hash`. The body is filed under that hash in the operational store, so
+`/v1/receipts/{hash}/verify` replays the answer after a restart. A dry run files nothing. Every role
+may already read every projection, so an inline one widens nothing. This is the one place a client
+sends a projection of its own, and only to a query; the sentence in section 5 below that a client
+never sends one is about `ReadRecord`, which is not built. The example in
+`internal/daemon/openapi.yaml` is held to the loader by a test.
+
 **Saved selections (2026-10-22).** `POST /v1/selections` takes `{"program": "..."}` and
 answers 201 with `{"code", "hash", "url", "program"}`: the program filed as a row of kind
 `selection`, addressed by the SHA-256 of its canonical text (a chip program in its one layout, any

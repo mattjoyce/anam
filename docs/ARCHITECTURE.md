@@ -562,7 +562,7 @@ rebuild has to know what it may drop:
 |---|---|---|
 | **Derived** | facet index, edge index (card 104), anam-event index, checkpoint index and its values (card 215), `span_head`, sync cursors | replay the ledger, and mint again |
 | **Provisioned** | Facet Definitions (bundled and registered), bundled projection templates, token scopes | the embedded assets, config, and each importer registering its Definitions again — i.e. git |
-| **Authored** | registered projection templates (card 125), receipts, served values and saved selections (card 215), `meta` | nowhere Anam can reach. Back it up; a registered template also comes back by registering it again from wherever the operator keeps the file |
+| **Authored** | registered projection templates (card 125), receipts, served values and saved selections (card 215), the bodies of inline projections (card 211), `meta` | nowhere Anam can reach. Back it up; a registered template also comes back by registering it again from wherever the operator keeps the file |
 | **Disposable** | importers' complete-resend snapshots (card 78): which parts of a run were admitted and which facet ids they carried | the next resend makes another; nothing is tombstoned from here without an operator's `anam retract --yes`, and an incomplete snapshot is dropped after `snapshot_ttl`, a day by default |
 
 The tier belongs in the schema beside each table, because it is the only thing that tells a later reader
@@ -874,8 +874,18 @@ rules (`current/2`, `displaced/2`, and `linked/2` over the edge facets, card 104
 Anam's reading of its own time semantics rather than rewriting it. The answer is a receipt like any
 other served thing: it carries the watermark and `ledger_id`, the projection name, version and
 content hash, the definition-set version, the rule-set hash, and the query text; `receipt verify`
-re-runs the same query over the same value and must get the same hash. A query moves no watermark
-and writes nothing. The evaluator is read-side and disposable, outside the error kernel; a wrong
+re-runs the same query over the same value and must get the same hash.
+
+A query may carry its projection inline (card 211), for a one-off question that no operator has
+registered a projection for. The `projection` field is then a template object with a manifest's knobs,
+without a name or a version, checked by the loader a registered manifest goes through. It is known by
+its content hash. Its body is filed in the authored tier under that hash, and the receipt names it by
+the hash with an inline marker, so verify finds the body and replays it after a restart. Every role may
+already read every registered projection, so an inline one widens nothing; if projections ever become
+a per-role ceiling, an inline one must sit under the caller's ceiling. Reading through a saved
+selection's code in place of a projection is a possible later slice and is not built.
+
+A query moves no watermark and writes nothing to the ledger. The evaluator is read-side and disposable, outside the error kernel; a wrong
 answer is fixed by fixing the rules and asking again, and the bundled `current/2` is held equal to
 `fold.Snapshot` by a standing test, so there is one account of liveness even while there are two
 implementations of it. Blending projections remains a later contract.
@@ -893,7 +903,7 @@ the fold.
 
 Projections are **materialised as files**, content-addressed. **Receipts** make a served projection
 reproducible: `served_hash = sha256(served bytes)` plus the exact facet-id set, the watermark, the
-template version and its content hash, the definition-set version, the `served_at` time, the span, and the `ledger_id` the
+template version and its content hash (an inline template is marked as one, and its body is filed under that hash), the definition-set version, the `served_at` time, the span, and the `ledger_id` the
 watermark counts in (since 2026-10-07; a watermark means nothing against another ledger, so `receipt
 verify` on a rebuilt ledger reports *other ledger*, never a failed reproduction, and a receipt from
 before the field is verified with a note).

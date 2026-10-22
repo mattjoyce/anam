@@ -58,6 +58,11 @@ import (
 // as though there were none. The file refuses, and is carried forward by rebuilding
 // it and moving the folder in (anam move-artifacts). The bump also gives mint_run its
 // picks column and drops mint_seal, which the picks replace.
+//
+// inline_projection (card 211) does not bump it. A version-9 file gains the empty table
+// when Open applies the schema, which is true of it: no receipt there names an inline
+// body. A build before it never reads the table, and refuses a receipt carrying the
+// inline marker as one with an unknown field, so neither build misreads the other's file.
 const schemaVersion = 9
 
 // ErrSchemaVersion is returned by Open for a database written by a different schema.

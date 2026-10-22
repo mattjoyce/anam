@@ -134,7 +134,7 @@ drops it from the current value and never from the ledger.
 
 Every fact is a **facet** of a named type, and each type has a versioned **Definition**: a JSON
 Schema, which field names the facet, and which field says when it was true. Definitions are
-immutable once published, so a change is a new version. Anam bundles the 36 below, and importers
+immutable once published, so a change is a new version. Anam bundles the 39 below, and importers
 register more. A running daemon lists what it holds at `GET /v1/definitions` and in the
 inspector's definitions page; the bundled files are in
 [`internal/def/manifests/`](internal/def/manifests/), and the gate checks this table against them.
@@ -142,9 +142,9 @@ Adding a type is a Definition file, not code.
 
 ### Bundled with Anam
 
-Every type is named `domain.concept[.specialisation…]`, and the first word is one of eight: `health`, `activity`, `place`
-and `record` today, with `social`, `money`, `media` and `work` held for later. A new kind of fact joins
-one of them and never adds a ninth. `family` groups types within a domain, and `kind` says whether a type
+Every type is named `domain.concept[.specialisation…]`, and the first word is one of nine: `health`, `activity`, `place`,
+`record` and `mind` today, with `social`, `money`, `media` and `work` held for later. A new kind of fact joins
+one of them. A head is added only by a logged decision, as `mind` was. `family` groups types within a domain, and `kind` says whether a type
 records a measure, a reading or an event.
 
 | Type | Version | family | kind | What it records | Identity | Fact time |
@@ -179,6 +179,9 @@ records a measure, a reading or an event.
 | `place.trip.flight` | 1 | trips | event | One flight leg (was `place.flight` v1, before the names took a third segment) | `id` | `date` |
 | `place.trip.arrived` | 1 | trips | event | Arriving at one place during a trip (was `place.arrived` v1, before the names took a third segment) | `id` | `date` |
 | `place.trip.returned` | 1 | trips | event | Getting home from a trip (was `place.returned` v1, before the names took a third segment) | `id` | `date` |
+| `mind.attention` | 1 | attention | reading | What is absorbing the person at a moment, with a topic and an intensity from 1 to 5, as the person says it | `id` | `at` |
+| `mind.attention.started` | 1 | attention | event | The moment the person says a topic began to hold their attention; opens an episode of that topic | `id` | `at` |
+| `mind.attention.ended` | 1 | attention | event | The moment the person says a topic stopped holding their attention; closes the episode | `id` | `at` |
 | `record.edge` | 2 | notes | event | An edge joining facets, with or without words; a note in the person's own words is one (was `note.annotation` (v1 to v3), then `record.note` (v1, v2)) | `id` | `at` |
 | `record.document` | 2 | documents |  | A pointer to one file in the documents library; the bytes never enter the ledger | `path` | `date` |
 | `health.heart-rate-day` | 2 | vitals | measure | One figure for a day's heart rate, as an Open mHealth heart-rate body (replaced by `health.heart-rate.day`; the garmin importer's snapshot leaves it absent, the operator retracts it, and it is kept for reads as-of before) | `id`, `statistic` | interval start |

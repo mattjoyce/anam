@@ -10,6 +10,7 @@ import (
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/gate"
+	"github.com/mattjoyce/anam/internal/policy"
 	"github.com/mattjoyce/anam/internal/retract"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
@@ -22,7 +23,7 @@ import (
 // runFacetRetraction plans, and with yes tombstones, one facet of source. The dry run
 // opens the ledger read-only, so it cannot write.
 func runFacetRetraction(cmd *cobra.Command, cfg config.Config, source, facetID string, yes bool) error {
-	declared, err := declaredSources(cfg)
+	file, err := importersFile(cfg)
 	if err != nil {
 		return err
 	}
@@ -40,7 +41,7 @@ func runFacetRetraction(cmd *cobra.Command, cfg config.Config, source, facetID s
 	}
 	defer func() { _ = db.Close() }()
 
-	plan, err := retract.PlanFacet(ctx, l, db, declared, source, facetID)
+	plan, err := retract.PlanFacet(ctx, l, db, policy.MayRetract(file, source), source, facetID)
 	if err != nil {
 		return err
 	}
@@ -81,9 +82,9 @@ func openFacetLedger(ctx context.Context, cfg config.Config, write bool) (*ledge
 	return openLedgerReadOnly(ctx, cfg)
 }
 
-// declaredSources are the sources the importers file names, none when no file is
-// configured.
-func declaredSources(cfg config.Config) ([]string, error) {
+// importersFile is the importers file's principals, none when no file is configured.
+// The policy reads it for the sources it declares.
+func importersFile(cfg config.Config) ([]config.Principal, error) {
 	if cfg.ImportersFile == "" {
 		return nil, nil
 	}
@@ -91,15 +92,5 @@ func declaredSources(cfg config.Config) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	importers, err := config.LoadPrincipals(cfg.ImportersFile, reg.Has)
-	if err != nil {
-		return nil, err
-	}
-	var out []string
-	for _, imp := range importers {
-		if imp.Role == config.RoleImporter {
-			out = append(out, imp.Source)
-		}
-	}
-	return out, nil
+	return config.LoadPrincipals(cfg.ImportersFile, reg.Has)
 }

@@ -145,9 +145,9 @@ Two rules make this safe:
   no version was verbatim), so every admitted facet reads the same instant and composes the same id.
 
 Granularity is a choice: start coarse (one Facet per source fragment) and decompose only where real
-fact-times or finer access control earn the cut. Facet types are **dotted `domain.concept[.specialisation…]`** under a closed set of eight
+fact-times or finer access control earn the cut. Facet types are **dotted `domain.concept[.specialisation…]`** under a closed set of nine
 domains (`health.blood-pressure`, `health.body-composition`, `activity.steps`, `place.stay`,
-`record.edge`), so new sources slot into a domain (`social.message`, `money.transaction`, `media.play`). Where a
+`record.edge`, `mind.attention`), so new sources slot into a domain (`social.message`, `money.transaction`, `media.play`). Where a
 distinction goes, in the name or elsewhere, is the decision [where a distinction is encoded](explainer/bundle/decisions/where-a-distinction-is-encoded.md).
 
 ---
@@ -617,8 +617,11 @@ by replay and by minting, and a crash leaves it behind and never wrong.
 rows naming values it does not hold, and receipts and selections that exist only in the folder beside it,
 and absent would read as none. The store refuses, as it does for any bump. It is carried forward by
 rebuilding it and moving the folder in with `anam move-artifacts`, which checks every file's bytes against
-its name before it writes anything, and which can copy the registered Definitions and projections across
-from the old file read-only (`--registered-from`).
+its name before it writes anything, and which can copy the whole authored tier across from the old file
+read-only (`--registered-from`): the registered Definitions and projections, the inline projection bodies,
+the admission holds, and the receipts, served values, saved selections and their codes, each row checked
+against its key (card 224). `anam migrate` carries the same rows into the store it creates. The next bump
+needs no folder: everything authored is already in the old file.
 
 The **derived** tier must stay *provably* derived. The rebuild test (`MVP.md` §7) drops it and re-derives
 it from the ledger: if a facet payload, an anam-event or `W` ever acquired a second home there, the test
@@ -895,6 +898,13 @@ the hash with an inline marker, so verify finds the body and replays it after a 
 already read every registered projection, so an inline one widens nothing; if projections ever become
 a per-role ceiling, an inline one must sit under the caller's ceiling. Reading through a saved
 selection's code in place of a projection is a possible later slice and is not built.
+
+Who may read, list or open what is answered in one place, `internal/policy` (card 223): static Go over
+the request and the importers file's principals, which never reads a payload, so access stays a
+mechanism and never a judgement of content. The handlers branch on nothing else about the caller. The
+stated later flip is the bundled Datalog engine over a policy base (`principal/2`, `flag/2`,
+`request/3`, a versioned `policy.dl`, never `attr/3`), taken when the rules pass about a dozen, a
+second class of principal arrives, or a rule must read beyond the request and the file.
 
 A query moves no watermark and writes nothing to the ledger. The evaluator is read-side and disposable, outside the error kernel; a wrong
 answer is fixed by fixing the rules and asking again, and the bundled `current/2` is held equal to

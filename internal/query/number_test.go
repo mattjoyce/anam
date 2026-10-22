@@ -3,6 +3,7 @@ package query_test
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -92,5 +93,48 @@ func TestNumber_TheNumberTheRecordHoldsIsTheNumberAComparisonMatches(t *testing.
 	}
 	if ans.Len() != 1 {
 		t.Errorf("the query answered %d rows, want 1", ans.Len())
+	}
+}
+
+// An exponent is bounded before any arithmetic is done on it (card 224). A reader
+// could send 1e9223372036854775807 in a query's text; the exponent's arithmetic wrapped
+// past the guards and the engine panicked. The bound is nine digits either way: at it
+// the number is exact and compares, one past it is refused as out of range.
+func TestNumber_AnExponentBeyondTheBoundIsRefusedNotAPanic(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	h.admit(t, "bp-csv", "health.blood-pressure", "2026-06-15T07:00:00Z",
+		`{"measured_at": "2026-06-15T07:00:00Z", "systolic": 120}`)
+	v, versions, _ := h.served(t)
+
+	cases := []struct {
+		constant string
+		refused  bool
+	}{
+		{"1e999999999", false},
+		{"1e-999999999", false},
+		{"1e+999999999", false},
+		{"1e1000000000", true},
+		{"1e-1000000000", true},
+		{"1e9223372036854775807", true}, // the panic the audit found
+		{"1e-9223372036854775808", true},
+		{"1e99999999999999999999", true}, // past an int altogether
+	}
+	for _, c := range cases {
+		t.Run(c.constant, func(t *testing.T) {
+			t.Parallel()
+			ans, err := tryRun(v, versions, h.defs,
+				`big(E) :- entry(E, "health.blood-pressure", _, _, _, _, _), attr(E, "/systolic", S), S < `+c.constant+`.`, "big")
+			switch {
+			case c.refused && (err == nil || !strings.Contains(err.Error(), "exponent out of range")):
+				t.Errorf("err = %v, want exponent out of range", err)
+			case !c.refused && err != nil:
+				t.Errorf("err = %v, want the query to run", err)
+			case !c.refused && strings.HasPrefix(c.constant, "1e-") && ans.Len() != 0:
+				t.Errorf("120 < %s answered %d rows", c.constant, ans.Len())
+			case !c.refused && !strings.HasPrefix(c.constant, "1e-") && ans.Len() != 1:
+				t.Errorf("120 < %s answered %d rows, want 1", c.constant, ans.Len())
+			}
+		})
 	}
 }

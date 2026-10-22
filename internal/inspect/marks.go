@@ -49,11 +49,11 @@ const hueNeutral = -1
 
 // families in row order, top to bottom: the families the Definitions declare (card
 // 147), by domain. Hues are assigned once, here, and never move when a filter hides a
-// family (dataviz: colour follows the entity). Thirteen families and eight hues: the
+// family (dataviz: colour follows the entity). Fourteen families and eight hues: the
 // hue stays with the row that carried it before the taxonomy, through its most
 // telling successor, and the rows of background measures (a day's steps, an hour of
-// positions), of rare events (a condition) and of what the person wrote or filed take
-// the neutral grey.
+// positions), of rare events (a condition), of what the person says is absorbing them
+// (attention) and of what the person wrote or filed take the neutral grey.
 var families = []family{
 	{"vitals", "vitals", 7},
 	{"body", "body", 0},
@@ -66,6 +66,7 @@ var families = []family{
 	{"clinical", "clinical", 5},
 	{"location", "location", hueNeutral},
 	{"trips", "trips", 1},
+	{"attention", "attention", hueNeutral},
 	{"notes", "notes", hueNeutral},
 	{"documents", "documents", hueNeutral},
 }
@@ -118,6 +119,11 @@ var typeStyles = map[facet.Type]typeStyle{
 
 	"health.illness.started": {"conditions", shapeTriUp, kindEvent},
 	"health.illness.ended":   {"conditions", shapeTriDown, kindEvent},
+
+	// A declared stretch of attention (card 222): a start and an end, as an illness has.
+	// The row is grey like the other self-reports, since the eight hues are all spent.
+	"mind.attention.started": {"attention", shapeTriUp, kindEvent},
+	"mind.attention.ended":   {"attention", shapeTriDown, kindEvent},
 
 	"health.encounter": {"clinical", shapeSquare, kindEvent},
 	"health.donation":  {"clinical", shapeStar, kindEvent},

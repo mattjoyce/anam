@@ -44,6 +44,9 @@ func zonedTypes(t *testing.T) (now, before []def.Definition, bodies [][]byte) {
 		if d.FactTime.ZonePointer == "" {
 			continue
 		}
+		if d.Version == 1 {
+			continue // born reading a zone (the attention types): no facet was admitted before
+		}
 		body, ok := old[fmt.Sprintf("%s@%d", d.Type, d.Version-1)]
 		if !ok {
 			t.Fatalf("%s v%d reads a zone but its v%d is not in the history", d.Type, d.Version, d.Version-1)

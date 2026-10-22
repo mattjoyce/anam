@@ -22,7 +22,8 @@
 * [Library (internal/library)](library.md) - Anam's store of document bytes: files named <sha256>.<ext>, written only by Anam, placed by a folder limit and found again by a walk for the name.
 * [Mint](mint.md) - Writes bucket checkpoints after each change, starting from the last run and touching only the buckets the tail dirtied; also the composed reads that start from those checkpoints.
 * [Operational store (internal/store/ops)](store-ops.md) - The tracking.db SQLite file: Definitions, the facet and event indexes, the checkpoint log, mint runs, snapshot parts, and the pins that refuse a mismatched ledger or width.
-* [Principals and roles (internal/daemon auth)](principals.md) - Every caller is a principal with a name, a role (reader, importer or operator) and a token hash; admit lets a request through only when its role is one the route names, with 401 for an unknown token and 403 for a role the route does not admit.
+* [Policy (internal/policy)](policy.md) - Pure functions over the request and the importers file's principals that answer every who-may question the daemon, the inspector and the CLI ask; it reads no payload.
+* [Principals and roles (internal/daemon auth)](principals.md) - Every caller is a principal with a name, a role (reader, importer or operator) and a token hash; admit asks the policy whether the route admits its role, with 401 for an unknown token and 403 for a role the route does not admit.
 * [Projection](projection.md) - Applies a template, bundled or registered, to a canonical value, metadata filters only, and explains each facet's verdict by the knob that decided it.
 * [Read (internal/read)](read.md) - The read API behind timeline, changes, publish and the snapshot report: parses the query, picks composed or full fold, narrows, and bounds the answer.
 * [Receipt (internal/receipt)](receipt.md) - The receipt record and its proofs: validate, deterministic bytes, and compare a re-derived value with what the file holds.

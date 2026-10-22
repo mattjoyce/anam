@@ -11,8 +11,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"context"
+	"strings"
+	"time"
+
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/config"
+	"github.com/mattjoyce/anam/internal/store/ops/opstest"
 )
 
 const (
@@ -250,4 +255,122 @@ func TestRecordingTokenReadFailsWhenTheReceiptCannotBeFiled(t *testing.T) {
 	}
 	// A plain read does not write, so it is unaffected.
 	call(t, "GET", srv.URL+timelineBP, plainToken, "", http.StatusOK, nil)
+}
+
+// A recording token lists only the receipts that name it, and asking for another
+// reader's is refused; the operator and an ordinary reader list every receipt, by any
+// filter (Matt, 2026-10-22).
+func TestRecordingTokenListsOnlyItsOwnReceipts(t *testing.T) {
+	d := open(t, readerConfig(t))
+	t.Cleanup(func() { _ = d.closeStores() })
+	srv := httptest.NewServer(d.Handler())
+	defer srv.Close()
+	base := srv.URL
+
+	var mine, theirs api.Published
+	call(t, "GET", base+timelineBP, recorderToken, "", http.StatusOK, &mine)
+	call(t, "POST", base+"/v1/receipts?zone=UTC&projection=bp", plainToken, "", http.StatusCreated, &theirs)
+
+	for _, query := range []string{"", "?principal=assistant"} {
+		var l api.Receipts
+		call(t, "GET", base+"/v1/receipts"+query, recorderToken, "", http.StatusOK, &l)
+		if len(l.Receipts) != 1 || l.Receipts[0].Hash != mine.ReceiptHash {
+			t.Errorf("a recording token's list %q holds %+v, want only its own", query, l.Receipts)
+		}
+	}
+	var e api.Error
+	call(t, "GET", base+"/v1/receipts?principal=plain", recorderToken, "", http.StatusForbidden, &e)
+	if e.Error == "" {
+		t.Error("the refusal says nothing")
+	}
+
+	for _, tok := range []string{plainToken, testToken} {
+		var all, by api.Receipts
+		call(t, "GET", base+"/v1/receipts", tok, "", http.StatusOK, &all)
+		if len(all.Receipts) != 2 {
+			t.Errorf("an ordinary list holds %d receipts, want 2", len(all.Receipts))
+		}
+		call(t, "GET", base+"/v1/receipts?principal=assistant", tok, "", http.StatusOK, &by)
+		if len(by.Receipts) != 1 || by.Receipts[0].Hash != mine.ReceiptHash {
+			t.Errorf("an ordinary list by principal holds %+v", by.Receipts)
+		}
+	}
+}
+
+// A recording token verifies only the receipts that name it, as it opens only those;
+// every other token verifies any (Matt, 2026-10-22).
+func TestRecordingTokenVerifiesOnlyItsOwnReceipts(t *testing.T) {
+	d := open(t, readerConfig(t))
+	t.Cleanup(func() { _ = d.closeStores() })
+	srv := httptest.NewServer(d.Handler())
+	defer srv.Close()
+	base := srv.URL
+
+	var mine, theirs api.Published
+	call(t, "GET", base+timelineBP, recorderToken, "", http.StatusOK, &mine)
+	call(t, "POST", base+"/v1/receipts?zone=UTC&projection=bp", plainToken, "", http.StatusCreated, &theirs)
+
+	var v api.ReceiptVerified
+	call(t, "GET", base+"/v1/receipts/"+mine.ReceiptHash+"/verify", recorderToken, "", http.StatusOK, &v)
+	if !v.Result.OK() {
+		t.Errorf("its own receipt does not verify: %s", v.Result.Summary())
+	}
+	call(t, "GET", base+"/v1/receipts/"+theirs.ReceiptHash+"/verify", recorderToken, "", http.StatusForbidden, nil)
+	call(t, "GET", base+"/v1/receipts/sha256:"+fmt.Sprintf("%064x", 1)+"/verify", recorderToken, "", http.StatusNotFound, nil)
+
+	for _, tok := range []string{plainToken, testToken} {
+		for _, h := range []string{mine.ReceiptHash, theirs.ReceiptHash} {
+			call(t, "GET", base+"/v1/receipts/"+h+"/verify", tok, "", http.StatusOK, nil)
+		}
+	}
+}
+
+// A recording token's read files its receipt on the write handle, outside the write
+// queue. When another writer holds the store past its busy timeout, the read answers
+// 503 with Retry-After, as a busy queue does, and nothing is filed or served; a plain
+// read, which files nothing, is unaffected (card 224).
+func TestRecordingTokenReadIsBusyNotAFailureWhenTheStoreIsLocked(t *testing.T) {
+	cfg := readerConfig(t)
+	// Longer than the store's busy timeout, so the lock, not the request's deadline,
+	// is what the read meets.
+	cfg.Timeout = 20 * time.Second
+	d := open(t, cfg)
+	t.Cleanup(func() { _ = d.closeStores() })
+
+	release, err := opstest.HoldWriteLock(context.Background(), cfg.DBPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+
+	query := `{"projection": "bp", "relation": "high", "text": "high(T, S) :- entry(E, \"health.blood-pressure\", T, _, _, _, _), attr(E, \"/systolic_blood_pressure/value\", S), S > 110."}`
+	for _, c := range []struct{ method, path, body string }{
+		{http.MethodGet, timelineBP, ""},
+		{http.MethodPost, "/v1/query", query},
+	} {
+		req := httptest.NewRequest(c.method, c.path, strings.NewReader(c.body))
+		req.Header.Set("Authorization", "Bearer "+recorderToken)
+		rec := httptest.NewRecorder()
+		d.Handler().ServeHTTP(rec, req)
+		if rec.Code != http.StatusServiceUnavailable || rec.Header().Get("Retry-After") == "" {
+			t.Errorf("%s %s: status %d, Retry-After %q; want 503 with Retry-After: %s",
+				c.method, c.path, rec.Code, rec.Header().Get("Retry-After"), rec.Body)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, timelineBP, nil)
+	req.Header.Set("Authorization", "Bearer "+plainToken)
+	rec := httptest.NewRecorder()
+	d.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("a plain read while the store is locked: status %d: %s", rec.Code, rec.Body)
+	}
+
+	release()
+	srv := httptest.NewServer(d.Handler())
+	defer srv.Close()
+	if n := len(listReceipts(t, srv.URL, "").Receipts); n != 0 {
+		t.Errorf("the refused reads filed %d receipts", n)
+	}
+	call(t, "GET", srv.URL+timelineBP, recorderToken, "", http.StatusOK, nil)
 }

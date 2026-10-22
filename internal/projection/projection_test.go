@@ -135,7 +135,7 @@ func TestBundled_ParsesBpAndSleep(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Bundled: %v", err)
 	}
-	if got, want := r.Names(), []string{"bp", "doses", "meds", "sleep"}; !reflect.DeepEqual(got, want) {
+	if got, want := r.Names(), []string{"attention", "bp", "doses", "meds", "sleep"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("bundled names = %v, want %v", got, want)
 	}
 	// Card 147: meds v2 names the types under the health domain, and card 196 gave them
@@ -525,5 +525,43 @@ func TestPatterns_KeepsPrefixesAsWritten(t *testing.T) {
 	tmpl := mustParse(t, template("x", []string{"activity.exercise-session.", "health.sleep"}, []string{"admitted"}, "Normal", "", ""))
 	if got, want := tmpl.Patterns(), []string{"health.sleep", "activity.exercise-session."}; !reflect.DeepEqual(got, want) {
 		t.Errorf("Patterns = %v, want %v", got, want)
+	}
+}
+
+// Card 222: the bundled attention projection is a log of the three attention types, at
+// the time they were said, up to Confidential. Nothing else is served, and a declared
+// end stays beside its start: a log infers no episode.
+func TestBundled_AttentionServesTheThreeTypes(t *testing.T) {
+	t.Parallel()
+	r, err := projection.Bundled()
+	if err != nil {
+		t.Fatalf("Bundled: %v", err)
+	}
+	tmpl, err := r.Lookup("attention")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if tmpl.Shape != "log" || tmpl.MaxClassification != "Confidential" {
+		t.Errorf("attention = %s up to %s, want a log up to Confidential", tmpl.Shape, tmpl.MaxClassification)
+	}
+	v, err := fold.NewValue([]fold.Entry{
+		entry("a-started", "mind.attention.started", "2026-10-20T00:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationConfidential),
+		entry("a-reading-1", "mind.attention", "2026-10-21T10:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationConfidential),
+		entry("a-reading-2", "mind.attention", "2026-10-22T10:00:00.000000000Z", facet.StatusEndorsed, facet.ClassificationConfidential),
+		entry("a-ended", "mind.attention.ended", "2026-10-23T00:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationConfidential),
+		entry("a-retracted", "mind.attention", "2026-10-22T11:00:00.000000000Z", facet.StatusTombstoned, facet.ClassificationConfidential),
+		entry("f-bp-1", "health.blood-pressure", "2026-10-21T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
+		entry("f-note", "record.edge", "2026-10-21T07:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
+	})
+	if err != nil {
+		t.Fatalf("fold.NewValue: %v", err)
+	}
+	served, err := projection.Apply(v, tmpl, consent.Open{}, nil)
+	if err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	want := []string{"a-started", "a-reading-1", "a-reading-2", "a-ended"}
+	if got := ids(served); !reflect.DeepEqual(got, want) {
+		t.Errorf("served %v, want %v", got, want)
 	}
 }

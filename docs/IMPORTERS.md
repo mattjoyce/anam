@@ -249,6 +249,20 @@ importers:
   a `role` (`reader` or `operator`) and no source or types. An importer may be listed there too,
   with `role: importer`, a name, a source and types or `any_type`. Names, sources and token hashes
   are each used once. API.md §2 has the roles.
+- `receipts: always` on a principal files every read its token makes as a receipt that names the
+  principal, so `GET /v1/receipts?principal=<name>` answers who read what. It is off unless set (`off` says
+  so), it is for a `reader` or an `importer`, and a value other than `always` or `off` is refused at start.
+  The operator and the `workbench` entry cannot have it. A token with it must read through a projection:
+  a timeline read without one, or with `explain`, is a 400, and it opens only the receipts that name
+  it. A `dry_run` query still files nothing. API.md has the whole contract:
+
+  ```yaml
+  principals:
+    - name: assistant
+      role: reader
+      token_sha256: 9f86d081...
+      receipts: always
+  ```
 - Make a token with `openssl rand -hex 32`. Present it as `Authorization: Bearer <token>`.
 
 ### 8.3 Definitions

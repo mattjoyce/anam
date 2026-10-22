@@ -83,6 +83,7 @@ listen: 127.0.0.1:8787
 #     - name: assistant
 #       role: reader
 #       token_sha256: <printf %s "$token" | sha256sum>
+#       receipts: always                 # file every read this token makes as a receipt naming it
 # importers_file: ~/.config/anam/importers.yaml
 
 # Bounds one long write inside the daemon: an index replay, a backup, the mint at

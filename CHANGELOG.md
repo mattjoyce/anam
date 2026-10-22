@@ -8,6 +8,18 @@ decisions is in `journal/`.
 
 ## 2026-10-22
 
+- A token can always leave receipts, so a receipt says who read what (card 216). A principal in the
+  importers file may set `receipts: always` (a reader or an importer; off when absent). Its
+  `GET /v1/timeline` is then answered as `POST /v1/receipts` is, with status 200, and the receipt
+  names the principal in a new `principal` field; its `POST /v1/query` names it on the receipt it
+  already files, and `dry_run` still files nothing. Such a token must name a projection (a read
+  without one, or with `explain`, is a 400), opens only the receipts that name it, and has the read
+  fail if the receipt cannot be filed. A receipt cut before the field has the same bytes and hash
+  and still verifies, but an older binary cannot parse a receipt that names a principal, so
+  `GET /v1/receipts` fails on one after a rollback. `GET /v1/receipts` takes `principal`, `since`,
+  `until` and `zone`, and `anam receipt list` takes `--principal`, `--since` and `--until` and shows
+  a `READER` column.
+
 - Receipts, served values, saved selections and checkpoint values are rows of the operational store
   (card 215), not files in a folder beside it. The schema is 9, so a store from before is refused and
   is carried forward by moving it aside, running `anam init` for a fresh one, and then

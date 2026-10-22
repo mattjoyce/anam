@@ -89,25 +89,25 @@ func TestPlanFacet(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		declared []string
+		outright bool
 		source   string
 		id       string
 		wantErr  error
 	}{
-		{"a live facet of a source with no snapshot", nil, "workbench", live, nil},
-		{"declared but no complete snapshot", []string{"workbench"}, "workbench", live, nil},
-		{"another source's name", nil, "scale", live, retract.ErrWrongSource},
-		{"already tombstoned", nil, "workbench", dead, retract.ErrNotLive},
-		{"declared with a complete snapshot", []string{"scale"}, "scale", reconciled, retract.ErrReconciled},
-		{"a snapshot but no declaration", nil, "scale", reconciled, nil},
-		{"unknown facet", nil, "workbench", "no-such-facet", ledger.ErrNotFound},
+		{"a live facet of a source with no snapshot", true, "workbench", live, nil},
+		{"declared but no complete snapshot", false, "workbench", live, nil},
+		{"another source's name", true, "scale", live, retract.ErrWrongSource},
+		{"already tombstoned", true, "workbench", dead, retract.ErrNotLive},
+		{"declared with a complete snapshot", false, "scale", reconciled, retract.ErrReconciled},
+		{"a snapshot but no declaration", true, "scale", reconciled, nil},
+		{"unknown facet", true, "workbench", "no-such-facet", ledger.ErrNotFound},
 	}
 	// The group returns once every parallel subtest has, so the head is read after them.
 	t.Run("plans", func(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
-				plan, err := retract.PlanFacet(ctx, f.l, f.db, tt.declared, tt.source, tt.id)
+				plan, err := retract.PlanFacet(ctx, f.l, f.db, tt.outright, tt.source, tt.id)
 				if !errors.Is(err, tt.wantErr) {
 					t.Fatalf("err = %v, want %v", err, tt.wantErr)
 				}

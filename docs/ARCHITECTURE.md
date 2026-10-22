@@ -887,6 +887,13 @@ already read every registered projection, so an inline one widens nothing; if pr
 a per-role ceiling, an inline one must sit under the caller's ceiling. Reading through a saved
 selection's code in place of a projection is a possible later slice and is not built.
 
+Who may read, list or open what is answered in one place, `internal/policy` (card 223): static Go over
+the request and the importers file's principals, which never reads a payload, so access stays a
+mechanism and never a judgement of content. The handlers branch on nothing else about the caller. The
+stated later flip is the bundled Datalog engine over a policy base (`principal/2`, `flag/2`,
+`request/3`, a versioned `policy.dl`, never `attr/3`), taken when the rules pass about a dozen, a
+second class of principal arrives, or a rule must read beyond the request and the file.
+
 A query moves no watermark and writes nothing to the ledger. The evaluator is read-side and disposable, outside the error kernel; a wrong
 answer is fixed by fixing the rules and asking again, and the bundled `current/2` is held equal to
 `fold.Snapshot` by a standing test, so there is one account of liveness even while there are two

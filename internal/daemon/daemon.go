@@ -99,7 +99,10 @@ type Daemon struct {
 	// workbench is the principal the importers file declares for hand entry, nil
 	// when it declares none. It has no token: POST /entry submits as it.
 	workbench *config.Principal
-	defs      *definitions
+	// file is the importers file's whole list, which the policy reads for the sources
+	// it declares.
+	file []config.Principal
+	defs *definitions
 	// projections are the templates reads select from and receipts verify against:
 	// bundled, and those the operator registered (card 125).
 	projections *projections
@@ -139,7 +142,7 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 	if err != nil {
 		return nil, err
 	}
-	whom, workbench, err := loadPrincipals(cfg.ImportersFile, tok)
+	whom, err := loadPrincipals(cfg.ImportersFile, tok)
 	if err != nil {
 		return nil, err
 	}
@@ -208,8 +211,9 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		readOps:     readOps,
 		selections:  selection.NewStore(db),
 		sources:     newSources(),
-		principals:  whom,
-		workbench:   workbench,
+		principals:  whom.byToken,
+		workbench:   whom.workbench,
+		file:        whom.file,
 		defs:        defs,
 		projections: projs,
 		mints:       make(chan struct{}, 1),

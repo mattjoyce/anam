@@ -16,6 +16,7 @@ import (
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/mint"
+	"github.com/mattjoyce/anam/internal/policy"
 	"github.com/mattjoyce/anam/internal/read"
 	"github.com/mattjoyce/anam/internal/serve"
 	"github.com/mattjoyce/anam/internal/store/ops"
@@ -147,13 +148,21 @@ func (d *Daemon) postCheckpoints(w http.ResponseWriter, r *http.Request) {
 
 // getReceipts lists the receipts, newest first: all of them, or those that name a
 // principal (?principal=) and were served in a window (?since=, ?until=, with ?zone=
-// for a bare date), which is the answer to who read what (card 216).
+// for a bare date), which is the answer to who read what (card 216). The policy's list
+// scope narrows it: a recording token lists only the receipts that name it, and asking
+// for another reader's is 403.
 func (d *Daemon) getReceipts(w http.ResponseWriter, r *http.Request) {
 	q := api.ReceiptsQueryOf(r.URL.Query())
 	if err := namedZone(q.Zone); err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	principal, err := policy.ListScope(principalOf(r)).Receipts(q.Principal)
+	if err != nil {
+		writeError(w, http.StatusForbidden, err)
+		return
+	}
+	q.Principal = principal
 	deps, err := read.ServeDeps(d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
@@ -229,10 +238,16 @@ func (d *Daemon) getReceiptFacet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, shown)
 }
 
+// verifyReceipt proves one receipt against the ledger and the stored value. A verify
+// answers the receipt's facet ids and query text, so the policy gates it as it gates
+// opening the receipt.
 func (d *Daemon) verifyReceipt(w http.ResponseWriter, r *http.Request) {
 	deps, err := read.ServeDeps(d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if !d.mayOpenReceipt(w, r, deps) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
@@ -274,7 +289,7 @@ func (d *Daemon) publishRead(w http.ResponseWriter, r *http.Request, status int)
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	deps.Reader = readerOf(principalOf(r))
+	deps.Reader = policy.ReaderOf(principalOf(r))
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
 	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Values: d.readOps, Definitions: defs, Projections: d.projections.current.Load()}
@@ -286,22 +301,12 @@ func (d *Daemon) publishRead(w http.ResponseWriter, r *http.Request, status int)
 	writeJSON(w, status, p)
 }
 
-// readerOf is the name a receipt filed for p carries: p's, when its token records every
-// read, else none.
-func readerOf(p config.Principal) string {
-	if p.Records() {
-		return p.Name
-	}
-	return ""
-}
-
-// mayOpenReceipt reports whether the caller may open the value of the receipt the
-// request names, and answers 403 when it may not. A token that records every read
-// opens only receipts that name it: opening another's would be a read of facets no
-// receipt of its own records. Every other token opens any receipt, as before.
+// mayOpenReceipt reports whether the caller may open the receipt the request names,
+// or verify it, and answers 403 when it may not (policy.MayOpenReceipt). The receipt's
+// reader is read only when the policy needs it.
 func (d *Daemon) mayOpenReceipt(w http.ResponseWriter, r *http.Request, deps serve.Deps) bool {
 	who := principalOf(r)
-	if !who.Records() {
+	if policy.OpensAnyReceipt(who) {
 		return true
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
@@ -311,9 +316,8 @@ func (d *Daemon) mayOpenReceipt(w http.ResponseWriter, r *http.Request, deps ser
 	case err != nil:
 		writeReadError(w, err)
 		return false
-	case reader != who.Name:
-		writeError(w, http.StatusForbidden, fmt.Errorf(
-			"%s files a receipt for every read, so it opens only the receipts that name it; read through a projection to file one", who.Name))
+	case !policy.MayOpenReceipt(who, reader):
+		writeError(w, http.StatusForbidden, policy.OpenRefusal(who))
 		return false
 	}
 	return true
@@ -331,16 +335,16 @@ func (d *Daemon) getTimeline(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	if who := principalOf(r); who.Records() {
+	publish, err := policy.TimelineRead(principalOf(r), q.Projection, q.Explain)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if publish {
 		// The read is filed as a receipt and answered from what was filed, once, so the
 		// reader holds exactly what the receipt names (card 216). The answer is the
 		// timeline's own fields with the receipt beside them, and a read too large for
 		// one answer comes a page at a time, as a published read does.
-		if q.Projection == "" || q.Explain {
-			writeError(w, http.StatusBadRequest, fmt.Errorf(
-				"%s files a receipt for every read, and a receipt is what a projection served: name a projection, and leave out explain", who.Name))
-			return
-		}
 		d.publishRead(w, r, http.StatusOK)
 		return
 	}

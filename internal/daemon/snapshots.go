@@ -18,6 +18,7 @@ import (
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
+	"github.com/mattjoyce/anam/internal/policy"
 	"github.com/mattjoyce/anam/internal/read"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
@@ -51,7 +52,7 @@ func validSnapshot(s *api.SnapshotPart, imp config.Principal, envs []api.Submitt
 	}
 	speaks := map[string]bool{}
 	for _, t := range s.Types {
-		if !maySubmit(imp, facet.Type(t)) {
+		if !policy.MaySubmitType(imp, facet.Type(t)) {
 			return fmt.Errorf("snapshot type %s is not one %s may submit", t, imp.Source)
 		}
 		speaks[t] = true
@@ -155,7 +156,7 @@ func (d *Daemon) getSnapshot(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
 	s, ok, err := d.readOps.Snapshot(ctx, r.PathValue("id"))
-	if who := principalOf(r); ok && who.Role == config.RoleImporter && who.Source != s.Source {
+	if ok && !policy.ListScope(principalOf(r)).Snapshot(s.Source) {
 		ok = false // another importer's run is not this one's to see
 	}
 	switch {

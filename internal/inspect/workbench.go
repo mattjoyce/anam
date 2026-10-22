@@ -21,14 +21,14 @@ import (
 // routes at all.
 
 // Workbench is what the entry pages need from the daemon, declared here where it is
-// used. Source is the source the daemon enters facts as, and Types the facet types it
-// may enter, which are the workbench principal's in the importers file: the page asks
-// and does not read that file. Enter submits one payload of a type, drawn at a
+// used. Source is the source the daemon enters facts as, and Enters says whether it
+// may enter facts of a type, which the daemon asks the policy about the workbench
+// principal in the importers file: the page asks and does not read that file. Enter submits one payload of a type, drawn at a
 // Definition version, through the same write the envelope route ends in. Retract
 // tombstones one facet of that source.
 type Workbench interface {
 	Source() string
-	Types() []facet.Type
+	Enters(t facet.Type) bool
 	Enter(ctx context.Context, t facet.Type, version int, payload json.RawMessage) (Entered, error)
 	Retract(ctx context.Context, facetID string) (Retracted, error)
 }
@@ -96,15 +96,7 @@ const maxFormBytes = 256 << 10
 
 // enterable says whether the Workbench may enter facets of type t.
 func (s *Server) enterable(t facet.Type) bool {
-	if s.bench == nil {
-		return false
-	}
-	for _, e := range s.bench.Types() {
-		if e == t {
-			return true
-		}
-	}
-	return false
+	return s.bench != nil && s.bench.Enters(t)
 }
 
 // entryData is the form page.

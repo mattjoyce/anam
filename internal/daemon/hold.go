@@ -11,6 +11,7 @@ import (
 
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/config"
+	"github.com/mattjoyce/anam/internal/policy"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
@@ -37,25 +38,37 @@ func (e *heldError) Error() string {
 
 func (e *heldError) Unwrap() error { return ErrHeld }
 
-// checkHold refuses a submission from a held source. It runs inside the write, where
-// the hold and the admission are one order: a hold written before this write is seen,
-// and one written after it is not. A hold that cannot be read refuses the submission
-// too: an admission that cannot see a hold must not admit.
+// checkHold refuses a submission from a held source (policy.Held). It runs inside the
+// write, where the hold and the admission are one order: a hold written before this
+// write is seen, and one written after it is not. A hold that cannot be read refuses
+// the submission too: an admission that cannot see a hold must not admit.
 //
-// The workbench is never held. A hold names an importer's source; a hand entry is the
-// operator's own, and it is not an importer's submission.
-func checkHold(ctx context.Context, db *ops.DB, source string) error {
-	if source == config.WorkbenchSource {
+// The workbench is never held (policy.Holdable), and reads no hold.
+func checkHold(ctx context.Context, db *ops.DB, who config.Principal) error {
+	if !policy.Holdable(who) {
 		return nil
 	}
-	held, err := db.HasHold(ctx, source)
+	holds, err := db.Holds(ctx)
 	if err != nil {
-		return &heldError{Source: source, Cause: err}
+		return &heldError{Source: who.Source, Cause: err}
 	}
-	if held {
-		return &heldError{Source: source}
+	if policy.Held(policy.Request{Caller: who, Hold: holdOf(holds)}) {
+		return &heldError{Source: who.Source}
 	}
 	return nil
+}
+
+// holdOf is the hold rows as the policy reads them.
+func holdOf(rows []ops.Hold) policy.Hold {
+	var h policy.Hold
+	for _, r := range rows {
+		if r.Source == ops.HoldAll {
+			h.All = true
+			continue
+		}
+		h.Sources = append(h.Sources, r.Source)
+	}
+	return h
 }
 
 // postHold holds admission for the sources the body names, or for every source when
@@ -173,7 +186,7 @@ func heldSources(sources []string, all bool) ([]string, error) {
 		if src == "" {
 			continue
 		}
-		if src == config.WorkbenchSource {
+		if !policy.MayHold(src) {
 			return nil, fmt.Errorf("%s is never held: a hand entry is the operator's own", config.WorkbenchSource)
 		}
 		out = append(out, src)

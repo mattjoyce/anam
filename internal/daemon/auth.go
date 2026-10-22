@@ -7,17 +7,26 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"slices"
 	"strings"
 
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
+	"github.com/mattjoyce/anam/internal/policy"
 )
 
 // principals are the clients the daemon admits, by the hex SHA-256 of their token:
 // the operator from token_file, and everyone the importers file names. The daemon
 // never holds a client's token.
 type principals map[string]config.Principal
+
+// roster is who the daemon admits, read once at Open: the principals by token hash, the
+// workbench, and the importers file's whole list, which the policy reads for what the
+// file declares.
+type roster struct {
+	byToken   principals
+	workbench *config.Principal
+	file      []config.Principal
+}
 
 // loadPrincipals reads the importers file at path, and adds the operator whose token
 // is operator, when there is one. A principal in the file with the operator's token
@@ -27,35 +36,35 @@ type principals map[string]config.Principal
 // the map: it has no token, so no request authenticates as it. The daemon submits as it
 // for the operator's entries (POST /entry), which is how an importer's token never
 // reaches a browser.
-func loadPrincipals(path string, operator []byte) (principals, *config.Principal, error) {
-	out := principals{}
+func loadPrincipals(path string, operator []byte) (roster, error) {
+	out := roster{byToken: principals{}}
 	if operator != nil {
-		out[hashOf(operator)] = config.Principal{Name: config.OperatorName, Role: config.RoleOperator}
+		out.byToken[hashOf(operator)] = config.Principal{Name: config.OperatorName, Role: config.RoleOperator}
 	}
 	if path == "" {
-		return out, nil, nil
+		return out, nil
 	}
 	reg, err := def.Bundled()
 	if err != nil {
-		return nil, nil, fmt.Errorf("daemon: %w", err)
+		return roster{}, fmt.Errorf("daemon: %w", err)
 	}
 	list, err := config.LoadPrincipals(path, reg.Has)
 	if err != nil {
-		return nil, nil, fmt.Errorf("daemon: %w", err)
+		return roster{}, fmt.Errorf("daemon: %w", err)
 	}
-	var workbench *config.Principal
+	out.file = list
 	for _, p := range list {
 		if p.Source == config.WorkbenchSource {
 			wb := p
-			workbench = &wb
+			out.workbench = &wb
 			continue
 		}
-		if _, taken := out[p.TokenSHA256]; taken {
-			return nil, nil, fmt.Errorf("daemon: %w: %s has the operator's token", config.ErrInvalidImporters, p.Name)
+		if _, taken := out.byToken[p.TokenSHA256]; taken {
+			return roster{}, fmt.Errorf("daemon: %w: %s has the operator's token", config.ErrInvalidImporters, p.Name)
 		}
-		out[p.TokenSHA256] = p
+		out.byToken[p.TokenSHA256] = p
 	}
-	return out, workbench, nil
+	return out, nil
 }
 
 func hashOf(token []byte) string {
@@ -79,18 +88,18 @@ func (d *Daemon) who(r *http.Request) (config.Principal, bool) {
 	return config.Principal{}, false
 }
 
-// admit lets a request through when its principal holds one of roles, with the
-// principal in its context: 401 for no token or one the daemon does not know, 403
-// for a token whose role the route does not admit.
+// admit lets a request through when the policy allows it, with the principal in its
+// context: 401 for no token or one the daemon does not know, 403 for a token whose role
+// the route does not admit. roles are the route table's, which the policy reads.
 func (d *Daemon) admit(roles []config.Role, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		who, ok := d.who(r)
-		switch {
-		case !ok:
+		switch policy.Allow(policy.Request{Caller: who, Known: ok, Roles: roles}) {
+		case policy.Unknown:
 			// Basic, so a browser opening the inspector prompts for the token.
 			w.Header().Set("WWW-Authenticate", `Basic realm="anam"`)
 			writeError(w, http.StatusUnauthorized, fmt.Errorf("unauthorized"))
-		case !slices.Contains(roles, who.Role):
+		case policy.Forbidden:
 			writeError(w, http.StatusForbidden, fmt.Errorf("%s holds role %s, and %s %s admits %s",
 				who.Name, who.Role, r.Method, r.URL.Path, rolesText(roles)))
 		default:

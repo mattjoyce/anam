@@ -10,6 +10,7 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
 	"github.com/mattjoyce/anam/internal/inspect"
+	"github.com/mattjoyce/anam/internal/policy"
 	"github.com/mattjoyce/anam/internal/retract"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
@@ -33,8 +34,9 @@ func (d *Daemon) workbenchFor() inspect.Workbench {
 // Source is the source the workbench enters facts as.
 func (h hand) Source() string { return h.d.workbench.Source }
 
-// Types are the facet types the workbench principal may enter: the allow-list.
-func (h hand) Types() []facet.Type { return h.d.workbench.Types }
+// Enters reports whether the workbench principal may enter facts of type t: the policy's
+// answer for its allow-list, the same one the gate holds an entry to.
+func (h hand) Enters(t facet.Type) bool { return policy.MaySubmitType(*h.d.workbench, t) }
 
 // Enter admits one payload as the workbench within the daemon's request timeout.
 func (h hand) Enter(ctx context.Context, t facet.Type, version int, payload json.RawMessage) (inspect.Entered, error) {

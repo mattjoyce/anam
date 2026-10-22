@@ -251,3 +251,71 @@ func TestRecordingTokenReadFailsWhenTheReceiptCannotBeFiled(t *testing.T) {
 	// A plain read does not write, so it is unaffected.
 	call(t, "GET", srv.URL+timelineBP, plainToken, "", http.StatusOK, nil)
 }
+
+// A recording token lists only the receipts that name it, and asking for another
+// reader's is refused; the operator and an ordinary reader list every receipt, by any
+// filter (Matt, 2026-10-22).
+func TestRecordingTokenListsOnlyItsOwnReceipts(t *testing.T) {
+	d := open(t, readerConfig(t))
+	t.Cleanup(func() { _ = d.closeStores() })
+	srv := httptest.NewServer(d.Handler())
+	defer srv.Close()
+	base := srv.URL
+
+	var mine, theirs api.Published
+	call(t, "GET", base+timelineBP, recorderToken, "", http.StatusOK, &mine)
+	call(t, "POST", base+"/v1/receipts?zone=UTC&projection=bp", plainToken, "", http.StatusCreated, &theirs)
+
+	for _, query := range []string{"", "?principal=assistant"} {
+		var l api.Receipts
+		call(t, "GET", base+"/v1/receipts"+query, recorderToken, "", http.StatusOK, &l)
+		if len(l.Receipts) != 1 || l.Receipts[0].Hash != mine.ReceiptHash {
+			t.Errorf("a recording token's list %q holds %+v, want only its own", query, l.Receipts)
+		}
+	}
+	var e api.Error
+	call(t, "GET", base+"/v1/receipts?principal=plain", recorderToken, "", http.StatusForbidden, &e)
+	if e.Error == "" {
+		t.Error("the refusal says nothing")
+	}
+
+	for _, tok := range []string{plainToken, testToken} {
+		var all, by api.Receipts
+		call(t, "GET", base+"/v1/receipts", tok, "", http.StatusOK, &all)
+		if len(all.Receipts) != 2 {
+			t.Errorf("an ordinary list holds %d receipts, want 2", len(all.Receipts))
+		}
+		call(t, "GET", base+"/v1/receipts?principal=assistant", tok, "", http.StatusOK, &by)
+		if len(by.Receipts) != 1 || by.Receipts[0].Hash != mine.ReceiptHash {
+			t.Errorf("an ordinary list by principal holds %+v", by.Receipts)
+		}
+	}
+}
+
+// A recording token verifies only the receipts that name it, as it opens only those;
+// every other token verifies any (Matt, 2026-10-22).
+func TestRecordingTokenVerifiesOnlyItsOwnReceipts(t *testing.T) {
+	d := open(t, readerConfig(t))
+	t.Cleanup(func() { _ = d.closeStores() })
+	srv := httptest.NewServer(d.Handler())
+	defer srv.Close()
+	base := srv.URL
+
+	var mine, theirs api.Published
+	call(t, "GET", base+timelineBP, recorderToken, "", http.StatusOK, &mine)
+	call(t, "POST", base+"/v1/receipts?zone=UTC&projection=bp", plainToken, "", http.StatusCreated, &theirs)
+
+	var v api.ReceiptVerified
+	call(t, "GET", base+"/v1/receipts/"+mine.ReceiptHash+"/verify", recorderToken, "", http.StatusOK, &v)
+	if !v.Result.OK() {
+		t.Errorf("its own receipt does not verify: %s", v.Result.Summary())
+	}
+	call(t, "GET", base+"/v1/receipts/"+theirs.ReceiptHash+"/verify", recorderToken, "", http.StatusForbidden, nil)
+	call(t, "GET", base+"/v1/receipts/sha256:"+fmt.Sprintf("%064x", 1)+"/verify", recorderToken, "", http.StatusNotFound, nil)
+
+	for _, tok := range []string{plainToken, testToken} {
+		for _, h := range []string{mine.ReceiptHash, theirs.ReceiptHash} {
+			call(t, "GET", base+"/v1/receipts/"+h+"/verify", tok, "", http.StatusOK, nil)
+		}
+	}
+}

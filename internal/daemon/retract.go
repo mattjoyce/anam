@@ -10,8 +10,8 @@ import (
 
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/clock"
-	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/gate"
+	"github.com/mattjoyce/anam/internal/policy"
 	"github.com/mattjoyce/anam/internal/retract"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
@@ -19,19 +19,6 @@ import (
 // maxRetractBody bounds a retraction's body: one source name. It is an invariant (a
 // longer body is not this request), not a default.
 const maxRetractBody = 4 << 10
-
-// importerSources are the sources the importers file gives a token to. A retraction by
-// hand is refused for one that has completed a snapshot, since the importer's resend
-// reconciles it.
-func (d *Daemon) importerSources() []string {
-	var out []string
-	for _, p := range d.principals {
-		if p.Role == config.RoleImporter {
-			out = append(out, p.Source)
-		}
-	}
-	return out
-}
 
 // postFacetRetract tombstones one facet of the source the body names, by hand, as the
 // operator (card 188, slice 3). The plan is the one `anam retract <source> --facet`
@@ -81,7 +68,7 @@ func (d *Daemon) postFacetRetract(w http.ResponseWriter, r *http.Request) {
 func (d *Daemon) retractFacet(ctx context.Context, source, id string, budget time.Duration) (api.Retraction, error) {
 	var out api.Retraction
 	err := d.TryWrite(ctx, budget, func(ctx context.Context, s Stores) error {
-		plan, err := retract.PlanFacet(ctx, s.Ledger, s.Ops, d.importerSources(), source, id)
+		plan, err := retract.PlanFacet(ctx, s.Ledger, s.Ops, policy.MayRetract(d.file, source), source, id)
 		if err != nil {
 			return err
 		}

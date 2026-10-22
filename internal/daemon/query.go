@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/policy"
 	"github.com/mattjoyce/anam/internal/query"
 	"github.com/mattjoyce/anam/internal/read"
 )
@@ -78,7 +79,7 @@ func (d *Daemon) postQuery(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	deps.Reader = readerOf(principalOf(r))
+	deps.Reader = policy.ReaderOf(principalOf(r))
 	a, err := read.Query(ctx, src, deps, q, d.cfg.MaxReadBytes)
 	if err != nil {
 		writeReadError(w, err)

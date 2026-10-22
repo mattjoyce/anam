@@ -6,50 +6,10 @@ import (
 	"log/slog"
 	"sync/atomic"
 
-	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
-	"github.com/mattjoyce/anam/internal/gate"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
-
-// maySubmit reports whether imp may submit facets of type t: one of its types, or
-// any with any_type.
-func maySubmit(imp config.Principal, t facet.Type) bool {
-	return imp.AnyType || lists(imp, t)
-}
-
-// mayRegister reports whether imp owns type t, and so may register its
-// Definitions. An any_type importer owns nothing (card 177).
-func mayRegister(imp config.Principal, t facet.Type) bool {
-	return lists(imp, t)
-}
-
-// mayStore reports whether imp may post a document's bytes to the library: it lists
-// record.document. any_type reaches every facet type and not the library, which takes
-// bytes only from a source that owns the references to them (card 177's audit).
-func mayStore(imp config.Principal) bool {
-	return lists(imp, docType)
-}
-
-// lists reports whether t is one of imp's types.
-func lists(imp config.Principal, t facet.Type) bool {
-	for _, allowed := range imp.Types {
-		if allowed == t {
-			return true
-		}
-	}
-	return false
-}
-
-// scopesOf is the gate's authenticated pillar for imp: its source for its types, or
-// for every type with any_type.
-func scopesOf(imp config.Principal) gate.TokenScopes {
-	if imp.AnyType {
-		return gate.OpenScopes(imp.Source)
-	}
-	return gate.StaticScopes{imp.Source: imp.Types}
-}
 
 // definitions is the registry importers' envelopes are admitted against: the bundled
 // Definitions and the newest registered version of every other type. It is replaced

@@ -253,6 +253,9 @@ paths:
         so principal lists what one reader read and since and until bound it by the
         time it was served. A receipt cut for a reader whose token does not record,
         or before receipts named readers, names nobody and is listed under no principal.
+        A token that records every read lists only the receipts that name it: without
+        principal, or with its own name, it gets those, and naming another principal
+        is 403. The operator and every other token list all receipts.
       parameters:
         - name: principal
           in: query
@@ -290,6 +293,11 @@ paths:
                       principal: assistant
         "400": { $ref: "#/components/responses/BadQuery" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: the token records every read and principal names another reader
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "504": { $ref: "#/components/responses/Timeout" }
     post:
       operationId: postReceipt
@@ -436,6 +444,10 @@ paths:
       x-anam-roles: [reader, importer, operator]
       x-anam-type: ReceiptVerified
       summary: Re-derive a receipt from the ledger and re-hash its file.
+      description: >-
+        The answer carries the receipt, its facet ids and its query text, so a token
+        that records every read verifies only the receipts that name it, as it opens
+        only those. Every other token verifies any receipt.
       parameters:
         - { $ref: "#/components/parameters/ReceiptHash" }
         - { $ref: "#/components/parameters/AnamTimeout" }
@@ -446,6 +458,11 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ReceiptVerified" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: the token records every read and this receipt names another reader, or nobody
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404": { $ref: "#/components/responses/NoArtifact" }
         "409": { $ref: "#/components/responses/CannotHonour" }
         "504": { $ref: "#/components/responses/Timeout" }

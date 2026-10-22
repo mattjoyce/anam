@@ -14,6 +14,7 @@ import (
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
+	"github.com/mattjoyce/anam/internal/policy"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
@@ -32,7 +33,7 @@ func (d *Daemon) postDefinitions(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnprocessableEntity, err)
 		return
 	}
-	if !mayRegister(imp, parsed.Type) {
+	if !policy.MayRegisterType(imp, parsed.Type) {
 		writeError(w, http.StatusForbidden, fmt.Errorf("%s does not own %s, so may not define it", imp.Source, parsed.Type))
 		return
 	}
@@ -41,7 +42,7 @@ func (d *Daemon) postDefinitions(w http.ResponseWriter, r *http.Request) {
 	err = d.tryWriteWithin(r.Context(), d.cfg.ImporterWait, d.timeout(r), func(ctx context.Context, s Stores) error {
 		// A held source registers nothing: the check is inside the write, where the
 		// hold and this registration are one order.
-		if err := checkHold(ctx, s.Ops, imp.Source); err != nil {
+		if err := checkHold(ctx, s.Ops, imp); err != nil {
 			return err
 		}
 		var err error

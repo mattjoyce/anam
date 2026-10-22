@@ -305,28 +305,9 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 		return receipt.Receipt{}, receipt.Result{}, err
 	}
 
-	// The exact version the receipt names, not the newest: every version ever held
-	// stays readable (card 125), so a receipt served under v1 verifies after v2 is
-	// registered. A version this record does not hold cannot re-derive the value.
-	t, err := d.Templates.Version(r.Template, r.TemplateVersion)
+	t, notes, err := templateOf(ctx, d, r)
 	if err != nil {
-		if errors.Is(err, projection.ErrUnknown) {
-			return r, receipt.Result{}, fmt.Errorf("%w: the receipt was served under %s v%d: %v",
-				ErrTemplateMoved, r.Template, r.TemplateVersion, err)
-		}
 		return r, receipt.Result{}, err
-	}
-	var notes []string
-	if cur, err := d.Templates.Lookup(r.Template); err == nil && cur.Version != t.Version {
-		notes = append(notes, fmt.Sprintf("replayed %s v%d from the held history; v%d is current", t.Name, t.Version, cur.Version))
-	}
-	switch r.TemplateHash {
-	case t.Hash:
-	case "":
-		notes = append(notes, "receipt names no template hash (served before template hashes were recorded); the version held is taken to be the one that served")
-	default:
-		return r, receipt.Result{}, fmt.Errorf("%w: %s v%d is %s here, the receipt was served under %s",
-			ErrTemplateMoved, t.Name, t.Version, t.Hash, r.TemplateHash)
 	}
 
 	ledgerID, err := d.Ledger.ID(ctx)
@@ -387,6 +368,62 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 			r.DefinitionSetVersion, d.DefinitionSetVersion, note))
 	}
 	return r, out, nil
+}
+
+// templateOf is the template a receipt was served through, and notes on how it was
+// found. A registered template is the exact version the receipt names, not the newest:
+// every version ever held stays readable (card 125), so a receipt served under v1
+// verifies after v2 is registered. An inline one is the body filed under its hash
+// (card 211), parsed again by the loader that checked it. Either missing cannot
+// re-derive the value.
+func templateOf(ctx context.Context, d Deps, r receipt.Receipt) (projection.Template, []string, error) {
+	if r.TemplateInline {
+		t, err := inlineTemplate(ctx, d, r.TemplateHash)
+		return t, nil, err
+	}
+	t, err := d.Templates.Version(r.Template, r.TemplateVersion)
+	if err != nil {
+		if errors.Is(err, projection.ErrUnknown) {
+			return projection.Template{}, nil, fmt.Errorf("%w: the receipt was served under %s v%d: %v",
+				ErrTemplateMoved, r.Template, r.TemplateVersion, err)
+		}
+		return projection.Template{}, nil, err
+	}
+	var notes []string
+	if cur, err := d.Templates.Lookup(r.Template); err == nil && cur.Version != t.Version {
+		notes = append(notes, fmt.Sprintf("replayed %s v%d from the held history; v%d is current", t.Name, t.Version, cur.Version))
+	}
+	switch r.TemplateHash {
+	case t.Hash:
+	case "":
+		notes = append(notes, "receipt names no template hash (served before template hashes were recorded); the version held is taken to be the one that served")
+	default:
+		return projection.Template{}, nil, fmt.Errorf("%w: %s v%d is %s here, the receipt was served under %s",
+			ErrTemplateMoved, t.Name, t.Version, t.Hash, r.TemplateHash)
+	}
+	return t, notes, nil
+}
+
+// inlineTemplate loads the inline projection filed under hash and checks it parses to
+// that hash. The store re-hashes the bytes it returns, so a body that was altered is
+// refused there, and one that parses to another hash is refused here.
+func inlineTemplate(ctx context.Context, d Deps, hash string) (projection.Template, error) {
+	body, err := d.Published.Get(ctx, receipt.InlineKind, hash)
+	if err != nil {
+		if errors.Is(err, ops.ErrNotFound) {
+			return projection.Template{}, fmt.Errorf("%w: the receipt was served through an inline projection %s, and its body is not held: %v",
+				ErrTemplateMoved, hash, err)
+		}
+		return projection.Template{}, err
+	}
+	t, err := projection.ParseInline(body)
+	if err != nil {
+		return projection.Template{}, fmt.Errorf("serve: inline projection %s: %w", hash, err)
+	}
+	if t.Hash != hash {
+		return projection.Template{}, fmt.Errorf("%w: the inline projection filed as %s parses to %s", ErrTemplateMoved, hash, t.Hash)
+	}
+	return t, nil
 }
 
 // Show returns a published receipt and the served value it names, read from the

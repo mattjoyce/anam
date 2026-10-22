@@ -227,6 +227,22 @@ CREATE TRIGGER IF NOT EXISTS saved_selection_code_no_delete
 BEFORE DELETE ON saved_selection_code
 BEGIN SELECT RAISE(ABORT, 'saved_selection_code is immutable'); END;
 
+-- tier: authored, inline projections (card 211): the body of a projection a query carried
+-- in its request rather than naming a registered one, keyed by the SHA-256 of it, which is
+-- the template hash its receipt records. A receipt for such a query names this row, so
+-- verify finds the template to replay. Immutable, like the receipt; a body is only ever
+-- filed when a query that used it was answered.
+CREATE TABLE IF NOT EXISTS inline_projection (
+  hash TEXT PRIMARY KEY CHECK (length(hash) = 71 AND hash GLOB 'sha256:*'),
+  body BLOB NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS inline_projection_no_update
+BEFORE UPDATE ON inline_projection
+BEGIN SELECT RAISE(ABORT, 'inline_projection is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS inline_projection_no_delete
+BEFORE DELETE ON inline_projection
+BEGIN SELECT RAISE(ABORT, 'inline_projection is immutable'); END;
+
 -- tier: provisioned — the static source -> facet-type token map (the gate's
 -- authenticated pillar). One row per grant.
 CREATE TABLE IF NOT EXISTS token_scope (

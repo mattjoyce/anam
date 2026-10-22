@@ -83,7 +83,7 @@ func TestQueryRoutes(t *testing.T) {
 		t.Errorf("catalogue = %d relations, rules %s, %d types", len(cat.Relations), cat.Rules.Name, len(cat.Types))
 	}
 
-	req := api.QueryRequest{Projection: "bp", Relation: "high",
+	req := api.QueryRequest{Projection: api.Named("bp"), Relation: "high",
 		Text: `high(T, S) :- entry(E, "health.blood-pressure", T, _, _, _, _), attr(E, "/systolic_blood_pressure/value", S), S > 110.`}
 	var a api.QueryAnswer
 	if status := postJSON(t, srv.URL+"/v1/query", req, &a); status != http.StatusCreated {
@@ -124,7 +124,7 @@ func TestQueryRoutes_BoundsTheDerivation(t *testing.T) {
 	srv := httptest.NewServer(d.Handler())
 	defer srv.Close()
 
-	req := api.QueryRequest{Projection: "bp", Relation: "leaf", Text: `leaf(E, P, V) :- attr(E, P, V).`}
+	req := api.QueryRequest{Projection: api.Named("bp"), Relation: "leaf", Text: `leaf(E, P, V) :- attr(E, P, V).`}
 	var e api.Error
 	if status := postJSON(t, srv.URL+"/v1/query", req, &e); status != http.StatusRequestEntityTooLarge {
 		t.Fatalf("POST /v1/query over the bound = %d %q", status, e.Error)

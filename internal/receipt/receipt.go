@@ -34,6 +34,10 @@ const Kind = "receipt"
 // (ops.KindServed). It lives here because a receipt is the only thing that names one.
 const ServedKind = "served"
 
+// InlineKind is the kind of stored content the bodies of inline projections are filed
+// under (ops.KindInlineProjection), which a receipt with TemplateInline names by hash.
+const InlineKind = "inline-projection"
+
 // Receipt is the immutable record of one serve. Its field set is §9's, and each field
 // earns its place by being something the re-derivation needs or something a reader
 // years later could not otherwise recover:
@@ -83,6 +87,13 @@ type Receipt struct {
 	// last and omitted when empty, so their bytes and hashes are unchanged and they
 	// still verify. It is the name in the importers file, never the token.
 	Principal string `json:"principal,omitempty"`
+	// TemplateInline says the template was not a registered one but the body a query
+	// carried (card 211). Template and TemplateVersion then hold the fixed stand-ins
+	// "inline" and 1, and TemplateHash is the body's address in the operational
+	// store's inline-projection rows, which is where verify finds the body to replay.
+	// Last and omitted when false, so every earlier receipt keeps its bytes and its
+	// hash and still verifies.
+	TemplateInline bool `json:"template_inline,omitempty"`
 }
 
 // Program is the query half of a query receipt. RuleSetHash pins the bundled rules
@@ -185,6 +196,10 @@ func (r Receipt) Validate() error {
 		return fmt.Errorf("%w: served_at is required", ErrMalformed)
 	case r.Span == "":
 		return fmt.Errorf("%w: span is required", ErrMalformed)
+	case r.TemplateInline && r.TemplateHash == "":
+		return fmt.Errorf("%w: an inline template is found by its hash; template_hash is required", ErrMalformed)
+	case r.TemplateInline && r.Program == nil:
+		return fmt.Errorf("%w: only a query receipt carries an inline template", ErrMalformed)
 	case r.Query != nil && r.Query.IsZero():
 		return fmt.Errorf("%w: query narrows nothing; omit it", ErrMalformed)
 	case r.Query != nil && r.Query.At != "" && r.Query.Before != "":

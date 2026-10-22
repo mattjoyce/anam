@@ -118,15 +118,15 @@ func (o moveOptions) carryRegistered(ctx context.Context, out io.Writer, db *ops
 		return fmt.Errorf("--registered-from %s: %w", path, err)
 	}
 	if !o.yes {
-		_, err = fmt.Fprintf(out, "would copy %d registered Definitions and %d registered projection templates from %s\n",
-			len(reg.Definitions), len(reg.Projections), path)
+		_, err = fmt.Fprintf(out, "would copy %d registered Definitions, %d registered projection templates and %d inline projection bodies from %s\n",
+			len(reg.Definitions), len(reg.Projections), len(reg.Inline), path)
 		return err
 	}
 	if err := db.CarryRegistered(ctx, reg); err != nil {
 		return fmt.Errorf("copy the registered rows: %w (the store must hold none of its own)", err)
 	}
-	_, err = fmt.Fprintf(out, "copied %d registered Definitions and %d registered projection templates from %s\n",
-		len(reg.Definitions), len(reg.Projections), path)
+	_, err = fmt.Fprintf(out, "copied %d registered Definitions, %d registered projection templates and %d inline projection bodies from %s\n",
+		len(reg.Definitions), len(reg.Projections), len(reg.Inline), path)
 	return err
 }
 

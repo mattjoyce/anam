@@ -34,7 +34,8 @@ func (d Deps) definitions() (query.Definitions, error) {
 }
 
 // PublishQuery files a query's answer as what template t served at w, with a receipt
-// that names the facets the projection served, the program, and the answer's hash.
+// that names the facets the projection served, the program, and the answer's hash. An
+// inline t (card 211) has its body filed by hash and the receipt marks it inline.
 // The answer is filed first and the receipt second, as Publish does; with dryRun set
 // nothing is written.
 func PublishQuery(ctx context.Context, d Deps, t projection.Template, w ledger.Watermark, prog receipt.Program,
@@ -43,6 +44,9 @@ func PublishQuery(ctx context.Context, d Deps, t projection.Template, w ledger.W
 	ledgerID, err := d.Ledger.ID(ctx)
 	if err != nil {
 		return Served{}, err
+	}
+	if t.Inline && ops.Digest(t.Body) != t.Hash {
+		return Served{}, fmt.Errorf("serve: inline template body hashes to %s, not its hash %s", ops.Digest(t.Body), t.Hash)
 	}
 	r := receipt.Receipt{
 		LedgerID:             ledgerID,
@@ -57,6 +61,7 @@ func PublishQuery(ctx context.Context, d Deps, t projection.Template, w ledger.W
 		Span:                 t.Span(),
 		Program:              &prog,
 		Principal:            d.Reader,
+		TemplateInline:       t.Inline,
 	}
 	if err := r.Validate(); err != nil {
 		return Served{}, err
@@ -68,6 +73,14 @@ func PublishQuery(ctx context.Context, d Deps, t projection.Template, w ledger.W
 	out := Served{Receipt: r, ReceiptHash: ops.Digest(receiptBytes), Answer: &ans}
 	if dryRun {
 		return out, nil
+	}
+	// An inline template's body is filed before the receipt that names it, as the
+	// answer is: a crash leaves a body no receipt names, never a receipt verify cannot
+	// replay.
+	if t.Inline {
+		if _, err := d.Published.Put(ctx, receipt.InlineKind, t.Body); err != nil {
+			return Served{}, err
+		}
 	}
 	if _, err := d.Published.Put(ctx, receipt.ServedKind, ans.Bytes()); err != nil {
 		return Served{}, err

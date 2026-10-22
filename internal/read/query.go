@@ -137,18 +137,14 @@ type standing struct {
 // stand reads the full fold at the knowledge asked for and serves it through the
 // projection. The full fold, not the composed read: the base relations carry each
 // facet's Definition version, which only the fold's live facets hold.
-func stand(ctx context.Context, src Source, know knowledge, projName string) (standing, error) {
+func stand(ctx context.Context, src Source, know knowledge, ref api.ProjectionRef) (standing, error) {
 	defs, err := src.definitions()
 	if err != nil {
 		return standing{}, err
 	}
-	templates, err := src.projections()
+	t, err := queryTemplate(src, defs, ref)
 	if err != nil {
 		return standing{}, err
-	}
-	t, err := templates.Lookup(projName)
-	if err != nil {
-		return standing{}, badQuery(err)
 	}
 	var v view
 	w, err := watermarkOf(ctx, src.Ledger, know, &v)
@@ -166,11 +162,39 @@ func stand(ctx context.Context, src Source, know knowledge, projName string) (st
 	return standing{defs: defs, tmpl: t, res: res, served: served, w: w, view: v}, nil
 }
 
+// queryTemplate is the template a query reads through: the registered or bundled one
+// ref names, newest version, or the inline one ref carries (card 211), checked by the
+// loader a registered manifest is and against the Definitions in force. Nothing has
+// been read when it refuses, and a bad template is the reader's error naming the field.
+func queryTemplate(src Source, defs *def.Registry, ref api.ProjectionRef) (projection.Template, error) {
+	if len(ref.Inline) == 0 {
+		templates, err := src.projections()
+		if err != nil {
+			return projection.Template{}, err
+		}
+		t, err := templates.Lookup(ref.Name)
+		if err != nil {
+			return projection.Template{}, badQuery(err)
+		}
+		return t, nil
+	}
+	t, err := projection.ParseInline(ref.Inline)
+	if err != nil {
+		return projection.Template{}, badQuery(err)
+	}
+	if err := t.CheckDefined(func(ft facet.Type) bool { return defs.Has(ft) }); err != nil {
+		return projection.Template{}, badQuery(err)
+	}
+	return t, nil
+}
+
 // checkQueryRequest refuses a request that cannot run, and parses its program.
 func checkQueryRequest(q api.QueryRequest) (query.Program, error) {
 	switch {
-	case q.Projection == "":
-		return query.Program{}, badQuery(errors.New("a query runs through a projection; name one"))
+	case q.Projection.IsZero():
+		return query.Program{}, badQuery(errors.New("a query runs through a projection; name one, or give the template inline"))
+	case q.Projection.Name != "" && len(q.Projection.Inline) > 0:
+		return query.Program{}, badQuery(errors.New("a projection is named or inline, not both"))
 	case strings.TrimSpace(q.Text) == "":
 		return query.Program{}, badQuery(errors.New("the query has no program"))
 	case q.Relation == "":

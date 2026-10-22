@@ -22,6 +22,8 @@ var replace = map[string]string{
 	ops.KindServed:        `INSERT OR REPLACE INTO served_value (hash, body) VALUES (?, ?)`,
 	ops.KindSelection:     `INSERT OR REPLACE INTO saved_selection (hash, body) VALUES (?, ?)`,
 	ops.KindSelectionCode: `INSERT OR REPLACE INTO saved_selection_code (hash, body) VALUES (?, ?)`,
+
+	ops.KindInlineProjection: `INSERT OR REPLACE INTO inline_projection (hash, body) VALUES (?, ?)`,
 }
 
 // Corrupt files body under digest in the table kind names, replacing the row there, so

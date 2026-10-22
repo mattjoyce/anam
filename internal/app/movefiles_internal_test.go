@@ -103,7 +103,7 @@ func TestMoveArtifacts_ARecordsFolderComesInAndItsReceiptsVerify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("move: %v", err)
 	}
-	if !strings.Contains(out, "copied 0 registered Definitions and 1 registered projection") {
+	if !strings.Contains(out, "copied 0 registered Definitions, 1 registered projection templates and 0 inline projection bodies") {
 		t.Errorf("the move does not say it copied the registered projection:\n%s", out)
 	}
 

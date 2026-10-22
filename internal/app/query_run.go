@@ -56,7 +56,7 @@ The program is -e, -f, or stdin.`,
 					return err
 				}
 			}
-			q := api.QueryRequest{Projection: projName, Text: program, Relation: relation, AsOf: asOf, W: w, DryRun: dryRun}
+			q := api.QueryRequest{Projection: api.Named(projName), Text: program, Relation: relation, AsOf: asOf, W: w, DryRun: dryRun}
 			a, err := runQuery(cmd.Context(), cfg, q)
 			if err != nil {
 				return err

@@ -659,7 +659,9 @@ ledger.db
 There is no watermark row. `W` is `MAX(seq)`, and a trigger lets an anam-event take only the `seq` after
 the newest one, so the sequence is gapless and the highest `seq` is the count of everything Anam learned.
 
-**The ledger carries no secondary indexes.** It serves two access paths, both on a primary key:
+**The ledger carries no derived indexes.** It serves three access paths, two on a primary key and
+one on its own lookup index, `anam_event_by_facet` (`internal/store/ledger/indexes.sql`, installed as
+its own step; card 65), which lets the gate fold one facet's events without replaying the ledger:
 
 - one facet's versions, highest first: the current artifact version, whose `content_hash` `commit`
   compares against (§6a);
@@ -967,8 +969,9 @@ Anam later as an ordinary source fact.
   values, or supersession silently becomes duplication (§6a).
 - **Sort keys are identity-first and fixed-width.** An artifact's key carries its `facet_id`, never its
   `fact_time`; every integer in a sort key is zero-padded. Otherwise supersession silently duplicates, or
-  lexical order stops being chronological (§8). The ledger carries **no secondary indexes**: an index is
-  derived, and derived things live in the operational store.
+  lexical order stops being chronological (§8). The ledger carries **no derived indexes**: anything
+  derived lives in the operational store. Its one index, `anam_event_by_facet`, is a lookup on its own
+  rows for the gate's fold of one facet (§8), not a derivation.
 - **Canonical means the live-only value; the ledger means append-everything-marked.** One word, one
   surface (§7, §9).
 - **Metadata / payload separation**: the payload is verbatim, immutable, stored opaque, never parsed

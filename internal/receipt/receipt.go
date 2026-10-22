@@ -77,6 +77,12 @@ type Receipt struct {
 	// query ran through, and ServedHash is the answer's. Nil for a timeline receipt;
 	// last and omitted when nil, so every earlier receipt keeps its bytes.
 	Program *Program `json:"program,omitempty"`
+	// Principal is the name of the principal whose read this receipt files (card 216),
+	// for a token set to leave a receipt for every read. Empty when the serve was not
+	// filed on a named reader's behalf, which is every receipt cut before it; it is
+	// last and omitted when empty, so their bytes and hashes are unchanged and they
+	// still verify. It is the name in the importers file, never the token.
+	Principal string `json:"principal,omitempty"`
 }
 
 // Program is the query half of a query receipt. RuleSetHash pins the bundled rules

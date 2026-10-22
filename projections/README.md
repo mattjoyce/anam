@@ -7,7 +7,7 @@ back from a backup or by registering them again from here.
 
 ```sh
 export ANAM_SERVER=http://192.168.20.4:8787 ANAM_TOKEN_FILE=~/.config/anam/token
-anam projection register projections/heart.v4.json
+anam projection register projections/heart.v5.json
 anam projection register projections/sleep.v4.json
 anam projection register projections/recent-life.v6.json
 anam projection list
@@ -19,8 +19,9 @@ before the domain taxonomy. `recent-life.v2` names notes `record.note`, `recent-
 illness types as `place.departed` and `health.illness-started` and the like, and `recent-life.v4`
 names `activity.exercise-session` as one type, before it was split into a leaf per vendor, so v5 names the
 prefix `activity.exercise-session.`. `heart.v2` names `health.heart-rate-day`, three facts a day,
-which became one fact a day, `health.heart-rate.day`, in v3. The newest of each, `heart.v4`, `sleep.v4` and
-`recent-life.v6`, serve the same types as the version before and only reword the description.
+which became one fact a day, `health.heart-rate.day`, in v3, and `heart.v5` adds
+`health.heart-rate.hour`, the watch's own readings, a minute a slot. `sleep.v4` and
+`recent-life.v6` serve the same types as the version before and only reword the description.
 A registered version is immutable. The same file again is reported unchanged; a change
 is a new version in a new file (`<name>.v<n>.json`), and every version ever registered
 stays readable, because a receipt names the version that served it.

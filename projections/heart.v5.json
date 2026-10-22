@@ -1,0 +1,11 @@
+{
+  "name": "heart",
+  "version": 5,
+  "description": "The heart: Garmin's daily resting, minimum and maximum heart rate, the watch's own hourly readings, and every alert it raised, without the rest of the health record. v5 adds health.heart-rate.hour, a UTC hour's 60 minute slots. v4 names the same types as v3 and only rewords this description. v3 named health.heart-rate.day, one fact a day; v2 named health.heart-rate-day, three a day; v1 named health.heart-rate-daily.",
+  "types": ["health.heart-rate.day", "health.heart-rate.hour", "health.heart-rate-alert"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

@@ -24,6 +24,21 @@ var (
 	ErrUndefinedType = errors.New("projection: template names a type with no Definition")
 )
 
+// CheckDefined refuses a template that names a type defined says has no Definition; nil
+// skips the check. Registering a template and answering a query through an inline one
+// both ask it, so a typo is told to the author rather than served as nothing.
+func (t Template) CheckDefined(defined func(facet.Type) bool) error {
+	if defined == nil {
+		return nil
+	}
+	for _, typ := range t.Types {
+		if !defined(typ) {
+			return fmt.Errorf("%w: %s names %s", ErrUndefinedType, t.Name, typ)
+		}
+	}
+	return nil
+}
+
 // Stored is one template body the operational store holds, by name and version.
 type Stored struct {
 	Name    string
@@ -51,12 +66,8 @@ func Register(body []byte, held *Registry, defined func(facet.Type) bool) (Regis
 	if err != nil {
 		return Registration{}, err
 	}
-	if defined != nil {
-		for _, typ := range t.Types {
-			if !defined(typ) {
-				return Registration{}, fmt.Errorf("%w: %s names %s", ErrUndefinedType, t.Name, typ)
-			}
-		}
+	if err := t.CheckDefined(defined); err != nil {
+		return Registration{}, err
 	}
 	versions := held.Versions(t.Name)
 	for _, h := range versions {

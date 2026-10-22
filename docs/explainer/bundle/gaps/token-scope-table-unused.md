@@ -4,7 +4,7 @@ title: token_scope is a dead table
 description: The operational store creates token_scope (source, type) for the gate's authenticated pillar; nothing reads or writes it. Importer scopes come from the importers file.
 timestamp: 2026-10-17T00:00:00Z
 looked_at:
-  - internal/store/ops/ops.go
+  - internal/store/ops/ops.sql
   - internal/config/principals.go
   - internal/app/retract.go
   - internal/daemon/envelopes.go

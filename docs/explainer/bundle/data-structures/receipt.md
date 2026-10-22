@@ -1,8 +1,8 @@
 ---
 type: data-structure
 title: Receipt
-description: "Proof of what a projection served: the served hash, the facet ids, the watermark and ledger id, the template and definition-set versions, served_at, the span, and the query a read narrowed by."
-timestamp: 2026-10-11T00:00:00Z
+description: "Proof of what a projection served: the served hash, the facet ids, the watermark and ledger id, the template and definition-set versions, served_at, the span, the query a read narrowed by, and the principal whose read it files."
+timestamp: 2026-10-22T00:00:00Z
 resource: internal/receipt/receipt.go#Receipt
 anchor: "type Receipt struct {"
 basis: code
@@ -28,5 +28,7 @@ references:
 | `served_at` | string | the clock layout |
 | `span` | string | `whole-person` or `fact-time[from,to)` |
 | `query` | object, optional | `{from, before, at, type}` a read narrowed by after the template; nil for a whole serve |
+| `template_inline` | bool, optional | the template was an inline projection a query carried (card 211): `template` is then `inline`, `template_version` 1, and `template_hash` the address of the body filed in the `inline_projection` table. Last, left out when false, so every earlier receipt keeps its bytes and hash |
+| `principal` | string, optional | the name, from the importers file, of the principal whose read this files, for a token set to record every read (card 216). Last and left out when empty, so every receipt cut before it has the same bytes and hash and still verifies |
 
-Written as indented JSON to `receipt/sha256-<hex>.json`; parsed with unknown fields refused. Verification reports two independent proofs: reproduced (re-derived hash and id set match) and intact (the served file still hashes to `served_hash`).
+Stored as a row of the `receipt` table, addressed by the SHA-256 of its indented JSON; parsed with unknown fields refused. Verification reports two independent proofs: reproduced (re-derived hash and id set match) and intact (the served file still hashes to `served_hash`).

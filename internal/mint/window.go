@@ -51,7 +51,7 @@ type Window struct {
 // The whole value's bytes are its buckets' bytes in time order, joined: a value is a
 // JSON array in (fact_time, facet_id) order, and buckets partition fact-time. So the
 // hash streamed here is the hash the full fold computes.
-func ReadWindow(ctx context.Context, l ReadLedger, log WindowLog, artifacts Store,
+func ReadWindow(ctx context.Context, l ReadLedger, log WindowLog, values Store,
 	w ledger.Watermark, from, toX string,
 ) (Window, bool, error) {
 	run, ok, err := startingRun(ctx, l, log, w)
@@ -86,9 +86,9 @@ func ReadWindow(ctx context.Context, l ReadLedger, log WindowLog, artifacts Stor
 	var shown []fold.Entry
 	for _, b := range order {
 		need := overlaps(b.bucket, from, toX)
-		inner, entries, n, err := readBucket(artifacts, b, d, need, sizes)
+		inner, entries, n, err := readBucket(ctx, values, b, d, need, sizes)
 		if err != nil {
-			return Window{}, false, err
+			return Window{}, false, declineIfMissing(err)
 		}
 		if entries != nil {
 			win.Decoded++
@@ -231,14 +231,14 @@ func overlaps(b span.Bucket, from, toX string) bool {
 
 // readBucket returns one bucket's array contents, without its brackets, for the whole
 // hash, and how many facets it holds. It decodes the bucket, returning its entries,
-// when the read shows it or the tail dirtied it; otherwise it only checks the file's
+// when the read shows it or the tail dirtied it; otherwise it only checks the value's
 // bytes against their hash, and counts from the recorded size.
-func readBucket(artifacts Store, b orderedBucket, d dirtied, need bool, sizes map[ops.SpanVersion]int,
+func readBucket(ctx context.Context, values Store, b orderedBucket, d dirtied, need bool, sizes map[ops.SpanVersion]int,
 ) (inner []byte, entries []fold.Entry, n int, err error) {
 	id := b.bucket.ID()
 	var raw []byte
 	if b.row != nil {
-		if raw, err = artifacts.Get(Kind, b.row.ValueHash); err != nil {
+		if raw, err = values.Get(ctx, Kind, b.row.ValueHash); err != nil {
 			return nil, nil, 0, fmt.Errorf("mint: checkpoint %s v%d: %w", id, b.row.V, err)
 		}
 	}

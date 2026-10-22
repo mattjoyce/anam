@@ -3,7 +3,7 @@ type: data-structure
 title: Snapshot tables
 description: "The operational store's record of an importer's resend-everything run: the run with its started and completed watermarks, each part's digest, and the facet ids the parts carried."
 timestamp: 2026-10-11T00:00:00Z
-resource: internal/store/ops/ops.go#snapshot
+resource: internal/store/ops/ops.sql#snapshot
 anchor: "CREATE TABLE IF NOT EXISTS snapshot ("
 basis: code
 tier: supporting

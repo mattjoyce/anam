@@ -4,12 +4,12 @@
 // Serving reads: the person at the head watermark, composed from the last mint run and
 // the tail after it when the checkpoint log is to hand and folded from the beginning
 // when it is not, pruned through the selected template and the consent gate; the
-// served value and its receipt are written to the published-artifact tier. It writes nothing to the ledger and does not move W —
-// being shown is not something Anam learned (§9).
+// served value and its receipt are written to the operational store. It writes nothing to
+// the ledger and does not move W: being shown is not something Anam learned (§9).
 //
 // Verifying re-runs exactly that derivation at the receipt's own watermark and checks
 // two things independently: that the ledger still produces those bytes, and that the
-// artifact on disk is still those bytes. If serving and verifying ever stop being the
+// stored value is still those bytes. If serving and verifying ever stop being the
 // same derivation, a receipt becomes a story about a serve rather than a proof of one,
 // which is why they are neighbours in one file.
 package serve
@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/clock"
@@ -29,8 +30,8 @@ import (
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/query"
 	"github.com/mattjoyce/anam/internal/receipt"
-	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
+	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
 // ErrTemplateMoved is returned when a receipt names a template version this record
@@ -52,12 +53,13 @@ type Ledger interface {
 	ID(ctx context.Context) (string, error)
 }
 
-// Store is the published-artifact tier this package writes to and reads back. It is
-// also where the mint files its checkpoints, so it is the mint's Store too.
+// Store is where this package writes the receipts and served values it publishes and
+// reads them back: the operational store's content-addressed rows. It is also where
+// the mint files its checkpoints, so it is the mint's Store too.
 type Store interface {
 	mint.Store
-	Raw(kind, digest string) ([]byte, error)
-	List(kind string) ([]string, error)
+	Raw(ctx context.Context, kind, digest string) ([]byte, error)
+	List(ctx context.Context, kind string) ([]string, error)
 }
 
 // Clock supplies the served-at time; tests freeze it.
@@ -69,7 +71,7 @@ type Clock interface{ Now() time.Time }
 type Deps struct {
 	Ledger    Ledger
 	Templates *projection.Registry
-	Artifacts Store
+	Published Store
 	Gate      projection.Gate
 	Clock     Clock
 
@@ -91,6 +93,11 @@ type Deps struct {
 	// Definitions are the Definitions in force, which a query's base relations and
 	// pointer check read (card 173). Nil means the bundled ones alone.
 	Definitions query.Definitions
+
+	// Reader is the principal a receipt filed through these Deps names (card 216):
+	// the one whose read it files. Empty names nobody, which is how every receipt
+	// before it was cut and how an ordinary publish still is.
+	Reader string
 }
 
 // Served reports one completed serve.
@@ -134,7 +141,7 @@ type canonical struct {
 // is what lets serve and verify use either and still be each other's inverse.
 func valueAt(ctx context.Context, d Deps, w ledger.Watermark) (canonical, error) {
 	if d.Checkpoints != nil {
-		c, ok, err := mint.ReadAt(ctx, d.Ledger, d.Checkpoints, d.Artifacts, w)
+		c, ok, err := mint.ReadAt(ctx, d.Ledger, d.Checkpoints, d.Published, w)
 		if err != nil {
 			return canonical{}, err
 		}
@@ -211,6 +218,7 @@ func Publish(ctx context.Context, d Deps, t projection.Template, w ledger.Waterm
 		ServedAt:             clock.Format(d.Clock.Now()),
 		Span:                 t.Span(),
 		Query:                q,
+		Principal:            d.Reader,
 	}
 	if err := r.Validate(); err != nil {
 		return Served{}, err
@@ -220,14 +228,14 @@ func Publish(ctx context.Context, d Deps, t projection.Template, w ledger.Waterm
 		return Served{}, err
 	}
 
-	out := Served{Receipt: r, ReceiptHash: artifact.Digest(receiptBytes), Frame: fr}
+	out := Served{Receipt: r, ReceiptHash: ops.Digest(receiptBytes), Frame: fr}
 	if dryRun {
 		return out, nil
 	}
-	if _, err := d.Artifacts.Put(receipt.ServedKind, servedBytes); err != nil {
+	if _, err := d.Published.Put(ctx, receipt.ServedKind, servedBytes); err != nil {
 		return Served{}, err
 	}
-	if _, err := d.Artifacts.Put(receipt.Kind, receiptBytes); err != nil {
+	if _, err := d.Published.Put(ctx, receipt.Kind, receiptBytes); err != nil {
 		return Served{}, err
 	}
 	out.Written = true
@@ -286,10 +294,9 @@ func Cut(v fold.Value, q *receipt.Query) (*frame.Frame, error) {
 	return &f, nil
 }
 
-// Verify honours a receipt: re-derive at its watermark, and re-hash the artifact on
-// disk. The two proofs are independent (see receipt.Result).
+// Verify honours a receipt: re-derive at its watermark, and re-hash the stored value. The two proofs are independent (see receipt.Result).
 func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, receipt.Result, error) {
-	raw, err := d.Artifacts.Get(receipt.Kind, receiptHash)
+	raw, err := d.Published.Get(ctx, receipt.Kind, receiptHash)
 	if err != nil {
 		return receipt.Receipt{}, receipt.Result{}, err
 	}
@@ -298,28 +305,9 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 		return receipt.Receipt{}, receipt.Result{}, err
 	}
 
-	// The exact version the receipt names, not the newest: every version ever held
-	// stays readable (card 125), so a receipt served under v1 verifies after v2 is
-	// registered. A version this record does not hold cannot re-derive the value.
-	t, err := d.Templates.Version(r.Template, r.TemplateVersion)
+	t, notes, err := templateOf(ctx, d, r)
 	if err != nil {
-		if errors.Is(err, projection.ErrUnknown) {
-			return r, receipt.Result{}, fmt.Errorf("%w: the receipt was served under %s v%d: %v",
-				ErrTemplateMoved, r.Template, r.TemplateVersion, err)
-		}
 		return r, receipt.Result{}, err
-	}
-	var notes []string
-	if cur, err := d.Templates.Lookup(r.Template); err == nil && cur.Version != t.Version {
-		notes = append(notes, fmt.Sprintf("replayed %s v%d from the held history; v%d is current", t.Name, t.Version, cur.Version))
-	}
-	switch r.TemplateHash {
-	case t.Hash:
-	case "":
-		notes = append(notes, "receipt names no template hash (served before template hashes were recorded); the version held is taken to be the one that served")
-	default:
-		return r, receipt.Result{}, fmt.Errorf("%w: %s v%d is %s here, the receipt was served under %s",
-			ErrTemplateMoved, t.Name, t.Version, t.Hash, r.TemplateHash)
 	}
 
 	ledgerID, err := d.Ledger.ID(ctx)
@@ -362,13 +350,13 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 	}
 
 	// Raw, not Get: the verifier wants the bytes as they are so it can say what they
-	// hash to. Get would refuse a tampered artifact and report only that it refused.
-	stored, err := d.Artifacts.Raw(receipt.ServedKind, r.ServedHash)
-	if err != nil && !errors.Is(err, artifact.ErrNotFound) {
+	// hash to. Get would refuse a tampered row and report only that it refused.
+	stored, err := d.Published.Raw(ctx, receipt.ServedKind, r.ServedHash)
+	if err != nil && !errors.Is(err, ops.ErrNotFound) {
 		return r, receipt.Result{}, err
 	}
 
-	out := receipt.Compare(r, derivedHash, idsOf(value), stored, artifact.Digest)
+	out := receipt.Compare(r, derivedHash, idsOf(value), stored, ops.Digest)
 	out.Notes = append(out.Notes, notes...)
 	if r.DefinitionSetVersion != d.DefinitionSetVersion {
 		note := "definitions govern capture, not the fold, so this does not affect reproduction"
@@ -382,19 +370,75 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 	return r, out, nil
 }
 
+// templateOf is the template a receipt was served through, and notes on how it was
+// found. A registered template is the exact version the receipt names, not the newest:
+// every version ever held stays readable (card 125), so a receipt served under v1
+// verifies after v2 is registered. An inline one is the body filed under its hash
+// (card 211), parsed again by the loader that checked it. Either missing cannot
+// re-derive the value.
+func templateOf(ctx context.Context, d Deps, r receipt.Receipt) (projection.Template, []string, error) {
+	if r.TemplateInline {
+		t, err := inlineTemplate(ctx, d, r.TemplateHash)
+		return t, nil, err
+	}
+	t, err := d.Templates.Version(r.Template, r.TemplateVersion)
+	if err != nil {
+		if errors.Is(err, projection.ErrUnknown) {
+			return projection.Template{}, nil, fmt.Errorf("%w: the receipt was served under %s v%d: %v",
+				ErrTemplateMoved, r.Template, r.TemplateVersion, err)
+		}
+		return projection.Template{}, nil, err
+	}
+	var notes []string
+	if cur, err := d.Templates.Lookup(r.Template); err == nil && cur.Version != t.Version {
+		notes = append(notes, fmt.Sprintf("replayed %s v%d from the held history; v%d is current", t.Name, t.Version, cur.Version))
+	}
+	switch r.TemplateHash {
+	case t.Hash:
+	case "":
+		notes = append(notes, "receipt names no template hash (served before template hashes were recorded); the version held is taken to be the one that served")
+	default:
+		return projection.Template{}, nil, fmt.Errorf("%w: %s v%d is %s here, the receipt was served under %s",
+			ErrTemplateMoved, t.Name, t.Version, t.Hash, r.TemplateHash)
+	}
+	return t, notes, nil
+}
+
+// inlineTemplate loads the inline projection filed under hash and checks it parses to
+// that hash. The store re-hashes the bytes it returns, so a body that was altered is
+// refused there, and one that parses to another hash is refused here.
+func inlineTemplate(ctx context.Context, d Deps, hash string) (projection.Template, error) {
+	body, err := d.Published.Get(ctx, receipt.InlineKind, hash)
+	if err != nil {
+		if errors.Is(err, ops.ErrNotFound) {
+			return projection.Template{}, fmt.Errorf("%w: the receipt was served through an inline projection %s, and its body is not held: %v",
+				ErrTemplateMoved, hash, err)
+		}
+		return projection.Template{}, err
+	}
+	t, err := projection.ParseInline(body)
+	if err != nil {
+		return projection.Template{}, fmt.Errorf("serve: inline projection %s: %w", hash, err)
+	}
+	if t.Hash != hash {
+		return projection.Template{}, fmt.Errorf("%w: the inline projection filed as %s parses to %s", ErrTemplateMoved, hash, t.Hash)
+	}
+	return t, nil
+}
+
 // Show returns a published receipt and the served value it names, read from the
-// artifact tier alone — no ledger, no fold, no re-derivation.
+// operational store alone: no ledger, no fold, no re-derivation.
 //
 // That restraint is the point. Verify asks whether the ledger still honours a receipt;
-// Show asks what the artifact actually says, which is a question you must be able to
+// Show asks what the store actually says, which is a question you must be able to
 // answer when the ledger is gone, unreachable, or exactly what you doubt. The bytes are
-// checked against their own content address on the way out, so a tampered artifact is
+// checked against their own content address on the way out, so a tampered row is
 // reported rather than displayed as though it were what was served.
 //
 // A receipt whose query named fields names a frame, not a list of entries (card
 // 138); Show returns it as Shown.Frame, with Entries empty.
-func Show(d Deps, receiptHash string) (receipt.Receipt, Shown, error) {
-	raw, err := d.Artifacts.Get(receipt.Kind, receiptHash)
+func Show(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, Shown, error) {
+	raw, err := d.Published.Get(ctx, receipt.Kind, receiptHash)
 	if err != nil {
 		return receipt.Receipt{}, Shown{}, err
 	}
@@ -403,7 +447,7 @@ func Show(d Deps, receiptHash string) (receipt.Receipt, Shown, error) {
 		return receipt.Receipt{}, Shown{}, err
 	}
 
-	served, err := d.Artifacts.Get(receipt.ServedKind, r.ServedHash)
+	served, err := d.Published.Get(ctx, receipt.ServedKind, r.ServedHash)
 	if err != nil {
 		return r, Shown{}, err
 	}
@@ -428,7 +472,7 @@ func Show(d Deps, receiptHash string) (receipt.Receipt, Shown, error) {
 	return r, Shown{Entries: entries}, nil
 }
 
-// Shown is a served value read back from the artifact tier: the entries of a whole
+// Shown is a served value read back from the store: the entries of a whole
 // serve, the frame of one that named fields, or the answer of a query.
 type Shown struct {
 	Entries []fold.Entry
@@ -436,17 +480,40 @@ type Shown struct {
 	Answer  *query.Answer
 }
 
-// List returns the receipts in the store, newest serve first.
-func List(d Deps) ([]receipt.Receipt, []string, error) {
-	digests, err := d.Artifacts.List(receipt.Kind)
+// ListFilter narrows a listing of receipts. Each part is optional, and a receipt
+// must pass every part that is set. Since and Until are clock.Layout instants, the
+// window [Since, Until) of served time.
+type ListFilter struct {
+	// Principal keeps the receipts that name this reader.
+	Principal string
+	// Since keeps the receipts served at or after this instant.
+	Since string
+	// Until keeps the receipts served before this instant.
+	Until string
+}
+
+// admits reports whether r passes f. served_at is a fixed-width clock.Layout string,
+// so the lexical comparison is the chronological one.
+func (f ListFilter) admits(r receipt.Receipt) bool {
+	return (f.Principal == "" || r.Principal == f.Principal) &&
+		(f.Since == "" || r.ServedAt >= f.Since) &&
+		(f.Until == "" || r.ServedAt < f.Until)
+}
+
+// List returns the receipts in the store that pass f, newest serve first.
+func List(ctx context.Context, d Deps, f ListFilter) ([]receipt.Receipt, []string, error) {
+	digests, err := d.Published.List(ctx, receipt.Kind)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	receipts := make([]receipt.Receipt, 0, len(digests))
-	hashes := make([]string, 0, len(digests))
+	type listed struct {
+		r    receipt.Receipt
+		hash string
+	}
+	var kept []listed
 	for _, digest := range digests {
-		raw, err := d.Artifacts.Get(receipt.Kind, digest)
+		raw, err := d.Published.Get(ctx, receipt.Kind, digest)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -454,20 +521,23 @@ func List(d Deps) ([]receipt.Receipt, []string, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("serve: receipt %s: %w", digest, err)
 		}
-		receipts = append(receipts, r)
-		hashes = append(hashes, digest)
+		if f.admits(r) {
+			kept = append(kept, listed{r, digest})
+		}
 	}
 
 	// served_at is a fixed-width clock.Layout string, so the lexical sort is the
 	// chronological one; the hash breaks ties on a same-instant pair.
-	for i := range receipts {
-		for j := i + 1; j < len(receipts); j++ {
-			ri, rj := receipts[i], receipts[j]
-			if rj.ServedAt > ri.ServedAt || (rj.ServedAt == ri.ServedAt && hashes[j] < hashes[i]) {
-				receipts[i], receipts[j] = receipts[j], receipts[i]
-				hashes[i], hashes[j] = hashes[j], hashes[i]
-			}
+	sort.Slice(kept, func(i, j int) bool {
+		if kept[i].r.ServedAt != kept[j].r.ServedAt {
+			return kept[i].r.ServedAt > kept[j].r.ServedAt
 		}
+		return kept[i].hash < kept[j].hash
+	})
+	receipts := make([]receipt.Receipt, len(kept))
+	hashes := make([]string, len(kept))
+	for i, k := range kept {
+		receipts[i], hashes[i] = k.r, k.hash
 	}
 	return receipts, hashes, nil
 }

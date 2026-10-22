@@ -86,9 +86,8 @@ func newRemoteFixtureWith(t *testing.T, zone string, tweak func(t *testing.T, f 
 	// No person and no file that exists: if the CLI opened anything local it would fail.
 	nowhere := filepath.Join(f.dir, "not-here")
 	f.remoteCfg = filepath.Join(f.dir, "remote.yaml")
-	remote := fmt.Sprintf("server: %s\ntoken_file: %s\nzone: %s\nledger_path: %s\ndb_path: %s\nartifact_dir: %s\n",
-		f.server, tokenPath, zone, filepath.Join(nowhere, "ledger.db"), filepath.Join(nowhere, "tracking.db"),
-		filepath.Join(nowhere, "artifacts"))
+	remote := fmt.Sprintf("server: %s\ntoken_file: %s\nzone: %s\nledger_path: %s\ndb_path: %s\n",
+		f.server, tokenPath, zone, filepath.Join(nowhere, "ledger.db"), filepath.Join(nowhere, "tracking.db"))
 	if err := os.WriteFile(f.remoteCfg, []byte(remote), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -373,6 +372,25 @@ func TestReceipts_SameOverTheDaemon(t *testing.T) {
 	}
 	if hash == "" {
 		t.Fatalf("no receipt listed:\n%s", list)
+	}
+	// Who read what: the listing narrows by reader and by served time, the same
+	// locally and over the daemon, and a receipt that names nobody shows a dash.
+	if !strings.Contains(list, "READER") || !strings.Contains(list, " - ") {
+		t.Errorf("the listing does not show a reader column:\n%s", list)
+	}
+	for _, c := range []struct {
+		args []string
+		want bool
+	}{
+		{[]string{"--principal", "assistant"}, false},
+		{[]string{"--since", "2000-01-01", "--until", "2999-12-31"}, true},
+		{[]string{"--since", "2999-01-01"}, false},
+		{[]string{"--until", "2000-01-01"}, false},
+	} {
+		out := f.sameOutput(t, append([]string{"receipt", "list"}, c.args...)...)
+		if has := strings.Contains(out, hash); has != c.want {
+			t.Errorf("receipt list %v listed the receipt = %v, want %v:\n%s", c.args, has, c.want, out)
+		}
 	}
 	f.sameOutput(t, "receipt", "show", hash)
 	f.sameOutput(t, "receipt", "show", hash, "--json")

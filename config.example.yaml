@@ -13,11 +13,12 @@
 # shrug: a silently-ignored `ledger_pth` would leave Anam writing to the default
 # ledger while you believed it was writing to yours.
 #
-# Anam stores in three places (ARCHITECTURE.md §8): the ledger is the record;
-# files hold published artifacts; the operational store holds what Anam derives
-# and authors. Each of the operational store's tables records where it comes back
-# from — the derived tier by replaying the ledger, the rest from git or from a
-# backup.
+# Anam stores in two places and a folder of documents (ARCHITECTURE.md §8): the
+# ledger is the record; the operational store holds what Anam derives and authors,
+# receipts and saved selections included. Each of the operational store's tables
+# records where it comes back from, the derived tier by replaying the ledger, the
+# rest from git or from a backup. artifact_dir, which once held receipts and
+# checkpoint values as files, is gone; `anam move-artifacts` reads an old folder in.
 
 # Whose timeline this is. Pinned into the ledger by `anam init`; a ledger pinned
 # to another person is refused. Required, and deliberately without a default.
@@ -38,17 +39,13 @@ ledger_path: ~/.local/share/anam/ledger.db
 
 # --- operational store: SQLite ------------------------------------------------
 # Definitions, projection templates, token scopes, the facet and anam-event
-# indexes, the span registry and per-span V/Wv, checkpoint and receipt index,
-# saved span bookmarks, sync cursors, GC state.
+# indexes, the checkpoint log and its values, receipts, served values and saved
+# selections, sync cursors.
 # Not a cache: the derived tables replay back from the ledger, but definitions
-# come from git and the bookmarks come from nowhere. Back this file up.
+# come from git and receipts and saved selections come from nowhere. Back this
+# file up.
 # Defaults to $XDG_DATA_HOME/anam/tracking.db, else ~/.local/share/anam/.
 db_path: ~/.local/share/anam/tracking.db
-
-# --- published artifacts: files -----------------------------------------------
-# Content-addressed checkpoint values and served receipts. Immutable. These are
-# authored, not rebuildable — back them up.
-artifact_dir: ~/.local/share/anam/artifacts
 
 # --- the library: document bytes ------------------------------------------------
 # Only Anam writes it (POST /v1/documents), naming each file by its sha256.
@@ -86,6 +83,7 @@ listen: 127.0.0.1:8787
 #     - name: assistant
 #       role: reader
 #       token_sha256: <printf %s "$token" | sha256sum>
+#       receipts: always                 # file every read this token makes as a receipt naming it
 # importers_file: ~/.config/anam/importers.yaml
 
 # Bounds one long write inside the daemon: an index replay, a backup, the mint at

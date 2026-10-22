@@ -285,8 +285,8 @@ Anam; placed on the timeline at its **fact-time**. An **anam-event** asserts tha
 > the watermark, the template version and the span. Keeping `published` in the ledger would braid *what
 > Anam knows* with *what Anam has shown* — the same complecting §7 untangles for *ledger* vs *canonical*.
 >
-> The cost, named: published-time moves out of the ledger and into the receipts, which are published
-> artifacts — authored, backed up, not rebuilt (§1). Lose the artifact directory and published-time is
+> The cost, named: published-time moves out of the ledger and into the receipts, which are rows of the
+> operational store's authored tier, backed up and not rebuilt (§1, §8). Lose them and published-time is
 > gone. That is the trade, and it is worth it, because every remaining kind maps one-to-one onto a status.
 
 The dependency is **one-directional**: an anam-event references a Facet; a Facet **never** references an
@@ -487,7 +487,8 @@ moves both hashes, and both buckets re-mint. A bucket that has emptied is found 
 re-mints as the empty value, or a composed read would still list the facets that left.
 
 Each mint run that writes records its `W` in `mint_run`, after its checkpoints, with each checkpoint's
-facet count in `checkpoint_size`. A run checks every bucket, minting or finding it unchanged, so the
+facet count in `checkpoint_size`. The values themselves are rows of `checkpoint_value`, keyed by their own
+SHA-256 (card 215, §8). A run checks every bucket, minting or finding it unchanged, so the
 checkpoints at or below a run's `W` are the value at that `W`, and a read starts there. A run in progress
 has no `mint_run` row yet, so no reader starts from it.
 
@@ -501,27 +502,59 @@ stands without being decoded, and the run is still a run that checked every buck
 the buckets the tail touched, and a stat per checkpoint: at 600k facets, 132 ms for a tail touching 32
 daily buckets against 19.8 s for the full fold, on the ThinkPad. The full mint (`anam checkpoint --full`)
 remains, and is taken without a budget, without a run, and when the log is not sealed. Recording a run
-also records how many checkpoint rows the log then held (`mint_seal`); a log holding more has rows from
-a mint that crashed, which `covers_w` cannot show, since a run at the last run's own `W` (a lowered
-budget, no new event) writes rows at that `W` too. Until a mint seals the log again, reads fold in full
-as well, or a read would take the crashed run's rows for the last run's. The full mint settles every bucket against the fold whatever the
-log holds, so it is both the oracle the incremental mint is tested against and the repair.
+also records a digest of the checkpoints a read from it takes: each span's latest checkpoint at or below
+its `W`, by span, version and value hash (`mint_run.picks`). A log is sealed when the newest run's digest
+still matches the log and no checkpoint was written after that run. A mint that crashed leaves rows the
+digest does not match or rows past the run, which `covers_w` cannot show, since a run at the last run's own
+`W` (a lowered budget, no new event) writes rows at that `W` too. Until a mint records a run again, the
+mint folds in full. The full mint settles every bucket against the fold whatever the log holds, so it is
+both the oracle the incremental mint is tested against and the repair.
 
-**Receipts** prove exactly what was served at a watermark (§9). Unserved interstitial checkpoints are
-garbage-collectable once a later checkpoint subsumes them and no receipt pins them; they were only ever
-replay floors.
+**Receipts** prove exactly what was served at a watermark (§9). A receipt names a watermark and not a
+checkpoint, and verifying one re-derives it from the ledger, so no receipt holds a checkpoint in place.
+
+**A checkpoint is a cache that is allowed to go missing** (card 215, 2026-10-22, Matt's decision). A
+missing one means fold past it and mint it again. The checkpoints bound replay; they are never what a
+read's answer depends on, because the ledger can always give the same value, only more slowly.
+
+- *Reads decline rather than guess.* A read at `W` starts from the latest mint run at or below `W` and
+  takes that run's checkpoints (`RunCheckpoints`), in one transaction with the run's digest. If the log no
+  longer yields exactly the checkpoints the run saw, because a row is gone, has been replaced or another
+  has joined it, or if a value is not in the store, the read reports no run to start from and its caller
+  folds the ledger in full. The digest is what makes a lost row noticeable: without it a span whose row
+  was lost would be absent from the composed value, or present at an older version, and nothing would say
+  so. A value whose bytes do not hash to their key is damage and stays an error.
+- *A mint heals the cache.* A bucket whose head checkpoint is unchanged but whose value the store no longer
+  holds gets the value written again; the incremental mint, meeting a leaf whose value is gone, takes the
+  full path, which does the same. No new version is cut.
+- *A mint ends by clearing what the newest run does not read.* One transaction deletes the checkpoint
+  rows, sizes and values that are not each span's latest checkpoint at or below the newest run (that is,
+  the heads). Nothing else needs keeping: an older run whose checkpoints were deleted declines, and one
+  whose checkpoints all still stand (nothing changed since) reads as before. A failure to clear is
+  returned after the mint, which stands; the next mint clears.
+- *The cost* is that a read at a watermark before the newest run folds the ledger in full: 19.8 s at 600k
+  facets on the ThinkPad against 132 ms from a run. The live record's artifact folder, never collected,
+  held 1,329 checkpoint files and 347 MB against a 57 MB ledger.
 
 ---
 
-## 8. Storage — three substrates
+## 8. Storage: two substrates and the documents
 
-Anam stores in **three** places, because three different things want three different shapes.
+Anam stores in **two** databases and a folder of documents, because different things want different shapes.
 
 | Substrate | Holds | Nature |
 |---|---|---|
 | **SQLite, the ledger file** | facet artifacts (metadata + opaque payload) and anam-events | the **ledger** — Anam's record of what it knew |
-| **Filesystem** | checkpoint values (`VALUE#<hash>`) and served receipts | **published artifacts** — immutable, content-addressed |
-| **SQLite, the tracking file** | Facet Definitions, projection templates, token scopes, the facet and anam-event indexes, the span registry and per-span `V`/`Wᵥ`, the checkpoint and receipt index, saved span bookmarks, sync cursors, GC state, the operational log | Anam's **operational store** |
+| **SQLite, the tracking file** | Facet Definitions, projection templates, token scopes, the facet, edge and anam-event indexes, the checkpoint log and the checkpoint values it names, receipts, served values, saved selections, sync cursors | Anam's **operational store** |
+| **Files, the library** | the primary source documents a `record.document` facet names, each file named by its sha256 | **documents**, written by Anam alone, content-addressed, never overwritten (card 150) |
+
+Until 2026-10-22 a third substrate held checkpoint values, receipts, served values and saved selections as
+files under an artifact directory. The split dated from when the ledger was in DynamoDB and SQLite was a
+cache that could hold "nothing that cannot be rebuilt by replaying the ledger", and a content-addressed
+value fitted neither. Since the ledger moved to SQLite (card 46) the operational store is authoritative for
+what Anam authors, so those became rows (card 215), and a backup is the ledger, the operational store and
+the library folder. A row is keyed by the SHA-256 of its bytes and every read hashes what it returns, so
+what the files did for integrity the rows still do.
 
 Config is **YAML**; Facet Definitions are **JSON** (§3a).
 
@@ -536,13 +569,56 @@ rebuild has to know what it may drop:
 
 | Tier | Tables | Recovery |
 |---|---|---|
-| **Derived** | facet index, edge index (card 104), anam-event index, checkpoint index, `span_head`, sync cursors | replay the ledger |
+| **Derived** | facet index, edge index (card 104), anam-event index, checkpoint index and its values (card 215), `span_head`, sync cursors | replay the ledger, and mint again |
 | **Provisioned** | Facet Definitions (bundled and registered), bundled projection templates, token scopes | the embedded assets, config, and each importer registering its Definitions again — i.e. git |
-| **Authored** | registered projection templates (card 125), saved span bookmarks, GC state, the operational log | nowhere Anam can reach. Back it up; a registered template also comes back by registering it again from wherever the operator keeps the file |
+| **Authored** | registered projection templates (card 125), receipts, served values and saved selections (card 215), the bodies of inline projections (card 211), `meta` | nowhere Anam can reach. Back it up; a registered template also comes back by registering it again from wherever the operator keeps the file |
 | **Disposable** | importers' complete-resend snapshots (card 78): which parts of a run were admitted and which facet ids they carried | the next resend makes another; nothing is tombstoned from here without an operator's `anam retract --yes`, and an incomplete snapshot is dropped after `snapshot_ttl`, a day by default |
 
 The tier belongs in the schema beside each table, because it is the only thing that tells a later reader
 whether dropping it is survivable.
+
+**Where the schema lives.** Each store's fresh-store schema is a `.sql` file beside the Go that opens it,
+read with `//go:embed`, so the binary that checks the version carries the text it checks and nothing is
+read from disk at run time. `internal/store/ledger/ledger.sql` holds the ledger's three tables and their
+append-only triggers, and `internal/store/ledger/indexes.sql` holds its lookup indexes, which a writable
+open installs as a separate step and which are not part of what the schema version pins.
+`internal/store/ops/ops.sql` holds every operational table, view and trigger, each table under its
+`-- tier:` comment. Reading one file shows the whole fresh store, and a schema change shows as a change to
+that file. Each migration's SQL is a file of its own under `migrations/` beside the store, embedded the
+same way. The ledger has `internal/store/ledger/migrations/0002.sql`, named for the version it moves to
+(schema 3 has no file, because it changed no SQL and its step is a rebuild). The operational store has
+`internal/store/ops/migrations/snapshot-part-digest.sql`, the in-place step for a store written before the
+snapshot digest column, which is a compatibility step and moves no version. The Go keeps what is a
+decision rather than a description: `schemaVersion` in each store, which file runs when and in what
+transaction, the old-store refusal, the carry across a bump, `bindSnapshotParts` with its check for
+whether the step is needed, and the teardown (`dropSchema`). Only `internal/store` names SQLite, and the
+files sit inside it.
+
+A test in each store pins the SHA-256 of each embedded file, the schema file and every migration, beside the schema version. It detects a change
+and cannot judge it. A hash moving does not prove the stored layout moved (a comment edit changes it, and
+several tables were added without a bump because an older store gains them on open), and a hash holding
+does not prove the meaning held (ledger version 3 changed no SQL). The person making the change decides:
+if an existing file would be misread, bump the version and write the migration or carry, and update both
+pins; if the change is compatible, update only the hash, in the same commit, saying why. The ledger test
+also lists the ten append-only triggers by name against the file and against a newly created ledger, and
+the behavioural tests in `appendonly_test.go` are what show each trigger still refuses the write it
+exists to refuse.
+
+**Content-addressed rows** (card 215) are five tables of one shape, a hash and the bytes it names:
+`checkpoint_value` in the derived tier, and `receipt`, `served_value`, `saved_selection` and
+`saved_selection_code` in the authored tier. The authored four are immutable by trigger, like
+`registered_projection`: an update and a delete are refused, for every writer. `checkpoint_value` refuses an
+update, and lets a mint delete a value it no longer reads (§7): it is a cache. A receipt and the served value it names are two inserts, the value first, so a crash
+leaves a value no receipt names and never a receipt without its value; the files they replace had the same
+order. There is no transaction across the two database files, as before: the operational store catches up
+by replay and by minting, and a crash leaves it behind and never wrong.
+
+**Carrying a store across the change.** The tables bump the schema (9): a version-8 store has checkpoint
+rows naming values it does not hold, and receipts and selections that exist only in the folder beside it,
+and absent would read as none. The store refuses, as it does for any bump. It is carried forward by
+rebuilding it and moving the folder in with `anam move-artifacts`, which checks every file's bytes against
+its name before it writes anything, and which can copy the registered Definitions and projections across
+from the old file read-only (`--registered-from`).
 
 The **derived** tier must stay *provably* derived. The rebuild test (`MVP.md` §7) drops it and re-derives
 it from the ledger: if a facet payload, an anam-event or `W` ever acquired a second home there, the test
@@ -592,7 +668,9 @@ ledger.db
 There is no watermark row. `W` is `MAX(seq)`, and a trigger lets an anam-event take only the `seq` after
 the newest one, so the sequence is gapless and the highest `seq` is the count of everything Anam learned.
 
-**The ledger carries no secondary indexes.** It serves two access paths, both on a primary key:
+**The ledger carries no derived indexes.** It serves three access paths, two on a primary key and
+one on its own lookup index, `anam_event_by_facet` (`internal/store/ledger/indexes.sql`, installed as
+its own step; card 65), which lets the gate fold one facet's events without replaying the ledger:
 
 - one facet's versions, highest first: the current artifact version, whose `content_hash` `commit`
   compares against (§6a);
@@ -627,8 +705,8 @@ mode, so recent commits can sit in `ledger.db-wal` until a checkpoint folds them
 `sqlite3 ledger.db ".backup <dest>"`, or copy `ledger.db` together with its `-wal` file with no writer
 running.
 
-**The ledger's directory is the record, and the backup unit.** Beside `ledger.db` sit the published
-artifacts (`artifacts/`) and the **default library** (`documents/`): the primary source documents the
+**The ledger's directory is the record, and the backup unit.** Beside `ledger.db` sit the operational
+store (`tracking.db`, which holds the receipts) and the **default library** (`documents/`): the primary source documents the
 facts were extracted from, each referenced by a `record.document` that names it and its sha256. Anam
 alone writes the library (`POST /v1/documents`, card 102) and names each file by its sha256 (card 150),
 so a stored file is a value: never overwritten, never renamed, found by its name. Where a file sits
@@ -807,8 +885,18 @@ rules (`current/2`, `displaced/2`, and `linked/2` over the edge facets, card 104
 Anam's reading of its own time semantics rather than rewriting it. The answer is a receipt like any
 other served thing: it carries the watermark and `ledger_id`, the projection name, version and
 content hash, the definition-set version, the rule-set hash, and the query text; `receipt verify`
-re-runs the same query over the same value and must get the same hash. A query moves no watermark
-and writes nothing. The evaluator is read-side and disposable, outside the error kernel; a wrong
+re-runs the same query over the same value and must get the same hash.
+
+A query may carry its projection inline (card 211), for a one-off question that no operator has
+registered a projection for. The `projection` field is then a template object with a manifest's knobs,
+without a name or a version, checked by the loader a registered manifest goes through. It is known by
+its content hash. Its body is filed in the authored tier under that hash, and the receipt names it by
+the hash with an inline marker, so verify finds the body and replays it after a restart. Every role may
+already read every registered projection, so an inline one widens nothing; if projections ever become
+a per-role ceiling, an inline one must sit under the caller's ceiling. Reading through a saved
+selection's code in place of a projection is a possible later slice and is not built.
+
+A query moves no watermark and writes nothing to the ledger. The evaluator is read-side and disposable, outside the error kernel; a wrong
 answer is fixed by fixing the rules and asking again, and the bundled `current/2` is held equal to
 `fold.Snapshot` by a standing test, so there is one account of liveness even while there are two
 implementations of it. Blending projections remains a later contract.
@@ -826,7 +914,7 @@ the fold.
 
 Projections are **materialised as files**, content-addressed. **Receipts** make a served projection
 reproducible: `served_hash = sha256(served bytes)` plus the exact facet-id set, the watermark, the
-template version and its content hash, the definition-set version, the `served_at` time, the span, and the `ledger_id` the
+template version and its content hash (an inline template is marked as one, and its body is filed under that hash), the definition-set version, the `served_at` time, the span, and the `ledger_id` the
 watermark counts in (since 2026-10-07; a watermark means nothing against another ledger, so `receipt
 verify` on a rebuilt ledger reports *other ledger*, never a failed reproduction, and a receipt from
 before the field is verified with a note).
@@ -877,7 +965,7 @@ Anam later as an ordinary source fact.
 - **Storage is partitioned by the person (one timeline).** The **whole-person read is the default**; a
   Span is an optional derived *read* filter. **Minting is per span, never whole-life** — the two are
   different concerns and must not be conflated (§1, §7).
-- **The ledger is the system of record**; files hold published artifacts; SQLite is Anam's **operational
+- **The ledger is the system of record**; the library's files hold documents; SQLite is Anam's **operational
   store** — authoritative for what Anam authors, and annotated per table with where it comes back from.
   Its **derived** tier must stay provably rebuildable by replaying the ledger, or the rebuild test proves
   nothing (§8).
@@ -890,8 +978,9 @@ Anam later as an ordinary source fact.
   values, or supersession silently becomes duplication (§6a).
 - **Sort keys are identity-first and fixed-width.** An artifact's key carries its `facet_id`, never its
   `fact_time`; every integer in a sort key is zero-padded. Otherwise supersession silently duplicates, or
-  lexical order stops being chronological (§8). The ledger carries **no secondary indexes**: an index is
-  derived, and derived things live in the operational store.
+  lexical order stops being chronological (§8). The ledger carries **no derived indexes**: anything
+  derived lives in the operational store. Its one index, `anam_event_by_facet`, is a lookup on its own
+  rows for the gate's fold of one facet (§8), not a derivation.
 - **Canonical means the live-only value; the ledger means append-everything-marked.** One word, one
   surface (§7, §9).
 - **Metadata / payload separation**: the payload is verbatim, immutable, stored opaque, never parsed

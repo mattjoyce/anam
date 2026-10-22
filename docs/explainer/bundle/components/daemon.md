@@ -12,7 +12,6 @@ depends_on:
   - /components/gate.md
   - /components/store-ledger.md
   - /components/store-ops.md
-  - /components/store-artifact.md
   - /components/catchup.md
   - /components/mint.md
   - /components/read.md
@@ -27,7 +26,7 @@ depends_on:
 
 ## Start
 
-`Open` runs in this order: check the [limits](/data-structures/limits.md) (`Limits.Validate`), read the operator token (`token_file`, or refuse a non-loopback listen), build the bucket width, load the [importers file](/data-structures/importers-file.md) as [principals](/components/principals.md) (refusing a principal that holds the operator's token, or two importers naming an unbundled type), open the ledger read-write and read-only, open the operational store, check its index is not ahead of the ledger, run `guardBundled` (`def.Guard` over the bundled Definitions against the ones the store last saw, then store the current set, so a Definition that would re-key the ledger's facets stops the daemon starting), load Definitions and projection templates, open a read-only ops handle for read routes, open the artifact store. `Serve` then runs the single write worker, catches up the index as its first write, and mints if behind.
+`Open` runs in this order: check the [limits](/data-structures/limits.md) (`Limits.Validate`), read the operator token (`token_file`, or refuse a non-loopback listen), build the bucket width, load the [importers file](/data-structures/importers-file.md) as [principals](/components/principals.md) (refusing a principal that holds the operator's token, or two importers naming an unbundled type), open the ledger read-write and read-only, open the operational store, check its index is not ahead of the ledger, run `guardBundled` (`def.Guard` over the bundled Definitions against the ones the store last saw, then store the current set, so a Definition that would re-key the ledger's facets stops the daemon starting), load Definitions and projection templates, open a read-only ops handle for read routes. The write handle also serves publishing a receipt and saving a selection, two idempotent inserts that take no turn on the write queue. `Serve` then runs the single write worker, catches up the index as its first write, and mints if behind.
 
 ## Routes
 
@@ -45,7 +44,7 @@ One table in `api.go` names each route with the roles whose tokens open it (see 
 | `GET /v1/snapshots/{id}` | any; an importer sees its own source's | the resend report: live, absent, carried |
 | `GET /v1/timeline`, `GET /v1/changes`, `GET /v1/status`, `GET /v1/checkpoints` | any | reads, bounded by `max_read_bytes` |
 | `GET /v1/coverage[?w=&as_of=&projection=]` | any | each type's live count, earliest and latest fact-time, and each source's share, at the head or a named W, counted from the same value the timeline reads (card 90); says what is recorded, never that a source is complete |
-| `POST /v1/receipts`, `GET /v1/receipts[/{hash}[/verify]]`, `GET /v1/receipts/{hash}/facets/{facet_id}` | any | publish, verify, and open one served facet beside its links from the [edge index](/data-structures/facet-edge-row.md) (cards 91, 104); a read over `max_read_bytes` is published once and answered a page at a time, `GET /v1/receipts/{hash}?cursor=` reading each page from the served artifact (card 92) |
+| `POST /v1/receipts`, `GET /v1/receipts[/{hash}[/verify]]`, `GET /v1/receipts/{hash}/facets/{facet_id}` | any | publish, verify, and open one served facet beside its links from the [edge index](/data-structures/facet-edge-row.md) (cards 91, 104); a read over `max_read_bytes` is published once and answered a page at a time, `GET /v1/receipts/{hash}?cursor=` reading each page from the served value (card 92). The list takes `principal`, `since`, `until` and `zone`, which is who read what (card 216); a token set to record every read has `GET /v1/timeline` answered as a publish and opens only the receipts that name it |
 | `POST /v1/checkpoints` | operator | mint on the write queue |
 | `POST /v1/backups` | operator | `VACUUM INTO` both stores under `backup_dir` |
 | `POST /v1/entry` | operator | hand-enter a fact as the workbench source (never held) |

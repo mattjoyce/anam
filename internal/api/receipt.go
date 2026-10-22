@@ -7,11 +7,26 @@ import (
 	"github.com/mattjoyce/anam/internal/receipt"
 )
 
+// ReceiptsQuery narrows a listing of receipts: who read, and when it was served. Each
+// part is optional. Since and Until are as the reader typed them, with the zone a bare
+// date is a day in (card 216).
+type ReceiptsQuery struct {
+	// Principal keeps the receipts that name this reader.
+	Principal string `json:"principal,omitempty"`
+	// Since keeps the receipts served at or after this instant.
+	Since string `json:"since,omitempty"`
+	// Until keeps the receipts served before this instant; a bare date includes its
+	// whole day.
+	Until string `json:"until,omitempty"`
+	// Zone is the reader's zone; it is needed when Since or Until is set.
+	Zone string `json:"zone,omitempty"`
+}
+
 // Receipts lists the receipts of past serves, newest first.
 type Receipts struct {
-	// Dir is the artifact directory the receipts were read from, on the machine
+	// Store is the operational store the receipts were read from, on the machine
 	// that read them.
-	Dir      string           `json:"dir"`
+	Store    string           `json:"store"`
 	Receipts []ReceiptListing `json:"receipts"`
 }
 
@@ -21,8 +36,8 @@ type ReceiptListing struct {
 	Receipt receipt.Receipt `json:"receipt"`
 }
 
-// ReceiptShown is a receipt and the served value it names, read from the artifacts
-// alone: the whole value, or over the daemon one page of it (card 92).
+// ReceiptShown is a receipt and the served value it names, read from the stored
+// rows alone: the whole value, or over the daemon one page of it (card 92).
 //
 // Receipt rides the first page only. A page asked for by cursor carries Hash and
 // Page with its entries: the cursor is bound to that hash, so the reader already
@@ -56,7 +71,7 @@ type Page struct {
 }
 
 // ReceiptVerified is a receipt and the two proofs of it: re-derived from the ledger,
-// and re-hashed on disk.
+// and re-hashed in the store.
 type ReceiptVerified struct {
 	Hash    string          `json:"hash"`
 	Receipt receipt.Receipt `json:"receipt"`

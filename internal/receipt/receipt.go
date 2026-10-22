@@ -26,12 +26,17 @@ import (
 // ErrMalformed is returned by Parse for bytes that are not a whole receipt.
 var ErrMalformed = errors.New("receipt: malformed")
 
-// Kind is the artifact-store subdirectory receipts are filed under.
+// Kind is the kind of stored content receipts are filed under (ops.KindReceipt, the
+// operational store's receipt table).
 const Kind = "receipt"
 
-// ServedKind is the artifact-store subdirectory served projection values are filed
-// under. It lives here because a receipt is the only thing that names one.
+// ServedKind is the kind of stored content served projection values are filed under
+// (ops.KindServed). It lives here because a receipt is the only thing that names one.
 const ServedKind = "served"
+
+// InlineKind is the kind of stored content the bodies of inline projections are filed
+// under (ops.KindInlineProjection), which a receipt with TemplateInline names by hash.
+const InlineKind = "inline-projection"
 
 // Receipt is the immutable record of one serve. Its field set is §9's, and each field
 // earns its place by being something the re-derivation needs or something a reader
@@ -76,6 +81,19 @@ type Receipt struct {
 	// query ran through, and ServedHash is the answer's. Nil for a timeline receipt;
 	// last and omitted when nil, so every earlier receipt keeps its bytes.
 	Program *Program `json:"program,omitempty"`
+	// Principal is the name of the principal whose read this receipt files (card 216),
+	// for a token set to leave a receipt for every read. Empty when the serve was not
+	// filed on a named reader's behalf, which is every receipt cut before it; it is
+	// last and omitted when empty, so their bytes and hashes are unchanged and they
+	// still verify. It is the name in the importers file, never the token.
+	Principal string `json:"principal,omitempty"`
+	// TemplateInline says the template was not a registered one but the body a query
+	// carried (card 211). Template and TemplateVersion then hold the fixed stand-ins
+	// "inline" and 1, and TemplateHash is the body's address in the operational
+	// store's inline-projection rows, which is where verify finds the body to replay.
+	// Last and omitted when false, so every earlier receipt keeps its bytes and its
+	// hash and still verifies.
+	TemplateInline bool `json:"template_inline,omitempty"`
 }
 
 // Program is the query half of a query receipt. RuleSetHash pins the bundled rules
@@ -178,6 +196,10 @@ func (r Receipt) Validate() error {
 		return fmt.Errorf("%w: served_at is required", ErrMalformed)
 	case r.Span == "":
 		return fmt.Errorf("%w: span is required", ErrMalformed)
+	case r.TemplateInline && r.TemplateHash == "":
+		return fmt.Errorf("%w: an inline template is found by its hash; template_hash is required", ErrMalformed)
+	case r.TemplateInline && r.Program == nil:
+		return fmt.Errorf("%w: only a query receipt carries an inline template", ErrMalformed)
 	case r.Query != nil && r.Query.IsZero():
 		return fmt.Errorf("%w: query narrows nothing; omit it", ErrMalformed)
 	case r.Query != nil && r.Query.At != "" && r.Query.Before != "":
@@ -212,16 +234,16 @@ func Parse(raw []byte) (Receipt, error) {
 //
 // Reproduced asks whether the ledger still honours what the receipt promised — re-fold
 // at the watermark, re-prune through the template, compare. Intact asks whether the
-// artifact on disk is still the one that was served — re-hash the file against its own
-// content address. Either can fail without the other: a tampered file under a sound
-// ledger, or a corrupted ledger under an untouched file. Collapsing them into one
+// stored value is still the one that was served: re-hash it against its own content
+// address. Either can fail without the other: a tampered row under a sound ledger, or a
+// corrupted ledger under an untouched row. Collapsing them into one
 // boolean would let each hide behind the other.
 type Result struct {
 	Reproduced bool `json:"reproduced"`
 	Intact     bool `json:"intact"`
 
-	// StoredHash is what the served file on disk actually hashes to; empty when the
-	// file is absent.
+	// StoredHash is what the stored served value actually hashes to; empty when it is
+	// absent.
 	StoredHash string `json:"stored_hash,omitempty"`
 
 	// DerivedHash is what re-deriving at the receipt's watermark produced.
@@ -240,8 +262,8 @@ type Result struct {
 func (r Result) OK() bool { return r.Reproduced && r.Intact }
 
 // Compare checks a receipt against a freshly derived served value and, when the served
-// file was found, the bytes actually on disk. storedBytes may be nil, which records the
-// artifact as absent rather than as altered — those are different failures.
+// value was found, the bytes actually stored. storedBytes may be nil, which records the
+// value as absent rather than as altered, which are different failures.
 func Compare(r Receipt, derivedHash string, derivedIDs []string, storedBytes []byte, digest func([]byte) string) Result {
 	res := Result{DerivedHash: derivedHash}
 
@@ -294,11 +316,11 @@ func (r Result) Summary() string {
 
 	write(r.Reproduced, "reproduced", fmt.Sprintf("  re-derived %s", r.DerivedHash))
 	// Absent is neither pass nor fail: the ledger can still honour a receipt whose
-	// artifact was deleted, and calling that "FAIL intact" would read as tampering.
+	// served value is not there, and calling that "FAIL intact" would read as tampering.
 	if r.StoredHash == "" {
-		b.WriteString("--   intact      served artifact not present in this store\n")
+		b.WriteString("--   intact      served value not present in this store\n")
 	} else {
-		write(r.Intact, "intact", fmt.Sprintf("      on disk    %s", r.StoredHash))
+		write(r.Intact, "intact", fmt.Sprintf("      stored     %s", r.StoredHash))
 	}
 	if len(r.Missing) > 0 {
 		fmt.Fprintf(&b, "     missing     %d facet(s): %s\n", len(r.Missing), strings.Join(clip(r.Missing), ", "))

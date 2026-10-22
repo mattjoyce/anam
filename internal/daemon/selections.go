@@ -13,9 +13,9 @@ import (
 	"github.com/mattjoyce/anam/internal/selection"
 )
 
-// The saved-selection routes (card 206). Saving writes an artifact and never the
-// ledger, so, like publishing a receipt, it is every role's and takes no turn on the
-// write queue; the artifact store's writes are atomic.
+// The saved-selection routes (card 206). Saving writes a row and never the ledger, so,
+// like publishing a receipt, it is every role's and takes no turn on the write queue; a
+// row is inserted whole or not at all.
 
 // postSelection saves a program and answers its code. The body is bounded as a
 // query's is: a program is text a person or an agent wrote.
@@ -32,7 +32,7 @@ func (d *Daemon) postSelection(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("selection request: %w", err))
 		return
 	}
-	saved, err := d.selections.Save(req.Program)
+	saved, err := d.selections.Save(r.Context(), req.Program)
 	if err != nil {
 		writeSelectionError(w, err)
 		return
@@ -42,7 +42,7 @@ func (d *Daemon) postSelection(w http.ResponseWriter, r *http.Request) {
 
 // getSelection answers the program a code names.
 func (d *Daemon) getSelection(w http.ResponseWriter, r *http.Request) {
-	saved, err := d.selections.Open(r.PathValue("code"))
+	saved, err := d.selections.Open(r.Context(), r.PathValue("code"))
 	if err != nil {
 		writeSelectionError(w, err)
 		return

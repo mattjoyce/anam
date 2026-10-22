@@ -11,8 +11,8 @@ import (
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/query"
 	"github.com/mattjoyce/anam/internal/receipt"
-	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
+	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
 // A query receipt (card 173) is a receipt whose served value is a query's answer: the
@@ -34,7 +34,8 @@ func (d Deps) definitions() (query.Definitions, error) {
 }
 
 // PublishQuery files a query's answer as what template t served at w, with a receipt
-// that names the facets the projection served, the program, and the answer's hash.
+// that names the facets the projection served, the program, and the answer's hash. An
+// inline t (card 211) has its body filed by hash and the receipt marks it inline.
 // The answer is filed first and the receipt second, as Publish does; with dryRun set
 // nothing is written.
 func PublishQuery(ctx context.Context, d Deps, t projection.Template, w ledger.Watermark, prog receipt.Program,
@@ -43,6 +44,9 @@ func PublishQuery(ctx context.Context, d Deps, t projection.Template, w ledger.W
 	ledgerID, err := d.Ledger.ID(ctx)
 	if err != nil {
 		return Served{}, err
+	}
+	if t.Inline && ops.Digest(t.Body) != t.Hash {
+		return Served{}, fmt.Errorf("serve: inline template body hashes to %s, not its hash %s", ops.Digest(t.Body), t.Hash)
 	}
 	r := receipt.Receipt{
 		LedgerID:             ledgerID,
@@ -56,6 +60,8 @@ func PublishQuery(ctx context.Context, d Deps, t projection.Template, w ledger.W
 		ServedAt:             clock.Format(d.Clock.Now()),
 		Span:                 t.Span(),
 		Program:              &prog,
+		Principal:            d.Reader,
+		TemplateInline:       t.Inline,
 	}
 	if err := r.Validate(); err != nil {
 		return Served{}, err
@@ -64,14 +70,22 @@ func PublishQuery(ctx context.Context, d Deps, t projection.Template, w ledger.W
 	if err != nil {
 		return Served{}, err
 	}
-	out := Served{Receipt: r, ReceiptHash: artifact.Digest(receiptBytes), Answer: &ans}
+	out := Served{Receipt: r, ReceiptHash: ops.Digest(receiptBytes), Answer: &ans}
 	if dryRun {
 		return out, nil
 	}
-	if _, err := d.Artifacts.Put(receipt.ServedKind, ans.Bytes()); err != nil {
+	// An inline template's body is filed before the receipt that names it, as the
+	// answer is: a crash leaves a body no receipt names, never a receipt verify cannot
+	// replay.
+	if t.Inline {
+		if _, err := d.Published.Put(ctx, receipt.InlineKind, t.Body); err != nil {
+			return Served{}, err
+		}
+	}
+	if _, err := d.Published.Put(ctx, receipt.ServedKind, ans.Bytes()); err != nil {
 		return Served{}, err
 	}
-	if _, err := d.Artifacts.Put(receipt.Kind, receiptBytes); err != nil {
+	if _, err := d.Published.Put(ctx, receipt.Kind, receiptBytes); err != nil {
 		return Served{}, err
 	}
 	out.Written = true
@@ -107,11 +121,11 @@ func verifyQuery(ctx context.Context, d Deps, r receipt.Receipt, t projection.Te
 	if err != nil {
 		return receipt.Result{}, err
 	}
-	stored, err := d.Artifacts.Raw(receipt.ServedKind, r.ServedHash)
-	if err != nil && !errors.Is(err, artifact.ErrNotFound) {
+	stored, err := d.Published.Raw(ctx, receipt.ServedKind, r.ServedHash)
+	if err != nil && !errors.Is(err, ops.ErrNotFound) {
 		return receipt.Result{}, err
 	}
-	out := receipt.Compare(r, ans.Hash(), idsOf(served), stored, artifact.Digest)
+	out := receipt.Compare(r, ans.Hash(), idsOf(served), stored, ops.Digest)
 	out.Notes = append(out.Notes, notes...)
 	if r.DefinitionSetVersion != d.DefinitionSetVersion {
 		out.Notes = append(out.Notes, fmt.Sprintf(

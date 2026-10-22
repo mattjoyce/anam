@@ -19,8 +19,7 @@ How a document dropped on the share becomes facets, and what each step promises.
 
 <the daemon's data directory>          the RECORD, and the backup unit
 ├── ledger.db                          the ledger
-├── tracking.db                        the operational store
-├── artifacts/                         checkpoints and receipts
+├── tracking.db                        the operational store: checkpoints, receipts, selections
 └── documents/                         the LIBRARY: the bytes of every referenced document,
                                        written by Anam alone from what anam_documents posts
 ```

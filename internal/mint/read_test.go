@@ -4,27 +4,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/mint"
-	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
+	"github.com/mattjoyce/anam/internal/store/ops"
+	"github.com/mattjoyce/anam/internal/store/ops/opstest"
 )
 
 // The oracle: at every watermark, a read composed from checkpoints is the full fold,
 // byte for byte, across the cases that make composition hard. A facet's fact-time
 // moves it into another bucket, a backfill reopens an old bucket, a retraction
-// empties one, and a facet is corrected twice in one tail. Watermarks before the
-// first mint run have nothing to start from and are the full fold's.
+// empties one, and a facet is corrected twice in one tail. A watermark before the
+// newest mint run has nothing to start from, since a mint collects the runs it
+// supersedes, and answers from the full fold: so it is checked at each stage, while
+// the run it starts from is the newest, and again once a later run has taken its place.
 func TestReadAt_IsTheFoldAtEveryWatermark(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()
 	h.seed(t)
-	moved := h.weight(t, "w-1", "2026-07-09T07:00:00Z", 81.2)
+	h.weight(t, "w-1", "2026-07-09T07:00:00Z", 81.2)
 	alone := h.bp(t, "2026-05-20T06:30:00Z", 125) // May's only reading
 	first := h.run(t, false).W
 
@@ -37,25 +38,36 @@ func TestReadAt_IsTheFoldAtEveryWatermark(t *testing.T) {
 	h.weight(t, "w-2", "2026-09-01T07:00:00Z", 80.0)
 	h.weight(t, "w-2", "2026-09-01T07:00:00Z", 80.4) // corrected
 	h.weight(t, "w-2", "2026-09-02T07:00:00Z", 80.4) // and moved within September
+	h.checkReads(t, 1, first, nil)
+
 	second := h.run(t, false).W
 	h.bp(t, "2026-09-20T06:30:00Z", 116) // a tail after the second run
+	h.checkReads(t, 1, second, nil)
+}
 
+// checkReads holds ReadAt, and ReadWindow over each window given, to the full fold at
+// every watermark from 1 to the ledger's head. run is the newest mint run: a read from it
+// on composes from it and its tail. A read before it composes from an older run only if
+// every checkpoint that run saw is still in the log, and otherwise says it cannot. Either
+// way the value is the fold's.
+func (h *harness) checkReads(t *testing.T, from, run ledger.Watermark, windows [][2]string) {
+	t.Helper()
+	ctx := context.Background()
 	head, err := h.l.Head(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	store := h.deps.Artifacts
-	for w := ledger.Watermark(1); w <= head; w++ {
+	for w := from; w <= head; w++ {
 		want, err := fold.ReadAt(ctx, h.l, w)
 		if err != nil {
 			t.Fatal(err)
 		}
-		got, ok, err := mint.ReadAt(ctx, h.l, h.db, store, w)
+		got, ok, err := mint.ReadAt(ctx, h.l, h.db, h.deps.Values, w)
 		if err != nil {
 			t.Fatalf("W=%d: %v", w, err)
 		}
-		if ok != (w >= first) {
-			t.Fatalf("W=%d: composed=%v, want %v (first run at %d)", w, ok, w >= first, first)
+		if w >= run && !ok {
+			t.Fatalf("W=%d: no composed read, but the newest run (%d) is at or before it", w, run)
 		}
 		if !ok {
 			continue
@@ -69,15 +81,27 @@ func TestReadAt_IsTheFoldAtEveryWatermark(t *testing.T) {
 				t.Errorf("W=%d: %s at v%d, fold says v%d", w, id, v, want.States[id].Version)
 			}
 		}
-		wantRun := first
-		if w >= second {
-			wantRun = second
+		wantRun := run
+		if w < run {
+			// An older run whose checkpoints all still stand reads as before.
+			wantRun = got.Run
 		}
-		if got.Run != wantRun || got.Tail != int(w-wantRun) {
+		if got.Run != wantRun || got.Run > w || got.Tail != int(w-got.Run) {
 			t.Errorf("W=%d: started from run %d with tail %d, want run %d", w, got.Run, got.Tail, wantRun)
 		}
+		for _, win := range windows {
+			gotWin, ok, err := mint.ReadWindow(ctx, h.l, h.db, h.deps.Values, w, win[0], win[1])
+			if err != nil || !ok {
+				t.Fatalf("W=%d %v: ok=%v %v", w, win, ok, err)
+			}
+			if gotWin.Hash != want.Value.Hash() || gotWin.Live != want.Value.Len() {
+				t.Fatalf("W=%d %v: whole %s/%d, fold %s/%d", w, win, gotWin.Hash, gotWin.Live, want.Value.Hash(), want.Value.Len())
+			}
+			if a, b := inWindow(gotWin.Value.Entries(), win), inWindow(want.Value.Entries(), win); !sameIDs(a, b) {
+				t.Fatalf("W=%d %v: window %v, fold %v", w, win, a, b)
+			}
+		}
 	}
-	_ = moved
 }
 
 // A checkpoint log built from another ledger describes another record. Composing from
@@ -89,37 +113,38 @@ func TestReadAt_RefusesAnotherLedgersCheckpoints(t *testing.T) {
 	other := newHarness(t)
 	other.seed(t)
 	head, _ := other.l.Head(context.Background())
-	_, _, err := mint.ReadAt(context.Background(), other.l, h.db, h.deps.Artifacts, head)
+	_, _, err := mint.ReadAt(context.Background(), other.l, h.db, h.deps.Values, head)
 	if !errors.Is(err, mint.ErrOtherLedger) {
 		t.Fatalf("ReadAt over another ledger's log: %v", err)
 	}
 }
 
-// A checkpoint whose file was altered fails the read: the store checks the bytes
+// A checkpoint whose value was altered fails the read: the store checks the bytes
 // against the hash the row names, and nothing falls back to another answer.
 func TestReadAt_RefusesATamperedCheckpoint(t *testing.T) {
 	h := newHarness(t)
+	ctx := context.Background()
 	h.seed(t)
 	h.run(t, false)
-	files, err := filepath.Glob(filepath.Join(h.dir, mint.Kind, "*.json"))
-	if err != nil || len(files) == 0 {
-		t.Fatalf("no checkpoint files: %v", err)
+	digests, err := h.db.List(ctx, mint.Kind)
+	if err != nil || len(digests) == 0 {
+		t.Fatalf("no checkpoint values: %v", err)
 	}
-	b, err := os.ReadFile(files[0])
+	b, err := h.db.Get(ctx, mint.Kind, digests[0])
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(files[0], []byte(strings.Replace(string(b), "118", "181", 1)+" "), 0o600); err != nil {
+	if err := opstest.Corrupt(ctx, h.db, mint.Kind, digests[0], []byte(strings.Replace(string(b), "118", "181", 1)+" ")); err != nil {
 		t.Fatal(err)
 	}
-	head, _ := h.l.Head(context.Background())
-	_, _, err = mint.ReadAt(context.Background(), h.l, h.db, h.deps.Artifacts, head)
-	if !errors.Is(err, artifact.ErrCorrupt) {
+	head, _ := h.l.Head(ctx)
+	_, _, err = mint.ReadAt(ctx, h.l, h.db, h.deps.Values, head)
+	if !errors.Is(err, ops.ErrCorrupt) {
 		t.Fatalf("ReadAt over a tampered checkpoint: %v", err)
 	}
 }
 
-// The narrow read's oracle: at every watermark from the first run on, and for windows
+// The narrow read's oracle: at every watermark from the newest run on, and for windows
 // that cut across the buckets the tail dirtied, the whole hash and live count are the
 // full fold's, and the window's entries are the full fold's entries in that window.
 func TestReadWindow_IsTheFoldInTheWindow(t *testing.T) {
@@ -135,8 +160,6 @@ func TestReadWindow_IsTheFoldInTheWindow(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.weight(t, "w-2", "2026-10-01T07:00:00Z", 80.0) // a bucket no checkpoint has
-	h.run(t, false)
-	h.weight(t, "w-2", "2026-09-30T07:00:00Z", 80.0) // moved back, after the run
 
 	windows := [][2]string{
 		{"", ""},
@@ -145,25 +168,10 @@ func TestReadWindow_IsTheFoldInTheWindow(t *testing.T) {
 		{"", "2026-06-01T00:00:00.000000000Z"},
 		{"2026-09-15T00:00:00.000000000Z", "2026-10-15T00:00:00.000000000Z"},
 	}
-	head, _ := h.l.Head(ctx)
-	for w := first; w <= head; w++ {
-		want, err := fold.ReadAt(ctx, h.l, w)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, win := range windows {
-			got, ok, err := mint.ReadWindow(ctx, h.l, h.db, h.deps.Artifacts, w, win[0], win[1])
-			if err != nil || !ok {
-				t.Fatalf("W=%d %v: ok=%v %v", w, win, ok, err)
-			}
-			if got.Hash != want.Value.Hash() || got.Live != want.Value.Len() {
-				t.Fatalf("W=%d %v: whole %s/%d, fold %s/%d", w, win, got.Hash, got.Live, want.Value.Hash(), want.Value.Len())
-			}
-			if a, b := inWindow(got.Value.Entries(), win), inWindow(want.Value.Entries(), win); !sameIDs(a, b) {
-				t.Fatalf("W=%d %v: window %v, fold %v", w, win, a, b)
-			}
-		}
-	}
+	h.checkReads(t, first, first, windows)
+	second := h.run(t, false).W
+	h.weight(t, "w-2", "2026-09-30T07:00:00Z", 80.0) // moved back, after the run
+	h.checkReads(t, 1, second, windows)
 }
 
 func inWindow(entries []fold.Entry, win [2]string) []string {
@@ -193,7 +201,6 @@ func sameIDs(a, b []string) bool {
 // splits, whole and windowed, are still the full fold at every watermark.
 func TestSubdivision_SplitsByBytesAndReadsAreStillTheFold(t *testing.T) {
 	h := newHarness(t)
-	ctx := context.Background()
 	h.deps.Budget = 1000 // two readings fit, six do not
 	h.bp(t, "2024-03-01T06:30:00Z", 120)
 	h.bp(t, "2024-11-01T06:30:00Z", 121)
@@ -216,6 +223,12 @@ func TestSubdivision_SplitsByBytesAndReadsAreStillTheFold(t *testing.T) {
 		h.bp(t, fmt.Sprintf("2026-08-%02dT06:30:00Z", d), 100+d)
 	}
 	h.weight(t, "w-1", "2024-05-02T08:00:00Z", 80)
+	windows := [][2]string{
+		{"2026-08-01T00:00:00.000000000Z", "2026-09-01T00:00:00.000000000Z"},
+		{"2024-01-01T00:00:00.000000000Z", "2025-01-01T00:00:00.000000000Z"},
+		{"2026-07-02T00:00:00.000000000Z", "2026-07-03T00:00:00.000000000Z"},
+	}
+	h.checkReads(t, first.W, first.W, windows)
 	second := h.run(t, false)
 	ids = map[string]bool{}
 	for _, o := range second.Outcomes {
@@ -225,30 +238,5 @@ func TestSubdivision_SplitsByBytesAndReadsAreStillTheFold(t *testing.T) {
 		t.Fatalf("second layout did not split August: %v", ids)
 	}
 	h.bp(t, "2026-08-09T06:30:00Z", 99) // a tail after the second run
-
-	head, _ := h.l.Head(ctx)
-	for w := first.W; w <= head; w++ {
-		want, err := fold.ReadAt(ctx, h.l, w)
-		if err != nil {
-			t.Fatal(err)
-		}
-		got, ok, err := mint.ReadAt(ctx, h.l, h.db, h.deps.Artifacts, w)
-		if err != nil || !ok || got.Value.Hash() != want.Value.Hash() {
-			t.Fatalf("W=%d: composed %v %v %s, fold %s", w, ok, err, got.Value.Hash(), want.Value.Hash())
-		}
-		for _, win := range [][2]string{
-			{"2026-08-01T00:00:00.000000000Z", "2026-09-01T00:00:00.000000000Z"},
-			{"2024-01-01T00:00:00.000000000Z", "2025-01-01T00:00:00.000000000Z"},
-			{"2026-07-02T00:00:00.000000000Z", "2026-07-03T00:00:00.000000000Z"},
-		} {
-			got, ok, err := mint.ReadWindow(ctx, h.l, h.db, h.deps.Artifacts, w, win[0], win[1])
-			if err != nil || !ok || got.Hash != want.Value.Hash() || got.Live != want.Value.Len() {
-				t.Fatalf("W=%d %v: %v %v %s/%d, fold %s/%d", w, win, ok, err, got.Hash, got.Live,
-					want.Value.Hash(), want.Value.Len())
-			}
-			if a, b := inWindow(got.Value.Entries(), win), inWindow(want.Value.Entries(), win); !sameIDs(a, b) {
-				t.Fatalf("W=%d %v: window %v, fold %v", w, win, a, b)
-			}
-		}
-	}
+	h.checkReads(t, 1, second.W, windows)
 }

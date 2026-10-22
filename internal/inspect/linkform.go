@@ -294,7 +294,7 @@ func (s *Server) linkPage(w http.ResponseWriter, r *http.Request) {
 	}
 	if code := q.Get("sel"); code != "" {
 		// A saved selection (card 206) fills the basket as its program does.
-		saved, ok := s.openSelection(w, code)
+		saved, ok := s.openSelection(r.Context(), w, code)
 		if !ok {
 			return
 		}

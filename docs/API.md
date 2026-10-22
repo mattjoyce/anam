@@ -79,7 +79,7 @@ first page, with `page` (`offset`, `returned_count`, `total_count`, `next_cursor
 whole count. `GET /v1/receipts/{hash}?cursor=…` reads each later page, and without a cursor answers
 the first page, so a small receipt reads as before, with a `page` that has no `next_cursor`. A page
 is whole facets, as many from its offset as fit `max_read_bytes` by the same measure, cut from the
-served artifact the receipt hashes: never a new read, so walking `next_cursor` to the end gives back
+served value the receipt hashes: never a new read, so walking `next_cursor` to the end gives back
 exactly the receipt's `facet_ids`, in order, whatever Anam learned in between. A frame pages by rows,
 with every column on every page. The receipt rides the first page only; a later page carries `hash`
 and `page`. The cursor is opaque, and checked rather than trusted: it names its format, the receipt,
@@ -130,17 +130,58 @@ is 400 with a message that says what to change; a derivation or an answer over `
 of a type declare and others do not. `anam query run` and `anam query describe` are the CLI, local
 or over the daemon. [QUERY.md](QUERY.md) is the reference, with worked questions.
 
+**An inline projection (2026-10-22).** `projection` in a query takes a name, as above, or a
+template object, so an assistant can ask a one-off question without an operator registering a
+projection first. The object has a manifest's fields less its `name`, `version` and `description`:
+`types`, `statuses` and `max_classification` (required), and `from`, `to` and `shape`. The loader
+that checks a registered manifest checks it, so a mistake is 400 and the message names the field, as
+does a type with no Definition. It has no name; it is known by its content hash. The answer and its
+receipt call it `inline` at version 1, and the receipt carries `template_inline: true` with the hash
+in `template_hash`. The body is filed under that hash in the operational store, so
+`/v1/receipts/{hash}/verify` replays the answer after a restart. A dry run files nothing. Every role
+may already read every projection, so an inline one widens nothing. This is the one place a client
+sends a projection of its own, and only to a query; the sentence in section 5 below that a client
+never sends one is about `ReadRecord`, which is not built. The example in
+`internal/daemon/openapi.yaml` is held to the loader by a test.
+
 **Saved selections (2026-10-22).** `POST /v1/selections` takes `{"program": "..."}` and
-answers 201 with `{"code", "hash", "url", "program"}`: the program filed as an artifact of kind
+answers 201 with `{"code", "hash", "url", "program"}`: the program filed as a row of kind
 `selection`, addressed by the SHA-256 of its canonical text (a chip program in its one layout, any
 other trimmed), and its code, the first 8 hex of that hash, lengthened at save to the shortest unique
 prefix when another saved selection shares the 8. `url` is the timeline drawing the selection, a
 path on the daemon (`/?sel=<code>`). `GET /v1/selections/{code}` answers the same shape; the code may
-carry `sel:`. Saving writes an artifact only, never the ledger, so every role may save, as every role
+carry `sel:`. Saving writes a row of the operational store only, never the ledger, so every role may save, as every role
 may publish a receipt. 400 is text that is not a program or a string that is not a code, 404 a code
 nothing was saved under, 409 a prefix that starts two saved selections. The inspector's timeline,
 select page and link form take `?sel=<code>` ([QUERY.md](QUERY.md#saved-selections)); anam-mcp's
 `save_selection` and `open_selection` are the tools.
+
+**Who read what (2026-10-22).** A receipt can name the principal whose read it files: a `principal`
+field, the name from the importers file, left out when there is none, so every receipt cut before it
+has the same bytes and the same hash and still verifies. A principal sets `receipts: always` in the
+importers file (off unless set; only a `reader` or an `importer` may) and every read its token makes
+that serves facets is then filed as a receipt naming it. `GET /v1/timeline` is answered as
+`POST /v1/receipts` answers, with status 200: the usual fields with `receipt_hash`, `receipt` and
+`page` beside them, from one derivation, so the reader holds exactly what the receipt names. Such a
+token must name a projection and cannot use `explain` (400), since a receipt is what a projection
+served. A read too large for one answer comes a page at a time, from `GET /v1/receipts/{hash}`,
+where an unrecorded token would get a 413. `POST /v1/query` names the principal on the receipt it
+already files; `dry_run` still files nothing, for every token, so a recording token can still try a
+program unrecorded. A recording token opens only the receipts that name it (`GET /v1/receipts/{hash}`
+and `/facets/{facet_id}` are 403 for another's), because opening another's value would be a read no
+receipt records. Filing is part of the read: if the receipt cannot be written the read fails with
+a 5xx and returns no facets, as `POST /v1/receipts` does. Any other token's reads are unchanged, and
+an ordinary `POST /v1/receipts` names nobody. `GET /v1/receipts` takes `principal`, `since`, `until` and
+`zone` (a bare date is a day in it, and a bare `until` includes its whole day), and `anam receipt list`
+takes `--principal`, `--since` and `--until` and shows a `READER` column. A receipt is parsed to be
+filtered, so a very long list is the cost of a very long record of reads; filter by time.
+
+**Receipts and checkpoints are rows (2026-10-22).** Receipts, the values they served, saved selections
+and checkpoint values live in the operational store, not in a folder beside it. `GET /v1/receipts` names
+that store in `store` where it named a directory in `dir`. Checkpoints are a cache that may go missing:
+a mint ends by removing the ones the newest run does not read, so `GET /v1/checkpoints` lists the
+checkpoints the log still holds, and a read at a watermark before the newest run, or one that finds a
+checkpoint gone, folds the ledger in full and answers the same value.
 
 This document proposes the application API that every client shares: the CLI, the inspector,
 importers, and conversational clients (§8). The two conversational features are **chat with my
@@ -190,7 +231,7 @@ Inspector -------------------+              |
 
 **Target deployment, agreed 2026-10-07:** Anam runs as a service in Docker on Unraid, exposing a
 comprehensive application API. SQLite remains the database substrate, on safe host-local storage.
-The service owns the ledger, operational store, artifacts, and managed source-writing operations.
+The service owns the ledger, the operational store (receipts and saved selections included), and managed source-writing operations.
 CLI, inspector, conversational clients, and scheduled ingestion use the service API in normal operation; they do not
 independently open its database files. A separately controlled offline maintenance mode may access
 them only with the service stopped.
@@ -245,7 +286,7 @@ or under `importers`, the file's first shape, where each entry is an importer na
 
 | Role | Opens |
 |---|---|
-| `reader` | Every read: status, timeline, changes, receipts and their verification, projections, checkpoints, Definitions, snapshots. Publishing a read (`POST /v1/receipts`), which writes artifacts and never the ledger |
+| `reader` | Every read: status, timeline, changes, receipts and their verification, projections, checkpoints, Definitions, snapshots. Publishing a read (`POST /v1/receipts`), which writes a receipt and its served value and never the ledger |
 | `importer` | A reader's routes, and envelopes, documents and Definition registration, as its one source and for its types only. With `any_type` in place of `types` it submits every type the daemon knows, registers none and stores no document. It sees only its own source's snapshots |
 | `operator` | A reader's routes, and minting, backups, projection templates, admission holds and the inspector. It submits no envelopes, since it is no source; it enters facts by hand at `POST /v1/entry`, which the daemon admits as the `workbench` source (never held) |
 
@@ -638,8 +679,8 @@ runs the daemon.
 
 Initialization, configuration, backup/restore, and destructive maintenance remain explicit operator
 workflows. They need safe application contracts if automated, but not generic shell or file access for clients.
-Backups cover the ledger, authored operational state, records source, and published artifacts as
-appropriate; rebuilding an index is not recovery of all of Anam.
+Backups cover the ledger, the operational store (which holds the receipts and saved selections), the
+records source and the document library as appropriate; rebuilding an index is not recovery of all of Anam.
 
 Long operations return an `operation_id` promptly and persist progress where the operation requires
 restart recovery. An ingest may have committed earlier batches before a later one fails. Results must

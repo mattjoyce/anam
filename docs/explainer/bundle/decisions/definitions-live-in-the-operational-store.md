@@ -3,7 +3,7 @@ type: decision
 title: Definitions live in the operational store, not the ledger
 description: A Definition is how Anam interprets, not what it knew; every version is held in tracking.db, provisioned from the binary or from the importer that registers it, and a registered version is immutable.
 timestamp: 2026-10-11T00:00:00Z
-resource: internal/store/ops/ops.go#registered_definition_no_update
+resource: internal/store/ops/ops.sql#registered_definition_no_update
 anchor: "registered_definition is immutable"
 basis: docs
 tier: supporting

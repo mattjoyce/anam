@@ -24,12 +24,48 @@ latest of each series, so a question about the past finds nothing there to look 
 projection for history. The bundled ones are `bp`, `doses` and `sleep`; others are registered with
 `POST /v1/projections`.
 
+## Asking without a registered projection
+
+For a one-off question, the request can carry the projection itself. In place of a name, `projection`
+takes an object with the fields of a manifest, without its name, version or description:
+
+```json
+{
+  "projection": {
+    "types": ["health.weight", "health.blood-pressure."],
+    "statuses": ["admitted", "endorsed"],
+    "max_classification": "Sensitive",
+    "from": "2026-01-01T00:00:00.000000000Z",
+    "shape": "log"
+  },
+  "text": "heavy(E, Kg) :- entry(E, \"health.weight\", _, _, _, _, _), attr(E, \"/kg\", Kg), Kg > 80.",
+  "relation": "heavy"
+}
+```
+
+`types`, `statuses` and `max_classification` are required, as they are in a manifest. `from`, `to` and
+`shape` are optional, and `shape` is `log` when left out. A `types` entry ending in `.` admits every type
+under it. The projection loader that checks a registered manifest checks this one, so a mistake is a 400
+that names the field (`types`, `statuses`, `max_classification`, `from`, `to`, `shape`, or an unknown
+key), and so is a type that no Definition publishes. Nothing is read before it is refused.
+
+An inline projection has no name and no version. It is known by its content hash, worked out the way a
+registered template's is, so the same object sent twice is the same projection. In the answer and the
+receipt it appears as `inline` at version 1, and the receipt carries `template_inline: true` and the
+hash in `template_hash`. The body is filed in the operational store under that hash, so
+`GET /v1/receipts/{hash}/verify` finds it and replays the answer, after a restart too. A dry run files
+no body. Every role may already read every registered projection, so an inline one lets a reader see
+nothing it could not already see.
+
+The CLI still takes a name. Reading through a saved selection's code in place of a projection is a
+possible later slice and is not built.
+
 ## Running one
 
 | Surface | How |
 |---|---|
 | CLI | `anam query run --projection bp -e '<program>'`, or `-f file`, or stdin. `--relation` names the answer, by default the head of the last rule. `--dry-run` derives and files nothing, `--as-of` and `--w` pick the knowledge, `--json` prints the receipt too. `anam query describe` prints the catalogue. With `ANAM_SERVER` set both ask the daemon. |
-| `POST /v1/query` | JSON body `projection` (required), `text`, `relation`, `as_of` or `w` (at most one), `zone` (for a bare date in `as_of`), `dry_run`. 201 when the receipt was filed, 200 for a dry run. |
+| `POST /v1/query` | JSON body `projection` (required: a name, or a template object, see below), `text`, `relation`, `as_of` or `w` (at most one), `zone` (for a bare date in `as_of`), `dry_run`. 201 when the receipt was filed, 200 for a dry run. |
 | `GET /v1/query` | The catalogue, with no parameters. |
 
 All three take a reader's, importer's or operator's token. A body with a field outside the list is a
@@ -48,8 +84,8 @@ under a version without it has no `attr` for it, so the query misses it silently
 
 ## Receipts
 
-A query answer is filed as an artifact and a receipt. The receipt records the ledger, the watermark,
-the projection and its hash, the definition-set version, the hash of the answer, and a `program`
+A query answer is filed as a served value and a receipt. The receipt records the ledger, the watermark,
+the projection and its hash (an inline projection is marked `template_inline`), the definition-set version, the hash of the answer, and a `program`
 block with the rule set (`rule_set`, `rule_set_version`, `rule_set_hash`), the text as written and the
 relation answered. `GET /v1/receipts/{hash}/verify` folds the ledger at that watermark, serves the
 projection, runs the same program and compares hashes. It reports a difference if the record changed
@@ -362,14 +398,14 @@ it, and says so when it could not.
 
 A selection is handed on as its program, and also as a short code. "Save this
 selection" on the select page, or `POST /v1/selections` with `{"program": "..."}`, files the program
-as an artifact of kind `selection`, addressed by the SHA-256 of its canonical text, and answers its
+as a row of kind `selection`, addressed by the SHA-256 of its canonical text, and answers its
 code, written `sel:<code>`. The canonical text is what `selection.Parse` then `Program` write for a
 program within the chip grammar, so the same selection written in another layout or rule order has
 the same code; any other program is saved as its text, trimmed.
 
 The code is the first 8 hex digits of the hash. At save, if another saved selection shares those 8,
 the new one's code lengthens to the shortest prefix of its hash that no other saved selection shares,
-and that lengthened code is filed as a second small artifact, kind `selection-code`, since which of
+and that lengthened code is filed as a second small row, kind `selection-code`, since which of
 the two came first is not something the hashes can say. The first one keeps its 8 digits. A code is
 written once and never rewritten, so it never changes meaning. Saving the same program again writes
 nothing and answers the same code.

@@ -11,4 +11,4 @@ group: published
 depends_on: []
 ---
 
-No dependencies: a receipt must be readable from the artifact alone. `Compare` reports two independent proofs, reproduced (the re-derived hash and id set match) and intact (the stored bytes still hash to `served_hash`), with missing and unexpected ids. The record is the [receipt](/data-structures/receipt.md).
+No dependencies: a receipt must be readable from its stored row alone. `Compare` reports two independent proofs, reproduced (the re-derived hash and id set match) and intact (the stored bytes still hash to `served_hash`), with missing and unexpected ids. The record is the [receipt](/data-structures/receipt.md).

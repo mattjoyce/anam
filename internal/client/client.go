@@ -210,10 +210,10 @@ func (c *Client) Changes(ctx context.Context, q api.ChangesQuery) (api.Changes, 
 	return ch, err
 }
 
-// Receipts lists the daemon's receipts, newest first.
-func (c *Client) Receipts(ctx context.Context) (api.Receipts, error) {
+// Receipts lists the daemon's receipts that pass q, newest first.
+func (c *Client) Receipts(ctx context.Context, q api.ReceiptsQuery) (api.Receipts, error) {
 	var r api.Receipts
-	_, err := c.do(ctx, c.timeout, http.MethodGet, "/v1/receipts", nil, nil, &r)
+	_, err := c.do(ctx, c.timeout, http.MethodGet, "/v1/receipts", q.Values(), nil, &r)
 	return r, err
 }
 

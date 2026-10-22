@@ -11,7 +11,6 @@ enforced_at: not enforced
 applies_to:
   - /components/store-ledger.md
   - /components/store-ops.md
-  - /components/store-artifact.md
   - /terms/operational-store.md
 ---
 

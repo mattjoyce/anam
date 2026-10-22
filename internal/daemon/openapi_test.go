@@ -18,6 +18,7 @@ import (
 
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/config"
+	"github.com/mattjoyce/anam/internal/projection"
 )
 
 // The description and the mux must agree (card 49): every route is a path in the
@@ -39,7 +40,10 @@ type operation struct {
 	} `yaml:"responses"`
 	RequestBody struct {
 		Content map[string]struct {
-			Example any `yaml:"example"`
+			Example  any `yaml:"example"`
+			Examples map[string]struct {
+				Value any `yaml:"value"`
+			} `yaml:"examples"`
 		} `yaml:"content"`
 	} `yaml:"requestBody"`
 }
@@ -137,6 +141,23 @@ func TestOpenAPI_ExamplesDecodeIntoTheAPITypes(t *testing.T) {
 	if ex := s.Paths["/v1/selections"]["post"].RequestBody.Content["application/json"].Example; ex != nil {
 		if err := decodeStrict(ex, new(api.SelectionRequest)); err != nil {
 			t.Errorf("POST /v1/selections request example does not decode into api.SelectionRequest: %v", err)
+		}
+	}
+	// POST /v1/query carries a name and an inline template as two examples, and both
+	// decode into the request (card 211).
+	queryExamples := s.Paths["/v1/query"]["post"].RequestBody.Content["application/json"].Examples
+	if queryExamples["named"].Value == nil || queryExamples["inline"].Value == nil {
+		t.Errorf("POST /v1/query has examples %v, want a named and an inline one", queryExamples)
+	}
+	for name, ex := range queryExamples {
+		var q api.QueryRequest
+		if err := decodeStrict(ex.Value, &q); err != nil {
+			t.Errorf("POST /v1/query %s example does not decode into api.QueryRequest: %v", name, err)
+		}
+		if name == "inline" {
+			if _, err := projection.ParseInline(q.Projection.Inline); err != nil {
+				t.Errorf("POST /v1/query inline example is not a template the loader accepts: %v", err)
+			}
 		}
 	}
 	// The other request body with an example is a Submission.

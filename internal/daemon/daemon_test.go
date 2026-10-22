@@ -27,7 +27,6 @@ func newConfig(t *testing.T) config.Config {
 		PersonID:           "matt",
 		LedgerPath:         filepath.Join(dir, "ledger.db"),
 		DBPath:             filepath.Join(dir, "tracking.db"),
-		ArtifactDir:        filepath.Join(dir, "artifacts"),
 		LibraryDir:         filepath.Join(dir, "documents"),
 		LibraryFolderLimit: config.DefaultLibraryFolderLimit,
 		Zone:               "UTC",

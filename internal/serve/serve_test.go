@@ -6,8 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -15,7 +13,8 @@ import (
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/receipt"
 	"github.com/mattjoyce/anam/internal/serve"
-	"github.com/mattjoyce/anam/internal/store/artifact"
+	"github.com/mattjoyce/anam/internal/store/ops"
+	"github.com/mattjoyce/anam/internal/store/ops/opstest"
 )
 
 func TestRun_ServesAndPublishes(t *testing.T) {
@@ -57,16 +56,16 @@ func TestRun_ServesAndPublishes(t *testing.T) {
 	}
 
 	// served_hash addresses the bytes actually on disk.
-	stored, err := h.store.Get(receipt.ServedKind, r.ServedHash)
+	stored, err := h.db.Get(context.Background(), receipt.ServedKind, r.ServedHash)
 	if err != nil {
 		t.Fatalf("the served value is not in the store at its own hash: %v", err)
 	}
-	if artifact.Digest(stored) != r.ServedHash {
+	if ops.Digest(stored) != r.ServedHash {
 		t.Errorf("served_hash %s does not address the stored bytes", r.ServedHash)
 	}
 
 	// The receipt is itself content-addressed and retrievable.
-	if _, err := h.store.Get(receipt.Kind, out.ReceiptHash); err != nil {
+	if _, err := h.db.Get(context.Background(), receipt.Kind, out.ReceiptHash); err != nil {
 		t.Errorf("the receipt is not in the store at its own hash: %v", err)
 	}
 
@@ -140,7 +139,7 @@ func TestRun_StableAcrossRepeatedServes(t *testing.T) {
 
 	// And the tier holds one served file and one receipt, not two of each.
 	for _, kind := range []string{receipt.ServedKind, receipt.Kind} {
-		got, err := h.store.List(kind)
+		got, err := h.db.List(context.Background(), kind)
 		if err != nil {
 			t.Fatalf("List(%s): %v", kind, err)
 		}
@@ -165,7 +164,7 @@ func TestRun_DryRunPublishesNothing(t *testing.T) {
 		t.Error("a dry run reported bytes written")
 	}
 	for _, kind := range []string{receipt.ServedKind, receipt.Kind} {
-		got, err := h.store.List(kind)
+		got, err := h.db.List(context.Background(), kind)
 		if err != nil {
 			t.Fatalf("List(%s): %v", kind, err)
 		}
@@ -270,17 +269,15 @@ func TestVerify_DetectsATamperedArtifact(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 
-	path := filepath.Join(h.dir, receipt.ServedKind,
-		strings.Replace(out.Receipt.ServedHash, "sha256:", "sha256-", 1)+".json")
-	original, err := os.ReadFile(path) //nolint:gosec // test-owned temp path
+	original, err := h.db.Raw(ctx, receipt.ServedKind, out.Receipt.ServedHash)
 	if err != nil {
-		t.Fatalf("read served file: %v", err)
+		t.Fatalf("read the served value: %v", err)
 	}
 	tampered := strings.Replace(string(original), `"systolic":118`, `"systolic":119`, 1)
 	if tampered == string(original) {
 		t.Fatalf("the tamper changed nothing; the served bytes are:\n%s", original)
 	}
-	if err := os.WriteFile(path, []byte(tampered), 0o600); err != nil {
+	if err := opstest.Corrupt(ctx, h.db, receipt.ServedKind, out.Receipt.ServedHash, []byte(tampered)); err != nil {
 		t.Fatalf("tamper: %v", err)
 	}
 
@@ -305,22 +302,26 @@ func TestVerify_DetectsATamperedArtifact(t *testing.T) {
 	}
 }
 
-// A receipt whose served artifact was deleted is a different situation from one whose
-// artifact was altered: the ledger can still honour it.
-func TestVerify_MissingArtifactIsNotTampering(t *testing.T) {
+// A receipt whose served value is not there is a different situation from one whose
+// value was altered: the ledger can still honour it.
+func TestVerify_MissingServedValueIsNotTampering(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	h.seed(t)
 	ctx := context.Background()
 
-	out, err := serve.Run(ctx, h.deps, "bp", false)
+	// A dry run derives the receipt and writes nothing; filing the receipt alone leaves
+	// one whose served value is not there.
+	out, err := serve.Run(ctx, h.deps, "bp", true)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	path := filepath.Join(h.dir, receipt.ServedKind,
-		strings.Replace(out.Receipt.ServedHash, "sha256:", "sha256-", 1)+".json")
-	if err := os.Remove(path); err != nil {
-		t.Fatalf("remove served file: %v", err)
+	rb, err := out.Receipt.Bytes()
+	if err != nil {
+		t.Fatalf("Bytes: %v", err)
+	}
+	if _, err := h.db.Put(ctx, receipt.Kind, rb); err != nil {
+		t.Fatalf("Put the receipt: %v", err)
 	}
 
 	_, res, err := serve.Verify(ctx, h.deps, out.ReceiptHash)
@@ -399,8 +400,8 @@ func TestVerify_UnknownReceipt(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()
 
-	absent := artifact.Digest([]byte("never served"))
-	if _, _, err := serve.Verify(ctx, h.deps, absent); !errors.Is(err, artifact.ErrNotFound) {
+	absent := ops.Digest([]byte("never served"))
+	if _, _, err := serve.Verify(ctx, h.deps, absent); !errors.Is(err, ops.ErrNotFound) {
 		t.Errorf("Verify(absent): err = %v, want ErrNotFound", err)
 	}
 }

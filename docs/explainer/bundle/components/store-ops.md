@@ -1,7 +1,7 @@
 ---
 type: component
 title: Operational store (internal/store/ops)
-description: "The tracking.db SQLite file: Definitions, the facet and event indexes, the checkpoint log, mint runs and seals, snapshot parts, the operator's admission holds, and the pins that refuse a mismatched ledger or width."
+description: "The tracking.db SQLite file: Definitions, the facet and event indexes, the checkpoint log and its values, receipts and saved selections, the operator's admission holds, mint runs, snapshot parts, and the pins that refuse a mismatched ledger or width."
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/store/ops/ops.go#Open
 anchor: "func Open(ctx context.Context, path string, buckets span.Buckets) (*DB, error) {"
@@ -14,16 +14,16 @@ depends_on:
   - /components/facet.md
 ---
 
-Each table is annotated with its tier in the schema.
+Each table is annotated with its tier in the schema, `internal/store/ops/ops.sql`, which is embedded.
 
 | Tier | Tables | Comes back from |
 |---|---|---|
-| derived | `facet_index`, `facet_edge`, `anam_event_index`, `checkpoint` (+ `span_head` view), `checkpoint_size`, `mint_run`, `mint_seal`, `sync` | replaying the ledger, then minting |
+| derived | `facet_index`, `facet_edge`, `anam_event_index`, `checkpoint` (+ `span_head` view), `checkpoint_value`, `checkpoint_size`, `mint_run` (with its digest of the checkpoints a read takes), `sync` | replaying the ledger, then minting |
 | provisioned | `definition` (bundled, every version), `registered_definition` (immutable by trigger) | the binary, and each importer registering again; `anam migrate` copies the registered rows to a new store with their registration moments (card 200) |
-| authored | `meta` (schema_version, bucket_width, ledger_id), `registered_projection` (immutable by trigger), `admission_hold` (operator admission holds; immutable by trigger) | the file itself, the operator's own registrations and holds |
+| authored | `registered_projection`, `receipt`, `served_value`, `saved_selection`, `saved_selection_code`, `inline_projection`, `admission_hold` (immutable by trigger), `meta` (schema_version, bucket_width, ledger_id) | a backup, or nowhere |
 | disposable | `snapshot`, `snapshot_part`, `snapshot_facet` | the importer's next resend |
 
-`Open` applies the schema, pins the bucket width and refuses a file built at another, and `PinLedger` refuses an index derived from another ledger. `OpenReadOnly` is what the daemon's read routes use. The repair is to delete the file and replay, which cannot reach a fact.
+`Open` applies the schema, pins the bucket width and refuses a file built at another, and `PinLedger` refuses an index derived from another ledger. `OpenReadOnly` is what the daemon's read routes use. The content-addressed tables are filed and read through `Put`, `Get`, `Raw`, `Size` and `List` by kind (see [stored content is a row keyed by its hash](/decisions/content-is-a-row-keyed-by-its-hash.md)), `RunCheckpoints` takes a run's checkpoints and says when the log no longer yields the ones the run saw, and `CollectCheckpoints` ends a mint by removing the checkpoints the newest run does not read. Checkpoints are a cache. The repair is to delete the file and replay, which cannot reach a fact.
 
 `admission_hold` holds a source's admission at the daemon's door (`POST /v1/hold`): a held source's envelopes and Definition registrations are refused, and the workbench is never held. A held row is not rewritten; releasing it deletes it. It is authored state, so `anam migrate` carries it into the new store like the registered rows.
 

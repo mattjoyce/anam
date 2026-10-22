@@ -7,8 +7,8 @@ resource: internal/mint/read.go#ReadAt
 anchor: "rows, _, ok, err := leavesAt(ctx, log, run)"
 basis: code
 tier: supporting
-enforced_at: internal/mint/read.go#startingRun
-enforced_anchor: "if sealed, err := log.LogSealed(ctx); err != nil || !sealed {"
+enforced_at: internal/mint/read.go#leavesAt
+enforced_anchor: "rows, ok, err := log.RunCheckpoints(ctx, int64(run))"
 applies_to:
   - /components/mint.md
   - /components/fold.md

@@ -3,8 +3,6 @@ package serve_test
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,7 +10,8 @@ import (
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/receipt"
 	"github.com/mattjoyce/anam/internal/serve"
-	"github.com/mattjoyce/anam/internal/store/artifact"
+	"github.com/mattjoyce/anam/internal/store/ops"
+	"github.com/mattjoyce/anam/internal/store/ops/opstest"
 )
 
 // The reads that go to the artifact tier rather than the ledger: Show renders what was
@@ -37,7 +36,7 @@ func TestShow_ReadsThePublishedArtifactOnly(t *testing.T) {
 
 	// Deps carrying nothing but the store — no ledger, no templates, no gate. If Show
 	// reached for any of them this would panic rather than quietly pass.
-	r, shown, err := serve.Show(serve.Deps{Artifacts: h.store}, out.ReceiptHash)
+	r, shown, err := serve.Show(ctx, serve.Deps{Published: h.db}, out.ReceiptHash)
 	entries := shown.Entries
 	if err != nil {
 		t.Fatalf("Show: %v", err)
@@ -58,7 +57,7 @@ func TestShow_ReadsThePublishedArtifactOnly(t *testing.T) {
 	}
 }
 
-// A tampered artifact must be refused rather than displayed as though it were what was
+// A tampered row must be refused rather than displayed as though it were what was
 // served — showing altered bytes under a genuine receipt is the one failure a viewer
 // of published artifacts must not have.
 func TestShow_RefusesATamperedArtifact(t *testing.T) {
@@ -71,9 +70,7 @@ func TestShow_RefusesATamperedArtifact(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	path := filepath.Join(h.dir, receipt.ServedKind,
-		strings.Replace(out.Receipt.ServedHash, "sha256:", "sha256-", 1)+".json")
-	original, err := os.ReadFile(path) //nolint:gosec // test-owned temp path
+	original, err := h.db.Raw(ctx, receipt.ServedKind, out.Receipt.ServedHash)
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -81,11 +78,11 @@ func TestShow_RefusesATamperedArtifact(t *testing.T) {
 	if tampered == string(original) {
 		t.Fatalf("the tamper changed nothing")
 	}
-	if err := os.WriteFile(path, []byte(tampered), 0o600); err != nil {
+	if err := opstest.Corrupt(ctx, h.db, receipt.ServedKind, out.Receipt.ServedHash, []byte(tampered)); err != nil {
 		t.Fatalf("tamper: %v", err)
 	}
 
-	if _, _, err := serve.Show(serve.Deps{Artifacts: h.store}, out.ReceiptHash); !errors.Is(err, artifact.ErrCorrupt) {
+	if _, _, err := serve.Show(ctx, serve.Deps{Published: h.db}, out.ReceiptHash); !errors.Is(err, ops.ErrCorrupt) {
 		t.Errorf("Show over a tampered artifact: err = %v, want ErrCorrupt", err)
 	}
 }
@@ -94,8 +91,8 @@ func TestShow_UnknownReceipt(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 
-	absent := artifact.Digest([]byte("never served"))
-	if _, _, err := serve.Show(serve.Deps{Artifacts: h.store}, absent); !errors.Is(err, artifact.ErrNotFound) {
+	absent := ops.Digest([]byte("never served"))
+	if _, _, err := serve.Show(context.Background(), serve.Deps{Published: h.db}, absent); !errors.Is(err, ops.ErrNotFound) {
 		t.Errorf("Show(absent): err = %v, want ErrNotFound", err)
 	}
 }
@@ -118,7 +115,7 @@ func TestList_NewestFirst(t *testing.T) {
 		t.Fatalf("Run(late): %v", err)
 	}
 
-	receipts, hashes, err := serve.List(h.deps)
+	receipts, hashes, err := serve.List(context.Background(), h.deps, serve.ListFilter{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -135,7 +132,7 @@ func TestList_NewestFirst(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Bytes: %v", err)
 		}
-		if got := artifact.Digest(b); got != hashes[i] {
+		if got := ops.Digest(b); got != hashes[i] {
 			t.Errorf("receipt %d is paired with hash %s but hashes to %s", i, hashes[i], got)
 		}
 	}
@@ -145,7 +142,7 @@ func TestList_EmptyStore(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 
-	receipts, hashes, err := serve.List(h.deps)
+	receipts, hashes, err := serve.List(context.Background(), h.deps, serve.ListFilter{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}

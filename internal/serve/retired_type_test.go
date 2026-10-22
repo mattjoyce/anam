@@ -17,8 +17,9 @@ import (
 	"github.com/mattjoyce/anam/internal/gate"
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/serve"
-	"github.com/mattjoyce/anam/internal/store/artifact"
+	"github.com/mattjoyce/anam/internal/span"
 	"github.com/mattjoyce/anam/internal/store/ledger"
+	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
 // courseManifest is a medication event Definition shaped like the bundled ones: a
@@ -56,9 +57,13 @@ func TestVerify_ReceiptServedUnderRetiredTypesStillReproduces(t *testing.T) {
 		t.Fatalf("ledger.Create: %v", err)
 	}
 	t.Cleanup(func() { _ = l.Close() })
-	store, err := artifact.New(t.TempDir())
+	buckets, err := span.New(span.Default)
 	if err != nil {
-		t.Fatalf("artifact.New: %v", err)
+		t.Fatalf("span.New: %v", err)
+	}
+	store, err := ops.Open(ctx, filepath.Join(t.TempDir(), "tracking.db"), buckets)
+	if err != nil {
+		t.Fatalf("ops.Open: %v", err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
 
@@ -118,7 +123,7 @@ func TestVerify_ReceiptServedUnderRetiredTypesStillReproduces(t *testing.T) {
 	}
 	fixed := clock.Fixed{Instant: time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC)}
 	deps := serve.Deps{
-		Ledger: l, Templates: served, Artifacts: store, Gate: consent.Open{}, Clock: fixed,
+		Ledger: l, Templates: served, Published: store, Gate: consent.Open{}, Clock: fixed,
 		DefinitionSetVersion: "sha256:" + strings.Repeat("d", 64), Series: before, Definitions: before,
 	}
 	out, err := serve.Run(ctx, deps, "meds", false)

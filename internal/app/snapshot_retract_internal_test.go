@@ -30,7 +30,7 @@ func TestRetract_PlansAnImportersSourceFromItsSnapshot(t *testing.T) {
 	dir := t.TempDir()
 	cfg := config.Config{
 		LedgerPath: filepath.Join(dir, "ledger.db"), DBPath: filepath.Join(dir, "tracking.db"),
-		ArtifactDir: filepath.Join(dir, "artifacts"), PersonID: "matt",
+		PersonID:    "matt",
 		BucketWidth: span.Default, Timeout: 5 * time.Second, Limits: config.DefaultLimits(),
 	}
 	l, err := ledger.Create(ctx, cfg.LedgerPath, cfg.PersonID)

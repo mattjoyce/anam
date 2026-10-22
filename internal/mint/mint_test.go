@@ -3,7 +3,6 @@ package mint_test
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -16,14 +15,13 @@ import (
 	"github.com/mattjoyce/anam/internal/gate"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/span"
-	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
-// The mint is tested over the real trio it writes across (AGENTS.md: real components
-// over mocks): a ledger file, an operational store file and an artifact directory,
-// each under the test's own temp directory.
+// The mint is tested over the real pair it writes across (AGENTS.md: real components
+// over mocks): a ledger file and an operational store file, each under the test's own
+// temp directory.
 
 const person = "matt"
 
@@ -69,7 +67,6 @@ type harness struct {
 	gate *gate.Gate
 	l    *ledger.Ledger
 	db   *ops.DB
-	dir  string
 	deps mint.Deps
 }
 
@@ -93,13 +90,6 @@ func newHarness(t *testing.T) *harness {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	dir := t.TempDir()
-	store, err := artifact.New(dir)
-	if err != nil {
-		t.Fatalf("artifact.New: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-
 	bp, err := def.Parse([]byte(bpManifest))
 	if err != nil {
 		t.Fatalf("def.Parse(bp): %v", err)
@@ -121,9 +111,8 @@ func newHarness(t *testing.T) *harness {
 		gate: gate.New(l, defs, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}),
 		l:    l,
 		db:   db,
-		dir:  dir,
 		deps: mint.Deps{
-			Ledger: l, Index: db, Artifacts: store, Buckets: buckets,
+			Ledger: l, Index: db, Values: db, Buckets: buckets,
 			Clock: clock.Fixed{Instant: time.Date(2026, 10, 6, 9, 0, 0, 0, time.UTC)},
 		},
 	}
@@ -194,16 +183,14 @@ func (h *harness) rows(t *testing.T) []ops.CheckpointRow {
 	return rows
 }
 
+// files is how many checkpoint values the store holds.
 func (h *harness) files(t *testing.T) int {
 	t.Helper()
-	entries, err := os.ReadDir(filepath.Join(h.dir, mint.Kind))
-	if os.IsNotExist(err) {
-		return 0
-	}
+	digests, err := h.db.List(context.Background(), mint.Kind)
 	if err != nil {
-		t.Fatalf("ReadDir: %v", err)
+		t.Fatalf("List: %v", err)
 	}
-	return len(entries)
+	return len(digests)
 }
 
 func outcomes(res mint.Result) map[string]mint.Outcome {
@@ -234,7 +221,7 @@ func TestRun_FirstMintThenIdempotent(t *testing.T) {
 		}
 	}
 	if n := h.files(t); n != 3 {
-		t.Fatalf("artifact files: %d, want 3", n)
+		t.Fatalf("checkpoint values: %d, want 3", n)
 	}
 
 	second := h.run(t, false)
@@ -271,8 +258,10 @@ func TestRun_BackfillReopensOneBucket(t *testing.T) {
 			t.Errorf("%s moved on a July backfill: %+v", id, o[id])
 		}
 	}
-	if len(h.rows(t)) != 4 {
-		t.Fatalf("checkpoint rows: %d, want 4", len(h.rows(t)))
+	// July's first version is subsumed by the second and no receipt pins it, so the
+	// mint that cut the second removed it: the log holds one row per bucket.
+	if len(h.rows(t)) != 3 || h.files(t) != 3 {
+		t.Fatalf("checkpoint rows and values: %d and %d, want 3 and 3", len(h.rows(t)), h.files(t))
 	}
 }
 
@@ -329,7 +318,7 @@ func TestCompose_MatchesTheFoldOverARange(t *testing.T) {
 
 	var values []fold.Value
 	for _, id := range []string{"bucket:2026-07", "bucket:2026-08"} {
-		v, err := mint.Load(h.deps, heads[id])
+		v, err := mint.Load(context.Background(), h.deps, heads[id])
 		if err != nil {
 			t.Fatalf("Load %s: %v", id, err)
 		}
@@ -380,7 +369,7 @@ func TestRun_EmptiedBucketMintsTheEmptyValue(t *testing.T) {
 	if res.Minted() != 1 {
 		t.Fatalf("minted %d buckets, want 1: %+v", res.Minted(), res.Outcomes)
 	}
-	empty, err := mint.Load(h.deps, h.heads(t)["bucket:2026-09"])
+	empty, err := mint.Load(context.Background(), h.deps, h.heads(t)["bucket:2026-09"])
 	if err != nil {
 		t.Fatalf("Load empty: %v", err)
 	}
@@ -399,7 +388,7 @@ func TestRun_DryRunPublishesNothing(t *testing.T) {
 		t.Fatalf("dry run: written=%v minted=%d, want false and 3", dry.Written, dry.Minted())
 	}
 	if len(h.rows(t)) != 0 || h.files(t) != 0 {
-		t.Fatalf("dry run wrote %d rows and %d files", len(h.rows(t)), h.files(t))
+		t.Fatalf("dry run wrote %d rows and %d values", len(h.rows(t)), h.files(t))
 	}
 
 	real := h.run(t, false)
@@ -428,20 +417,20 @@ func TestRun_LeavesTheLedgerUntouched(t *testing.T) {
 	}
 }
 
-// Load refuses a file that hashes to its name but is not a value's serialisation. The
-// store's check covers bytes against name; this covers bytes against the value they
-// claim to be, so a hand-written or re-encoded file is caught at the row.
-func TestLoad_RefusesAFileThatIsNotTheValueItClaims(t *testing.T) {
+// Load refuses bytes that hash to their key but are not a value's serialisation. The
+// store's check covers bytes against key; this covers bytes against the value they
+// claim to be, so a hand-written or re-encoded value is caught at the row.
+func TestLoad_RefusesBytesThatAreNotTheValueTheyClaim(t *testing.T) {
 	h := newHarness(t)
 	// Valid JSON for the empty value, but not NewValue's bytes for it.
 	loose := []byte("[ ]")
-	digest, err := h.deps.Artifacts.Put(mint.Kind, loose)
+	digest, err := h.deps.Values.Put(context.Background(), mint.Kind, loose)
 	if err != nil {
 		t.Fatalf("Put: %v", err)
 	}
 	row := ops.CheckpointRow{SpanID: "bucket:2026-01", V: 1, CoversW: 0, ValueHash: digest, MintedAt: "x"}
-	if _, err := mint.Load(h.deps, row); err == nil {
-		t.Fatal("Load accepted a file whose bytes are not the value's serialisation")
+	if _, err := mint.Load(context.Background(), h.deps, row); err == nil {
+		t.Fatal("Load accepted bytes that are not the value's serialisation")
 	}
 }
 
@@ -451,7 +440,7 @@ func (h *harness) composeAll(t *testing.T) fold.Value {
 	t.Helper()
 	var values []fold.Value
 	for _, row := range h.heads(t) {
-		v, err := mint.Load(h.deps, row)
+		v, err := mint.Load(context.Background(), h.deps, row)
 		if err != nil {
 			t.Fatalf("Load %s: %v", row.SpanID, err)
 		}

@@ -12,15 +12,20 @@ import (
 
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/selection"
-	"github.com/mattjoyce/anam/internal/store/artifact"
+	"github.com/mattjoyce/anam/internal/span"
+	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
 // Saved selections (card 206) on the inspector's pages, over a real ledger and a real
-// artifact directory.
+// operational store.
 
 func savedServer(t *testing.T, maxReadBytes int) *httptest.Server {
 	t.Helper()
-	a, err := artifact.New(filepath.Join(t.TempDir(), "artifacts"))
+	buckets, err := span.New(span.Default)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := ops.Open(t.Context(), filepath.Join(t.TempDir(), "tracking.db"), buckets)
 	if err != nil {
 		t.Fatal(err)
 	}

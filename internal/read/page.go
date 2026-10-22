@@ -1,6 +1,7 @@
 package read
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -84,23 +85,23 @@ func pageOf(hash string, ids []string, offset, end int) api.Page {
 	return p
 }
 
-// Receipt reads one receipt and the whole served value it names, from the artifacts
+// Receipt reads one receipt and the whole served value it names, from the stored rows
 // alone: the one page a local read answers with.
-func Receipt(d serve.Deps, hash string) (api.ReceiptShown, error) {
-	return ReceiptPage(d, hash, "", 0)
+func Receipt(ctx context.Context, d serve.Deps, hash string) (api.ReceiptShown, error) {
+	return ReceiptPage(ctx, d, hash, "", 0)
 }
 
-// ReceiptPage reads one page of the value receipt hash served, from the artifacts
+// ReceiptPage reads one page of the value receipt hash served, from the stored rows
 // alone (card 92): the page cursor names, or the first page when cursor is empty, cut
 // to whole facets that fit limit bytes as Fit measures them. Zero is no bound, one
-// page. Every page is cut from the same served artifact the receipt hashes, so the
+// page. Every page is cut from the same served value the receipt hashes, so the
 // pages' union is exactly the receipt's facet_ids, in order, whatever the ledger has
 // learned since. A facet over limit alone is refused with a *TooLarge naming it.
 //
 // A query receipt's answer (card 173) is one relation, not facets, and is answered
 // whole within limit or refused; a cursor on one is refused.
-func ReceiptPage(d serve.Deps, hash, cursor string, limit int) (api.ReceiptShown, error) {
-	r, shown, err := serve.Show(d, hash)
+func ReceiptPage(ctx context.Context, d serve.Deps, hash, cursor string, limit int) (api.ReceiptShown, error) {
+	r, shown, err := serve.Show(ctx, d, hash)
 	if err != nil {
 		return api.ReceiptShown{}, err
 	}

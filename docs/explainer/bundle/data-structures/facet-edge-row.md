@@ -3,7 +3,7 @@ type: data-structure
 title: Edge index row
 description: The operational store's derived index of each live edge facet's ends, one row per facet id on each side, written by catch-up from the edge's own payload and rebuilt by replaying the ledger.
 timestamp: 2026-10-21T00:00:00Z
-resource: internal/store/ops/ops.go#facet_edge
+resource: internal/store/ops/ops.sql#facet_edge
 anchor: "CREATE TABLE IF NOT EXISTS facet_edge ("
 basis: code
 tier: detail

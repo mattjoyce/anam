@@ -17,6 +17,7 @@ package ops
 import (
 	"context"
 	"database/sql"
+	_ "embed" // go:embed for ops.sql
 	"errors"
 	"fmt"
 	"os"
@@ -49,9 +50,24 @@ import (
 // file that had already replayed past the edges it should hold, and for edges absent
 // does not mean none, so the pre-edge file refuses and is replayed.
 //
-// 8 -> 9 adds admission_hold: the operator's admission hold over sources. Authored
-// state, stored in the operational store; the derived tier must not depend on it.
-// Bump because the table is new and must exist in a version-9 file.
+// 8 -> 9 adds checkpoint_value, receipt, served_value, saved_selection and
+// saved_selection_code (card 215): the values, receipts and selections that were files
+// under an artifact directory. The same rule bumps it. A version-8 file has checkpoint
+// rows naming values it does not hold, and receipts and selections that exist only in
+// the folder beside it, so a build that opened it would find them absent and answer
+// as though there were none. The file refuses, and is carried forward by rebuilding
+// it and moving the folder in (anam move-artifacts). The bump also gives mint_run its
+// picks column and drops mint_seal, which the picks replace.
+//
+// inline_projection (card 211) does not bump it. A version-9 file gains the empty table
+// when Open applies the schema, which is true of it: no receipt there names an inline
+// body. A build before it never reads the table, and refuses a receipt carrying the
+// inline marker as one with an unknown field, so neither build misreads the other's file.
+//
+// admission_hold (the operator's admission hold over sources) does not bump it either, by
+// the same rule: a version-9 file gains the empty table when Open applies the schema, and
+// a build before it never reads the table. A hold set by this build is not enforced by an
+// older one, which is the rollback's known cost.
 const schemaVersion = 9
 
 // ErrSchemaVersion is returned by Open for a database written by a different schema.
@@ -69,226 +85,12 @@ type DB struct {
 	db *sql.DB
 }
 
-// schema is executed idempotently by Open. Sort-ordered text columns (fact_time,
-// anam_time) hold fixed-width clock.Layout timestamps; bucket ids are span.Bucket
-// ids — both compare lexically in chronological order by construction.
-const schema = `
--- tier: derived — the facet index: one row per logical facet, at its current version
--- and folded status (current_version + status is exactly a persisted fold.State,
--- which is what lets catch-up replay incrementally instead of from genesis).
--- The read paths that left the ledger live here: the timeline (fact_time), the type
--- filter, and bucket membership (the bucket-span seam — bucket_id is arithmetic on
--- fact_time, materialised for the joins the mint will need).
-CREATE TABLE IF NOT EXISTS facet_index (
-  facet_id        TEXT PRIMARY KEY,
-  type            TEXT NOT NULL,
-  fact_time      TEXT NOT NULL,
-  bucket_id       TEXT NOT NULL,
-  current_version INTEGER NOT NULL,
-  status          TEXT NOT NULL,
-  content_hash    TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS facet_index_by_time   ON facet_index (fact_time);
-CREATE INDEX IF NOT EXISTS facet_index_by_type   ON facet_index (type, fact_time);
-CREATE INDEX IF NOT EXISTS facet_index_by_bucket ON facet_index (bucket_id);
-
--- tier: derived — the anam-event index: changes_since by anam-time, and the
--- as-of translation (greatest seq with anam_time <= T).
-CREATE TABLE IF NOT EXISTS anam_event_index (
-  seq              INTEGER PRIMARY KEY,
-  anam_time      TEXT NOT NULL,
-  kind             TEXT NOT NULL,
-  facet_id         TEXT NOT NULL,
-  artifact_version INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS anam_event_by_time ON anam_event_index (anam_time, seq);
-
--- tier: derived — the edge index (card 104): one row per end of every live edge facet,
--- the facet ids its payload names on its from and to sides, so "the live edges touching
--- X" is one lookup. Derived from the edges' own payloads by catch-up, replaced whole
--- for an edge at each of its versions, gone when it is tombstoned.
-CREATE TABLE IF NOT EXISTS facet_edge (
-  edge_id  TEXT NOT NULL,
-  kind     TEXT NOT NULL,
-  side     TEXT NOT NULL CHECK (side IN ('from', 'to')),
-  facet_id TEXT NOT NULL,
-  PRIMARY KEY (edge_id, side, facet_id)
-);
-CREATE INDEX IF NOT EXISTS facet_edge_by_facet ON facet_edge (facet_id);
-
--- tier: derived — the checkpoint index: every mint of every span, append-only.
--- covers_w is the watermark the value actually folded; value_hash addresses the
--- checkpoint file. As-of wants "greatest covers_w <= W", which is why this is a log
--- and the head is a view.
-CREATE TABLE IF NOT EXISTS checkpoint (
-  span_id    TEXT NOT NULL,
-  v          INTEGER NOT NULL,
-  covers_w   INTEGER NOT NULL,
-  value_hash TEXT NOT NULL,
-  minted_at  TEXT NOT NULL,
-  PRIMARY KEY (span_id, v)
-);
-
--- The head of each span is its latest checkpoint. A view, not a table: a second,
--- overwritten copy of the same fact could drift from the log it summarises.
-CREATE VIEW IF NOT EXISTS span_head AS
-  SELECT span_id, v, covers_w, value_hash, minted_at
-  FROM checkpoint c
-  WHERE v = (SELECT MAX(v) FROM checkpoint WHERE span_id = c.span_id);
-
--- tier: derived — one row per mint run that wrote. Every span's latest checkpoint at or
--- below a run's w was checked against the fold at w, minted or found unchanged, so a
--- read at or after w can start from those checkpoints and replay only what came after.
--- A run is recorded after its checkpoints, so a run still in progress is invisible.
--- Added without a schema version: the table is additive, and a store without it simply
--- has no runs, which reads as "no checkpoint to start from".
-CREATE TABLE IF NOT EXISTS mint_run (
-  w      INTEGER PRIMARY KEY,
-  ran_at TEXT NOT NULL
-);
-
--- tier: derived — how many checkpoint rows the log held when a run at w was recorded.
--- A run's own rows and an earlier run's share a covers_w when both mint at one W (a
--- lowered budget splits with no new event), so covers_w cannot say a row was left by a
--- run that crashed. The count can: a log holding more rows than its newest seal has
--- checkpoints no recorded run accounts for, and nothing starts from it until a full
--- mint seals it again. Additive, like mint_run: a store without seals mints in full.
-CREATE TABLE IF NOT EXISTS mint_seal (
-  checkpoints INTEGER PRIMARY KEY,
-  w           INTEGER NOT NULL
-);
-
--- tier: derived — how many facets each checkpoint's value holds, so a read can count
--- the whole value without decoding the buckets it does not show. Additive, like
--- mint_run: a checkpoint without a row here is counted by decoding it.
-CREATE TABLE IF NOT EXISTS checkpoint_size (
-  span_id TEXT NOT NULL,
-  v       INTEGER NOT NULL,
-  facets  INTEGER NOT NULL,
-  PRIMARY KEY (span_id, v)
-);
-
--- tier: derived — per-source resumption markers. Losing one costs a re-scan, never a
--- fact: ingest is idempotent.
-CREATE TABLE IF NOT EXISTS sync_cursor (
-  source     TEXT PRIMARY KEY,
-  cursor     TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-
--- tier: derived — how far the derived tier has replayed the ledger. Catch-up asserts
--- last_seq == W before any fold; behind is fixable, wrong is not representable.
-CREATE TABLE IF NOT EXISTS replay_cursor (
-  id       INTEGER PRIMARY KEY CHECK (id = 1),
-  last_seq INTEGER NOT NULL
-);
-
--- tier: provisioned — Facet Definitions, every version, loaded from embedded JSON:
--- each type's current manifest and the earlier versions the binary keeps under
--- manifests/history (card 111), so a rebuilt store holds every version a facet was
--- admitted under. Not in the ledger: a definition is not something Anam knew, it is
--- how Anam interprets. Old artifacts stay interpretable because old versions stay
--- loadable.
-CREATE TABLE IF NOT EXISTS definition (
-  type    TEXT NOT NULL,
-  version INTEGER NOT NULL,
-  body    TEXT NOT NULL,
-  PRIMARY KEY (type, version)
-);
-
--- tier: provisioned — Facet Definitions registered by importers (POST /v1/definitions),
--- every version. Each importer's repo holds its Definitions, so a lost table comes
--- back by registering them again. A registered version is immutable: the triggers
--- refuse a change or a removal, for every writer.
-CREATE TABLE IF NOT EXISTS registered_definition (
-  type          TEXT NOT NULL,
-  version       INTEGER NOT NULL,
-  body          TEXT NOT NULL,
-  registered_at TEXT NOT NULL,
-  PRIMARY KEY (type, version)
-);
-CREATE TRIGGER IF NOT EXISTS registered_definition_no_update
-BEFORE UPDATE ON registered_definition
-BEGIN SELECT RAISE(ABORT, 'registered_definition is immutable'); END;
-CREATE TRIGGER IF NOT EXISTS registered_definition_no_delete
-BEFORE DELETE ON registered_definition
-BEGIN SELECT RAISE(ABORT, 'registered_definition is immutable'); END;
-
--- tier: authored — projection templates the operator registered (POST /v1/projections),
--- every version (card 125). The bundled templates are the floor and come back with the
--- binary; a registered one comes back from a backup, or by registering it again from
--- wherever the operator keeps the file. A registered version is immutable: the
--- triggers refuse a change or a removal, for every writer.
-CREATE TABLE IF NOT EXISTS registered_projection (
-  name          TEXT NOT NULL,
-  version       INTEGER NOT NULL,
-  body          TEXT NOT NULL,
-  registered_at TEXT NOT NULL,
-  PRIMARY KEY (name, version)
-);
-CREATE TRIGGER IF NOT EXISTS registered_projection_no_update
-BEFORE UPDATE ON registered_projection
-BEGIN SELECT RAISE(ABORT, 'registered_projection is immutable'); END;
-CREATE TRIGGER IF NOT EXISTS registered_projection_no_delete
-BEFORE DELETE ON registered_projection
-BEGIN SELECT RAISE(ABORT, 'registered_projection is immutable'); END;
-
--- tier: provisioned — the static source -> facet-type token map (the gate's
--- authenticated pillar). One row per grant.
-CREATE TABLE IF NOT EXISTS token_scope (
-  source TEXT NOT NULL,
-  type   TEXT NOT NULL,
-  PRIMARY KEY (source, type)
-);
-
--- tier: disposable — importers' complete-resend snapshots (card 78): which parts of a
--- run were admitted and which facet ids they carried. Lost, the next resend makes
--- another; nothing is ever tombstoned from here without an operator running
--- anam retract --yes. An incomplete snapshot is dropped after a day.
-CREATE TABLE IF NOT EXISTS snapshot (
-  id           TEXT PRIMARY KEY,
-  source       TEXT NOT NULL,
-  types        TEXT NOT NULL,
-  parts        INTEGER NOT NULL CHECK (parts >= 1),
-  started_at   TEXT NOT NULL,
-  started_w    INTEGER NOT NULL,
-  completed_at TEXT,
-  completed_w  INTEGER
-);
-CREATE INDEX IF NOT EXISTS snapshot_by_source ON snapshot (source, completed_at);
--- A part is a value: digest is the content identity of the envelopes it was recorded
--- with (card 107), so a resend of the part number with other envelopes is refused and
--- a snapshot's membership, the union of its parts, cannot change once a part is in.
--- Added in place by bindSnapshotParts rather than by a schema version: the tier is
--- disposable, and a version bump rebuilds the provisioned tier too (card 111).
-CREATE TABLE IF NOT EXISTS snapshot_part (
-  id     TEXT NOT NULL,
-  part   INTEGER NOT NULL,
-  digest TEXT NOT NULL,
-  PRIMARY KEY (id, part)
-);
-CREATE TABLE IF NOT EXISTS snapshot_facet (
-  id       TEXT NOT NULL,
-  facet_id TEXT NOT NULL,
-  PRIMARY KEY (id, facet_id)
-);
-
--- tier: authored — Anam's own bookkeeping; comes back from a backup or not at all.
-CREATE TABLE IF NOT EXISTS meta (
-  key   TEXT PRIMARY KEY,
-  value TEXT NOT NULL
-);
-
--- tier: authored — operator admission holds (POST /v1/hold). Holds are per-source
--- or global ("*"). Held rows are not updated; deletion releases a hold.
-CREATE TABLE IF NOT EXISTS admission_hold (
-  source    TEXT PRIMARY KEY,
-  held_at   TEXT NOT NULL
-);
-CREATE TRIGGER IF NOT EXISTS admission_hold_no_update
-BEFORE UPDATE ON admission_hold
-BEGIN SELECT RAISE(ABORT, 'admission_hold is immutable'); END;
-`
+// schema is ops.sql, embedded, and executed idempotently by Open. Sort-ordered text
+// columns (fact_time, anam_time) hold fixed-width clock.Layout timestamps; bucket ids
+// are span.Bucket ids — both compare lexically in chronological order by construction.
+//
+//go:embed ops.sql
+var schema string
 
 // Open opens (creating if absent) the operational store at path and idempotently
 // applies the schema. Parent directories are created. A database written by a
@@ -348,6 +150,13 @@ func OpenReadOnly(ctx context.Context, path string) (*DB, error) {
 	return &DB{db: db}, nil
 }
 
+// snapshotPartDigest is the compatibility step bindSnapshotParts runs, in
+// migrations/snapshot-part-digest.sql: clear the snapshot tables, then add the column.
+// The statements run in the order the file lists them, inside the caller's transaction.
+//
+//go:embed migrations/snapshot-part-digest.sql
+var snapshotPartDigest string
+
 // bindSnapshotParts gives a store written before card 107 the digest column on
 // snapshot_part. A part recorded without one cannot be told from a changed one, so
 // the snapshot tables are cleared with it: the tier is disposable, and the next
@@ -366,13 +175,8 @@ func bindSnapshotParts(ctx context.Context, db *sql.DB) error {
 		return fmt.Errorf("ops: bind snapshot parts: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }() // no-op after Commit
-	for _, q := range []string{
-		`DELETE FROM snapshot_facet`, `DELETE FROM snapshot_part`, `DELETE FROM snapshot`,
-		`ALTER TABLE snapshot_part ADD COLUMN digest TEXT NOT NULL DEFAULT ''`,
-	} {
-		if _, err := tx.ExecContext(ctx, q); err != nil {
-			return fmt.Errorf("ops: bind snapshot parts: %w", err)
-		}
+	if _, err := tx.ExecContext(ctx, snapshotPartDigest); err != nil {
+		return fmt.Errorf("ops: bind snapshot parts: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("ops: bind snapshot parts: %w", err)
@@ -389,7 +193,8 @@ func pinSchemaVersion(ctx context.Context, db *sql.DB) error {
 	case fresh || stored == fmt.Sprintf("%d", schemaVersion):
 		return nil
 	}
-	return fmt.Errorf("%w: database holds %s, this build writes %d — delete the file and re-run init; the derived tier replays and the provisioned tier reloads",
+	return fmt.Errorf("%w: database holds %s, this build writes %d. Set the file aside and re-run init; the derived tier replays and the provisioned tier reloads, "+
+		"and anam move-artifacts --registered-from <the old file> copies across what importers and the operator registered, and moves in any artifact folder",
 		ErrSchemaVersion, stored, schemaVersion)
 }
 

@@ -3,11 +3,11 @@ type: invariant
 title: Append-only is enforced by the ledger's triggers, for every writer
 description: Facts are added and re-statused, never modified, never deleted; triggers on every ledger table refuse UPDATE, DELETE and an INSERT over an existing key, binding a sqlite3 shell as much as Anam.
 timestamp: 2026-10-11T00:00:00Z
-resource: internal/store/ledger/schema.go#schema
+resource: internal/store/ledger/ledger.sql#facet_no_update
 anchor: "CREATE TRIGGER IF NOT EXISTS facet_no_update BEFORE UPDATE ON facet"
 basis: code
 tier: supporting
-enforced_at: internal/store/ledger/schema.go#schema
+enforced_at: internal/store/ledger/ledger.sql#facet_no_update
 enforced_anchor: "CREATE TRIGGER IF NOT EXISTS facet_no_replace BEFORE INSERT ON facet"
 applies_to:
   - /components/store-ledger.md

@@ -14,7 +14,7 @@ depends_on:
   - /components/facet.md
 ---
 
-Each table is annotated with its tier in the schema.
+Each table is annotated with its tier in the schema, `internal/store/ops/ops.sql`, which is embedded.
 
 | Tier | Tables | Comes back from |
 |---|---|---|

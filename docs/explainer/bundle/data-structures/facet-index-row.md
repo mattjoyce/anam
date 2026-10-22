@@ -3,7 +3,7 @@ type: data-structure
 title: Facet index row
 description: The operational store's derived index of each facet's current version, status, fact-time and bucket, written by catch-up and provably rebuildable by replaying the ledger.
 timestamp: 2026-10-11T00:00:00Z
-resource: internal/store/ops/ops.go#facet_index
+resource: internal/store/ops/ops.sql#facet_index
 anchor: "CREATE TABLE IF NOT EXISTS facet_index ("
 basis: code
 tier: detail

@@ -7,6 +7,7 @@ looked_at:
   - docs/ARCHITECTURE.md
   - internal/clock/clock.go
   - internal/store/ledger/schema.go
+  - internal/store/ledger/ledger.sql
   - internal/app/app.go
   - internal/daemon/envelopes.go
 ---

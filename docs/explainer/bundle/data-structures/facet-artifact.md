@@ -3,7 +3,7 @@ type: data-structure
 title: Facet artifact row
 description: "One row per artifact version in the ledger's facet table: the governing metadata as columns, the payload as an opaque BLOB, and no status column."
 timestamp: 2026-10-11T00:00:00Z
-resource: internal/store/ledger/schema.go#schema
+resource: internal/store/ledger/ledger.sql#facet
 anchor: "PRIMARY KEY (facet_id, artifact_version)"
 basis: code
 tier: supporting

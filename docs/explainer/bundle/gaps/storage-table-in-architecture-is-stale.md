@@ -6,6 +6,7 @@ timestamp: 2026-10-11T00:00:00Z
 looked_at:
   - docs/ARCHITECTURE.md
   - internal/store/ops/ops.go
+  - internal/store/ops/ops.sql
   - internal/serve/serve.go
   - config.example.yaml
 ---

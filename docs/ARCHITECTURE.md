@@ -568,6 +568,28 @@ rebuild has to know what it may drop:
 The tier belongs in the schema beside each table, because it is the only thing that tells a later reader
 whether dropping it is survivable.
 
+**Where the schema lives.** Each store's fresh-store schema is a `.sql` file beside the Go that opens it,
+read with `//go:embed`, so the binary that checks the version carries the text it checks and nothing is
+read from disk at run time. `internal/store/ledger/ledger.sql` holds the ledger's three tables and their
+append-only triggers, and `internal/store/ledger/indexes.sql` holds its lookup indexes, which a writable
+open installs as a separate step and which are not part of what the schema version pins.
+`internal/store/ops/ops.sql` holds every operational table, view and trigger, each table under its
+`-- tier:` comment. Reading one file shows the whole fresh store, and a schema change shows as a change to
+that file. The Go keeps what is a decision rather than a description: `schemaVersion` in each store, the
+migrations and the old-store refusal, the carry across a bump, the compatibility steps that upgrade an
+older store in place (`bindSnapshotParts`), and the teardown (`dropSchema`). Only `internal/store` names
+SQLite, and the files sit inside it.
+
+A test in each store pins the SHA-256 of its embedded file beside the schema version. It detects a change
+and cannot judge it. A hash moving does not prove the stored layout moved (a comment edit changes it, and
+several tables were added without a bump because an older store gains them on open), and a hash holding
+does not prove the meaning held (ledger version 3 changed no SQL). The person making the change decides:
+if an existing file would be misread, bump the version and write the migration or carry, and update both
+pins; if the change is compatible, update only the hash, in the same commit, saying why. The ledger test
+also lists the ten append-only triggers by name against the file and against a newly created ledger, and
+the behavioural tests in `appendonly_test.go` are what show each trigger still refuses the write it
+exists to refuse.
+
 **Content-addressed rows** (card 215) are five tables of one shape, a hash and the bytes it names:
 `checkpoint_value` in the derived tier, and `receipt`, `served_value`, `saved_selection` and
 `saved_selection_code` in the authored tier. The authored four are immutable by trigger, like

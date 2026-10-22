@@ -23,7 +23,7 @@ steps:
   - actor: /components/store-ops.md
     caller: /components/cli.md
     label: read the registered rows
-    action: "`ReadRegistered` reads, in one read transaction on a handle SQLite will not write through, every `registered_definition` and `registered_projection` row with its registration moment, and the store's copy of the Definitions the binary carried. The old files are opened read-only throughout."
+    action: "`ReadRegistered` reads, in one read transaction on a handle SQLite will not write through, every `registered_definition` and `registered_projection` row with its registration moment, every inline projection body and admission hold, every receipt, served value, saved selection and selection code (card 224), and the store's copy of the Definitions the binary carried. The old files are opened read-only throughout."
     resource: internal/store/ops/registered.go#ReadRegistered
     anchor: "ReadOnly: true"
   - actor: /components/fold.md
@@ -73,7 +73,7 @@ steps:
   - actor: /components/store-ops.md
     caller: /components/cli.md
     label: Definitions first
-    action: "`CarryRegistered` writes every registered Definition and projection, at its registration moment, in one transaction before any facet, so every version a carried facet was admitted under is held in the new store. The bundled ones come from the binary when a daemon starts on it."
+    action: "`CarryRegistered` writes every registered Definition and projection, at its registration moment, and the rest of the authored tier, each content row checked against its key, in one transaction before any facet, so every version a carried facet was admitted under is held in the new store. The bundled ones come from the binary when a daemon starts on it."
     resource: internal/store/ops/registered.go#CarryRegistered
     anchor: "ops: carry registered"
   - actor: /components/gate.md

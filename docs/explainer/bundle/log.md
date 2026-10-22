@@ -212,3 +212,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: `mind` is the ninth domain head, decided by Matt on 2026-10-22. Three Definitions are bundled, `mind.attention` (a reading with a topic and an intensity from 1 to 5), `mind.attention.started` and `mind.attention.ended` (a declared pair that closes a series keyed by topic), each timed by a wall clock that names its own offset. A bundled `attention` projection serves them as a log, and the timeline draws them in an attention row.
 - Bundle: the attention term is new, and the definition-manifest and where-a-distinction-is-encoded pages say nine domains and that a head is added only by a logged decision. Counts: 39 bundled Definitions, 33 terms.
+
+## 2026-10-23, card 224
+
+- Code: fixes from the 22 October audit. `ReadRegistered` and `CarryRegistered` carry the whole authored tier: receipts, served values, saved selections and selection codes join the registered rows, inline bodies and holds (`ops.Content`), each checked against its key, in the same transactions; `anam move-artifacts --registered-from` and `anam migrate` gain them, and the version refusal's remedy names them. The exact-decimal parser refuses an exponent past nine digits either way (`maxExponent`) before any arithmetic, where `1e9223372036854775807` panicked. A Put that finds the store locked past its busy timeout is `ops.ErrBusy`, and a read that files a receipt answers 503 with `Retry-After` for it. `checkpoint_value`'s comment no longer promises a delete guard; the schema pin moved, the version did not.
+- Bundle: the store-ops component and the migrate workflow say what the carry takes.

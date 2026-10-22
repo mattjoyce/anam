@@ -3,6 +3,7 @@
 * [Anam-event](anam-event.md) - An assertion that Anam's knowledge changed, in one of exactly five kinds, each with a gapless sequence number.
 * [Anam-time](anam-time.md) - When Anam's knowledge changed; the clock an as-of reads, and an audit instrument rather than a history one.
 * [Bucket span](bucket-span.md) - The minted span, a calendar window over fact-time that every facet belongs to by arithmetic; invisible to the reader.
+* [Attention (the mind domain)](attention.md) - What the person says is absorbing them, kept as a reading with a topic and a strength from 1 to 5, and as a declared start and end; the first concept in the mind domain.
 * [Canonical](canonical.md) - The live-only value of the fold at a watermark; superseded and tombstoned facets are excluded from it.
 * [Checkpoint](checkpoint.md) - An immutable, content-addressed value of the live-only fold over one bucket at a watermark, there only to bound replay.
 * [Derived span](derived-span.md) - A lens the person names over the timeline, composed on demand from bucket values and never minted.

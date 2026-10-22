@@ -207,3 +207,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: an operator can hold a source's admission at the daemon's door. `POST /v1/hold` (operator) takes `{"sources":[...]}` or `{"all":true}`, `DELETE /v1/hold` releases, and `GET /v1/status` reports the held sources in `held`. A held source's `POST /v1/envelopes` and `POST /v1/definitions` are refused with 503 and a `Retry-After`, and the body names the hold; the check is inside the write, so a hold and an admission are one order. Reads, the operator's own writes and `POST /v1/entry` (the workbench) are never held. The hold is authored state in the operational store (`admission_hold`, schema version 9), so it survives a restart of the daemon and is carried into a new store by `anam migrate`. `anam hold <source>...`, `anam hold --all`, `anam hold --release [<source>...]` and `anam hold` to list.
 - Bundle: the daemon component's route table, the CLI component's command table, the store-ops component's table and the operational-store term.
+
+## 2026-10-23, card 222
+
+- Code: `mind` is the ninth domain head, decided by Matt on 2026-10-22. Three Definitions are bundled, `mind.attention` (a reading with a topic and an intensity from 1 to 5), `mind.attention.started` and `mind.attention.ended` (a declared pair that closes a series keyed by topic), each timed by a wall clock that names its own offset. A bundled `attention` projection serves them as a log, and the timeline draws them in an attention row.
+- Bundle: the attention term is new, and the definition-manifest and where-a-distinction-is-encoded pages say nine domains and that a head is added only by a logged decision. Counts: 39 bundled Definitions, 33 terms.

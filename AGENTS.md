@@ -164,7 +164,7 @@ Go, and these rules hold:
 
 | Surface | Shape | Example |
 |---|---|---|
-| **Facet type** | lower-case **dotted**, `domain.concept[.specialisation…]` | `health.blood-pressure`, `social.message` |
+| **Facet type** | lower-case **dotted**, `domain.concept[.specialisation…]` | `health.blood-pressure`, `mind.attention` |
 | Source / operator identity | lower-case **hyphenated** | `garmin`, `bp-csv` |
 | CLI command | lower-case hyphenated | `ingest`, `def load` |
 | Config / payload / data key | **snake_case** | `db_path`, `ledger_path`, `period_start` |
@@ -172,9 +172,10 @@ Go, and these rules hold:
 | Env var | UPPER_SNAKE | `ANAM_LEDGER_PATH` |
 
 Facet types are **dotted `domain.concept[.specialisation…]`** on purpose. The domain is a closed set
-of eight (`health`, `activity`, `place`, `record`, with `social`, `money`, `media` and `work`
+of nine (`health`, `activity`, `place`, `record` and `mind`, with `social`, `money`, `media` and `work`
 reserved), so growth is in the concept, in a specialisation after it, and in `family`, not in new
-heads (`health.blood-pressure`, `social.message`, `media.play`). Which of those a distinction
+heads (`health.blood-pressure`, `social.message`, `media.play`). A head is added only by a logged
+decision, as `mind` was for self-reported inner states. Which of those a distinction
 belongs in is written down in `docs/explainer/bundle/decisions/where-a-distinction-is-encoded.md`.
 Payload keys stay snake_case; the dotted facet type is deliberate and lives here so it doesn't drift.
 

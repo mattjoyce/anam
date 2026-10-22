@@ -194,3 +194,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: a receipt can name its reader. `receipt.Receipt.Principal` is last and omitted when empty, so every receipt cut before it keeps its bytes and hash and still verifies (`TestPrincipal_OldReceiptKeepsItsBytesAndHash`). A principal in the importers file may set `receipts: always` (reader or importer only; validated at load). The daemon then files that token's `GET /v1/timeline` as `POST /v1/receipts` files a read, with status 200, naming the principal; `POST /v1/query` names it on the receipt it already files, and `dry_run` still files nothing. Such a token must name a projection and cannot use `explain` (400), opens only the receipts that name it (403), and its read fails if the receipt cannot be filed. `serve.Deps.Reader` carries the name; `serve.List` takes a `ListFilter`, `GET /v1/receipts` takes `principal`, `since`, `until` and `zone`, and `anam receipt list` takes `--principal`, `--since` and `--until` and shows a reader column.
 - Bundle: the receipt, importers-file, principals, daemon and serve pages.
+
+## 2026-10-22, the ledger's one index is named
+
+- Docs: ARCHITECTURE §8 and §12 said the ledger carries no secondary indexes while `anam_event_by_facet` has existed since card 65. They now say no derived indexes, and name that one as a lookup on the ledger's own rows for the gate's fold of one facet (anam 9417fe2).
+- Bundle: the invariant page is reworded and re-anchored; the gap page is closed.

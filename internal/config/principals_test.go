@@ -162,3 +162,85 @@ importers:
 		}
 	})
 }
+
+// receipts is a per-principal choice in the importers file: always, or off, which is
+// what a principal that says nothing gets.
+func TestLoadPrincipalsReceipts(t *testing.T) {
+	t.Parallel()
+	valid := `
+principals:
+  - name: assistant
+    role: reader
+    token_sha256: ` + hashC + `
+    receipts: always
+  - name: conversation
+    role: importer
+    source: conversation
+    token_sha256: ` + hashB + `
+    types: [record.edge]
+    receipts: off
+  - name: auditor
+    role: operator
+    token_sha256: ` + hashA + `
+`
+	t.Run("always, off and nothing said", func(t *testing.T) {
+		t.Parallel()
+		got, err := config.LoadPrincipals(writeImporters(t, valid), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		records := map[string]bool{}
+		for _, p := range got {
+			records[p.Name] = p.Records()
+		}
+		want := map[string]bool{"assistant": true, "conversation": false, "auditor": false}
+		for name, w := range want {
+			if records[name] != w {
+				t.Errorf("%s records = %v, want %v", name, records[name], w)
+			}
+		}
+	})
+
+	cases := []struct{ name, body, want string }{
+		{"a setting that is not known", strings.Replace(valid, "receipts: always", "receipts: sometimes", 1), "not always or off"},
+		{"a boolean", strings.Replace(valid, "receipts: always", "receipts: true", 1), "not always or off"},
+		{"an operator", strings.Replace(valid, "role: operator", "role: operator\n    receipts: always", 1), "unprojected"},
+		{"the importers key", `
+importers:
+  - source: withings
+    token_sha256: ` + hashA + `
+    types: [health.weight]
+    receipts: maybe
+`, "not always or off"},
+		{"the workbench", `
+importers:
+  - source: workbench
+    types: [health.medication.dose]
+    receipts: always
+`, "no token to read with"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := config.LoadPrincipals(writeImporters(t, c.body), nil)
+			if !errors.Is(err, config.ErrInvalidImporters) || !strings.Contains(err.Error(), c.want) {
+				t.Errorf("got %v, want ErrInvalidImporters containing %q", err, c.want)
+			}
+		})
+	}
+
+	t.Run("an importer under importers may record", func(t *testing.T) {
+		t.Parallel()
+		body := `
+importers:
+  - source: withings
+    token_sha256: ` + hashA + `
+    types: [health.weight]
+    receipts: always
+`
+		got, err := config.LoadPrincipals(writeImporters(t, body), nil)
+		if err != nil || len(got) != 1 || !got[0].Records() {
+			t.Fatalf("got %+v, %v", got, err)
+		}
+	})
+}

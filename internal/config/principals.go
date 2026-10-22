@@ -32,6 +32,23 @@ const (
 	RoleOperator Role = "operator"
 )
 
+// Receipts says whether a principal's reads each leave a receipt. It is a choice
+// someone running Anam makes per principal, so it is data in the importers file beside
+// the role, and off unless the file turns it on.
+type Receipts string
+
+// The receipt settings. Off is the empty string, so a principal that says nothing
+// keeps today's behaviour. They are an invariant, not a default: a value this build
+// does not know would silently leave a reader unrecorded, so Load refuses it.
+const (
+	// ReceiptsOff is the default: a read leaves a receipt only when the reader files
+	// one, by POST /v1/receipts or a query that is not a dry run.
+	ReceiptsOff Receipts = ""
+	// ReceiptsAlways files a receipt, naming the principal, for every read the
+	// principal makes that serves facets (card 216).
+	ReceiptsAlways Receipts = "always"
+)
+
 // OperatorName is the name of the principal whose token is in token_file. It is
 // reserved, so a log or a refusal that names the operator means that token.
 const OperatorName = "operator"
@@ -79,7 +96,16 @@ type Principal struct {
 	// from every other source's by the source in their identity. An importer has
 	// Types or AnyType, not both.
 	AnyType bool `mapstructure:"any_type"`
+
+	// Receipts is "always" for a principal whose every read is filed as a receipt
+	// naming it, or empty (or "off") for one whose reads are not. Only a reader and
+	// an importer have it: the operator reads the record unprojected, which a
+	// receipt cannot describe, and the workbench principal has no token to read with.
+	Receipts Receipts `mapstructure:"receipts"`
 }
+
+// Records reports whether every read p makes is filed as a receipt.
+func (p Principal) Records() bool { return p.Receipts == ReceiptsAlways }
 
 // importersFile holds principals under two keys. importers is the file's first shape,
 // importers alone, and stays so a deployed file reads as it did; principals names
@@ -121,6 +147,11 @@ func LoadPrincipals(path string, bundled func(facet.Type) bool) ([]Principal, er
 	}
 	all := make([]Principal, 0, len(f.Principals)+len(f.Importers))
 	all = append(append(all, f.Principals...), f.Importers...)
+	for i := range all {
+		if all[i].Receipts == "off" {
+			all[i].Receipts = ReceiptsOff
+		}
+	}
 	if err := validPrincipals(all, bundled); err != nil {
 		return nil, fmt.Errorf("%w: %s: %v", ErrInvalidImporters, path, err)
 	}
@@ -191,6 +222,10 @@ func validPrincipal(p Principal) error {
 		return errors.New("no types")
 	case p.AnyType && len(p.Types) > 0:
 		return errors.New("any_type with types: list the types it owns, or any_type, not both")
+	case p.Receipts != ReceiptsOff && p.Receipts != ReceiptsAlways:
+		return fmt.Errorf("receipts %q is not always or off", p.Receipts)
+	case p.Receipts != ReceiptsOff && p.Role == RoleOperator:
+		return errors.New("receipts: an operator reads the whole record unprojected, which no receipt describes")
 	}
 	for _, t := range p.Types {
 		if !t.Valid() {
@@ -222,6 +257,8 @@ func validWorkbench(p Principal) error {
 		return fmt.Errorf("source %s has no token_sha256: the daemon holds this principal itself", WorkbenchSource)
 	case p.AnyType:
 		return fmt.Errorf("source %s lists the types it may enter, and takes no any_type", WorkbenchSource)
+	case p.Receipts != ReceiptsOff:
+		return fmt.Errorf("source %s has no token to read with, so receipts do not apply", WorkbenchSource)
 	case len(p.Types) == 0:
 		return errors.New("no types")
 	}

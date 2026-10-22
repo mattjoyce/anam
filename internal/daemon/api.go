@@ -145,13 +145,23 @@ func (d *Daemon) postCheckpoints(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// getReceipts lists the receipts, newest first: all of them, or those that name a
+// principal (?principal=) and were served in a window (?since=, ?until=, with ?zone=
+// for a bare date), which is the answer to who read what (card 216).
 func (d *Daemon) getReceipts(w http.ResponseWriter, r *http.Request) {
+	q := api.ReceiptsQueryOf(r.URL.Query())
+	if err := namedZone(q.Zone); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 	deps, err := read.ServeDeps(d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	list, err := read.Receipts(r.Context(), deps, d.cfg.DBPath)
+	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
+	defer cancel()
+	list, err := read.Receipts(ctx, deps, d.cfg.DBPath, q)
 	if err != nil {
 		writeReadError(w, err)
 		return
@@ -167,6 +177,9 @@ func (d *Daemon) getReceipt(w http.ResponseWriter, r *http.Request) {
 	deps, err := read.ServeDeps(d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if !d.mayOpenReceipt(w, r, deps) {
 		return
 	}
 	shown, err := read.ReceiptPage(r.Context(), deps, r.PathValue("hash"), r.URL.Query().Get("cursor"), d.cfg.MaxReadBytes)
@@ -186,6 +199,9 @@ func (d *Daemon) getReceiptFacet(w http.ResponseWriter, r *http.Request) {
 	deps, err := read.ServeDeps(d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if !d.mayOpenReceipt(w, r, deps) {
 		return
 	}
 	if err := d.index.wrong(); err != nil {
@@ -236,6 +252,13 @@ func (d *Daemon) verifyReceipt(w http.ResponseWriter, r *http.Request) {
 // It writes on the write handle, SQLite lets one writer in at a time, and two publishes
 // of one value at once each leave the one row (card 95).
 func (d *Daemon) postReceipt(w http.ResponseWriter, r *http.Request) {
+	d.publishRead(w, r, http.StatusCreated)
+}
+
+// publishRead files the read r describes and answers with it, under status. The
+// receipt names the principal when the principal's token records every read (card
+// 216); for any other it names nobody, as every receipt did before.
+func (d *Daemon) publishRead(w http.ResponseWriter, r *http.Request, status int) {
 	q, err := api.TimelineQueryOf(r.URL.Query())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
@@ -251,6 +274,7 @@ func (d *Daemon) postReceipt(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
+	deps.Reader = readerOf(principalOf(r))
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
 	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Values: d.readOps, Definitions: defs, Projections: d.projections.current.Load()}
@@ -259,7 +283,40 @@ func (d *Daemon) postReceipt(w http.ResponseWriter, r *http.Request) {
 		writeReadError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, p)
+	writeJSON(w, status, p)
+}
+
+// readerOf is the name a receipt filed for p carries: p's, when its token records every
+// read, else none.
+func readerOf(p config.Principal) string {
+	if p.Records() {
+		return p.Name
+	}
+	return ""
+}
+
+// mayOpenReceipt reports whether the caller may open the value of the receipt the
+// request names, and answers 403 when it may not. A token that records every read
+// opens only receipts that name it: opening another's would be a read of facets no
+// receipt of its own records. Every other token opens any receipt, as before.
+func (d *Daemon) mayOpenReceipt(w http.ResponseWriter, r *http.Request, deps serve.Deps) bool {
+	who := principalOf(r)
+	if !who.Records() {
+		return true
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
+	defer cancel()
+	reader, err := read.ReceiptReader(ctx, deps, r.PathValue("hash"))
+	switch {
+	case err != nil:
+		writeReadError(w, err)
+		return false
+	case reader != who.Name:
+		writeError(w, http.StatusForbidden, fmt.Errorf(
+			"%s files a receipt for every read, so it opens only the receipts that name it; read through a projection to file one", who.Name))
+		return false
+	}
+	return true
 }
 
 // getTimeline is the CLI's timeline read, run here on the read handle. The query
@@ -272,6 +329,19 @@ func (d *Daemon) getTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := namedZone(q.Zone); err != nil {
 		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if who := principalOf(r); who.Records() {
+		// The read is filed as a receipt and answered from what was filed, once, so the
+		// reader holds exactly what the receipt names (card 216). The answer is the
+		// timeline's own fields with the receipt beside them, and a read too large for
+		// one answer comes a page at a time, as a published read does.
+		if q.Projection == "" || q.Explain {
+			writeError(w, http.StatusBadRequest, fmt.Errorf(
+				"%s files a receipt for every read, and a receipt is what a projection served: name a projection, and leave out explain", who.Name))
+			return
+		}
+		d.publishRead(w, r, http.StatusOK)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))

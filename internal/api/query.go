@@ -74,6 +74,21 @@ func ChangesQueryOf(v url.Values) ChangesQuery {
 	return ChangesQuery{Since: v.Get("since"), Until: v.Get("until"), Zone: v.Get("zone")}
 }
 
+// Values encodes q for a GET.
+func (q ReceiptsQuery) Values() url.Values {
+	v := url.Values{}
+	set(v, "principal", q.Principal)
+	set(v, "since", q.Since)
+	set(v, "until", q.Until)
+	set(v, "zone", q.Zone)
+	return v
+}
+
+// ReceiptsQueryOf decodes a receipts listing from a GET's parameters.
+func ReceiptsQueryOf(v url.Values) ReceiptsQuery {
+	return ReceiptsQuery{Principal: v.Get("principal"), Since: v.Get("since"), Until: v.Get("until"), Zone: v.Get("zone")}
+}
+
 func set(v url.Values, key, val string) {
 	if val != "" {
 		v.Set(key, val)

@@ -115,7 +115,7 @@ func TestList_NewestFirst(t *testing.T) {
 		t.Fatalf("Run(late): %v", err)
 	}
 
-	receipts, hashes, err := serve.List(context.Background(), h.deps)
+	receipts, hashes, err := serve.List(context.Background(), h.deps, serve.ListFilter{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestList_EmptyStore(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 
-	receipts, hashes, err := serve.List(context.Background(), h.deps)
+	receipts, hashes, err := serve.List(context.Background(), h.deps, serve.ListFilter{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}

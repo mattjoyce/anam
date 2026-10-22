@@ -7,6 +7,21 @@ import (
 	"github.com/mattjoyce/anam/internal/receipt"
 )
 
+// ReceiptsQuery narrows a listing of receipts: who read, and when it was served. Each
+// part is optional. Since and Until are as the reader typed them, with the zone a bare
+// date is a day in (card 216).
+type ReceiptsQuery struct {
+	// Principal keeps the receipts that name this reader.
+	Principal string `json:"principal,omitempty"`
+	// Since keeps the receipts served at or after this instant.
+	Since string `json:"since,omitempty"`
+	// Until keeps the receipts served before this instant; a bare date includes its
+	// whole day.
+	Until string `json:"until,omitempty"`
+	// Zone is the reader's zone; it is needed when Since or Until is set.
+	Zone string `json:"zone,omitempty"`
+}
+
 // Receipts lists the receipts of past serves, newest first.
 type Receipts struct {
 	// Store is the operational store the receipts were read from, on the machine

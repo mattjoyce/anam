@@ -78,6 +78,7 @@ func (d *Daemon) postQuery(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
+	deps.Reader = readerOf(principalOf(r))
 	a, err := read.Query(ctx, src, deps, q, d.cfg.MaxReadBytes)
 	if err != nil {
 		writeReadError(w, err)

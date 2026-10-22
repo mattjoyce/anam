@@ -107,6 +107,16 @@ paths:
         shows every version with its verdict, and fields cuts the payload to named
         pointers and answers with a frame. The answer is bounded by max_read_bytes;
         over it, 413 says what is left to narrow by.
+
+
+        A token the importers file sets to record every read is answered as
+        POST /v1/receipts answers, with status 200: the same fields, and beside them
+        receipt_hash, receipt and page, because the read is filed as a receipt that
+        names the principal. Such a token must name a projection and cannot use
+        explain, since a receipt is what a projection served; either is a 400. A read
+        too large for one answer comes a page at a time, from GET /v1/receipts/{hash},
+        instead of a 413. If the receipt cannot be filed the read fails with a 5xx and
+        returns nothing.
       parameters:
         - { $ref: "#/components/parameters/From" }
         - { $ref: "#/components/parameters/To" }
@@ -235,14 +245,52 @@ paths:
       tags: [receipts]
       x-anam-roles: [reader, importer, operator]
       x-anam-type: Receipts
-      summary: The receipts of past serves, newest first.
+      summary: The receipts of past serves, newest first; who read what.
+      description: >-
+        Every receipt, or those that pass the parameters given, each of which narrows
+        the list. A receipt names the principal whose read it files when that
+        principal's token records every read (the importers file's receipts: always),
+        so principal lists what one reader read and since and until bound it by the
+        time it was served. A receipt cut for a reader whose token does not record,
+        or before receipts named readers, names nobody and is listed under no principal.
+      parameters:
+        - name: principal
+          in: query
+          schema: { type: string, example: assistant }
+          description: keep the receipts that name this principal
+        - name: since
+          in: query
+          schema: { type: string }
+          description: keep receipts served at or after this instant; RFC 3339 or a bare date in zone
+        - name: until
+          in: query
+          schema: { type: string }
+          description: keep receipts served before this instant; a bare date includes its whole day
+        - { $ref: "#/components/parameters/Zone" }
+        - { $ref: "#/components/parameters/AnamTimeout" }
       responses:
         "200":
           description: the receipts
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Receipts" }
+              example:
+                store: /var/lib/anam/tracking.db
+                receipts:
+                  - hash: sha256:5d0c3a7e9b1f42d8a6c3e0b7f19d2a4c8e6b0f3a5d7c9e1b2a4f6d8c0e2b4a6c
+                    receipt:
+                      served_hash: sha256:1976fb0a4cfc1313ce243c81ae29b34671610d8c3898da3dab3a40a67d737d02
+                      facet_ids: [923f857a-84a2-5284-9d4a-b73e6d0a16c4]
+                      watermark: 33378
+                      template: bp
+                      template_version: 1
+                      definition_set_version: sha256:ec002e673b06e5688a000c8b8a345759cb68b93b01edbea62ca04d65adbc1705
+                      served_at: "2026-10-21T09:00:00.000000000Z"
+                      span: all
+                      principal: assistant
+        "400": { $ref: "#/components/responses/BadQuery" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "504": { $ref: "#/components/responses/Timeout" }
     post:
       operationId: postReceipt
       tags: [receipts]
@@ -374,6 +422,11 @@ paths:
                 error: "cursor invalid: offset 3 is outside the receipt's 2 facets"
                 code: cursor_invalid
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: the token records every read and this receipt names another reader, or nobody
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404": { $ref: "#/components/responses/NoArtifact" }
         "413": { $ref: "#/components/responses/TooLarge" }
   /v1/receipts/{hash}/verify:
@@ -422,6 +475,11 @@ paths:
               schema: { $ref: "#/components/schemas/FacetShown" }
         "400": { $ref: "#/components/responses/BadQuery" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: the token records every read and this receipt names another reader, or nobody
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404": { $ref: "#/components/responses/NoArtifact" }
         "413": { $ref: "#/components/responses/TooLarge" }
         "504": { $ref: "#/components/responses/Timeout" }
@@ -562,7 +620,9 @@ paths:
         A program that cannot run is refused with 400 and a message saying what to
         change; a derivation or an answer over max_read_bytes is 413, with instant,
         projection and program as the narrowings. Writes a receipt and its served value
-        only, never the ledger, and moves no watermark.
+        only, never the ledger, and moves no watermark. The receipt names the principal
+        when the importers file sets the token to record every read; dry_run files
+        nothing for any token.
       parameters:
         - { $ref: "#/components/parameters/AnamTimeout" }
       requestBody:
@@ -1498,6 +1558,12 @@ components:
         query: { $ref: "#/components/schemas/ReceiptQuery" }
         template_hash: { type: string }
         program: { $ref: "#/components/schemas/ReceiptProgram" }
+        principal:
+          type: string
+          description: >-
+            the principal whose read this receipt files, when that principal's token
+            records every read; absent otherwise, and on every receipt cut before
+            receipts named readers
     ReceiptProgram:
       type: object
       description: the query a receipt answers; the template is the projection it ran through

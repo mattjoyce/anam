@@ -373,6 +373,25 @@ func TestReceipts_SameOverTheDaemon(t *testing.T) {
 	if hash == "" {
 		t.Fatalf("no receipt listed:\n%s", list)
 	}
+	// Who read what: the listing narrows by reader and by served time, the same
+	// locally and over the daemon, and a receipt that names nobody shows a dash.
+	if !strings.Contains(list, "READER") || !strings.Contains(list, " - ") {
+		t.Errorf("the listing does not show a reader column:\n%s", list)
+	}
+	for _, c := range []struct {
+		args []string
+		want bool
+	}{
+		{[]string{"--principal", "assistant"}, false},
+		{[]string{"--since", "2000-01-01", "--until", "2999-12-31"}, true},
+		{[]string{"--since", "2999-01-01"}, false},
+		{[]string{"--until", "2000-01-01"}, false},
+	} {
+		out := f.sameOutput(t, append([]string{"receipt", "list"}, c.args...)...)
+		if has := strings.Contains(out, hash); has != c.want {
+			t.Errorf("receipt list %v listed the receipt = %v, want %v:\n%s", c.args, has, c.want, out)
+		}
+	}
 	f.sameOutput(t, "receipt", "show", hash)
 	f.sameOutput(t, "receipt", "show", hash, "--json")
 	if out := f.sameOutput(t, "receipt", "verify", hash); !strings.Contains(out, "OK   reproduced") {

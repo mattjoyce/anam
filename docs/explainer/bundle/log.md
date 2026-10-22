@@ -199,3 +199,7 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Docs: ARCHITECTURE §8 and §12 said the ledger carries no secondary indexes while `anam_event_by_facet` has existed since card 65. They now say no derived indexes, and name that one as a lookup on the ledger's own rows for the gate's fold of one facet (anam 9417fe2).
 - Bundle: the invariant page is reworded and re-anchored; the gap page is closed.
+## 2026-10-22, card 211
+
+- Code: `POST /v1/query`'s `projection` is a name or an inline template object (`api.ProjectionRef`). `projection.ParseInline` is the manifest loader less a name, a version and a description, and the daemon also refuses a type with no Definition (`Template.CheckDefined`, shared with registration). An inline template is known by its content hash. `PublishQuery` files its body in the new authored table `inline_projection` before the receipt, and the receipt is marked `template_inline` with `template` `inline`, version 1, and the hash in `template_hash`. `serve.Verify` loads the body by that hash. The field is last and omitted when false, so earlier receipts keep their bytes (`TestInline_EarlierReceiptsKeepTheirBytes`). The schema stays 9: a version-9 store gains the empty table when it opens. `ReadRegistered` and `CarryRegistered` carry the bodies, and `move-artifacts` reports their count.
+- Bundle: the query term, the receipt and store-ops pages, the stored-content decision and the reader gap.

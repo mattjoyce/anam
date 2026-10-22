@@ -117,6 +117,11 @@ type Template struct {
 	Hash string
 	Body []byte
 
+	// Inline is true for a template a query carried in its request (card 211), which
+	// no registry holds and no operator named. Its body is filed by hash when its
+	// receipt is, and a receipt for it says so.
+	Inline bool
+
 	// typeSet and statusSet are the allow-lists as sets, built once at parse.
 	typeSet   map[facet.Type]bool
 	statusSet map[facet.Status]bool

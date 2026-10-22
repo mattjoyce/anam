@@ -44,15 +44,72 @@ type manifest struct {
 // external input: unknown keys, missing knobs and unparseable enums fail here, at
 // load, rather than at the first serve.
 func Parse(raw []byte) (Template, error) {
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	var m manifest
-	if err := dec.Decode(&m); err != nil {
-		return Template{}, fmt.Errorf("%w: %v", ErrBadTemplate, err)
+	m, err := decodeManifest(raw)
+	if err != nil {
+		return Template{}, err
 	}
 	if err := m.requireEveryKnob(); err != nil {
 		return Template{}, err
 	}
+	return m.template(raw)
+}
+
+// InlineName and InlineVersion are what an inline template is called in a receipt and
+// in an answer: it has no name or version of its own, it is known by its hash (card
+// 211). They only fill the fields a Template has; the receipt's inline marker, not
+// this name, says a template was inline, so a registered template may still be called
+// "inline".
+const (
+	InlineName    = "inline"
+	InlineVersion = 1
+)
+
+// ParseInline reads and validates a template a query carried in its request (card 211),
+// through the same checks as Parse: a manifest without a name or a version, which an
+// inline template has none of. Naming either is refused, as is a description, so the
+// body is only the knobs that prune. Its hash is taken the way a registered template's
+// is, over the body as canonical JSON, so the same body is the same template wherever
+// it is sent from.
+func ParseInline(raw []byte) (Template, error) {
+	m, err := decodeManifest(raw)
+	if err != nil {
+		return Template{}, err
+	}
+	switch {
+	case m.Name != nil:
+		return Template{}, fmt.Errorf("%w: name: an inline projection has none; it is known by its content hash", ErrBadTemplate)
+	case m.Version != nil:
+		return Template{}, fmt.Errorf("%w: version: an inline projection has none; it is known by its content hash", ErrBadTemplate)
+	case m.Description != "":
+		return Template{}, fmt.Errorf("%w: description: an inline projection has none", ErrBadTemplate)
+	}
+	name, version := InlineName, InlineVersion
+	m.Name, m.Version = &name, &version
+	if err := m.requireEveryKnob(); err != nil {
+		return Template{}, err
+	}
+	t, err := m.template(raw)
+	if err != nil {
+		return Template{}, err
+	}
+	t.Inline = true
+	return t, nil
+}
+
+// decodeManifest reads the JSON layout, refusing a key it does not know.
+func decodeManifest(raw []byte) (manifest, error) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	var m manifest
+	if err := dec.Decode(&m); err != nil {
+		return manifest{}, fmt.Errorf("%w: %v", ErrBadTemplate, err)
+	}
+	return m, nil
+}
+
+// template forms the Template a decoded manifest describes, once its knobs are all
+// stated. raw is the manifest as written; its hash is over the canonical form.
+func (m manifest) template(raw []byte) (Template, error) {
 	// Shape is the one knob with a safe default. A template that says nothing serves
 	// the log, which is exactly what every template served before the knob existed;
 	// a snapshot only ever narrows that, so absent cannot over-serve.
@@ -103,7 +160,7 @@ func (m manifest) requireEveryKnob() error {
 	case m.MaxClassification == nil:
 		return fmt.Errorf("%w: %s: max_classification is required", ErrBadTemplate, *m.Name)
 	case m.Shape != "" && !Shape(m.Shape).Valid():
-		return fmt.Errorf("%w: %s: shape %q is not log or snapshot", ErrBadTemplate, *m.Name, m.Shape)
+		return fmt.Errorf("%w: %s: shape: %q is not log or snapshot", ErrBadTemplate, *m.Name, m.Shape)
 	}
 	return nil
 }
@@ -113,7 +170,7 @@ func (m manifest) requireEveryKnob() error {
 func (t *Template) adoptFilters(types, statuses []string) error {
 	for _, s := range types {
 		if !facet.ValidPattern(s) {
-			return fmt.Errorf("%w: %s: %q is not a valid namespaced facet type or type prefix", ErrBadTemplate, t.Name, s)
+			return fmt.Errorf("%w: %s: types: %q is not a valid namespaced facet type or type prefix", ErrBadTemplate, t.Name, s)
 		}
 		if facet.IsPrefixPattern(s) {
 			t.Prefixes = append(t.Prefixes, s)
@@ -126,13 +183,13 @@ func (t *Template) adoptFilters(types, statuses []string) error {
 	for _, s := range statuses {
 		st := facet.Status(s)
 		if !st.Valid() {
-			return fmt.Errorf("%w: %s: %q is not a facet status", ErrBadTemplate, t.Name, s)
+			return fmt.Errorf("%w: %s: statuses: %q is not a facet status", ErrBadTemplate, t.Name, s)
 		}
 		t.Statuses = append(t.Statuses, st)
 		t.statusSet[st] = true
 	}
 	if !t.MaxClassification.Valid() {
-		return fmt.Errorf("%w: %s: max_classification %q", ErrBadTemplate, t.Name, t.MaxClassification)
+		return fmt.Errorf("%w: %s: max_classification: %q is not a classification", ErrBadTemplate, t.Name, t.MaxClassification)
 	}
 	return nil
 }
@@ -150,7 +207,7 @@ func (t Template) checkWindow() error {
 		}
 	}
 	if t.From != "" && t.To != "" && t.From >= t.To {
-		return fmt.Errorf("%w: %s: from %s is not before to %s", ErrBadTemplate, t.Name, t.From, t.To)
+		return fmt.Errorf("%w: %s: from: %s is not before to %s", ErrBadTemplate, t.Name, t.From, t.To)
 	}
 	return nil
 }

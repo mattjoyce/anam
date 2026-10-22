@@ -613,8 +613,15 @@ paths:
       summary: Run a Datalog program through a projection, answered with a receipt.
       description: >-
         The third read (ARCHITECTURE.md §9). The program runs over what the
-        named projection serves at the head, or at as_of or w, built on the bundled
+        projection serves at the head, or at as_of or w, built on the bundled
         rules; the named relation is the answer, a sorted relation that hashes. The
+        projection is a name, or an inline template: an object with the fields of a
+        manifest less its name, version and description, checked by the loader a
+        registered manifest is, so a bad one is 400 naming the field. An inline template
+        is known by its content hash. With the answer, its body is filed under that hash
+        and the receipt is marked template_inline, so verify replays it after a restart;
+        its template is "inline" at version 1. Every role may read every projection
+        already, so an inline one widens nothing. The
         answer is filed with a receipt naming the projection, the rule set and the
         program unless dry_run is set, so the same query at the same W reproduces it.
         A program that cannot run is refused with 400 and a message saying what to
@@ -630,10 +637,24 @@ paths:
         content:
           application/json:
             schema: { $ref: "#/components/schemas/QueryRequest" }
-            example:
-              projection: everything
-              text: "instant(At) :- entry(_, \"health.blood-pressure\", At, _, _, _, _).\nregimen(At, Drug) :- entry(_, \"health.blood-pressure\", At, _, _, _, _), current(E, At), entry(E, \"health.medication.started\", _, _, _, _, _), attr(E, \"/drug\", Drug)."
-              relation: regimen
+            examples:
+              named:
+                summary: through a registered or bundled projection, by name
+                value:
+                  projection: everything
+                  text: "instant(At) :- entry(_, \"health.blood-pressure\", At, _, _, _, _).\nregimen(At, Drug) :- entry(_, \"health.blood-pressure\", At, _, _, _, _), current(E, At), entry(E, \"health.medication.started\", _, _, _, _, _), attr(E, \"/drug\", Drug)."
+                  relation: regimen
+              inline:
+                summary: through the types the request itself names, with no projection registered
+                value:
+                  projection:
+                    types: [health.weight, health.blood-pressure]
+                    statuses: [admitted, endorsed]
+                    max_classification: Sensitive
+                    from: "2026-01-01T00:00:00.000000000Z"
+                    shape: log
+                  text: "heavy(E, Kg) :- entry(E, \"health.weight\", _, _, _, _, _), attr(E, \"/kg\", Kg), Kg > 80."
+                  relation: heavy
       responses:
         "200":
           description: the answer, derived and not filed (dry_run)
@@ -1557,6 +1578,12 @@ components:
         ledger_id: { type: string }
         query: { $ref: "#/components/schemas/ReceiptQuery" }
         template_hash: { type: string }
+        template_inline:
+          type: boolean
+          description: >-
+            true when the template was an inline projection a query carried. template is
+            then "inline", template_version 1, and template_hash is the address of the
+            body filed beside the receipt; absent on every other receipt
         program: { $ref: "#/components/schemas/ReceiptProgram" }
         principal:
           type: string
@@ -1656,13 +1683,38 @@ components:
       type: object
       required: [projection, text, relation]
       properties:
-        projection: { type: string, description: the template the query runs through }
+        projection:
+          description: >-
+            the template the query runs through, by name or inline. An inline template
+            has no name or version and is known by its content hash.
+          oneOf:
+            - { type: string, description: the name of a bundled or registered projection }
+            - { $ref: "#/components/schemas/InlineProjection" }
         text: { type: string, description: the program, Anam's Datalog, built on the bundled rules }
         relation: { type: string, description: the derived relation answered }
         as_of: { type: string, description: read what Anam knew at this anam-time }
         w: { type: integer, format: int64, description: read at this watermark instead }
         dry_run: { type: boolean, description: derive the answer and its receipt, file nothing }
         zone: { type: string, description: the reader's zone, for a bare date in as_of }
+    InlineProjection:
+      type: object
+      description: >-
+        a projection template carried in a query, with the fields of a manifest but its
+        name, version and description. Checked by the loader a registered manifest is;
+        every field but from, to and shape is required, and an empty types or statuses
+        list serves nothing.
+      required: [types, statuses, max_classification]
+      additionalProperties: false
+      properties:
+        types:
+          type: array
+          items: { type: string }
+          description: the facet types served; an entry ending in "." admits every type under it
+        statuses: { type: array, items: { type: string, enum: [admitted, endorsed] } }
+        max_classification: { type: string, description: "the ceiling, compared as an ordinal (Normal, Sensitive, ...)" }
+        from: { $ref: "#/components/schemas/AnamTime", description: fact-time the window opens at, inclusive }
+        to: { $ref: "#/components/schemas/AnamTime", description: fact-time the window closes at, exclusive }
+        shape: { type: string, enum: [log, snapshot], description: "log when absent" }
     QueryAnswer:
       type: object
       required: [w, ledger_id, live, canonical, projection, definition_set_version, rules, answer, hash, receipt_hash, receipt, written]

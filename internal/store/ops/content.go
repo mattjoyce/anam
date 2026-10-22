@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-// The content-addressed tables (card 215). Checkpoint values, receipts, served values
+// The content-addressed tables (card 215, card 211). Checkpoint values, receipts, served values
 // and saved selections used to be files in an artifact directory, each named by the
 // SHA-256 of its own bytes. They are rows now, in the same shape: a hash and the bytes
 // it names. Content addressing still does real work. A served value's key is the hash
@@ -34,11 +34,14 @@ const (
 	KindSelection = "selection"
 	// KindSelectionCode is the code of a saved selection that lengthened (authored).
 	KindSelectionCode = "selection-code"
+	// KindInlineProjection is the body of a projection a query carried in its request,
+	// filed so the receipt that names its hash can be replayed (authored).
+	KindInlineProjection = "inline-projection"
 )
 
 // Kinds lists every kind, in the order a move reports them.
 func Kinds() []string {
-	return []string{KindCheckpoint, KindReceipt, KindServed, KindSelection, KindSelectionCode}
+	return []string{KindCheckpoint, KindReceipt, KindServed, KindSelection, KindSelectionCode, KindInlineProjection}
 }
 
 // ErrNotFound is returned for a kind and digest with no row.
@@ -86,6 +89,8 @@ var contentTables = map[string]contentTable{
 	KindServed:        newContentTable("served_value"),
 	KindSelection:     newContentTable("saved_selection"),
 	KindSelectionCode: newContentTable("saved_selection_code"),
+
+	KindInlineProjection: newContentTable("inline_projection"),
 }
 
 func tableOf(kind string) (contentTable, error) {

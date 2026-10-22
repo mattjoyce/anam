@@ -175,14 +175,17 @@ func TestParse_IdentityTemplate(t *testing.T) {
 	}
 }
 
-func TestBundled_OnlyTheDoseDeclaresATemplate(t *testing.T) {
+// The types that declare an id rule: the dose, and the three attention types, which
+// take the same moment-and-offset shape. Any other bundled type lets the writer choose
+// the identity field's text.
+func TestBundled_OnlyTheseTypesDeclareATemplate(t *testing.T) {
 	t.Parallel()
 	reg, err := def.Bundled()
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, d := range reg.All() {
-		want := d.Type == "health.medication.dose"
+		want := d.Type == "health.medication.dose" || strings.HasPrefix(string(d.Type), "mind.attention")
 		if got := d.IdentityTemplate != ""; got != want {
 			t.Errorf("%s declares a template: %v, want %v", d.Type, got, want)
 		}

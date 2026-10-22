@@ -1,0 +1,11 @@
+{
+  "name": "attention",
+  "version": 1,
+  "description": "What the person says is absorbing them, as a log at the time they said it: the attention readings, and the moments they declared a topic started and ended. It records what was said and infers no episode from the readings.",
+  "types": ["mind.attention", "mind.attention.started", "mind.attention.ended"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Confidential",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

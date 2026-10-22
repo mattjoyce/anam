@@ -56,6 +56,7 @@ func PublishQuery(ctx context.Context, d Deps, t projection.Template, w ledger.W
 		ServedAt:             clock.Format(d.Clock.Now()),
 		Span:                 t.Span(),
 		Program:              &prog,
+		Principal:            d.Reader,
 	}
 	if err := r.Validate(); err != nil {
 		return Served{}, err

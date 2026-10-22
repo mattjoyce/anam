@@ -1,7 +1,7 @@
 ---
 type: data-structure
 title: Receipt
-description: "Proof of what a projection served: the served hash, the facet ids, the watermark and ledger id, the template and definition-set versions, served_at, the span, and the query a read narrowed by."
+description: "Proof of what a projection served: the served hash, the facet ids, the watermark and ledger id, the template and definition-set versions, served_at, the span, the query a read narrowed by, and the principal whose read it files."
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/receipt/receipt.go#Receipt
 anchor: "type Receipt struct {"
@@ -28,5 +28,6 @@ references:
 | `served_at` | string | the clock layout |
 | `span` | string | `whole-person` or `fact-time[from,to)` |
 | `query` | object, optional | `{from, before, at, type}` a read narrowed by after the template; nil for a whole serve |
+| `principal` | string, optional | the name, from the importers file, of the principal whose read this files, for a token set to record every read (card 216). Last and left out when empty, so every receipt cut before it has the same bytes and hash and still verifies |
 
-Written as indented JSON to `receipt/sha256-<hex>.json`; parsed with unknown fields refused. Verification reports two independent proofs: reproduced (re-derived hash and id set match) and intact (the served file still hashes to `served_hash`).
+Stored as a row of the `receipt` table, addressed by the SHA-256 of its indented JSON; parsed with unknown fields refused. Verification reports two independent proofs: reproduced (re-derived hash and id set match) and intact (the served file still hashes to `served_hash`).

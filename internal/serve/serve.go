@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/clock"
@@ -92,6 +93,11 @@ type Deps struct {
 	// Definitions are the Definitions in force, which a query's base relations and
 	// pointer check read (card 173). Nil means the bundled ones alone.
 	Definitions query.Definitions
+
+	// Reader is the principal a receipt filed through these Deps names (card 216):
+	// the one whose read it files. Empty names nobody, which is how every receipt
+	// before it was cut and how an ordinary publish still is.
+	Reader string
 }
 
 // Served reports one completed serve.
@@ -212,6 +218,7 @@ func Publish(ctx context.Context, d Deps, t projection.Template, w ledger.Waterm
 		ServedAt:             clock.Format(d.Clock.Now()),
 		Span:                 t.Span(),
 		Query:                q,
+		Principal:            d.Reader,
 	}
 	if err := r.Validate(); err != nil {
 		return Served{}, err
@@ -436,15 +443,38 @@ type Shown struct {
 	Answer  *query.Answer
 }
 
-// List returns the receipts in the store, newest serve first.
-func List(ctx context.Context, d Deps) ([]receipt.Receipt, []string, error) {
+// ListFilter narrows a listing of receipts. Each part is optional, and a receipt
+// must pass every part that is set. Since and Until are clock.Layout instants, the
+// window [Since, Until) of served time.
+type ListFilter struct {
+	// Principal keeps the receipts that name this reader.
+	Principal string
+	// Since keeps the receipts served at or after this instant.
+	Since string
+	// Until keeps the receipts served before this instant.
+	Until string
+}
+
+// admits reports whether r passes f. served_at is a fixed-width clock.Layout string,
+// so the lexical comparison is the chronological one.
+func (f ListFilter) admits(r receipt.Receipt) bool {
+	return (f.Principal == "" || r.Principal == f.Principal) &&
+		(f.Since == "" || r.ServedAt >= f.Since) &&
+		(f.Until == "" || r.ServedAt < f.Until)
+}
+
+// List returns the receipts in the store that pass f, newest serve first.
+func List(ctx context.Context, d Deps, f ListFilter) ([]receipt.Receipt, []string, error) {
 	digests, err := d.Published.List(ctx, receipt.Kind)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	receipts := make([]receipt.Receipt, 0, len(digests))
-	hashes := make([]string, 0, len(digests))
+	type listed struct {
+		r    receipt.Receipt
+		hash string
+	}
+	var kept []listed
 	for _, digest := range digests {
 		raw, err := d.Published.Get(ctx, receipt.Kind, digest)
 		if err != nil {
@@ -454,20 +484,23 @@ func List(ctx context.Context, d Deps) ([]receipt.Receipt, []string, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("serve: receipt %s: %w", digest, err)
 		}
-		receipts = append(receipts, r)
-		hashes = append(hashes, digest)
+		if f.admits(r) {
+			kept = append(kept, listed{r, digest})
+		}
 	}
 
 	// served_at is a fixed-width clock.Layout string, so the lexical sort is the
 	// chronological one; the hash breaks ties on a same-instant pair.
-	for i := range receipts {
-		for j := i + 1; j < len(receipts); j++ {
-			ri, rj := receipts[i], receipts[j]
-			if rj.ServedAt > ri.ServedAt || (rj.ServedAt == ri.ServedAt && hashes[j] < hashes[i]) {
-				receipts[i], receipts[j] = receipts[j], receipts[i]
-				hashes[i], hashes[j] = hashes[j], hashes[i]
-			}
+	sort.Slice(kept, func(i, j int) bool {
+		if kept[i].r.ServedAt != kept[j].r.ServedAt {
+			return kept[i].r.ServedAt > kept[j].r.ServedAt
 		}
+		return kept[i].hash < kept[j].hash
+	})
+	receipts := make([]receipt.Receipt, len(kept))
+	hashes := make([]string, len(kept))
+	for i, k := range kept {
+		receipts[i], hashes[i] = k.r, k.hash
 	}
 	return receipts, hashes, nil
 }

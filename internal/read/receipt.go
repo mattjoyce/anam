@@ -3,6 +3,8 @@ package read
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/clock"
@@ -10,6 +12,7 @@ import (
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/projection"
+	"github.com/mattjoyce/anam/internal/receipt"
 	"github.com/mattjoyce/anam/internal/serve"
 )
 
@@ -54,10 +57,14 @@ func ServeDeps(l serve.Ledger, published serve.Store, checkpoints mint.Checkpoin
 	}, nil
 }
 
-// Receipts lists the receipts in d's store, newest serve first. store names it for the
-// reader.
-func Receipts(ctx context.Context, d serve.Deps, store string) (api.Receipts, error) {
-	receipts, hashes, err := serve.List(ctx, d)
+// Receipts lists the receipts in d's store that pass q, newest serve first. store names
+// it for the reader. A q that names no part lists them all.
+func Receipts(ctx context.Context, d serve.Deps, store string, q api.ReceiptsQuery) (api.Receipts, error) {
+	f, err := listFilterOf(q)
+	if err != nil {
+		return api.Receipts{}, err
+	}
+	receipts, hashes, err := serve.List(ctx, d, f)
 	if err != nil {
 		return api.Receipts{}, err
 	}
@@ -66,6 +73,61 @@ func Receipts(ctx context.Context, d serve.Deps, store string) (api.Receipts, er
 		out.Receipts = append(out.Receipts, api.ReceiptListing{Hash: hashes[i], Receipt: r})
 	}
 	return out, nil
+}
+
+// listFilterOf resolves q's instants. A bare date is a day in the reader's zone, so it
+// needs one; an RFC 3339 instant names its own. A bare date for Until is the whole
+// day, so the bound is the start of the next.
+func listFilterOf(q api.ReceiptsQuery) (serve.ListFilter, error) {
+	f := serve.ListFilter{Principal: q.Principal}
+	instant := func(name, s string) (time.Time, error) {
+		t, dateOnly, err := parseInstant(s, nil)
+		if err != nil {
+			return time.Time{}, badQuery(fmt.Errorf("%s: %w", name, err))
+		}
+		if !dateOnly {
+			return t, nil
+		}
+		loc, err := Location(q.Zone)
+		if err != nil {
+			return time.Time{}, err
+		}
+		t, _, _ = parseInstant(s, loc)
+		if name == "until" {
+			t = t.AddDate(0, 0, 1)
+		}
+		return t, nil
+	}
+	if q.Since != "" {
+		t, err := instant("since", q.Since)
+		if err != nil {
+			return serve.ListFilter{}, err
+		}
+		f.Since = clock.Format(t)
+	}
+	if q.Until != "" {
+		t, err := instant("until", q.Until)
+		if err != nil {
+			return serve.ListFilter{}, err
+		}
+		f.Until = clock.Format(t)
+	}
+	return f, nil
+}
+
+// ReceiptReader names the principal a stored receipt files, empty when it names none.
+// The daemon asks it to keep a token that records every read from opening a value
+// nobody recorded it reading.
+func ReceiptReader(ctx context.Context, d serve.Deps, hash string) (string, error) {
+	raw, err := d.Published.Get(ctx, receipt.Kind, hash)
+	if err != nil {
+		return "", err
+	}
+	r, err := receipt.Parse(raw)
+	if err != nil {
+		return "", err
+	}
+	return r.Principal, nil
 }
 
 // VerifyReceipt proves one receipt against the ledger and the stored value.

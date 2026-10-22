@@ -142,6 +142,26 @@ nothing was saved under, 409 a prefix that starts two saved selections. The insp
 select page and link form take `?sel=<code>` ([QUERY.md](QUERY.md#saved-selections)); anam-mcp's
 `save_selection` and `open_selection` are the tools.
 
+**Who read what (2026-10-22).** A receipt can name the principal whose read it files: a `principal`
+field, the name from the importers file, left out when there is none, so every receipt cut before it
+has the same bytes and the same hash and still verifies. A principal sets `receipts: always` in the
+importers file (off unless set; only a `reader` or an `importer` may) and every read its token makes
+that serves facets is then filed as a receipt naming it. `GET /v1/timeline` is answered as
+`POST /v1/receipts` answers, with status 200: the usual fields with `receipt_hash`, `receipt` and
+`page` beside them, from one derivation, so the reader holds exactly what the receipt names. Such a
+token must name a projection and cannot use `explain` (400), since a receipt is what a projection
+served. A read too large for one answer comes a page at a time, from `GET /v1/receipts/{hash}`,
+where an unrecorded token would get a 413. `POST /v1/query` names the principal on the receipt it
+already files; `dry_run` still files nothing, for every token, so a recording token can still try a
+program unrecorded. A recording token opens only the receipts that name it (`GET /v1/receipts/{hash}`
+and `/facets/{facet_id}` are 403 for another's), because opening another's value would be a read no
+receipt records. Filing is part of the read: if the receipt cannot be written the read fails with
+a 5xx and returns no facets, as `POST /v1/receipts` does. Any other token's reads are unchanged, and
+an ordinary `POST /v1/receipts` names nobody. `GET /v1/receipts` takes `principal`, `since`, `until` and
+`zone` (a bare date is a day in it, and a bare `until` includes its whole day), and `anam receipt list`
+takes `--principal`, `--since` and `--until` and shows a `READER` column. A receipt is parsed to be
+filtered, so a very long list is the cost of a very long record of reads; filter by time.
+
 **Receipts and checkpoints are rows (2026-10-22).** Receipts, the values they served, saved selections
 and checkpoint values live in the operational store, not in a folder beside it. `GET /v1/receipts` names
 that store in `store` where it named a directory in `dir`. Checkpoints are a cache that may go missing:

@@ -91,10 +91,15 @@ func receiptCmd(cfgPath *string) *cobra.Command {
 }
 
 func receiptListCmd(cfgPath *string) *cobra.Command {
-	return &cobra.Command{
+	var q api.ReceiptsQuery
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "list the receipts in the operational store, newest first",
-		Args:  cobra.NoArgs,
+		Long: `List shows the receipts of past serves, newest first. A receipt names the
+principal whose read it files when that principal's token records every read, so
+--principal lists what one reader read, and --since and --until bound it by the time
+it was served. A bare date is a day in your zone, and --until includes its whole day.`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := loadRoutedConfig(*cfgPath, cmd)
 			if err != nil {
@@ -102,29 +107,37 @@ func receiptListCmd(cfgPath *string) *cobra.Command {
 			}
 			var list api.Receipts
 			if cfg.Server != "" {
+				if q.Zone, err = cfg.ZoneName(); err != nil {
+					return err
+				}
 				c, err := newClient(cfg)
 				if err != nil {
 					return err
 				}
-				list, err = c.Receipts(cmd.Context())
+				list, err = c.Receipts(cmd.Context(), q)
 				if err != nil {
 					return err
 				}
 			} else {
 				// Listing reads the operational store and nothing else, so it still
 				// answers when there is no ledger to open.
+				q.Zone = cfg.Zone
 				db, err := openStore(cmd.Context(), cfg)
 				if err != nil {
 					return err
 				}
 				defer func() { _ = db.Close() }()
-				if list, err = read.Receipts(cmd.Context(), serve.Deps{Published: db}, cfg.DBPath); err != nil {
+				if list, err = read.Receipts(cmd.Context(), serve.Deps{Published: db}, cfg.DBPath, q); err != nil {
 					return err
 				}
 			}
 			return writeReceipts(cmd, list)
 		},
 	}
+	cmd.Flags().StringVar(&q.Principal, "principal", "", "list only the receipts that name this reader")
+	cmd.Flags().StringVar(&q.Since, "since", "", "list receipts served at or after this instant (2006-01-02 or RFC 3339)")
+	cmd.Flags().StringVar(&q.Until, "until", "", "list receipts served before this instant; a bare date includes its whole day")
+	return cmd
 }
 
 func writeReceipts(cmd *cobra.Command, list api.Receipts) error {
@@ -133,11 +146,15 @@ func writeReceipts(cmd *cobra.Command, list api.Receipts) error {
 		return err
 	}
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 2, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "SERVED AT\tPROJECTION\tW\tFACETS\tRECEIPT")
+	_, _ = fmt.Fprintln(w, "SERVED AT\tREADER\tPROJECTION\tW\tFACETS\tRECEIPT")
 	for _, l := range list.Receipts {
 		r := l.Receipt
-		_, _ = fmt.Fprintf(w, "%s\t%s v%d\t%d\t%d\t%s\n",
-			r.ServedAt, r.Template, r.TemplateVersion, r.Watermark, len(r.FacetIDs), l.Hash)
+		reader := r.Principal
+		if reader == "" {
+			reader = "-"
+		}
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s v%d\t%d\t%d\t%s\n",
+			r.ServedAt, reader, r.Template, r.TemplateVersion, r.Watermark, len(r.FacetIDs), l.Hash)
 	}
 	return w.Flush()
 }

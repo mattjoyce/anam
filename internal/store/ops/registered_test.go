@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/span"
@@ -108,5 +109,111 @@ func TestCarryRegistered_RefusesAnInlineBodyThatDoesNotHashToItsKey(t *testing.T
 	}
 	if got, _ := to.List(ctx, ops.KindInlineProjection); len(got) != 0 {
 		t.Errorf("a refused carry left %d inline rows", len(got))
+	}
+}
+
+// Card 224: a schema bump carries the whole authored tier. A store with rows of every
+// authored kind is read, a fresh store is initialised, the rows are carried into it,
+// and every row comes back byte-identical: the registered Definitions and projections,
+// the inline projection bodies, the admission holds, and the receipts, served values,
+// saved selections and selection codes.
+func TestCarryRegistered_EveryAuthoredRowComesBackByteIdentical(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	buckets, err := span.New(span.Default)
+	if err != nil {
+		t.Fatal(err)
+	}
+	from, err := ops.Open(ctx, filepath.Join(t.TempDir(), "tracking.db"), buckets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = from.Close() }()
+	if err := from.RegisterDefinition(ctx, ops.DefinitionRow{Type: "test.reading", Version: 1, Body: `{"v":1}`}, "2026-10-22T00:00:00.000000000Z"); err != nil {
+		t.Fatal(err)
+	}
+	if err := from.RegisterProjection(ctx, ops.ProjectionRow{Name: "heart", Version: 1, Body: `{"name":"heart"}`}, "2026-10-22T01:00:00.000000000Z"); err != nil {
+		t.Fatal(err)
+	}
+	if err := from.SetHold(ctx, "scale", "2026-10-22T02:00:00.000000000Z"); err != nil {
+		t.Fatal(err)
+	}
+	bodies := map[string][][]byte{
+		ops.KindInlineProjection: {[]byte(`{"types":["test.reading"]}`)},
+		ops.KindReceipt:          {[]byte(`{"served_hash":"a"}`), []byte(`{"served_hash":"b","principal":"assistant"}`)},
+		ops.KindServed:           {[]byte("served value one\x00\xff"), []byte(`[{"facet_id":"f"}]`)},
+		ops.KindSelection:        {[]byte("pick(E) :- entry(E, _, _, _, _, _, _).")},
+		ops.KindSelectionCode:    {[]byte(`{"code":"0123abcd9","hash":"sha256:x"}`)},
+	}
+	for kind, list := range bodies {
+		for _, b := range list {
+			if _, err := from.Put(ctx, kind, b); err != nil {
+				t.Fatalf("put %s: %v", kind, err)
+			}
+		}
+	}
+	// A checkpoint value is derived and is not carried: a mint makes it again.
+	if _, err := from.Put(ctx, ops.KindCheckpoint, []byte("a checkpoint value")); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := from.ReadRegistered(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	to, err := ops.Open(ctx, filepath.Join(t.TempDir(), "tracking.db"), buckets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = to.Close() }()
+	if err := to.CarryRegistered(ctx, got); err != nil {
+		t.Fatal(err)
+	}
+
+	again, err := to.ReadRegistered(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got.Provisioned, again.Provisioned = nil, nil // the daemon provisions its own
+	if !reflect.DeepEqual(again, got) {
+		t.Errorf("the carried store reads back\n%+v\nwant\n%+v", again, got)
+	}
+	for kind, list := range bodies {
+		for _, b := range list {
+			back, err := to.Get(ctx, kind, ops.Digest(b))
+			if err != nil || !bytes.Equal(back, b) {
+				t.Errorf("%s %q came back as %q (%v)", kind, b, back, err)
+			}
+		}
+	}
+	if got, _ := to.List(ctx, ops.KindCheckpoint); len(got) != 0 {
+		t.Errorf("the carry wrote %d checkpoint values; they are derived", len(got))
+	}
+}
+
+// A content row whose bytes do not hash to its key is refused whole, as an inline body
+// is: the new store never holds a receipt or a served value a read would refuse.
+func TestCarryRegistered_RefusesContentThatDoesNotHashToItsKey(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	buckets, err := span.New(span.Default)
+	if err != nil {
+		t.Fatal(err)
+	}
+	to, err := ops.Open(ctx, filepath.Join(t.TempDir(), "tracking.db"), buckets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = to.Close() }()
+	good := []byte(`{"served_hash":"a"}`)
+	bad := ops.Registered{Content: []ops.Content{
+		{Kind: ops.KindReceipt, Hash: ops.Digest(good), Body: good},
+		{Kind: ops.KindServed, Hash: ops.Digest([]byte("other")), Body: []byte("served")},
+	}}
+	if err := to.CarryRegistered(ctx, bad); !errors.Is(err, ops.ErrCorrupt) {
+		t.Fatalf("CarryRegistered of a served value under another hash = %v, want ErrCorrupt", err)
+	}
+	if got, _ := to.List(ctx, ops.KindReceipt); len(got) != 0 {
+		t.Errorf("a refused carry left %d receipts", len(got))
 	}
 }

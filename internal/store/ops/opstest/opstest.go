@@ -9,6 +9,7 @@ package opstest
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/mattjoyce/anam/internal/store/ops"
@@ -62,4 +63,29 @@ func LoseCheckpointRow(ctx context.Context, db *ops.DB, spanID string, v int) er
 		}
 	}
 	return nil
+}
+
+// HoldWriteLock takes the write lock of the store file at path on a connection of its
+// own, as another writer mid-transaction would hold it, until release is called. A
+// write through the store then waits out its busy timeout and fails as busy.
+func HoldWriteLock(ctx context.Context, path string) (release func(), err error) {
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return nil, fmt.Errorf("opstest: open %s: %w", path, err)
+	}
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("opstest: connect %s: %w", path, err)
+	}
+	if _, err := conn.ExecContext(ctx, `BEGIN IMMEDIATE`); err != nil {
+		_ = conn.Close()
+		_ = db.Close()
+		return nil, fmt.Errorf("opstest: take the write lock of %s: %w", path, err)
+	}
+	return func() {
+		_, _ = conn.ExecContext(context.Background(), `ROLLBACK`) // nothing was written
+		_ = conn.Close()
+		_ = db.Close()
+	}, nil
 }

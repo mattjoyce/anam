@@ -29,6 +29,14 @@ type number struct {
 // and no number a record holds comes near it.
 const maxNumberDigits = 64
 
+// maxExponent bounds the exponent a lexeme may write, either way. It is an invariant,
+// not a setting: it keeps the arithmetic on the exponent (the digits' count added to
+// it, the scientific form's place) inside an int, where an exponent near the int's own
+// limit wrapped past the guards and panicked (card 224). Nine digits keeps every
+// number a record can usefully hold, "1e999999999" included, and a value beyond it is
+// refused as out of range before any arithmetic is done.
+const maxExponent = 999_999_999
+
 // parseNumber reads a JSON number lexeme into an exact decimal. The value is what
 // the lexeme says; nothing is rounded away.
 func parseNumber(lexeme string) (number, error) {
@@ -67,7 +75,7 @@ func parseNumber(lexeme string) (number, error) {
 		}
 		i = next
 		e, err := strconv.Atoi(es)
-		if err != nil {
+		if err != nil || e > maxExponent {
 			return number{}, fmt.Errorf("%q has an exponent out of range", lexeme)
 		}
 		exp = sign * e

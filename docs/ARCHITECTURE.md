@@ -617,8 +617,11 @@ by replay and by minting, and a crash leaves it behind and never wrong.
 rows naming values it does not hold, and receipts and selections that exist only in the folder beside it,
 and absent would read as none. The store refuses, as it does for any bump. It is carried forward by
 rebuilding it and moving the folder in with `anam move-artifacts`, which checks every file's bytes against
-its name before it writes anything, and which can copy the registered Definitions and projections across
-from the old file read-only (`--registered-from`).
+its name before it writes anything, and which can copy the whole authored tier across from the old file
+read-only (`--registered-from`): the registered Definitions and projections, the inline projection bodies,
+the admission holds, and the receipts, served values, saved selections and their codes, each row checked
+against its key (card 224). `anam migrate` carries the same rows into the store it creates. The next bump
+needs no folder: everything authored is already in the old file.
 
 The **derived** tier must stay *provably* derived. The rebuild test (`MVP.md` §7) drops it and re-derives
 it from the ledger: if a facet payload, an anam-event or `W` ever acquired a second home there, the test

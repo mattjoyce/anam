@@ -11,8 +11,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"context"
+	"strings"
+	"time"
+
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/config"
+	"github.com/mattjoyce/anam/internal/store/ops/opstest"
 )
 
 const (
@@ -318,4 +323,54 @@ func TestRecordingTokenVerifiesOnlyItsOwnReceipts(t *testing.T) {
 			call(t, "GET", base+"/v1/receipts/"+h+"/verify", tok, "", http.StatusOK, nil)
 		}
 	}
+}
+
+// A recording token's read files its receipt on the write handle, outside the write
+// queue. When another writer holds the store past its busy timeout, the read answers
+// 503 with Retry-After, as a busy queue does, and nothing is filed or served; a plain
+// read, which files nothing, is unaffected (card 224).
+func TestRecordingTokenReadIsBusyNotAFailureWhenTheStoreIsLocked(t *testing.T) {
+	cfg := readerConfig(t)
+	// Longer than the store's busy timeout, so the lock, not the request's deadline,
+	// is what the read meets.
+	cfg.Timeout = 20 * time.Second
+	d := open(t, cfg)
+	t.Cleanup(func() { _ = d.closeStores() })
+
+	release, err := opstest.HoldWriteLock(context.Background(), cfg.DBPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+
+	query := `{"projection": "bp", "relation": "high", "text": "high(T, S) :- entry(E, \"health.blood-pressure\", T, _, _, _, _), attr(E, \"/systolic_blood_pressure/value\", S), S > 110."}`
+	for _, c := range []struct{ method, path, body string }{
+		{http.MethodGet, timelineBP, ""},
+		{http.MethodPost, "/v1/query", query},
+	} {
+		req := httptest.NewRequest(c.method, c.path, strings.NewReader(c.body))
+		req.Header.Set("Authorization", "Bearer "+recorderToken)
+		rec := httptest.NewRecorder()
+		d.Handler().ServeHTTP(rec, req)
+		if rec.Code != http.StatusServiceUnavailable || rec.Header().Get("Retry-After") == "" {
+			t.Errorf("%s %s: status %d, Retry-After %q; want 503 with Retry-After: %s",
+				c.method, c.path, rec.Code, rec.Header().Get("Retry-After"), rec.Body)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, timelineBP, nil)
+	req.Header.Set("Authorization", "Bearer "+plainToken)
+	rec := httptest.NewRecorder()
+	d.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("a plain read while the store is locked: status %d: %s", rec.Code, rec.Body)
+	}
+
+	release()
+	srv := httptest.NewServer(d.Handler())
+	defer srv.Close()
+	if n := len(listReceipts(t, srv.URL, "").Receipts); n != 0 {
+		t.Errorf("the refused reads filed %d receipts", n)
+	}
+	call(t, "GET", srv.URL+timelineBP, recorderToken, "", http.StatusOK, nil)
 }

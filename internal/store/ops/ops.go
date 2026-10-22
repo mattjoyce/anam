@@ -24,7 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	_ "modernc.org/sqlite" // registers the pure-Go "sqlite" driver
+	"modernc.org/sqlite" // registers the pure-Go "sqlite" driver
+	sqlite3 "modernc.org/sqlite/lib"
 
 	"github.com/mattjoyce/anam/internal/span"
 )
@@ -72,6 +73,11 @@ const schemaVersion = 9
 
 // ErrSchemaVersion is returned by Open for a database written by a different schema.
 var ErrSchemaVersion = errors.New("ops: schema version mismatch")
+
+// ErrBusy is returned for a write that found the file locked by another writer for
+// longer than the busy timeout. Nothing was written; the caller may try again once the
+// other writer has finished.
+var ErrBusy = errors.New("ops: locked by another writer")
 
 // ErrBucketWidth is returned by Open for an index built at a different bucket width.
 var ErrBucketWidth = errors.New("ops: bucket width mismatch")
@@ -194,7 +200,8 @@ func pinSchemaVersion(ctx context.Context, db *sql.DB) error {
 		return nil
 	}
 	return fmt.Errorf("%w: database holds %s, this build writes %d. Set the file aside and re-run init; the derived tier replays and the provisioned tier reloads, "+
-		"and anam move-artifacts --registered-from <the old file> copies across what importers and the operator registered, and moves in any artifact folder",
+		"and anam move-artifacts --registered-from <the old file> copies across what importers and the operator registered, the admission holds, "+
+		"the receipts and the values they served, the saved selections and their codes, and the inline projection bodies, and moves in any artifact folder",
 		ErrSchemaVersion, stored, schemaVersion)
 }
 
@@ -260,3 +267,13 @@ func (d *DB) Close() error { return d.db.Close() }
 // never sees it: only internal/store may speak SQL, and the boundary check holds
 // everything above to that.
 func (d *DB) SQL() *sql.DB { return d.db }
+
+// busy gives lock contention its own sentinel, so a caller can answer "try again"
+// rather than a bare failure; any other error is returned as it is.
+func busy(err error) error {
+	var se *sqlite.Error
+	if errors.As(err, &se) && se.Code()&0xff == sqlite3.SQLITE_BUSY {
+		return fmt.Errorf("%w: %v", ErrBusy, err)
+	}
+	return err
+}

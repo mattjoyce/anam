@@ -4,16 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/store/ops"
+	"github.com/mattjoyce/anam/internal/store/ops/opstest"
 )
 
 // A mint that starts from the last run is held to the full mint as its oracle: the
@@ -113,7 +112,7 @@ func TestRun_FromTheLastRunIsTheFullMint(t *testing.T) {
 			both := func(index func(mint.Index) mint.Index) {
 				for _, db := range []*ops.DB{h.db, twin} {
 					d := h.deps
-					d.Index = index(db)
+					d.Index, d.Values = index(db), db
 					_, err := mint.RunFull(ctx, d, false)
 					if err != nil && !errors.Is(err, errCrash) {
 						t.Fatalf("RunFull: %v", err)
@@ -139,7 +138,7 @@ func TestRun_FromTheLastRunIsTheFullMint(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Run: %v", err)
 			}
-			d.Index = twin
+			d.Index, d.Values = twin, twin
 			full, err := mint.RunFull(ctx, d, false)
 			if err != nil {
 				t.Fatalf("RunFull: %v", err)
@@ -191,7 +190,7 @@ func readIsTheFold(t *testing.T, h *harness) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, ok, err := mint.ReadAt(ctx, h.l, h.db, h.deps.Artifacts, head)
+	got, ok, err := mint.ReadAt(ctx, h.l, h.db, h.deps.Values, head)
 	if err != nil || (ok && got.Value.Hash() != want.Value.Hash()) {
 		t.Fatalf("composed read after a crash: %v %v %d facets, fold %d", ok, err, got.Value.Len(), want.Value.Len())
 	}
@@ -241,24 +240,23 @@ func sameLogs(t *testing.T, a, b *ops.DB, w int64) {
 	}
 }
 
-// removeCheckpointFile deletes the file a bucket's head names, as a lost or
-// half-restored artifact directory would, and returns its path.
-func (h *harness) removeCheckpointFile(t *testing.T, spanID string) string {
+// loseCheckpointValue removes the value a bucket's head names, as a store carried
+// across without its values would, and returns its digest.
+func (h *harness) loseCheckpointValue(t *testing.T, spanID string) string {
 	t.Helper()
 	head, ok := h.heads(t)[spanID]
 	if !ok {
 		t.Fatalf("no head for %s", spanID)
 	}
-	path := filepath.Join(h.dir, mint.Kind, strings.Replace(head.ValueHash, "sha256:", "sha256-", 1)+".json")
-	if err := os.Remove(path); err != nil {
-		t.Fatalf("remove %s: %v", path, err)
+	if err := opstest.LoseCheckpointValue(context.Background(), h.db, head.ValueHash); err != nil {
+		t.Fatal(err)
 	}
-	return path
+	return head.ValueHash
 }
 
-// Card 66: a checkpoint whose file has gone is written again by the next mint, from
+// A checkpoint whose value has gone is written again by the next mint, from
 // the last run or in full, with no new row; a dry run only reports.
-func TestRun_RestoresAMissingCheckpointFile(t *testing.T) {
+func TestRun_RestoresAMissingCheckpointValue(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		run      func(context.Context, mint.Deps, bool) (mint.Result, error)
@@ -274,18 +272,17 @@ func TestRun_RestoresAMissingCheckpointFile(t *testing.T) {
 			h.deps.Budget = 1000
 			h.seed(t)
 			h.run(t, false)
-			path := h.removeCheckpointFile(t, "bucket:2026-08")
+			digest := h.loseCheckpointValue(t, "bucket:2026-08")
 			if tc.ingest {
 				h.bp(t, "2026-09-20T06:30:00Z", 120)
 			}
-			rows := len(h.rows(t))
 
 			dry, err := tc.run(context.Background(), h.deps, true)
 			if err != nil {
 				t.Fatalf("dry run: %v", err)
 			}
-			if _, err := os.Stat(path); !os.IsNotExist(err) {
-				t.Fatalf("a dry run wrote %s (%v)", path, err)
+			if _, err := h.db.Size(context.Background(), mint.Kind, digest); !errors.Is(err, ops.ErrNotFound) {
+				t.Fatalf("a dry run wrote %s (%v)", digest, err)
 			}
 			res, err := tc.run(context.Background(), h.deps, false)
 			if err != nil {
@@ -294,14 +291,15 @@ func TestRun_RestoresAMissingCheckpointFile(t *testing.T) {
 			if res.Full != tc.wantFull || dry.Full != tc.wantFull {
 				t.Fatalf("full = %v (dry %v), want %v", res.Full, dry.Full, tc.wantFull)
 			}
-			if _, err := os.Stat(path); err != nil {
-				t.Fatalf("the missing file was not restored: %v", err)
+			if _, err := h.db.Size(context.Background(), mint.Kind, digest); err != nil {
+				t.Fatalf("the missing value was not restored: %v", err)
 			}
 			if aug := outcomes(res)["bucket:2026-08"]; aug.Minted || aug.V != 1 {
-				t.Fatalf("August re-minted for a missing file: %+v", aug)
+				t.Fatalf("August re-minted for a missing value: %+v", aug)
 			}
-			if want := rows + res.Minted(); len(h.rows(t)) != want {
-				t.Fatalf("checkpoint rows %d, want %d", len(h.rows(t)), want)
+			// Each bucket re-minted replaced the version it superseded.
+			if want := len(h.heads(t)); len(h.rows(t)) != want {
+				t.Fatalf("checkpoint rows %d, want one per bucket (%d)", len(h.rows(t)), want)
 			}
 			readIsTheFold(t, h)
 		})

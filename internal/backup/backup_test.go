@@ -51,7 +51,11 @@ func TestTake_RestoresAsTheRecordAndKeepsTheNewest(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write(filepath.Join(data, "artifacts", "checkpoint", "sha256-ab.json"), "[]")
+	// A receipt is a row of the operational store, so the backup of the store carries it.
+	receiptHash, err := db.Put(ctx, ops.KindReceipt, []byte(`{"served_hash":"sha256:x","watermark":0}`))
+	if err != nil {
+		t.Fatal(err)
+	}
 	write(filepath.Join(data, "documents", "2024", "letter.md"), "# a letter")
 
 	dir := filepath.Join(t.TempDir(), "backups")
@@ -60,7 +64,7 @@ func TestTake_RestoresAsTheRecordAndKeepsTheNewest(t *testing.T) {
 
 	at := time.Date(2026, 10, 9, 23, 0, 0, 0, time.UTC)
 	d := backup.Deps{
-		Ledger: l, Ops: db, ArtifactDir: filepath.Join(data, "artifacts"),
+		Ledger: l, Ops: db,
 		LibraryDir: filepath.Join(data, "documents"), Dir: dir, Keep: 2,
 	}
 	var last string
@@ -70,8 +74,8 @@ func TestTake_RestoresAsTheRecordAndKeepsTheNewest(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Take %d: %v", i, err)
 		}
-		if b.Files != 4 || b.W != 0 {
-			t.Fatalf("Take %d: %+v, want 4 files at W=0", i, b)
+		if b.Files != 3 || b.W != 0 {
+			t.Fatalf("Take %d: %+v, want 3 files at W=0", i, b)
 		}
 		if i == 2 && (len(b.Pruned) != 1 || b.Pruned[0] != "anam-20261009T230000Z") {
 			t.Fatalf("third backup pruned %v, want the first", b.Pruned)
@@ -116,7 +120,10 @@ func TestTake_RestoresAsTheRecordAndKeepsTheNewest(t *testing.T) {
 	if got, _ := rdb.LedgerID(ctx); got != id {
 		t.Fatalf("backup store pins %q, want %q", got, id)
 	}
-	for _, f := range []string{"artifacts/checkpoint/sha256-ab.json", "documents/2024/letter.md"} {
+	if _, err := rdb.Get(ctx, ops.KindReceipt, receiptHash); err != nil {
+		t.Fatalf("the backed-up store does not hold the receipt: %v", err)
+	}
+	for _, f := range []string{"documents/2024/letter.md"} {
 		if _, err := os.Stat(filepath.Join(last, f)); err != nil {
 			t.Errorf("backup lacks %s: %v", f, err)
 		}

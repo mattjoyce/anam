@@ -41,13 +41,13 @@ steps:
   - actor: /components/mint.md
     caller: /components/read.md
     label: find the last run at or below W
-    action: "`startingRun` checks the log is pinned to this ledger, is sealed (the seal's checkpoint count equals the rows), and has a `mint_run` at or below W, then reads the leaf checkpoints of that run and derives the layout from their ids."
+    action: "`startingRun` checks the log is pinned to this ledger and has a `mint_run` at or below W; `leavesAt` then takes that run's checkpoints with `RunCheckpoints`, which compares them with the digest the run recorded, and derives the layout from their ids. A checkpoint row or value that is gone makes the read decline."
     reads: [/data-structures/checkpoint-row.md]
-    resource: internal/mint/read.go#startingRun
-    anchor: "if sealed, err := log.LogSealed(ctx); err != nil || !sealed {"
+    resource: internal/mint/read.go#leavesAt
+    anchor: "rows, ok, err := log.RunCheckpoints(ctx, int64(run))"
   - actor: /components/fold.md
     caller: /components/read.md
-    branch: unpinned, unsealed, no run, or weekly ids
+    branch: unpinned, no run, a checkpoint gone, or weekly ids
     label: fold the ledger from seq 0
     action: "`ReadAt` replays every event to W, folds every facet's status, fetches the live versions and builds the whole value; the read then narrows it in Go and answers as below. The header's Live and Canonical come from this whole value."
     ends: true

@@ -251,8 +251,8 @@ paths:
       summary: Publish a read, filed with a receipt.
       description: >-
         The timeline read the query describes, through the projection it names, filed
-        as an artifact with a receipt that names exactly the entries served at W.
-        Writes artifacts only, never the ledger. The parameters are the timeline's;
+        as a served value with a receipt that names exactly the entries served at W.
+        Writes those two rows only, never the ledger. The parameters are the timeline's;
         projection is required. A read too large for one answer is filed once, whole,
         and answered a page at a time: entries (or the frame's rows) and
         versions are the first page, shown is the whole count, and page.next_cursor
@@ -326,11 +326,11 @@ paths:
       tags: [receipts]
       x-anam-roles: [reader, importer, operator]
       x-anam-type: ReceiptShown
-      summary: A receipt and the value it served, a page at a time, from the artifacts alone.
+      summary: A receipt and the value it served, a page at a time, from the stored rows alone.
       description: >-
         Without a cursor, the receipt and the first page of its value; with one, the
         page it names, carrying hash and page but not the receipt again.
-        Every page is whole facets cut to max_read_bytes from the served artifact the
+        Every page is whole facets cut to max_read_bytes from the served value the
         receipt hashes, never a new read, so walking next_cursor to the end gives back
         exactly the receipt's facet_ids in order. A frame pages by rows, every page
         with all the columns. A query receipt's answer is one relation and is not
@@ -433,13 +433,13 @@ paths:
       x-anam-type: Selection
       summary: Save a selection program under a short code.
       description: >-
-        Files the program as an artifact addressed by the SHA-256 of its canonical text
+        Files the program as a row addressed by the SHA-256 of its canonical text
         and answers its code: the first eight hex digits of that hash, or the
         shortest longer prefix no other saved selection shares. A program within the
         selection page's chip grammar is saved in that grammar's one layout, so the
         same selection written another way has the same code; any other program is
         saved as its text, trimmed. Saving the same program again writes nothing and
-        answers the same code. Writes an artifact only, never the ledger, so every role
+        answers the same code. Writes a row only, never the ledger, so every role
         may save. The code names the program, not its results: the timeline at url
         runs it over the record as it stands when opened.
       parameters:
@@ -561,8 +561,8 @@ paths:
         program unless dry_run is set, so the same query at the same W reproduces it.
         A program that cannot run is refused with 400 and a message saying what to
         change; a derivation or an answer over max_read_bytes is 413, with instant,
-        projection and program as the narrowings. Writes artifacts only, never the
-        ledger, and moves no watermark.
+        projection and program as the narrowings. Writes a receipt and its served value
+        only, never the ledger, and moves no watermark.
       parameters:
         - { $ref: "#/components/parameters/AnamTimeout" }
       requestBody:
@@ -720,7 +720,7 @@ paths:
       tags: [catalogue]
       x-anam-roles: [reader, importer, operator]
       x-anam-type: Checkpoints
-      summary: Every checkpoint ever minted, by bucket and version.
+      summary: The checkpoints the log still holds, by bucket and version.
       parameters: [{ $ref: "#/components/parameters/AnamTimeout" }]
       responses:
         "200":
@@ -748,7 +748,8 @@ paths:
       description: >-
         Runs on the write queue; while another write holds it, 503 at once. dry_run
         derives and publishes nothing; full folds the whole ledger instead of starting
-        from the last run.
+        from the last run. A run that wrote ends by removing the checkpoints the newest run does
+        not read; checkpoints are a cache.
       parameters:
         - name: dry_run
           in: query
@@ -1518,9 +1519,9 @@ components:
         fields: { type: array, items: { type: string } }
     Receipts:
       type: object
-      required: [dir, receipts]
+      required: [store, receipts]
       properties:
-        dir: { type: string }
+        store: { type: string, description: the operational store the receipts were read from }
         receipts:
           type: array
           items:
@@ -1582,7 +1583,7 @@ components:
       required: [code, hash, url, program]
       properties:
         code: { type: string, description: "eight hex digits of hash, or more when another saved selection shares them; written sel:<code>" }
-        hash: { type: string, description: "the SHA-256 of program, sha256:<64 hex>, the artifact's address" }
+        hash: { type: string, description: "the SHA-256 of program, sha256:<64 hex>, the row's address" }
         url: { type: string, description: "the timeline drawing the selection, a path on the daemon's address" }
         program: { type: string, description: the text saved, a chip program in its canonical layout }
     QueryRequest:

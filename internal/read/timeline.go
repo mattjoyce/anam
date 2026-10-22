@@ -59,13 +59,13 @@ type Ledger interface {
 }
 
 // Source is the record a read is taken from: the ledger, and when they are to hand,
-// the checkpoint log and the artifacts its checkpoints are filed in. With them a read
+// the checkpoint log and the values its checkpoints name. With them a read
 // starts from the last mint run and replays only what came after; without them, or
 // before any run, it folds the ledger from the beginning. The answer is the same.
 type Source struct {
 	Ledger      Ledger
 	Checkpoints mint.WindowLog
-	Artifacts   mint.Store
+	Values      mint.Store
 	// Definitions are the ones the record's facets were admitted against: the
 	// bundled ones and those importers registered. Nil means the bundled ones alone.
 	Definitions *def.Registry
@@ -327,7 +327,7 @@ func readView(ctx context.Context, src Source, know knowledge, projName, at stri
 // hash is over all of it, a snapshot's series can start anywhere earlier), and so does
 // explain, which needs every facet's history.
 func narrow(src Source, q api.TimelineQuery, b bounds) bool {
-	return src.Checkpoints != nil && src.Artifacts != nil &&
+	return src.Checkpoints != nil && src.Values != nil &&
 		q.Projection == "" && q.At == "" && !q.Explain && (b.from != "" || b.toX != "")
 }
 
@@ -337,7 +337,7 @@ func narrow(src Source, q api.TimelineQuery, b bounds) bool {
 // prefix from the first bucket to D's holds every series' history up to D, the start
 // of a series begun years earlier and any closing event included (card 64).
 func snapshotPrefix(src Source, q api.TimelineQuery) bool {
-	return src.Checkpoints != nil && src.Artifacts != nil && q.At != "" && q.Projection == "" && !q.Explain
+	return src.Checkpoints != nil && src.Values != nil && q.At != "" && q.Projection == "" && !q.Explain
 }
 
 // readSnapshotPrefix reads the snapshot at fact-time at from the buckets up to at's,
@@ -374,7 +374,7 @@ func readWindow(ctx context.Context, src Source, know knowledge, b bounds) (view
 	if err != nil {
 		return view{}, err
 	}
-	win, ok, err := mint.ReadWindow(ctx, src.Ledger, src.Checkpoints, src.Artifacts, w, b.from, b.toX)
+	win, ok, err := mint.ReadWindow(ctx, src.Ledger, src.Checkpoints, src.Values, w, b.from, b.toX)
 	if err != nil {
 		return view{}, err
 	}
@@ -405,8 +405,8 @@ func readAtOrHead(ctx context.Context, src Source, know knowledge, v *view) (fol
 	if err != nil {
 		return fold.Result{}, err
 	}
-	if src.Checkpoints != nil && src.Artifacts != nil {
-		c, ok, err := mint.ReadAt(ctx, l, src.Checkpoints, src.Artifacts, w)
+	if src.Checkpoints != nil && src.Values != nil {
+		c, ok, err := mint.ReadAt(ctx, l, src.Checkpoints, src.Values, w)
 		if err != nil {
 			return fold.Result{}, err
 		}

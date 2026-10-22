@@ -23,8 +23,8 @@ import (
 // Selections saves a program under its code and opens the program a code names;
 // *selection.Store satisfies it.
 type Selections interface {
-	Save(text string) (selection.Saved, error)
-	Open(code string) (selection.Saved, error)
+	Save(ctx context.Context, text string) (selection.Saved, error)
+	Open(ctx context.Context, code string) (selection.Saved, error)
 }
 
 // missingData is the page for a code that opens nothing.
@@ -36,14 +36,14 @@ type missingData struct {
 // itself and returns false when there is none: 404 for a code nothing was saved
 // under, 400 for one that cannot be a code, 409 for one that names two. An unknown
 // code is never drawn as an empty page, which would read as a selection of nothing.
-func (s *Server) openSelection(w http.ResponseWriter, code string) (selection.Saved, bool) {
+func (s *Server) openSelection(ctx context.Context, w http.ResponseWriter, code string) (selection.Saved, bool) {
 	shown := strings.TrimPrefix(strings.TrimSpace(code), selection.CodePrefix)
 	if s.selections == nil {
 		renderStatus(w, http.StatusNotFound, "selection_missing.html", missingData{Code: shown,
 			Message: "This inspector keeps no saved selections: they are the daemon's. Open the daemon's inspector, or run the program itself."})
 		return selection.Saved{}, false
 	}
-	saved, err := s.selections.Open(code)
+	saved, err := s.selections.Open(ctx, code)
 	if err == nil {
 		return saved, true
 	}
@@ -71,7 +71,7 @@ func (s *Server) saveSelection(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	saved, err := s.selections.Save(r.PostForm.Get("program"))
+	saved, err := s.selections.Save(r.Context(), r.PostForm.Get("program"))
 	switch {
 	case errors.Is(err, selection.ErrNotProgram):
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -200,7 +200,7 @@ func (s *Server) drawSelection(ctx context.Context, w http.ResponseWriter, q url
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return nil, nil, from, to, false
 	}
-	saved, ok := s.openSelection(w, q.Get("sel"))
+	saved, ok := s.openSelection(ctx, w, q.Get("sel"))
 	if !ok {
 		return nil, nil, from, to, false
 	}

@@ -67,7 +67,7 @@ func TestPublishQuery_VerifiesAndShows(t *testing.T) {
 	if !vr.OK() {
 		t.Errorf("the query receipt did not verify:\n%s", vr.Summary())
 	}
-	_, shown, err := serve.Show(h.deps, out.ReceiptHash)
+	_, shown, err := serve.Show(ctx, h.deps, out.ReceiptHash)
 	if err != nil {
 		t.Fatalf("Show: %v", err)
 	}

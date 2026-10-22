@@ -4,8 +4,8 @@
 * [Anam-event row](anam-event.md) - One row per change in Anam's knowledge: a gapless seq, one of five kinds, the facet and artifact version it concerns, and anam-time.
 * [Batch event](batch-event.md) - The ductile event <plugin>.batch an importer emits and an anam_submit instance consumes: envelopes, the manifests as text, a label, and optionally a snapshot part or current_versions.
 * [Batch submission](batch-submission.md) - The JSON body of POST /v1/envelopes: 1 to 49 envelopes and an optional snapshot label; any unknown field is a 400.
-* [Checkpoint log](checkpoint-row.md) - The operational store's checkpoint, mint_run, mint_seal and checkpoint_size tables: one row per mint of a bucket, the runs that checked every bucket, and the seal that proves no crashed run left rows behind.
-* [Checkpoint value file](checkpoint-value.md) - The live-only value of one bucket at a watermark: a JSON array of fold entries, written under its own sha256 in the artifact directory.
+* [Checkpoint log](checkpoint-row.md) - The operational store\'s checkpoint, mint_run and checkpoint_size tables: one row per mint of a bucket, the runs that checked every bucket with a digest of the checkpoints they took, and the sizes.
+* [Checkpoint value row](checkpoint-value.md) - The live-only value of one bucket at a watermark: a JSON array of fold entries, a row of checkpoint_value keyed by its own sha256.
 * [Config keys](config-keys.md) - Every key the daemon and CLI read, from config.yaml or ANAM_* env vars, with its default; an unknown key or an unknown bucket width is refused at load.
 * [Config limits](limits.md) - The 21 bounds and waits the daemon, the gate, the inspector and the CLI client take from the loaded config, each a key with a shipped default and a range checked at start.
 * [Definition manifest](definition-manifest.md) - The JSON contract for one facet type: meta with identity, time, classification, validation mode and series, and a closed JSON Schema 2020-12.

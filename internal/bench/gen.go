@@ -20,7 +20,6 @@ import (
 	"github.com/mattjoyce/anam/internal/gate"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/span"
-	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
@@ -71,15 +70,14 @@ func Shapes() map[string]Shape {
 
 // Paths are the files of one bench record, laid out as Anam lays out its own.
 type Paths struct {
-	Ledger, DB, Artifacts string
+	Ledger, DB string
 }
 
 // PathsIn is the layout of a record in dir.
 func PathsIn(dir string) Paths {
 	return Paths{
-		Ledger:    filepath.Join(dir, "ledger.db"),
-		DB:        filepath.Join(dir, "tracking.db"),
-		Artifacts: filepath.Join(dir, "artifacts"),
+		Ledger: filepath.Join(dir, "ledger.db"),
+		DB:     filepath.Join(dir, "tracking.db"),
 	}
 }
 
@@ -284,13 +282,8 @@ func checkpoint(ctx context.Context, l *ledger.Ledger, p Paths, budget int, prog
 	if _, err := catchup.Sync(ctx, l, db, buckets); err != nil {
 		return err
 	}
-	store, err := artifact.New(p.Artifacts)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = store.Close() }()
 	res, err := mint.Run(ctx, mint.Deps{
-		Ledger: l, Index: db, Artifacts: store, Buckets: buckets, Clock: clock.Real{}, Budget: budget,
+		Ledger: l, Index: db, Values: db, Buckets: buckets, Clock: clock.Real{}, Budget: budget,
 	}, false)
 	if err != nil {
 		return err
@@ -321,13 +314,8 @@ func MintRecord(ctx context.Context, p Paths, person string, budget int) (int, i
 	if _, err := catchup.Sync(ctx, l, db, buckets); err != nil {
 		return 0, 0, err
 	}
-	store, err := artifact.New(p.Artifacts)
-	if err != nil {
-		return 0, 0, err
-	}
-	defer func() { _ = store.Close() }()
 	res, err := mint.Run(ctx, mint.Deps{
-		Ledger: l, Index: db, Artifacts: store, Buckets: buckets, Clock: clock.Real{}, Budget: budget,
+		Ledger: l, Index: db, Values: db, Buckets: buckets, Clock: clock.Real{}, Budget: budget,
 	}, false)
 	if err != nil {
 		return 0, 0, err
@@ -348,11 +336,6 @@ func BackfillSizes(ctx context.Context, p Paths) (int, error) {
 		return 0, err
 	}
 	defer func() { _ = db.Close() }()
-	store, err := artifact.New(p.Artifacts)
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = store.Close() }()
 	rows, err := db.Checkpoints(ctx)
 	if err != nil {
 		return 0, err
@@ -366,7 +349,7 @@ func BackfillSizes(ctx context.Context, p Paths) (int, error) {
 		if _, ok := have[ops.SpanVersion{SpanID: r.SpanID, V: r.V}]; ok {
 			continue
 		}
-		b, err := store.Get(mint.Kind, r.ValueHash)
+		b, err := db.Get(ctx, mint.Kind, r.ValueHash)
 		if err != nil {
 			return n, err
 		}

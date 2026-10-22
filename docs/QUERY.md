@@ -48,7 +48,7 @@ under a version without it has no `attr` for it, so the query misses it silently
 
 ## Receipts
 
-A query answer is filed as an artifact and a receipt. The receipt records the ledger, the watermark,
+A query answer is filed as a served value and a receipt. The receipt records the ledger, the watermark,
 the projection and its hash, the definition-set version, the hash of the answer, and a `program`
 block with the rule set (`rule_set`, `rule_set_version`, `rule_set_hash`), the text as written and the
 relation answered. `GET /v1/receipts/{hash}/verify` folds the ledger at that watermark, serves the
@@ -362,14 +362,14 @@ it, and says so when it could not.
 
 A selection is handed on as its program, and also as a short code. "Save this
 selection" on the select page, or `POST /v1/selections` with `{"program": "..."}`, files the program
-as an artifact of kind `selection`, addressed by the SHA-256 of its canonical text, and answers its
+as a row of kind `selection`, addressed by the SHA-256 of its canonical text, and answers its
 code, written `sel:<code>`. The canonical text is what `selection.Parse` then `Program` write for a
 program within the chip grammar, so the same selection written in another layout or rule order has
 the same code; any other program is saved as its text, trimmed.
 
 The code is the first 8 hex digits of the hash. At save, if another saved selection shares those 8,
 the new one's code lengthens to the shortest prefix of its hash that no other saved selection shares,
-and that lengthened code is filed as a second small artifact, kind `selection-code`, since which of
+and that lengthened code is filed as a second small row, kind `selection-code`, since which of
 the two came first is not something the hashes can say. The first one keeps its 8 digits. A code is
 written once and never rewritten, so it never changes meaning. Saving the same program again writes
 nothing and answers the same code.

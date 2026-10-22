@@ -20,8 +20,8 @@ affects:
 
 **Context.** Card 62. Whether a bucket needs re-minting is decided by its value, not by bookkeeping about it, and the tail is the pre-filter.
 
-**Choice.** A run records its W after its checkpoints, and a seal row records how many checkpoint rows the log then held. The next mint replays (R, W], rebuilds the buckets those events touched from their checkpoint plus the tail, splits over budget, and compares by hash. A log holding more rows than its last seal has rows from a crashed mint, so until a mint seals it again both mints and reads fold in full.
+**Choice.** A run records its W after its checkpoints, and the run records a digest of the checkpoints a read from it takes. The next mint replays (R, W], rebuilds the buckets those events touched from their checkpoint plus the tail, splits over budget, and compares by hash. A log that no longer yields those checkpoints, or holds rows past the run, is one a mint crashed in or a cache lost entries from, so until a mint records a run again mints fold in full and a read that needs a missing checkpoint folds in full.
 
 **Why.** A mint costs its tail, the buckets it touched and a stat per checkpoint, which is what lets the daemon mint after every change.
 
-**What it costs.** The seal is a count, not a proof of content; the full mint settles every bucket against the fold whatever the log holds, and is the test oracle the incremental path must equal.
+**What it costs.** The digest says the checkpoints are the ones the run took, not that their values are right; the full mint settles every bucket against the fold whatever the log holds, and is the test oracle the incremental path must equal.

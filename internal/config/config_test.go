@@ -39,7 +39,6 @@ func TestLoadDefaults(t *testing.T) {
 		PersonID:           "matt",
 		LedgerPath:         "/data/anam/ledger.db",
 		DBPath:             "/data/anam/tracking.db",
-		ArtifactDir:        "/data/anam/artifacts",
 		LibraryDir:         "/data/anam/documents",
 		Zone:               "Local",
 		Listen:             config.DefaultListen,
@@ -64,9 +63,6 @@ func TestDefaultDataPaths(t *testing.T) {
 	}
 	if got, want := config.DefaultDBPath(), "/data/anam/tracking.db"; got != want {
 		t.Errorf("DefaultDBPath() = %q, want %q (XDG_DATA_HOME honoured)", got, want)
-	}
-	if got, want := config.DefaultArtifactDir(), "/data/anam/artifacts"; got != want {
-		t.Errorf("DefaultArtifactDir() = %q, want %q", got, want)
 	}
 
 	t.Setenv("XDG_DATA_HOME", "")
@@ -96,7 +92,6 @@ func TestLoadFromFile(t *testing.T) {
 person_id: matt
 ledger_path: /srv/anam/ledger.db
 db_path: /srv/anam/tracking.db
-artifact_dir: /srv/anam/artifacts
 timeout: 12s
 bucket_width: weekly
 `)
@@ -110,7 +105,6 @@ bucket_width: weekly
 		PersonID:           "matt",
 		LedgerPath:         "/srv/anam/ledger.db",
 		DBPath:             "/srv/anam/tracking.db",
-		ArtifactDir:        "/srv/anam/artifacts",
 		LibraryDir:         "/srv/anam/documents",
 		Zone:               "Local",
 		Listen:             config.DefaultListen,
@@ -179,7 +173,8 @@ func TestEnvOverridesFileAndDefaults(t *testing.T) {
 // TestLoadRejectsUnknownKey is the fail-fast guard: a mistyped key must not be
 // silently ignored, leaving Anam writing to the default ledger while the operator
 // believes it is writing to theirs. The retired DynamoDB keys are refused by the same
-// rule, so a config written for the old ledger fails at startup and names the key.
+// rule, so a config written for the old ledger fails at startup and names the key. So is
+// artifact_dir, retired when receipts and checkpoint values moved into the operational store.
 func TestLoadRejectsUnknownKey(t *testing.T) {
 	tests := []struct {
 		name string
@@ -190,6 +185,7 @@ func TestLoadRejectsUnknownKey(t *testing.T) {
 		{"camelCase instead of snake_case", "ledgerPath: /x/ledger.db\n"},
 		{"retired DynamoDB endpoint", "ddb_endpoint: http://x:8000\n"},
 		{"retired DynamoDB table", "table_name: anam\n"},
+		{"retired artifact directory", "artifact_dir: /x/artifacts\n"},
 	}
 
 	for _, tt := range tests {
@@ -241,7 +237,6 @@ func TestValidate(t *testing.T) {
 		PersonID:           "matt",
 		LedgerPath:         "/srv/ledger.db",
 		DBPath:             "/srv/tracking.db",
-		ArtifactDir:        "/srv/artifacts",
 		LibraryDir:         "/srv/documents",
 		Zone:               "Australia/Sydney",
 		Timeout:            5 * time.Second,
@@ -269,7 +264,6 @@ func TestValidate(t *testing.T) {
 		{"missing ledger_path", func(c *config.Config) { c.LedgerPath = "" }, true},
 		{"ledger and tracking in one file", func(c *config.Config) { c.LedgerPath = c.DBPath }, true},
 		{"missing db_path", func(c *config.Config) { c.DBPath = "" }, true},
-		{"missing artifact_dir", func(c *config.Config) { c.ArtifactDir = "" }, true},
 		{"missing library_dir", func(c *config.Config) { c.LibraryDir = "" }, true},
 		{"unknown zone", func(c *config.Config) { c.Zone = "Mars/Olympus" }, true},
 		{"utc zone", func(c *config.Config) { c.Zone = "UTC" }, false},

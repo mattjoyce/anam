@@ -18,7 +18,6 @@ import (
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/serve"
 	"github.com/mattjoyce/anam/internal/span"
-	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
@@ -66,11 +65,9 @@ const sleepManifest = `{
 }`
 
 type harness struct {
-	gate  *gate.Gate
-	l     *ledger.Ledger
-	deps  serve.Deps
-	dir   string
-	store *artifact.Store
+	gate *gate.Gate
+	l    *ledger.Ledger
+	deps serve.Deps
 
 	// db is the operational store and mint the deps to cut checkpoints into it, for
 	// the tests that serve and verify from a mint run. deps.Checkpoints starts nil:
@@ -110,13 +107,6 @@ func newHarness(t *testing.T) *harness {
 	if err != nil {
 		t.Fatalf("projection.Bundled: %v", err)
 	}
-	dir := t.TempDir()
-	store, err := artifact.New(dir)
-	if err != nil {
-		t.Fatalf("artifact.New: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-
 	buckets, err := span.New(span.Monthly)
 	if err != nil {
 		t.Fatalf("span.New: %v", err)
@@ -128,19 +118,17 @@ func newHarness(t *testing.T) *harness {
 	t.Cleanup(func() { _ = db.Close() })
 
 	return &harness{
-		gate:  gate.New(l, defs, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}),
-		l:     l,
-		dir:   dir,
-		store: store,
-		db:    db,
+		gate: gate.New(l, defs, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}),
+		l:    l,
+		db:   db,
 		mint: mint.Deps{
-			Ledger: l, Index: db, Artifacts: store, Buckets: buckets,
+			Ledger: l, Index: db, Values: db, Buckets: buckets,
 			Clock: clock.Fixed{Instant: time.Date(2026, 7, 25, 9, 0, 0, 0, time.UTC)},
 		},
 		deps: serve.Deps{
 			Ledger:               l,
 			Templates:            templates,
-			Artifacts:            store,
+			Published:            db,
 			Gate:                 consent.Open{},
 			Clock:                clock.Fixed{Instant: time.Date(2026, 7, 25, 9, 0, 0, 0, time.UTC)},
 			DefinitionSetVersion: "sha256:" + strings.Repeat("d", 64),

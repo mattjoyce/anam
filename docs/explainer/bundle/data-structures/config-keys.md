@@ -16,7 +16,6 @@ references: []
 | `person_id` | `ANAM_PERSON_ID` | none on purpose; pinned into the ledger at init |
 | `ledger_path` | `ANAM_LEDGER_PATH` | `~/.local/share/anam/ledger.db` |
 | `db_path` | `ANAM_DB_PATH` | `~/.local/share/anam/tracking.db`; must differ from the ledger |
-| `artifact_dir` | `ANAM_ARTIFACT_DIR` | `~/.local/share/anam/artifacts` |
 | `library_dir` | `ANAM_LIBRARY_DIR` | `documents/` beside the ledger |
 | `library_folder_limit` | `ANAM_LIBRARY_FOLDER_LIMIT` | 1000 files a library folder holds before a new one goes a level deeper (card 150) |
 | `zone` | `ANAM_ZONE` | `Local`; the daemon refuses it for reads |
@@ -33,3 +32,5 @@ references: []
 Twenty-one more keys, the bounds and waits, are the [config limits](/data-structures/limits.md); `config.example.yaml` lists every one.
 
 The config file is `ANAM_CONFIG` or `<user config dir>/anam/config.yaml`; the example file now lists every key but still carries an old backup method and a stale store list (see [config example is stale](/gaps/config-example-is-stale.md)).
+
+`artifact_dir` is retired: checkpoint values, receipts, served values and saved selections are rows of the operational store. A config file that still names it is refused at load, like any unknown key; `ANAM_ARTIFACT_DIR` is no longer read. `anam move-artifacts --from <folder>` reads an old folder in.

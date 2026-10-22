@@ -78,7 +78,7 @@ of the files. Unset it for those two commands.
 ./anam projection list                             # the templates: a reader selects one, the operator registers one
 ./anam timeline --projection bp --publish          # publish: a served value and a receipt, content-addressed
 ./anam receipt list
-./anam receipt show <hash>          # what was served, from the artifact alone
+./anam receipt show <hash>          # what was served, from the stored receipt alone
 ./anam receipt verify <hash>        # re-derive it from the ledger, and re-hash the file
 ```
 

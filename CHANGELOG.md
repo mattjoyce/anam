@@ -8,6 +8,18 @@ decisions is in `journal/`.
 
 ## 2026-10-22
 
+- Receipts, served values, saved selections and checkpoint values are rows of the operational store
+  (card 215), not files in a folder beside it. The schema is 9, so a store from before is refused and
+  is carried forward by moving it aside, running `anam init` for a fresh one, and then
+  `anam move-artifacts --from <the old artifacts folder> --registered-from <the old tracking.db>`.
+  Without `--yes` that reads and checks every file against its name and writes nothing; with it, it
+  loads the rows. `artifact_dir` is gone from the config, and a config file that names it is refused
+  at start. Checkpoints are a cache that may go missing: a mint ends by removing the ones the newest
+  run does not read, and a read that needs one that is gone, as a read at an older watermark does,
+  folds the ledger in full, which gives the same value more slowly. A mint writes back a checkpoint
+  value the log names and the store has lost. `GET /v1/receipts` names the store in `store` where it
+  named a folder in `dir`, and a backup is the ledger, the operational store and the library.
+
 - The Workbench writes links by hand (card 202). `GET /link` on the inspector draws one `record.edge`
   from a basket of facets, each on its side, with a kind, the person's words, a "link to this
   version" pin per facet and the moment in the browser's zone; `POST /link` saves it as source

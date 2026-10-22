@@ -12,7 +12,7 @@ steps:
   - actor: /components/cli.md
     caller: outside
     label: serveCmd opens the local files
-    action: "`serveCmd` uses `loadConfig`, which refuses a configured server, opens the ledger read-only, the operational store, the artifact store and the Definitions, and calls `serve.Run`; with no argument it lists the templates instead."
+    action: "`serveCmd` uses `loadConfig`, which refuses a configured server, opens the ledger read-only, the operational store and the Definitions, and calls `serve.Run`; with no argument it lists the templates instead."
     resource: internal/app/serve.go#serveCmd
     anchor: "out, err := serve.Run(ctx, deps, args[0], dryRun)"
   - actor: /components/read.md
@@ -34,7 +34,7 @@ steps:
     action: "`valueAt` asks `mint.ReadAt` for the composed value at the head watermark and falls back to `fold.ReadAt` when no sealed run is usable."
     reads: [/data-structures/checkpoint-value.md, /data-structures/anam-event.md]
     resource: internal/serve/serve.go#valueAt
-    anchor: "c, ok, err := mint.ReadAt(ctx, d.Ledger, d.Checkpoints, d.Artifacts, w)"
+    anchor: "c, ok, err := mint.ReadAt(ctx, d.Ledger, d.Checkpoints, d.Published, w)"
   - actor: /components/projection.md
     caller: /components/serve.md
     label: apply the template, keep served entries
@@ -53,16 +53,16 @@ steps:
     writes: [/data-structures/receipt.md]
     resource: internal/serve/serve.go#Publish
     anchor: "ServedHash:           servedHash,"
-  - actor: /components/store-artifact.md
+  - actor: /components/store-ops.md
     caller: /components/serve.md
     label: put the value, then the receipt
-    action: Each file is written to a nonce-named temp file under `O_EXCL`, synced and renamed into `served/sha256-<hex>.json` then `receipt/sha256-<hex>.json`. Value first, so a crash leaves a value no receipt names and never a receipt without its value. A dry run returns before either.
+    action: Each is inserted into `served_value` then `receipt`, keyed by the hash of its bytes; an insert of equal bytes is a no-op. Value first, so a crash leaves a value no receipt names and never a receipt without its value. A dry run returns before either.
     writes: [/data-structures/receipt.md]
-    resource: internal/store/artifact/artifact.go#writeAtomic
-    anchor: 'tmp := name + "." + hex.EncodeToString(nonce[:]) + ".tmp"'
+    resource: internal/store/ops/content.go#Put
+    anchor: "res, err := d.db.ExecContext(ctx, t.put, digest, b)"
   - actor: /components/cli.md
     label: print counts and the receipt hash
-    action: Template and version, W, canonical and served counts with their hashes, the receipt hash and the span. `anam receipt verify <hash>` later re-derives at that watermark and re-hashes the file.
+    action: Template and version, W, canonical and served counts with their hashes, the receipt hash and the span. `anam receipt verify <hash>` later re-derives at that watermark and re-hashes the stored value.
     ends: true
     resource: internal/app/serve.go#serveCmd
     anchor: '_, _ = fmt.Fprintf(w, "  receipt    %s\n", out.ReceiptHash)'
@@ -70,6 +70,6 @@ steps:
 
 Publishing writes nothing to the ledger: being shown is not something Anam learned about a fact. That is why there is no `published` anam-event and why a facet's published time is derived from receipts.
 
-There is no receipt index in SQLite. `anam receipt list` lists the artifact directory and sorts by served_at.
+There is no separate receipt index. `anam receipt list` reads the `receipt` table and sorts by served_at.
 
-Related: [publication is not an anam-event](/decisions/publication-is-not-an-anam-event.md), [projections prune, never reshape](/invariants/projections-prune-never-reshape.md), [artifact writes are atomic](/decisions/artifact-writes-are-atomic.md).
+Related: [publication is not an anam-event](/decisions/publication-is-not-an-anam-event.md), [projections prune, never reshape](/invariants/projections-prune-never-reshape.md), [stored content is a row keyed by its hash](/decisions/content-is-a-row-keyed-by-its-hash.md).

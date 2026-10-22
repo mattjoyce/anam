@@ -13,8 +13,8 @@ depends_on:
   - /components/fold.md
   - /components/projection.md
   - /components/receipt.md
-  - /components/store-artifact.md
+  - /components/store-ops.md
   - /components/store-ledger.md
 ---
 
-`Run` serves a whole template; `Publish` files value then receipt, so a crash between them leaves a value no receipt names and never a receipt without its value; `Narrow` applies a read's query after the template; `Verify` re-derives at the receipt's watermark and refuses a moved template version or another ledger; `List` and `Show` read the artifact directory, which is the only receipt index. Traced in [publish a projection](/workflows/publish-a-projection.md).
+`Run` serves a whole template; `Publish` files value then receipt, so a crash between them leaves a value no receipt names and never a receipt without its value; `Narrow` applies a read's query after the template; `Verify` re-derives at the receipt's watermark and refuses a moved template version or another ledger; `List` and `Show` read the `receipt` and `served_value` tables, which are the only receipt index. Traced in [publish a projection](/workflows/publish-a-projection.md).

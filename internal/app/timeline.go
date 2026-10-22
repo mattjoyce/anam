@@ -13,7 +13,6 @@ import (
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/read"
-	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
@@ -175,7 +174,7 @@ func publishTimeline(ctx context.Context, cfg config.Config, q api.TimelineQuery
 }
 
 // readSource opens what a local read is taken from: the ledger read-only, and the
-// checkpoint log and artifacts so the read can start from the last mint run. The
+// checkpoint log and its values so the read can start from the last mint run. The
 // returned func closes them.
 func readSource(ctx context.Context, cfg config.Config) (read.Source, func(), error) {
 	l, err := openLedgerReadOnly(ctx, cfg)
@@ -192,13 +191,7 @@ func readSource(ctx context.Context, cfg config.Config) (read.Source, func(), er
 		_ = l.Close()
 		return read.Source{}, nil, err
 	}
-	store, err := artifact.New(cfg.ArtifactDir)
-	if err != nil {
-		_ = db.Close()
-		_ = l.Close()
-		return read.Source{}, nil, err
-	}
-	closeAll := func() { _ = store.Close(); _ = db.Close(); _ = l.Close() }
+	closeAll := func() { _ = db.Close(); _ = l.Close() }
 	defs, err := registryOf(ctx, db)
 	if err != nil {
 		closeAll()
@@ -209,7 +202,7 @@ func readSource(ctx context.Context, cfg config.Config) (read.Source, func(), er
 		closeAll()
 		return read.Source{}, nil, err
 	}
-	return read.Source{Ledger: l, Checkpoints: db, Artifacts: store, Definitions: defs, Projections: templates}, closeAll, nil
+	return read.Source{Ledger: l, Checkpoints: db, Values: db, Definitions: defs, Projections: templates}, closeAll, nil
 }
 
 // timelineHeader describes the read: which watermark, which lens, and the hash that

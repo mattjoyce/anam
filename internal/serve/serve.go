@@ -4,12 +4,12 @@
 // Serving reads: the person at the head watermark, composed from the last mint run and
 // the tail after it when the checkpoint log is to hand and folded from the beginning
 // when it is not, pruned through the selected template and the consent gate; the
-// served value and its receipt are written to the published-artifact tier. It writes nothing to the ledger and does not move W —
-// being shown is not something Anam learned (§9).
+// served value and its receipt are written to the operational store. It writes nothing to
+// the ledger and does not move W: being shown is not something Anam learned (§9).
 //
 // Verifying re-runs exactly that derivation at the receipt's own watermark and checks
 // two things independently: that the ledger still produces those bytes, and that the
-// artifact on disk is still those bytes. If serving and verifying ever stop being the
+// stored value is still those bytes. If serving and verifying ever stop being the
 // same derivation, a receipt becomes a story about a serve rather than a proof of one,
 // which is why they are neighbours in one file.
 package serve
@@ -29,8 +29,8 @@ import (
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/query"
 	"github.com/mattjoyce/anam/internal/receipt"
-	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
+	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
 // ErrTemplateMoved is returned when a receipt names a template version this record
@@ -52,12 +52,13 @@ type Ledger interface {
 	ID(ctx context.Context) (string, error)
 }
 
-// Store is the published-artifact tier this package writes to and reads back. It is
-// also where the mint files its checkpoints, so it is the mint's Store too.
+// Store is where this package writes the receipts and served values it publishes and
+// reads them back: the operational store's content-addressed rows. It is also where
+// the mint files its checkpoints, so it is the mint's Store too.
 type Store interface {
 	mint.Store
-	Raw(kind, digest string) ([]byte, error)
-	List(kind string) ([]string, error)
+	Raw(ctx context.Context, kind, digest string) ([]byte, error)
+	List(ctx context.Context, kind string) ([]string, error)
 }
 
 // Clock supplies the served-at time; tests freeze it.
@@ -69,7 +70,7 @@ type Clock interface{ Now() time.Time }
 type Deps struct {
 	Ledger    Ledger
 	Templates *projection.Registry
-	Artifacts Store
+	Published Store
 	Gate      projection.Gate
 	Clock     Clock
 
@@ -134,7 +135,7 @@ type canonical struct {
 // is what lets serve and verify use either and still be each other's inverse.
 func valueAt(ctx context.Context, d Deps, w ledger.Watermark) (canonical, error) {
 	if d.Checkpoints != nil {
-		c, ok, err := mint.ReadAt(ctx, d.Ledger, d.Checkpoints, d.Artifacts, w)
+		c, ok, err := mint.ReadAt(ctx, d.Ledger, d.Checkpoints, d.Published, w)
 		if err != nil {
 			return canonical{}, err
 		}
@@ -220,14 +221,14 @@ func Publish(ctx context.Context, d Deps, t projection.Template, w ledger.Waterm
 		return Served{}, err
 	}
 
-	out := Served{Receipt: r, ReceiptHash: artifact.Digest(receiptBytes), Frame: fr}
+	out := Served{Receipt: r, ReceiptHash: ops.Digest(receiptBytes), Frame: fr}
 	if dryRun {
 		return out, nil
 	}
-	if _, err := d.Artifacts.Put(receipt.ServedKind, servedBytes); err != nil {
+	if _, err := d.Published.Put(ctx, receipt.ServedKind, servedBytes); err != nil {
 		return Served{}, err
 	}
-	if _, err := d.Artifacts.Put(receipt.Kind, receiptBytes); err != nil {
+	if _, err := d.Published.Put(ctx, receipt.Kind, receiptBytes); err != nil {
 		return Served{}, err
 	}
 	out.Written = true
@@ -286,10 +287,9 @@ func Cut(v fold.Value, q *receipt.Query) (*frame.Frame, error) {
 	return &f, nil
 }
 
-// Verify honours a receipt: re-derive at its watermark, and re-hash the artifact on
-// disk. The two proofs are independent (see receipt.Result).
+// Verify honours a receipt: re-derive at its watermark, and re-hash the stored value. The two proofs are independent (see receipt.Result).
 func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, receipt.Result, error) {
-	raw, err := d.Artifacts.Get(receipt.Kind, receiptHash)
+	raw, err := d.Published.Get(ctx, receipt.Kind, receiptHash)
 	if err != nil {
 		return receipt.Receipt{}, receipt.Result{}, err
 	}
@@ -362,13 +362,13 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 	}
 
 	// Raw, not Get: the verifier wants the bytes as they are so it can say what they
-	// hash to. Get would refuse a tampered artifact and report only that it refused.
-	stored, err := d.Artifacts.Raw(receipt.ServedKind, r.ServedHash)
-	if err != nil && !errors.Is(err, artifact.ErrNotFound) {
+	// hash to. Get would refuse a tampered row and report only that it refused.
+	stored, err := d.Published.Raw(ctx, receipt.ServedKind, r.ServedHash)
+	if err != nil && !errors.Is(err, ops.ErrNotFound) {
 		return r, receipt.Result{}, err
 	}
 
-	out := receipt.Compare(r, derivedHash, idsOf(value), stored, artifact.Digest)
+	out := receipt.Compare(r, derivedHash, idsOf(value), stored, ops.Digest)
 	out.Notes = append(out.Notes, notes...)
 	if r.DefinitionSetVersion != d.DefinitionSetVersion {
 		note := "definitions govern capture, not the fold, so this does not affect reproduction"
@@ -383,18 +383,18 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 }
 
 // Show returns a published receipt and the served value it names, read from the
-// artifact tier alone — no ledger, no fold, no re-derivation.
+// operational store alone: no ledger, no fold, no re-derivation.
 //
 // That restraint is the point. Verify asks whether the ledger still honours a receipt;
-// Show asks what the artifact actually says, which is a question you must be able to
+// Show asks what the store actually says, which is a question you must be able to
 // answer when the ledger is gone, unreachable, or exactly what you doubt. The bytes are
-// checked against their own content address on the way out, so a tampered artifact is
+// checked against their own content address on the way out, so a tampered row is
 // reported rather than displayed as though it were what was served.
 //
 // A receipt whose query named fields names a frame, not a list of entries (card
 // 138); Show returns it as Shown.Frame, with Entries empty.
-func Show(d Deps, receiptHash string) (receipt.Receipt, Shown, error) {
-	raw, err := d.Artifacts.Get(receipt.Kind, receiptHash)
+func Show(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, Shown, error) {
+	raw, err := d.Published.Get(ctx, receipt.Kind, receiptHash)
 	if err != nil {
 		return receipt.Receipt{}, Shown{}, err
 	}
@@ -403,7 +403,7 @@ func Show(d Deps, receiptHash string) (receipt.Receipt, Shown, error) {
 		return receipt.Receipt{}, Shown{}, err
 	}
 
-	served, err := d.Artifacts.Get(receipt.ServedKind, r.ServedHash)
+	served, err := d.Published.Get(ctx, receipt.ServedKind, r.ServedHash)
 	if err != nil {
 		return r, Shown{}, err
 	}
@@ -428,7 +428,7 @@ func Show(d Deps, receiptHash string) (receipt.Receipt, Shown, error) {
 	return r, Shown{Entries: entries}, nil
 }
 
-// Shown is a served value read back from the artifact tier: the entries of a whole
+// Shown is a served value read back from the store: the entries of a whole
 // serve, the frame of one that named fields, or the answer of a query.
 type Shown struct {
 	Entries []fold.Entry
@@ -437,8 +437,8 @@ type Shown struct {
 }
 
 // List returns the receipts in the store, newest serve first.
-func List(d Deps) ([]receipt.Receipt, []string, error) {
-	digests, err := d.Artifacts.List(receipt.Kind)
+func List(ctx context.Context, d Deps) ([]receipt.Receipt, []string, error) {
+	digests, err := d.Published.List(ctx, receipt.Kind)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -446,7 +446,7 @@ func List(d Deps) ([]receipt.Receipt, []string, error) {
 	receipts := make([]receipt.Receipt, 0, len(digests))
 	hashes := make([]string, 0, len(digests))
 	for _, digest := range digests {
-		raw, err := d.Artifacts.Get(receipt.Kind, digest)
+		raw, err := d.Published.Get(ctx, receipt.Kind, digest)
 		if err != nil {
 			return nil, nil, err
 		}

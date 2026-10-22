@@ -1,7 +1,7 @@
 ---
 type: term
 title: Receipt
-description: Proof of exactly what a projection served at a watermark, verifiable from the artifact alone or against the ledger.
+description: Proof of exactly what a projection served at a watermark, verifiable from its stored row alone or against the ledger.
 timestamp: 2026-10-11T00:00:00Z
 ---
 

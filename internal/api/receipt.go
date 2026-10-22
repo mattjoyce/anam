@@ -9,9 +9,9 @@ import (
 
 // Receipts lists the receipts of past serves, newest first.
 type Receipts struct {
-	// Dir is the artifact directory the receipts were read from, on the machine
+	// Store is the operational store the receipts were read from, on the machine
 	// that read them.
-	Dir      string           `json:"dir"`
+	Store    string           `json:"store"`
 	Receipts []ReceiptListing `json:"receipts"`
 }
 
@@ -21,8 +21,8 @@ type ReceiptListing struct {
 	Receipt receipt.Receipt `json:"receipt"`
 }
 
-// ReceiptShown is a receipt and the served value it names, read from the artifacts
-// alone: the whole value, or over the daemon one page of it (card 92).
+// ReceiptShown is a receipt and the served value it names, read from the stored
+// rows alone: the whole value, or over the daemon one page of it (card 92).
 //
 // Receipt rides the first page only. A page asked for by cursor carries Hash and
 // Page with its entries: the cursor is bound to that hash, so the reader already
@@ -56,7 +56,7 @@ type Page struct {
 }
 
 // ReceiptVerified is a receipt and the two proofs of it: re-derived from the ledger,
-// and re-hashed on disk.
+// and re-hashed in the store.
 type ReceiptVerified struct {
 	Hash    string          `json:"hash"`
 	Receipt receipt.Receipt `json:"receipt"`

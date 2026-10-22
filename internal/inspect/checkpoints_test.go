@@ -12,7 +12,6 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/mint"
-	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
@@ -62,18 +61,12 @@ func newCheckpointFixture(t *testing.T) *checkpointFixture {
 		t.Fatalf("ops.Open: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	store, err := artifact.New(t.TempDir())
-	if err != nil {
-		t.Fatalf("artifact.New: %v", err)
-	}
-	t.Cleanup(func() { _ = store.Close() })
-
 	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Checkpoints: db}))
 	t.Cleanup(srv.Close)
 	return &checkpointFixture{
 		l: l, srv: srv,
 		deps: mint.Deps{
-			Ledger: l, Index: db, Artifacts: store, Buckets: defaultBuckets,
+			Ledger: l, Index: db, Values: db, Buckets: defaultBuckets,
 			Clock: clock.Fixed{Instant: time.Date(2026, 10, 13, 9, 0, 0, 0, time.UTC)},
 		},
 	}

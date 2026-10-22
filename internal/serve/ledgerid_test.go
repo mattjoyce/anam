@@ -69,7 +69,7 @@ func TestVerify_UnnamedLedgerIsANote(t *testing.T) {
 	if strings.Contains(string(raw), "ledger_id") {
 		t.Fatal("an unnamed ledger still serialises a ledger_id")
 	}
-	old, err := h.store.Put("receipt", raw)
+	old, err := h.db.Put(ctx, "receipt", raw)
 	if err != nil {
 		t.Fatalf("Put: %v", err)
 	}

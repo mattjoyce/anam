@@ -81,7 +81,7 @@ func runCmd(build string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "run",
 		Short: "time every read scenario against the record in a directory",
-		Long: `Run reads the record in --dir (ledger.db, tracking.db, artifacts/) with every
+		Long: `Run reads the record in --dir (ledger.db, tracking.db) with every
 scenario, --reps times each, and prints the timings. With --out it also writes them
 as JSON, for compare. The index is caught up first, untimed. Point it at a copy of
 a record, never at one a daemon holds.`,

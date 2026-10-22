@@ -135,7 +135,7 @@ func (h *harness) composePrefix(t *testing.T, upto string) fold.Value {
 		if id > upto {
 			continue
 		}
-		v, err := mint.Load(h.deps, row)
+		v, err := mint.Load(context.Background(), h.deps, row)
 		if err != nil {
 			t.Fatalf("Load %s: %v", id, err)
 		}

@@ -48,7 +48,16 @@ import (
 // 7 -> 8 adds facet_edge (card 104). A table added without a bump would be empty in a
 // file that had already replayed past the edges it should hold, and for edges absent
 // does not mean none, so the pre-edge file refuses and is replayed.
-const schemaVersion = 8
+//
+// 8 -> 9 adds checkpoint_value, receipt, served_value, saved_selection and
+// saved_selection_code (card 215): the values, receipts and selections that were files
+// under an artifact directory. The same rule bumps it. A version-8 file has checkpoint
+// rows naming values it does not hold, and receipts and selections that exist only in
+// the folder beside it, so a build that opened it would find them absent and answer
+// as though there were none. The file refuses, and is carried forward by rebuilding
+// it and moving the folder in (anam move-artifacts). The bump also gives mint_run its
+// picks column and drops mint_seal, which the picks replace.
+const schemaVersion = 9
 
 // ErrSchemaVersion is returned by Open for a database written by a different schema.
 var ErrSchemaVersion = errors.New("ops: schema version mismatch")
@@ -112,10 +121,12 @@ CREATE TABLE IF NOT EXISTS facet_edge (
 );
 CREATE INDEX IF NOT EXISTS facet_edge_by_facet ON facet_edge (facet_id);
 
--- tier: derived — the checkpoint index: every mint of every span, append-only.
+-- tier: derived, the checkpoint index: every mint of every span. A cache that may go
+-- missing: a mint removes the rows the newest run does not read (CollectCheckpoints),
+-- and a read that needs one that is gone folds the ledger in full.
 -- covers_w is the watermark the value actually folded; value_hash addresses the
--- checkpoint file. As-of wants "greatest covers_w <= W", which is why this is a log
--- and the head is a view.
+-- checkpoint's value in checkpoint_value. As-of wants "greatest covers_w <= W", which
+-- is why this is a log and the head is a view.
 CREATE TABLE IF NOT EXISTS checkpoint (
   span_id    TEXT NOT NULL,
   v          INTEGER NOT NULL,
@@ -132,26 +143,34 @@ CREATE VIEW IF NOT EXISTS span_head AS
   FROM checkpoint c
   WHERE v = (SELECT MAX(v) FROM checkpoint WHERE span_id = c.span_id);
 
--- tier: derived — one row per mint run that wrote. Every span's latest checkpoint at or
+-- tier: derived, checkpoint values (card 215): the bytes a checkpoint row names, keyed
+-- by the SHA-256 of themselves. Insert-only: an update is refused, and a delete is
+-- refused while any checkpoint row still names the value, so the only value that can
+-- go is one nothing reads. A value is re-hashed on every read, so a row that no longer
+-- hashes to its key is reported rather than served. Being derived it comes back by
+-- minting, and a store rebuild may drop it.
+CREATE TABLE IF NOT EXISTS checkpoint_value (
+  hash TEXT PRIMARY KEY CHECK (length(hash) = 71 AND hash GLOB 'sha256:*'),
+  body BLOB NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS checkpoint_value_no_update
+BEFORE UPDATE ON checkpoint_value
+BEGIN SELECT RAISE(ABORT, 'checkpoint_value is insert-only'); END;
+
+-- tier: derived, one row per mint run that wrote. Every span's latest checkpoint at or
 -- below a run's w was checked against the fold at w, minted or found unchanged, so a
 -- read at or after w can start from those checkpoints and replay only what came after.
 -- A run is recorded after its checkpoints, so a run still in progress is invisible.
--- Added without a schema version: the table is additive, and a store without it simply
--- has no runs, which reads as "no checkpoint to start from".
+-- picks is a digest of the checkpoints the run took (span, version and value hash),
+-- written with the run. A read that starts from a run takes the same checkpoints again
+-- and compares: a row lost, replaced or added since changes the digest, and the read
+-- declines and folds the ledger in full instead of composing from a log that is not
+-- the one the run saw (RunCheckpoints). This is also how a mint that crashed before it
+-- recorded its run is told from one that finished (LogSealed).
 CREATE TABLE IF NOT EXISTS mint_run (
   w      INTEGER PRIMARY KEY,
-  ran_at TEXT NOT NULL
-);
-
--- tier: derived — how many checkpoint rows the log held when a run at w was recorded.
--- A run's own rows and an earlier run's share a covers_w when both mint at one W (a
--- lowered budget splits with no new event), so covers_w cannot say a row was left by a
--- run that crashed. The count can: a log holding more rows than its newest seal has
--- checkpoints no recorded run accounts for, and nothing starts from it until a full
--- mint seals it again. Additive, like mint_run: a store without seals mints in full.
-CREATE TABLE IF NOT EXISTS mint_seal (
-  checkpoints INTEGER PRIMARY KEY,
-  w           INTEGER NOT NULL
+  ran_at TEXT NOT NULL,
+  picks  TEXT NOT NULL
 );
 
 -- tier: derived — how many facets each checkpoint's value holds, so a read can count
@@ -228,6 +247,64 @@ BEGIN SELECT RAISE(ABORT, 'registered_projection is immutable'); END;
 CREATE TRIGGER IF NOT EXISTS registered_projection_no_delete
 BEFORE DELETE ON registered_projection
 BEGIN SELECT RAISE(ABORT, 'registered_projection is immutable'); END;
+
+-- tier: authored, receipts (card 215): the immutable record of one serve, keyed by the
+-- SHA-256 of its own bytes. What Anam showed is not something the ledger records, so a
+-- receipt comes back from a backup or from nowhere. Immutable: the triggers refuse a
+-- change or a removal, for every writer.
+CREATE TABLE IF NOT EXISTS receipt (
+  hash TEXT PRIMARY KEY CHECK (length(hash) = 71 AND hash GLOB 'sha256:*'),
+  body BLOB NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS receipt_no_update
+BEFORE UPDATE ON receipt
+BEGIN SELECT RAISE(ABORT, 'receipt is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS receipt_no_delete
+BEFORE DELETE ON receipt
+BEGIN SELECT RAISE(ABORT, 'receipt is immutable'); END;
+
+-- tier: authored, served values (card 215): the bytes a receipt's served_hash names,
+-- keyed by the SHA-256 of themselves, so a receipt can be shown without the ledger.
+-- Immutable, like the receipt.
+CREATE TABLE IF NOT EXISTS served_value (
+  hash TEXT PRIMARY KEY CHECK (length(hash) = 71 AND hash GLOB 'sha256:*'),
+  body BLOB NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS served_value_no_update
+BEFORE UPDATE ON served_value
+BEGIN SELECT RAISE(ABORT, 'served_value is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS served_value_no_delete
+BEFORE DELETE ON served_value
+BEGIN SELECT RAISE(ABORT, 'served_value is immutable'); END;
+
+-- tier: authored, saved selections (card 215): a program's canonical text, keyed by the
+-- SHA-256 of it. Immutable; a selection is named by a code, and a code never changes
+-- meaning.
+CREATE TABLE IF NOT EXISTS saved_selection (
+  hash TEXT PRIMARY KEY CHECK (length(hash) = 71 AND hash GLOB 'sha256:*'),
+  body BLOB NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS saved_selection_no_update
+BEFORE UPDATE ON saved_selection
+BEGIN SELECT RAISE(ABORT, 'saved_selection is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS saved_selection_no_delete
+BEFORE DELETE ON saved_selection
+BEGIN SELECT RAISE(ABORT, 'saved_selection is immutable'); END;
+
+-- tier: authored, the codes of saved selections that lengthened past their first
+-- digits (card 215), each a small JSON record keyed by the SHA-256 of it. Which of two
+-- selections that share a code's start was saved first is a fact the hashes cannot
+-- say, so the record is kept. Immutable.
+CREATE TABLE IF NOT EXISTS saved_selection_code (
+  hash TEXT PRIMARY KEY CHECK (length(hash) = 71 AND hash GLOB 'sha256:*'),
+  body BLOB NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS saved_selection_code_no_update
+BEFORE UPDATE ON saved_selection_code
+BEGIN SELECT RAISE(ABORT, 'saved_selection_code is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS saved_selection_code_no_delete
+BEFORE DELETE ON saved_selection_code
+BEGIN SELECT RAISE(ABORT, 'saved_selection_code is immutable'); END;
 
 -- tier: provisioned — the static source -> facet-type token map (the gate's
 -- authenticated pillar). One row per grant.
@@ -375,7 +452,8 @@ func pinSchemaVersion(ctx context.Context, db *sql.DB) error {
 	case fresh || stored == fmt.Sprintf("%d", schemaVersion):
 		return nil
 	}
-	return fmt.Errorf("%w: database holds %s, this build writes %d — delete the file and re-run init; the derived tier replays and the provisioned tier reloads",
+	return fmt.Errorf("%w: database holds %s, this build writes %d. Set the file aside and re-run init; the derived tier replays and the provisioned tier reloads, "+
+		"and anam move-artifacts --registered-from <the old file> copies across what importers and the operator registered, and moves in any artifact folder",
 		ErrSchemaVersion, stored, schemaVersion)
 }
 

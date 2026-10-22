@@ -1,6 +1,8 @@
 package api
 
-// Checkpoints is every checkpoint ever minted, by bucket and version.
+// Checkpoints is every checkpoint the log still holds, by bucket and version. Checkpoints
+// are a cache: a mint removes the ones the newest run does not read, so this is the
+// newest of each bucket.
 type Checkpoints struct {
 	// DB is the operational store the log was read from, on the machine that read it.
 	DB          string       `json:"db"`
@@ -8,7 +10,7 @@ type Checkpoints struct {
 }
 
 // Checkpoint is one bucket's value at one version: the watermark it folded and the
-// hash of the value filed in the artifact store.
+// hash of the value filed in the operational store.
 type Checkpoint struct {
 	SpanID    string `json:"span_id"`
 	V         int    `json:"v"`

@@ -76,11 +76,11 @@ Because a tombstone is an anam-event with no artifact (§6a), the ledger's primi
 one with an optional facet**: admit an artifact with its event, or mark an existing facet with an event.
 An optional pointer would make `{no artifact, admitted}` representable.
 
-**Three substrates** (`ARCHITECTURE.md` §8): a **SQLite file** is the ledger (facet artifacts and
-anam-events, atomic in one transaction; the watermark `W` is the newest event's `seq`); the
-**filesystem** holds checkpoint values and receipts, content-addressed; a **second SQLite file** is the
-**operational store** — definitions, indexes, the span registry and per-span `V`/`Wᵥ`, cursors,
-bookmarks, GC state. Config is YAML; definitions are JSON.
+**Two substrates and the documents** (`ARCHITECTURE.md` §8): a **SQLite file** is the ledger (facet
+artifacts and anam-events, atomic in one transaction; the watermark `W` is the newest event's `seq`); a
+**second SQLite file** is the **operational store**: definitions, indexes, the checkpoint log and its
+values, receipts, saved selections, cursors; the **filesystem** holds the library of source documents.
+Config is YAML; definitions are JSON.
 
 There is no transaction across two files, so everything that must be atomic lives in one. Only
 `internal/store` may name any of them, and `scripts/check.sh` enforces that — because Anam owns no source

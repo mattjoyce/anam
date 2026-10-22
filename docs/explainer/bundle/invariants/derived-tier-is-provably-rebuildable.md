@@ -1,7 +1,7 @@
 ---
 type: invariant
 title: The derived tier must stay provably rebuildable from the ledger
-description: The ledger is the system of record; files hold published artifacts; the operational store's derived tables come back by replay and must never acquire a second home for a payload, an event or W.
+description: The ledger is the system of record; the library's files hold documents; the operational store's derived tables come back by replay and must never acquire a second home for a payload, an event or W.
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/store/ops/derived.go#ApplyReplay
 anchor: "return fmt.Errorf(\"ops: replay cursor moved since it was read at %d\", fromSeq)"

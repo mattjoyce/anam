@@ -194,8 +194,8 @@ func TestList_SortedAndPerKind(t *testing.T) {
 }
 
 // The authored tables are immutable for every writer: the triggers refuse a change
-// and a removal. The checkpoint value table refuses a change, and a removal while a
-// checkpoint row names the value.
+// and a removal. The checkpoint value table, a cache, refuses a change and lets a mint
+// remove a value.
 func TestTriggers_RefuseWhatImmutableMeans(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -222,23 +222,13 @@ func TestTriggers_RefuseWhatImmutableMeans(t *testing.T) {
 		}
 	}
 
-	// A checkpoint value goes only when no row names it.
-	named, err := d.Put(ctx, ops.KindCheckpoint, []byte("named"))
+	// A checkpoint value is a cache entry: a mint removes the ones it does not read.
+	gone, err := d.Put(ctx, ops.KindCheckpoint, []byte("unread"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := d.AppendCheckpoint(ctx, ops.CheckpointRow{SpanID: "bucket:2026", V: 1, CoversW: 1, ValueHash: named, MintedAt: "t"}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := d.SQL().ExecContext(ctx, `DELETE FROM checkpoint_value WHERE hash = ?`, named); err == nil {
-		t.Error("a checkpoint value a row names was deleted")
-	}
-	unnamed, err := d.Put(ctx, ops.KindCheckpoint, []byte("unnamed"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := d.SQL().ExecContext(ctx, `DELETE FROM checkpoint_value WHERE hash = ?`, unnamed); err != nil {
-		t.Errorf("a checkpoint value nothing names was refused: %v", err)
+	if _, err := d.SQL().ExecContext(ctx, `DELETE FROM checkpoint_value WHERE hash = ?`, gone); err != nil {
+		t.Errorf("a checkpoint value could not be removed: %v", err)
 	}
 }
 

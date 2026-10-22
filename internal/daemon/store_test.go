@@ -44,10 +44,9 @@ func TestStore_ANewDaemonOnTheTwoFilesServesWhatTheLastPublished(t *testing.T) {
 		return m
 	}
 
-	// Three rounds of publishing and minting. A receipt keeps the checkpoints its
-	// watermark reads from; the facet each round admits after its receipt is a mint no
-	// receipt reads from, and the next mint collects it. The second round's receipt is
-	// the one a read is repeated against.
+	// Three rounds of publishing and minting, so that the mints remove the checkpoints
+	// of the rounds before, and the watermarks of the first rounds have no checkpoint left
+	// to start from. The second round's receipt is the one a read is repeated against.
 	var published []api.Published
 	for round := 0; round < 3; round++ {
 		admit(round*3, 3)
@@ -56,8 +55,8 @@ func TestStore_ANewDaemonOnTheTwoFilesServesWhatTheLastPublished(t *testing.T) {
 		admit(100+round, 1)
 		mint()
 	}
-	// One watermark a receipt reads from, and one just after the first receipt's, which
-	// no receipt reads from and whose checkpoints the mints have collected.
+	// Two watermarks from before the last mint, whose checkpoints the mints have removed:
+	// reading them folds the ledger, and a daemon opened afterwards must give the same.
 	atSecond := published[1].Receipt.Watermark
 	atUnpinned := published[0].Receipt.Watermark + 1
 	timelineAt := func(base string, w int64) api.Timeline {
@@ -133,10 +132,10 @@ func TestStore_ANewDaemonOnTheTwoFilesServesWhatTheLastPublished(t *testing.T) {
 	}
 
 	// Seven mints cut seven versions of the one bucket the weigh-ins fall in. What is
-	// left is the head and the versions the three receipts read from.
+	// left is the head, which is all the newest run reads.
 	var cps api.Checkpoints
 	call(t, "GET", base2+"/v1/checkpoints", testToken, "", http.StatusOK, &cps)
-	if n := len(cps.Checkpoints); n > 4 {
-		t.Errorf("the log holds %d checkpoints, want the head and at most the three a receipt reads from", n)
+	if n := len(cps.Checkpoints); n != 1 {
+		t.Errorf("the log holds %d checkpoints, want the one head", n)
 	}
 }

@@ -23,9 +23,10 @@ import (
 //
 // Failure and recovery (Armstrong): a mint that crashes leaves checkpoints no recorded
 // run accounts for. Their covers_w cannot say so, since a run at the last run's W
-// writes rows at that W too; the log's seal can (ops.LogSealed). The next mint finds
-// the log unsealed and folds in full, which settles every bucket against the fold
-// whatever the log holds, and seals it again. A checkpoint value that has gone is met
+// writes rows at that W too; the digest of the checkpoints the run took can
+// (ops.LogSealed). The next mint finds the log unsealed and folds in full, which settles
+// every bucket against the fold whatever the log holds, and records a run whose digest
+// matches the log again. A checkpoint value that has gone is met
 // as ops.ErrNotFound, which Run answers with the full mint, which writes the
 // value again.
 

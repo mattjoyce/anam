@@ -276,7 +276,6 @@ func TestRun_RestoresAMissingCheckpointValue(t *testing.T) {
 			if tc.ingest {
 				h.bp(t, "2026-09-20T06:30:00Z", 120)
 			}
-			rows := len(h.rows(t))
 
 			dry, err := tc.run(context.Background(), h.deps, true)
 			if err != nil {
@@ -299,8 +298,8 @@ func TestRun_RestoresAMissingCheckpointValue(t *testing.T) {
 				t.Fatalf("August re-minted for a missing value: %+v", aug)
 			}
 			// Each bucket re-minted replaced the version it superseded.
-			if want := rows + res.Minted() - res.Collected.Checkpoints; len(h.rows(t)) != want {
-				t.Fatalf("checkpoint rows %d, want %d", len(h.rows(t)), want)
+			if want := len(h.heads(t)); len(h.rows(t)) != want {
+				t.Fatalf("checkpoint rows %d, want one per bucket (%d)", len(h.rows(t)), want)
 			}
 			readIsTheFold(t, h)
 		})

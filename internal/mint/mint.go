@@ -25,7 +25,8 @@
 // buckets leaves the earlier buckets minted and the later ones for the re-run. No bucket
 // is ever half-minted, because its value is one row and its checkpoint is one insert.
 //
-// A run that wrote ends by collecting the checkpoints nothing reads any more (collect).
+// A run that wrote ends by removing the checkpoints the newest run does not read
+// (collect): a checkpoint is a cache, and a read that needs one that is gone folds past it.
 package mint
 
 import (
@@ -57,7 +58,7 @@ type Index interface {
 	LastMintRun(ctx context.Context, w int64) (int64, bool, error)
 	LogSealed(ctx context.Context) (bool, error)
 	CheckpointSizes(ctx context.Context) (map[ops.SpanVersion]int, error)
-	CollectCheckpoints(ctx context.Context) (ops.Collected, error)
+	CollectCheckpoints(ctx context.Context) error
 }
 
 // Store is where checkpoint values are written to and read back from: the operational
@@ -122,12 +123,6 @@ type Result struct {
 	// the mint run at From and rebuilt only what the tail after it touched.
 	Full bool
 	From ledger.Watermark
-
-	// Collected is what the run removed afterwards: the checkpoints nothing reads any
-	// more. Zero for a dry run. CollectErr is why that failed, when it did: the run
-	// stands, and the next one collects.
-	Collected  ops.Collected
-	CollectErr error
 }
 
 // Minted counts the buckets that received a new version.
@@ -156,13 +151,13 @@ func Run(ctx context.Context, d Deps, dryRun bool) (Result, error) {
 	case err != nil:
 		return res, err
 	case ok:
-		return d.collect(ctx, res, dryRun), nil
+		return d.collect(ctx, res, dryRun)
 	}
 	res, err = d.full(ctx, dryRun)
 	if err != nil {
 		return res, err
 	}
-	return d.collect(ctx, res, dryRun), nil
+	return d.collect(ctx, res, dryRun)
 }
 
 // RunFull is Run without the last run: it folds the whole ledger and compares every
@@ -176,20 +171,21 @@ func RunFull(ctx context.Context, d Deps, dryRun bool) (Result, error) {
 	if err != nil {
 		return res, err
 	}
-	return d.collect(ctx, res, dryRun), nil
+	return d.collect(ctx, res, dryRun)
 }
 
-// collect removes the checkpoints nothing reads any more, once a run that wrote has
-// sealed the log (ops.CollectCheckpoints says which). It is the run's last step and not
-// part of what it minted: a failure here leaves the run done and the checkpoints
-// longer than they need be, and the next run collects them. It is reported in the
-// result, not returned, so a mint that stands is not reported as one that failed.
-func (d Deps) collect(ctx context.Context, res Result, dryRun bool) Result {
+// collect removes the checkpoints the newest run does not read, once a run that wrote
+// has recorded itself. It is the run's last step and not part of what it minted: a
+// failure leaves the run done and the log longer than it need be, and the next run
+// collects. The error says so.
+func (d Deps) collect(ctx context.Context, res Result, dryRun bool) (Result, error) {
 	if dryRun {
-		return res
+		return res, nil
 	}
-	res.Collected, res.CollectErr = d.Index.CollectCheckpoints(ctx)
-	return res
+	if err := d.Index.CollectCheckpoints(ctx); err != nil {
+		return res, fmt.Errorf("mint: minted at W=%d, but removing the old checkpoints failed and the next mint will try again: %w", res.W, err)
+	}
+	return res, nil
 }
 
 // pin refuses a checkpoint log built from another ledger.
@@ -303,13 +299,6 @@ func Report(ctx context.Context, d Deps, q api.MintQuery) (api.Mint, error) {
 	out := api.Mint{
 		W: int64(res.W), Written: res.Written, Full: res.Full, From: int64(res.From),
 		Outcomes: make([]api.MintOutcome, 0, len(res.Outcomes)),
-		Collected: api.Collected{
-			Checkpoints: res.Collected.Checkpoints, Runs: res.Collected.Runs,
-			Values: res.Collected.Values, Bytes: res.Collected.Bytes,
-		},
-	}
-	if res.CollectErr != nil {
-		out.CollectError = res.CollectErr.Error()
 	}
 	for _, o := range res.Outcomes {
 		out.Outcomes = append(out.Outcomes, api.MintOutcome{

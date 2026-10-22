@@ -88,7 +88,7 @@ func ReadWindow(ctx context.Context, l ReadLedger, log WindowLog, values Store,
 		need := overlaps(b.bucket, from, toX)
 		inner, entries, n, err := readBucket(ctx, values, b, d, need, sizes)
 		if err != nil {
-			return Window{}, false, ifRunStands(ctx, log, run, err)
+			return Window{}, false, declineIfMissing(err)
 		}
 		if entries != nil {
 			win.Decoded++
@@ -108,9 +108,6 @@ func ReadWindow(ctx context.Context, l ReadLedger, log WindowLog, values Store,
 	h.Write([]byte("]"))
 	win.Hash = "sha256:" + hex.EncodeToString(h.Sum(nil))
 	if win.Value, err = fold.NewValue(shown); err != nil {
-		return Window{}, false, err
-	}
-	if stands, err := runStands(ctx, log, run); err != nil || !stands {
 		return Window{}, false, err
 	}
 	return win, true, nil

@@ -46,9 +46,10 @@ func TestReadAt_IsTheFoldAtEveryWatermark(t *testing.T) {
 }
 
 // checkReads holds ReadAt, and ReadWindow over each window given, to the full fold at
-// every watermark from 1 to the ledger's head. run is the newest mint run, the only one
-// the log keeps: a read from it on composes from it and its tail, and a read before it
-// has no run and says so. Either way the value is the fold's.
+// every watermark from 1 to the ledger's head. run is the newest mint run: a read from it
+// on composes from it and its tail. A read before it composes from an older run only if
+// every checkpoint that run saw is still in the log, and otherwise says it cannot. Either
+// way the value is the fold's.
 func (h *harness) checkReads(t *testing.T, from, run ledger.Watermark, windows [][2]string) {
 	t.Helper()
 	ctx := context.Background()
@@ -65,8 +66,8 @@ func (h *harness) checkReads(t *testing.T, from, run ledger.Watermark, windows [
 		if err != nil {
 			t.Fatalf("W=%d: %v", w, err)
 		}
-		if ok != (w >= run) {
-			t.Fatalf("W=%d: composed=%v, want %v (newest run at %d)", w, ok, w >= run, run)
+		if w >= run && !ok {
+			t.Fatalf("W=%d: no composed read, but the newest run (%d) is at or before it", w, run)
 		}
 		if !ok {
 			continue
@@ -80,8 +81,13 @@ func (h *harness) checkReads(t *testing.T, from, run ledger.Watermark, windows [
 				t.Errorf("W=%d: %s at v%d, fold says v%d", w, id, v, want.States[id].Version)
 			}
 		}
-		if got.Run != run || got.Tail != int(w-run) {
-			t.Errorf("W=%d: started from run %d with tail %d, want run %d", w, got.Run, got.Tail, run)
+		wantRun := run
+		if w < run {
+			// An older run whose checkpoints all still stand reads as before.
+			wantRun = got.Run
+		}
+		if got.Run != wantRun || got.Run > w || got.Tail != int(w-got.Run) {
+			t.Errorf("W=%d: started from run %d with tail %d, want run %d", w, got.Run, got.Tail, wantRun)
 		}
 		for _, win := range windows {
 			gotWin, ok, err := mint.ReadWindow(ctx, h.l, h.db, h.deps.Values, w, win[0], win[1])

@@ -748,8 +748,8 @@ paths:
       description: >-
         Runs on the write queue; while another write holds it, 503 at once. dry_run
         derives and publishes nothing; full folds the whole ledger instead of starting
-        from the last run. A run that wrote ends by removing the checkpoints nothing
-        reads any more, and says what it removed in collected.
+        from the last run. A run that wrote ends by removing the checkpoints the newest run does
+        not read; checkpoints are a cache.
       parameters:
         - name: dry_run
           in: query
@@ -1754,22 +1754,12 @@ components:
               minted_at: { $ref: "#/components/schemas/AnamTime" }
     Mint:
       type: object
-      required: [w, written, full, outcomes, collected]
+      required: [w, written, full, outcomes]
       properties:
         w: { type: integer, format: int64 }
         written: { type: boolean, description: false for a dry run }
         full: { type: boolean }
         from: { type: integer, format: int64 }
-        collected:
-          type: object
-          description: what the run removed afterwards, the checkpoints nothing reads any more
-          required: [checkpoints, runs, values, bytes]
-          properties:
-            checkpoints: { type: integer }
-            runs: { type: integer }
-            values: { type: integer }
-            bytes: { type: integer, format: int64 }
-        collect_error: { type: string, description: why removing them failed, when it did; the mint stands and the next one removes them }
         outcomes:
           type: array
           items:

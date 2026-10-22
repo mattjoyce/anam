@@ -263,9 +263,6 @@ func TestRun_BackfillReopensOneBucket(t *testing.T) {
 	if len(h.rows(t)) != 3 || h.files(t) != 3 {
 		t.Fatalf("checkpoint rows and values: %d and %d, want 3 and 3", len(h.rows(t)), h.files(t))
 	}
-	if after.Collected.Checkpoints != 1 || after.Collected.Values != 1 {
-		t.Errorf("the mint removed %+v, want July's first version and its value", after.Collected)
-	}
 }
 
 // A new version whose fact-time falls in another bucket re-mints both buckets, and a

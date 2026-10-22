@@ -26,8 +26,9 @@ var ErrOtherLedger = errors.New("mint: checkpoints belong to another ledger")
 type CheckpointLog interface {
 	LedgerID(ctx context.Context) (string, error)
 	LastMintRun(ctx context.Context, w int64) (int64, bool, error)
-	LogSealed(ctx context.Context) (bool, error)
-	CheckpointsAt(ctx context.Context, w int64) ([]ops.CheckpointRow, error)
+	// RunCheckpoints is the checkpoints a read from the run takes, and ok false when
+	// the log no longer yields the ones the run saw.
+	RunCheckpoints(ctx context.Context, run int64) ([]ops.CheckpointRow, bool, error)
 }
 
 // ReadLedger is the ledger surface a composed read needs: the tail, the artifacts the
@@ -75,7 +76,7 @@ func ReadAt(ctx context.Context, l ReadLedger, log CheckpointLog, values Store, 
 	byID := map[string]fold.Entry{}
 	for _, row := range rows {
 		if err := loadInto(ctx, values, row, byID); err != nil {
-			return Composed{}, false, ifRunStands(ctx, log, run, err)
+			return Composed{}, false, declineIfMissing(err)
 		}
 	}
 
@@ -96,45 +97,26 @@ func ReadAt(ctx context.Context, l ReadLedger, log CheckpointLog, values Store, 
 	if err != nil {
 		return Composed{}, false, err
 	}
-	if stands, err := runStands(ctx, log, run); err != nil || !stands {
-		return Composed{}, false, err
-	}
 	return Composed{
 		W: w, Value: value, Run: run, Checkpoints: len(rows), Tail: len(tail),
 		Touched: len(versions.touched), Versions: versions.live,
 	}, true, nil
 }
 
-// runStands reports whether the mint run is still recorded. A mint collects the
-// checkpoints nothing reads any more, with the runs only they were read from, in one
-// transaction; a read takes the run, its checkpoints and their values in separate
-// steps, so one that straddles the collection may hold a run, or the rows of one, that
-// is gone. It checks before it trusts what it got. A run that stands was not collected,
-// and what was read from it is whole, because the collection removes a run, its rows
-// and their values together or none of them.
-func runStands(ctx context.Context, log CheckpointLog, run ledger.Watermark) (bool, error) {
-	got, ok, err := log.LastMintRun(ctx, int64(run))
-	return ok && got == int64(run), err
-}
-
-// ifRunStands is the error a read failed with if its run still stands, and nil if the
-// run is gone, which is the collection's doing and not a fault: the read answers
-// that it has no run to start from, and the caller folds the ledger in full.
-func ifRunStands(ctx context.Context, log CheckpointLog, run ledger.Watermark, failed error) error {
-	stands, err := runStands(ctx, log, run)
-	switch {
-	case err != nil:
-		return err
-	case stands:
-		return failed
+// declineIfMissing turns a checkpoint value that is not in the store into a read that
+// declines, which its caller answers by folding the ledger in full: a checkpoint is a
+// cache, and a missing one is a miss. Any other error, a value whose bytes do not hash
+// to their key among them, stays an error, since that is damage and not absence.
+func declineIfMissing(err error) error {
+	if errors.Is(err, ops.ErrNotFound) {
+		return nil
 	}
-	return nil
+	return err
 }
 
 // startingRun is the latest mint run at or below w, once the log is known to describe
-// this ledger and every checkpoint in it to belong to a recorded run. A mint that
-// crashed may have left rows a run at w would take for its own, so until a mint seals
-// the log again, reads fold in full.
+// this ledger. Whether the run's checkpoints are all still there is asked next, of the
+// log, in leavesAt.
 func startingRun(ctx context.Context, l ReadLedger, log CheckpointLog, w ledger.Watermark,
 ) (ledger.Watermark, bool, error) {
 	pinned, err := log.LedgerID(ctx)
@@ -148,9 +130,6 @@ func startingRun(ctx context.Context, l ReadLedger, log CheckpointLog, w ledger.
 	if pinned != id {
 		return 0, false, fmt.Errorf("%w: the log was built from %s, this is %s", ErrOtherLedger, pinned, id)
 	}
-	if sealed, err := log.LogSealed(ctx); err != nil || !sealed {
-		return 0, false, err
-	}
 	run, ok, err := log.LastMintRun(ctx, int64(w))
 	return ledger.Watermark(run), ok, err
 }
@@ -158,11 +137,14 @@ func startingRun(ctx context.Context, l ReadLedger, log CheckpointLog, w ledger.
 // leavesAt returns the checkpoints at run of the buckets the layout then held, and that
 // layout. A bucket split since its checkpoint was minted has children with their own,
 // so its row is history, not part of the value. ok is false for a log whose ids do
-// not subdivide (a weekly width): the caller reads the full fold instead.
+// not subdivide (a weekly width), and for a run whose checkpoints are not all there: the
+// caller reads the full fold instead. That check is the one that keeps a cache which lost
+// entries from answering with a bucket missing or stale, since a span whose row is gone
+// would otherwise simply be absent from the value.
 func leavesAt(ctx context.Context, log CheckpointLog, run ledger.Watermark,
 ) ([]ops.CheckpointRow, span.Layout, bool, error) {
-	rows, err := log.CheckpointsAt(ctx, int64(run))
-	if err != nil {
+	rows, ok, err := log.RunCheckpoints(ctx, int64(run))
+	if err != nil || !ok {
 		return nil, span.Layout{}, false, err
 	}
 	ids := make([]string, len(rows))

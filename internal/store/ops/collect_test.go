@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/store/ops"
+	"github.com/mattjoyce/anam/internal/store/ops/opstest"
 )
 
 // Collection of old checkpoints (card 215), over a log built by hand as the mint
@@ -48,14 +49,6 @@ func (b *logBuilder) run(w int64) {
 	}
 }
 
-// receipt files a receipt whose watermark is w.
-func (b *logBuilder) receipt(w int) {
-	b.t.Helper()
-	if _, err := b.d.Put(b.ctx, ops.KindReceipt, []byte(fmt.Sprintf(`{"watermark":%d,"served_hash":"sha256:x"}`, w))); err != nil {
-		b.t.Fatal(err)
-	}
-}
-
 // at is what a read from the run at w takes, as "span vN" in span order.
 func (b *logBuilder) at(w int64) []string {
 	b.t.Helper()
@@ -70,26 +63,44 @@ func (b *logBuilder) at(w int64) []string {
 	return out
 }
 
-func (b *logBuilder) runs() []int64 {
+func (b *logBuilder) collect() {
 	b.t.Helper()
-	var out []int64
-	for w := int64(0); w <= 100; w++ {
-		if run, ok, err := b.d.LastMintRun(b.ctx, w); err != nil {
-			b.t.Fatal(err)
-		} else if ok && run == w {
-			out = append(out, w)
-		}
+	if err := b.d.CollectCheckpoints(b.ctx); err != nil {
+		b.t.Fatalf("CollectCheckpoints: %v", err)
+	}
+}
+
+// log is the rows the log holds, as "span vN" in span order.
+func (b *logBuilder) log() []string {
+	b.t.Helper()
+	rows, err := b.d.Checkpoints(b.ctx)
+	if err != nil {
+		b.t.Fatal(err)
+	}
+	var out []string
+	for _, r := range rows {
+		out = append(out, fmt.Sprintf("%s v%d", r.SpanID, r.V))
 	}
 	return out
 }
 
-func (b *logBuilder) collect() ops.Collected {
+func (b *logBuilder) values() int {
 	b.t.Helper()
-	got, err := b.d.CollectCheckpoints(b.ctx)
+	digests, err := b.d.List(b.ctx, ops.KindCheckpoint)
 	if err != nil {
-		b.t.Fatalf("CollectCheckpoints: %v", err)
+		b.t.Fatal(err)
 	}
-	return got
+	return len(digests)
+}
+
+// readable reports whether a read from the run at w finds its checkpoints all there.
+func (b *logBuilder) readable(w int64) bool {
+	b.t.Helper()
+	_, ok, err := b.d.RunCheckpoints(b.ctx, w)
+	if err != nil {
+		b.t.Fatal(err)
+	}
+	return ok
 }
 
 func same[T comparable](t *testing.T, what string, got, want []T) {
@@ -112,79 +123,58 @@ func buildThreeRuns(b *logBuilder) {
 	b.run(30)
 }
 
-func TestCollect_KeepsTheNewestRunAndTheHeadsAndNothingElse(t *testing.T) {
+// A collection keeps what the newest run reads, which is each span's head, and nothing
+// else: not the older versions, their sizes or their values.
+func TestCollect_KeepsWhatTheNewestRunReads(t *testing.T) {
 	t.Parallel()
 	b := newLog(t)
 	buildThreeRuns(b)
+	if !b.readable(10) || !b.readable(20) || !b.readable(30) {
+		t.Fatal("a run is not readable before any collection")
+	}
 
-	got := b.collect()
-	want := ops.Collected{Runs: 2, Checkpoints: 3, Values: 3}
-	if got.Runs != want.Runs || got.Checkpoints != want.Checkpoints || got.Values != want.Values || got.Bytes == 0 {
-		t.Errorf("collected %+v, want %d runs, %d checkpoints, %d values and their bytes", got, want.Runs, want.Checkpoints, want.Values)
+	b.collect()
+	same(t, "the log", b.log(), []string{"A v3", "B v2"})
+	same(t, "a read from the newest run", b.at(30), []string{"A v3", "B v2"})
+	if n := b.values(); n != 2 {
+		t.Errorf("%d checkpoint values remain, want the 2 the heads name", n)
 	}
-	same(t, "the log", func() []string {
-		rows, _ := b.d.Checkpoints(b.ctx)
-		var out []string
-		for _, r := range rows {
-			out = append(out, fmt.Sprintf("%s v%d", r.SpanID, r.V))
-		}
-		return out
-	}(), []string{"A v3", "B v2"})
-	same(t, "the runs", b.runs(), []int64{30})
-	same(t, "a read at the newest run", b.at(30), []string{"A v3", "B v2"})
-	// A watermark between the runs removed has no run left to start from.
-	if _, ok, _ := b.d.LastMintRun(b.ctx, 25); ok {
-		t.Error("a read at 25 still finds a run")
-	}
-	digests, _ := b.d.List(b.ctx, ops.KindCheckpoint)
-	if len(digests) != 2 {
-		t.Errorf("%d checkpoint values remain, want the 2 the heads name", len(digests))
-	}
-	sizes, _ := b.d.CheckpointSizes(b.ctx)
-	if len(sizes) != 2 {
+	if sizes, _ := b.d.CheckpointSizes(b.ctx); len(sizes) != 2 {
 		t.Errorf("%d sizes remain, want 2", len(sizes))
 	}
 	if sealed, err := b.d.LogSealed(b.ctx); err != nil || !sealed {
-		t.Errorf("LogSealed after a collection = %v, %v, want sealed at the rows that remain", sealed, err)
+		t.Errorf("LogSealed after a collection = %v, %v, want sealed", sealed, err)
 	}
-	if again := b.collect(); !again.None() {
-		t.Errorf("a second collection removed %+v", again)
+	if !b.readable(30) {
+		t.Error("the newest run cannot be read after a collection")
 	}
+	// The older runs saw checkpoints that are gone, so they decline.
+	if b.readable(10) || b.readable(20) {
+		t.Error("an older run whose checkpoints were removed still reads")
+	}
+	b.collect()
+	same(t, "the log after a second collection", b.log(), []string{"A v3", "B v2"})
 }
 
-// A receipt pins the run its watermark starts from, and with it the checkpoints that run
-// reads: verifying it later still starts from a floor.
-func TestCollect_AReceiptPinsTheRunItReadsFrom(t *testing.T) {
+// A run whose checkpoints are still the newest run's keeps reading: nothing it needs
+// is gone, so there is nothing for it to decline over.
+func TestCollect_AnOlderRunWhoseCheckpointsStandStillReads(t *testing.T) {
 	t.Parallel()
 	b := newLog(t)
-	buildThreeRuns(b)
-	b.receipt(25) // starts from the run at 20
-
-	got := b.collect()
-	if got.Runs != 1 || got.Checkpoints != 1 {
-		t.Errorf("collected %+v, want the run at 10 and A v1", got)
+	b.row("A", 1, 10, "a1")
+	b.run(10)
+	b.row("B", 1, 20, "b1")
+	b.run(20)
+	b.run(30) // nothing new: the same checkpoints as the run at 20
+	b.collect()
+	if !b.readable(30) || !b.readable(20) || !b.readable(10) {
+		t.Error("runs whose checkpoints all stand stopped reading")
 	}
-	same(t, "the runs", b.runs(), []int64{20, 30})
-	same(t, "a read from the pinned run", b.at(20), []string{"A v2", "B v1"})
-	same(t, "a read from the newest run", b.at(30), []string{"A v3", "B v2"})
-	if sealed, _ := b.d.LogSealed(b.ctx); !sealed {
-		t.Error("the log is not sealed after a collection")
-	}
-}
-
-func TestCollect_AReceiptThatPinsNothing(t *testing.T) {
-	t.Parallel()
-	b := newLog(t)
-	buildThreeRuns(b)
-	b.receipt(3) // below every run
-	for _, body := range []string{`not json`, `{"served_hash":"sha256:x"}`, `{"watermark":"soon"}`} {
-		if _, err := b.d.Put(b.ctx, ops.KindReceipt, []byte(body)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	got := b.collect()
-	if got.Runs != 2 || got.Checkpoints != 3 {
-		t.Errorf("collected %+v, want the same as with no receipt: 2 runs and 3 checkpoints", got)
+	b.row("A", 2, 40, "a2")
+	b.run(40)
+	b.collect()
+	if !b.readable(40) || b.readable(30) || b.readable(10) {
+		t.Error("after A moved on, only the newest run should read: the others saw A v1")
 	}
 }
 
@@ -199,49 +189,49 @@ func TestCollect_KeepsAValueARowStillNames(t *testing.T) {
 	b.run(20)
 	b.row("A", 3, 30, "same")
 	b.run(30)
-
-	got := b.collect()
-	if got.Checkpoints != 2 || got.Values != 1 {
-		t.Errorf("collected %+v, want 2 checkpoints and the one value only they named", got)
+	b.collect()
+	same(t, "the log", b.log(), []string{"A v3"})
+	if n := b.values(); n != 1 {
+		t.Fatalf("%d values remain, want the head's", n)
 	}
 	rows, _ := b.d.Checkpoints(b.ctx)
-	if len(rows) != 1 {
-		t.Fatalf("the log holds %d rows, want the head", len(rows))
-	}
 	if _, err := b.d.Get(b.ctx, ops.KindCheckpoint, rows[0].ValueHash); err != nil {
 		t.Errorf("the head's value is gone: %v", err)
 	}
 }
 
-// A log holding rows from a mint that crashed is not sealed, and collecting around them
-// would seal them in as a run's own. It waits for the next run.
-func TestCollect_WaitsForASealedLog(t *testing.T) {
+// A row written after the newest run, by a mint that crashed before it recorded its run,
+// is not read and goes; the log is as the run left it.
+func TestCollect_RemovesWhatACrashedMintWroteAfterTheRun(t *testing.T) {
 	t.Parallel()
 	b := newLog(t)
 	buildThreeRuns(b)
-	b.row("A", 4, 40, "a4") // a mint that crashed after this row, before its run
-	if got := b.collect(); !got.None() {
-		t.Fatalf("collected %+v from an unsealed log", got)
-	}
+	b.row("A", 4, 40, "a4")
+	b.row("C", 1, 40, "c1")
 	if sealed, _ := b.d.LogSealed(b.ctx); sealed {
-		t.Fatal("the collection sealed an unsealed log")
+		t.Fatal("a log holding rows after its newest run reads as sealed")
 	}
-	b.run(40)
-	if got := b.collect(); got.Checkpoints != 4 || got.Runs != 3 {
-		t.Errorf("after the run, collected %+v, want 4 checkpoints and 3 runs", got)
+	b.collect()
+	same(t, "the log", b.log(), []string{"A v3", "B v2"})
+	if sealed, _ := b.d.LogSealed(b.ctx); !sealed {
+		t.Error("the log is not sealed once the rows no run accounts for are gone")
 	}
 }
 
-func TestCollect_AnEmptyLog(t *testing.T) {
+// With no run recorded nothing is read, and nothing is removed.
+func TestCollect_NoRunRemovesNothing(t *testing.T) {
 	t.Parallel()
 	b := newLog(t)
-	if got := b.collect(); !got.None() {
-		t.Errorf("collected %+v from an empty log", got)
+	b.row("A", 1, 10, "a1")
+	b.row("A", 2, 20, "a2")
+	b.collect()
+	same(t, "the log", b.log(), []string{"A v1", "A v2"})
+	if n := b.values(); n != 2 {
+		t.Errorf("%d values remain, want 2", n)
 	}
 }
 
-// A value put by a move that no row names is as unread as one a collected row named, so
-// the next collection takes it.
+// A value put by a move that no row names is as unread as one a collected row named.
 func TestCollect_RemovesValuesNoRowNames(t *testing.T) {
 	t.Parallel()
 	b := newLog(t)
@@ -251,10 +241,76 @@ func TestCollect_RemovesValuesNoRowNames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := b.collect(); got.Values != 1 {
-		t.Errorf("collected %+v, want the orphan", got)
-	}
+	b.collect()
 	if _, err := b.d.Size(b.ctx, ops.KindCheckpoint, orphan); err == nil {
 		t.Error("the orphan survived")
+	}
+	if n := b.values(); n != 1 {
+		t.Errorf("%d values remain, want the head's", n)
+	}
+}
+
+// A read from a run takes the checkpoints the run saw. A log that lost one, replaced
+// one, or gained one since does not yield them, and the read must be told so rather
+// than composed from what is left: that is the one way a cache that lost entries could
+// give a value with a bucket missing or stale in it.
+func TestRunCheckpoints_NoticesWhatIsGoneChangedOrAdded(t *testing.T) {
+	t.Parallel()
+	build := func(t *testing.T) *logBuilder {
+		b := newLog(t)
+		b.row("A", 1, 10, "a1")
+		b.row("B", 1, 10, "b1")
+		b.run(10)
+		b.row("A", 2, 20, "a2")
+		b.run(20)
+		return b
+	}
+	for _, tc := range []struct {
+		name string
+		hurt func(t *testing.T, b *logBuilder)
+	}{
+		{"nothing hurt", func(*testing.T, *logBuilder) {}},
+		{"a span's only row lost", func(t *testing.T, b *logBuilder) {
+			if err := opstest.LoseCheckpointRow(b.ctx, b.d, "B", 1); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"the head lost, leaving the version before it", func(t *testing.T, b *logBuilder) {
+			if err := opstest.LoseCheckpointRow(b.ctx, b.d, "A", 2); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"a row added at a version the run did not see", func(t *testing.T, b *logBuilder) {
+			b.row("A", 3, 20, "a3") // same covers_w as the run: it would now be the pick
+		}},
+		{"a span added at or below the run", func(t *testing.T, b *logBuilder) {
+			b.row("C", 1, 15, "c1")
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			b := build(t)
+			if !b.readable(20) || !b.readable(10) {
+				t.Fatal("the runs do not read before anything is hurt")
+			}
+			tc.hurt(t, b)
+			want := tc.name == "nothing hurt"
+			if got := b.readable(20); got != want {
+				t.Errorf("readable(20) = %v, want %v", got, want)
+			}
+		})
+	}
+	b := build(t)
+	if _, ok, err := b.d.RunCheckpoints(b.ctx, 15); err != nil || ok {
+		t.Errorf("a w that is no run reads: ok=%v err=%v", ok, err)
+	}
+	// An older run whose pick for a span was lost, though a newer version remains: the
+	// plain query would answer with no row for the span at all.
+	if err := opstest.LoseCheckpointRow(b.ctx, b.d, "A", 1); err != nil {
+		t.Fatal(err)
+	}
+	same(t, "the plain query at 10", b.at(10), []string{"B v1"})
+	if b.readable(10) {
+		t.Error("RunCheckpoints at 10 read a log with A missing")
 	}
 }

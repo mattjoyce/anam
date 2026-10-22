@@ -40,49 +40,24 @@ func Corrupt(ctx context.Context, db *ops.DB, kind, digest string, body []byte) 
 }
 
 // LoseCheckpointValue removes a checkpoint value although the log still names it, as a
-// store whose values were not carried across would be. The store refuses to delete a
-// value a checkpoint row names, so the rows that name it are lifted for the delete and
-// put back as they were, in one transaction.
+// cache that lost an entry would.
 func LoseCheckpointValue(ctx context.Context, db *ops.DB, digest string) error {
-	tx, err := db.SQL().BeginTx(ctx, nil)
-	if err != nil {
+	if _, err := db.SQL().ExecContext(ctx, `DELETE FROM checkpoint_value WHERE hash = ?`, digest); err != nil {
 		return fmt.Errorf("opstest: lose %s: %w", digest, err)
 	}
-	defer func() { _ = tx.Rollback() }() // no-op after Commit
+	return nil
+}
 
-	rows, err := tx.QueryContext(ctx,
-		`SELECT span_id, v, covers_w, value_hash, minted_at FROM checkpoint WHERE value_hash = ?`, digest)
-	if err != nil {
-		return fmt.Errorf("opstest: lose %s: %w", digest, err)
-	}
-	var named []ops.CheckpointRow
-	for rows.Next() {
-		var r ops.CheckpointRow
-		if err := rows.Scan(&r.SpanID, &r.V, &r.CoversW, &r.ValueHash, &r.MintedAt); err != nil {
-			_ = rows.Close()
-			return fmt.Errorf("opstest: lose %s: %w", digest, err)
-		}
-		named = append(named, r)
-	}
-	if err := rows.Err(); err != nil {
-		_ = rows.Close()
-		return fmt.Errorf("opstest: lose %s: %w", digest, err)
-	}
-	if err := rows.Close(); err != nil {
-		return fmt.Errorf("opstest: lose %s: %w", digest, err)
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM checkpoint WHERE value_hash = ?`, digest); err != nil {
-		return fmt.Errorf("opstest: lose %s: %w", digest, err)
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM checkpoint_value WHERE hash = ?`, digest); err != nil {
-		return fmt.Errorf("opstest: lose %s: %w", digest, err)
-	}
-	for _, r := range named {
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO checkpoint (span_id, v, covers_w, value_hash, minted_at) VALUES (?, ?, ?, ?, ?)`,
-			r.SpanID, r.V, r.CoversW, r.ValueHash, r.MintedAt); err != nil {
-			return fmt.Errorf("opstest: lose %s: %w", digest, err)
+// LoseCheckpointRow removes one checkpoint row, and its recorded size, from the log, as a
+// cache that lost an entry would. The mint runs that read it are left as they were.
+func LoseCheckpointRow(ctx context.Context, db *ops.DB, spanID string, v int) error {
+	for _, q := range []string{
+		`DELETE FROM checkpoint_size WHERE span_id = ? AND v = ?`,
+		`DELETE FROM checkpoint WHERE span_id = ? AND v = ?`,
+	} {
+		if _, err := db.SQL().ExecContext(ctx, q, spanID, v); err != nil {
+			return fmt.Errorf("opstest: lose %s v%d: %w", spanID, v, err)
 		}
 	}
-	return tx.Commit()
+	return nil
 }

@@ -9,19 +9,20 @@ import (
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
+	"github.com/mattjoyce/anam/internal/store/ops/opstest"
 )
 
-// Collecting old checkpoints ends a mint (card 215): a checkpoint a later one of its
-// span subsumes and no receipt pins is removed, with the run it was read from, and every
-// read stays the fold.
+// Checkpoints are a cache (card 215). A mint ends by removing what the newest run does
+// not read, and a read that needs a checkpoint that is gone folds the ledger instead of
+// composing from what is left.
 
-// A mint leaves the heads and nothing else, and a read at a watermark before the run
-// that remains still answers, from the ledger.
-func TestRun_LeavesOnlyTheCheckpointsStillNeeded(t *testing.T) {
+// A mint leaves each bucket's head and nothing else, and a read at an older watermark
+// still answers, from the ledger.
+func TestRun_LeavesOnlyWhatTheNewestRunReads(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()
 	h.seed(t)
-	first := h.run(t, false)
+	h.run(t, false)
 
 	// Three later mints, each re-opening July and August.
 	var last mint.Result
@@ -29,13 +30,9 @@ func TestRun_LeavesOnlyTheCheckpointsStillNeeded(t *testing.T) {
 		h.bp(t, fmt.Sprintf("2026-07-%02dT08:00:00Z", 10+i), 120+i)
 		h.bp(t, fmt.Sprintf("2026-08-%02dT08:00:00Z", 10+i), 130+i)
 		last = h.run(t, false)
-		if last.Collected.Checkpoints != 2 {
-			t.Fatalf("mint %d removed %+v, want the two versions it subsumed", i+2, last.Collected)
-		}
 	}
 
-	heads := h.heads(t)
-	rows := h.rows(t)
+	heads, rows := h.heads(t), h.rows(t)
 	if len(rows) != len(heads) || len(rows) != 3 {
 		t.Fatalf("the log holds %d rows for %d buckets, want 3 and 3", len(rows), len(heads))
 	}
@@ -49,8 +46,8 @@ func TestRun_LeavesOnlyTheCheckpointsStillNeeded(t *testing.T) {
 		t.Errorf("LogSealed = %v, %v after a mint, want sealed", sealed, err)
 	}
 
-	// Every watermark answers as the fold does: from the run that remains at or after
-	// it, and from the ledger before it.
+	// Every watermark answers as the fold does: from the newest run at or after it, and
+	// from the ledger before it, where the older runs no longer have their rows.
 	head, _ := h.l.Head(ctx)
 	for w := ledger.Watermark(1); w <= head; w++ {
 		want, err := fold.ReadAt(ctx, h.l, w)
@@ -62,7 +59,7 @@ func TestRun_LeavesOnlyTheCheckpointsStillNeeded(t *testing.T) {
 			t.Fatalf("W=%d: %v", w, err)
 		}
 		if ok != (w >= last.W) {
-			t.Fatalf("W=%d: composed=%v, want %v: the first run (%d) is gone, the newest is %d", w, ok, w >= last.W, first.W, last.W)
+			t.Fatalf("W=%d: composed=%v, want %v (newest run %d)", w, ok, w >= last.W, last.W)
 		}
 		if ok && got.Value.Hash() != want.Value.Hash() {
 			t.Fatalf("W=%d: composed %s, fold %s", w, got.Value.Hash(), want.Value.Hash())
@@ -70,113 +67,217 @@ func TestRun_LeavesOnlyTheCheckpointsStillNeeded(t *testing.T) {
 	}
 }
 
-// A receipt keeps the floor its watermark reads from: the run, and the checkpoints it
-// takes, stay, and a read at that watermark still starts from them.
-func TestRun_AReceiptKeepsItsFloor(t *testing.T) {
-	h := newHarness(t)
-	ctx := context.Background()
-	h.seed(t)
-	first := h.run(t, false)
-	h.bp(t, "2026-07-20T08:00:00Z", 125)
-	pinned := ledger.Watermark(first.W + 1) // between the first run and the next
-	h.bp(t, "2026-07-21T08:00:00Z", 126)
-
-	body := fmt.Sprintf(`{"watermark":%d,"served_hash":"sha256:x"}`, pinned)
-	if _, err := h.db.Put(ctx, ops.KindReceipt, []byte(body)); err != nil {
-		t.Fatal(err)
-	}
-	second := h.run(t, false)
-	if second.Collected.Runs != 0 || second.Collected.Checkpoints != 0 {
-		t.Fatalf("the mint removed %+v although a receipt reads from the first run", second.Collected)
-	}
-	if len(h.rows(t)) != 4 {
-		t.Fatalf("the log holds %d rows, want July's two versions and the other buckets' one", len(h.rows(t)))
-	}
-
-	want, err := fold.ReadAt(ctx, h.l, pinned)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, ok, err := mint.ReadAt(ctx, h.l, h.db, h.deps.Values, pinned)
-	if err != nil || !ok || got.Run != first.W || got.Value.Hash() != want.Value.Hash() {
-		t.Fatalf("ReadAt at the receipt's watermark: ok=%v err=%v run=%d, want the first run (%d) and the fold's value", ok, err, got.Run, first.W)
-	}
-
-	// A later mint collects what the receipt does not read from, and no more.
-	h.bp(t, "2026-07-22T08:00:00Z", 127)
-	if third := h.run(t, false); third.Collected.Runs != 1 || third.Collected.Checkpoints != 1 {
-		t.Errorf("the third mint removed %+v, want the second run and July's v2, subsumed by v3", third.Collected)
-	}
-}
-
-// A dry run collects nothing, and a mint that crashed before its run was recorded
-// leaves the log unsealed, so nothing is collected around it.
+// A dry run removes nothing.
 func TestRun_DryRunCollectsNothing(t *testing.T) {
 	h := newHarness(t)
 	h.seed(t)
 	h.run(t, false)
 	h.bp(t, "2026-07-20T08:00:00Z", 125)
 	before := len(h.rows(t))
-	dry := h.run(t, true)
-	if !dry.Collected.None() || len(h.rows(t)) != before {
-		t.Fatalf("a dry run collected %+v", dry.Collected)
+	h.run(t, true)
+	if len(h.rows(t)) != before {
+		t.Fatalf("a dry run changed the log from %d rows to %d", before, len(h.rows(t)))
 	}
 }
 
-// straddle is a checkpoint log that, once a read has the rows of a run, lets a later mint
-// run, as one running beside the read would. during runs on every call, so it is written
-// to do its work once.
-type straddle struct {
+// hurt is a way a cache loses an entry.
+type hurt struct {
+	name string
+	do   func(t *testing.T, h *harness)
+}
+
+// The ways a checkpoint can go: a value of the newest run, a row of it, the head of one
+// bucket while an older version of it stays, and a row that had been collected.
+func hurts() []hurt {
+	return []hurt{
+		{"a value gone", func(t *testing.T, h *harness) {
+			if err := opstest.LoseCheckpointValue(context.Background(), h.db, h.heads(t)["bucket:2026-08"].ValueHash); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"a bucket's only row gone", func(t *testing.T, h *harness) {
+			if err := opstest.LoseCheckpointRow(context.Background(), h.db, "bucket:2026-09", 1); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"a head gone, an older version of it left", func(t *testing.T, h *harness) {
+			// The run reads July's second version. Put the first back as the pick: the
+			// log is what an older mint left, and a read that composed from it would
+			// carry the July of an earlier watermark.
+			head := h.heads(t)["bucket:2026-07"]
+			if head.V < 2 {
+				t.Fatal("July has no second version to lose")
+			}
+			if err := opstest.LoseCheckpointRow(context.Background(), h.db, head.SpanID, head.V); err != nil {
+				t.Fatal(err)
+			}
+		}},
+	}
+}
+
+// readyForHurt is a harness minted twice, July having moved on between, with July's first
+// version put back in the log beside its second, as a log that had not yet collected has it.
+func readyForHurt(t *testing.T) *harness {
+	t.Helper()
+	h := newHarness(t)
+	h.seed(t)
+	h.run(t, false)
+	h.bp(t, "2026-07-20T08:00:00Z", 125)
+	h.run(t, false)
+	// Collection left July at v2 alone. Put v1 back, covering the first run's W, so that
+	// losing v2 leaves an older version behind for the plain query to find.
+	first := h.heads(t)["bucket:2026-07"]
+	v1 := ops.CheckpointRow{SpanID: first.SpanID, V: 1, CoversW: 1, ValueHash: first.ValueHash, MintedAt: "t"}
+	if err := h.db.AppendCheckpoint(context.Background(), v1); err != nil {
+		t.Fatal(err)
+	}
+	return h
+}
+
+// A read that cannot find every checkpoint its run saw declines, whichever way it is
+// short, and the value it would otherwise give is never partial: ReadAt and ReadWindow
+// both report no run to start from, and the fold is the answer.
+func TestReads_ACacheThatLostAnEntryDeclines(t *testing.T) {
+	for _, tc := range hurts() {
+		t.Run(tc.name, func(t *testing.T) {
+			h := readyForHurt(t)
+			ctx := context.Background()
+			head, _ := h.l.Head(ctx)
+			if _, ok, err := mint.ReadAt(ctx, h.l, h.db, h.deps.Values, head); err != nil || !ok {
+				t.Fatalf("before the loss: ok=%v err=%v, want a composed read", ok, err)
+			}
+			tc.do(t, h)
+			if _, ok, err := mint.ReadAt(ctx, h.l, h.db, h.deps.Values, head); err != nil || ok {
+				t.Errorf("ReadAt after the loss: ok=%v err=%v, want it to decline", ok, err)
+			}
+			if _, ok, err := mint.ReadWindow(ctx, h.l, h.db, h.deps.Values, head, "", ""); err != nil || ok {
+				t.Errorf("ReadWindow after the loss: ok=%v err=%v, want it to decline", ok, err)
+			}
+		})
+	}
+}
+
+// valuesThatVanish is a store that loses a checkpoint's value between a read choosing its
+// run and loading the value, as a cache entry removed beside the read would be.
+type valuesThatVanish struct {
+	mint.Store
+	h    *harness
+	done bool
+}
+
+func (v *valuesThatVanish) Get(ctx context.Context, kind, digest string) ([]byte, error) {
+	if !v.done {
+		v.done = true
+		if err := opstest.LoseCheckpointValue(ctx, v.h.db, digest); err != nil {
+			return nil, err
+		}
+	}
+	return v.Store.Get(ctx, kind, digest)
+}
+
+// rowsThatVanish is a checkpoint log that loses a row after a read chose its run and
+// before the read took the run's checkpoints.
+type rowsThatVanish struct {
 	mint.WindowLog
 	during func()
 }
 
-func (s straddle) CheckpointsAt(ctx context.Context, w int64) ([]ops.CheckpointRow, error) {
-	rows, err := s.WindowLog.CheckpointsAt(ctx, w)
-	if s.during != nil {
-		s.during()
+func (r *rowsThatVanish) RunCheckpoints(ctx context.Context, run int64) ([]ops.CheckpointRow, bool, error) {
+	if r.during != nil {
+		r.during()
+		r.during = nil
 	}
-	return rows, err
+	return r.WindowLog.RunCheckpoints(ctx, run)
 }
 
-// A read that took a run and its rows, and then met the collection that removed them,
-// declines rather than fail or answer from the rows that were left. Its caller folds
-// the ledger, which is the same value.
-func TestReads_AMintCollectingMidReadFoldsInFull(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		read func(h *harness, log straddle, w ledger.Watermark) (bool, error)
-	}{
-		{"ReadAt", func(h *harness, log straddle, w ledger.Watermark) (bool, error) {
-			_, ok, err := mint.ReadAt(context.Background(), h.l, log, h.deps.Values, w)
+// A value or a row that goes after the read chose its run declines as well, and a mint
+// that comes after writes the value back.
+func TestReads_ALossAfterTheRunWasChosenDeclines(t *testing.T) {
+	ctx := context.Background()
+	reads := map[string]func(h *harness, log mint.WindowLog, values mint.Store, w ledger.Watermark) (bool, error){
+		"ReadAt": func(h *harness, log mint.WindowLog, values mint.Store, w ledger.Watermark) (bool, error) {
+			_, ok, err := mint.ReadAt(ctx, h.l, log, values, w)
 			return ok, err
-		}},
-		{"ReadWindow", func(h *harness, log straddle, w ledger.Watermark) (bool, error) {
-			_, ok, err := mint.ReadWindow(context.Background(), h.l, log, h.deps.Values, w, "", "")
+		},
+		"ReadWindow": func(h *harness, log mint.WindowLog, values mint.Store, w ledger.Watermark) (bool, error) {
+			_, ok, err := mint.ReadWindow(ctx, h.l, log, values, w, "", "")
 			return ok, err
-		}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
+		},
+	}
+	for name, read := range reads {
+		t.Run(name+", a value", func(t *testing.T) {
 			h := newHarness(t)
 			h.seed(t)
 			h.run(t, false)
-			w, _ := h.l.Head(context.Background())
-			done := false
-			log := straddle{WindowLog: h.db, during: func() {
-				if done {
-					return
-				}
-				done = true
-				h.bp(t, "2026-07-20T08:00:00Z", 125)
-				h.run(t, false) // collects the run the read took
-			}}
-			ok, err := tc.read(h, log, w)
+			w, _ := h.l.Head(ctx)
+			ok, err := read(h, h.db, &valuesThatVanish{Store: h.deps.Values, h: h}, w)
 			if err != nil || ok {
-				t.Fatalf("a read that straddled a collection: ok=%v err=%v, want it to decline", ok, err)
+				t.Fatalf("a value lost mid-read: ok=%v err=%v, want it to decline", ok, err)
 			}
-			// And the next read, started after, takes the new run.
-			if _, ok, err := mint.ReadAt(context.Background(), h.l, h.db, h.deps.Values, w+1); err != nil || !ok {
-				t.Fatalf("a read after the collection: ok=%v err=%v", ok, err)
+			// The next mint finds the value gone and writes it back; the read composes again.
+			h.run(t, false)
+			if ok, err := read(h, h.db, h.deps.Values, w); err != nil || !ok {
+				t.Fatalf("after the mint: ok=%v err=%v, want a composed read", ok, err)
+			}
+		})
+		t.Run(name+", a row", func(t *testing.T) {
+			h := newHarness(t)
+			h.seed(t)
+			h.run(t, false)
+			w, _ := h.l.Head(ctx)
+			log := &rowsThatVanish{WindowLog: h.db, during: func() {
+				if err := opstest.LoseCheckpointRow(ctx, h.db, "bucket:2026-08", 1); err != nil {
+					t.Error(err)
+				}
+			}}
+			ok, err := read(h, log, h.deps.Values, w)
+			if err != nil || ok {
+				t.Fatalf("a row lost mid-read: ok=%v err=%v, want it to decline", ok, err)
+			}
+		})
+	}
+}
+
+// A mint writes back a value the log names and the store has lost, and the read that
+// declined composes again. It does so whether the mint starts from the last run or folds
+// in full, with nothing new or with a tail elsewhere.
+func TestRun_WritesBackAValueTheCacheLost(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		run    func(context.Context, mint.Deps, bool) (mint.Result, error)
+		ingest bool
+	}{
+		{"full", mint.RunFull, false},
+		{"from the last run", mint.Run, false},
+		{"from the last run, with a tail", mint.Run, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.deps.Budget = 1000
+			h.seed(t)
+			h.run(t, false)
+			ctx := context.Background()
+			digest := h.loseCheckpointValue(t, "bucket:2026-08")
+			if tc.ingest {
+				h.bp(t, "2026-09-20T06:30:00Z", 120)
+			}
+			head, _ := h.l.Head(ctx)
+			if _, ok, _ := mint.ReadAt(ctx, h.l, h.db, h.deps.Values, head); ok {
+				t.Fatal("a read composed from a log with a value missing")
+			}
+			if _, err := tc.run(ctx, h.deps, false); err != nil {
+				t.Fatalf("mint: %v", err)
+			}
+			if _, err := h.db.Size(ctx, mint.Kind, digest); err != nil {
+				t.Fatalf("the value was not written back: %v", err)
+			}
+			want, err := fold.ReadAt(ctx, h.l, head)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, ok, err := mint.ReadAt(ctx, h.l, h.db, h.deps.Values, head)
+			if err != nil || !ok || got.Value.Hash() != want.Value.Hash() {
+				t.Fatalf("after the mint: ok=%v err=%v, want a composed read equal to the fold", ok, err)
 			}
 		})
 	}

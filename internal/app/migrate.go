@@ -37,7 +37,9 @@ it was admitted under. Superseded versions and tombstoned facets are not
 carried. Every registered Definition and projection of the old store is written to the
 new one first, so every version a carried facet was admitted under is held. The
 operator's admission holds are carried too: a source held before the move is held
-after it.
+after it. So are the receipts, the values they served, the saved selections and their
+codes, byte for byte. A carried receipt still names the old ledger, so verifying it
+against the new one reports another ledger rather than a failed reproduction.
 
 With --program, only the facets a Datalog program's pick/1 selects are carried; the
 program is run over the old ledger's whole live value, with no projection narrowing.

@@ -194,7 +194,8 @@ func pinSchemaVersion(ctx context.Context, db *sql.DB) error {
 		return nil
 	}
 	return fmt.Errorf("%w: database holds %s, this build writes %d. Set the file aside and re-run init; the derived tier replays and the provisioned tier reloads, "+
-		"and anam move-artifacts --registered-from <the old file> copies across what importers and the operator registered, and moves in any artifact folder",
+		"and anam move-artifacts --registered-from <the old file> copies across what importers and the operator registered, the admission holds, "+
+		"the receipts and the values they served, the saved selections and their codes, and the inline projection bodies, and moves in any artifact folder",
 		ErrSchemaVersion, stored, schemaVersion)
 }
 

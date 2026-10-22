@@ -70,6 +70,9 @@ func Digest(b []byte) string {
 // caller gave.
 type contentTable struct {
 	put, get, size, list string
+	// all reads every row and carry inserts one that must not be there yet, for the
+	// schema-bump carry (registered.go).
+	all, carry string
 }
 
 func newContentTable(name string) contentTable {
@@ -79,6 +82,9 @@ func newContentTable(name string) contentTable {
 		get:  q(`SELECT body FROM {table} WHERE hash = ?`),
 		size: q(`SELECT length(body) FROM {table} WHERE hash = ?`),
 		list: q(`SELECT hash FROM {table} ORDER BY hash`),
+
+		all:   q(`SELECT hash, body FROM {table} ORDER BY hash`),
+		carry: q(`INSERT INTO {table} (hash, body) VALUES (?, ?)`),
 	}
 }
 

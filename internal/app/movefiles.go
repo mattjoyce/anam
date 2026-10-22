@@ -33,10 +33,12 @@ Without --yes it only reads and reports: how many files of each kind, how many b
 what it would load. With --yes it loads the rows. A row already in the store is left
 alone, so running it again is safe. The folder is never changed.
 
-With --registered-from, the Definitions and projection templates registered in an older
-operational store are first copied into this one, read-only from the old file. The store
-must hold none of its own: that is what a fresh store from init is. Use it when the old
-store was set aside because its schema moved on.
+With --registered-from, what an older operational store authored is first copied into
+this one, read-only from the old file: the Definitions and projection templates
+registered, the inline projection bodies, the admission holds, and the receipts, the
+values they served, the saved selections and their codes, byte for byte. The store must
+hold none of its own: that is what a fresh store from init is. Use it when the old store
+was set aside because its schema moved on.
 
 Like the other maintenance commands it opens the files itself, so stop the daemon first.`,
 		Args: cobra.NoArgs,
@@ -118,16 +120,26 @@ func (o moveOptions) carryRegistered(ctx context.Context, out io.Writer, db *ops
 		return fmt.Errorf("--registered-from %s: %w", path, err)
 	}
 	if !o.yes {
-		_, err = fmt.Fprintf(out, "would copy %d registered Definitions, %d registered projection templates and %d inline projection bodies from %s\n",
-			len(reg.Definitions), len(reg.Projections), len(reg.Inline), path)
+		_, err = fmt.Fprintf(out, "would copy %s from %s\n", carriedCounts(reg), path)
 		return err
 	}
 	if err := db.CarryRegistered(ctx, reg); err != nil {
 		return fmt.Errorf("copy the registered rows: %w (the store must hold none of its own)", err)
 	}
-	_, err = fmt.Fprintf(out, "copied %d registered Definitions, %d registered projection templates and %d inline projection bodies from %s\n",
-		len(reg.Definitions), len(reg.Projections), len(reg.Inline), path)
+	_, err = fmt.Fprintf(out, "copied %s from %s\n", carriedCounts(reg), path)
 	return err
+}
+
+// carriedCounts says how many rows of each authored kind reg holds.
+func carriedCounts(reg ops.Registered) string {
+	byKind := map[string]int{}
+	for _, c := range reg.Content {
+		byKind[c.Kind]++
+	}
+	return fmt.Sprintf("%d registered Definitions, %d registered projection templates, %d inline projection bodies, "+
+		"%d admission holds, %d receipts, %d served values, %d saved selections and %d selection codes",
+		len(reg.Definitions), len(reg.Projections), len(reg.Inline), len(reg.Holds),
+		byKind[ops.KindReceipt], byKind[ops.KindServed], byKind[ops.KindSelection], byKind[ops.KindSelectionCode])
 }
 
 // writeMoved prints the counts by kind. LOADED and PRESENT are what a write did; on a

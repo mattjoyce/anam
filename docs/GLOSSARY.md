@@ -63,7 +63,7 @@ Never whole-life. Comes in two provenances, *hard* and *soft*, below; only a har
 floor. See *Mint*, *Watermark*, *Bucket span*.
 
 **Checkpoint, hard** — A checkpoint that has been given a place: a row in the checkpoint log
-(`span_id`, `v`, `covers_w`, `value_hash`) and a file under its hash in the artifact tier. Minted,
+(`span_id`, `v`, `covers_w`, `value_hash`) and a row under its hash in `checkpoint_value`. A later checkpoint of the span subsumes it, and a mint then removes it unless a receipt pins it. Minted,
 citable, a replay floor. The mint promotes a soft checkpoint to a hard one. See *Checkpoint, soft*.
 
 **Checkpoint, soft** — A bucket's live-only value at a watermark, computed on demand and **ephemeral**:
@@ -249,7 +249,7 @@ the method/model and the canonical watermark it was computed from.
 
 **Published time** — When a Facet first appeared in a served account: the **earliest `served_at` over
 the receipts naming it** (an Anam clock). Deliberately *not* an anam-event — being shown changes
-nothing Anam knows — so it lives in the published-artifact tier and is lost with it. See *Receipt*,
+nothing Anam knows, so it lives in the operational store's authored tier and is lost with it. See *Receipt*,
 *Anam-event*.
 
 **Query** — The third read, after the timeline and *Fields* (decided 2026-10-17, built 2026-10-19;

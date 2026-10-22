@@ -6,7 +6,6 @@
 * [anam_dreamstation](importer-dreamstation.md) - Decodes a CPAP SD card copy with the dreamstation package and sends every session as health.cpap-session.dreamstation, a type the binary does not bundle, so it registers its own Definition.
 * [anam_records](importer-records.md) - Sends a records folder as one snapshot of the bundled types it carries, reading YAML with Go's yaml.v3 rules so every record Anam's own records worker admitted before card 119 resends as no-op.
 * [anam_submit](anam-submit.md) - The one generic plugin that posts batches: makes sure Anam publishes the batch's Definitions, submits under the importer's token, and raises the absent alert on a completed snapshot.
-* [Artifact store (internal/store/artifact)](store-artifact.md) - Content-addressed files under artifact_dir: checkpoint values, served values and receipts, written atomically and re-hashed on read.
 * [Backup (internal/backup)](backup.md) - POST /v1/backups copies both SQLite files with VACUUM INTO and the artifact and library directories into a dated folder, keeping backup_keep of them.
 * [Buckets (internal/span)](span.md) - Bucket arithmetic over fact-time: the configurable width, self-describing ids, and the layout that subdivides a year into months and days.
 * [Catch-up (internal/catchup)](catchup.md) - Replays anam-events since the index's last seen seq into the operational store, so the derived tier is behind after a crash, never wrong.

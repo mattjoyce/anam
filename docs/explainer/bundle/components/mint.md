@@ -13,7 +13,6 @@ depends_on:
   - /components/span.md
   - /components/store-ledger.md
   - /components/store-ops.md
-  - /components/store-artifact.md
 ---
 
 Two jobs in one package, because they share the layout and the tail logic.

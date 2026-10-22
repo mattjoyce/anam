@@ -55,7 +55,7 @@ steps:
     anchor: "tail, err := d.Ledger.Replay(ctx, run, w)"
   - actor: /components/mint.md
     label: rebuild touched and over-budget buckets
-    action: Each dirtied bucket is loaded from its checkpoint file (hash-checked), touched facets dropped, the tail's live entries added. A bucket whose file is over budget is rebuilt too, because the budget was lowered or the run was at a fixed width.
+    action: Each dirtied bucket is loaded from its checkpoint value (hash-checked), touched facets dropped, the tail's live entries added. A bucket whose value is over budget is rebuilt too, because the budget was lowered or the run was at a fixed width.
     reads: [/data-structures/checkpoint-value.md]
     resource: internal/mint/incremental.go#rebuild
     anchor: "if n > int64(d.Budget) {"
@@ -70,18 +70,18 @@ steps:
     reads: [/data-structures/checkpoint-row.md]
     resource: internal/mint/mint.go#settle
     anchor: "if minted && head.ValueHash == value.Hash() {"
-  - actor: /components/store-artifact.md
+  - actor: /components/store-ops.md
     caller: /components/mint.md
     branch: hash differs
-    label: write the value file and a new row
-    action: The value's bytes go to `checkpoint/sha256-<hex>.json`, then a `checkpoint` row at version head+1 covering W, then its facet count. A dry run returns before any write.
+    label: write the value and a new row
+    action: The value's bytes go to `checkpoint_value` under their hash, then a `checkpoint` row at version head+1 covering W, then its facet count. A dry run returns before any write.
     writes: [/data-structures/checkpoint-value.md, /data-structures/checkpoint-row.md]
     resource: internal/mint/mint.go#settle
-    anchor: "d.Artifacts.Put(Kind, value.Bytes())"
+    anchor: "d.Values.Put(ctx, Kind, value.Bytes())"
   - actor: /components/mint.md
     branch: hash equal
     label: the head stands, undecoded
-    action: Nothing is written; the facet count comes from `checkpoint_size`, recorded once if missing, and a checkpoint file that has gone missing is re-put.
+    action: Nothing is written; the facet count comes from `checkpoint_size`, recorded once if missing, and a checkpoint value that has gone missing is re-put.
     resource: internal/mint/incremental.go#unchanged
     anchor: "n, ok := sizes[ops.SpanVersion{SpanID: head.SpanID, V: head.V}]"
   - actor: /components/store-ops.md
@@ -91,14 +91,21 @@ steps:
     writes: [/data-structures/checkpoint-row.md]
     resource: internal/store/ops/checkpoint.go#AppendMintRun
     anchor: "INSERT INTO mint_run (w, ran_at) VALUES (?, ?) ON CONFLICT (w) DO NOTHING"
+  - actor: /components/store-ops.md
+    caller: /components/mint.md
+    label: collect the checkpoints nothing reads
+    action: "`collect` ends a run that wrote: `CollectCheckpoints`, in one transaction, keeps the newest run, the run each receipt's watermark reads from, those runs' checkpoints and every span's head, removes the other runs, rows and sizes and then the values no row names, and seals the log again at the rows left. It waits for a sealed log. A failure is reported beside the mint, which stands."
+    writes: [/data-structures/checkpoint-row.md]
+    resource: internal/store/ops/collect.go#CollectCheckpoints
+    anchor: "keepRuns := map[int64]bool{runs[len(runs)-1]: true}"
   - actor: /components/cli.md
     label: print each bucket's outcome
-    action: One line per bucket, minted or unchanged or would-mint, with version, covered W, facet count and value hash, and a footer with the count at W.
+    action: One line per bucket, minted or unchanged or would-mint, with version, covered W, facet count and value hash, and a footer with the count at W, and what the collection removed.
     ends: true
     resource: internal/app/checkpoint.go#writeMint
     anchor: 'fmt.Fprintln(w, "BUCKET\tV\tCOVERS W\tFACETS\tVALUE\t")'
 ---
 
-The mint's only job is to bound replay; freshness comes from the ledger. The incremental path costs its tail, the buckets the tail touched and a stat per checkpoint file. The full mint remains as the oracle it is tested against and the repair for an unsealed log.
+The mint's only job is to bound replay; freshness comes from the ledger. The incremental path costs its tail, the buckets the tail touched and a size per checkpoint value. The full mint remains as the oracle it is tested against and the repair for an unsealed log.
 
 Related: [bucket on fact-time, subdivide by budget](/decisions/bucket-on-fact-time-subdivide-by-budget.md), [a mint starts from the last run](/decisions/a-mint-starts-from-the-last-run.md), [minting is per span, never whole-life](/invariants/minting-is-per-span-never-whole-life.md).

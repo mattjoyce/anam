@@ -65,11 +65,10 @@ CREATE VIEW IF NOT EXISTS span_head AS
   WHERE v = (SELECT MAX(v) FROM checkpoint WHERE span_id = c.span_id);
 
 -- tier: derived, checkpoint values (card 215): the bytes a checkpoint row names, keyed
--- by the SHA-256 of themselves. Insert-only: an update is refused, and a delete is
--- refused while any checkpoint row still names the value, so the only value that can
--- go is one nothing reads. A value is re-hashed on every read, so a row that no longer
--- hashes to its key is reported rather than served. Being derived it comes back by
--- minting, and a store rebuild may drop it.
+-- by the SHA-256 of themselves. Insert-only: an update is refused. A value is
+-- re-hashed on every read, so a row that no longer hashes to its key is reported
+-- rather than served. Being derived it comes back by minting, and a store rebuild may
+-- drop it.
 CREATE TABLE IF NOT EXISTS checkpoint_value (
   hash TEXT PRIMARY KEY CHECK (length(hash) = 71 AND hash GLOB 'sha256:*'),
   body BLOB NOT NULL

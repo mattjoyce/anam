@@ -40,12 +40,14 @@ One table in `api.go` names each route with the roles whose tokens open it (see 
 | `POST /v1/documents?ext=` | importer with `record.document` | store one document's bytes in the [library](/components/library.md) as `<sha256>.<ext>` (cards 102, 150): 201 stored, 200 already held, 400 a bad extension, 403 a token without `record.document`; see [hand Anam a document](/workflows/hand-anam-a-document.md) |
 | `POST /v1/projections` | operator | register a projection template (card 125); a registered version is immutable and every version stays readable for receipts |
 | `GET /v1/projections[/{name}[/{v}]]` | any | publish projection templates |
+| `POST /v1/hold`, `DELETE /v1/hold` | operator | hold a source's admission or release it (authored state in the [operational store](/components/store-ops.md); `anam hold`): a held source's `POST /v1/envelopes` and `POST /v1/definitions` answer 503 with `Retry-After`, and `GET /v1/status` lists what is held in `held` |
 | `GET /v1/snapshots/{id}` | any; an importer sees its own source's | the resend report: live, absent, carried |
 | `GET /v1/timeline`, `GET /v1/changes`, `GET /v1/status`, `GET /v1/checkpoints` | any | reads, bounded by `max_read_bytes` |
 | `GET /v1/coverage[?w=&as_of=&projection=]` | any | each type's live count, earliest and latest fact-time, and each source's share, at the head or a named W, counted from the same value the timeline reads (card 90); says what is recorded, never that a source is complete |
 | `POST /v1/receipts`, `GET /v1/receipts[/{hash}[/verify]]`, `GET /v1/receipts/{hash}/facets/{facet_id}` | any | publish, verify, and open one served facet beside its links from the [edge index](/data-structures/facet-edge-row.md) (cards 91, 104); a read over `max_read_bytes` is published once and answered a page at a time, `GET /v1/receipts/{hash}?cursor=` reading each page from the served value (card 92). The list takes `principal`, `since`, `until` and `zone`, which is who read what (card 216); a token set to record every read has `GET /v1/timeline` answered as a publish and opens only the receipts that name it |
 | `POST /v1/checkpoints` | operator | mint on the write queue |
 | `POST /v1/backups` | operator | `VACUUM INTO` both stores under `backup_dir` |
+| `POST /v1/entry` | operator | hand-enter a fact as the workbench source (never held) |
 | `/` | operator | the [inspector](/components/inspect.md) |
 
 `/healthz` is outside the table and needs no token. A missing or unknown token is 401; a token whose role the route does not admit is 403 naming the principal.
@@ -57,6 +59,8 @@ The daemon reads no source itself (card 119): `POST /v1/ingest`, `GET /v1/operat
 ## The write queue
 
 Every write is one job on one channel, run by one goroutine under the job's deadline. An operator write waits `accept_wait` (250 ms) to be accepted; an importer's batch waits `importer_wait` (5 s) and gets a 503 with `Retry-After` (`retry_after`, 15 s) after that. The wait spends the request's budget, the shorter of `timeout` and the caller's `Anam-Timeout`, so a request that runs out of it before the queue takes it is a 503 and its write never starts (card 110; see [queue wait spends the caller's budget](/invariants/queue-wait-spends-the-callers-budget.md)). Reads never take a turn; they use the read-only handles. Publishing writes artifacts only and takes no turn either.
+
+The admission hold is read inside the write, not before it is queued: a hold and an admission are then one order, so a batch whose turn comes after a hold is set is refused and a batch whose turn came before it is admitted. A hold the write cannot read refuses the batch too, since an admission that cannot see a hold must not admit.
 
 ## Mint cadence
 

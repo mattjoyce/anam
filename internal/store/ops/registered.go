@@ -41,6 +41,10 @@ type Registered struct {
 	// and immutable like the registered rows, and a receipt that names one cannot be
 	// replayed without it, so a migration copies them too.
 	Inline []InlineProjection
+	// Holds are the admission holds the operator has set. They are authored state,
+	// like the registered rows: a migration carries them into the new store, so a
+	// source held before the move is still held after it.
+	Holds []Hold
 
 	// Provisioned is the store's copy of the Definitions the binary carries, bundled
 	// and history. It is read so a migration can resolve an older version; it is not
@@ -108,6 +112,22 @@ func (d *DB) ReadRegistered(ctx context.Context) (Registered, error) {
 		return Registered{}, fmt.Errorf("ops: read inline projections: %w", err)
 	}
 
+	rows, err = tx.QueryContext(ctx, `SELECT source, held_at FROM admission_hold ORDER BY source`)
+	if err != nil {
+		return Registered{}, fmt.Errorf("ops: read holds: %w", err)
+	}
+	for rows.Next() {
+		var h Hold
+		if err := rows.Scan(&h.Source, &h.HeldAt); err != nil {
+			_ = rows.Close()
+			return Registered{}, fmt.Errorf("ops: scan hold: %w", err)
+		}
+		out.Holds = append(out.Holds, h)
+	}
+	if err := closeRows(rows); err != nil {
+		return Registered{}, fmt.Errorf("ops: read holds: %w", err)
+	}
+
 	rows, err = tx.QueryContext(ctx, `SELECT type, version, body FROM definition ORDER BY type, version`)
 	if err != nil {
 		return Registered{}, fmt.Errorf("ops: read provisioned definitions: %w", err)
@@ -135,11 +155,11 @@ func closeRows(rows *sql.Rows) error {
 	return rows.Close()
 }
 
-// CarryRegistered writes the registered Definitions and projections and the inline
-// projection bodies of r, each at its
-// registration moment, in one transaction: all of them or none. The tables are
-// immutable, so it fits a store with none of these versions, which is what a fresh
-// store is; a version already there fails the call and leaves the store as it was.
+// CarryRegistered writes the registered Definitions and projections, the inline
+// projection bodies and the admission holds of r, each at its registration moment, in
+// one transaction: all of them or none. The tables are immutable, so it fits a store
+// with none of these versions, which is what a fresh store is; a version already there
+// fails the call and leaves the store as it was.
 func (d *DB) CarryRegistered(ctx context.Context, r Registered) error {
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -170,6 +190,13 @@ func (d *DB) CarryRegistered(ctx context.Context, r Registered) error {
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO inline_projection (hash, body) VALUES (?, ?)`, x.Hash, x.Body); err != nil {
 			return fmt.Errorf("ops: carry inline projection %s: %w", x.Hash, err)
+		}
+	}
+	for _, x := range r.Holds {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO admission_hold (source, held_at) VALUES (?, ?) ON CONFLICT(source) DO NOTHING`,
+			x.Source, x.HeldAt); err != nil {
+			return fmt.Errorf("ops: carry hold %s: %w", x.Source, err)
 		}
 	}
 	if err := tx.Commit(); err != nil {

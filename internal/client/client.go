@@ -327,6 +327,20 @@ func (c *Client) RegisterProjection(ctx context.Context, manifest []byte) (api.R
 	return reg, err
 }
 
+// Hold puts sources into admission hold.
+func (c *Client) Hold(ctx context.Context, req api.HoldRequest) (api.Holds, error) {
+	var h api.Holds
+	_, err := c.do(ctx, c.timeout, http.MethodPost, "/v1/hold", nil, req, &h)
+	return h, err
+}
+
+// ReleaseHold releases admission holds.
+func (c *Client) ReleaseHold(ctx context.Context, req api.HoldReleaseRequest) (api.Holds, error) {
+	var h api.Holds
+	_, err := c.do(ctx, c.timeout, http.MethodDelete, "/v1/hold", nil, req, &h)
+	return h, err
+}
+
 // Coverage asks what the record holds, type by type, at the W q names.
 func (c *Client) Coverage(ctx context.Context, q api.CoverageQuery) (api.Coverage, error) {
 	var cv api.Coverage

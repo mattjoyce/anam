@@ -7,7 +7,7 @@ Knowledge about the Anam repo and its importers, one concept per file. Start wit
 # Subdirectories
 
 * [purpose](purpose/index.md) - Purpose, 1 concepts.
-* [terms](terms/index.md) - Terms, 32 concepts.
+* [terms](terms/index.md) - Terms, 33 concepts.
 * [components](components/index.md) - Components, 28 concepts.
 * [workflows](workflows/index.md) - Workflows, 11 concepts.
 * [data-structures](data-structures/index.md) - Data structures, 18 concepts.

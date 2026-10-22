@@ -40,6 +40,11 @@ func (d *Daemon) postDefinitions(w http.ResponseWriter, r *http.Request) {
 
 	var reg def.Registration
 	err = d.tryWriteWithin(r.Context(), d.cfg.ImporterWait, d.timeout(r), func(ctx context.Context, s Stores) error {
+		// A held source registers nothing: the check is inside the write, where the
+		// hold and this registration are one order.
+		if err := checkHold(ctx, s.Ops, imp); err != nil {
+			return err
+		}
 		var err error
 		reg, err = d.register(ctx, s.Ops, body)
 		return err
@@ -50,7 +55,7 @@ func (d *Daemon) postDefinitions(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, def.ErrBundled), errors.Is(err, def.ErrRegistered),
 		errors.Is(err, def.ErrVersionBehind), errors.Is(err, def.ErrKeyed):
 		writeError(w, http.StatusConflict, err)
-	case errors.Is(err, ErrBusy), errors.Is(err, ErrStopped):
+	case errors.Is(err, ErrHeld), errors.Is(err, ErrBusy), errors.Is(err, ErrStopped):
 		w.Header().Set("Retry-After", d.retryAfter())
 		writeError(w, http.StatusServiceUnavailable, err)
 	case err != nil:

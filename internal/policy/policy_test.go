@@ -236,3 +236,36 @@ func TestDeclaredSources(t *testing.T) {
 		})
 	}
 }
+
+// A held source submits nothing; the workbench is never held; the hold is what the
+// request carries, read by the daemon inside the write.
+func TestHeld(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		p    config.Principal
+		hold Hold
+		held bool
+	}{
+		{"no hold", scale, Hold{}, false},
+		{"its source is held", scale, Hold{Sources: []string{"scale"}}, true},
+		{"another source is held", scale, Hold{Sources: []string{"docs"}}, false},
+		{"every source is held", scale, Hold{All: true}, true},
+		{"any_type is held like any importer", speaker, Hold{All: true}, true},
+		{"the workbench is never held", workbench, Hold{All: true, Sources: []string{config.WorkbenchSource}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := Held(Request{Caller: tt.p, Hold: tt.hold}); got != tt.held {
+				t.Errorf("Held = %v, want %v", got, tt.held)
+			}
+			if got := Holdable(tt.p); got == (tt.p.Source == config.WorkbenchSource) {
+				t.Errorf("Holdable = %v", got)
+			}
+			if got := MayHold(tt.p.Source); got != Holdable(tt.p) {
+				t.Errorf("MayHold(%s) = %v, Holdable = %v", tt.p.Source, got, Holdable(tt.p))
+			}
+		})
+	}
+}

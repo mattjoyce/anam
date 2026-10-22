@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/def"
+	"github.com/mattjoyce/anam/internal/facet"
 )
 
 // The form walk is tested on Definitions it is handed, so a schema feature the bundled
@@ -287,5 +288,99 @@ func TestAZonedFormSendsTheBrowsersZone(t *testing.T) {
 	payload, ok := form.read(vals)
 	if ok || payload != nil || !strings.Contains(form.OffsetProblem, "Anam needs the offset") {
 		t.Errorf("no offset posted: payload %s, ok %v, problem %q; want nothing sent and the reason", payload, ok, form.OffsetProblem)
+	}
+}
+
+// Card 222: the attention types are entered by hand, and the form is drawn from their
+// Definitions with nothing about them in the page. The fact time leads and is zoned,
+// the composed id is left to the gate, intensity is a whole number with its bounds
+// stated, the topic and the note are text, and what the person types reads back as
+// the typed JSON the Definition takes.
+func TestTheAttentionTypesDrawAsForms(t *testing.T) {
+	t.Parallel()
+	manifests, err := def.Manifests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	drawType := func(typ string) entryForm {
+		t.Helper()
+		d, ok := reg.Lookup(facet.Type(typ))
+		if !ok {
+			t.Fatalf("%s is not bundled", typ)
+		}
+		for _, m := range manifests {
+			if m.Type == d.Type && m.Version == d.Version {
+				form, err := drawForm(m.Body, d, false)
+				if err != nil {
+					t.Fatalf("%s: %v", typ, err)
+				}
+				if !form.Zoned {
+					t.Errorf("%s: the form does not send the zone", typ)
+				}
+				for _, f := range form.Fields {
+					if f.Name == "id" || f.Name == def.SourceTimeField {
+						t.Errorf("%s draws %s", typ, f.Name)
+					}
+				}
+				return form
+			}
+		}
+		t.Fatalf("no manifest for %s", typ)
+		return entryForm{}
+	}
+	byName := func(form entryForm) map[string]formField {
+		out := map[string]formField{}
+		for _, f := range form.Fields {
+			out[f.Name] = f
+		}
+		return out
+	}
+
+	form := drawType("mind.attention")
+	if form.Fields[0].Name != "at" || form.Fields[0].Input != "datetime-local" || !form.Fields[0].FactTime {
+		t.Errorf("first field = %+v, want the fact time as a date and time", form.Fields[0])
+	}
+	fields := byName(form)
+	if f := fields["intensity"]; f.Input != "number" || f.Step != "1" || !f.Required ||
+		strings.Join(f.Hints, ",") != "at least 1,at most 5" {
+		t.Errorf("intensity = %+v, want a required whole number saying at least 1 and at most 5", f)
+	}
+	if f := fields["topic"]; f.Input != "text" || !f.Required {
+		t.Errorf("topic = %+v, want required text", f)
+	}
+	if f := fields["note"]; f.Input != "text" || f.Required {
+		t.Errorf("note = %+v, want optional text", f)
+	}
+
+	good := url.Values{"f.at": {"2026-10-22T21:40"}, "f.topic": {"deskcam"}, "f.intensity": {"4"}, "f.note": {"prints straight"},
+		"zone": {"Australia/Sydney"}, "offset": {"+11:00"}}
+	payload, ok := form.read(good)
+	if !ok {
+		t.Fatalf("read refused good values: %+v", form.Fields)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(payload, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["at"] != "2026-10-22 21:40" || got["topic"] != "deskcam" || got["intensity"] != float64(4) || got["note"] != "prints straight" {
+		t.Errorf("payload = %s", payload)
+	}
+	if !strings.Contains(string(payload), `"intensity":4`) {
+		t.Errorf("intensity was sent as text: %s", payload)
+	}
+	bad := url.Values{"f.at": {"2026-10-22T21:40"}, "f.topic": {"deskcam"}, "f.intensity": {"4.5"}, "zone": {"Australia/Sydney"}, "offset": {"+11:00"}}
+	if _, ok := form.read(bad); ok || byName(form)["intensity"].Problem == "" {
+		t.Errorf("a fractional intensity was read; problem %q", byName(form)["intensity"].Problem)
+	}
+
+	for _, typ := range []string{"mind.attention.started", "mind.attention.ended"} {
+		f := byName(drawType(typ))
+		if f["at"].Input != "datetime-local" || f["topic"].Input != "text" || f["note"].Required {
+			t.Errorf("%s: at %+v, topic %+v, note %+v", typ, f["at"], f["topic"], f["note"])
+		}
 	}
 }

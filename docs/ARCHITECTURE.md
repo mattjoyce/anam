@@ -145,9 +145,9 @@ Two rules make this safe:
   no version was verbatim), so every admitted facet reads the same instant and composes the same id.
 
 Granularity is a choice: start coarse (one Facet per source fragment) and decompose only where real
-fact-times or finer access control earn the cut. Facet types are **dotted `domain.concept[.specialisation…]`** under a closed set of eight
+fact-times or finer access control earn the cut. Facet types are **dotted `domain.concept[.specialisation…]`** under a closed set of nine
 domains (`health.blood-pressure`, `health.body-composition`, `activity.steps`, `place.stay`,
-`record.edge`), so new sources slot into a domain (`social.message`, `money.transaction`, `media.play`). Where a
+`record.edge`, `mind.attention`), so new sources slot into a domain (`social.message`, `money.transaction`, `media.play`). Where a
 distinction goes, in the name or elsewhere, is the decision [where a distinction is encoded](explainer/bundle/decisions/where-a-distinction-is-encoded.md).
 
 ---
@@ -317,6 +317,15 @@ The gate is exposed as two calls:
 - **`resolve(envelope) → binding + assurance`** — enforces association.
 - **`commit(envelope, resolution) → admitted | rejected`** — enforces facet-compliance and token scope,
   computes the content hash, and appends the artifact plus an `admitted` anam-event.
+
+**The operator's hold is not a pillar.** `POST /v1/hold` and `DELETE /v1/hold` (operator) let the
+operator stop one source's admission, or every source's, without touching a token: a held source's
+envelopes and Definition registrations are refused with 503 and a `Retry-After`, and nothing of it is
+admitted. The hold is read *inside* the write, so a hold and an admission are one order: a hold set
+before the batch's turn is seen, and one set after it is not. A hold the write cannot read refuses
+the batch too: an admission that cannot see a hold must not admit. It is authored state in the
+operational store, so it outlives a restart of the daemon. The `workbench` is never held: a hand
+entry is the operator's own, not an importer's submission.
 
 ### 6a. Idempotency and supersession (the crash-clean property)
 

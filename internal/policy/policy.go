@@ -22,10 +22,11 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
-// Request is the part of a request a route decision reads: who asks, and which roles
-// the route admits. Roles come from the daemon's route table, the one source for which
-// roles reach a route (mirrored in openapi.yaml), so the policy reads that table and
-// keeps no copy of it.
+// Request is the part of a request a decision reads: who asks, which roles the route
+// admits, and the admission hold in force. Roles come from the daemon's route table, the
+// one source for which roles reach a route (mirrored in openapi.yaml), so the policy
+// reads that table and keeps no copy of it. The hold is read by the daemon inside the
+// write and passed in, so the policy reads nothing but the request and the file.
 type Request struct {
 	// Caller is the principal the request's token names. Known is false when no
 	// token names one.
@@ -33,6 +34,8 @@ type Request struct {
 	Known  bool
 	// Roles are the roles the route admits.
 	Roles []config.Role
+	// Hold is the admission hold in force, for a submission.
+	Hold Hold
 }
 
 // Answer is a route decision.

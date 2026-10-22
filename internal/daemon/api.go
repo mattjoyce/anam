@@ -81,6 +81,8 @@ func (d *Daemon) routes() []route {
 		f("POST /v1/documents", importerOnly, d.postDocument),
 
 		f("POST /v1/projections", operatorOnly, d.postProjections),
+		f("POST /v1/hold", operatorOnly, d.postHold),
+		f("DELETE /v1/hold", operatorOnly, d.deleteHold),
 		f("POST /v1/checkpoints", operatorOnly, d.postCheckpoints),
 		f("POST /v1/backups", operatorOnly, d.postBackups),
 		f("POST /v1/facets/{id}/retract", operatorOnly, d.postFacetRetract),
@@ -467,9 +469,14 @@ func (d *Daemon) getStatus(w http.ResponseWriter, r *http.Request) {
 		writeLedgerError(w, err)
 		return
 	}
+	held, err := heldNames(ctx, d.readOps)
+	if err != nil {
+		writeReadError(w, err)
+		return
+	}
 	s := api.Status{
 		Version: d.opts.Version, Person: d.cfg.PersonID, LedgerID: id, W: int64(head),
-		Since: d.started, Sources: d.sources.statuses(),
+		Since: d.started, Sources: d.sources.statuses(), Held: held,
 	}
 	writeJSON(w, http.StatusOK, s)
 }

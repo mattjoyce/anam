@@ -244,7 +244,9 @@ importers:
   The `workbench` source is reserved. It owns none of its types, so another importer may own one
   (`types` for a type no binary bundles is that importer's alone), and the workbench registers no
   Definition. Leave the entry out and `POST /v1/entry` answers 404, saying the file declares no
-  workbench principal. `anam retract workbench --facet <id> --yes` undoes one entry.
+  workbench principal. `anam retract workbench --facet <id> --yes` undoes one entry. The attention
+  types (`mind.attention`, `mind.attention.started`, `mind.attention.ended`) are entered by listing
+  them in `types`; the form is drawn from their Definitions, so nothing else changes.
 - The same file names principals that are not importers, under `principals`, each with a `name` and
   a `role` (`reader` or `operator`) and no source or types. An importer may be listed there too,
   with `role: importer`, a name, a source and types or `any_type`. Names, sources and token hashes
@@ -318,7 +320,8 @@ second shape, `internal/def/sourcetime/v2.json`, adds and requires: the offset f
 clock had where it was said, which names one instant even in an hour the zone repeats, beside
 `zone`, the IANA name where the writer knows it (else the offset again). The gate refuses an offset
 the named zone does not keep at that wall clock: London never showed 01:30 on 29 March 2026, and
-never sat at +05:00. `record.edge` v2 and `health.medication.dose` v2 require it: the conversation
+never sat at +05:00. `record.edge` v2, `health.medication.dose` v2 and the three `mind.attention`
+types require it: the conversation
 writer and the Workbench send it with `basis: source` when the person's client or browser names the
 zone, else anam-mcp's `ANAM_ZONE` with `basis: configuration`, and a writer that cannot tell the
 offset refuses rather than guess. `health.weight` v5 declares it without requiring it, since
@@ -380,7 +383,7 @@ The batch is admitted whole or not at all:
 | 400 | `error` | The body is not one submission: bad JSON, an unknown field, no version, 0 or more than 49 envelopes, or anything but whitespace after the submission. Nothing written. |
 | 401 / 403 | `error` | No importer's token, or the operator's. |
 | 413 | `error` | The body is over 49 payloads at `max_payload_bytes` plus 1 MiB (about 16 MB at the 300 KiB default), counting whatever follows the submission. Nothing written. The whole body is read before the batch is queued, and the daemon cuts off a body that takes longer than `http_read_timeout` (30 s) to arrive. |
-| 503 | `error`, `Retry-After` | Another write held the ledger for longer than this batch could wait: `importer_wait` (5 s), or less when the request's budget is shorter (below). Nothing was written, and it never will be: a batch the queue did not take in time is dropped, not started later. Usually a backup or a full mint. Wait as long as `Retry-After` says and send the same batch again. |
+| 503 | `error`, `Retry-After` | Nothing written. Either another write held the ledger for longer than this batch could wait (`importer_wait`, 5 s, or less when the request's budget is shorter, below), usually a backup or a full mint, or the operator holds this source's admission, which the body names. Wait as long as `Retry-After` says and send the same batch again: a batch the queue did not take in time is dropped, not started later, so only the resend can admit it. |
 
 A request's budget is the shorter of the daemon's `timeout` and the request's own `Anam-Timeout`
 header (a Go duration, `25s`), and it counts from arrival: the wait for the write queue spends it,

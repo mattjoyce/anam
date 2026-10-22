@@ -6,6 +6,21 @@ of the API must do or may expect, newest first, by the day they merged. Each nam
 kanban board, which holds the reasoning. The full history is `git log`; the story behind the
 decisions is in `journal/`.
 
+## Unreleased
+
+- Anam can hold what a person says is absorbing them (card 222). `mind` is a ninth domain head, for
+  self-reported inner states, so mood or energy can join later; a head is added only by a logged
+  decision. Three Definitions are bundled at v1, `mind.attention` (a reading: `at`, `topic`,
+  `intensity` from 1 to 5, an optional `note`), and `mind.attention.started` and
+  `mind.attention.ended` (a pair the person declares, which closes a series keyed by `topic`; a
+  later started opens a new one). `topic` has one spelling, lower case with hyphens (`deskcam`).
+  `at` is a wall clock read at the offset `source_time` names, so one minute said in two zones is
+  two readings. All three are Confidential and strict. A bundled `attention` projection serves them
+  as a log. To enter them by hand, list `mind.attention`, `mind.attention.started` and
+  `mind.attention.ended` under the `workbench` entry's `types` in the importers file and restart;
+  an agent saves one through anam-mcp's `save_fact` with no change to either program. Nothing is
+  inferred: readings never open or close an episode, and `mind.attention.reflection` is not built.
+
 ## 2026-10-22
 
 - A token can always leave receipts, so a receipt says who read what (card 216). A principal in the
@@ -31,6 +46,17 @@ decisions is in `journal/`.
   folds the ledger in full, which gives the same value more slowly. A mint writes back a checkpoint
   value the log names and the store has lost. `GET /v1/receipts` names the store in `store` where it
   named a folder in `dir`, and a backup is the ledger, the operational store and the library.
+- The operator can hold a source's admission. `POST /v1/hold` (operator) takes `{"sources": ["garmin"]}`
+  or `{"all": true}` and answers the sources held now; `DELETE /v1/hold` releases the ones it names,
+  or every hold when it names none. `GET /v1/status` reports them in `held`, where `*` is the global
+  hold. A held source's `POST /v1/envelopes` and `POST /v1/definitions` answer 503 with `Retry-After`
+  and a body naming the hold; reads, the operator's own writes and `POST /v1/entry` are never held,
+  and the workbench is never held. The hold is authored state in the operational store (schema
+  version 9, table `admission_hold`), so it survives a restart; a store at version 9 is refused by an
+  older binary, so roll back to the previous store, not the previous build. `anam migrate` carries
+  the holds into the new store. `anam hold <source>...`, `anam hold --all`,
+  `anam hold --release [<source>...]`, and `anam hold` to list. Ductile retries a 503 on its own
+  backoff and does not read `Retry-After`, so a held source's importer is retried later, not sooner.
 
 - The Workbench writes links by hand (card 202). `GET /link` on the inspector draws one `record.edge`
   from a basket of facets, each on its side, with a kind, the person's words, a "link to this

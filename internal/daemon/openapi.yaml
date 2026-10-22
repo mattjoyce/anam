@@ -794,6 +794,89 @@ paths:
               schema: { $ref: "#/components/schemas/ProjectionManifest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /v1/hold:
+    post:
+      operationId: postHold
+      tags: [operate]
+      x-anam-roles: [operator]
+      x-anam-type: Holds
+      summary: Put sources on admission hold.
+      description: >-
+        A held source admits nothing: its POST /v1/envelopes and POST /v1/definitions
+        answer 503 with Retry-After, and the body names the hold. Reads, the operator's
+        own writes and POST /v1/entry are never held, and the workbench source is never
+        held (naming it is 400). all holds every source but the workbench. Holding a
+        source that is held already changes nothing: the hold keeps the moment it was
+        first set. The hold is authored state in the operational store, so it survives a
+        restart and is carried into a new store by anam migrate.
+      parameters: [{ $ref: "#/components/parameters/AnamTimeout" }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                sources:
+                  type: array
+                  items: { type: string }
+                all:
+                  type: boolean
+            example: { sources: [garmin] }
+      responses:
+        "200":
+          description: current holds
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Holds" }
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "503": { $ref: "#/components/responses/Busy" }
+    delete:
+      operationId: deleteHold
+      tags: [operate]
+      x-anam-roles: [operator]
+      x-anam-type: Holds
+      summary: Release admission holds.
+      description: >-
+        Releases the holds the body names, or every hold when it names none: an empty
+        body (or none) releases everything. Releasing a source that is not held changes
+        nothing.
+      parameters: [{ $ref: "#/components/parameters/AnamTimeout" }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                sources:
+                  type: array
+                  items: { type: string }
+                all:
+                  type: boolean
+            example: { sources: [garmin] }
+      responses:
+        "200":
+          description: current holds
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Holds" }
+        "400":
+          description: bad request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "503": { $ref: "#/components/responses/Busy" }
   /v1/projections/{name}/{version}:
     get:
       operationId: getProjectionVersion
@@ -903,7 +986,7 @@ paths:
         201 a new version, 200 the same body again at a held version, 403 a type the
         importer does not own (one of its types; an any_type importer owns none), 409
         another body at a held version, a bundled type, or a version behind, 422 a bad
-        manifest.
+        manifest, 503 with Retry-After while the operator holds this source's admission.
       requestBody:
         required: true
         content:
@@ -1021,7 +1104,8 @@ paths:
         is a no-op, changed content under the same identity supersedes. At most
         gate.MaxBatch envelopes. A batch may be one part of a complete resend
         (snapshot). While another write holds the queue past importer_wait, 503 with
-        Retry-After.
+        Retry-After. While the operator holds this source's admission (POST /v1/hold),
+        nothing of it is admitted and the same 503 with Retry-After names the hold.
       parameters: [{ $ref: "#/components/parameters/AnamTimeout" }]
       requestBody:
         required: true
@@ -1394,7 +1478,7 @@ components:
             code: result_too_large
             too_large: { matched: 14609, bytes: 524288, max_bytes: 524288, narrow: [from, type, projection] }
     Busy:
-      description: another write holds the queue past the wait, or the daemon is stopping
+      description: another write holds the queue past the wait, the daemon is stopping, or the operator holds this source's admission
       headers:
         Retry-After:
           schema: { type: integer }
@@ -1459,6 +1543,18 @@ components:
         sources:
           type: array
           items: { $ref: "#/components/schemas/SourceStatus" }
+        held:
+          type: array
+          description: the sources on admission hold; "*" holds every source but the workbench
+          items: { type: string }
+    Holds:
+      type: object
+      description: the sources on admission hold now
+      required: [held]
+      properties:
+        held:
+          type: array
+          items: { type: string }
     SourceStatus:
       type: object
       required: [source, last_scan_at]

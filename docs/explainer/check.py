@@ -132,7 +132,10 @@ def _scalar(v: str):
         inner = v[1:-1].strip()
         return [] if not inner else [_scalar(x.strip()) for x in inner.split(",")]
     if len(v) >= 2 and v[0] == v[-1] and v[0] in "'\"":
-        return v[1:-1]
+        body = v[1:-1]
+        # YAML's two quoted styles: a double-quoted scalar carries escapes, and a
+        # single-quoted one writes a quote by doubling it.
+        return _unescape(body) if v[0] == '"' else body.replace("''", "'")
     if v in ("true", "True"):
         return True
     if v in ("false", "False"):
@@ -140,6 +143,35 @@ def _scalar(v: str):
     if re.fullmatch(r"-?\d+", v):
         return int(v)
     return v
+
+
+# The escapes a double-quoted YAML scalar defines. PyYAML reads them; the fallback
+# must too, or an anchor written as YAML reads as something else.
+_ESCAPES = {
+    '"': '"', "\\": "\\", "/": "/", " ": " ", "a": "\a", "b": "\b", "t": "\t",
+    "\t": "\t", "n": "\n", "v": "\v", "f": "\f", "r": "\r", "e": "\x1b", "0": "\0",
+}
+
+
+def _unescape(s: str) -> str:
+    """Unescape a double-quoted YAML scalar, as PyYAML does."""
+    out: list[str] = []
+    i = 0
+    while i < len(s):
+        c = s[i]
+        if c != "\\" or i + 1 >= len(s):
+            out.append(c)
+            i += 1
+            continue
+        n = s[i + 1]
+        if n in _ESCAPES:
+            out.append(_ESCAPES[n])
+            i += 2
+            continue
+        # An escape YAML does not define is an error there; here it stays as it is.
+        out.append(c)
+        i += 1
+    return "".join(out)
 
 
 def load_bundle(bundle: Path) -> dict[str, dict]:

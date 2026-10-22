@@ -83,6 +83,12 @@ func (d *Daemon) admitBatch(ctx context.Context, who config.Principal, b intake,
 		digest = partDigest(b.envs)
 	}
 	err := d.tryWriteWithin(ctx, d.cfg.ImporterWait, budget, func(ctx context.Context, s Stores) error {
+		// A held source admits nothing. The check is inside the write, where the hold
+		// and this admission are one order: a hold set before this write is seen, and
+		// one set after it is not.
+		if err := checkHold(ctx, s.Ops, who); err != nil {
+			return err
+		}
 		// A part that does not belong to the run its id names, or that was already
 		// recorded with other envelopes, is refused before anything is admitted.
 		if err := checkSnapshot(ctx, s.Ops, who.Source, b.snap, digest); err != nil {
@@ -137,7 +143,8 @@ func (d *Daemon) admitBatch(ctx context.Context, who config.Principal, b intake,
 // writeAdmitError answers an error admitBatch returned, and reports whether there was
 // one. A batch the gate refused is 422 with every envelope's reason; a snapshot part
 // that does not fit its run is 409; a write queue that is busy, or stopping, is 503
-// with Retry-After; a budget spent is 504.
+// with Retry-After; a source the operator held is 503 with Retry-After; a budget spent
+// is 504.
 func (d *Daemon) writeAdmitError(w http.ResponseWriter, err error) bool {
 	var refused *gate.Refused
 	switch {
@@ -147,7 +154,7 @@ func (d *Daemon) writeAdmitError(w http.ResponseWriter, err error) bool {
 		writeError(w, http.StatusConflict, err)
 	case errors.As(err, &refused):
 		writeJSON(w, http.StatusUnprocessableEntity, refusalOf(refused))
-	case errors.Is(err, ErrBusy), errors.Is(err, ErrStopped), errors.Is(err, gate.ErrContention):
+	case errors.Is(err, ErrHeld), errors.Is(err, ErrBusy), errors.Is(err, ErrStopped), errors.Is(err, gate.ErrContention):
 		w.Header().Set("Retry-After", d.retryAfter())
 		writeError(w, http.StatusServiceUnavailable, err)
 	case errors.Is(err, context.DeadlineExceeded):

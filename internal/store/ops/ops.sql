@@ -288,3 +288,13 @@ CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- tier: authored — operator admission holds (POST /v1/hold). Holds are per-source
+-- or global ("*"). Held rows are not updated; deletion releases a hold.
+CREATE TABLE IF NOT EXISTS admission_hold (
+  source    TEXT PRIMARY KEY,
+  held_at   TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS admission_hold_no_update
+BEFORE UPDATE ON admission_hold
+BEGIN SELECT RAISE(ABORT, 'admission_hold is immutable'); END;

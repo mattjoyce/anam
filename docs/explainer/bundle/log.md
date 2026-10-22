@@ -203,6 +203,10 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: `POST /v1/query`'s `projection` is a name or an inline template object (`api.ProjectionRef`). `projection.ParseInline` is the manifest loader less a name, a version and a description, and the daemon also refuses a type with no Definition (`Template.CheckDefined`, shared with registration). An inline template is known by its content hash. `PublishQuery` files its body in the new authored table `inline_projection` before the receipt, and the receipt is marked `template_inline` with `template` `inline`, version 1, and the hash in `template_hash`. `serve.Verify` loads the body by that hash. The field is last and omitted when false, so earlier receipts keep their bytes (`TestInline_EarlierReceiptsKeepTheirBytes`). The schema stays 9: a version-9 store gains the empty table when it opens. `ReadRegistered` and `CarryRegistered` carry the bodies, and `move-artifacts` reports their count.
 - Bundle: the query term, the receipt and store-ops pages, the stored-content decision and the reader gap.
+## 2026-10-22, the operator admission hold
+
+- Code: an operator can hold a source's admission at the daemon's door. `POST /v1/hold` (operator) takes `{"sources":[...]}` or `{"all":true}`, `DELETE /v1/hold` releases, and `GET /v1/status` reports the held sources in `held`. A held source's `POST /v1/envelopes` and `POST /v1/definitions` are refused with 503 and a `Retry-After`, and the body names the hold; the check is inside the write, so a hold and an admission are one order. Reads, the operator's own writes and `POST /v1/entry` (the workbench) are never held. The hold is authored state in the operational store (`admission_hold`, schema version 9), so it survives a restart of the daemon and is carried into a new store by `anam migrate`. `anam hold <source>...`, `anam hold --all`, `anam hold --release [<source>...]` and `anam hold` to list.
+- Bundle: the daemon component's route table, the CLI component's command table, the store-ops component's table and the operational-store term.
 
 ## 2026-10-23, card 222
 

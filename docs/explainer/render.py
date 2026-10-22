@@ -282,7 +282,10 @@ def component_diagrams(c: dict[str, dict], colours: dict[str, str]) -> tuple[str
         lines = ["graph LR"]
         for cid in nodes:
             lines.append(f"  {mm_id(cid)}[{mm_label(nodes[cid]['title'])}]")
-        for cid in externals:
+        # A set's order changes with the interpreter's hash seed, and the page is a
+        # committed artifact: sorted, two renders of the same bundle are the same file.
+        ext = sorted(externals)
+        for cid in ext:
             lines.append(f"  {mm_id(cid)}[{mm_label(c[cid]['title'])}]")
         for cid, d in nodes.items():
             for dep in d.get("depends_on") or []:
@@ -290,10 +293,10 @@ def component_diagrams(c: dict[str, dict], colours: dict[str, str]) -> tuple[str
                     lines.append(f"  {mm_id(cid)} --> {mm_id(dep)}")
         for cid in nodes:
             lines.append(f"  click {mm_id(cid)} \"#{slug(cid)}\"")
-        for cid in externals:
+        for cid in ext:
             lines.append(f"  click {mm_id(cid)} \"#{slug(cid)}\"")
         lines += class_defs(colours, {"component"})
-        lines.append("  class " + ",".join(mm_id(x) for x in list(nodes) + list(externals)) + " component;")
+        lines.append("  class " + ",".join(mm_id(x) for x in list(nodes) + ext) + " component;")
         return diagram_block(title, "\n".join(lines), note)
 
     if len(comps) <= MAX_NODES:
@@ -506,7 +509,8 @@ def er_diagrams(c: dict[str, dict], colours: dict[str, str]) -> str:
         lines.append(f"  {re.sub(r'[^A-Za-z0-9_]', '_', g)} {{ }}")
     seen: set[tuple[str, str]] = set()
     for g, members in groups.items():
-        for cid in members:
+        # Sorted, for the same reason as the components diagram: the page is committed.
+        for cid in sorted(members):
             for r in ds[cid].get("references") or []:
                 tg = ds.get(r.get("to"), {}).get("group") or "ungrouped"
                 if r.get("to") in ds and tg != g and (g, tg) not in seen:

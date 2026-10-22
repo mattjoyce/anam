@@ -51,6 +51,10 @@ type Status struct {
 	// Both are empty for a local read, which has no history of its own.
 	Since   string         `json:"since,omitempty"`
 	Sources []SourceStatus `json:"sources"`
+	// Held are the sources the operator has held: their admission is refused until
+	// the hold is released. "*" is the global hold, and it holds every source but the
+	// workbench, which is never held.
+	Held []string `json:"held,omitempty"`
 }
 
 // SourceStatus is what the daemon has seen of one importer's source since it started.
@@ -72,6 +76,25 @@ type Backup struct {
 	Bytes  int64    `json:"bytes"`
 	Files  int      `json:"files"`
 	Pruned []string `json:"pruned,omitempty"`
+}
+
+// HoldRequest is the body of POST /v1/hold: the sources to hold, or every source when
+// All is set. A source that is held already keeps the hold it has.
+type HoldRequest struct {
+	Sources []string `json:"sources,omitempty"`
+	All     bool     `json:"all,omitempty"`
+}
+
+// HoldReleaseRequest is the body of DELETE /v1/hold: the sources to release, or every
+// hold when none is named.
+type HoldReleaseRequest struct {
+	Sources []string `json:"sources,omitempty"`
+	All     bool     `json:"all,omitempty"`
+}
+
+// Holds is the answer to a hold: the sources held now.
+type Holds struct {
+	Held []string `json:"held"`
 }
 
 // RetractRequest is the body of POST /v1/facets/{id}/retract: the source the facet must

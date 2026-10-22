@@ -63,6 +63,11 @@ import (
 // when Open applies the schema, which is true of it: no receipt there names an inline
 // body. A build before it never reads the table, and refuses a receipt carrying the
 // inline marker as one with an unknown field, so neither build misreads the other's file.
+//
+// admission_hold (the operator's admission hold over sources) does not bump it either, by
+// the same rule: a version-9 file gains the empty table when Open applies the schema, and
+// a build before it never reads the table. A hold set by this build is not enforced by an
+// older one, which is the rollback's known cost.
 const schemaVersion = 9
 
 // ErrSchemaVersion is returned by Open for a database written by a different schema.

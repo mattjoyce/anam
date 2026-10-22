@@ -282,7 +282,7 @@ func (d *Daemon) publishRead(w http.ResponseWriter, r *http.Request, status int)
 	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Values: d.readOps, Definitions: defs, Projections: d.projections.current.Load()}
 	p, err := read.Publish(ctx, src, deps, q, d.cfg.MaxReadBytes)
 	if err != nil {
-		writeReadError(w, err)
+		d.writeFiledReadError(w, err)
 		return
 	}
 	writeJSON(w, status, p)
@@ -429,6 +429,19 @@ func namedZone(zone string) error {
 // with code cursor_invalid for a cursor that names no page of its receipt, 404 for a stored value that is not there, 409 for a receipt this daemon cannot honour,
 // 413 for an answer over max_read_bytes, with its measure, 504 for a read that ran
 // out of time, 500 for anything else.
+// writeFiledReadError answers a read that files a receipt as it is served. Filing writes
+// the operational store on the write handle outside the write queue, so another writer
+// holding the file past its busy timeout fails the read; that is 503 with Retry-After,
+// as a busy queue is, and nothing was filed or served. Anything else is writeReadError's.
+func (d *Daemon) writeFiledReadError(w http.ResponseWriter, err error) {
+	if errors.Is(err, ops.ErrBusy) {
+		w.Header().Set("Retry-After", d.retryAfter())
+		writeError(w, http.StatusServiceUnavailable, err)
+		return
+	}
+	writeReadError(w, err)
+}
+
 func writeReadError(w http.ResponseWriter, err error) {
 	var tooLarge *read.TooLarge
 	switch {

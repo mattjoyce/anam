@@ -170,7 +170,9 @@ already files; `dry_run` still files nothing, for every token, so a recording to
 program unrecorded. A recording token opens only the receipts that name it (`GET /v1/receipts/{hash}`
 and `/facets/{facet_id}` are 403 for another's), because opening another's value would be a read no
 receipt records. Filing is part of the read: if the receipt cannot be written the read fails with
-a 5xx and returns no facets, as `POST /v1/receipts` does. Any other token's reads are unchanged, and
+a 5xx and returns no facets, as `POST /v1/receipts` does. When it cannot be written because another
+writer holds the operational store past its busy wait, the read answers `503` with a `Retry-After`, as a
+busy write queue does, and is safe to send again. Any other token's reads are unchanged, and
 an ordinary `POST /v1/receipts` names nobody. `GET /v1/receipts` takes `principal`, `since`, `until` and
 `zone` (a bare date is a day in it, and a bare `until` includes its whole day), and `anam receipt list`
 takes `--principal`, `--since` and `--until` and shows a `READER` column. A receipt is parsed to be

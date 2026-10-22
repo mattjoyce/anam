@@ -154,6 +154,7 @@ paths:
         "400": { $ref: "#/components/responses/BadQuery" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "413": { $ref: "#/components/responses/TooLarge" }
+        "503": { $ref: "#/components/responses/StoreBusy" }
         "504": { $ref: "#/components/responses/Timeout" }
   /v1/changes:
     get:
@@ -367,6 +368,7 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "409": { $ref: "#/components/responses/CannotHonour" }
         "413": { $ref: "#/components/responses/TooLarge" }
+        "503": { $ref: "#/components/responses/StoreBusy" }
         "504": { $ref: "#/components/responses/Timeout" }
   /v1/receipts/{hash}:
     get:
@@ -703,6 +705,7 @@ paths:
         "400": { $ref: "#/components/responses/BadQuery" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "413": { $ref: "#/components/responses/TooLarge" }
+        "503": { $ref: "#/components/responses/StoreBusy" }
         "504": { $ref: "#/components/responses/Timeout" }
   /v1/projections:
     get:
@@ -1471,6 +1474,17 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
     IndexWrong:
       description: the operational store's index was built from another ledger or is ahead of this one; restart the daemon on a sound one
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    StoreBusy:
+      description: >-
+        the read files a receipt, and another writer held the operational store past its
+        busy wait; nothing was filed or served, and the read may be sent again
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: whole seconds (retry_after)
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }

@@ -128,7 +128,7 @@ func (d *DB) Put(ctx context.Context, kind string, b []byte) (string, error) {
 	digest := Digest(b)
 	res, err := d.db.ExecContext(ctx, t.put, digest, b)
 	if err != nil {
-		return "", fmt.Errorf("ops: put %s %s: %w", kind, digest, err)
+		return "", fmt.Errorf("ops: put %s %s: %w", kind, digest, busy(err))
 	}
 	if n, _ := res.RowsAffected(); n == 1 {
 		return digest, nil

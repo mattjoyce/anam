@@ -24,7 +24,7 @@ func (d *Daemon) postBackups(w http.ResponseWriter, r *http.Request) {
 	err := d.Write(r.Context(), d.cfg.LongWriteTimeout, func(ctx context.Context, s Stores) error {
 		var err error
 		b, err = backup.Take(ctx, backup.Deps{
-			Ledger: s.Ledger, Ops: s.Ops, ArtifactDir: d.cfg.ArtifactDir, LibraryDir: d.cfg.LibraryDir,
+			Ledger: s.Ledger, Ops: s.Ops, LibraryDir: d.cfg.LibraryDir,
 			Dir: d.cfg.BackupDir, Keep: d.cfg.BackupKeep, Clock: clock.Real{},
 		})
 		return err

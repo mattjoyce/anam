@@ -212,7 +212,7 @@ func (s *Server) selectPage(w http.ResponseWriter, r *http.Request) {
 	}
 	var saved *selection.Saved
 	if code := q.Get("sel"); code != "" {
-		sv, ok := s.openSelection(w, code)
+		sv, ok := s.openSelection(r.Context(), w, code)
 		if !ok {
 			return
 		}

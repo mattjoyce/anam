@@ -19,12 +19,13 @@
 // versions sits in a new bucket and has left its old one, so both hashes move and both
 // buckets re-mint. No birth-bucket pinning, no second index.
 //
-// Failure and recovery (Armstrong): the value file is written before its checkpoint
-// row, and both are idempotent — a crash between them leaves an unreferenced,
-// correctly named file that the re-run writes again (a no-op) and then references. A
-// crash between buckets leaves the earlier buckets minted and the later ones for the
-// re-run. No bucket is ever half-minted, because its value is one file and its row is
-// one insert.
+// Failure and recovery (Armstrong): the value is written before its checkpoint row, and
+// both are idempotent: a crash between them leaves an unreferenced, correctly keyed
+// value that the re-run writes again (a no-op) and then references. A crash between
+// buckets leaves the earlier buckets minted and the later ones for the re-run. No bucket
+// is ever half-minted, because its value is one row and its checkpoint is one insert.
+//
+// A run that wrote ends by collecting the checkpoints nothing reads any more (collect).
 package mint
 
 import (
@@ -39,13 +40,12 @@ import (
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/span"
-	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
-// Kind is the artifact-store subdirectory checkpoint values are filed under.
-const Kind = "checkpoint"
+// Kind is the kind of stored content checkpoint values are filed under.
+const Kind = ops.KindCheckpoint
 
 // Index is the checkpoint log the mint reads heads from and appends to.
 type Index interface {
@@ -57,13 +57,16 @@ type Index interface {
 	LastMintRun(ctx context.Context, w int64) (int64, bool, error)
 	LogSealed(ctx context.Context) (bool, error)
 	CheckpointSizes(ctx context.Context) (map[ops.SpanVersion]int, error)
+	CollectCheckpoints(ctx context.Context) (ops.Collected, error)
 }
 
-// Store is the published-artifact tier the values are written to and read back from.
+// Store is where checkpoint values are written to and read back from: the operational
+// store's content-addressed rows. Get checks the bytes against the digest that keys
+// them.
 type Store interface {
-	Put(kind string, b []byte) (string, error)
-	Get(kind, digest string) ([]byte, error)
-	Size(kind, digest string) (int64, error)
+	Put(ctx context.Context, kind string, b []byte) (string, error)
+	Get(ctx context.Context, kind, digest string) ([]byte, error)
+	Size(ctx context.Context, kind, digest string) (int64, error)
 }
 
 // Ledger is the read surface the mint folds: fold's own, plus the ledger's identity so
@@ -78,11 +81,11 @@ type Clock interface{ Now() time.Time }
 
 // Deps is everything a mint needs.
 type Deps struct {
-	Ledger    Ledger
-	Index     Index
-	Artifacts Store
-	Buckets   span.Buckets
-	Clock     Clock
+	Ledger  Ledger
+	Index   Index
+	Values  Store
+	Buckets span.Buckets
+	Clock   Clock
 	// Budget, when positive, is the most bytes a bucket's value may hold before the
 	// mint splits it: years into months, months into days (span.Layout). Zero mints
 	// at the fixed width Buckets names.
@@ -119,6 +122,12 @@ type Result struct {
 	// the mint run at From and rebuilt only what the tail after it touched.
 	Full bool
 	From ledger.Watermark
+
+	// Collected is what the run removed afterwards: the checkpoints nothing reads any
+	// more. Zero for a dry run. CollectErr is why that failed, when it did: the run
+	// stands, and the next one collects.
+	Collected  ops.Collected
+	CollectErr error
 }
 
 // Minted counts the buckets that received a new version.
@@ -142,12 +151,18 @@ func Run(ctx context.Context, d Deps, dryRun bool) (Result, error) {
 	}
 	res, ok, err := d.fromLastRun(ctx, dryRun)
 	switch {
-	case errors.Is(err, artifact.ErrNotFound):
-		// A checkpoint's file has gone: the full mint writes it again (settle).
-	case err != nil || ok:
+	case errors.Is(err, ops.ErrNotFound):
+		// A checkpoint's value has gone: the full mint writes it again (settle).
+	case err != nil:
+		return res, err
+	case ok:
+		return d.collect(ctx, res, dryRun), nil
+	}
+	res, err = d.full(ctx, dryRun)
+	if err != nil {
 		return res, err
 	}
-	return d.full(ctx, dryRun)
+	return d.collect(ctx, res, dryRun), nil
 }
 
 // RunFull is Run without the last run: it folds the whole ledger and compares every
@@ -157,7 +172,24 @@ func RunFull(ctx context.Context, d Deps, dryRun bool) (Result, error) {
 	if err := d.pin(ctx); err != nil {
 		return Result{}, err
 	}
-	return d.full(ctx, dryRun)
+	res, err := d.full(ctx, dryRun)
+	if err != nil {
+		return res, err
+	}
+	return d.collect(ctx, res, dryRun), nil
+}
+
+// collect removes the checkpoints nothing reads any more, once a run that wrote has
+// sealed the log (ops.CollectCheckpoints says which). It is the run's last step and not
+// part of what it minted: a failure here leaves the run done and the checkpoints
+// longer than they need be, and the next run collects them. It is reported in the
+// result, not returned, so a mint that stands is not reported as one that failed.
+func (d Deps) collect(ctx context.Context, res Result, dryRun bool) Result {
+	if dryRun {
+		return res
+	}
+	res.Collected, res.CollectErr = d.Index.CollectCheckpoints(ctx)
+	return res
 }
 
 // pin refuses a checkpoint log built from another ledger.
@@ -215,10 +247,10 @@ func (d Deps) settle(ctx context.Context, w ledger.Watermark, spanID string, ent
 		if err := d.Index.AppendCheckpointSize(ctx, spanID, o.V, o.Len); err != nil {
 			return Outcome{}, err
 		}
-		// A checkpoint whose file has gone gets it back: the same bytes under the same
-		// name, so the row that names it can be loaded again. No new version.
-		if _, err := d.Artifacts.Size(Kind, head.ValueHash); errors.Is(err, artifact.ErrNotFound) {
-			if _, err := d.Artifacts.Put(Kind, value.Bytes()); err != nil {
+		// A checkpoint whose value has gone gets it back: the same bytes under the same
+		// key, so the row that names it can be loaded again. No new version.
+		if _, err := d.Values.Size(ctx, Kind, head.ValueHash); errors.Is(err, ops.ErrNotFound) {
+			if _, err := d.Values.Put(ctx, Kind, value.Bytes()); err != nil {
 				return Outcome{}, err
 			}
 		} else if err != nil {
@@ -231,7 +263,7 @@ func (d Deps) settle(ctx context.Context, w ledger.Watermark, spanID string, ent
 	if dryRun {
 		return o, nil
 	}
-	if _, err := d.Artifacts.Put(Kind, value.Bytes()); err != nil {
+	if _, err := d.Values.Put(ctx, Kind, value.Bytes()); err != nil {
 		return Outcome{}, err
 	}
 	row := ops.CheckpointRow{
@@ -271,6 +303,13 @@ func Report(ctx context.Context, d Deps, q api.MintQuery) (api.Mint, error) {
 	out := api.Mint{
 		W: int64(res.W), Written: res.Written, Full: res.Full, From: int64(res.From),
 		Outcomes: make([]api.MintOutcome, 0, len(res.Outcomes)),
+		Collected: api.Collected{
+			Checkpoints: res.Collected.Checkpoints, Runs: res.Collected.Runs,
+			Values: res.Collected.Values, Bytes: res.Collected.Bytes,
+		},
+	}
+	if res.CollectErr != nil {
+		out.CollectError = res.CollectErr.Error()
 	}
 	for _, o := range res.Outcomes {
 		out.Outcomes = append(out.Outcomes, api.MintOutcome{
@@ -422,12 +461,12 @@ func Compose(values ...fold.Value) (fold.Value, error) {
 	return fold.NewValue(entries)
 }
 
-// Load reads a checkpoint's value back from the artifact tier and rebuilds it,
-// refusing a file whose bytes do not reproduce the hash the row recorded. The store's
-// own check covers the file against its name; this one covers the name against the row,
-// so a row pointing at the wrong (intact) file is caught too.
-func Load(d Deps, row ops.CheckpointRow) (fold.Value, error) {
-	b, err := d.Artifacts.Get(Kind, row.ValueHash)
+// Load reads a checkpoint's value back from the store and rebuilds it, refusing bytes
+// that do not reproduce the hash the row recorded. The store's own check covers the
+// bytes against their key; this one covers the key against the row, so a row pointing
+// at the wrong (intact) value is caught too.
+func Load(ctx context.Context, d Deps, row ops.CheckpointRow) (fold.Value, error) {
+	b, err := d.Values.Get(ctx, Kind, row.ValueHash)
 	if err != nil {
 		return fold.Value{}, err
 	}

@@ -1,11 +1,13 @@
-// Package backup takes a backup of the record: the ledger, the operational store, the
-// artifacts and the library, into one directory that restores by copying it back.
+// Package backup takes a backup of the record: the ledger, the operational store and the
+// library, into one directory that restores by copying it back.
 //
 // The record is the ledger directory (ARCHITECTURE.md §8), and the daemon holds its
 // databases open, so a file copy could catch one mid-write. Each store copies itself
 // with SQLite's VACUUM INTO, one read transaction each, and the caller takes the
 // backup inside one write, so nothing is admitted between the two copies and they
-// agree. The artifacts and the library are plain files, copied as they are.
+// agree. The library is plain files, copied as they are. The operational store carries
+// the receipts, served values and saved selections, so it is the whole of what Anam
+// authored beside the ledger.
 //
 // Failure and recovery (Armstrong): a backup is written under a .partial name and
 // renamed when complete, so a crash leaves a .partial directory, never a backup that
@@ -45,10 +47,9 @@ type Clock interface{ Now() time.Time }
 
 // Deps is everything a backup needs.
 type Deps struct {
-	Ledger      Ledger
-	Ops         Store
-	ArtifactDir string
-	LibraryDir  string
+	Ledger     Ledger
+	Ops        Store
+	LibraryDir string
 	// Dir is where backups are kept, one directory each; Keep is how many.
 	Dir   string
 	Keep  int
@@ -104,7 +105,7 @@ func Take(ctx context.Context, d Deps) (api.Backup, error) {
 	return out, nil
 }
 
-// write fills dir: the two stores, then the artifacts and the library. It returns the
+// write fills dir: the two stores, then the library. It returns the
 // W the ledger copy holds.
 func (d Deps) write(ctx context.Context, dir string) (ledger.Watermark, error) {
 	w, err := d.Ledger.Head(ctx)
@@ -117,16 +118,14 @@ func (d Deps) write(ctx context.Context, dir string) (ledger.Watermark, error) {
 	if err := d.Ops.BackupTo(ctx, filepath.Join(dir, "tracking.db")); err != nil {
 		return 0, err
 	}
-	for name, src := range map[string]string{"artifacts": d.ArtifactDir, "documents": d.LibraryDir} {
-		if err := copyTree(src, filepath.Join(dir, name)); err != nil {
-			return 0, err
-		}
+	if err := copyTree(d.LibraryDir, filepath.Join(dir, "documents")); err != nil {
+		return 0, err
 	}
 	return w, nil
 }
 
 // copyTree copies the tree at src to dst. A src that does not exist is an empty tree:
-// nothing published yet, or no library.
+// no library yet.
 func copyTree(src, dst string) error {
 	if src == "" {
 		return nil

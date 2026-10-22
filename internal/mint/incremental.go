@@ -25,9 +25,9 @@ import (
 // run accounts for. Their covers_w cannot say so, since a run at the last run's W
 // writes rows at that W too; the log's seal can (ops.LogSealed). The next mint finds
 // the log unsealed and folds in full, which settles every bucket against the fold
-// whatever the log holds, and seals it again. A checkpoint file that has gone is met
-// as artifact.ErrNotFound, which Run answers with the full mint, which writes the
-// file again.
+// whatever the log holds, and seals it again. A checkpoint value that has gone is met
+// as ops.ErrNotFound, which Run answers with the full mint, which writes the
+// value again.
 
 // fromLastRun mints from the last run at or below the head. ok is false when it
 // cannot, and the caller folds in full: without a budget, the fixed width (and any
@@ -77,7 +77,7 @@ func (d Deps) fromLastRun(ctx context.Context, dryRun bool) (Result, bool, error
 	if err != nil {
 		return Result{}, false, err
 	}
-	parts, err := d.rebuild(leaves, dd)
+	parts, err := d.rebuild(ctx, leaves, dd)
 	if err != nil {
 		return Result{}, false, err
 	}
@@ -111,7 +111,7 @@ func (d Deps) fromLastRun(ctx context.Context, dryRun bool) (Result, bool, error
 // checkpoint is over budget: the checkpoint's entries less the facets the tail
 // touched, plus the tail's own. A dirtied bucket with no checkpoint and nothing live
 // is left out, as the full mint, which never sees it, leaves it out.
-func (d Deps) rebuild(leaves map[string]ops.CheckpointRow, dd dirtied) (map[string][]fold.Entry, error) {
+func (d Deps) rebuild(ctx context.Context, leaves map[string]ops.CheckpointRow, dd dirtied) (map[string][]fold.Entry, error) {
 	ids := map[string]bool{}
 	for id := range dd.buckets {
 		ids[id] = true
@@ -120,7 +120,7 @@ func (d Deps) rebuild(leaves map[string]ops.CheckpointRow, dd dirtied) (map[stri
 		if ids[id] {
 			continue
 		}
-		n, err := d.Artifacts.Size(Kind, row.ValueHash)
+		n, err := d.Values.Size(ctx, Kind, row.ValueHash)
 		if err != nil {
 			return nil, err
 		}
@@ -134,7 +134,7 @@ func (d Deps) rebuild(leaves map[string]ops.CheckpointRow, dd dirtied) (map[stri
 		row, minted := leaves[id]
 		entries := []fold.Entry{}
 		if minted {
-			v, err := Load(d, row)
+			v, err := Load(ctx, d, row)
 			if err != nil {
 				return nil, err
 			}
@@ -162,7 +162,7 @@ func (d Deps) unchanged(ctx context.Context, head ops.CheckpointRow, sizes map[o
 		o.Len = n
 		return o, nil
 	}
-	v, err := Load(d, head)
+	v, err := Load(ctx, d, head)
 	if err != nil {
 		return Outcome{}, err
 	}

@@ -73,3 +73,16 @@ func registryOf(ctx context.Context, db *ops.DB) (*def.Registry, error) {
 	}
 	return def.WithRegistered(bundled, stored)
 }
+
+// openStore opens the operational store at cfg's path, which a command that reads
+// only it (receipt list, receipt show) needs and no ledger. The schema and the bucket
+// width are checked as every opener checks them.
+func openStore(ctx context.Context, cfg config.Config) (*ops.DB, error) {
+	buckets, err := cfg.Buckets()
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+	defer cancel()
+	return ops.Open(ctx, cfg.DBPath, buckets)
+}

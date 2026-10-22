@@ -92,8 +92,8 @@ func newLedgerFixture(t *testing.T) ledgerFixture {
 		cfgPath:    filepath.Join(dir, "config.yaml"),
 		ledgerPath: filepath.Join(dir, "ledger.db"),
 	}
-	cfg := fmt.Sprintf("person_id: matt\nledger_path: %s\ndb_path: %s\nartifact_dir: %s\n",
-		f.ledgerPath, filepath.Join(dir, "tracking.db"), filepath.Join(dir, "artifacts"))
+	cfg := fmt.Sprintf("person_id: matt\nledger_path: %s\ndb_path: %s\n",
+		f.ledgerPath, filepath.Join(dir, "tracking.db"))
 	if err := os.WriteFile(f.cfgPath, []byte(cfg), 0o600); err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,7 @@
 package read
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -14,11 +15,11 @@ import (
 // id alone opens nothing a projection did not serve (card 91).
 var ErrNotServed = errors.New("read: the receipt did not serve that facet")
 
-// Facet reads one facet as the receipt served it, from the artifacts alone, with no
+// Facet reads one facet as the receipt served it, from the stored rows alone, with no
 // links yet: the entry is the receipt's value, and the caller joins the links the
 // index holds at its own watermark (LinksOf).
-func Facet(d serve.Deps, hash, facetID string) (api.FacetShown, error) {
-	r, shown, err := serve.Show(d, hash)
+func Facet(ctx context.Context, d serve.Deps, hash, facetID string) (api.FacetShown, error) {
+	r, shown, err := serve.Show(ctx, d, hash)
 	if err != nil {
 		return api.FacetShown{}, err
 	}

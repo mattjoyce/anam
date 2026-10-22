@@ -1,6 +1,8 @@
 package api
 
-// Checkpoints is every checkpoint ever minted, by bucket and version.
+// Checkpoints is every checkpoint the log still holds, by bucket and version. A mint
+// removes the ones nothing reads any more, so this is the newest of each bucket and
+// the older ones a receipt keeps a floor for.
 type Checkpoints struct {
 	// DB is the operational store the log was read from, on the machine that read it.
 	DB          string       `json:"db"`
@@ -8,7 +10,7 @@ type Checkpoints struct {
 }
 
 // Checkpoint is one bucket's value at one version: the watermark it folded and the
-// hash of the value filed in the artifact store.
+// hash of the value filed in the operational store.
 type Checkpoint struct {
 	SpanID    string `json:"span_id"`
 	V         int    `json:"v"`
@@ -28,6 +30,20 @@ type Mint struct {
 	Full     bool          `json:"full"`
 	From     int64         `json:"from,omitempty"`
 	Outcomes []MintOutcome `json:"outcomes"`
+	// Collected is what the run removed afterwards: the checkpoints nothing reads any
+	// more. CollectError is why that failed, when it did; the mint itself stands, and
+	// the next one collects.
+	Collected    Collected `json:"collected"`
+	CollectError string    `json:"collect_error,omitempty"`
+}
+
+// Collected counts what a mint removed once it had finished: checkpoint rows, the mint
+// runs only they were read from, and the values no row names, with their size.
+type Collected struct {
+	Checkpoints int   `json:"checkpoints"`
+	Runs        int   `json:"runs"`
+	Values      int   `json:"values"`
+	Bytes       int64 `json:"bytes"`
 }
 
 // MintQuery is how a mint is asked for. DryRun derives and publishes nothing; Full

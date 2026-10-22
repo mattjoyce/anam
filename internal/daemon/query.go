@@ -15,7 +15,8 @@ import (
 
 // The query routes (card 173): GET /v1/query is the introspection a program is
 // written against, POST /v1/query runs one through a projection and answers with a
-// receipt. Both read on the read-only handles and take no turn on the write queue.
+// receipt. Both read on the read-only handles and take no turn on the write queue; a
+// query's receipt is written on the write handle, as a published read's is.
 
 // querySource is the read's source with every held Definition body, for the
 // catalogue and the per-version pointer warnings.
@@ -25,7 +26,7 @@ func (d *Daemon) querySource(ctx context.Context) (read.Source, error) {
 		return read.Source{}, err
 	}
 	return read.Source{
-		Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts,
+		Ledger: d.read, Checkpoints: d.readOps, Values: d.readOps,
 		Definitions: d.defs.current.Load(), Projections: d.projections.current.Load(), Held: query.Held(bodies),
 	}, nil
 }
@@ -72,7 +73,7 @@ func (d *Daemon) postQuery(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, src.Definitions, src.Projections)
+	deps, err := read.ServeDeps(d.read, d.writes.Ops, d.readOps, src.Definitions, src.Projections)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return

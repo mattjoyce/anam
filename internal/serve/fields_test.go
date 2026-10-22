@@ -47,7 +47,7 @@ func TestPublish_FieldsServeAFrameThatVerifies(t *testing.T) {
 		t.Errorf("the frame holds the wrong cells: %s", s)
 	}
 
-	r, shown, err := serve.Show(serve.Deps{Artifacts: h.store}, out.ReceiptHash)
+	r, shown, err := serve.Show(ctx, serve.Deps{Published: h.db}, out.ReceiptHash)
 	if err != nil {
 		t.Fatalf("Show: %v", err)
 	}

@@ -38,10 +38,6 @@ type Config struct {
 	// derived tables rebuild by replaying the ledger (§8).
 	DBPath string `mapstructure:"db_path"`
 
-	// ArtifactDir holds content-addressed checkpoint values and served receipts —
-	// published artifacts, immutable, backed up rather than rebuilt (§8).
-	ArtifactDir string `mapstructure:"artifact_dir"`
-
 	// LibraryDir is the default library: the folder of primary source documents the
 	// facts were extracted from. Anam alone writes it, each document's bytes named by
 	// their sha256 (card 150), and a record.document finds them by that name. It
@@ -169,7 +165,6 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 
 	v.SetDefault("ledger_path", DefaultLedgerPath())
 	v.SetDefault("db_path", DefaultDBPath())
-	v.SetDefault("artifact_dir", DefaultArtifactDir())
 	v.SetDefault("timeout", DefaultTimeout)
 	v.SetDefault("bucket_width", string(span.Default))
 	v.SetDefault("library_dir", "")
@@ -217,8 +212,7 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 		c.LibraryDir = filepath.Join(filepath.Dir(c.LedgerPath), "documents")
 	}
 	paths := map[string]*string{
-		"ledger_path": &c.LedgerPath, "db_path": &c.DBPath, "artifact_dir": &c.ArtifactDir,
-		"library_dir": &c.LibraryDir,
+		"ledger_path": &c.LedgerPath, "db_path": &c.DBPath, "library_dir": &c.LibraryDir,
 	}
 	if c.TokenFile != "" {
 		paths["token_file"] = &c.TokenFile
@@ -277,8 +271,6 @@ func (c Config) Validate() error {
 		// put the ledger inside that repair.
 		return fmt.Errorf("%w: ledger_path and db_path are the same file (%s); the ledger must have its own",
 			ErrInvalid, c.LedgerPath)
-	case c.ArtifactDir == "":
-		return fmt.Errorf("%w: artifact_dir is required", ErrInvalid)
 	case c.LibraryDir == "":
 		return fmt.Errorf("%w: library_dir is required", ErrInvalid)
 	case c.Timeout <= 0:
@@ -410,10 +402,6 @@ func DefaultLedgerPath() string { return dataPath("ledger.db") }
 
 // DefaultDBPath is the tracking database: <data dir>/anam/tracking.db.
 func DefaultDBPath() string { return dataPath("tracking.db") }
-
-// DefaultArtifactDir is where checkpoint values and receipts are written:
-// <data dir>/anam/artifacts.
-func DefaultArtifactDir() string { return dataPath("artifacts") }
 
 // dataPath resolves $XDG_DATA_HOME/anam/<rel>, falling back to
 // ~/.local/share/anam/<rel>, and finally to a bare relative name when neither is

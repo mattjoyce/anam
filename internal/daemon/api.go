@@ -18,7 +18,7 @@ import (
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/read"
 	"github.com/mattjoyce/anam/internal/serve"
-	"github.com/mattjoyce/anam/internal/store/artifact"
+	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
 // route is one pattern, the roles whose tokens open it, and its handler.
@@ -29,8 +29,9 @@ type route struct {
 }
 
 // Who may call a route. Reading the record, and publishing a read or saving a
-// selection, which write artifacts and never the ledger, is every role's. Submitting is an importer's alone:
-// an envelope is admitted as its importer's source, and the operator is no source.
+// selection, which write rows and never the ledger, is every role's. Submitting is an
+// importer's alone: an envelope is admitted as its importer's source, and the operator
+// is no source.
 // Running the daemon is the operator's, and so is the inspector, which shows the
 // whole record unprojected.
 var (
@@ -106,14 +107,14 @@ func (d *Daemon) getCheckpoints(w http.ResponseWriter, r *http.Request) {
 func (d *Daemon) mintDeps(s Stores) mint.Deps {
 	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
 	return mint.Deps{
-		Ledger: s.Ledger, Index: s.Ops, Artifacts: d.artifacts, Buckets: buckets, Clock: clock.Real{},
+		Ledger: s.Ledger, Index: s.Ops, Values: s.Ops, Buckets: buckets, Clock: clock.Real{},
 		Budget: d.cfg.CheckpointBudget,
 	}
 }
 
 // postCheckpoints mints, or with ?dry_run=true derives without publishing; ?full=true
 // folds the whole ledger instead of starting from the last run. Minting
-// writes the operational store and the artifacts, so it runs on the write queue. While
+// writes the operational store, so it runs on the write queue. While
 // another write holds the queue it answers 503 at once, rather than wait out a write
 // that may take minutes. Once accepted, the mint
 // is answered whenever it ends, so a 2xx or an error always says what happened.
@@ -144,13 +145,13 @@ func (d *Daemon) postCheckpoints(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (d *Daemon) getReceipts(w http.ResponseWriter, _ *http.Request) {
-	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, d.defs.current.Load(), d.projections.current.Load())
+func (d *Daemon) getReceipts(w http.ResponseWriter, r *http.Request) {
+	deps, err := read.ServeDeps(d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	list, err := read.Receipts(deps, d.cfg.ArtifactDir)
+	list, err := read.Receipts(r.Context(), deps, d.cfg.DBPath)
 	if err != nil {
 		writeReadError(w, err)
 		return
@@ -160,15 +161,15 @@ func (d *Daemon) getReceipts(w http.ResponseWriter, _ *http.Request) {
 
 // getReceipt answers a receipt and the value it served, a page at a time (card 92):
 // the first page without a cursor, the page ?cursor= names with one. Every page is
-// cut from the served artifact, so a receipt published locally, or before the bound,
+// cut from the served value, so a receipt published locally, or before the bound,
 // pages like any other and still verifies.
 func (d *Daemon) getReceipt(w http.ResponseWriter, r *http.Request) {
-	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, d.defs.current.Load(), d.projections.current.Load())
+	deps, err := read.ServeDeps(d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	shown, err := read.ReceiptPage(deps, r.PathValue("hash"), r.URL.Query().Get("cursor"), d.cfg.MaxReadBytes)
+	shown, err := read.ReceiptPage(r.Context(), deps, r.PathValue("hash"), r.URL.Query().Get("cursor"), d.cfg.MaxReadBytes)
 	if err != nil {
 		writeReadError(w, err)
 		return
@@ -182,7 +183,7 @@ func (d *Daemon) getReceipt(w http.ResponseWriter, r *http.Request) {
 // they were read, and a wrong index refuses the whole answer rather than show the
 // entry with links absent, which would read as none.
 func (d *Daemon) getReceiptFacet(w http.ResponseWriter, r *http.Request) {
-	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, d.defs.current.Load(), d.projections.current.Load())
+	deps, err := read.ServeDeps(d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -191,7 +192,7 @@ func (d *Daemon) getReceiptFacet(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	shown, err := read.Facet(deps, r.PathValue("hash"), r.PathValue("facet_id"))
+	shown, err := read.Facet(r.Context(), deps, r.PathValue("hash"), r.PathValue("facet_id"))
 	if err != nil {
 		writeReadError(w, err)
 		return
@@ -213,7 +214,7 @@ func (d *Daemon) getReceiptFacet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *Daemon) verifyReceipt(w http.ResponseWriter, r *http.Request) {
-	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, d.defs.current.Load(), d.projections.current.Load())
+	deps, err := read.ServeDeps(d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -230,9 +231,10 @@ func (d *Daemon) verifyReceipt(w http.ResponseWriter, r *http.Request) {
 
 // postReceipt publishes a read: the timeline read the query describes, through its
 // projection, filed with a receipt (card 87). The query is the timeline's, in the
-// same parameters. Publishing writes artifacts only, so it takes no turn on the write
-// queue and never waits on a write; the artifact store's writes are atomic (card
-// 95), so two publishes of one value at once each leave a whole file.
+// same parameters. Publishing writes the receipt and the served value, two idempotent
+// inserts, and never the ledger or the index, so it takes no turn on the write queue.
+// It writes on the write handle, SQLite lets one writer in at a time, and two publishes
+// of one value at once each leave the one row (card 95).
 func (d *Daemon) postReceipt(w http.ResponseWriter, r *http.Request) {
 	q, err := api.TimelineQueryOf(r.URL.Query())
 	if err != nil {
@@ -244,14 +246,14 @@ func (d *Daemon) postReceipt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defs := d.defs.current.Load()
-	deps, err := read.ServeDeps(d.read, d.artifacts, d.readOps, defs, d.projections.current.Load())
+	deps, err := read.ServeDeps(d.read, d.writes.Ops, d.readOps, defs, d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
-	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts, Definitions: defs, Projections: d.projections.current.Load()}
+	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Values: d.readOps, Definitions: defs, Projections: d.projections.current.Load()}
 	p, err := read.Publish(ctx, src, deps, q, d.cfg.MaxReadBytes)
 	if err != nil {
 		writeReadError(w, err)
@@ -274,7 +276,7 @@ func (d *Daemon) getTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
-	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts, Definitions: d.defs.current.Load(), Projections: d.projections.current.Load()}
+	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Values: d.readOps, Definitions: d.defs.current.Load(), Projections: d.projections.current.Load()}
 	t, err := read.Timeline(ctx, src, q)
 	if err != nil {
 		writeReadError(w, err)
@@ -352,7 +354,7 @@ func namedZone(zone string) error {
 }
 
 // writeReadError answers a failed read: 400 for a query that cannot be read as asked,
-// with code cursor_invalid for a cursor that names no page of its receipt, 404 for an artifact that is not there, 409 for a receipt this daemon cannot honour,
+// with code cursor_invalid for a cursor that names no page of its receipt, 404 for a stored value that is not there, 409 for a receipt this daemon cannot honour,
 // 413 for an answer over max_read_bytes, with its measure, 504 for a read that ran
 // out of time, 500 for anything else.
 func writeReadError(w http.ResponseWriter, err error) {
@@ -360,12 +362,12 @@ func writeReadError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, read.ErrCursor):
 		writeJSON(w, http.StatusBadRequest, api.Error{Error: err.Error(), Code: api.CodeCursorInvalid})
-	case errors.Is(err, read.ErrQuery), errors.Is(err, artifact.ErrInvalid):
+	case errors.Is(err, read.ErrQuery), errors.Is(err, ops.ErrInvalid):
 		writeError(w, http.StatusBadRequest, err)
 	case errors.As(err, &tooLarge):
 		writeJSON(w, http.StatusRequestEntityTooLarge,
 			api.Error{Error: err.Error(), Code: api.CodeTooLarge, TooLarge: &tooLarge.TooLarge})
-	case errors.Is(err, artifact.ErrNotFound), errors.Is(err, read.ErrNotServed):
+	case errors.Is(err, ops.ErrNotFound), errors.Is(err, read.ErrNotServed):
 		writeError(w, http.StatusNotFound, err)
 	case errors.Is(err, read.ErrTooManyAbsent):
 		writeError(w, http.StatusRequestEntityTooLarge, err)
@@ -432,7 +434,7 @@ func (d *Daemon) getCoverage(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
-	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Artifacts: d.artifacts, Definitions: d.defs.current.Load(), Projections: d.projections.current.Load()}
+	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Values: d.readOps, Definitions: d.defs.current.Load(), Projections: d.projections.current.Load()}
 	c, err := read.Coverage(ctx, src, q)
 	if err != nil {
 		writeReadError(w, err)

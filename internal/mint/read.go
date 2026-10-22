@@ -62,7 +62,7 @@ type Composed struct {
 // that event leaves it live. That is the whole difference between a checkpoint at the
 // run and the value at w, so the result is the fold at w (the oracle test holds it to
 // that).
-func ReadAt(ctx context.Context, l ReadLedger, log CheckpointLog, artifacts Store, w ledger.Watermark,
+func ReadAt(ctx context.Context, l ReadLedger, log CheckpointLog, values Store, w ledger.Watermark,
 ) (Composed, bool, error) {
 	run, ok, err := startingRun(ctx, l, log, w)
 	if err != nil || !ok {
@@ -74,8 +74,8 @@ func ReadAt(ctx context.Context, l ReadLedger, log CheckpointLog, artifacts Stor
 	}
 	byID := map[string]fold.Entry{}
 	for _, row := range rows {
-		if err := loadInto(artifacts, row, byID); err != nil {
-			return Composed{}, false, err
+		if err := loadInto(ctx, values, row, byID); err != nil {
+			return Composed{}, false, ifRunStands(ctx, log, run, err)
 		}
 	}
 
@@ -96,10 +96,39 @@ func ReadAt(ctx context.Context, l ReadLedger, log CheckpointLog, artifacts Stor
 	if err != nil {
 		return Composed{}, false, err
 	}
+	if stands, err := runStands(ctx, log, run); err != nil || !stands {
+		return Composed{}, false, err
+	}
 	return Composed{
 		W: w, Value: value, Run: run, Checkpoints: len(rows), Tail: len(tail),
 		Touched: len(versions.touched), Versions: versions.live,
 	}, true, nil
+}
+
+// runStands reports whether the mint run is still recorded. A mint collects the
+// checkpoints nothing reads any more, with the runs only they were read from, in one
+// transaction; a read takes the run, its checkpoints and their values in separate
+// steps, so one that straddles the collection may hold a run, or the rows of one, that
+// is gone. It checks before it trusts what it got. A run that stands was not collected,
+// and what was read from it is whole, because the collection removes a run, its rows
+// and their values together or none of them.
+func runStands(ctx context.Context, log CheckpointLog, run ledger.Watermark) (bool, error) {
+	got, ok, err := log.LastMintRun(ctx, int64(run))
+	return ok && got == int64(run), err
+}
+
+// ifRunStands is the error a read failed with if its run still stands, and nil if the
+// run is gone, which is the collection's doing and not a fault: the read answers
+// that it has no run to start from, and the caller folds the ledger in full.
+func ifRunStands(ctx context.Context, log CheckpointLog, run ledger.Watermark, failed error) error {
+	stands, err := runStands(ctx, log, run)
+	switch {
+	case err != nil:
+		return err
+	case stands:
+		return failed
+	}
+	return nil
 }
 
 // startingRun is the latest mint run at or below w, once the log is known to describe
@@ -154,11 +183,11 @@ func leavesAt(ctx context.Context, log CheckpointLog, run ledger.Watermark,
 	return leaves, layout, true, nil
 }
 
-// loadInto adds a checkpoint's entries to byID. The artifact store checks the file's
-// bytes against the hash the row names, so a tampered or missing checkpoint fails the
-// read rather than answering from something else.
-func loadInto(artifacts Store, row ops.CheckpointRow, byID map[string]fold.Entry) error {
-	b, err := artifacts.Get(Kind, row.ValueHash)
+// loadInto adds a checkpoint's entries to byID. The store checks the bytes against the
+// hash the row names, so a tampered or missing checkpoint fails the read rather than
+// answering from something else.
+func loadInto(ctx context.Context, values Store, row ops.CheckpointRow, byID map[string]fold.Entry) error {
+	b, err := values.Get(ctx, Kind, row.ValueHash)
 	if err != nil {
 		return fmt.Errorf("mint: checkpoint %s v%d: %w", row.SpanID, row.V, err)
 	}

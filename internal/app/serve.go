@@ -17,7 +17,6 @@ import (
 	"github.com/mattjoyce/anam/internal/read"
 	"github.com/mattjoyce/anam/internal/receipt"
 	"github.com/mattjoyce/anam/internal/serve"
-	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
@@ -94,7 +93,7 @@ func receiptCmd(cfgPath *string) *cobra.Command {
 func receiptListCmd(cfgPath *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "list the receipts in the artifact directory, newest first",
+		Short: "list the receipts in the operational store, newest first",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := loadRoutedConfig(*cfgPath, cmd)
@@ -112,13 +111,14 @@ func receiptListCmd(cfgPath *string) *cobra.Command {
 					return err
 				}
 			} else {
-				// Listing reads the artifact directory and nothing else, so it still
+				// Listing reads the operational store and nothing else, so it still
 				// answers when there is no ledger to open.
-				store, err := artifact.New(cfg.ArtifactDir)
+				db, err := openStore(cmd.Context(), cfg)
 				if err != nil {
 					return err
 				}
-				if list, err = read.Receipts(serve.Deps{Artifacts: store}, cfg.ArtifactDir); err != nil {
+				defer func() { _ = db.Close() }()
+				if list, err = read.Receipts(cmd.Context(), serve.Deps{Published: db}, cfg.DBPath); err != nil {
 					return err
 				}
 			}
@@ -129,7 +129,7 @@ func receiptListCmd(cfgPath *string) *cobra.Command {
 
 func writeReceipts(cmd *cobra.Command, list api.Receipts) error {
 	if len(list.Receipts) == 0 {
-		_, err := fmt.Fprintf(cmd.OutOrStdout(), "no receipts in %s\n", list.Dir)
+		_, err := fmt.Fprintf(cmd.OutOrStdout(), "no receipts in %s\n", list.Store)
 		return err
 	}
 	w := tabwriter.NewWriter(cmd.OutOrStdout(), 2, 0, 2, ' ', 0)
@@ -151,14 +151,14 @@ func receiptShowCmd(cfgPath *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "show <receipt-hash>",
 		Short: "render what a past serve actually published, from the artifact alone",
-		Long: `Show reads the receipt and the served value out of the artifact directory and
+		Long: `Show reads the receipt and the served value out of the operational store and
 prints them. It consults no ledger and re-derives nothing.
 
 That restraint is the point. ` + "`receipt verify`" + ` asks whether the ledger still honours
 a receipt; show asks what the artifact itself says — the question you have to be
 able to answer when the ledger is gone, unreachable, or exactly the thing you
-doubt. Both files are checked against their own content addresses on the way out,
-so a tampered artifact is refused rather than displayed as if it were genuine.`,
+doubt. Both are checked against their own content addresses on the way out, so a
+tampered row is refused rather than displayed as if it were genuine.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := loadRoutedConfig(*cfgPath, cmd)
@@ -183,11 +183,12 @@ so a tampered artifact is refused rather than displayed as if it were genuine.`,
 				if cursor != "" {
 					return errors.New("--cursor pages a receipt over the daemon; a local show reads the whole value")
 				}
-				store, err := artifact.New(cfg.ArtifactDir)
+				db, err := openStore(cmd.Context(), cfg)
 				if err != nil {
 					return err
 				}
-				if shown, err = read.Receipt(serve.Deps{Artifacts: store}, args[0]); err != nil {
+				defer func() { _ = db.Close() }()
+				if shown, err = read.Receipt(cmd.Context(), serve.Deps{Published: db}, args[0]); err != nil {
 					return err
 				}
 			}
@@ -290,16 +291,16 @@ func clipPayload(b []byte) string {
 func receiptVerifyCmd(cfgPath *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "verify <receipt-hash>",
-		Short: "prove a receipt: re-derive it from the ledger and re-hash the artifact",
+		Short: "prove a receipt: re-derive it from the ledger and re-hash the stored value",
 		Long: `Verify honours a receipt with two independent proofs.
 
   reproduced  the ledger, folded at the receipt's own watermark and pruned through
               the same template version, still produces exactly those bytes.
-  intact      the served artifact on disk still hashes to the address it is filed
+  intact      the served value in the store still hashes to the address it is filed
               under.
 
-Either can fail without the other: a tampered file under a sound ledger, or a
-corrupted ledger under an untouched file. Both must hold for the serve to be proved.`,
+Either can fail without the other: a tampered row under a sound ledger, or a
+corrupted ledger under an untouched row. Both must hold for the serve to be proved.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := loadRoutedConfig(*cfgPath, cmd)
@@ -423,7 +424,7 @@ func ledgerOrUnnamed(id string) string {
 }
 
 // serveDeps assembles the serve path's dependencies from config (read.ServeDeps):
-// the ledger read-only, since serving writes nothing to it, the artifacts, and the
+// the ledger read-only, since serving writes nothing to it, the store that holds receipts, and the
 // checkpoint log so a serve or a verify starts from the last mint run rather than
 // the ledger's first event. The returned func closes them.
 func serveDeps(ctx context.Context, cfg config.Config) (serve.Deps, func(), error) {
@@ -441,13 +442,7 @@ func serveDeps(ctx context.Context, cfg config.Config) (serve.Deps, func(), erro
 		_ = l.Close()
 		return serve.Deps{}, nil, err
 	}
-	store, err := artifact.New(cfg.ArtifactDir)
-	if err != nil {
-		_ = db.Close()
-		_ = l.Close()
-		return serve.Deps{}, nil, err
-	}
-	closeAll := func() { _ = store.Close(); _ = db.Close(); _ = l.Close() }
+	closeAll := func() { _ = db.Close(); _ = l.Close() }
 	defs, err := registryOf(ctx, db)
 	if err != nil {
 		closeAll()
@@ -458,7 +453,7 @@ func serveDeps(ctx context.Context, cfg config.Config) (serve.Deps, func(), erro
 		closeAll()
 		return serve.Deps{}, nil, err
 	}
-	deps, err := read.ServeDeps(l, store, db, defs, templates)
+	deps, err := read.ServeDeps(l, db, db, defs, templates)
 	if err != nil {
 		closeAll()
 		return serve.Deps{}, nil, err

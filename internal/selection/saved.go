@@ -1,6 +1,7 @@
 package selection
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -11,7 +12,7 @@ import (
 	"github.com/mattjoyce/anam/internal/query"
 )
 
-// Saved selections (card 206). A program is saved as an artifact of its own kind,
+// Saved selections (card 206). A program is saved as stored content of its own kind,
 // addressed by the SHA-256 of its canonical text, and named by a short code: the
 // first CodeLen hex digits of that hash, written sel:<code>. The same program always
 // has the same code, and a code never changes meaning: it names the program, not
@@ -20,10 +21,11 @@ import (
 // Two programs whose hashes share the first CodeLen digits are told apart at save.
 // The first one saved keeps its CodeLen digits; the later one's code lengthens to
 // the shortest prefix of its hash no other saved selection shares, and that code is
-// filed as a second small artifact (CodeKind), since which of the two came first is
+// filed as a second small record (CodeKind), since which of the two came first is
 // a fact the hashes cannot say. A code is written once and never rewritten.
 
-// The artifact kinds, and the code's shape.
+// The kinds of stored content, and the code's shape. They are the operational store's
+// (ops.KindSelection and ops.KindSelectionCode); a name it does not know is refused.
 const (
 	// Kind files a selection's canonical text.
 	Kind = "selection"
@@ -41,12 +43,12 @@ const (
 // hashLen is the digits of a SHA-256 in hex, the longest a code can be.
 const hashLen = 2 * sha256.Size
 
-// Artifacts is the content-addressed store a saved selection is filed in, as
-// internal/store/artifact's Store provides it.
-type Artifacts interface {
-	Put(kind string, b []byte) (string, error)
-	Get(kind, digest string) ([]byte, error)
-	List(kind string) ([]string, error)
+// Content is the content-addressed store a saved selection is filed in: the
+// operational store's rows, which the store checks against their keys on the way out.
+type Content interface {
+	Put(ctx context.Context, kind string, b []byte) (string, error)
+	Get(ctx context.Context, kind, digest string) ([]byte, error)
+	List(ctx context.Context, kind string) ([]string, error)
 }
 
 // The refusals of saving and opening.
@@ -100,15 +102,15 @@ func ParseCode(s string) (string, error) {
 	return c, nil
 }
 
-// Store saves and opens selections in an artifact store.
-type Store struct{ a Artifacts }
+// Store saves and opens selections in the operational store.
+type Store struct{ a Content }
 
 // NewStore returns a Store over a.
-func NewStore(a Artifacts) *Store { return &Store{a: a} }
+func NewStore(a Content) *Store { return &Store{a: a} }
 
 // Save files a program and answers its code. Saving the same program again writes
 // nothing new and answers the same code.
-func (s *Store) Save(text string) (Saved, error) {
+func (s *Store) Save(ctx context.Context, text string) (Saved, error) {
 	if strings.TrimSpace(text) == "" {
 		return Saved{}, fmt.Errorf("%w: the text is empty", ErrNotProgram)
 	}
@@ -117,11 +119,11 @@ func (s *Store) Save(text string) (Saved, error) {
 		return Saved{}, fmt.Errorf("%w: %v", ErrNotProgram, err)
 	}
 	digest := digestOf([]byte(canon))
-	code, err := s.codeFor(digest)
+	code, err := s.codeFor(ctx, digest)
 	if err != nil {
 		return Saved{}, err
 	}
-	if _, err := s.a.Put(Kind, []byte(canon)); err != nil {
+	if _, err := s.a.Put(ctx, Kind, []byte(canon)); err != nil {
 		return Saved{}, fmt.Errorf("selection: save: %w", err)
 	}
 	return Saved{Code: code, Hash: digest, Program: canon}, nil
@@ -133,15 +135,15 @@ func (s *Store) Save(text string) (Saved, error) {
 // before the text, so a save that dies between the two leaves a code whose program
 // is missing, which the next save of the same program completes, rather than a
 // program whose code the store cannot say.
-func (s *Store) codeFor(digest string) (string, error) {
-	codes, err := s.codes()
+func (s *Store) codeFor(ctx context.Context, digest string) (string, error) {
+	codes, err := s.codes(ctx)
 	if err != nil {
 		return "", err
 	}
 	if c, ok := codes.byHash[digest]; ok {
 		return c, nil
 	}
-	stored, err := s.a.List(Kind)
+	stored, err := s.a.List(ctx, Kind)
 	if err != nil {
 		return "", fmt.Errorf("selection: list saved selections: %w", err)
 	}
@@ -164,7 +166,7 @@ func (s *Store) codeFor(digest string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("selection: code record: %w", err)
 	}
-	if _, err := s.a.Put(CodeKind, rec); err != nil {
+	if _, err := s.a.Put(ctx, CodeKind, rec); err != nil {
 		return "", fmt.Errorf("selection: file code %s: %w", code, err)
 	}
 	return code, nil
@@ -197,19 +199,19 @@ func anyHasPrefix(xs []string, prefix, self string) bool {
 // selection; a code of CodeLen digits names the one saved selection that starts with
 // them and did not lengthen; a longer code that was never filed is read as a prefix
 // of a hash and names the one selection it starts, if there is one.
-func (s *Store) Open(code string) (Saved, error) {
+func (s *Store) Open(ctx context.Context, code string) (Saved, error) {
 	c, err := ParseCode(code)
 	if err != nil {
 		return Saved{}, err
 	}
-	codes, err := s.codes()
+	codes, err := s.codes(ctx)
 	if err != nil {
 		return Saved{}, err
 	}
 	if d, ok := codes.byCode[c]; ok {
-		return s.get(d, c)
+		return s.get(ctx, d, c)
 	}
-	stored, err := s.a.List(Kind)
+	stored, err := s.a.List(ctx, Kind)
 	if err != nil {
 		return Saved{}, fmt.Errorf("selection: list saved selections: %w", err)
 	}
@@ -231,13 +233,13 @@ func (s *Store) Open(code string) (Saved, error) {
 		if !ok {
 			own = hexOf(found[0])[:CodeLen]
 		}
-		return s.get(found[0], own)
+		return s.get(ctx, found[0], own)
 	}
 	return Saved{}, fmt.Errorf("%w: %s%s starts %d; give more of the hash", ErrAmbiguous, CodePrefix, c, len(found))
 }
 
-func (s *Store) get(digest, code string) (Saved, error) {
-	b, err := s.a.Get(Kind, digest)
+func (s *Store) get(ctx context.Context, digest, code string) (Saved, error) {
+	b, err := s.a.Get(ctx, Kind, digest)
 	if err != nil {
 		return Saved{}, fmt.Errorf("%w: %s%s is filed, but its program is not: %v", ErrNoCode, CodePrefix, code, err)
 	}
@@ -258,14 +260,14 @@ type codeIndex struct {
 
 // codes reads every filed code. There is one only for each pair of saved selections
 // whose hashes share CodeLen digits, so this is few reads, usually none.
-func (s *Store) codes() (codeIndex, error) {
+func (s *Store) codes(ctx context.Context) (codeIndex, error) {
 	idx := codeIndex{byCode: map[string]string{}, byHash: map[string]string{}}
-	digests, err := s.a.List(CodeKind)
+	digests, err := s.a.List(ctx, CodeKind)
 	if err != nil {
 		return idx, fmt.Errorf("selection: list codes: %w", err)
 	}
 	for _, d := range digests {
-		b, err := s.a.Get(CodeKind, d)
+		b, err := s.a.Get(ctx, CodeKind, d)
 		if err != nil {
 			return idx, fmt.Errorf("selection: read code %s: %w", d, err)
 		}
@@ -281,7 +283,7 @@ func (s *Store) codes() (codeIndex, error) {
 	return idx, nil
 }
 
-// digestOf is the content address the artifact store files b under.
+// digestOf is the content address the store files b under.
 func digestOf(b []byte) string {
 	sum := sha256.Sum256(b)
 	return "sha256:" + hex.EncodeToString(sum[:])

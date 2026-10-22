@@ -11,8 +11,8 @@ import (
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/query"
 	"github.com/mattjoyce/anam/internal/receipt"
-	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
+	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
 // A query receipt (card 173) is a receipt whose served value is a query's answer: the
@@ -64,14 +64,14 @@ func PublishQuery(ctx context.Context, d Deps, t projection.Template, w ledger.W
 	if err != nil {
 		return Served{}, err
 	}
-	out := Served{Receipt: r, ReceiptHash: artifact.Digest(receiptBytes), Answer: &ans}
+	out := Served{Receipt: r, ReceiptHash: ops.Digest(receiptBytes), Answer: &ans}
 	if dryRun {
 		return out, nil
 	}
-	if _, err := d.Artifacts.Put(receipt.ServedKind, ans.Bytes()); err != nil {
+	if _, err := d.Published.Put(ctx, receipt.ServedKind, ans.Bytes()); err != nil {
 		return Served{}, err
 	}
-	if _, err := d.Artifacts.Put(receipt.Kind, receiptBytes); err != nil {
+	if _, err := d.Published.Put(ctx, receipt.Kind, receiptBytes); err != nil {
 		return Served{}, err
 	}
 	out.Written = true
@@ -107,11 +107,11 @@ func verifyQuery(ctx context.Context, d Deps, r receipt.Receipt, t projection.Te
 	if err != nil {
 		return receipt.Result{}, err
 	}
-	stored, err := d.Artifacts.Raw(receipt.ServedKind, r.ServedHash)
-	if err != nil && !errors.Is(err, artifact.ErrNotFound) {
+	stored, err := d.Published.Raw(ctx, receipt.ServedKind, r.ServedHash)
+	if err != nil && !errors.Is(err, ops.ErrNotFound) {
 		return receipt.Result{}, err
 	}
-	out := receipt.Compare(r, ans.Hash(), idsOf(served), stored, artifact.Digest)
+	out := receipt.Compare(r, ans.Hash(), idsOf(served), stored, ops.Digest)
 	out.Notes = append(out.Notes, notes...)
 	if r.DefinitionSetVersion != d.DefinitionSetVersion {
 		out.Notes = append(out.Notes, fmt.Sprintf(

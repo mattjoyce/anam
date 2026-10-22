@@ -12,7 +12,6 @@ import (
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/read"
-	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
@@ -26,10 +25,15 @@ func checkpointCmd(cfgPath *string) *cobra.Command {
 and writes a new version of every bucket whose value differs from its last
 checkpoint. A bucket that has not changed is left alone: same hash, no new row.
 
-Each value is written to the artifact directory under the SHA-256 of its own bytes,
-and the checkpoint log in the operational store records the bucket, its version and
-the watermark it folded. Minting writes nothing to the ledger; a checkpoint is a
-cache of the fold, there to bound replay, and is rebuilt by running this again.
+Each value is written to the operational store under the SHA-256 of its own bytes,
+and the checkpoint log beside it records the bucket, its version and the watermark it
+folded. Minting writes nothing to the ledger; a checkpoint is a cache of the fold,
+there to bound replay, and is rebuilt by running this again.
+
+A run that wrote ends by removing the checkpoints nothing reads any more: the older
+versions of a bucket, except those a receipt's watermark still starts from. A read at a
+watermark before the oldest run left folds the ledger in full, which is the same value,
+only slower.
 
 Buckets subdivide: a bucket whose value is over checkpoint_budget bytes (default
 1 MiB) is split along the calendar, a year into months, a month into days. The run
@@ -61,7 +65,7 @@ which repairs any checkpoint that is not the fold's.`,
 func checkpointListCmd(cfgPath *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "list every checkpoint ever minted, by bucket and version",
+		Short: "list the checkpoints the log holds, by bucket and version",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			cfg, err := loadRoutedConfig(*cfgPath, cmd)
@@ -125,9 +129,21 @@ func writeMint(cmd *cobra.Command, m api.Mint) error {
 	if !m.Full {
 		from = fmt.Sprintf("from the run at W=%d", m.From)
 	}
-	_, err := fmt.Fprintf(out, "%s %d of %d buckets at W=%d, %s\n",
-		verb, m.MintedCount(), len(m.Outcomes), m.W, from)
-	return err
+	if _, err := fmt.Fprintf(out, "%s %d of %d buckets at W=%d, %s\n",
+		verb, m.MintedCount(), len(m.Outcomes), m.W, from); err != nil {
+		return err
+	}
+	if c := m.Collected; c.Checkpoints > 0 || c.Runs > 0 || c.Values > 0 {
+		if _, err := fmt.Fprintf(out, "removed %d old checkpoints, %d mint runs and %d values (%.1f MB)\n",
+			c.Checkpoints, c.Runs, c.Values, float64(c.Bytes)/1e6); err != nil {
+			return err
+		}
+	}
+	if m.CollectError != "" {
+		_, err := fmt.Fprintf(cmd.ErrOrStderr(), "removing old checkpoints failed, the next mint tries again: %s\n", m.CollectError)
+		return err
+	}
+	return nil
 }
 
 // listCheckpoints asks the daemon when a server is configured. Locally it reads the
@@ -167,13 +183,9 @@ func writeCheckpoints(cmd *cobra.Command, list api.Checkpoints) error {
 
 // mintDeps assembles the mint's dependencies from config. The ledger is opened
 // read-only: minting writes nothing to it. The operational store takes the checkpoint
-// rows and the artifact directory takes the values. The returned func closes all three.
+// rows and the values. The returned func closes both.
 func mintDeps(ctx context.Context, cfg config.Config) (mint.Deps, func(), error) {
 	buckets, err := cfg.Buckets()
-	if err != nil {
-		return mint.Deps{}, nil, err
-	}
-	store, err := artifact.New(cfg.ArtifactDir)
 	if err != nil {
 		return mint.Deps{}, nil, err
 	}
@@ -189,9 +201,8 @@ func mintDeps(ctx context.Context, cfg config.Config) (mint.Deps, func(), error)
 	closeAll := func() {
 		_ = l.Close()
 		_ = db.Close()
-		_ = store.Close()
 	}
 	return mint.Deps{
-		Ledger: l, Index: db, Artifacts: store, Buckets: buckets, Clock: clock.Real{}, Budget: cfg.CheckpointBudget,
+		Ledger: l, Index: db, Values: db, Buckets: buckets, Clock: clock.Real{}, Budget: cfg.CheckpointBudget,
 	}, closeAll, nil
 }

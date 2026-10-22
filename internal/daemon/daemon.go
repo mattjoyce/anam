@@ -30,7 +30,6 @@ import (
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/selection"
-	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
 	"github.com/mattjoyce/anam/internal/token"
@@ -88,9 +87,7 @@ type Daemon struct {
 	// readOps is a read-only handle on the operational store, so the routes that only
 	// read it cannot write it.
 	readOps *ops.DB
-	// artifacts is the published-artifact tier: checkpoint values and receipts.
-	artifacts *artifact.Store
-	// selections are the saved selections (card 206), filed in artifacts.
+	// selections are the saved selections (card 206), filed in the operational store.
 	selections *selection.Store
 	// index is whether the operational index is wrong rather than merely behind.
 	index indexState
@@ -201,12 +198,6 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		closeAll()
 		return nil, err
 	}
-	artifacts, err := artifact.New(cfg.ArtifactDir)
-	if err != nil {
-		_ = readOps.Close()
-		closeAll()
-		return nil, err
-	}
 	return &Daemon{
 		cfg:         cfg,
 		opts:        opts,
@@ -215,8 +206,7 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		writes:      Stores{Ledger: w, Ops: db},
 		read:        r,
 		readOps:     readOps,
-		artifacts:   artifacts,
-		selections:  selection.NewStore(artifacts),
+		selections:  selection.NewStore(db),
 		sources:     newSources(),
 		principals:  whom,
 		workbench:   workbench,
@@ -428,8 +418,7 @@ func (d *Daemon) Serve(ctx context.Context, ln net.Listener) error {
 }
 
 func (d *Daemon) closeStores() error {
-	return errors.Join(d.read.Close(), d.readOps.Close(), d.writes.Ledger.Close(), d.writes.Ops.Close(),
-		d.artifacts.Close())
+	return errors.Join(d.read.Close(), d.readOps.Close(), d.writes.Ledger.Close(), d.writes.Ops.Close())
 }
 
 // Ready asks the daemon listening on addr whether it is ready. An address bound to

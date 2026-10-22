@@ -29,7 +29,11 @@ func (d *Daemon) mintAtHead() *api.MintRun {
 		return &api.MintRun{Error: err.Error()}
 	}
 	slog.Info("daemon: minted", "w", m.W, "full", m.Full, "from", m.From,
-		"minted", m.MintedCount(), "buckets", len(m.Outcomes))
+		"minted", m.MintedCount(), "buckets", len(m.Outcomes),
+		"collected_checkpoints", m.Collected.Checkpoints, "collected_bytes", m.Collected.Bytes)
+	if m.CollectError != "" {
+		slog.Warn("daemon: collecting old checkpoints failed; the next mint tries again", "err", m.CollectError)
+	}
 	return &api.MintRun{W: m.W, Full: m.Full, From: m.From, Minted: m.MintedCount(), Buckets: len(m.Outcomes)}
 }
 

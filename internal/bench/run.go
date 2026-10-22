@@ -17,7 +17,6 @@ import (
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/read"
 	"github.com/mattjoyce/anam/internal/span"
-	"github.com/mattjoyce/anam/internal/store/artifact"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
@@ -92,17 +91,12 @@ func Run(ctx context.Context, o Options, progress func(string)) (Report, error) 
 	if _, err := catchup.Sync(ctx, l, db, buckets); err != nil {
 		return Report{}, fmt.Errorf("bench: catch the index up: %w", err)
 	}
-	store, err := artifact.New(o.Paths.Artifacts)
-	if err != nil {
-		return Report{}, err
-	}
-	defer func() { _ = store.Close() }()
 
 	rep, plan, err := describe(ctx, o, l, db, buckets)
 	if err != nil {
 		return Report{}, err
 	}
-	deps := mint.Deps{Ledger: l, Index: db, Artifacts: store, Buckets: buckets, Clock: clock.Real{}, Budget: o.Budget}
+	deps := mint.Deps{Ledger: l, Index: db, Values: db, Buckets: buckets, Clock: clock.Real{}, Budget: o.Budget}
 	for _, sc := range scenarios(l, db, plan, deps) {
 		if !o.wants(sc.name) {
 			continue
@@ -230,7 +224,7 @@ type scenario struct {
 }
 
 func scenarios(l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) []scenario {
-	src := read.Source{Ledger: l, Checkpoints: db, Artifacts: deps.Artifacts}
+	src := read.Source{Ledger: l, Checkpoints: db, Values: deps.Values}
 	timeline := func(q api.TimelineQuery) func(context.Context) (int, error) {
 		return func(ctx context.Context) (int, error) {
 			q.Zone = "UTC"
@@ -248,7 +242,7 @@ func scenarios(l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) []scenario 
 			return res.Value.Len(), err
 		}},
 		{"composed read (mint.ReadAt)", func(ctx context.Context) (int, error) {
-			c, ok, err := mint.ReadAt(ctx, l, db, deps.Artifacts, p.head)
+			c, ok, err := mint.ReadAt(ctx, l, db, deps.Values, p.head)
 			if !ok {
 				return 0, err // no mint run to start from: zero rows says so
 			}

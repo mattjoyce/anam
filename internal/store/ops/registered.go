@@ -30,6 +30,11 @@ type Registered struct {
 	Definitions []RegisteredDefinition
 	Projections []RegisteredProjection
 
+	// Holds are the admission holds the operator has set. They are authored state,
+	// like the registered rows: a migration carries them into the new store, so a
+	// source held before the move is still held after it.
+	Holds []Hold
+
 	// Provisioned is the store's copy of the Definitions the binary carries, bundled
 	// and history. It is read so a migration can resolve an older version; it is not
 	// written, because the daemon provisions the new store's own at start.
@@ -80,6 +85,22 @@ func (d *DB) ReadRegistered(ctx context.Context) (Registered, error) {
 		return Registered{}, fmt.Errorf("ops: read registered projections: %w", err)
 	}
 
+	rows, err = tx.QueryContext(ctx, `SELECT source, held_at FROM admission_hold ORDER BY source`)
+	if err != nil {
+		return Registered{}, fmt.Errorf("ops: read holds: %w", err)
+	}
+	for rows.Next() {
+		var h Hold
+		if err := rows.Scan(&h.Source, &h.HeldAt); err != nil {
+			_ = rows.Close()
+			return Registered{}, fmt.Errorf("ops: scan hold: %w", err)
+		}
+		out.Holds = append(out.Holds, h)
+	}
+	if err := closeRows(rows); err != nil {
+		return Registered{}, fmt.Errorf("ops: read holds: %w", err)
+	}
+
 	rows, err = tx.QueryContext(ctx, `SELECT type, version, body FROM definition ORDER BY type, version`)
 	if err != nil {
 		return Registered{}, fmt.Errorf("ops: read provisioned definitions: %w", err)
@@ -108,9 +129,10 @@ func closeRows(rows *sql.Rows) error {
 }
 
 // CarryRegistered writes the registered Definitions and projections of r, each at its
-// registration moment, in one transaction: all of them or none. The tables are
-// immutable, so it fits a store with none of these versions, which is what a fresh
-// store is; a version already there fails the call and leaves the store as it was.
+// registration moment, and the holds it names, in one transaction: all of them or
+// none. The tables are immutable, so it fits a store with none of these versions,
+// which is what a fresh store is; a version already there fails the call and leaves
+// the store as it was.
 func (d *DB) CarryRegistered(ctx context.Context, r Registered) error {
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -129,6 +151,13 @@ func (d *DB) CarryRegistered(ctx context.Context, r Registered) error {
 			`INSERT INTO registered_projection (name, version, body, registered_at) VALUES (?, ?, ?, ?)`,
 			x.Name, x.Version, x.Body, x.RegisteredAt); err != nil {
 			return fmt.Errorf("ops: carry projection %s v%d: %w", x.Name, x.Version, err)
+		}
+	}
+	for _, x := range r.Holds {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO admission_hold (source, held_at) VALUES (?, ?) ON CONFLICT(source) DO NOTHING`,
+			x.Source, x.HeldAt); err != nil {
+			return fmt.Errorf("ops: carry hold %s: %w", x.Source, err)
 		}
 	}
 	if err := tx.Commit(); err != nil {

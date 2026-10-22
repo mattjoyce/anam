@@ -29,6 +29,7 @@ depends_on:
 | `init` | ledger read-write (create) | no |
 | `daemon` | everything, read-write | is the daemon |
 | `timeline`, `changes`, `status`, `receipt`, `checkpoint`, `projection` | ledger read-only | yes |
+| `hold` | nothing local: the daemon's own admission holds | yes, and it needs the daemon |
 | `serve` | ledger read-only, artifacts | no, local only |
 | `retract` | ledger read-only to plan, read-write with `--yes` | no, refuses to run with a server configured |
 | `rename` | ledger read-only to plan, read-write with `--yes` | no, refuses to run with a server configured |
@@ -38,3 +39,5 @@ depends_on:
 Routing is one function, `loadRoutedConfig`: with `server` set the command builds a [client](/components/client.md); without it the command opens the files. Commands that must own the files (`daemon`, `retract`, `rename`, `serve`) call `loadConfig`, which refuses a configured server.
 
 There is no `ingest` command since card 119. Facts reach the ledger only from importers, through the daemon's `POST /v1/envelopes`; the CLI writes the ledger only to create it (`init`), to tombstone (`retract --yes`), and to carry facets into a renamed type as new versions of themselves (`rename --yes`, card 140, [workflow](/workflows/rename-a-type.md)), and to make a new ledger and carry the live facets of an old one into it (`migrate --yes`, card 200, [workflow](/workflows/migrate-to-a-fresh-ledger.md)). `openLedgerForWrite` and `registryOf` live in `init.go`.
+
+`anam hold <source>...` puts a source's admission on hold, `anam hold --all` holds every source, `anam hold --release [<source>...]` releases them, and `anam hold` alone lists what is held.

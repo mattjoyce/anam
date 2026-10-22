@@ -149,6 +149,11 @@ func registerInStore(t *testing.T, f ledgerFixture, bodies ...string) {
 	if err := db.RegisterProjection(ctx, ops.ProjectionRow{Name: "heart", Version: 1, Body: heartTemplate}, "2026-10-23T00:00:00.000000000Z"); err != nil {
 		t.Fatal(err)
 	}
+	// A source the operator has held: the hold is authored state, so the carry takes
+	// it into the new store.
+	if err := db.SetHold(ctx, "garmin", "2026-10-23T00:00:00.000000000Z"); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // migrationFixture is an old ledger with churn in it, and the ids of what it holds.
@@ -375,6 +380,9 @@ func assertRegisteredCarried(t *testing.T, f migrationFixture) {
 	}
 	if was.Projections[0] != now.Projections[0] {
 		t.Errorf("projection row: %+v, was %+v", now.Projections[0], was.Projections[0])
+	}
+	if len(was.Holds) != 1 || len(now.Holds) != 1 || now.Holds[0] != was.Holds[0] {
+		t.Errorf("holds: %+v, was %+v", now.Holds, was.Holds)
 	}
 }
 

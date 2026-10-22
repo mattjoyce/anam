@@ -184,3 +184,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: `anam migrate` carries a facet under the type's current Definition version when its payload passes it and the facet built has the same id, content hash, fact time, series, classification, descriptor and binding as the one read; otherwise under the version it was admitted under, as before; a facet neither carries is refused. The dry run prints MOVED and OWN per type and source and a line per group moved or kept; the proof reports the moves apart from the identity check. Matt's decision of 2026-10-22.
 - Bundle: the migrate workflow and the IMPORTERS section 8.9 describe the rule.
+
+## 2026-10-22, the operator admission hold
+
+- Code: an operator can hold a source's admission at the daemon's door. `POST /v1/hold` (operator) takes `{"sources":[...]}` or `{"all":true}`, `DELETE /v1/hold` releases, and `GET /v1/status` reports the held sources in `held`. A held source's `POST /v1/envelopes` and `POST /v1/definitions` are refused with 503 and a `Retry-After`, and the body names the hold; the check is inside the write, so a hold and an admission are one order. Reads, the operator's own writes and `POST /v1/entry` (the workbench) are never held. The hold is authored state in the operational store (`admission_hold`, schema version 9), so it survives a restart of the daemon and is carried into a new store by `anam migrate`. `anam hold <source>...`, `anam hold --all`, `anam hold --release [<source>...]` and `anam hold` to list.
+- Bundle: the daemon component's route table, the CLI component's command table, the store-ops component's table and the operational-store term.

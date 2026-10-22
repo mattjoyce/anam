@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -72,6 +73,9 @@ func writeStatus(cmd *cobra.Command, s api.Status, server string) error {
 	_, _ = fmt.Fprintf(out, "ledger  %s (person %s)\n", s.LedgerID, s.Person)
 	_, _ = fmt.Fprintf(out, "W       %d\n", s.W)
 	_, _ = fmt.Fprintf(out, "build   %s, %s\n", s.Version, where)
+	if len(s.Held) > 0 {
+		_, _ = fmt.Fprintf(out, "holds   %s\n", strings.Join(s.Held, " "))
+	}
 	if s.Since == "" {
 		return nil
 	}

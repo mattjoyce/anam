@@ -8,6 +8,18 @@ decisions is in `journal/`.
 
 ## 2026-10-22
 
+- The operator can hold a source's admission. `POST /v1/hold` (operator) takes `{"sources": ["garmin"]}`
+  or `{"all": true}` and answers the sources held now; `DELETE /v1/hold` releases the ones it names,
+  or every hold when it names none. `GET /v1/status` reports them in `held`, where `*` is the global
+  hold. A held source's `POST /v1/envelopes` and `POST /v1/definitions` answer 503 with `Retry-After`
+  and a body naming the hold; reads, the operator's own writes and `POST /v1/entry` are never held,
+  and the workbench is never held. The hold is authored state in the operational store (schema
+  version 9, table `admission_hold`), so it survives a restart; a store at version 9 is refused by an
+  older binary, so roll back to the previous store, not the previous build. `anam migrate` carries
+  the holds into the new store. `anam hold <source>...`, `anam hold --all`,
+  `anam hold --release [<source>...]`, and `anam hold` to list. Ductile retries a 503 on its own
+  backoff and does not read `Retry-After`, so a held source's importer is retried later, not sooner.
+
 - The Workbench writes links by hand (card 202). `GET /link` on the inspector draws one `record.edge`
   from a basket of facets, each on its side, with a kind, the person's words, a "link to this
   version" pin per facet and the moment in the browser's zone; `POST /link` saves it as source

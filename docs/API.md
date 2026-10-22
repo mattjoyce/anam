@@ -247,7 +247,7 @@ or under `importers`, the file's first shape, where each entry is an importer na
 |---|---|
 | `reader` | Every read: status, timeline, changes, receipts and their verification, projections, checkpoints, Definitions, snapshots. Publishing a read (`POST /v1/receipts`), which writes artifacts and never the ledger |
 | `importer` | A reader's routes, and envelopes, documents and Definition registration, as its one source and for its types only. With `any_type` in place of `types` it submits every type the daemon knows, registers none and stores no document. It sees only its own source's snapshots |
-| `operator` | A reader's routes, and minting, backups, projection templates and the inspector. It submits no envelopes, since it is no source; it enters facts by hand at `POST /v1/entry`, which the daemon admits as the `workbench` source |
+| `operator` | A reader's routes, and minting, backups, projection templates, admission holds and the inspector. It submits no envelopes, since it is no source; it enters facts by hand at `POST /v1/entry`, which the daemon admits as the `workbench` source (never held) |
 
 A route names the roles it admits, in one table (`internal/daemon/api.go`), and a test sends a
 token of each role to every route. No token, or one the daemon does not know, is 401; a token whose
@@ -282,6 +282,29 @@ The application accepts resolved dates, not strings such as `yesterday`. Discove
 server's current instant and configured zone. The client resolves relative expressions against the
 user's utterance time, preserving that anchor in the submission. A retry tomorrow still logs the
 same day. Unknown or ambiguous time is a validation issue, never a default to now.
+
+### Admission hold
+
+An operator may hold a source's admission at the daemon's door. `POST /v1/hold` takes
+`{"sources": ["garmin"]}` or `{"all": true}` and answers the sources held now; `DELETE /v1/hold`
+releases the sources it names, or every hold when it names none, and answers the same way. `GET
+/v1/status` reports them in `held`, where `*` is the global hold.
+
+A held source's `POST /v1/envelopes` and `POST /v1/definitions` answer `503` with a `Retry-After`
+header and a body naming the hold, and nothing of it is admitted. The check runs inside the write,
+so a hold and an admission are one order: a hold set before the batch's write is seen, and one set
+after it is not. A hold the daemon cannot read refuses the submission too: an admission that cannot
+see a hold must not admit.
+
+Reads, the operator's own writes and `POST /v1/entry` are never held. The workbench is the
+operator's own hand entry, not an importer's submission, so `POST /v1/hold` naming `workbench` is
+`400`, and `all` holds every source but it. `POST /v1/documents` is not held either: the hold is
+over ledger admission, and the document a facet names arrives as an envelope.
+
+The hold is authored state in the operational store (`admission_hold`, schema version 9), so it
+outlives a restart of the daemon, and `anam migrate` carries it into a new store. `anam hold garmin`
+holds a source, `anam hold --all` holds every source, `anam hold --release [garmin]` releases, and
+`anam hold` alone lists what is held.
 
 ### Errors and bounds
 

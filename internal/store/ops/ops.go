@@ -48,7 +48,11 @@ import (
 // 7 -> 8 adds facet_edge (card 104). A table added without a bump would be empty in a
 // file that had already replayed past the edges it should hold, and for edges absent
 // does not mean none, so the pre-edge file refuses and is replayed.
-const schemaVersion = 8
+//
+// 8 -> 9 adds admission_hold: the operator's admission hold over sources. Authored
+// state, stored in the operational store; the derived tier must not depend on it.
+// Bump because the table is new and must exist in a version-9 file.
+const schemaVersion = 9
 
 // ErrSchemaVersion is returned by Open for a database written by a different schema.
 var ErrSchemaVersion = errors.New("ops: schema version mismatch")
@@ -274,6 +278,16 @@ CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- tier: authored — operator admission holds (POST /v1/hold). Holds are per-source
+-- or global ("*"). Held rows are not updated; deletion releases a hold.
+CREATE TABLE IF NOT EXISTS admission_hold (
+  source    TEXT PRIMARY KEY,
+  held_at   TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS admission_hold_no_update
+BEFORE UPDATE ON admission_hold
+BEGIN SELECT RAISE(ABORT, 'admission_hold is immutable'); END;
 `
 
 // Open opens (creating if absent) the operational store at path and idempotently

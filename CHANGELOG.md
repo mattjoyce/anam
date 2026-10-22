@@ -6,6 +6,21 @@ of the API must do or may expect, newest first, by the day they merged. Each nam
 kanban board, which holds the reasoning. The full history is `git log`; the story behind the
 decisions is in `journal/`.
 
+## Unreleased
+
+- Anam can hold what a person says is absorbing them (card 222). `mind` is a ninth domain head, for
+  self-reported inner states, so mood or energy can join later; a head is added only by a logged
+  decision. Three Definitions are bundled at v1, `mind.attention` (a reading: `at`, `topic`,
+  `intensity` from 1 to 5, an optional `note`), and `mind.attention.started` and
+  `mind.attention.ended` (a pair the person declares, which closes a series keyed by `topic`; a
+  later started opens a new one). `topic` has one spelling, lower case with hyphens (`deskcam`).
+  `at` is a wall clock read at the offset `source_time` names, so one minute said in two zones is
+  two readings. All three are Confidential and strict. A bundled `attention` projection serves them
+  as a log. To enter them by hand, list `mind.attention`, `mind.attention.started` and
+  `mind.attention.ended` under the `workbench` entry's `types` in the importers file and restart;
+  an agent saves one through anam-mcp's `save_fact` with no change to either program. Nothing is
+  inferred: readings never open or close an episode, and `mind.attention.reflection` is not built.
+
 ## 2026-10-22
 
 - A token can always leave receipts, so a receipt says who read what (card 216). A principal in the

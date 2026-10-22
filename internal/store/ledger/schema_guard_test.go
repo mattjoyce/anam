@@ -23,12 +23,18 @@ import (
 //     gains on open: leave schemaVersion alone and update only the hash below, in the
 //     same commit, with a line saying why it is compatible.
 //
+// A migration file is history: an older ledger runs it once and a new one never does,
+// so editing it after release changes nothing for a ledger that already ran it and
+// would change what a ledger still at the older version becomes. Its hash moving
+// therefore needs a reason said in the commit, not only a new pin.
+//
 // Whether the triggers still hold is not decided here. TestAppendOnly_* and
 // TestSeq_*, TestVersion_Database* in appendonly_test.go do that, against the file.
 const (
 	pinnedSchemaVersion = 3
 	pinnedLedgerSQL     = "906d1cda1bdc769932ef7cc8a9c09ed2845ee5c6437b9c943b007a553e738ea0"
 	pinnedIndexesSQL    = "24a1caf45c986d7ce20a4aa4e8d96efddde74365b4dbc481ea6764bed4a34eb0"
+	pinnedMigration0002 = "bb8609fad84e40fb945ef825cd9c660074717c6cd3d2381fd4b4f1dae3e1a34e"
 )
 
 func sha(s string) string {
@@ -51,6 +57,15 @@ func TestSchemaFiles_AreHeldToTheirVersion(t *testing.T) {
 	if got := sha(indexes); got != pinnedIndexesSQL {
 		t.Errorf("indexes.sql changed (sha256 %s). Indexes are installed on every writable open and "+
 			"do not bump schemaVersion; update pinnedIndexesSQL deliberately", got)
+	}
+}
+
+func TestMigrationFiles_AreHeldToTheirPins(t *testing.T) {
+	t.Parallel()
+	if got := sha(migration0002); got != pinnedMigration0002 {
+		t.Errorf("migrations/0002.sql changed (sha256 %s). A migration is history and an older ledger "+
+			"runs it as written. A change to what it does needs a new migration and a schemaVersion bump; "+
+			"a comment-only change may update pinnedMigration0002 deliberately, saying why in the commit", got)
 	}
 }
 

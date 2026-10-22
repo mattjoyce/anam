@@ -140,6 +140,13 @@ func OpenReadOnly(ctx context.Context, path string) (*DB, error) {
 	return &DB{db: db}, nil
 }
 
+// snapshotPartDigest is the compatibility step bindSnapshotParts runs, in
+// migrations/snapshot-part-digest.sql: clear the snapshot tables, then add the column.
+// The statements run in the order the file lists them, inside the caller's transaction.
+//
+//go:embed migrations/snapshot-part-digest.sql
+var snapshotPartDigest string
+
 // bindSnapshotParts gives a store written before card 107 the digest column on
 // snapshot_part. A part recorded without one cannot be told from a changed one, so
 // the snapshot tables are cleared with it: the tier is disposable, and the next
@@ -158,13 +165,8 @@ func bindSnapshotParts(ctx context.Context, db *sql.DB) error {
 		return fmt.Errorf("ops: bind snapshot parts: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }() // no-op after Commit
-	for _, q := range []string{
-		`DELETE FROM snapshot_facet`, `DELETE FROM snapshot_part`, `DELETE FROM snapshot`,
-		`ALTER TABLE snapshot_part ADD COLUMN digest TEXT NOT NULL DEFAULT ''`,
-	} {
-		if _, err := tx.ExecContext(ctx, q); err != nil {
-			return fmt.Errorf("ops: bind snapshot parts: %w", err)
-		}
+	if _, err := tx.ExecContext(ctx, snapshotPartDigest); err != nil {
+		return fmt.Errorf("ops: bind snapshot parts: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("ops: bind snapshot parts: %w", err)

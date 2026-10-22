@@ -20,8 +20,9 @@ import (
 //     without misleading either build: leave schemaVersion alone and update only the
 //     hash below, in the same commit, with a line saying why it is compatible.
 const (
-	pinnedSchemaVersion = 9
-	pinnedOpsSQL        = "ddff2b18b163fa6961b4de346afba9464f8f76fe211ec0033629d0e4f55572bd"
+	pinnedSchemaVersion  = 9
+	pinnedOpsSQL         = "ddff2b18b163fa6961b4de346afba9464f8f76fe211ec0033629d0e4f55572bd"
+	pinnedSnapshotDigest = "825ac2dab2735474a64c9030a5944f77845e2da208f33ba336687072e60f7edf"
 )
 
 func TestSchemaFile_IsHeldToItsVersion(t *testing.T) {
@@ -36,5 +37,16 @@ func TestSchemaFile_IsHeldToItsVersion(t *testing.T) {
 		t.Errorf("ops.sql changed (sha256 %s). If it changes what an existing store holds or means, "+
 			"bump schemaVersion and make sure the carry covers it. If it is a comment or another "+
 			"change an older store accepts as it is, update pinnedOpsSQL deliberately and say why in the commit", got)
+	}
+}
+
+func TestMigrationFiles_AreHeldToTheirPins(t *testing.T) {
+	t.Parallel()
+	sum := sha256.Sum256([]byte(snapshotPartDigest))
+	if got := hex.EncodeToString(sum[:]); got != pinnedSnapshotDigest {
+		t.Errorf("migrations/snapshot-part-digest.sql changed (sha256 %s). An older store runs it as "+
+			"written when it opens. A change to what it does needs a new step and, if stored meaning "+
+			"moves, a schemaVersion bump; a comment-only change may update pinnedSnapshotDigest "+
+			"deliberately, saying why in the commit", got)
 	}
 }

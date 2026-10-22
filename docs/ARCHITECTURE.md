@@ -575,12 +575,17 @@ append-only triggers, and `internal/store/ledger/indexes.sql` holds its lookup i
 open installs as a separate step and which are not part of what the schema version pins.
 `internal/store/ops/ops.sql` holds every operational table, view and trigger, each table under its
 `-- tier:` comment. Reading one file shows the whole fresh store, and a schema change shows as a change to
-that file. The Go keeps what is a decision rather than a description: `schemaVersion` in each store, the
-migrations and the old-store refusal, the carry across a bump, the compatibility steps that upgrade an
-older store in place (`bindSnapshotParts`), and the teardown (`dropSchema`). Only `internal/store` names
-SQLite, and the files sit inside it.
+that file. Each migration's SQL is a file of its own under `migrations/` beside the store, embedded the
+same way. The ledger has `internal/store/ledger/migrations/0002.sql`, named for the version it moves to
+(schema 3 has no file, because it changed no SQL and its step is a rebuild). The operational store has
+`internal/store/ops/migrations/snapshot-part-digest.sql`, the in-place step for a store written before the
+snapshot digest column, which is a compatibility step and moves no version. The Go keeps what is a
+decision rather than a description: `schemaVersion` in each store, which file runs when and in what
+transaction, the old-store refusal, the carry across a bump, `bindSnapshotParts` with its check for
+whether the step is needed, and the teardown (`dropSchema`). Only `internal/store` names SQLite, and the
+files sit inside it.
 
-A test in each store pins the SHA-256 of its embedded file beside the schema version. It detects a change
+A test in each store pins the SHA-256 of each embedded file, the schema file and every migration, beside the schema version. It detects a change
 and cannot judge it. A hash moving does not prove the stored layout moved (a comment edit changes it, and
 several tables were added without a bump because an older store gains them on open), and a hash holding
 does not prove the meaning held (ledger version 3 changed no SQL). The person making the change decides:

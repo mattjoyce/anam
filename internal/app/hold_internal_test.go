@@ -26,7 +26,7 @@ func TestHoldCommand(t *testing.T) {
 		t.Errorf("hold listed %q, want the held source named", out)
 	}
 
-	out, _, err = cli(t, f.remoteCfg, "hold", "--release", "garmin")
+	_, _, err = cli(t, f.remoteCfg, "hold", "--release", "garmin")
 	if err != nil {
 		t.Fatalf("hold --release: %v", err)
 	}

@@ -21,7 +21,7 @@ affects:
 
 **Context.** Card 215. The key is a promise about its bytes, as the file name was.
 
-**Choice.** Five tables of one shape, a hash and the bytes it names (`checkpoint_value` derived; `receipt`, `served_value`, `saved_selection`, `saved_selection_code` authored). `Put` inserts and, if the key is there, compares the bytes and returns the digest or `ErrCorrupt`; `Get` re-hashes on read. The authored four refuse an update and a delete by trigger; `checkpoint_value` refuses an update, and a delete while a checkpoint row names the value. Value before receipt when publishing, so a crash leaves a value no receipt names and never the reverse.
+**Choice.** Five tables of one shape, a hash and the bytes it names (`checkpoint_value` derived; `receipt`, `served_value`, `saved_selection`, `saved_selection_code` authored). `Put` inserts and, if the key is there, compares the bytes and returns the digest or `ErrCorrupt`; `Get` re-hashes on read. The authored four refuse an update and a delete by trigger; `checkpoint_value`, a cache, refuses an update and lets a mint delete a value it no longer reads. Value before receipt when publishing, so a crash leaves a value no receipt names and never the reverse.
 
 **Why.** Content addressing only means something if the bytes under a key are whole, and a backup is only one consistent thing if the receipts are in the same file as everything else Anam authored.
 

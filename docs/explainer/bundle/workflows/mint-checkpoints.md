@@ -1,7 +1,7 @@
 ---
 type: workflow
 title: Mint checkpoints
-description: anam checkpoint over the daemon rebuilds only the buckets the events since the last run touched, writes a new version for each whose hash moved, and seals the log.
+description: anam checkpoint over the daemon rebuilds only the buckets the events since the last run touched, writes a new version for each whose hash moved, and clears what the newest run does not read.
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/mint/incremental.go#fromLastRun
 anchor: "r, ok, err := d.Index.LastMintRun(ctx, int64(w))"
@@ -86,18 +86,18 @@ steps:
     anchor: "n, ok := sizes[ops.SpanVersion{SpanID: head.SpanID, V: head.V}]"
   - actor: /components/store-ops.md
     caller: /components/mint.md
-    label: record the run and seal the log
-    action: One transaction inserts `mint_run(w)` and `mint_seal(checkpoints = COUNT(*), w)`, after the checkpoints, so a run that crashed before this is invisible to readers and leaves the log unsealed until the next mint.
+    label: record the run and a digest of its picks
+    action: "One transaction takes the checkpoints a read from W takes and upserts `mint_run(w, picks)` with their digest, after the checkpoints, so a run that crashed before this is invisible to readers and leaves rows the log's newest run does not account for until the next mint."
     writes: [/data-structures/checkpoint-row.md]
     resource: internal/store/ops/checkpoint.go#AppendMintRun
-    anchor: "INSERT INTO mint_run (w, ran_at) VALUES (?, ?) ON CONFLICT (w) DO NOTHING"
+    anchor: "`INSERT INTO mint_run (w, ran_at, picks) VALUES (?, ?, ?)"
   - actor: /components/store-ops.md
     caller: /components/mint.md
-    label: collect the checkpoints nothing reads
-    action: "`collect` ends a run that wrote: `CollectCheckpoints`, in one transaction, keeps the newest run, the run each receipt's watermark reads from, those runs' checkpoints and every span's head, removes the other runs, rows and sizes and then the values no row names, and seals the log again at the rows left. It waits for a sealed log. A failure is reported beside the mint, which stands."
+    label: clear what the newest run does not read
+    action: "`collect` ends a run that wrote: `CollectCheckpoints`, in one transaction, deletes the checkpoint rows, sizes and values that are not each span's latest checkpoint at or below the newest run. A checkpoint is a cache: a read that needs one that is gone declines and folds in full, and a later mint writes back a value the log names that the store lost."
     writes: [/data-structures/checkpoint-row.md]
     resource: internal/store/ops/collect.go#CollectCheckpoints
-    anchor: "keepRuns := map[int64]bool{runs[len(runs)-1]: true}"
+    anchor: "IS NOT, because a span with no row at or below the run has a NULL pick."
   - actor: /components/cli.md
     label: print each bucket's outcome
     action: One line per bucket, minted or unchanged or would-mint, with version, covered W, facet count and value hash, and a footer with the count at W, and what the collection removed.

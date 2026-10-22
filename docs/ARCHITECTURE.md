@@ -493,29 +493,39 @@ stands without being decoded, and the run is still a run that checked every buck
 the buckets the tail touched, and a stat per checkpoint: at 600k facets, 132 ms for a tail touching 32
 daily buckets against 19.8 s for the full fold, on the ThinkPad. The full mint (`anam checkpoint --full`)
 remains, and is taken without a budget, without a run, and when the log is not sealed. Recording a run
-also records how many checkpoint rows the log then held (`mint_seal`); a log holding more has rows from
-a mint that crashed, which `covers_w` cannot show, since a run at the last run's own `W` (a lowered
-budget, no new event) writes rows at that `W` too. Until a mint seals the log again, reads fold in full
-as well, or a read would take the crashed run's rows for the last run's. The full mint settles every bucket against the fold whatever the
-log holds, so it is both the oracle the incremental mint is tested against and the repair.
+also records a digest of the checkpoints a read from it takes: each span's latest checkpoint at or below
+its `W`, by span, version and value hash (`mint_run.picks`). A log is sealed when the newest run's digest
+still matches the log and no checkpoint was written after that run. A mint that crashed leaves rows the
+digest does not match or rows past the run, which `covers_w` cannot show, since a run at the last run's own
+`W` (a lowered budget, no new event) writes rows at that `W` too. Until a mint records a run again, the
+mint folds in full. The full mint settles every bucket against the fold whatever the log holds, so it is
+both the oracle the incremental mint is tested against and the repair.
 
-**Receipts** prove exactly what was served at a watermark (§9). Unserved interstitial checkpoints are
-garbage-collectable once a later checkpoint subsumes them and no receipt pins them; they were only ever
-replay floors.
+**Receipts** prove exactly what was served at a watermark (§9). A receipt names a watermark and not a
+checkpoint, and verifying one re-derives it from the ledger, so no receipt holds a checkpoint in place.
 
-**A mint ends by collecting them** (card 215, 2026-10-22). A read at `W` starts from the latest mint run at
-or below `W` and takes each span's latest checkpoint at or below that run, so what is still read is the
-newest run, which every mint starts from, and the run each receipt's watermark starts from. A receipt pins
-that run and the checkpoints it takes; every span's head is kept whatever reads it. The mint runs, the
-checkpoint rows and sizes and then the values nothing names are removed in one transaction, and the seal is
-written again at the rows that remain, so a reader sees the log before the collection or after it. It
-collects only a sealed log: an unsealed one holds rows from a mint that crashed, and the next full mint
-settles them first. A failure to collect leaves the mint done and is reported beside it; the next mint
-collects. The cost of collecting is that a read at a watermark before the oldest run kept finds no run to
-start from and folds the ledger in full, which is the same value and slower. A read that took a run and its
-rows and met a collection before it had their values declines in the same way, having checked that its run
-still stands (`mint.runStands`), so it never answers from a log with rows missing. The live record's artifact
-folder, never collected, held 1,329 checkpoint files and 347 MB against a 57 MB ledger.
+**A checkpoint is a cache that is allowed to go missing** (card 215, 2026-10-22, Matt's decision). A
+missing one means fold past it and mint it again. The checkpoints bound replay; they are never what a
+read's answer depends on, because the ledger can always give the same value, only more slowly.
+
+- *Reads decline rather than guess.* A read at `W` starts from the latest mint run at or below `W` and
+  takes that run's checkpoints (`RunCheckpoints`), in one transaction with the run's digest. If the log no
+  longer yields exactly the checkpoints the run saw, because a row is gone, has been replaced or another
+  has joined it, or if a value is not in the store, the read reports no run to start from and its caller
+  folds the ledger in full. The digest is what makes a lost row noticeable: without it a span whose row
+  was lost would be absent from the composed value, or present at an older version, and nothing would say
+  so. A value whose bytes do not hash to their key is damage and stays an error.
+- *A mint heals the cache.* A bucket whose head checkpoint is unchanged but whose value the store no longer
+  holds gets the value written again; the incremental mint, meeting a leaf whose value is gone, takes the
+  full path, which does the same. No new version is cut.
+- *A mint ends by clearing what the newest run does not read.* One transaction deletes the checkpoint
+  rows, sizes and values that are not each span's latest checkpoint at or below the newest run (that is,
+  the heads). Nothing else needs keeping: an older run whose checkpoints were deleted declines, and one
+  whose checkpoints all still stand (nothing changed since) reads as before. A failure to clear is
+  returned after the mint, which stands; the next mint clears.
+- *The cost* is that a read at a watermark before the newest run folds the ledger in full: 19.8 s at 600k
+  facets on the ThinkPad against 132 ms from a run. The live record's artifact folder, never collected,
+  held 1,329 checkpoint files and 347 MB against a 57 MB ledger.
 
 ---
 
@@ -562,8 +572,7 @@ whether dropping it is survivable.
 `checkpoint_value` in the derived tier, and `receipt`, `served_value`, `saved_selection` and
 `saved_selection_code` in the authored tier. The authored four are immutable by trigger, like
 `registered_projection`: an update and a delete are refused, for every writer. `checkpoint_value` refuses an
-update, and refuses a delete while a checkpoint row names the value, so the only value that can go is one
-nothing reads (§7). A receipt and the served value it names are two inserts, the value first, so a crash
+update, and lets a mint delete a value it no longer reads (§7): it is a cache. A receipt and the served value it names are two inserts, the value first, so a crash
 leaves a value no receipt names and never a receipt without its value; the files they replace had the same
 order. There is no transaction across the two database files, as before: the operational store catches up
 by replay and by minting, and a crash leaves it behind and never wrong.

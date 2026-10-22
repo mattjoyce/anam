@@ -63,7 +63,7 @@ Never whole-life. Comes in two provenances, *hard* and *soft*, below; only a har
 floor. See *Mint*, *Watermark*, *Bucket span*.
 
 **Checkpoint, hard** — A checkpoint that has been given a place: a row in the checkpoint log
-(`span_id`, `v`, `covers_w`, `value_hash`) and a row under its hash in `checkpoint_value`. A later checkpoint of the span subsumes it, and a mint then removes it unless a receipt pins it. Minted,
+(`span_id`, `v`, `covers_w`, `value_hash`) and a row under its hash in `checkpoint_value`. A checkpoint is a cache that may go missing: a later checkpoint of the span replaces it, a mint then removes it, and a read that needs it folds the ledger. Minted,
 citable, a replay floor. The mint promotes a soft checkpoint to a hard one. See *Checkpoint, soft*.
 
 **Checkpoint, soft** — A bucket's live-only value at a watermark, computed on demand and **ephemeral**:

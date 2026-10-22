@@ -20,6 +20,6 @@ references:
 | Bytes | `fold.Value.Bytes()`: `json.Marshal` of the entries sorted by fact-time then facet id |
 | Key | `sha256:<hex>` of exactly those bytes, which is also `fold.Value.Hash()` |
 | Integrity | re-hashed on `Get`; `mint.Load` also checks the rebuilt value against the row's hash |
-| Removal | refused by trigger while a `checkpoint` row names the value; a mint removes the values nothing names (`CollectCheckpoints`) |
+| Removal | a cache entry: a mint deletes the values the newest run does not read (`CollectCheckpoints`); one that is missing is a miss, the read folds past it and the next mint writes it again |
 
 The watermark is not in the bytes: a rebuilt ledger reaches the same value at a different W. Until card 215 the value was a file, `checkpoint/sha256-<hex>.json` under `artifact_dir`. Receipts, served values and saved selections use the same shape in authored tables.

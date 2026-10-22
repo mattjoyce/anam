@@ -14,10 +14,10 @@ decisions is in `journal/`.
   `anam move-artifacts --from <the old artifacts folder> --registered-from <the old tracking.db>`.
   Without `--yes` that reads and checks every file against its name and writes nothing; with it, it
   loads the rows. `artifact_dir` is gone from the config, and a config file that names it is refused
-  at start. A mint now ends by removing the checkpoints nothing reads any more: the older versions of
-  a bucket, except those a receipt's watermark starts from. A read at a watermark before the oldest
-  run left folds the ledger in full, which gives the same value more slowly. `POST /v1/checkpoints`
-  answers what it removed in `collected`, `GET /v1/receipts` names the store in `store` where it
+  at start. Checkpoints are a cache that may go missing: a mint ends by removing the ones the newest
+  run does not read, and a read that needs one that is gone, as a read at an older watermark does,
+  folds the ledger in full, which gives the same value more slowly. A mint writes back a checkpoint
+  value the log names and the store has lost. `GET /v1/receipts` names the store in `store` where it
   named a folder in `dir`, and a backup is the ledger, the operational store and the library.
 
 - The Workbench writes links by hand (card 202). `GET /link` on the inspector draws one `record.edge`

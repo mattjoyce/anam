@@ -144,11 +144,10 @@ select page and link form take `?sel=<code>` ([QUERY.md](QUERY.md#saved-selectio
 
 **Receipts and checkpoints are rows (2026-10-22).** Receipts, the values they served, saved selections
 and checkpoint values live in the operational store, not in a folder beside it. `GET /v1/receipts` names
-that store in `store` where it named a directory in `dir`. A mint ends by removing the checkpoints
-nothing reads any more, so `POST /v1/checkpoints` also answers `collected` (`checkpoints`, `runs`,
-`values`, `bytes`) and, if the removal failed after the mint stood, `collect_error`. `GET /v1/checkpoints`
-lists the checkpoints the log still holds. A read at a watermark before the oldest mint run kept folds
-the ledger in full and answers the same value.
+that store in `store` where it named a directory in `dir`. Checkpoints are a cache that may go missing:
+a mint ends by removing the ones the newest run does not read, so `GET /v1/checkpoints` lists the
+checkpoints the log still holds, and a read at a watermark before the newest run, or one that finds a
+checkpoint gone, folds the ledger in full and answers the same value.
 
 This document proposes the application API that every client shares: the CLI, the inspector,
 importers, and conversational clients (§8). The two conversational features are **chat with my

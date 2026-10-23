@@ -188,7 +188,7 @@ func (s *Server) entryPage(w http.ResponseWriter, r *http.Request) {
 		data.Edit = edit
 	}
 	data.Fields, data.Zoned, data.Zone, data.Offset = form.Fields, form.Zoned, form.Zone, form.Offset
-	renderStatus(w, entryStatus(data), "entry.html", data)
+	s.renderStatus(w, entryStatus(data), "entry.html", data)
 }
 
 // fillFromFacet loads the facet being corrected into the form.
@@ -276,7 +276,7 @@ func (s *Server) entrySubmit(w http.ResponseWriter, r *http.Request) {
 	}
 	data.Edit = edit
 	if data.NotDrawn != "" {
-		renderStatus(w, entryStatus(data), "entry.html", data)
+		s.renderStatus(w, entryStatus(data), "entry.html", data)
 		return
 	}
 	payload, typed := form.read(r.PostForm)
@@ -284,7 +284,7 @@ func (s *Server) entrySubmit(w http.ResponseWriter, r *http.Request) {
 	data.OffsetProblem = form.OffsetProblem
 	if !typed {
 		data.Message = "Some values are not what their fields take. Nothing was sent."
-		renderStatus(w, http.StatusUnprocessableEntity, "entry.html", data)
+		s.renderStatus(w, http.StatusUnprocessableEntity, "entry.html", data)
 		return
 	}
 	// The version the form was drawn from goes back with the payload, not the one in
@@ -298,11 +298,11 @@ func (s *Server) entrySubmit(w http.ResponseWriter, r *http.Request) {
 			data.Notice = fmt.Sprintf("The form below is drawn from the Definition now in force, v%d. "+
 				"Check it, then save again.", data.Version)
 		}
-		renderStatus(w, declined.status(), "entry.html", data)
+		s.renderStatus(w, declined.status(), "entry.html", data)
 	case err != nil:
 		httpError(w, err)
 	default:
-		renderStatus(w, http.StatusOK, "result.html", enteredPage(t, edit, res))
+		s.renderStatus(w, http.StatusOK, "result.html", enteredPage(t, edit, res))
 	}
 }
 
@@ -345,7 +345,7 @@ func (s *Server) retractSubmit(w http.ResponseWriter, r *http.Request) {
 	var declined *Declined
 	switch {
 	case errors.As(err, &declined):
-		renderStatus(w, declined.status(), "result.html", resultData{
+		s.renderStatus(w, declined.status(), "result.html", resultData{
 			Heading: "not retracted", Kind: "rejected", Lines: []string{declined.Message, "Nothing was written."},
 			Links: []resultLink{{"/facet?id=" + url.QueryEscape(id), "back to the facet"}},
 		})
@@ -356,7 +356,7 @@ func (s *Server) retractSubmit(w http.ResponseWriter, r *http.Request) {
 		if heading == "tombstoned" {
 			heading = "retracted"
 		}
-		renderStatus(w, http.StatusOK, "result.html", resultData{
+		s.renderStatus(w, http.StatusOK, "result.html", resultData{
 			Heading: heading, Kind: res.Outcome,
 			Lines: []string{fmt.Sprintf("Facet %s is tombstoned at artifact version %d, ledger watermark %d. "+
 				"The record keeps the entry and the retraction.", res.FacetID, res.ArtifactVersion, res.W)},
@@ -366,9 +366,9 @@ func (s *Server) retractSubmit(w http.ResponseWriter, r *http.Request) {
 }
 
 // renderStatus is render with a status other than 200.
-func renderStatus(w http.ResponseWriter, status int, name string, data any) {
+func (s *Server) renderStatus(w http.ResponseWriter, status int, name string, data any) {
 	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
+	if err := s.pages.ExecuteTemplate(&buf, name, data); err != nil {
 		httpError(w, err)
 		return
 	}

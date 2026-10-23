@@ -62,7 +62,7 @@ or reaches its deadline, and the stores are closed.`,
 			if err != nil {
 				return err
 			}
-			d, err := daemon.Open(cmd.Context(), cfg, daemon.Options{Version: info.Version})
+			d, err := daemon.Open(cmd.Context(), cfg, daemon.Options{Version: info.Version, GitCommit: info.GitCommit, BuildDate: info.BuildDate})
 			if err != nil {
 				return err
 			}

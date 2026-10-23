@@ -274,7 +274,7 @@ func (s *Server) location(w http.ResponseWriter, r *http.Request) {
 	data := locationData{W: res.W, Device: device}
 	if len(hours) == 0 {
 		data.Empty = "no place.track facets are live"
-		render(w, "location.html", data)
+		s.render(w, "location.html", data)
 		return
 	}
 
@@ -302,14 +302,14 @@ func (s *Server) location(w http.ResponseWriter, r *http.Request) {
 	sort.Strings(data.Devices)
 	if len(pts) == 0 {
 		data.Empty = "no positions in this window"
-		render(w, "location.html", data)
+		s.render(w, "location.html", data)
 		return
 	}
 	v := layoutTrack(pts, hourHue)
 	v.Device = device
 	v.Hours = countHours(pts)
 	data.Track = &v
-	render(w, "location.html", data)
+	s.render(w, "location.html", data)
 }
 
 // windowPoints gathers the fixes of the hours in [from, to) for one device, or

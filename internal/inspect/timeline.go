@@ -257,7 +257,7 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 	data.Query = address("", cleanView(r.URL.RawQuery))
 	data.HasDefault = len(stored) > 0
 	data.IsDefault = data.HasDefault && address("", stored) == data.Query
-	render(w, "timeline.html", data)
+	s.render(w, "timeline.html", data)
 }
 
 // bandFacets is what the band may draw under the status filter: the live (already

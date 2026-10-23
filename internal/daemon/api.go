@@ -43,15 +43,25 @@ var (
 
 // routes is every route but /healthz. Every handler is bounded by the configured
 // timeout, and none waits on the write queue, so a busy ledger never holds a request.
-func (d *Daemon) routes() []route {
+func (d *Daemon) routes() []route { return d.routeTable(d.inspector()) }
+
+// inspector is the Workbench's pages, handed what the daemon knows.
+func (d *Daemon) inspector() http.Handler {
 	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
 	index := guardedIndex{ops: d.readOps, state: &d.index}
-	inspector := inspect.Handler(inspect.Deps{
+	return inspect.Handler(inspect.Deps{
 		Ledger: d.read, Timeout: d.cfg.Timeout, Buckets: buckets, Library: d.cfg.LibraryDir,
 		Definitions: d.defs.current.Load, Held: d.heldDefinitions, Checkpoints: index, Edges: index,
 		Projections: d.projections.current.Load, CachedReads: d.cfg.InspectCachedReads,
 		Workbench: d.workbenchFor(), MaxReadBytes: d.cfg.MaxReadBytes, Selections: d.selections,
+		Build:  inspect.Build{Version: d.opts.Version, Commit: d.opts.GitCommit, Date: d.opts.BuildDate},
+		Roster: rosterView{d},
 	})
+}
+
+// routeTable is every route with inspector as the catch-all. The importers page reads
+// the table without the inspector, so it builds none.
+func (d *Daemon) routeTable(inspector http.Handler) []route {
 	f := func(pattern string, roles []config.Role, h http.HandlerFunc) route { return route{pattern, roles, h} }
 	return []route{
 		f("GET /v1/status", anyRole, d.getStatus),

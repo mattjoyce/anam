@@ -89,7 +89,7 @@ func (s *Server) linkSubmit(w http.ResponseWriter, r *http.Request) {
 	payload, why := lf.payload(&data, r.PostForm, stored)
 	if why != "" {
 		data.Message = why
-		renderStatus(w, http.StatusUnprocessableEntity, "link.html", data)
+		s.renderStatus(w, http.StatusUnprocessableEntity, "link.html", data)
 		return
 	}
 	// The version the form was drawn from goes back with the payload, so a Definition
@@ -103,7 +103,7 @@ func (s *Server) linkSubmit(w http.ResponseWriter, r *http.Request) {
 			data.Notice = fmt.Sprintf("The form below is drawn from the Definition now in force, v%d. "+
 				"Check it, then save again.", data.Version)
 		}
-		renderStatus(w, declined.status(), "link.html", data)
+		s.renderStatus(w, declined.status(), "link.html", data)
 	case err != nil:
 		httpError(w, err)
 	default:
@@ -112,7 +112,7 @@ func (s *Server) linkSubmit(w http.ResponseWriter, r *http.Request) {
 			{"/facet?id=" + url.QueryEscape(res.FacetID), "open the link"},
 			{"/select", "start another link"},
 		}
-		renderStatus(w, http.StatusOK, "result.html", out)
+		s.renderStatus(w, http.StatusOK, "result.html", out)
 	}
 }
 

@@ -13,7 +13,6 @@
 package inspect
 
 import (
-	"bytes"
 	"context"
 	"embed"
 	"errors"
@@ -46,12 +45,25 @@ type Ledger interface {
 //go:embed templates/*.html
 var templateFS embed.FS
 
-var tmpl = template.Must(template.ParseFS(templateFS, "templates/*.html"))
+// tmpl is the pages as parsed once. The frame names the build through a template
+// function that a parse needs and a Server answers: each Server runs its own clone
+// (Server.pages), with the build it was given.
+var tmpl = template.Must(template.New("").Funcs(template.FuncMap{
+	"build": func() Build { return Build{} }, "hasImporters": func() bool { return false },
+}).
+	ParseFS(templateFS, "templates/*.html"))
 
 // Server renders the inspector pages. Timeout bounds each request's ledger reads.
 type Server struct {
 	ledger  Ledger
 	timeout time.Duration
+
+	// pages is the templates with this server's build answered to the frame.
+	pages *template.Template
+
+	// roster answers the importers page; nil means there is none (a standalone
+	// `anam inspect` reads no importers file) and the route does not exist.
+	roster Roster
 
 	// library is the default library's root: the folder that holds the bytes a
 	// record.document names by sha256. The inspector serves those bytes itself, confined
@@ -141,6 +153,12 @@ type Deps struct {
 	// CachedReads is how many historical folds the inspector keeps
 	// (inspect_cached_reads); zero keeps none.
 	CachedReads int
+	// Build is the daemon's version, commit and build date, shown in every page's
+	// frame; zero shows nothing.
+	Build Build
+	// Roster lets the importers page show who the daemon admits and what the policy
+	// answers for each; nil leaves the page out.
+	Roster Roster
 	// MaxReadBytes bounds the derivation and the answer of a program the selection
 	// page runs (max_read_bytes, the bound POST /v1/query answers within); zero is no
 	// bound.
@@ -153,6 +171,7 @@ func Handler(d Deps) http.Handler {
 		ledger: d.Ledger, timeout: d.Timeout, buckets: d.Buckets, library: d.Library,
 		defs: d.Definitions, heldDefs: d.Held, checkpoints: d.Checkpoints, edges: d.Edges, projections: d.Projections,
 		cachedReads: d.CachedReads, bench: d.Workbench, maxReadBytes: d.MaxReadBytes, selections: d.Selections,
+		roster: d.Roster, pages: pagesFor(d.Build, d.Roster != nil),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.timeline)
@@ -166,6 +185,9 @@ func Handler(d Deps) http.Handler {
 	mux.HandleFunc("GET /document", s.document)
 	mux.HandleFunc("GET /definitions", s.definitionsIndex)
 	mux.HandleFunc("GET /definition", s.definitionPage)
+	if s.roster != nil {
+		mux.HandleFunc("GET /importers", s.importersPage)
+	}
 	if s.selections != nil {
 		mux.HandleFunc("POST /select/save", s.saveSelection)
 	}
@@ -337,7 +359,7 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 		return rows[i].ID < rows[j].ID
 	})
 
-	render(w, "index.html", indexData{W: res.W, facetList: pageFacets(rows, facetFilterOf(r), skipOf(r))})
+	s.render(w, "index.html", indexData{W: res.W, facetList: pageFacets(rows, facetFilterOf(r), skipOf(r))})
 }
 
 func (s *Server) rowOf(f facet.Facet, st facet.Status) facetRow {
@@ -365,14 +387,9 @@ func anamTimeOf(events []facet.AnamEvent, version int) string {
 	return "unknown"
 }
 
-func render(w http.ResponseWriter, name string, data any) {
-	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
-		httpError(w, err)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = buf.WriteTo(w)
+// render writes the page name with data.
+func (s *Server) render(w http.ResponseWriter, name string, data any) {
+	s.renderStatus(w, http.StatusOK, name, data)
 }
 
 func httpError(w http.ResponseWriter, err error) {

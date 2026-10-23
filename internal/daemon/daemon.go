@@ -70,8 +70,12 @@ type job struct {
 
 // Options are what the daemon is given rather than configured with.
 type Options struct {
-	// Version is the build, reported by /v1/status.
+	// Version is the build, reported by /v1/status and shown in the Workbench's frame.
 	Version string
+	// GitCommit and BuildDate are the rest of the build's identity, shown beside the
+	// version in the Workbench's frame.
+	GitCommit string
+	BuildDate string
 }
 
 // Daemon owns the stores. Open it, then Run it; Run closes the stores when it returns.

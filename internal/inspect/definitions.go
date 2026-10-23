@@ -93,7 +93,7 @@ func (s *Server) definitionsIndex(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, row)
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].Type < rows[j].Type })
-	render(w, "definitions.html", struct {
+	s.render(w, "definitions.html", struct {
 		Definitions []defSummary
 		// Bench is set when this inspector has a Workbench at all; without one the
 		// Enter column says so rather than offering links that do not exist.
@@ -204,7 +204,7 @@ func (s *Server) definitionPage(w http.ResponseWriter, r *http.Request) {
 		// An old body this build would refuse is still what was in force: show it raw.
 		data.ParseError = err.Error()
 		data.Def = def.Definition{Type: t, Version: v}
-		render(w, "definition.html", data)
+		s.render(w, "definition.html", data)
 		return
 	}
 	data.Def = d
@@ -217,7 +217,7 @@ func (s *Server) definitionPage(w http.ResponseWriter, r *http.Request) {
 	if s.enterable(t) && v == data.Current {
 		data.EnterURL = enterURL(t)
 	}
-	render(w, "definition.html", data)
+	s.render(w, "definition.html", data)
 }
 
 // fieldRow is one field of a Definition's payload schema, keyed by its JSON Pointer.

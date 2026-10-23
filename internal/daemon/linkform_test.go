@@ -94,7 +94,7 @@ func pageLists(t *testing.T, base, facetID, edge string) bool {
 	if status != http.StatusOK {
 		t.Fatalf("GET /facet %s = %d", facetID, status)
 	}
-	return strings.Contains(body, `<td class="mono"><a href="/facet?id=`+edge+`">`+edge+`</a></td>`)
+	return strings.Contains(body, `<td class="mono"><span class="facetid"><a class="mono" href="/facet?id=`+edge+`">`+edge+`</a>`)
 }
 
 var handoffLink = regexp.MustCompile(`<a id="handoff" href="([^"]+)"`)
@@ -121,7 +121,7 @@ func TestLinkFormLinksFourFacetsAndEachPageListsIt(t *testing.T) {
 		t.Fatalf("GET the handoff = %d:\n%s", status, form)
 	}
 	for _, id := range ids {
-		if !strings.Contains(form, `name="keep" value="`+id+`" checked`) || !strings.Contains(form, `<a href="/facet?id=`+id+`">`) {
+		if !strings.Contains(form, `name="keep" value="`+id+`" checked`) || !strings.Contains(form, `<a class="mono" href="/facet?id=`+id+`">`) {
 			t.Errorf("the form lacks %s, kept and linked to its page", id)
 		}
 	}

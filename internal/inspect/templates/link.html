@@ -24,7 +24,7 @@
 
 {{if .Message}}<p class="message" role="alert"><strong>Not saved.</strong> {{.Message}}{{if .Notice}}<br>{{.Notice}}{{end}}</p>{{end}}
 {{if .Problem}}<p class="message" role="alert">{{.Problem}}</p>{{end}}
-{{if .Edit}}<p class="meta">Editing <a class="mono" href="/facet?id={{.Edit}}">{{.Edit}}</a>. Saving writes a new version of this link, with the same id, whatever you change here; to undo it, retract it from its page.</p>{{end}}
+{{if .Edit}}<p class="meta">Editing {{template "facetid" .Edit}}. Saving writes a new version of this link, with the same id, whatever you change here; to undo it, retract it from its page.</p>{{end}}
 {{with .SideProblem}}{{if not $.Message}}<p class="note" id="side-problem">{{.}}</p>{{end}}{{end}}
 
 <form method="post" action="/link" class="entry">
@@ -41,7 +41,7 @@
     <tr>
       <td><input type="hidden" name="item" value="{{.ID}}"><input type="checkbox" name="keep" value="{{.ID}}"{{if .Keep}} checked{{end}} aria-label="keep {{.ID}} in the link"></td>
       <td><select name="side.{{.ID}}" aria-label="side of {{.ID}}"><option value="to"{{if not .From}} selected{{end}}>to</option><option value="from"{{if .From}} selected{{end}}>from</option></select></td>
-      <td class="mono"><a href="/facet?id={{.ID}}">{{.ID}}</a></td>
+      <td class="mono">{{template "facetid" .ID}}</td>
       {{if .Held}}<td>{{if .Label}}{{.Label}}{{else}}<span class="dim">no label</span>{{end}}</td><td>{{.Type}}</td><td class="mono">{{.FactTime}}</td>{{else}}<td colspan="3" class="dim">not held: Anam has no facet with this id</td>{{end}}
       <td><input type="hidden" name="hash.{{.ID}}" value="{{.Hash}}"><label><input type="checkbox" name="pin" value="{{.ID}}" data-pin{{if .Pin}} checked{{end}}> <span class="mono dim">{{.ShortHash}}</span></label></td>
     </tr>

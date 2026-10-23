@@ -32,7 +32,7 @@
       <td class="mono dim">{{.Bucket}}</td>
       <td>{{.Type}}</td>
       <td>{{.Source}}</td>
-      <td class="mono"><a href="/facet?id={{.ID}}">{{.ID}}</a></td>
+      <td class="mono">{{template "facetid" .ID}}</td>
       <td>{{.Version}}</td>
       <td><span class="kind kind-{{.Status}}">{{.Status}}</span></td>
     </tr>

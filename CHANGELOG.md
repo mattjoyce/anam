@@ -8,6 +8,13 @@ decisions is in `journal/`.
 
 ## Unreleased
 
+- The Workbench has a copy button beside every facet id it prints (card 235). The facet page's
+  heading, the facet list, the anam-events list, the link and selection pages, a projection's rows
+  and the receipt after a save or a retraction each show a small clipboard button that copies the
+  whole id and reads "copied" for a second. It is a real button with the label "copy facet id". It
+  uses the clipboard API where the browser has one and otherwise selects the id in a hidden input
+  and copies that, since the Workbench is often reached over plain HTTP on the tailnet. A page that
+  prints an id uses the `facetid` template fragment and gets the button. No new route.
 - The selection page reads a facet as a thing (card 199). A Definition may declare
   `handling.label`, a short template of literal text and `{/pointer}` fields read from the payload
   (`{/drug} {/amount} {/unit}`), and the picker's rows, its basket and the link form's basket show

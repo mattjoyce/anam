@@ -22,7 +22,7 @@
       <td>{{.Seq}}</td>
       <td class="mono">{{.AnamTimeText}}</td>
       <td><span class="kind kind-{{.Kind}}">{{.Kind}}</span></td>
-      <td class="mono"><a href="/facet?id={{.FacetID}}">{{.FacetID}}</a></td>
+      <td class="mono">{{template "facetid" .FacetID}}</td>
       <td><a href="/facet?id={{.FacetID}}&v={{.ArtifactVersion}}">{{.ArtifactVersion}}</a></td>
     </tr>
     {{else}}

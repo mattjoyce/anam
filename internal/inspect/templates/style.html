@@ -50,6 +50,14 @@
   details.guidance { margin: 1rem 0; } details.guidance p { margin: .4rem 0; }
   .actions { display: flex; gap: .75rem; align-items: center; margin: 1rem 0 0; }
   .actions form { margin: 0; } .actions button, .actions .button { font: inherit; padding: .2rem .7rem; cursor: pointer; }
+  /* the copy button beside a facet id (the facetid fragment): muted until hovered or focused */
+  button.copyid { font: inherit; font-size: .75rem; line-height: 1; margin-left: .35rem; padding: .1rem .25rem; border: 1px solid transparent; border-radius: 4px; background: none; color: inherit; opacity: .45; cursor: pointer; vertical-align: baseline; }
+  button.copyid:hover, button.copyid:focus-visible { opacity: 1; border-color: currentColor; }
+  button.copyid svg { display: inline-block; vertical-align: -1px; }
+  button.copyid .done { display: none; }
+  button.copyid.copied { opacity: 1; color: #1a7f37; }
+  button.copyid.copied svg { display: none; }
+  button.copyid.copied .done { display: inline; }
   @media (max-width: 40rem) { form.entry .field { grid-template-columns: 1fr; } form.entry .hint, form.entry .problem { grid-column: 1; } }
   @media (max-width: 40rem) {
     body { margin: 1rem auto; font-size: 14px; }
@@ -63,4 +71,34 @@
     table.fields td { display: block; border: 0; padding: .1rem .35rem; }
   }
 </style>
+<script>
+  // The copy button beside a facet id (see the facetid fragment) puts the id in its
+  // data-copy on the clipboard. The Workbench is often reached over plain HTTP, where
+  // navigator.clipboard does not exist, so the fallback selects the text in an input
+  // and uses execCommand. One listener on the document serves every button on the page.
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('button.copyid') : null;
+    if (!b) return;
+    var text = b.getAttribute('data-copy') || '';
+    function shown() {
+      b.classList.add('copied'); b.title = 'copied';
+      setTimeout(function () { b.classList.remove('copied'); b.title = 'copy facet id'; }, 1000);
+    }
+    function fallback() {
+      var t = document.createElement('input');
+      t.value = text; t.setAttribute('readonly', ''); t.setAttribute('aria-hidden', 'true');
+      t.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0';
+      document.body.appendChild(t); t.select(); t.setSelectionRange(0, text.length);
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (err) {}
+      document.body.removeChild(t); b.focus();
+      if (ok) shown();
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(shown, fallback);
+    } else {
+      fallback();
+    }
+  });
+</script>
 {{end}}

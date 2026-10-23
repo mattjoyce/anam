@@ -247,7 +247,11 @@ type resultData struct {
 	Heading string
 	Kind    string
 	Lines   []string
-	Links   []resultLink
+	// Facet is the id the answer is about, drawn with its copy button after the Lines;
+	// Detail follows it on that line. Both are empty when no facet is named.
+	Facet  string
+	Detail string
+	Links  []resultLink
 }
 
 type resultLink struct{ Href, Text string }
@@ -317,8 +321,8 @@ func enteredPage(t facet.Type, edit string, res Entered) resultData {
 	case "no-op":
 		out.Lines = []string{"This facet, with this content, is already held, so nothing was written."}
 	}
-	out.Lines = append(out.Lines, fmt.Sprintf("Facet %s, artifact version %d, ledger watermark %d.",
-		res.FacetID, res.ArtifactVersion, res.W))
+	out.Facet = res.FacetID
+	out.Detail = fmt.Sprintf(", artifact version %d, ledger watermark %d.", res.ArtifactVersion, res.W)
 	out.Links = []resultLink{{"/facet?id=" + url.QueryEscape(res.FacetID), "open the facet"}}
 	if edit == "" {
 		out.Links = append(out.Links, resultLink{"/entry?type=" + url.QueryEscape(string(t)), "enter another"})
@@ -358,8 +362,9 @@ func (s *Server) retractSubmit(w http.ResponseWriter, r *http.Request) {
 		}
 		s.renderStatus(w, http.StatusOK, "result.html", resultData{
 			Heading: heading, Kind: res.Outcome,
-			Lines: []string{fmt.Sprintf("Facet %s is tombstoned at artifact version %d, ledger watermark %d. "+
-				"The record keeps the entry and the retraction.", res.FacetID, res.ArtifactVersion, res.W)},
+			Facet: res.FacetID,
+			Detail: fmt.Sprintf(" is tombstoned at artifact version %d, ledger watermark %d. "+
+				"The record keeps the entry and the retraction.", res.ArtifactVersion, res.W),
 			Links: []resultLink{{"/facet?id=" + url.QueryEscape(res.FacetID), "open the facet"}},
 		})
 	}

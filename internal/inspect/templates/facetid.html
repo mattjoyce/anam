@@ -1,0 +1,9 @@
+{{/*
+  facetid is a facet id as the Workbench prints it: the id as a link to its page, and a
+  button beside it that copies the whole id. Every page that shows an id uses it (or
+  copyid, when the page draws the id its own way), so a new page gets the button for free.
+  The script that does the copy is in style.html.
+*/}}
+{{define "facetid"}}<span class="facetid"><a class="mono" href="/facet?id={{.}}">{{.}}</a>{{template "copyid" .}}</span>{{end}}
+{{define "facetidplain"}}<span class="facetid"><span class="mono">{{.}}</span>{{template "copyid" .}}</span>{{end}}
+{{define "copyid"}}<button type="button" class="copyid" data-copy="{{.}}" aria-label="copy facet id" title="copy facet id"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false"><rect x="5.5" y="5.5" width="8" height="9" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 3.5V3a1.2 1.2 0 0 0-1.2-1.2H3.7A1.2 1.2 0 0 0 2.5 3v7.5a1.2 1.2 0 0 0 1.2 1.2h.3" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span class="done" aria-hidden="true">copied</span></button>{{end}}

@@ -103,6 +103,27 @@ func TestDocs_WorkedQuestionsRunAgainstARealLedger(t *testing.T) {
 		t.Fatal("the April reading is not served")
 	}
 	h.admit(t, "records", "record.edge", "note:1", `{"id": "note:1", "at": "2026-04-10 18:00", "source_time": {"value": "2026-04-10 18:00", "zone": "Australia/Sydney", "offset": "+10:00", "basis": "source"}, "about": ["`+reading+`"], "text": "Before the dentist."}`)
+	// An evening of wine, a beer the next evening, a coffee, and a beer after the last sleep, with
+	// two nights' sleep: what the alcohol question on the page is asked of. The intake's id is
+	// left out for the gate to compose.
+	syd := func(wall string) string {
+		return `"at": "` + wall + `", "source_time": {"value": "` + wall + `", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}`
+	}
+	for _, in := range []struct{ kind, at, body string }{
+		{"alcohol", "2026-10-21 20:00", `"kind": "alcohol", "drink": "red-wine", "count": 2`},
+		{"caffeine", "2026-10-22 08:15", `"kind": "caffeine", "drink": "flat-white", "count": 1`},
+		{"alcohol", "2026-10-22 19:30", `"kind": "alcohol", "drink": "beer", "count": 1`},
+		{"alcohol", "2026-10-23 21:00", `"kind": "alcohol", "drink": "beer", "count": 1`},
+	} {
+		wall := strings.Replace(in.at, " ", "T", 1)
+		h.admit(t, "conversation", "health.intake", "conversation:intake/"+in.kind+"/"+wall+"+11:00", `{`+syd(in.at)+`, `+in.body+`}`)
+	}
+	for _, s := range []struct{ id, start, end string }{
+		{"sleep:2026-10-22", "2026-10-21T12:30:00Z", "2026-10-21T20:00:00Z"},
+		{"sleep:2026-10-23", "2026-10-22T12:00:00Z", "2026-10-22T19:30:00Z"},
+	} {
+		h.admit(t, "garmin", "health.sleep-episode", s.id, `{"id": "`+s.id+`", "effective_time_frame": {"time_interval": {"start_date_time": "`+s.start+`", "end_date_time": "`+s.end+`"}}, "source_time": {"value": "`+s.start+`", "zone": "UTC", "basis": "source"}}`)
+	}
 	v, versions, _ := h.served(t)
 
 	blocks := docBlocks(t)

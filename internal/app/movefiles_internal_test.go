@@ -83,7 +83,7 @@ func TestMoveArtifacts_ARecordsFolderComesInAndItsReceiptsVerify(t *testing.T) {
 	}
 	fresh := filepath.Join(t.TempDir(), "fresh.db")
 	cfg := filepath.Join(f.dir, "fresh.yaml")
-	writeDoc(t, cfg, fmt.Sprintf("person_id: matt\nledger_path: %s\ndb_path: %s\n", f.ledgerPath, fresh))
+	writeDoc(t, cfg, fmt.Sprintf("person_id: matt\nledger_path: %s\ndb_path: %s\ntimeout: %s\n", f.ledgerPath, fresh, testTimeout))
 
 	// Without --yes it reports and writes nothing.
 	out, _, err := cli(t, cfg, "move-artifacts", "--from", folder)
@@ -158,7 +158,7 @@ func TestMoveArtifacts_RefusesAFolderWithAnAlteredFile(t *testing.T) {
 
 	fresh := filepath.Join(t.TempDir(), "fresh.db")
 	cfg := filepath.Join(f.dir, "fresh.yaml")
-	writeDoc(t, cfg, fmt.Sprintf("person_id: matt\nledger_path: %s\ndb_path: %s\n", f.ledgerPath, fresh))
+	writeDoc(t, cfg, fmt.Sprintf("person_id: matt\nledger_path: %s\ndb_path: %s\ntimeout: %s\n", f.ledgerPath, fresh, testTimeout))
 	_, _, err = cli(t, cfg, "move-artifacts", "--from", folder, "--yes")
 	if err == nil || !strings.Contains(err.Error(), "do not match") {
 		t.Fatalf("move over an altered file: %v, want a refusal", err)

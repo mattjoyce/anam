@@ -3,6 +3,18 @@
 # the compiler is deliberately minimal; the rigour lives here.
 set -uo pipefail
 
+# One gate at a time per machine (card 227). golangci-lint refuses a second run, and two
+# test runs share the CPU so the daemon tests miss their deadlines; either way the second
+# gate fails for a reason that is not in the code. flock exists on Linux; without it (the
+# Mac) the gate runs as before.
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"${TMPDIR:-/tmp}/anam-check.lock"
+  if ! flock -n 9; then
+    echo "another gate is running; waiting for it to finish"
+    flock 9
+  fi
+fi
+
 fail=0
 run() {
   echo "→ $*"

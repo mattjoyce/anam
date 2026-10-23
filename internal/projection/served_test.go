@@ -163,14 +163,18 @@ func TestProjectionsByConcept(t *testing.T) {
 			}
 		}
 	}
+	// A registered version only adds to the bundled floor: everything v1 names, v2
+	// names too, so a reader who had v1 loses nothing by the newer version.
 	for _, name := range []string{"body", "activity"} {
 		v1, err := bundled.Version(name, 1)
 		if err != nil {
 			t.Fatal(err)
 		}
 		v2 := byName[name]
-		if !slices.Equal(v1.Prefixes, v2.Prefixes) || len(v2.Types) != len(v1.Types)+1 {
-			t.Errorf("%s v2 should be v1 plus one type: v1 %v, v2 %v", name, v1.Patterns(), v2.Patterns())
+		for _, pat := range v1.Patterns() {
+			if !slices.Contains(v2.Patterns(), pat) {
+				t.Errorf("%s v%d dropped %s, which v1 names: %v", name, v2.Version, pat, v2.Patterns())
+			}
 		}
 	}
 }

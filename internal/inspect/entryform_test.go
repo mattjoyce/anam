@@ -384,3 +384,75 @@ func TestTheAttentionTypesDrawAsForms(t *testing.T) {
 		}
 	}
 }
+
+// Card 232: health.intake is entered by hand too, and its form is drawn from the
+// Definition. The kind and the part of the day are selects, a meal's two answers are
+// yes or no selects, the count is a whole number from 1, and what the person types
+// reads back as typed JSON. The form shows every field of every kind; the gate, not
+// the page, refuses a drink with a meal's fields.
+func TestTheIntakeTypeDrawsAsAForm(t *testing.T) {
+	t.Parallel()
+	manifests, err := def.Manifests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, ok := reg.Lookup("health.intake")
+	if !ok {
+		t.Fatal("health.intake is not bundled")
+	}
+	var form entryForm
+	for _, m := range manifests {
+		if m.Type == d.Type && m.Version == d.Version {
+			if form, err = drawForm(m.Body, d, false); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if len(form.Fields) == 0 || !form.Zoned {
+		t.Fatalf("no form drawn, or it does not send the zone: %+v", form)
+	}
+	if form.Fields[0].Name != "at" || !form.Fields[0].FactTime {
+		t.Errorf("first field = %+v, want the fact time", form.Fields[0])
+	}
+	byName := map[string]formField{}
+	for _, f := range form.Fields {
+		byName[f.Name] = f
+	}
+	for _, name := range []string{"kind", "part_of_day", "rich", "out"} {
+		if byName[name].Input != "select" {
+			t.Errorf("%s drawn as %q, want a select", name, byName[name].Input)
+		}
+	}
+	if f := byName["count"]; f.Input != "number" || f.Step != "1" || strings.Join(f.Hints, ",") != "at least 1" {
+		t.Errorf("count = %+v, want a whole number saying at least 1", f)
+	}
+	if byName["id"].Name != "" || byName[def.SourceTimeField].Name != "" {
+		t.Error("the form draws the composed id or source_time")
+	}
+
+	payload, ok := form.read(url.Values{
+		"f.kind": {"alcohol"}, "f.at": {"2026-10-22T19:30"}, "f.drink": {"red-wine"}, "f.count": {"2"}, "f.abv": {"13.5"},
+		"zone": {"Australia/Sydney"}, "offset": {"+11:00"},
+	})
+	if !ok {
+		t.Fatalf("read refused good values: %+v", form.Fields)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(payload, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["kind"] != "alcohol" || got["at"] != "2026-10-22 19:30" || got["drink"] != "red-wine" || got["count"] != float64(2) || got["abv"] != 13.5 {
+		t.Errorf("payload = %s", payload)
+	}
+	meal, ok := form.read(url.Values{
+		"f.kind": {"meal"}, "f.at": {"2026-10-22T19:30"}, "f.text": {"ate out, rich"}, "f.rich": {"true"}, "f.out": {"false"},
+		"zone": {"Australia/Sydney"}, "offset": {"+11:00"},
+	})
+	if !ok || !strings.Contains(string(meal), `"rich":true`) || !strings.Contains(string(meal), `"out":false`) {
+		t.Errorf("meal = %s, ok %v; want rich and out sent as booleans, out false kept", meal, ok)
+	}
+}

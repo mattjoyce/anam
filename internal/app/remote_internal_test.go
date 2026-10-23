@@ -86,8 +86,8 @@ func newRemoteFixtureWith(t *testing.T, zone string, tweak func(t *testing.T, f 
 	// No person and no file that exists: if the CLI opened anything local it would fail.
 	nowhere := filepath.Join(f.dir, "not-here")
 	f.remoteCfg = filepath.Join(f.dir, "remote.yaml")
-	remote := fmt.Sprintf("server: %s\ntoken_file: %s\nzone: %s\nledger_path: %s\ndb_path: %s\n",
-		f.server, tokenPath, zone, filepath.Join(nowhere, "ledger.db"), filepath.Join(nowhere, "tracking.db"))
+	remote := fmt.Sprintf("server: %s\ntoken_file: %s\nzone: %s\nledger_path: %s\ndb_path: %s\ntimeout: %s\n",
+		f.server, tokenPath, zone, filepath.Join(nowhere, "ledger.db"), filepath.Join(nowhere, "tracking.db"), testTimeout)
 	if err := os.WriteFile(f.remoteCfg, []byte(remote), 0o600); err != nil {
 		t.Fatal(err)
 	}

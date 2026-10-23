@@ -19,6 +19,12 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
+// testTimeout is the timeout the fixtures give the daemon (card 227). Opening a daemon
+// guards every bundled Definition, which under the race detector on a busy machine can
+// pass the 5 s default; a request still answers in milliseconds. A test of timeout
+// behaviour sets its own short value.
+const testTimeout = 30 * time.Second
+
 // newConfig is a config over a real, initialised ledger under the test's own directory.
 func newConfig(t *testing.T) config.Config {
 	t.Helper()
@@ -30,7 +36,7 @@ func newConfig(t *testing.T) config.Config {
 		LibraryDir:         filepath.Join(dir, "documents"),
 		LibraryFolderLimit: config.DefaultLibraryFolderLimit,
 		Zone:               "UTC",
-		Timeout:            5 * time.Second,
+		Timeout:            testTimeout,
 		LongWriteTimeout:   time.Minute,
 		BucketWidth:        span.Default,
 		Listen:             "127.0.0.1:0",

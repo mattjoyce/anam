@@ -138,6 +138,11 @@ func sortItems(items []linkItem) {
 // time for the page, and its content hash, which a pin names unless the item already
 // names one. An id the ledger does not hold is drawn as such.
 func (s *Server) describe(ctx context.Context, d *linkData) error {
+	defs, err := s.definitions()
+	if err != nil {
+		return err
+	}
+	lab := labeler{defs}
 	for i := range d.Items {
 		it := &d.Items[i]
 		f, err := s.ledger.CurrentVersion(ctx, it.ID)
@@ -149,6 +154,7 @@ func (s *Server) describe(ctx context.Context, d *linkData) error {
 			return fmt.Errorf("inspect: facet %s: %w", it.ID, err)
 		}
 		it.Held, it.Type, it.FactTime, it.Current = true, string(f.Type), f.FactTime.Format(time.RFC3339), f.Descriptor.ContentHash
+		it.Label = lab.of(f.Type, f.Payload.Bytes())
 		if it.Hash == "" {
 			it.Hash = it.Current
 		}

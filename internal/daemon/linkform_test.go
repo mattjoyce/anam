@@ -125,7 +125,7 @@ func TestLinkFormLinksFourFacetsAndEachPageListsIt(t *testing.T) {
 			t.Errorf("the form lacks %s, kept and linked to its page", id)
 		}
 	}
-	for _, want := range []string{"<td>health.weight</td>", "4 in the link", `<option value="about" selected>about</option>`,
+	for _, want := range []string{"<td>health.weight</td>", "<td>80 kg</td>", "<td>80.3 kg</td>", "4 in the link", `<option value="about" selected>about</option>`,
 		`data-fact-time data-now`, `<input type="hidden" id="zone" name="zone" value="">`, "Intl.DateTimeFormat().resolvedOptions().timeZone"} {
 		if !strings.Contains(form, want) {
 			t.Errorf("the form lacks %q", want)

@@ -80,9 +80,11 @@ type linkItem struct {
 	// Type and FactTime describe the facet's current version; Held is false for an id
 	// the ledger does not hold.
 	Type, FactTime string
-	Held           bool
-	From, Keep     bool
-	Pin            bool
+	// Label is the facet's label from its Definition, "" when the type has none.
+	Label      string
+	Held       bool
+	From, Keep bool
+	Pin        bool
 	// Hash is the version a pin names: the one an edited link pins already, or the one
 	// current when the form was drawn. Current is the current version's.
 	Hash, Current string

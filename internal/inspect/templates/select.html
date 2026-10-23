@@ -118,7 +118,7 @@
     <tr>
       <td class="mono">{{.FactTime}}</td>
       <td>{{.Source}}</td>
-      <td class="members">{{range .Members}}<label><input type="hidden" name="shown" value="{{.ID}}">{{if $.Chips}}<input class="member" type="checkbox" name="on" value="{{.ID}}" {{if .Checked}}checked{{end}}> {{end}}<a class="mono member-id" href="/facet?id={{.ID}}">{{.Short}}</a></label>{{end}}</td>
+      <td class="members">{{range .Members}}<label><input type="hidden" name="shown" value="{{.ID}}">{{if $.Chips}}<input class="member" type="checkbox" name="on" value="{{.ID}}" {{if .Checked}}checked{{end}}> {{end}}{{if .Label}}<a class="member-id member-label" href="/facet?id={{.ID}}" title="{{.ID}}">{{.Label}}</a> <span class="mono dim">{{.Short}}</span>{{else}}<a class="mono member-id" href="/facet?id={{.ID}}">{{.Short}}</a>{{end}}</label>{{end}}</td>
     </tr>
     {{end}}
     </tbody>
@@ -143,7 +143,7 @@
     {{range .Basket}}
     <li class="tick"><span class="side">{{if .From}}from{{else}}to{{end}}</span>
       <a class="mono" href="/facet?id={{.ID}}">{{.ID}}</a>
-      {{if .Served}}{{.Type}} <span class="mono dim">{{.FactTime}}</span>{{else}}<span class="dim">not served by this projection</span>{{end}}
+      {{if .Served}}{{if .Label}}<strong class="label">{{.Label}}</strong> {{end}}{{.Type}} <span class="mono dim">{{.FactTime}}</span>{{else}}<span class="dim">not served by this projection</span>{{end}}
       · <a href="{{.Side}}">move to {{if .From}}to{{else}}from{{end}}</a> · <a href="{{.Remove}}">remove</a></li>
     {{end}}
   </ul>
@@ -151,7 +151,7 @@
   {{if .Excluded}}
   <p class="meta">Unticked from the criteria:</p>
   <ul>
-    {{range .Excluded}}<li class="untick"><a class="mono" href="/facet?id={{.ID}}">{{.ID}}</a> {{if .Served}}{{.Type}}{{end}} · <a href="{{.Return}}">give back</a></li>{{end}}
+    {{range .Excluded}}<li class="untick"><a class="mono" href="/facet?id={{.ID}}">{{.ID}}</a> {{if .Served}}{{if .Label}}<strong class="label">{{.Label}}</strong> {{end}}{{.Type}}{{end}} · <a href="{{.Return}}">give back</a></li>{{end}}
   </ul>
   {{end}}
 </section>

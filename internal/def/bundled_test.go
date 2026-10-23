@@ -301,7 +301,7 @@ func TestBundled_NoteAnnotationIsThePersonsWords(t *testing.T) {
 	if !ok {
 		t.Fatal("no bundled record.edge")
 	}
-	if d.Version != 2 || d.FactTime.Pointer != "/at" || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" {
+	if d.Version != 3 || d.FactTime.Pointer != "/at" || len(d.IdentityKey) != 1 || d.IdentityKey[0] != "/id" {
 		t.Fatalf("v%d fact time %s identity %v", d.Version, d.FactTime.Pointer, d.IdentityKey)
 	}
 	decode := func(s string) map[string]any {

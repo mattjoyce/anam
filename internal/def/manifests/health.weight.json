@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "health.weight",
-    "definition_version": 5,
+    "definition_version": 6,
     "kind": "reading",
     "family": "body",
     "classification": "Sensitive",
@@ -14,9 +14,12 @@
     "identity_key": ["/id"],
     "min_binding_assurance": "medium"
   },
+  "handling": {
+    "label": "{/kg} kg"
+  },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "One body weight, from a records file. Two records sources write it: the Fitbit weight log export, extracted by scripts/extract-fitbit-weight.py, and weights noted in the blood pressure diary, read into records by hand. Values are the source's own figures.",
+    "description": "One body weight, from a records file. Two records sources write it: the Fitbit weight log export, extracted by scripts/extract-fitbit-weight.py, and weights noted in the blood pressure diary, read into records by hand. Values are the source's own figures. Version 6 adds handling.label, a short label a page draws a row as, every rule unchanged.",
     "type": "object",
     "required": ["id", "date", "kg"],
     "properties": {

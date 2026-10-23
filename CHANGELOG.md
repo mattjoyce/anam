@@ -8,6 +8,20 @@ decisions is in `journal/`.
 
 ## Unreleased
 
+- The selection page reads a facet as a thing (card 199). A Definition may declare
+  `handling.label`, a short template of literal text and `{/pointer}` fields read from the payload
+  (`{/drug} {/amount} {/unit}`), and the picker's rows, its basket and the link form's basket show
+  it ("melatonin 5 mg", "80.4 kg"); a type without one keeps its type and time. A label never fails:
+  a field the payload lacks is nothing, a text field is its first line, and a label with every field
+  empty is no label. `Parse` refuses a label that reads no field, names none the schema declares or
+  uses anything but `{/pointer}`. Because `handling` is part of the version, five bundled types
+  moved a version to add one: `health.weight` v6, `health.medication.dose` v3, `mind.attention` v2,
+  `health.intake` v2 and `record.edge` v3. Writers that read the Definition in force (the Workbench
+  forms, anam-mcp, records files that name no version) follow; an importer that pins a version of
+  one of these must move with it. Blood pressure and the Garmin and Withings types have no label
+  yet, since their importers pin the version. The timeline's own selection (ctrl-click or shift-drag
+  marks) gains "link these…", beside the facet page's "link this…", which opens the selection page
+  with those facets in the basket.
 - Anam can hold what a person takes in, said in a few words (card 232). `health.intake` v1 is
   bundled: `kind` is `caffeine`, `alcohol` or `meal`, and `at` is the minute at the offset
   `source_time` names. A drink says `drink` (one spelling, lower case with hyphens, `flat-white`,

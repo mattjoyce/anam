@@ -46,6 +46,10 @@ type selectData struct {
 	// Types and Sources are what the served value holds, offered as the criteria's
 	// suggestions.
 	Types, Sources []string
+
+	// labeled reads the label of a served facet; it is nil-safe and the zero value
+	// labels nothing (card 199).
+	labeled labels
 }
 
 // HasCriteria reports whether the selection says anything beyond its basket.
@@ -73,6 +77,8 @@ type selectRow struct {
 type selectMember struct {
 	ID      string
 	Checked bool
+	// Label is the facet's label from its Definition, "" when it has none.
+	Label string
 }
 
 // Short is the id's first eight characters, enough to tell a row's members apart.
@@ -87,6 +93,7 @@ func (m selectMember) Short() string {
 // is there.
 type basketItem struct {
 	ID, Type, FactTime   string
+	Label                string
 	From                 bool
 	Served               bool
 	Remove, Side, Return string
@@ -126,6 +133,7 @@ func (s *Server) selectData(ctx context.Context, st selectState, served fold.Val
 	case err != nil:
 		return selectData{}, err
 	}
+	d.labeled = newLabels(defs, served)
 	picked := map[string]bool{}
 	for _, t := range ans.Tuples {
 		picked[t[0].Text()] = true
@@ -203,7 +211,7 @@ func (d *selectData) group(matched []selection.Row, picked map[string]bool) {
 			at[k] = row
 			byType[k.typ] = append(byType[k.typ], row)
 		}
-		row.Members = append(row.Members, selectMember{ID: r.ID, Checked: picked[r.ID]})
+		row.Members = append(row.Members, selectMember{ID: r.ID, Checked: picked[r.ID], Label: d.labeled.of(r.ID)})
 	}
 	d.RowCount = len(at)
 	if d.RowCount > rowLimit {
@@ -285,7 +293,7 @@ func (d *selectData) fillBasket(st selectState, rows []selection.Row) {
 	}
 	item := func(id string) basketItem {
 		r, ok := byID[id]
-		return basketItem{ID: id, Type: string(r.Type), FactTime: r.FactTime, Served: ok, From: st.fromSide[id]}
+		return basketItem{ID: id, Type: string(r.Type), FactTime: r.FactTime, Label: d.labeled.of(id), Served: ok, From: st.fromSide[id]}
 	}
 	for _, id := range st.filter.Ticks {
 		id := id

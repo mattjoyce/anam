@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "mind.attention",
-    "definition_version": 1,
+    "definition_version": 2,
     "kind": "reading",
     "family": "attention",
     "classification": "Confidential",
@@ -15,11 +15,12 @@
     "min_binding_assurance": "medium"
   },
   "handling": {
-    "guidance": "One reading, said at a moment: what holds the person's attention now, not a record of a period. topic is one agreed spelling per subject, lower case with words joined by hyphens (deskcam, never DeskCam or desk cam), the way health.medication.dose fixes the drug's spelling, so a query can match it exactly; the store never reads inside a note. intensity is a whole number from 1 to 5. at is the minute it was said, as a wall clock in Australia/Sydney or at the offset source_time names; a reading about an earlier time is dated at that time, and note says how it was worked out. The id is declared in identity_template, <source>:attention/<topic>/<at as YYYY-MM-DDTHH:MM>, then source_time's offset (+11:00), so one minute in two zones is two readings, and every writer builds it from there: leave id out and Anam fills it; send it and it must match. Two readings of one topic in one minute are one reading. How long a topic held the person is the mind.attention.started and mind.attention.ended pair, which the person declares; readings never open or close it."
+    "guidance": "One reading, said at a moment: what holds the person's attention now, not a record of a period. topic is one agreed spelling per subject, lower case with words joined by hyphens (deskcam, never DeskCam or desk cam), the way health.medication.dose fixes the drug's spelling, so a query can match it exactly; the store never reads inside a note. intensity is a whole number from 1 to 5. at is the minute it was said, as a wall clock in Australia/Sydney or at the offset source_time names; a reading about an earlier time is dated at that time, and note says how it was worked out. The id is declared in identity_template, <source>:attention/<topic>/<at as YYYY-MM-DDTHH:MM>, then source_time's offset (+11:00), so one minute in two zones is two readings, and every writer builds it from there: leave id out and Anam fills it; send it and it must match. Two readings of one topic in one minute are one reading. How long a topic held the person is the mind.attention.started and mind.attention.ended pair, which the person declares; readings never open or close it.",
+    "label": "{/topic}"
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "One self-reported attention reading: at a moment the person says what is absorbing them (the topic) and how strongly, from 1 to 5. Said by the person as it happens, through a conversation or the Workbench. It records what the person said, not what anything else infers.",
+    "description": "One self-reported attention reading: at a moment the person says what is absorbing them (the topic) and how strongly, from 1 to 5. Said by the person as it happens, through a conversation or the Workbench. It records what the person said, not what anything else infers. Version 2 adds handling.label, a short label a page draws a row as, every rule unchanged.",
     "type": "object",
     "required": ["id", "at", "topic", "intensity", "source_time"],
     "properties": {

@@ -44,19 +44,28 @@ func zonedTypes(t *testing.T) (now, before []def.Definition, bodies [][]byte) {
 		if d.FactTime.ZonePointer == "" {
 			continue
 		}
-		if d.Version == 1 {
+		// The version before the type first read a zone is what its facets were
+		// admitted under: walk back past versions that already read one (a later
+		// version may change only its label or its words).
+		var prev def.Definition
+		var body []byte
+		born := true
+		for v := d.Version - 1; v >= 1; v-- {
+			b, ok := old[fmt.Sprintf("%s@%d", d.Type, v)]
+			if !ok {
+				t.Fatalf("%s v%d reads a zone but its v%d is not in the history", d.Type, d.Version, v)
+			}
+			p, err := def.Parse(b)
+			if err != nil {
+				t.Fatalf("%s v%d: %v", d.Type, v, err)
+			}
+			if p.FactTime.ZonePointer == "" {
+				prev, body, born = p, b, false
+				break
+			}
+		}
+		if born {
 			continue // born reading a zone (the attention types): no facet was admitted before
-		}
-		body, ok := old[fmt.Sprintf("%s@%d", d.Type, d.Version-1)]
-		if !ok {
-			t.Fatalf("%s v%d reads a zone but its v%d is not in the history", d.Type, d.Version, d.Version-1)
-		}
-		prev, err := def.Parse(body)
-		if err != nil {
-			t.Fatalf("%s v%d: %v", d.Type, d.Version-1, err)
-		}
-		if prev.FactTime.ZonePointer != "" {
-			t.Fatalf("%s v%d already read a zone", d.Type, prev.Version)
 		}
 		now, before, bodies = append(now, d), append(before, prev), append(bodies, body)
 	}

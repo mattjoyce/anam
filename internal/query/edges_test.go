@@ -38,17 +38,28 @@ func edgeHarness(t *testing.T) *harness {
 	if !ok {
 		t.Fatal("no bundled record.edge")
 	}
-	defs, err := def.NewRegistry(append(registry(t).All(), note)...)
+	// The intake and the sleep episode are what docs/QUERY.md's alcohol question is asked of.
+	intake, ok := bundled.Lookup("health.intake")
+	if !ok {
+		t.Fatal("no bundled health.intake")
+	}
+	sleep, ok := bundled.Lookup("health.sleep-episode")
+	if !ok {
+		t.Fatal("no bundled health.sleep-episode")
+	}
+	defs, err := def.NewRegistry(append(registry(t).All(), note, intake, sleep)...)
 	if err != nil {
 		t.Fatalf("def.NewRegistry: %v", err)
 	}
 	scopes := gate.StaticScopes{
-		"bp-csv":    {"health.blood-pressure"},
-		"records":   {"record.edge"},
-		"self-log":  {"health.medication.started", "health.medication.dose-changed", "health.medication.stopped"},
-		"health-db": {"health.weight"},
+		"bp-csv":       {"health.blood-pressure"},
+		"records":      {"record.edge"},
+		"conversation": {"health.intake"},
+		"garmin":       {"health.sleep-episode"},
+		"self-log":     {"health.medication.started", "health.medication.dose-changed", "health.medication.stopped"},
+		"health-db":    {"health.weight"},
 	}
-	tmpl, err := projection.Parse([]byte(strings.Replace(logTemplate, `"health.blood-pressure",`, `"health.blood-pressure", "record.edge",`, 1)))
+	tmpl, err := projection.Parse([]byte(strings.Replace(logTemplate, `"health.blood-pressure",`, `"health.blood-pressure", "record.edge", "health.intake", "health.sleep-episode",`, 1)))
 	if err != nil {
 		t.Fatalf("projection.Parse: %v", err)
 	}

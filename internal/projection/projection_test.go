@@ -135,7 +135,7 @@ func TestBundled_ParsesBpAndSleep(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Bundled: %v", err)
 	}
-	if got, want := r.Names(), []string{"activity", "attention", "body", "bp", "clinical", "doses", "meds", "sleep"}; !reflect.DeepEqual(got, want) {
+	if got, want := r.Names(), []string{"activity", "attention", "body", "bp", "clinical", "doses", "intake", "meds", "sleep"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("bundled names = %v, want %v", got, want)
 	}
 	// Card 147: meds v2 names the types under the health domain, and card 196 gave them
@@ -567,6 +567,39 @@ func TestBundled_AttentionServesTheThreeTypes(t *testing.T) {
 	}
 	want := []string{"a-started", "a-reading-1", "a-reading-2", "a-ended"}
 	if got := ids(served); !reflect.DeepEqual(got, want) {
+		t.Errorf("served %v, want %v", got, want)
+	}
+}
+
+// Card 232: the bundled intake projection is a log of health.intake up to Sensitive, at
+// the time it was said, and serves nothing else.
+func TestBundled_IntakeServesTheIntakeLog(t *testing.T) {
+	t.Parallel()
+	r, err := projection.Bundled()
+	if err != nil {
+		t.Fatalf("Bundled: %v", err)
+	}
+	tmpl, err := r.Lookup("intake")
+	if err != nil {
+		t.Fatalf("Lookup: %v", err)
+	}
+	if tmpl.Shape != "log" || tmpl.MaxClassification != "Sensitive" {
+		t.Errorf("intake = %s up to %s, want a log up to Sensitive", tmpl.Shape, tmpl.MaxClassification)
+	}
+	v, err := fold.NewValue([]fold.Entry{
+		entry("i-coffee", "health.intake", "2026-10-22T08:15:00.000000000Z", facet.StatusAdmitted, facet.ClassificationSensitive),
+		entry("i-wine", "health.intake", "2026-10-22T19:30:00.000000000Z", facet.StatusEndorsed, facet.ClassificationSensitive),
+		entry("i-retracted", "health.intake", "2026-10-22T20:00:00.000000000Z", facet.StatusTombstoned, facet.ClassificationSensitive),
+		entry("f-bp-1", "health.blood-pressure", "2026-10-21T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
+	})
+	if err != nil {
+		t.Fatalf("fold.NewValue: %v", err)
+	}
+	served, err := projection.Apply(v, tmpl, consent.Open{}, nil)
+	if err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if got, want := ids(served), []string{"i-coffee", "i-wine"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("served %v, want %v", got, want)
 	}
 }

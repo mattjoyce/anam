@@ -47,6 +47,7 @@ The list runs from dearest to cheapest. Start at the bottom and promote a distin
 - Exercise sessions split by vendor. A Garmin session and a Concept2 session carry different payload shapes, so each is its own type under `activity.exercise-session`, not one type with a `vendor` field. Card 195 split them into four leaves, and renamed `activity.day`, `health.measurement` and `health.cpap-session` to their vendor's leaf.
 - Medication started and stopped as separate types. Stopped closes a series, and the fold reads that from the Definition, so it cannot be a `status` field on one type.
 - Rowing against walking is a payload field, `activity_name`. Both are an exercise session of one shape, so a split would only cost a rename run per new sport.
+- Coffee, wine and a rich meal are one type, `health.intake`, with `kind` a payload field (card 232). Each is an event at a minute with no series and one time rule, so a split would only cost a type per new kind; the per-kind fields a payload must carry are held by the schema's `if` and `then`, and a reader asks for the kind with `attr`.
 - `family: meds` is meta. It groups the medication types for a reader and changes no shape, so it needs neither a segment nor a field.
 
 **Why.** Each place up the list is dearer to change and harder to undo, so the cheap place that works is the right place. A rule that says so gives the same answer each time a new kind of fact arrives, where before it was whatever the last type did.

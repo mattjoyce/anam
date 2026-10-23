@@ -49,11 +49,12 @@ const hueNeutral = -1
 
 // families in row order, top to bottom: the families the Definitions declare (card
 // 147), by domain. Hues are assigned once, here, and never move when a filter hides a
-// family (dataviz: colour follows the entity). Fourteen families and eight hues: the
+// family (dataviz: colour follows the entity). Fifteen families and eight hues: the
 // hue stays with the row that carried it before the taxonomy, through its most
 // telling successor, and the rows of background measures (a day's steps, an hour of
 // positions), of rare events (a condition), of what the person says is absorbing them
-// (attention) and of what the person wrote or filed take the neutral grey.
+// (attention), of what the person says they took in (intake) and of what the person wrote or
+// filed take the neutral grey.
 var families = []family{
 	{"vitals", "vitals", 7},
 	{"body", "body", 0},
@@ -63,6 +64,7 @@ var families = []family{
 	{"labs", "labs", 2},
 	{"conditions", "conditions", hueNeutral},
 	{"meds", "meds", 4},
+	{"intake", "intake", hueNeutral},
 	{"clinical", "clinical", 5},
 	{"location", "location", hueNeutral},
 	{"trips", "trips", 1},

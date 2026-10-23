@@ -21,7 +21,7 @@ relation, filed with a receipt.
 The projection matters. A log-shaped projection serves every version of its types, so `current/2` can
 tell you what was in force on a date. A snapshot-shaped one (the bundled `meds`) has already taken the
 latest of each series, so a question about the past finds nothing there to look at. Use a log-shaped
-projection for history. The bundled ones are `activity`, `attention`, `body`, `bp`, `clinical`, `doses`, `meds` and `sleep`, and
+projection for history. The bundled ones are `activity`, `attention`, `body`, `bp`, `clinical`, `doses`, `intake`, `meds` and `sleep`, and
 `GET /v1/projections` lists them with the registered ones. A type served by none of them has no query route;
 `GET /v1/coverage` names, for each type, the projections that serve it. Others are registered with
 `POST /v1/projections`.
@@ -187,6 +187,9 @@ The record these run against is a small one. Ramipril started on 1 March 2026 an
 on 15 May. Vitamin D3 + K2 started on 1 May, stopped on 15 July, and began a second course on 10
 August. Blood-pressure readings were taken on 15 February, 10 April, 1 June, 20 July and 20 August,
 and the April one is the high one at 146. A note, "Before the dentist.", is about the April reading.
+For the alcohol question, the record also holds three `health.intake` alcohol facts (two red wines on the
+evening of 21 October, a beer on the evening of 22 and another on the evening of 23), a flat white on the
+morning of the 22nd, and two nights' sleep, which began at 12:30 UTC on the 21st and at 12:00 UTC on the 22nd.
 The medication types are `health.medication.started`, `.dose-changed` and `.stopped`, and each course
 of a drug is one series.
 
@@ -308,6 +311,34 @@ noted(At, Text) :- entry(R, "health.blood-pressure", At, _, _, _, _), linked(Edg
 ```answer question=notes-on-readings
 2026-04-10T07:00:00.000000000Z Before the dentist.
 ```
+
+### Alcohol before a sleep episode
+
+Each alcohol intake with the next sleep episode that began after it. `health.intake` keeps what kind of
+intake it was at `/kind` and which drink at `/drink`, so the flat white is left out by asking for
+`alcohol`. The next sleep is the earliest later start, found by negation over a relation you define:
+a start is skipped for an intake when another start falls between them. The beer on the 23rd is
+followed by no sleep in the record, so it has no row. Answers are the intake's instant, the drink and
+the sleep's start.
+
+```datalog question=alcohol-before-sleep relation=before_sleep
+alcohol(At, Drink) :- entry(A, "health.intake", At, _, _, _, _),
+                      attr(A, "/kind", "alcohol"), attr(A, "/drink", Drink).
+sleep_start(At) :- entry(_, "health.sleep-episode", At, _, _, _, _).
+skipped(At, Next) :- alcohol(At, _), sleep_start(Next), sleep_start(Other),
+                     At < Next, At < Other, Other < Next.
+before_sleep(At, Drink, Next) :- alcohol(At, Drink), sleep_start(Next),
+                                 At < Next, not skipped(At, Next).
+```
+
+```answer question=alcohol-before-sleep
+2026-10-21T09:00:00.000000000Z red-wine 2026-10-21T12:30:00.000000000Z
+2026-10-22T08:30:00.000000000Z beer 2026-10-22T12:00:00.000000000Z
+```
+
+This says the alcohol came before the sleep, not how long before. "Within six hours" would need
+arithmetic on instants, which the language does not have yet (card 212); until then a window is a
+pair of literal bounds, as in the summer question above.
 
 ### Every medication event, by prefix
 

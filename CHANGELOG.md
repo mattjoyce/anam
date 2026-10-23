@@ -8,6 +8,16 @@ decisions is in `journal/`.
 
 ## Unreleased
 
+- Anam can hold what a person takes in, said in a few words (card 232). `health.intake` v1 is
+  bundled: `kind` is `caffeine`, `alcohol` or `meal`, and `at` is the minute at the offset
+  `source_time` names. A drink says `drink` (one spelling, lower case with hyphens, `flat-white`,
+  `red-wine`) and `count`, with `size`, `volume_ml` and, for alcohol, `abv` when known; a meal says
+  `text`, `rich` and `out`. The gate refuses a field of the other shape. `part_of_day` makes `at`
+  that part's nominal minute (08:00, 14:00, 19:00, 22:00). Two intakes of one kind in one minute are
+  one fact, so `count` carries the number. Sensitive and strict, no nutrition or calories, and
+  standard drinks are worked out on read. To enter them by hand, list `health.intake` under the
+  `workbench` entry's `types` in the importers file and restart; an agent saves one through
+  anam-mcp's `save_fact`. A bundled `intake` projection serves it as a log, up to Sensitive.
 - The operator can name the projection an agent should read first (card 180). The new config key
   `default_projection` (`ANAM_DEFAULT_PROJECTION`, empty by default) is advertised as
   `default_projection` on `GET /v1/status` and as `default` on `GET /v1/projections`. It is advice,

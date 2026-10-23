@@ -1,0 +1,11 @@
+{
+  "name": "intake",
+  "version": 1,
+  "description": "What the person says they took in, as a log at the time they said it: caffeine, alcohol and notable meals in their own words, for an assistant asked what came before a poor sleep or a reading. It holds no nutrition.",
+  "types": ["health.intake"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

@@ -15,6 +15,7 @@
 * [Fold](fold.md) - The computation that derives each facet's current status from its anam-events and keeps the live ones.
 * [Idempotency](idempotency.md) - Re-ingesting the same source row is a no-op; what makes ingest crash-clean and a resend always safe.
 * [Importer](importer.md) - A ductile plugin outside Anam that reads one source, shapes rows to a Definition, and submits them under its own token.
+* [Intake (caffeine, alcohol and notable meals)](intake.md) - What the person says they took in, kept as a fact at its minute so a later question can ask whether it came before a poor sleep or a reading; drinks with a count, meals in the person's words, and no nutrition.
 * [Ledger](ledger.md) - Anam's append-only record of everything it admitted, every facet kept and marked at its current status.
 * [Mint](mint.md) - Checkpointing per bucket after the importer batches that moved W, rebuilding only the buckets the tail touched.
 * [Operational store](operational-store.md) - The second SQLite file, authoritative for what Anam authors, with each table annotated by where it comes back from.

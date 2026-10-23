@@ -110,6 +110,14 @@ type Config struct {
 	// bound. A local read, the operator at their own files, is never bounded.
 	MaxReadBytes int `mapstructure:"max_read_bytes"`
 
+	// DefaultProjection names the projection an agent should read first, which the
+	// daemon advertises on GET /v1/status and GET /v1/projections (card 180). It is
+	// advice to a client, never applied: a read that names no projection is the read
+	// it always was. Empty is none. Load takes any name; only the daemon can see the
+	// registered projections, so it refuses to start on a name that is neither
+	// bundled nor registered.
+	DefaultProjection string `mapstructure:"default_projection"`
+
 	// BucketWidth is how much fact-time one checkpoint bucket covers (§4, §7). It is a
 	// tuning knob and changes nothing a read returns — but it is stamped into every
 	// bucket id the operational index persists, so the ops store pins it and refuses a
@@ -177,6 +185,7 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 	v.SetDefault("backup_dir", "")
 	v.SetDefault("backup_keep", DefaultBackupKeep)
 	v.SetDefault("max_read_bytes", DefaultMaxReadBytes)
+	v.SetDefault("default_projection", DefaultDefaultProjection)
 	v.SetDefault("library_folder_limit", DefaultLibraryFolderLimit)
 	setLimitDefaults(v)
 
@@ -283,6 +292,8 @@ func (c Config) Validate() error {
 		return fmt.Errorf("%w: checkpoint_budget must be 0 or more bytes, got %d", ErrInvalid, c.CheckpointBudget)
 	case c.MaxReadBytes < 0:
 		return fmt.Errorf("%w: max_read_bytes must be 0 or more bytes, got %d", ErrInvalid, c.MaxReadBytes)
+	case c.DefaultProjection != strings.TrimSpace(c.DefaultProjection):
+		return fmt.Errorf("%w: default_projection %q has leading or trailing space", ErrInvalid, c.DefaultProjection)
 	case c.LibraryFolderLimit < 1:
 		return fmt.Errorf("%w: library_folder_limit must be at least 1, got %d", ErrInvalid, c.LibraryFolderLimit)
 	}
@@ -388,6 +399,11 @@ const DefaultCheckpointBudget = 1 << 20
 // docs/API.md §3 proposes. A month of every type is under it; the whole record, at
 // 12.8 MB on 2026-10-11, is not.
 const DefaultMaxReadBytes = 512 << 10
+
+// DefaultDefaultProjection is default_projection's default: none. Which projection
+// suits an agent first is the operator's choice, and the useful ones are registered
+// from the importers' types, so core ships no name that might not exist.
+const DefaultDefaultProjection = ""
 
 // DefaultLibraryFolderLimit is library_folder_limit's default: 1000 files, few
 // enough that a person listing a folder by hand still reads it.

@@ -8,6 +8,12 @@ decisions is in `journal/`.
 
 ## Unreleased
 
+- The operator can name the projection an agent should read first (card 180). The new config key
+  `default_projection` (`ANAM_DEFAULT_PROJECTION`, empty by default) is advertised as
+  `default_projection` on `GET /v1/status` and as `default` on `GET /v1/projections`. It is advice,
+  not applied: a read that names no projection is unchanged, and a receipt still names the version
+  that served it. The daemon will not start on a name that is neither a bundled nor a registered
+  projection. anam-mcp's `describe_record` names it.
 - Anam can hold what a person says is absorbing them (card 222). `mind` is a ninth domain head, for
   self-reported inner states, so mood or energy can join later; a head is added only by a logged
   decision. Three Definitions are bundled at v1, `mind.attention` (a reading: `at`, `topic`,

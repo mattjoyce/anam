@@ -1,11 +1,14 @@
 package daemon
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/projection"
 )
 
 // Card 125: the operator registers a projection template over the API; a held version
@@ -103,4 +106,70 @@ func TestPostProjections(t *testing.T) {
 	if tl.Projection == nil || tl.Projection.Version != 2 {
 		t.Errorf("a read after v2 went through %+v, want v2", tl.Projection)
 	}
+}
+
+// Card 180: the operator's default_projection is advertised on status and on the
+// projections list, applied to nothing, and a name that is neither bundled nor
+// registered stops the daemon at start.
+func TestDefaultProjectionAdvertised(t *testing.T) {
+	t.Run("none set", func(t *testing.T) {
+		_, url, _ := serveImporters(t, importerConfig(t))
+		var raw map[string]any
+		call(t, "GET", url+"/v1/status", testToken, "", http.StatusOK, &raw)
+		if _, ok := raw["default_projection"]; ok {
+			t.Errorf("status advertises a default with none set: %v", raw)
+		}
+		raw = nil
+		call(t, "GET", url+"/v1/projections", testToken, "", http.StatusOK, &raw)
+		if _, ok := raw["default"]; ok {
+			t.Errorf("projections advertises a default with none set: %v", raw)
+		}
+	})
+
+	t.Run("bundled", func(t *testing.T) {
+		cfg := importerConfig(t)
+		cfg.DefaultProjection = "bp"
+		_, url, _ := serveImporters(t, cfg)
+		var st api.Status
+		call(t, "GET", url+"/v1/status", testToken, "", http.StatusOK, &st)
+		if st.DefaultProjection != "bp" {
+			t.Errorf("status default_projection = %q, want bp", st.DefaultProjection)
+		}
+		var list api.Projections
+		call(t, "GET", url+"/v1/projections", testToken, "", http.StatusOK, &list)
+		if list.Default != "bp" {
+			t.Errorf("projections default = %q, want bp", list.Default)
+		}
+		// Advertised, not applied: a read naming no projection serves no template.
+		var tl api.Timeline
+		call(t, "GET", url+"/v1/timeline?zone=UTC", testToken, "", http.StatusOK, &tl)
+		if tl.Projection != nil {
+			t.Errorf("a read naming no projection went through %+v", tl.Projection)
+		}
+	})
+
+	t.Run("registered, then kept across a restart", func(t *testing.T) {
+		cfg := importerConfig(t)
+		_, url, stop := serveImporters(t, cfg)
+		call(t, "POST", url+"/v1/projections", testToken, weightsV1, http.StatusCreated, nil)
+		if err := stop(); err != nil {
+			t.Fatalf("stop: %v", err)
+		}
+		cfg.DefaultProjection = "weights"
+		_, url, _ = serveImporters(t, cfg)
+		var st api.Status
+		call(t, "GET", url+"/v1/status", testToken, "", http.StatusOK, &st)
+		if st.DefaultProjection != "weights" {
+			t.Errorf("status default_projection = %q, want weights", st.DefaultProjection)
+		}
+	})
+
+	t.Run("a name that is nothing", func(t *testing.T) {
+		cfg := importerConfig(t)
+		cfg.DefaultProjection = "no-such-projection"
+		_, err := Open(context.Background(), cfg, Options{})
+		if !errors.Is(err, projection.ErrUnknown) {
+			t.Fatalf("Open with an unknown default_projection = %v, want projection.ErrUnknown", err)
+		}
+	})
 }

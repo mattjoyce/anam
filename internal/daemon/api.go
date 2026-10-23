@@ -499,7 +499,7 @@ func (d *Daemon) getStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	s := api.Status{
 		Version: d.opts.Version, Person: d.cfg.PersonID, LedgerID: id, W: int64(head),
-		Since: d.started, Sources: d.sources.statuses(), Held: held,
+		Since: d.started, Sources: d.sources.statuses(), Held: held, DefaultProjection: d.cfg.DefaultProjection,
 	}
 	writeJSON(w, http.StatusOK, s)
 }

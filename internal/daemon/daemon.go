@@ -195,7 +195,7 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		closeAll()
 		return nil, err
 	}
-	projs, err := loadProjections(ctx, db)
+	projs, err := loadProjections(ctx, db, cfg.DefaultProjection)
 	if err != nil {
 		closeAll()
 		return nil, err

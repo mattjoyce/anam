@@ -78,7 +78,7 @@ func TestFacet_ListsTheEdgesTouchingIt(t *testing.T) {
 		"<td>to</td>",
 		"<td class=\"mono\"><strong>this facet</strong></td>",
 		"<td>Fasted, after the run.</td>",
-		`<a href="/facet?id=` + rec.note + `">` + rec.note + `</a>`,
+		`<a class="mono" href="/facet?id=` + rec.note + `">` + rec.note + `</a>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the weigh-in's page lacks %q", want)

@@ -129,7 +129,7 @@
       <td>v{{.Version}}</td>
       <td><span class="stand-{{.Standing}}">{{.Standing}}</span></td>
       <td class="dim">{{.Why}}</td>
-      <td class="mono"><a href="/facet?id={{.ID}}">{{.SourceRef}}</a></td>
+      <td class="mono"><a href="/facet?id={{.ID}}">{{.SourceRef}}</a>{{template "copyid" .ID}}</td>
     </tr>
     {{else}}
     <tr><td colspan="6" class="dim">no rows of this standing{{if or .From .To}} in this window{{end}}</td></tr>

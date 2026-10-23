@@ -8,6 +8,13 @@ decisions is in `journal/`.
 
 ## Unreleased
 
+- The Workbench has a copy button beside every facet id it prints (card 235). The facet page's
+  heading, the facet list, the anam-events list, the link and selection pages, a projection's rows
+  and the receipt after a save or a retraction each show a small clipboard button that copies the
+  whole id and reads "copied" for a second. It is a real button with the label "copy facet id". It
+  uses the clipboard API where the browser has one and otherwise selects the id in a hidden input
+  and copies that, since the Workbench is often reached over plain HTTP on the tailnet. A page that
+  prints an id uses the `facetid` template fragment and gets the button. No new route.
 - Anam can hold what a person takes in, said in a few words (card 232). `health.intake` v1 is
   bundled: `kind` is `caffeine`, `alcohol` or `meal`, and `at` is the minute at the offset
   `source_time` names. A drink says `drink` (one spelling, lower case with hyphens, `flat-white`,

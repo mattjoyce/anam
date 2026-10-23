@@ -12,6 +12,7 @@
 </header>
 
 {{range .Lines}}<p>{{.}}</p>
+{{end}}{{if .Facet}}<p>Facet {{template "facetid" .Facet}}{{.Detail}}</p>
 {{end}}
 <p>{{range $i, $l := .Links}}{{if $i}} · {{end}}<a href="{{$l.Href}}">{{$l.Text}}</a>{{end}}</p>
 </body>

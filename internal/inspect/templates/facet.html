@@ -7,7 +7,7 @@
 </head>
 <body>
 <header>
-  <h1>facet <span class="mono">{{.Facet.ID}}</span></h1>
+  <h1>facet {{template "facetidplain" .Facet.ID}}</h1>
   {{template "nav.html"}}
 </header>
 
@@ -99,10 +99,10 @@
       <td>{{.Kind}}</td>
       <td>{{.Side}}</td>
       <td class="mono">{{.At}}</td>
-      <td class="mono">{{range $i, $f := .From}}{{if $i}}<br>{{end}}{{if eq $f $this}}<strong>this facet</strong>{{else}}<a href="/facet?id={{$f}}">{{$f}}</a>{{end}}{{else}}<span class="dim">—</span>{{end}}</td>
-      <td class="mono">{{range $i, $f := .To}}{{if $i}}<br>{{end}}{{if eq $f $this}}<strong>this facet</strong>{{else}}<a href="/facet?id={{$f}}">{{$f}}</a>{{end}}{{else}}<span class="dim">—</span>{{end}}</td>
+      <td class="mono">{{range $i, $f := .From}}{{if $i}}<br>{{end}}{{if eq $f $this}}<strong>this facet</strong>{{else}}{{template "facetid" $f}}{{end}}{{else}}<span class="dim">—</span>{{end}}</td>
+      <td class="mono">{{range $i, $f := .To}}{{if $i}}<br>{{end}}{{if eq $f $this}}<strong>this facet</strong>{{else}}{{template "facetid" $f}}{{end}}{{else}}<span class="dim">—</span>{{end}}</td>
       <td>{{if .Text}}{{.Text}}{{else}}<span class="dim">no text</span>{{end}}</td>
-      <td class="mono"><a href="/facet?id={{.Edge}}">{{.Edge}}</a></td>
+      <td class="mono">{{template "facetid" .Edge}}</td>
     </tr>
     {{end}}
   </tbody>

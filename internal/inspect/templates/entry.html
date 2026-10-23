@@ -20,7 +20,7 @@
 <p class="message" role="alert">{{.NotDrawn}}</p>
 {{else}}
 {{if .Message}}<p class="message" role="alert"><strong>Not saved.</strong> {{.Message}}{{if .Notice}}<br>{{.Notice}}{{end}}</p>{{end}}
-{{if .Edit}}<p class="meta">Correcting <a class="mono" href="/facet?id={{.Edit}}">{{.Edit}}</a>. Saving writes a new version of this facet. The fields that decide which facet it is are locked, because changing one would make a different fact; to change one, retract this entry and enter a new one.</p>{{end}}
+{{if .Edit}}<p class="meta">Correcting {{template "facetid" .Edit}}. Saving writes a new version of this facet. The fields that decide which facet it is are locked, because changing one would make a different fact; to change one, retract this entry and enter a new one.</p>{{end}}
 {{if .Guidance}}<details class="guidance" open><summary>what the Definition says about this type</summary><p>{{.Guidance}}</p></details>{{end}}
 
 <form method="post" action="/entry" class="entry">

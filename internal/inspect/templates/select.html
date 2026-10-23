@@ -13,7 +13,8 @@
   ul.chips li { border: 1px solid color-mix(in srgb, currentColor 30%, transparent); border-radius: 999px; padding: .15rem .7rem; font-size: .9rem; }
   ul.chips .count { opacity: .65; margin-left: .3rem; }
   ul.chips a.remove { margin-left: .4rem; text-decoration: none; }
-  .members label { margin-right: .8rem; white-space: nowrap; }
+  .members label { margin-right: .2rem; white-space: nowrap; }
+  .members .copyid { margin-right: .8rem; }
   textarea.program { width: 100%; min-height: 9rem; font-family: ui-monospace, monospace; font-size: .85rem; }
   .note { padding: .6rem .9rem; border-left: 3px solid #7a5c00; margin: 1rem 0; }
   .basket li { margin: .2rem 0; }
@@ -37,7 +38,7 @@
   <a href="{{.SelectURL}}" id="saved-select">this selection</a> · open it <a href="{{.TimelineURL}}" id="saved-timeline">on the timeline</a>
   (<a href="{{.HighlightURL}}">highlighted among the rest</a>) · <a href="{{.LinkURL}}" id="saved-link">in the link form</a>
   <br><span class="dim">The code names the program, not what it selects today: as the record grows, the same code may select more. <span class="mono">{{.Hash}}</span></span></p>{{end}}
-{{if .Editing}}<p class="note">Changing the facets of the link <a class="mono" href="/facet?id={{.Editing}}">{{.Editing}}</a>. "Use this selection" takes this basket back to it; saving there writes a new version of the same link.</p>{{end}}
+{{if .Editing}}<p class="note">Changing the facets of the link {{template "facetid" .Editing}}. "Use this selection" takes this basket back to it; saving there writes a new version of the same link.</p>{{end}}
 
 {{if .Chips}}
 <form class="controls" method="get" action="/select">
@@ -118,7 +119,7 @@
     <tr>
       <td class="mono">{{.FactTime}}</td>
       <td>{{.Source}}</td>
-      <td class="members">{{range .Members}}<label><input type="hidden" name="shown" value="{{.ID}}">{{if $.Chips}}<input class="member" type="checkbox" name="on" value="{{.ID}}" {{if .Checked}}checked{{end}}> {{end}}<a class="mono member-id" href="/facet?id={{.ID}}">{{.Short}}</a></label>{{end}}</td>
+      <td class="members">{{range .Members}}<label><input type="hidden" name="shown" value="{{.ID}}">{{if $.Chips}}<input class="member" type="checkbox" name="on" value="{{.ID}}" {{if .Checked}}checked{{end}}> {{end}}<a class="mono member-id" href="/facet?id={{.ID}}">{{.Short}}</a></label>{{template "copyid" .ID}}{{end}}</td>
     </tr>
     {{end}}
     </tbody>
@@ -142,7 +143,7 @@
   <ul>
     {{range .Basket}}
     <li class="tick"><span class="side">{{if .From}}from{{else}}to{{end}}</span>
-      <a class="mono" href="/facet?id={{.ID}}">{{.ID}}</a>
+      {{template "facetid" .ID}}
       {{if .Served}}{{.Type}} <span class="mono dim">{{.FactTime}}</span>{{else}}<span class="dim">not served by this projection</span>{{end}}
       · <a href="{{.Side}}">move to {{if .From}}to{{else}}from{{end}}</a> · <a href="{{.Remove}}">remove</a></li>
     {{end}}
@@ -151,7 +152,7 @@
   {{if .Excluded}}
   <p class="meta">Unticked from the criteria:</p>
   <ul>
-    {{range .Excluded}}<li class="untick"><a class="mono" href="/facet?id={{.ID}}">{{.ID}}</a> {{if .Served}}{{.Type}}{{end}} · <a href="{{.Return}}">give back</a></li>{{end}}
+    {{range .Excluded}}<li class="untick">{{template "facetid" .ID}} {{if .Served}}{{.Type}}{{end}} · <a href="{{.Return}}">give back</a></li>{{end}}
   </ul>
   {{end}}
 </section>

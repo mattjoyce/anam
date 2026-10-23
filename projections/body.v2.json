@@ -1,0 +1,11 @@
+{
+  "name": "body",
+  "version": 2,
+  "description": "The body's measurements, for an assistant asked how the person is built or how they are trending: weight, body composition, blood pressure, and the Withings scale's own measurements, every reading Anam holds at its reading time. v2 adds health.measurement.withings to the bundled v1. It does not serve medicines, sleep, heart rate or what a clinician recorded.",
+  "types": ["health.weight", "health.body-composition", "health.blood-pressure", "health.measurement.withings"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

@@ -1,8 +1,8 @@
 {
   "name": "doses",
-  "version": 3,
-  "description": "Every dose taken, at its time: the health.medication.dose events as a log, so an occasional or as-needed medicine reads back without standing as a regimen. The meds projection is the current regimen; this is what was actually taken. Version 3 names the same type as version 2 and only rewords this description. Version 2 named the type with its third segment; version 1 named it health.medication-dose.",
-  "types": ["health.medication.dose"],
+  "version": 4,
+  "description": "Taking the medicine, at its time: every dose taken (health.medication.dose) as a log, so an occasional or as-needed medicine reads back without standing as a regimen, every dose missed (health.medication.dose-missed), and the compliance reports (health.medication.compliance). The meds projection is the current regimen; this is what was actually taken, and what was not. Version 4 adds health.medication.dose-missed and health.medication.compliance to version 3's dose. Version 3 named the same type as version 2 and only reworded this description. Version 2 named the type with its third segment; version 1 named it health.medication-dose.",
+  "types": ["health.medication.dose", "health.medication.dose-missed", "health.medication.compliance"],
   "statuses": ["admitted", "endorsed"],
   "max_classification": "Sensitive",
   "from": "",

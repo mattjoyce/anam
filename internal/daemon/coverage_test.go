@@ -73,13 +73,13 @@ func TestCoverage(t *testing.T) {
 	}
 	// Weight is logged in Sydney time; fact-times are held in UTC.
 	want := []api.TypeCoverage{
-		{Type: "health.weight", Count: 3,
+		{Type: "health.weight", Count: 3, Projections: []string{"body"},
 			Earliest: "2025-12-31T12:00:00.000000000Z", Latest: "2026-04-01T20:00:00.000000000Z",
 			Sources: []api.SourceCoverage{
 				{Source: "scale-test", Count: 2, Earliest: "2025-12-31T12:00:00.000000000Z", Latest: "2026-04-01T20:00:00.000000000Z"},
 				{Source: "test-import", Count: 1, Earliest: "2026-02-28T20:00:00.000000000Z", Latest: "2026-02-28T20:00:00.000000000Z"},
 			}},
-		{Type: "test.reading", Count: 1,
+		{Type: "test.reading", Count: 1, Projections: []string{},
 			Earliest: "2026-05-01T09:00:00.000000000Z", Latest: "2026-05-01T09:00:00.000000000Z",
 			Sources: []api.SourceCoverage{
 				{Source: "test-import", Count: 1, Earliest: "2026-05-01T09:00:00.000000000Z", Latest: "2026-05-01T09:00:00.000000000Z"},
@@ -98,6 +98,18 @@ func TestCoverage(t *testing.T) {
 	}
 	if w := then.Types[0]; w.Count != 1 || len(w.Sources) != 1 || w.Sources[0].Source != "test-import" {
 		t.Fatalf("weight at w=%d: %+v", first, w)
+	}
+
+	// Card 231: each type names the projections that serve it, the newest version of each
+	// name held. The bundled body serves weight; the reading is the gap, an empty list that
+	// reads [] and not null. A projection the operator registers joins the list, sorted.
+	call(t, "POST", url+"/v1/projections", testToken, weightsV1, http.StatusCreated, nil)
+	registered := coverage("")
+	if got := registered.Types[0].Projections; !reflect.DeepEqual(got, []string{"body", "weights"}) {
+		t.Fatalf("weight is served by %v, want body and weights", got)
+	}
+	if got := registered.Types[1].Projections; got == nil || len(got) != 0 {
+		t.Fatalf("a type no projection serves: %#v, want an empty list", got)
 	}
 
 	// A projection counts what it serves: meds serves neither type.

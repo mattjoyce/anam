@@ -1,0 +1,11 @@
+{
+  "name": "activity",
+  "version": 1,
+  "description": "What the person did with their body, for an assistant asked about training or movement: every exercise session from every vendor, the step count and the gym visits, each at its time. It does not serve sleep, heart rate or the body's measurements.",
+  "types": ["activity.exercise-session.", "activity.steps", "activity.gym-visit"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

@@ -352,11 +352,23 @@ version, so the 200/409 comparison includes it and an envelope's `definition_ver
 handling it was shaped under. It is served verbatim, on `GET /v1/definitions/{type}` and the
 inspector's Definition page, to whoever is about to write or read facets of the type; `def.Guard`
 ignores it. And Anam checks only that it is an object: no vocabulary, no verbs it knows, nothing
-read at the gate. By convention a `guidance` key holds prose, so a person or an agent reading the
+read at the gate, with one exception, `label`. By convention a `guidance` key holds prose, so a person or an agent reading the
 Definition before writing a records file or an importer has somewhere to start; the rest is the
 type's own. The test for what belongs there is advice to the author, not a gate: a thing goes in
 `handling` if every writer of the type must agree on it. Retry policy, poll cadence and a person's
 tolerance for drift fail that test and stay in the importer's config.
+
+The one key Anam reads is `label`, a short template a page draws a facet of the type as, so a row
+of the selection page reads "melatonin 5 mg" and not a type and a time. It is literal text with
+`{/pointer}` fields read from the payload, as `identity_template` reads them, and nothing else: no
+`{source}`, no transform, no optional mark, because a label may never fail. A pointer the payload lacks
+renders as nothing, a text field as its first line, and a label whose fields are all empty is no label,
+so the page shows the type and the time instead. Each pointer must name a field the schema declares,
+which Parse checks, so a typo fails at load. Nothing builds an id or a check from a label. It is part of
+the version like the rest of `handling`, so adding or changing one is a new Definition version, and
+a type whose importer shapes envelopes to a fixed Definition version (blood pressure, the Garmin and
+Withings leaves) can take a label only in step with that importer, since the gate refuses an envelope
+shaped to another version. A Definition with no `label` needs none: it is optional.
 
 ### 8.4 Envelopes
 

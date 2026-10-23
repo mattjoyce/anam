@@ -245,8 +245,10 @@ importers:
   (`types` for a type no binary bundles is that importer's alone), and the workbench registers no
   Definition. Leave the entry out and `POST /v1/entry` answers 404, saying the file declares no
   workbench principal. `anam retract workbench --facet <id> --yes` undoes one entry. The attention
-  types (`mind.attention`, `mind.attention.started`, `mind.attention.ended`) are entered by listing
-  them in `types`; the form is drawn from their Definitions, so nothing else changes.
+  types (`mind.attention`, `mind.attention.started`, `mind.attention.ended`) and `health.intake`
+  are entered by listing them in `types`; the form is drawn from their Definitions, so nothing else
+  changes. The intake form shows every field of every kind, and the gate refuses a drink with a
+  meal's fields or a meal with a drink's.
 - The same file names principals that are not importers, under `principals`, each with a `name` and
   a `role` (`reader` or `operator`) and no source or types. An importer may be listed there too,
   with `role: importer`, a name, a source and types or `any_type`. Names, sources and token hashes
@@ -320,8 +322,8 @@ second shape, `internal/def/sourcetime/v2.json`, adds and requires: the offset f
 clock had where it was said, which names one instant even in an hour the zone repeats, beside
 `zone`, the IANA name where the writer knows it (else the offset again). The gate refuses an offset
 the named zone does not keep at that wall clock: London never showed 01:30 on 29 March 2026, and
-never sat at +05:00. `record.edge` v2, `health.medication.dose` v2 and the three `mind.attention`
-types require it: the conversation
+never sat at +05:00. `record.edge` v2, `health.medication.dose` v2, `health.intake` and the three
+`mind.attention` types require it: the conversation
 writer and the Workbench send it with `basis: source` when the person's client or browser names the
 zone, else anam-mcp's `ANAM_ZONE` with `basis: configuration`, and a writer that cannot tell the
 offset refuses rather than guess. `health.weight` v5 declares it without requiring it, since

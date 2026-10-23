@@ -1,0 +1,58 @@
+{
+  "meta": {
+    "facet_type": "health.intake",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "intake",
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "records/health.intake",
+    "time_semantics": {
+      "fact_time": {"pointer": "/at", "layout": "2006-01-02 15:04", "zone": "Australia/Sydney", "zone_pointer": "/source_time/offset"}
+    },
+    "identity_key": ["/id"],
+    "identity_template": "{source}:intake/{/kind}/{/at|2006-01-02T15:04}{/source_time/offset?}",
+    "min_binding_assurance": "medium"
+  },
+  "handling": {
+    "guidance": "One intake, said at a moment: a coffee, some wine, a meal worth remembering, kept so a later question can ask whether it came before a poor sleep, a heart-rate alert or a blood-pressure reading. It is the person's account in a few words and carries no nutrition, calories or food database. kind is caffeine, alcohol or meal. A drink (caffeine or alcohol) says which drink and how many: drink is one agreed spelling per drink, lower case with words joined by hyphens (flat-white, red-wine), the way topic is on mind.attention, so a query can match it exactly; count is how many of it; size, volume_ml and abv (alcohol only) are added when the person knows them. Standard drinks and units are worked out on read from count, volume_ml and abv, never stored. A meal says text, in the person's words, and two yes or no answers, rich (a heavy meal) and out (eaten out). A field of the other shape is refused. place is the place's agreed spelling when it is worth naming; linking an intake to a place fact is an edge's work. at is the minute, as a wall clock in Australia/Sydney or at the offset source_time names. When the person says only a part of the day, part_of_day is morning, afternoon, evening or night and at is that part's nominal minute, 08:00, 14:00, 19:00 or 22:00, so the fact's clock is nominal and not a minute the person knew; note may say more. The id is declared in identity_template, <source>:intake/<kind>/<at as YYYY-MM-DDTHH:MM>, then source_time's offset (+11:00), so one minute in two zones is two intakes, and every writer builds it from there: leave id out and Anam fills it; send it and it must match. Two intakes of one kind in one minute are one intake, so count carries the multiplicity: a tap that records one coffee sends count 1 at the tap's minute. Nothing here closes or opens a series."
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One thing taken in, said by the person at a moment: a caffeine drink, an alcohol drink or a notable meal, in a few words. A drink says which one (drink) and how many (count); a meal says what it was in the person's words (text), whether it was rich and whether it was eaten out. It records what the person said and holds no nutrition, calories or portion weights.",
+    "type": "object",
+    "required": ["id", "kind", "at", "source_time"],
+    "properties": {
+      "kind": {"type": "string", "enum": ["caffeine", "alcohol", "meal"], "description": "What sort of intake it was. caffeine and alcohol are drinks and take drink and count; meal takes text, rich and out.", "examples": ["caffeine"]},
+      "at": {"type": "string", "minLength": 1, "description": "When it was taken, YYYY-MM-DD HH:MM as a wall clock in Australia/Sydney, or at the offset source_time names. This is the fact time. When part_of_day is present it is that part's nominal minute (08:00, 14:00, 19:00 or 22:00), not a minute the person knew.", "examples": ["2026-10-22 08:15"]},
+      "part_of_day": {"type": "string", "enum": ["morning", "afternoon", "evening", "night"], "description": "The part of the day, when that is all the person said. Present, it makes at the part's nominal minute: morning 08:00, afternoon 14:00, evening 19:00, night 22:00. Left out when the person gave a time.", "examples": ["evening"]},
+      "drink": {"type": "string", "minLength": 1, "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "Which drink, in one agreed spelling: lower case, words joined by hyphens, the way topic is on mind.attention, so the same drink is always the same string. Caffeine and alcohol kinds only.", "examples": ["flat-white", "espresso", "red-wine", "beer"]},
+      "count": {"type": "integer", "minimum": 1, "description": "How many of the drink, a whole number from 1. Two intakes of one kind in one minute are one fact, so the count carries the multiplicity.", "examples": [1, 2]},
+      "size": {"type": "string", "minLength": 1, "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "The serving size as the person names it, in one agreed spelling, when it is worth saying.", "examples": ["small", "regular", "large", "schooner", "pint"]},
+      "volume_ml": {"type": "number", "exclusiveMinimum": 0, "description": "The volume of one drink in millilitres, when it is known.", "examples": [250, 150]},
+      "abv": {"type": "number", "minimum": 0, "maximum": 100, "description": "Alcohol by volume, per cent, when it is known. Standard drinks or units are worked out on read from count, volume_ml and abv, never stored. Alcohol kind only.", "examples": [13.5, 4.8]},
+      "text": {"type": "string", "minLength": 1, "description": "The meal in the person's words. Meal kind only.", "examples": ["ate out, big pasta and dessert"]},
+      "rich": {"type": "boolean", "description": "Whether it was a rich or heavy meal, as the person judges it. Meal kind only.", "examples": [true]},
+      "out": {"type": "boolean", "description": "Whether it was eaten out. Meal kind only.", "examples": [true]},
+      "place": {"type": "string", "minLength": 1, "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "Where, as the place's agreed spelling, when it is worth naming. A place is named here, not held; linking the intake to a place fact is an edge's work.", "examples": ["corner-cafe"]},
+      "id": {"type": "string", "minLength": 1, "description": "Identity, composed from the rest by the Definition's identity_template: the source prefix, then intake, the kind and the moment, then the offset source_time names. A writer may leave it out and Anam fills it; one that sends it must send exactly the composition.", "examples": ["conversation:intake/caffeine/2026-10-22T08:15+11:00"]},
+      "note": {"type": "string", "minLength": 1, "description": "Free text in the person's words, about the intake, any kind. Where part_of_day stands in for a time, it can say how the time was worked out.", "examples": ["second one this morning"]},
+      "source_time": {"type": "object", "description": "How `at` was read: value is the wall clock as the person said it, zone the zone it was said in (an IANA name when the writer knows one, else the offset again), offset the offset from UTC it had then, and basis who decided the zone (source when the person's own client or browser names it, configuration when the writer's setting does). The fact time is `at` read at offset.", "required": ["value", "zone", "offset", "basis"], "additionalProperties": false, "properties": {"value": {"type": "string", "minLength": 1, "description": "The fact time as the source supplied it, as text and never rewritten: a date, a wall clock, an RFC 3339 string, or an epoch as its digits.", "examples": ["2026-10-17", "2026-10-20T20:00:00+11:00", "1792269840000"]}, "zone": {"type": "string", "minLength": 1, "pattern": "^([A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$", "description": "The zone value is read in, and nothing else: an IANA name when one is known, UTC for a value that is UTC, else a fixed offset +HH:MM or -HH:MM. The gate refuses a name that is no zone.", "examples": ["Australia/Sydney", "UTC", "+01:00"]}, "offset": {"type": "string", "pattern": "^[+-]([01][0-9]|2[0-3]):[0-5][0-9]$", "description": "The offset from UTC value had at that moment in zone, +HH:MM or -HH:MM, which names one instant even in an hour the zone repeats. A writer that cannot tell it refuses rather than guess.", "examples": ["+01:00", "+11:00"]}, "basis": {"type": "string", "enum": ["source", "configuration", "assumption"], "description": "Who decided the zone. source: the source supplied it with the value, or the value is UTC by the source's own definition. configuration: a setting a person made for this source names it. assumption: the importer or writer chose it, with nothing behind it but its own default or the Definition's zone, and logged that it did."}}}
+    },
+    "allOf": [
+      {
+        "if": {"properties": {"kind": {"const": "caffeine"}}, "required": ["kind"], "additionalProperties": {}},
+        "then": {"required": ["drink", "count"], "properties": {"text": false, "rich": false, "out": false, "abv": false}, "additionalProperties": {}}
+      },
+      {
+        "if": {"properties": {"kind": {"const": "alcohol"}}, "required": ["kind"], "additionalProperties": {}},
+        "then": {"required": ["drink", "count"], "properties": {"text": false, "rich": false, "out": false}, "additionalProperties": {}}
+      },
+      {
+        "if": {"properties": {"kind": {"const": "meal"}}, "required": ["kind"], "additionalProperties": {}},
+        "then": {"required": ["text", "rich", "out"], "properties": {"drink": false, "count": false, "size": false, "volume_ml": false, "abv": false}, "additionalProperties": {}}
+      }
+    ],
+    "additionalProperties": false
+  }
+}

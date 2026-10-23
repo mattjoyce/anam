@@ -134,7 +134,7 @@ drops it from the current value and never from the ledger.
 
 Every fact is a **facet** of a named type, and each type has a versioned **Definition**: a JSON
 Schema, which field names the facet, and which field says when it was true. Definitions are
-immutable once published, so a change is a new version. Anam bundles the 39 below, and importers
+immutable once published, so a change is a new version. Anam bundles the 40 below, and importers
 register more. A running daemon lists what it holds at `GET /v1/definitions` and in the
 inspector's definitions page; the bundled files are in
 [`internal/def/manifests/`](internal/def/manifests/), and the gate checks this table against them.
@@ -182,6 +182,7 @@ records a measure, a reading or an event.
 | `mind.attention` | 1 | attention | reading | What is absorbing the person at a moment, with a topic and an intensity from 1 to 5, as the person says it | `id` | `at` |
 | `mind.attention.started` | 1 | attention | event | The moment the person says a topic began to hold their attention; opens an episode of that topic | `id` | `at` |
 | `mind.attention.ended` | 1 | attention | event | The moment the person says a topic stopped holding their attention; closes the episode | `id` | `at` |
+| `health.intake` | 1 | intake | event | One caffeine drink, alcohol drink or notable meal, said in a few words at a moment: which drink and how many, or the meal in the person's words with rich and out; no nutrition | `id` | `at` |
 | `record.edge` | 2 | notes | event | An edge joining facets, with or without words; a note in the person's own words is one (was `note.annotation` (v1 to v3), then `record.note` (v1, v2)) | `id` | `at` |
 | `record.document` | 2 | documents |  | A pointer to one file in the documents library; the bytes never enter the ledger | `path` | `date` |
 | `health.heart-rate-day` | 2 | vitals | measure | One figure for a day's heart rate, as an Open mHealth heart-rate body (replaced by `health.heart-rate.day`; the garmin importer's snapshot leaves it absent, the operator retracts it, and it is kept for reads as-of before) | `id`, `statistic` | interval start |

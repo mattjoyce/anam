@@ -152,7 +152,7 @@ records a measure, a reading or an event.
 | `health.heart-rate.day` | 1 | vitals | measure | One day's resting, minimum and maximum heart rate as one fact (replaces `health.heart-rate-day`'s three a day) | `id` | interval start |
 | `health.heart-rate-alert` | 5 | vitals | event | One abnormal high heart rate alert from a watch | `source`, `kind`, `fact_time` | `fact_time` |
 | `health.blood-pressure` | 7 | vitals | reading | One blood pressure reading, as an Open mHealth body | `date_excel`, `reading` | `date_excel` |
-| `health.weight` | 5 | body | reading | One body weight | `id` | `date` |
+| `health.weight` | 6 | body | reading | One body weight | `id` | `date` |
 | `health.body-composition` | 4 | body | measure | A period's body metrics (fat, muscle and the rest) | `group`, `period_type`, `period_start` | `period_start` |
 | `health.sleep-episode` | 2 | sleep | measure | One sleep episode, as an IEEE 1752 sleep-episode body | `id` | interval start |
 | `health.lab-panel` | 2 | labs | event | One pathology request, the header of a draw's report | `id` | `collected` |
@@ -163,7 +163,7 @@ records a measure, a reading or an event.
 | `health.medication.started` | 1 | meds | event | A medicine course starting (was `health.medication-started` v1, before the names took a third segment) | `id` | `date` |
 | `health.medication.dose-changed` | 1 | meds | event | A change of dose within a course (was `health.medication-dose-changed` v1, before the names took a third segment) | `id` | `date` |
 | `health.medication.stopped` | 1 | meds | event | A course ending (was `health.medication-stopped` v1, before the names took a third segment) | `id` | `date` |
-| `health.medication.dose` | 2 | meds | event | One dose of a medicine taken at a moment, outside any course (was `health.medication-dose` up to v2, before the names took a third segment) | `id` | `taken_at` |
+| `health.medication.dose` | 3 | meds | event | One dose of a medicine taken at a moment, outside any course (was `health.medication-dose` up to v2, before the names took a third segment) | `id` | `taken_at` |
 | `health.medication.dose-missed` | 1 | meds | event | A dose the person says they missed (was `health.medication-missed-dose` v1, before the names took a third segment) | `id` | `date` |
 | `health.medication.compliance` | 1 | meds | measure | The person's own estimate of how well they kept to a course (was `health.medication-compliance` v1, before the names took a third segment) | `id` | `date` |
 | `health.encounter` | 1 | clinical | event | One appointment with a clinic or practitioner | `id` | `date` |
@@ -179,11 +179,11 @@ records a measure, a reading or an event.
 | `place.trip.flight` | 1 | trips | event | One flight leg (was `place.flight` v1, before the names took a third segment) | `id` | `date` |
 | `place.trip.arrived` | 1 | trips | event | Arriving at one place during a trip (was `place.arrived` v1, before the names took a third segment) | `id` | `date` |
 | `place.trip.returned` | 1 | trips | event | Getting home from a trip (was `place.returned` v1, before the names took a third segment) | `id` | `date` |
-| `mind.attention` | 1 | attention | reading | What is absorbing the person at a moment, with a topic and an intensity from 1 to 5, as the person says it | `id` | `at` |
+| `mind.attention` | 2 | attention | reading | What is absorbing the person at a moment, with a topic and an intensity from 1 to 5, as the person says it | `id` | `at` |
 | `mind.attention.started` | 1 | attention | event | The moment the person says a topic began to hold their attention; opens an episode of that topic | `id` | `at` |
 | `mind.attention.ended` | 1 | attention | event | The moment the person says a topic stopped holding their attention; closes the episode | `id` | `at` |
-| `health.intake` | 1 | intake | event | One caffeine drink, alcohol drink or notable meal, said in a few words at a moment: which drink and how many, or the meal in the person's words with rich and out; no nutrition | `id` | `at` |
-| `record.edge` | 2 | notes | event | An edge joining facets, with or without words; a note in the person's own words is one (was `note.annotation` (v1 to v3), then `record.note` (v1, v2)) | `id` | `at` |
+| `health.intake` | 2 | intake | event | One caffeine drink, alcohol drink or notable meal, said in a few words at a moment: which drink and how many, or the meal in the person's words with rich and out; no nutrition | `id` | `at` |
+| `record.edge` | 3 | notes | event | An edge joining facets, with or without words; a note in the person's own words is one (was `note.annotation` (v1 to v3), then `record.note` (v1, v2)) | `id` | `at` |
 | `record.document` | 2 | documents |  | A pointer to one file in the documents library; the bytes never enter the ledger | `path` | `date` |
 | `health.heart-rate-day` | 2 | vitals | measure | One figure for a day's heart rate, as an Open mHealth heart-rate body (replaced by `health.heart-rate.day`; the garmin importer's snapshot leaves it absent, the operator retracts it, and it is kept for reads as-of before) | `id`, `statistic` | interval start |
 | `health.heart-rate` | 3 |  |  | A period's heart rate metrics (retired; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |

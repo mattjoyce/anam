@@ -11,8 +11,10 @@
 // A third block, `handling`, is optional (card 166). It is what every writer and
 // reader of the type must agree on for its facts to mean the same thing and the
 // schema cannot say: a naming convention, an id's shape, what a disappearance means.
-// Anam holds it as part of the version, serves it verbatim and checks only that it is
-// an object. By convention a `guidance` key carries prose; the rest is the type's own.
+// Anam holds it as part of the version, serves it verbatim and checks that it is an
+// object. By convention a `guidance` key carries prose; the rest is the type's own,
+// but for `label` (card 199), a short template a page draws a facet of the type as,
+// which Parse checks and Label renders (label.go).
 //
 // Fields in `meta` are addressed by JSON Pointer (RFC 6901), because Anam's payloads
 // are nested where the reference implementation's were flat.
@@ -152,9 +154,16 @@ type Definition struct {
 	idParts          []idPart
 
 	// Handling is the manifest's `handling` block as written, a JSON object, or nil
-	// when the manifest has none. Anam reads nothing inside it: it is served to whoever
-	// writes or reads facets of the type, and a change to it is a new version.
+	// when the manifest has none. Anam reads nothing inside it but `label` (below): the rest
+	// is served to whoever writes or reads facets of the type, and a change to it is a
+	// new version.
 	Handling json.RawMessage
+
+	// LabelTemplate is handling.label, the short text a page draws a facet of this type
+	// as, or "" when the Definition declares none (card 199). The grammar is in label.go;
+	// Label renders it.
+	LabelTemplate string
+	labelParts    []labelPart
 
 	// schema is the compiled schema half; nil in verbatim mode. tree is the same
 	// schema as decoded JSON, walked to answer whether a field exists (HasPointer).
@@ -251,6 +260,10 @@ func Parse(raw []byte) (Definition, error) {
 			return Definition{}, fmt.Errorf("%w: handling must be a JSON object", ErrBadManifest)
 		}
 		d.Handling = m.Handling
+		var err error
+		if d.LabelTemplate, d.labelParts, err = labelFrom(m.Handling); err != nil {
+			return Definition{}, err
+		}
 	}
 	switch {
 	case d.Mode == ModeVerbatim && len(m.Schema) > 0:
@@ -267,6 +280,9 @@ func Parse(raw []byte) (Definition, error) {
 			return Definition{}, err
 		}
 		if err := d.declaresOptional(); err != nil {
+			return Definition{}, err
+		}
+		if err := d.checkLabel(); err != nil {
 			return Definition{}, err
 		}
 	case d.FactTime.ZonePointer != "" || len(optionalPointers(d.idParts)) > 0:

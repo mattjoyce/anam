@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "health.medication.dose",
-    "definition_version": 2,
+    "definition_version": 3,
     "kind": "event",
     "family": "meds",
     "classification": "Sensitive",
@@ -16,11 +16,12 @@
     "min_binding_assurance": "medium"
   },
   "handling": {
-    "guidance": "One dose, taken at a moment: a fact that an intake happened, not a statement about a course. drug is the generic name in lower case, the one spelling health.medication.started fixes for the substance (melatonin, paracetamol), so a dose and its regimen share the drug's name. amount and unit are the quantity taken as the pack states it (5 and mg), never a daily total. taken_at is when it was taken, to the minute, as a wall clock in Australia/Sydney, or at the offset source_time names; a time worked out rather than read (bedtime, with the hour unknown) is still the time, and source_note says how. course ties the dose to a known regimen's course and is left out for an as-needed or one-off dose; reason says why it was taken when there is no course. The id is declared in identity_template, <source>:med/<drug-slug>/dose/<taken_at as YYYY-MM-DDTHH:MM>, then source_time's offset (+01:00), which every dose names from v2 (one recorded before has none and keeps its id), so one local minute in two zones is two doses, and every writer builds it from there: leave id out and Anam fills it; send it and it must match. A dose never appears in the meds regimen projection; the doses projection reads them back at their time."
+    "guidance": "One dose, taken at a moment: a fact that an intake happened, not a statement about a course. drug is the generic name in lower case, the one spelling health.medication.started fixes for the substance (melatonin, paracetamol), so a dose and its regimen share the drug's name. amount and unit are the quantity taken as the pack states it (5 and mg), never a daily total. taken_at is when it was taken, to the minute, as a wall clock in Australia/Sydney, or at the offset source_time names; a time worked out rather than read (bedtime, with the hour unknown) is still the time, and source_note says how. course ties the dose to a known regimen's course and is left out for an as-needed or one-off dose; reason says why it was taken when there is no course. The id is declared in identity_template, <source>:med/<drug-slug>/dose/<taken_at as YYYY-MM-DDTHH:MM>, then source_time's offset (+01:00), which every dose names from v2 (one recorded before has none and keeps its id), so one local minute in two zones is two doses, and every writer builds it from there: leave id out and Anam fills it; send it and it must match. A dose never appears in the meds regimen projection; the doses projection reads them back at their time.",
+    "label": "{/drug} {/amount} {/unit}"
   },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "One dose of a medicine taken at a moment, as a point fact outside the regimen series. Written from the person's own word, through a conversation or a records file. Named health.medication-dose (v2) until its name gained a third segment.",
+    "description": "One dose of a medicine taken at a moment, as a point fact outside the regimen series. Written from the person's own word, through a conversation or a records file. Named health.medication-dose (v2) until its name gained a third segment. Version 3 adds handling.label, a short label a page draws a row as, every rule unchanged.",
     "type": "object",
     "required": ["id", "taken_at", "drug", "amount", "unit", "source_time"],
     "properties": {

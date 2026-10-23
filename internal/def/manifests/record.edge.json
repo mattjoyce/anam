@@ -1,7 +1,7 @@
 {
   "meta": {
     "facet_type": "record.edge",
-    "definition_version": 2,
+    "definition_version": 3,
     "kind": "event",
     "family": "notes",
     "classification": "Sensitive",
@@ -20,9 +20,12 @@
     ],
     "min_binding_assurance": "medium"
   },
+  "handling": {
+    "label": "{/text}"
+  },
   "schema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "description": "An edge with commentary: a fact that joins facets, with or without words, and the person's notes are edges of kind `about`. Named note.annotation, then record.note, whose v2 made the note an edge; v1 here is record.note v2 under its new name, so every record.note value is a record.edge value unchanged. `from` and `to` are each a list of facet ids and `kind` says what the join means; a note about some facets is an edge of kind `about` with no `from`, the kind every record.note v1 value has. The facets it names are never changed by it; the edge is appended beside them, carries its own provenance (the person, typed, or the conversation that took it down, or a model's reading), and is retracted or edited on its own. Its fact time is the moment it was asserted (v2 of note.annotation, 2026-10-13): the one time nothing else holds, since each facet it names carries its own fact time, and anam-time is the ingest, not the writing. Which version of each named facet was current when the edge landed is read from the ledger at that watermark, not stored here; `pins` may name the exact version where that matters. A value carries words, ends, or both: `text` alone is an account that names nothing yet, a later version of the same id can name them. `about` is record.note v1's name of `to`, accepted so that a value written to it is a record.edge value unchanged; a value carries one of the two, and a later version drops `about` once every writer sends `to`. Links are read back from the record, never written into the facets an edge names: a facet's read shows the live edges touching it as a derived part beside its payload.",
+    "description": "An edge with commentary: a fact that joins facets, with or without words, and the person's notes are edges of kind `about`. Named note.annotation, then record.note, whose v2 made the note an edge; v1 here is record.note v2 under its new name, so every record.note value is a record.edge value unchanged. `from` and `to` are each a list of facet ids and `kind` says what the join means; a note about some facets is an edge of kind `about` with no `from`, the kind every record.note v1 value has. The facets it names are never changed by it; the edge is appended beside them, carries its own provenance (the person, typed, or the conversation that took it down, or a model's reading), and is retracted or edited on its own. Its fact time is the moment it was asserted (v2 of note.annotation, 2026-10-13): the one time nothing else holds, since each facet it names carries its own fact time, and anam-time is the ingest, not the writing. Which version of each named facet was current when the edge landed is read from the ledger at that watermark, not stored here; `pins` may name the exact version where that matters. A value carries words, ends, or both: `text` alone is an account that names nothing yet, a later version of the same id can name them. `about` is record.note v1's name of `to`, accepted so that a value written to it is a record.edge value unchanged; a value carries one of the two, and a later version drops `about` once every writer sends `to`. Links are read back from the record, never written into the facets an edge names: a facet's read shows the live edges touching it as a derived part beside its payload. Version 3 adds handling.label, a short label a page draws a row as, every rule unchanged.",
     "type": "object",
     "required": [
       "id",

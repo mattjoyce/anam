@@ -208,6 +208,7 @@
       <strong><span id="sel-count">0</span> selected</strong>
       <button type="button" id="sel-clear">clear</button>
       <button type="button" id="sel-annotate">annotate</button>
+      {{if .CanLink}}<a class="button" id="sel-link" href="/select">link these…</a>{{end}}
       <span class="dim hint">shift-drag a box or ctrl-click marks · a note is a fact about these facets, appended beside them</span>
     </div>
     <ul class="sel-list mono" id="sel-list"></ul>
@@ -269,6 +270,10 @@
       marks.forEach(a => a.classList.toggle('selected', selected.has(a.dataset.t + a.getAttribute('href'))));
       panel.hidden = selected.size === 0;
       document.getElementById('sel-count').textContent = selected.size;
+      // "link these…" opens the selection page with the marked facets in its basket:
+      // the same address the facet page's "link this…" uses, one tick per facet.
+      const linkTo = document.getElementById('sel-link');
+      if (linkTo) linkTo.href = '/select?' + [...selected.values()].map(m => 'tick=' + encodeURIComponent(m.id)).join('&');
       list.innerHTML = '';
       [...selected.values()].sort((a, b) => a.t - b.t).forEach(m => {
         const li = document.createElement('li'), a = document.createElement('a');

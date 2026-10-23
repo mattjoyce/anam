@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -93,6 +94,10 @@ type tlTally struct {
 const stripMax = 1500
 
 type timelineData struct {
+	// CanLink offers "link these…" on the page's own selection when the Workbench
+	// enters links (card 199).
+	CanLink bool
+
 	W        ledger.Watermark
 	Hash     string
 	Total    int // logical facets in the ledger
@@ -242,6 +247,7 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := buildTimeline(newStyles(reg), res, all, from, to, zoomed, q["type"], status, sel)
+	data.CanLink = s.enterable(catchup.EdgeType)
 	if s.checkpoints != nil {
 		states, summary, err := checkpointStates(ctx, s.checkpoints, res, s.buckets)
 		switch {

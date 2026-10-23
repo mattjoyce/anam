@@ -411,6 +411,11 @@ an unticked one is `unpick("<id>")`, which each rule reads as `not unpick(E)`. A
 lexical bounds above. The program never reads `attr/3`, so it names no pointer and the evaluator
 builds none.
 
+The page draws each facet in the list, the basket and the link form as its label when the type's
+Definition declares one (`handling.label`, read by `def.Definition.Label`), and as its type and time
+when it does not. The label is for the person's eye: the program, the counts and the addresses know
+nothing of it.
+
 ```datalog selection=summer-medication relation=pick
 % An Anam selection (card 199): pick/1 holds the facets it selects.
 pick/1.

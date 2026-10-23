@@ -30,3 +30,30 @@ func TestMaxReadBytes(t *testing.T) {
 		t.Errorf("Load() with a negative max_read_bytes = %v, want ErrInvalid", err)
 	}
 }
+
+// default_projection is empty by default, the environment names one, and Load takes
+// any name: only the daemon can see the registered projections, so it is the daemon
+// that refuses a name that is nothing (card 180). Load refuses only stray space.
+func TestDefaultProjection(t *testing.T) {
+	t.Setenv("ANAM_PERSON_ID", "matt")
+
+	got, err := config.Load("")
+	if err != nil || got.DefaultProjection != "" {
+		t.Fatalf("Load() = %q, %v; want no default projection", got.DefaultProjection, err)
+	}
+
+	t.Setenv("ANAM_DEFAULT_PROJECTION", "recent-life")
+	if got, err = config.Load(""); err != nil || got.DefaultProjection != "recent-life" {
+		t.Errorf("DefaultProjection = %q, %v; want recent-life from the environment", got.DefaultProjection, err)
+	}
+
+	t.Setenv("ANAM_DEFAULT_PROJECTION", "no-such-thing")
+	if got, err = config.Load(""); err != nil || got.DefaultProjection != "no-such-thing" {
+		t.Errorf("DefaultProjection = %q, %v; want Load to take any name", got.DefaultProjection, err)
+	}
+
+	t.Setenv("ANAM_DEFAULT_PROJECTION", " recent-life")
+	if _, err = config.Load(""); !errors.Is(err, config.ErrInvalid) {
+		t.Errorf("Load() with a padded default_projection = %v, want ErrInvalid", err)
+	}
+}

@@ -406,8 +406,12 @@ reader to projections is left for later).
 ### Query shape
 
 `ReadRecord` takes a projection reference, one read mode, one knowledge selector, optional allowed
-narrowing, and pagination bounds. The operator can configure a default whole-person projection;
-the client may omit a projection only when that default is advertised. The client selects templates
+narrowing, and pagination bounds. The operator can configure a default projection
+(`default_projection`), which the daemon advertises as `default_projection` on `GET /v1/status` and
+as `default` on `GET /v1/projections`. It is advice about where to start, not a change under
+existing callers: a read that names no projection is the read it always was, and the client names
+the default like any other projection. A receipt names the version that served it, never "the
+default". The client selects templates
 and supplies permitted parameters; it never sends a new projection or changes classification
 ceilings. It may name fields, which only take away.
 

@@ -2,6 +2,11 @@ package api
 
 // Projections is the published list of projection templates (card 125).
 type Projections struct {
+	// Default names the entry the operator advises a client to read first, the same
+	// name GET /v1/status gives as default_projection. It is a top-level field rather
+	// than a flag on each entry so there is one place to look and no entry can
+	// disagree with another. Absent when none is set; never applied to a read.
+	Default     string              `json:"default,omitempty"`
 	Projections []ProjectionSummary `json:"projections"`
 }
 

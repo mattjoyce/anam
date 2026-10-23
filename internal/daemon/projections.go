@@ -31,8 +31,10 @@ type projections struct {
 // operational store holds as registered. A stored body this binary cannot hold
 // beside the bundled ones stops the daemon: the store is authored state and comes
 // back from a backup, and a daemon that silently dropped a template would verify
-// receipts against the wrong one.
-func loadProjections(ctx context.Context, db *ops.DB) (*projections, error) {
+// receipts against the wrong one. A default_projection that names neither a bundled
+// nor a registered template also stops it: only here are the registered ones visible,
+// and an operator who mistyped the name should learn at start, not from an agent.
+func loadProjections(ctx context.Context, db *ops.DB, defaultName string) (*projections, error) {
 	bundled, err := projection.Bundled()
 	if err != nil {
 		return nil, err
@@ -44,6 +46,11 @@ func loadProjections(ctx context.Context, db *ops.DB) (*projections, error) {
 	reg, err := projection.WithRegistered(bundled, projectionStored(rows))
 	if err != nil {
 		return nil, fmt.Errorf("daemon: registered projections: %w", err)
+	}
+	if defaultName != "" {
+		if _, err := reg.Lookup(defaultName); err != nil {
+			return nil, fmt.Errorf("daemon: default_projection: %w", err)
+		}
 	}
 	p := &projections{bundled: bundled}
 	p.current.Store(reg)
@@ -124,7 +131,7 @@ func (d *Daemon) registerProjection(ctx context.Context, db *ops.DB, body []byte
 // and every version held.
 func (d *Daemon) getProjections(w http.ResponseWriter, _ *http.Request) {
 	reg := d.projections.current.Load()
-	out := api.Projections{Projections: []api.ProjectionSummary{}}
+	out := api.Projections{Default: d.cfg.DefaultProjection, Projections: []api.ProjectionSummary{}}
 	for _, cur := range reg.All() {
 		s := api.ProjectionSummary{
 			Name: cur.Name, Origin: d.projectionOrigin(cur), Current: cur.Version,

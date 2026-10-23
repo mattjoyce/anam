@@ -124,6 +124,12 @@ checkpoint_budget: 1048576
 # default; the whole record is not.
 max_read_bytes: 524288
 
+# The projection an agent should read first, advertised on GET /v1/status and
+# GET /v1/projections and named by the MCP's describe_record. It is advice, not
+# applied: a read that names no projection is unchanged. It must be a bundled or
+# registered projection or the daemon will not start. Empty is none.
+# default_projection: recent-life
+
 # --- backups ------------------------------------------------------------------
 # Where POST /v1/backups writes, one directory per backup, on another disk from
 # the record. Unset, the daemon takes none.

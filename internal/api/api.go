@@ -55,6 +55,10 @@ type Status struct {
 	// the hold is released. "*" is the global hold, and it holds every source but the
 	// workbench, which is never held.
 	Held []string `json:"held,omitempty"`
+	// DefaultProjection is the projection the operator advises a client to read first
+	// (default_projection, card 180). It is advertised, never applied: a read that
+	// names no projection is the read it always was. Absent when none is set.
+	DefaultProjection string `json:"default_projection,omitempty"`
 }
 
 // SourceStatus is what the daemon has seen of one importer's source since it started.

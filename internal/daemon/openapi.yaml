@@ -1561,6 +1561,12 @@ components:
           type: array
           description: the sources on admission hold; "*" holds every source but the workbench
           items: { type: string }
+        default_projection:
+          type: string
+          description: >-
+            the projection the operator advises a client to read first (card 180); absent
+            when none is set. Advertised, never applied: a read that names no projection
+            is unchanged
     Holds:
       type: object
       description: the sources on admission hold now
@@ -1945,6 +1951,13 @@ components:
       type: object
       required: [projections]
       properties:
+        default:
+          type: string
+          description: >-
+            the name of the projection the operator advises a client to read first, as
+            GET /v1/status gives default_projection; absent when none is set. Advertised,
+            never applied, and never a receipt shortcut: a receipt names the version that
+            served it
         projections:
           type: array
           items:

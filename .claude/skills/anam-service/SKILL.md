@@ -52,6 +52,16 @@ A POST from a browser on another site (a foreign `Origin`, or `Sec-Fetch-Site` o
 importers send neither header and are unaffected. Library documents are served sandboxed, and HTML
 or SVG ones download rather than render (card 106).
 
+**Saving a document.** Nothing but the `documents` importer may post bytes: `POST /v1/documents`
+takes an importer that lists `record.document`, and the conversation and LifeOS writers are
+`any_type`, which reaches every facet type and not the library. So a document is saved by putting
+the file and a sidecar `<file>.meta.yaml` (`date: YYYY-MM-DD`, the document's own date; optional
+`title` and `note`) in `/mnt/Library/anam/documents` on the Library share. The gateway's watch
+runs the importer, the folder goes as one snapshot (held files no-op), and the new file is a
+`record.document` whose bytes sit in the library under their sha256. A file without a sidecar
+stops the run and names the sidecar to write; a dot-file is skipped. Live since card 119; the
+recipe is in anam-importers' README under the documents wiring.
+
 Any request may carry an `Anam-Timeout` header, the caller's own deadline as a Go duration
 (`25s`); the daemon works to the shorter of it and its configured timeout, and a read that runs
 out is 504. Every token belongs to a principal with a role (card 89, `docs/API.md` §2). The

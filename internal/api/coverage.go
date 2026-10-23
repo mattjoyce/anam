@@ -63,13 +63,18 @@ type Coverage struct {
 }
 
 // TypeCoverage is one type's share of the record, and each source's share of it.
-// Earliest and Latest are fact-times in the clock's fixed-width layout.
+// Earliest and Latest are fact-times in the clock's fixed-width layout. Projections
+// are the sorted names of the projections, the newest version of each name the daemon
+// holds, that serve the type: an empty list is a type no projection reaches, so the
+// query route cannot answer it and only a whole-history read can (card 231). It does
+// not depend on the W or the projection the coverage was counted through.
 type TypeCoverage struct {
-	Type     string           `json:"type"`
-	Count    int              `json:"count"`
-	Earliest string           `json:"earliest"`
-	Latest   string           `json:"latest"`
-	Sources  []SourceCoverage `json:"sources"`
+	Type        string           `json:"type"`
+	Count       int              `json:"count"`
+	Earliest    string           `json:"earliest"`
+	Latest      string           `json:"latest"`
+	Sources     []SourceCoverage `json:"sources"`
+	Projections []string         `json:"projections"`
 }
 
 // SourceCoverage is what one source contributed to one type.

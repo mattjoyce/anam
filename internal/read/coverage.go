@@ -36,11 +36,44 @@ func Coverage(ctx context.Context, src Source, q api.CoverageQuery) (api.Coverag
 	if err != nil {
 		return api.Coverage{}, err
 	}
+	servers, err := projectionsServing(src)
+	if err != nil {
+		return api.Coverage{}, err
+	}
+	types := coverageOf(v.shown.Entries())
+	for i := range types {
+		// Never nil, so the field reads [] and not null: an empty list is the gap.
+		types[i].Projections = append([]string{}, servers[types[i].Type]...)
+	}
 	t := v.describe()
 	return api.Coverage{
 		W: t.W, LedgerID: id, Live: v.shown.Len(), Canonical: t.Canonical, Projection: t.Projection,
-		Types: coverageOf(v.shown.Entries()),
+		Types: types,
 	}, nil
+}
+
+// projectionsServing maps each type to the sorted names of the projections that serve
+// it, the newest version of each name the source holds, resolved against the Definitions
+// held by Covers. A type in no list is one no projection can reach, so the query route
+// cannot answer it (card 231). It is the same for every W: the templates and the
+// Definitions are the ones in force now, not the ones at the W counted.
+func projectionsServing(src Source) (map[string][]string, error) {
+	reg, err := src.projections()
+	if err != nil {
+		return nil, err
+	}
+	defs, err := src.definitions()
+	if err != nil {
+		return nil, err
+	}
+	held := defs.All()
+	servers := map[string][]string{}
+	for _, tpl := range reg.All() { // in name order, so each list is sorted
+		for _, typ := range tpl.Covers(held) {
+			servers[string(typ)] = append(servers[string(typ)], tpl.Name)
+		}
+	}
+	return servers, nil
 }
 
 // coverageOf groups entries by type and, within a type, by source, sorted by name.

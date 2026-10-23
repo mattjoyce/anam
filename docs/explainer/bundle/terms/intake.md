@@ -11,4 +11,4 @@ timestamp: 2026-10-24T00:00:00Z
 
 The moment is a wall clock the person said it at, read at the offset `source_time` names, as for `health.medication.dose`. When the person says only a part of the day, `part_of_day` is morning, afternoon, evening or night and `at` is that part's nominal minute (08:00, 14:00, 19:00, 22:00), so the fact's clock is nominal and not a minute anyone knew. The id is the kind and the minute, then the offset. Two intakes of one kind in one minute are one fact, which is why `count` carries the number: a coffee tap that sends one coffee sends count 1 at the tap's minute. A different kind in the same minute is its own fact.
 
-The type closes no series and is not served by a bundled projection yet. To enter it by hand, an operator lists `health.intake` under the `workbench` principal's types; an agent saves one through anam-mcp's `save_fact`.
+The type closes no series. A bundled `intake` projection serves it as a log, up to Sensitive. To enter it by hand, an operator lists `health.intake` under the `workbench` principal's types; an agent saves one through anam-mcp's `save_fact`.

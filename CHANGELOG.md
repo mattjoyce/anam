@@ -17,7 +17,7 @@ decisions is in `journal/`.
   one fact, so `count` carries the number. Sensitive and strict, no nutrition or calories, and
   standard drinks are worked out on read. To enter them by hand, list `health.intake` under the
   `workbench` entry's `types` in the importers file and restart; an agent saves one through
-  anam-mcp's `save_fact`. No bundled projection serves it yet.
+  anam-mcp's `save_fact`. A bundled `intake` projection serves it as a log, up to Sensitive.
 - The operator can name the projection an agent should read first (card 180). The new config key
   `default_projection` (`ANAM_DEFAULT_PROJECTION`, empty by default) is advertised as
   `default_projection` on `GET /v1/status` and as `default` on `GET /v1/projections`. It is advice,

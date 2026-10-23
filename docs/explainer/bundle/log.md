@@ -224,5 +224,5 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 ## 2026-10-24, card 232
 
-- Code: `health.intake` v1 is bundled, an event in a new `intake` family, Sensitive and strict, timed by a wall clock that names its own offset. `kind` is caffeine, alcohol or meal, and the schema's `if` and `then` per kind require a drink's `drink` and `count` or a meal's `text`, `rich` and `out` and refuse the other kind's fields. `part_of_day` makes `at` a nominal minute. The timeline gives the family a grey row, and docs/QUERY.md has a worked question, alcohol before a sleep episode.
+- Code: `health.intake` v1 is bundled, an event in a new `intake` family, Sensitive and strict, timed by a wall clock that names its own offset. `kind` is caffeine, alcohol or meal, and the schema's `if` and `then` per kind require a drink's `drink` and `count` or a meal's `text`, `rich` and `out` and refuse the other kind's fields. `part_of_day` makes `at` a nominal minute. A bundled `intake` projection serves it as a log up to Sensitive, the timeline gives the family a grey row, and docs/QUERY.md has a worked question, alcohol before a sleep episode.
 - Bundle: the intake term is new, and the definition-manifest page says 40 bundled Definitions. Counts: 40 bundled Definitions, 34 terms.

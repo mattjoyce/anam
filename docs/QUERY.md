@@ -21,7 +21,9 @@ relation, filed with a receipt.
 The projection matters. A log-shaped projection serves every version of its types, so `current/2` can
 tell you what was in force on a date. A snapshot-shaped one (the bundled `meds`) has already taken the
 latest of each series, so a question about the past finds nothing there to look at. Use a log-shaped
-projection for history. The bundled ones are `attention`, `bp`, `doses` and `sleep`; others are registered with
+projection for history. The bundled ones are `activity`, `attention`, `body`, `bp`, `clinical`, `doses`, `meds` and `sleep`, and
+`GET /v1/projections` lists them with the registered ones. A type served by none of them has no query route;
+`GET /v1/coverage` names, for each type, the projections that serve it. Others are registered with
 `POST /v1/projections`.
 
 ## Asking without a registered projection

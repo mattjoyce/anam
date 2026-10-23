@@ -21,7 +21,8 @@ func coverageCmd(cfgPath *string) *cobra.Command {
 		Use:   "coverage",
 		Short: "what the record holds: each type's count, fact-time range and sources at a W",
 		Long: `Coverage counts the live facets of each type at the head, or at --w or --as-of,
-with the earliest and latest fact-time and each source's share. With --projection
+with the earliest and latest fact-time, each source's share and the projections that
+serve the type ("none" is a type the query route cannot reach). With --projection
 it counts what that projection serves. The same W gives the same answer.
 
 Coverage says what is recorded, never that a source is complete: a quiet source
@@ -90,13 +91,17 @@ func writeCoverage(cmd *cobra.Command, c api.Coverage) error {
 	}
 	_, _ = fmt.Fprintln(out)
 	w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "TYPE\tCOUNT\tEARLIEST\tLATEST\tSOURCES")
+	_, _ = fmt.Fprintln(w, "TYPE\tCOUNT\tEARLIEST\tLATEST\tSOURCES\tPROJECTIONS")
 	for _, t := range c.Types {
 		names := make([]string, len(t.Sources))
 		for i, s := range t.Sources {
 			names[i] = fmt.Sprintf("%s (%d)", s.Source, s.Count)
 		}
-		_, _ = fmt.Fprintf(w, "%s\t%d\t%s\t%s\t%s\n", t.Type, t.Count, day(t.Earliest), day(t.Latest), strings.Join(names, ", "))
+		served := strings.Join(t.Projections, ", ")
+		if served == "" {
+			served = "none"
+		}
+		_, _ = fmt.Fprintf(w, "%s\t%d\t%s\t%s\t%s\t%s\n", t.Type, t.Count, day(t.Earliest), day(t.Latest), strings.Join(names, ", "), served)
 	}
 	return w.Flush()
 }

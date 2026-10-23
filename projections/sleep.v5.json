@@ -1,0 +1,11 @@
+{
+  "name": "sleep",
+  "version": 5,
+  "description": "Sleep only: each night as Garmin scored it (health.sleep-episode) and each night on the CPAP machine (health.cpap-session.dreamstation), without the rest of the health record. A reader asking about CPAP nights is asking about sleep. v5 adds health.cpap-session.dreamstation to v4. v4 named the same type as v3 and only reworded this description. v3 named the type under the domain taxonomy; v2 named sleep.episode, v1 health.sleep, which only the retired health ETL wrote.",
+  "types": ["health.sleep-episode", "health.cpap-session.dreamstation"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

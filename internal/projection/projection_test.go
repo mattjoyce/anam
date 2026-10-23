@@ -135,7 +135,7 @@ func TestBundled_ParsesBpAndSleep(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Bundled: %v", err)
 	}
-	if got, want := r.Names(), []string{"attention", "bp", "doses", "meds", "sleep"}; !reflect.DeepEqual(got, want) {
+	if got, want := r.Names(), []string{"activity", "attention", "body", "bp", "clinical", "doses", "meds", "sleep"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("bundled names = %v, want %v", got, want)
 	}
 	// Card 147: meds v2 names the types under the health domain, and card 196 gave them
@@ -157,13 +157,18 @@ func TestBundled_ParsesBpAndSleep(t *testing.T) {
 	if old, err := r.Version("meds", 1); err != nil || old.Types[0] != "med.started" {
 		t.Errorf("meds v1 = %+v, %v; want the history's template", old.Types, err)
 	}
-	if cur, err := r.Lookup("doses"); err != nil || cur.Version != 3 || cur.Types[0] != "health.medication.dose" {
-		t.Errorf("doses = v%d %v, %v; want v3 current, naming health.medication.dose", cur.Version, cur.Types, err)
+	if cur, err := r.Lookup("doses"); err != nil || cur.Version != 4 || cur.Types[0] != "health.medication.dose" {
+		t.Errorf("doses = v%d %v, %v; want v4 current, naming health.medication.dose first", cur.Version, cur.Types, err)
 	}
+	// v4 adds the missed doses and the compliance reports to the dose; v3 stays held, as
+	// it was, for a receipt that names it.
 	curDoses, _ := r.Lookup("doses")
-	if old, err := r.Version("doses", 2); err != nil || !reflect.DeepEqual(old.Types, curDoses.Types) || old.Shape != curDoses.Shape ||
-		old.MaxClassification != curDoses.MaxClassification || old.Description == curDoses.Description {
-		t.Errorf("doses v2 = %+v, %v; want the same filter as v3 under its own description", old, err)
+	if old, err := r.Version("doses", 3); err != nil || !reflect.DeepEqual(old.Types, []facet.Type{"health.medication.dose"}) ||
+		!reflect.DeepEqual(curDoses.Types, []facet.Type{"health.medication.dose", "health.medication.dose-missed", "health.medication.compliance"}) {
+		t.Errorf("doses v3 = %+v, %v; v4 = %v; want v4 to add the missed doses and compliance to v3's dose", old.Types, err, curDoses.Types)
+	}
+	if old, err := r.Version("doses", 2); err != nil || !reflect.DeepEqual(old.Types, []facet.Type{"health.medication.dose"}) {
+		t.Errorf("doses v2 = %+v, %v; want the history's template", old.Types, err)
 	}
 	if old, err := r.Version("doses", 1); err != nil || old.Types[0] != "health.medication-dose" {
 		t.Errorf("doses v1 = %+v, %v; want the history's template", old.Types, err)

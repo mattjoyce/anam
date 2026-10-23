@@ -205,8 +205,10 @@ paths:
       summary: What the record holds, type by type, at a watermark.
       description: >-
         For each type in the value at the head, or at as_of or w: how many live facets,
-        the earliest and latest fact-time among them, and each source's share. With
-        projection it counts what that template serves. It is counted from the same
+        the earliest and latest fact-time among them, each source's share, and the names
+        of the projections that serve the type (an empty list is a type no projection
+        reaches, so the query route cannot answer it). With projection it counts what
+        that template serves. It is counted from the same
         value the timeline reads, so the same W gives the same answer, and canonical
         (or the projection's hash) names it. Coverage says what is recorded, never that
         a source is complete: freshness is GET /v1/status's, and a gap in fact-time may
@@ -237,6 +239,7 @@ paths:
                     sources:
                       - { source: bp-csv, count: 1180, earliest: "2019-03-02T21:10:00.000000000Z", latest: "2026-02-10T18:04:00.000000000Z" }
                       - { source: garmin, count: 24, earliest: "2026-02-14T19:40:00.000000000Z", latest: "2026-10-18T20:31:00.000000000Z" }
+                    projections: [body, bp]
         "400": { $ref: "#/components/responses/BadQuery" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "504": { $ref: "#/components/responses/Timeout" }
@@ -1663,13 +1666,20 @@ components:
         types: { type: array, items: { $ref: "#/components/schemas/TypeCoverage" } }
     TypeCoverage:
       type: object
-      required: [type, count, earliest, latest, sources]
+      required: [type, count, earliest, latest, sources, projections]
       properties:
         type: { type: string }
         count: { type: integer }
         earliest: { $ref: "#/components/schemas/AnamTime" }
         latest: { $ref: "#/components/schemas/AnamTime" }
         sources: { type: array, items: { $ref: "#/components/schemas/SourceCoverage" } }
+        projections:
+          type: array
+          items: { type: string }
+          description: >-
+            the sorted names of the projections, the newest version of each name held, that
+            serve this type. An empty list is a type no projection reaches, so the query
+            route cannot answer it and only a whole-history read can.
     SourceCoverage:
       type: object
       required: [source, count, earliest, latest]

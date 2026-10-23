@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>anam — importers</title>
+{{template "style.html"}}
+</head>
+<body>
+<header>
+  <h1>importers and principals</h1>
+  {{template "nav.html"}}
+</header>
+
+<p class="meta">Who the daemon admits, from the importers file it loaded. Each row's rules are what the policy package
+answers for that principal now, so this is what the daemon enforces, not a copy of the file. A token shows only the first
+eight hex characters of its stored SHA-256: hash a token file with <span class="mono">sha256sum</span> to match one. The
+last batch and the hold are what <span class="mono">GET /v1/status</span> knows since the daemon started.</p>
+
+{{if .Principals}}
+<div class="scroll">
+<table>
+  <thead><tr><th>name</th><th>role</th><th>source</th><th>token</th><th>submits</th><th>registers</th><th>receipts</th><th>lists / opens</th><th>hold</th><th>last batch</th><th>routes</th></tr></thead>
+  <tbody>
+  {{range .Principals}}
+    <tr>
+      <td>{{.Name}}</td>
+      <td>{{.Role}}</td>
+      <td class="mono{{if not .Source}} dim{{end}}">{{if .Source}}{{.Source}}{{else}}none{{end}}</td>
+      <td class="mono{{if not .Token}} dim{{end}}">{{if .Token}}{{.Token}}…{{else if .NoToken}}no token{{else}}unreadable{{end}}</td>
+      <td>{{if .AnyType}}any_type{{else if .Types}}{{range $i, $t := .Types}}{{if $i}}, {{end}}<span class="mono">{{$t}}</span>{{end}}{{else}}<span class="dim">none</span>{{end}}</td>
+      <td>{{if .Registers}}{{range $i, $t := .Registers}}{{if $i}}, {{end}}<span class="mono">{{$t}}</span>{{end}}{{else}}<span class="dim">none</span>{{end}}{{if .StoresDocuments}}<br>stores documents{{end}}</td>
+      <td>{{if .Records}}records every read{{else}}<span class="dim">not recorded</span>{{end}}</td>
+      <td>lists {{.Lists}}<br>opens {{.Opens}}</td>
+      <td>{{if not .Source}}<span class="dim">no source</span>{{else if not .Holdable}}<span class="dim">never held</span>{{else if .HeldNow}}held{{else}}may be held; not held now{{end}}</td>
+      <td>{{if .Seen}}<span class="mono">{{.LastScan}}</span>{{if .LastAdmission}}<br>admitted <span class="mono">{{.LastAdmission}}</span>{{else}}<br><span class="dim">nothing admitted</span>{{end}}{{else if .Source}}<span class="dim">not seen since the daemon started</span>{{else}}<span class="dim">no source</span>{{end}}</td>
+      <td>{{if .Routes}}<details><summary>{{len .Routes}} routes</summary><ul>{{range .Routes}}<li class="mono">{{.}}</li>{{end}}</ul></details>{{else}}<span class="dim">none</span>{{end}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{else}}
+<p class="dim">The daemon has no importers file and no token file, so it admits no one by token.</p>
+{{end}}
+</body>
+</html>

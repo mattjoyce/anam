@@ -129,7 +129,7 @@ func (s *Server) projectionPage(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err)
 		return
 	}
-	render(w, "projection.html", data)
+	s.render(w, "projection.html", data)
 }
 
 // errBadAsOf marks the one failure in this handler that is the caller's fault. Every

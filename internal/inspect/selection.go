@@ -249,7 +249,7 @@ func (s *Server) selectPage(w http.ResponseWriter, r *http.Request) {
 		v := savedViewOf(*saved)
 		data.Saved = &v
 	}
-	render(w, "select.html", data)
+	s.render(w, "select.html", data)
 }
 
 // applyTicks reads the checkboxes posted back: a listed facet left unticked is an

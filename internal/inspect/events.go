@@ -58,7 +58,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	if since > 0 {
 		data.Older = "/events?before=" + strconv.FormatInt(int64(since)+1, 10)
 	}
-	render(w, "events.html", data)
+	s.render(w, "events.html", data)
 }
 
 // headAndEvents reads the watermark and the full anam-event stream — the inspector

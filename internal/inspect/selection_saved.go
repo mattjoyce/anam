@@ -39,7 +39,7 @@ type missingData struct {
 func (s *Server) openSelection(ctx context.Context, w http.ResponseWriter, code string) (selection.Saved, bool) {
 	shown := strings.TrimPrefix(strings.TrimSpace(code), selection.CodePrefix)
 	if s.selections == nil {
-		renderStatus(w, http.StatusNotFound, "selection_missing.html", missingData{Code: shown,
+		s.renderStatus(w, http.StatusNotFound, "selection_missing.html", missingData{Code: shown,
 			Message: "This inspector keeps no saved selections: they are the daemon's. Open the daemon's inspector, or run the program itself."})
 		return selection.Saved{}, false
 	}
@@ -59,7 +59,7 @@ func (s *Server) openSelection(ctx context.Context, w http.ResponseWriter, code 
 		httpError(w, err)
 		return selection.Saved{}, false
 	}
-	renderStatus(w, status, "selection_missing.html", missingData{Code: shown, Message: err.Error()})
+	s.renderStatus(w, status, "selection_missing.html", missingData{Code: shown, Message: err.Error()})
 	return selection.Saved{}, false
 }
 

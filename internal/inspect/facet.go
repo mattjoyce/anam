@@ -179,7 +179,7 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	canEdit, canRetract := s.workbenchActions(f, latest.ArtifactVersion, status)
-	render(w, "facet.html", facetData{
+	s.render(w, "facet.html", facetData{
 		Links:             links,
 		CanEdit:           canEdit,
 		CanRetract:        canRetract,

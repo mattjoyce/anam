@@ -313,5 +313,5 @@ func (s *Server) linkPage(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err)
 		return
 	}
-	render(w, "link.html", data)
+	s.render(w, "link.html", data)
 }

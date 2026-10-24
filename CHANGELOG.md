@@ -19,7 +19,7 @@ account of one instance and carries its data.
   a coarser precision requires the first day of that month or year, and the schema refuses any
   other day. An `ended` row is dated the first day the person was no longer employed. A
   `role-changed` row restates the whole role, so a snapshot of the latest row of a stint still
-  holds it all. All three are Confidential and strict, require `source_time`, declare their id
+  holds it all. All three are Confidential and strict, carry no `source_time` (a date is a local date, card 198), declare their id
   (`<source>:employment/<org>/<stint>/started`, the same with `ended`, and
   `.../role-changed/<date>`) and have no field for pay. Two bundled projections serve them,
   `career` (a log over `org.employment.`) and `employment` (a snapshot: read at a fact-time bound it

@@ -57,20 +57,13 @@ func sayEmployment(t *testing.T, g *gate.Gate, typ, payload string) (gate.Result
 	return res, err
 }
 
-// employmentClock is source_time for a date read in Sydney with nothing behind the zone
-// but the Definition's own.
-func employmentClock(value string) string {
-	return fmt.Sprintf(`"source_time": {"value": %q, "zone": "Australia/Sydney", "basis": "assumption"}`, value)
-}
-
 // employmentRow is a payload with the keys every employment type shares, then body (a JSON
-// fragment without braces, possibly empty) and a source_time that restates the date.
+// fragment without braces, possibly empty).
 func employmentRow(org string, stint int, date, precision, body string) string {
 	if body != "" {
-		body += ", "
+		body = ", " + body
 	}
-	return fmt.Sprintf(`{"org": %q, "stint": %d, "date": %q, "date_precision": %q, %s%s}`,
-		org, stint, date, precision, body, employmentClock(date))
+	return fmt.Sprintf(`{"org": %q, "stint": %d, "date": %q, "date_precision": %q%s}`, org, stint, date, precision, body)
 }
 
 func TestEmployment_EachTypeAdmitsAGoodPayloadAndRefusesABadOne(t *testing.T) {
@@ -99,8 +92,8 @@ func TestEmployment_EachTypeAdmitsAGoodPayloadAndRefusesABadOne(t *testing.T) {
 		{"a fractional stint", startedType, strings.Replace(employmentRow(org, 1, "2019-09-30", "day", title), `"stint": 1`, `"stint": 1.5`, 1), false},
 		{"a stint as text", startedType, strings.Replace(employmentRow(org, 1, "2019-09-30", "day", title), `"stint": 1`, `"stint": "1"`, 1), false},
 		{"a start without a title", startedType, employmentRow(org, 1, "2019-09-30", "day", ""), false},
-		{"a start without a source_time", startedType, fmt.Sprintf(`{"org": %q, "stint": 1, "date": "2019-09-30", "date_precision": "day", %s}`, org, title), false},
-		{"a start without a precision", startedType, fmt.Sprintf(`{"org": %q, "stint": 1, "date": "2019-09-30", %s, %s}`, org, title, employmentClock("2019-09-30")), false},
+		{"a start without a precision", startedType, fmt.Sprintf(`{"org": %q, "stint": 1, "date": "2019-09-30", %s}`, org, title), false},
+		{"a clock block on a date, which has none to state", startedType, employmentRow(org, 1, "2019-09-30", "day", title+`, "source_time": {"value": "2019-09-30", "zone": "Australia/Sydney", "basis": "assumption"}`), false},
 		{"a salary", startedType, employmentRow(org, 1, "2019-09-30", "day", title+`, "salary": 120000`), false},
 		{"a pay rate", startedType, employmentRow(org, 1, "2019-09-30", "day", title+`, "pay": "120k"`), false},
 		{"a bonus on a role change", roleType, employmentRow(org, 1, "2022-04-01", "day", title+`, "bonus": 5000`), false},

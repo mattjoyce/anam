@@ -13,8 +13,15 @@ name it.
 The facts are exported from a served value with `anam query run --dry-run --json`
 (entry/7, attr/3, closes/1), written as Soufflé .facts files, and the instants both
 sides ask about are every Nth distinct fact-time. The Soufflé program below is the
-bundled rule set and the questions translated by hand; a change to anam.dl is a
-change here. Numbers are compared as numbers, since the two engines print them
+bundled rule set (v2, in_force/2 included) and the questions translated by hand; a
+change to anam.dl is a change here.
+
+The oracle covers the rules and nothing the evaluator answers in Go. The builtin
+within/3 (card 212) is not translated: Soufflé compares symbols, and a distance between
+two fact-time lexemes needs a functor it would have to be given, which would be a second
+implementation of the thing under test. within/3 is held instead by table tests and a
+brute-force check over every pair of instants in a real ledger (internal/query,
+builtin_test.go). A program that uses a builtin is outside what this script compares. Numbers are compared as numbers, since the two engines print them
 differently; tabs and newlines inside payload strings are spaced on both sides, since
 a .facts file cannot carry them.
 
@@ -62,6 +69,8 @@ latest(E, At) :- before(E, At), entry(E, _, _, S, _, _, _), S != "", !displaced(
 closed(E, At) :- latest(E, At), entry(E, Type, _, _, _, _, _), closes(Type).
 .decl current(e:symbol, at:symbol)
 current(E, At) :- before(E, At), !displaced(E, At), !closed(E, At).
+.decl in_force(e:symbol, f:symbol)
+in_force(E, F) :- entry(F, _, At, _, _, _, _), current(E, At).
 .decl edge_to(e:symbol, f:symbol)
 edge_to(E, F) :- entry(E, "record.edge", _, _, _, _, _), attr(E, P, F), match("/to/.*", P).
 edge_to(E, F) :- entry(E, "record.edge", _, _, _, _, _), attr(E, P, F), match("/about/.*", P).
@@ -72,6 +81,7 @@ linked(E, F) :- edge_to(E, F).
 linked(E, F) :- edge_from(E, F).
 .output current
 .output displaced
+.output in_force
 .output linked
 """
 
@@ -271,7 +281,7 @@ def run(args, env, work):
     out = run_souffle(args, work)
     facts = "".join(f'instant("{t}").\n' for t in instants)
     ok = True
-    for relation in ("current", "displaced", "linked"):
+    for relation in ("current", "displaced", "in_force", "linked"):
         ok &= compare(relation, anam_query(args, env, facts, relation), read_souffle(out, relation))
     for q in QUESTIONS:
         ok &= compare(q["relation"], anam_query(args, env, facts + q["anam"], q["relation"]), read_souffle(out, q["relation"]))

@@ -107,8 +107,8 @@ governing metadata* — deliberately **not** a normalised domain entity. Three p
   any other payload (`path`, `sha256`, `media_type`, `bytes`, `date`), so the descriptor describes the
   payload it holds — `application/json`, kind `reference`, hash over the reference — and the reference
   describes what it points at. One integrity invariant for both kinds. The first reference type is
-  `record.document`, from the `documents` folder source (built 2026-10-07;
-  `journal/notes/reference-payloads.md`).
+  `record.document`, from the `documents` folder source (built 2026-10-07; the
+  journal's decision note "reference payloads").
 
 Two rules make this safe:
 

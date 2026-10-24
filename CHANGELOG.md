@@ -3,8 +3,9 @@
 Anam has no releases: master is what runs, and a build names itself `v0.<commits>-<hash>`
 (`anam version`). This file lists the changes that alter what an operator, an importer or a reader
 of the API must do or may expect, newest first, by the day they merged. Each names its card on the
-kanban board, which holds the reasoning. The full history is `git log`; the story behind the
-decisions is in `journal/`.
+kanban board, which holds the reasoning. The full history is `git log`. The story behind the
+decisions is a journal kept apart from this repository since 2026-10-24, because it is the
+account of one instance and carries its data.
 
 ## Unreleased
 

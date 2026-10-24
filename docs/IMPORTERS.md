@@ -71,7 +71,7 @@ These make an importer correct in any language, without importing Anam's code.
    contract (`identity_key`, `time_semantics`, classification, validation mode) stays in `meta`.
    Health measures conform to a pinned [Open mHealth](https://www.openmhealth.org/) (IEEE 1752)
    schema where one exists, decided on 2026-10-08
-   ([journal note](../journal/notes/open-mhealth-is-the-payload-vocabulary-for-health-measures.md)). The first is `activity.exercise-session`: an OMH `physical-activity`
+   (the journal's decision note "Open mHealth is the payload vocabulary for health measures"). The first is `activity.exercise-session`: an OMH `physical-activity`
    payload, one type for Technogym, Strong and later Garmin, each shaping to the same Definition.
    It is split into a leaf per vendor (`activity.exercise-session.garmin`, `.concept2`,
    `.technogym` and `.strong`): the IEEE body and a shared core on each, with only that vendor's

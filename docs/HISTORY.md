@@ -21,6 +21,11 @@ the datom shape, 0032 on checkpoint plus replay, 0033 on per-span minting, 0035 
 the unit). The journal still does. Where Anam's own documents are silent, they are silent, and
 Arch no longer fills the gap.
 
+The journal itself, the dated account of how Anam was built and the decision notes behind it,
+left this repository on 2026-10-24. It is the story of one instance and carries that person's
+data, so it is kept privately; these documents name its decision notes by title where one
+explains a rule.
+
 Two early mistakes are worth knowing because the journal mentions them. Anam first reasoned that with
 no required span the mint unit must be the whole timeline, which conflates the read default with the
 mint unit; it was retracted. And it inherited Arch's sentence that a tombstone is a status-bearing

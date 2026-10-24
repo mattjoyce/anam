@@ -26,7 +26,7 @@ config.local.yaml
 BloodPressure_*
 *.csv
 
-# The Algorithm working state (ISAs). The repo's record of *why* lives in journal/.
+# The Algorithm working state (ISAs). The record of *why* is the kanban board and the private journal.
 /.algo/
 
 # graphify build products — derived, rebuildable, not part of the record

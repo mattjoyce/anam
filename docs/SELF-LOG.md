@@ -2,7 +2,7 @@
 
 Design for the next sources: facts you tell Anam yourself, documents and images, and the read
 that answers "what medication was I on, on that day". Written 2026-10-06 from a design conversation
-the night the first checkpoint was minted; the journal entry is `2026-10-06-what-meds-was-i-on`.
+the night the first checkpoint was minted; the journal's entry for that night records the design.
 Where this document is silent, `ARCHITECTURE.md` governs. Nothing here touches the error kernel.
 
 ---
@@ -33,7 +33,7 @@ has its own id) and type is too coarse. A Definition declares a series **family*
 that name one series within it, the drug and the course, and the gate stamps `<family>:<values>` into
 metadata at capture, as it stamps classification today. A Definition also declares whether its type
 **closes** a series (`health.medication.stopped`), so "a stop ends the regimen" is data in the Definition, not a rule
-in the read. Built 2026-10-07 (the design pass is `journal/notes/series-key.md`):
+in the read. Built 2026-10-07 (the design pass is the journal's decision note "series key"):
 
 ```json
 "series": {"name": "med.regimen", "key": ["/drug", "/course"], "closes": false}

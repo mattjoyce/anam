@@ -15,7 +15,7 @@ import (
 // viewCookie names the cookie; viewKeys are the query keys a view may carry.
 const viewCookie = "anam_view"
 
-var viewKeys = map[string]bool{"from": true, "to": true, "type": true, "status": true, "sel": true, "selmode": true}
+var viewKeys = map[string]bool{"from": true, "to": true, "type": true, "status": true, "sel": true, "selmode": true, "zone": true}
 
 // cleanView keeps the known keys of a query, in a fixed order, so a stored view is
 // exactly a timeline view and nothing a page could be sent to. "view=whole" has

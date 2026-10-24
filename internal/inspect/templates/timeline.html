@@ -161,6 +161,7 @@
     <div class="row">
       <label>from <input name="from" id="from" value="{{.From}}" placeholder="2026-03-07 or RFC 3339"></label>
       <label>to <input name="to" id="to" value="{{.To}}" placeholder="2026-06-06 or RFC 3339"></label>
+      <label>zone {{template "zoneinput" .Zone}}</label>
       <button type="submit">compose</button>
       <span class="nav">
         <a href="{{.Nav.Left}}" id="nav-left" title="pan left (←)">◀</a>
@@ -407,5 +408,6 @@
       t.addEventListener('change', () => document.querySelector('.controls').submit()));
   })();
 </script>
+{{template "readzone.html"}}
 </body>
 </html>

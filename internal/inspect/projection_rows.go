@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"sort"
+	"time"
 
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
@@ -79,7 +80,7 @@ type view struct {
 
 var errBadView = errors.New("bad view")
 
-func viewOf(q url.Values) (view, error) {
+func viewOf(q url.Values, loc *time.Location) (view, error) {
 	v := view{typ: q.Get("type"), show: q.Get("show"), rawFrom: q.Get("from"), rawTo: q.Get("to")}
 	if v.typ == "" {
 		return v, nil
@@ -94,8 +95,9 @@ func viewOf(q url.Values) (view, error) {
 	default:
 		return v, fmt.Errorf("%w: show %q is not served, excluded or superseded", errBadView, v.show)
 	}
-	// The whole of the last day, so "to 2026-07-05" includes the 5th.
-	from, to, err := selection.Days(v.rawFrom, v.rawTo)
+	// The whole of the last day, so "to 2026-07-05" includes the 5th. The days are the
+	// reader's zone's, as everywhere a bare date is read (card 236).
+	from, to, err := selection.Days(v.rawFrom, v.rawTo, loc)
 	if err != nil {
 		return v, fmt.Errorf("%w: %v", errBadView, err)
 	}

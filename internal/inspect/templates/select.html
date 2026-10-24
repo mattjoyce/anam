@@ -37,12 +37,13 @@
 {{with .Saved}}<p class="note saved" id="saved">Saved as <input class="code mono" id="saved-code" type="text" readonly value="{{.Ref}}" size="{{len .Ref}}" onclick="this.select()">
   <a href="{{.SelectURL}}" id="saved-select">this selection</a> · open it <a href="{{.TimelineURL}}" id="saved-timeline">on the timeline</a>
   (<a href="{{.HighlightURL}}">highlighted among the rest</a>) · <a href="{{.LinkURL}}" id="saved-link">in the link form</a>
+  {{if .Zone}}<br><span class="dim" id="saved-zone">Its dates were read in {{.Zone}}.</span>{{end}}
   <br><span class="dim">The code names the program, not what it selects today: as the record grows, the same code may select more. <span class="mono">{{.Hash}}</span></span></p>{{end}}
 {{if .Editing}}<p class="note">Changing the facets of the link {{template "facetid" .Editing}}. "Use this selection" takes this basket back to it; saving there writes a new version of the same link.</p>{{end}}
 
 {{if .Chips}}
 <form class="controls" method="get" action="/select">
-  {{range $.Hidden "p" "from" "to" "standing"}}<input type="hidden" name="{{.Name}}" value="{{.Value}}">{{end}}
+  {{range $.Hidden "p" "from" "to" "standing" "zone"}}<input type="hidden" name="{{.Name}}" value="{{.Value}}">{{end}}
   <div>
     <label for="p">projection</label>
     <select name="p" id="p">
@@ -56,6 +57,10 @@
   <div>
     <label for="to">to (fact time, the whole day)</label>
     <input type="date" name="to" id="to" value="{{.ToValue}}">
+  </div>
+  <div>
+    <label for="zone">dates are days in (zone)</label>
+    {{template "zoneinput" .Zone}}
   </div>
   <div>
     <label for="type">add a type or prefix</label>
@@ -176,5 +181,6 @@
   <p><a id="handoff" href="{{.Handoff}}">use this selection</a>
     <span class="dim">opens the link form with what the program selects, each facet on its side, to write one link between them with your words on it.</span></p>
 </section>
+{{template "readzone.html"}}
 </body>
 </html>

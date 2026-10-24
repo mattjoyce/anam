@@ -48,12 +48,15 @@ func (d *Daemon) routes() []route { return d.routeTable(d.inspector()) }
 // inspector is the Workbench's pages, handed what the daemon knows.
 func (d *Daemon) inspector() http.Handler {
 	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
+	// The pages read a bare date in the configured zone when a request names none; a
+	// Local zone with no name reads in UTC (the pages say which zone they read in).
+	zone, _ := d.cfg.ZoneName()
 	index := guardedIndex{ops: d.readOps, state: &d.index}
 	return inspect.Handler(inspect.Deps{
 		Ledger: d.read, Timeout: d.cfg.Timeout, Buckets: buckets, Library: d.cfg.LibraryDir,
 		Definitions: d.defs.current.Load, Held: d.heldDefinitions, Checkpoints: index, Edges: index,
 		Projections: d.projections.current.Load, CachedReads: d.cfg.InspectCachedReads,
-		Workbench: d.workbenchFor(), MaxReadBytes: d.cfg.MaxReadBytes, Selections: d.selections,
+		Workbench: d.workbenchFor(), MaxReadBytes: d.cfg.MaxReadBytes, Selections: d.selections, Zone: zone,
 		Build:  inspect.Build{Version: d.opts.Version, Commit: d.opts.GitCommit, Date: d.opts.BuildDate},
 		Roster: rosterView{d},
 	})
@@ -434,7 +437,8 @@ func writeLedgerError(w http.ResponseWriter, err error) {
 // reader's is the one that counts.
 func namedZone(zone string) error {
 	if zone == "Local" {
-		return errors.New("zone Local names the daemon's zone, not the reader's: send an IANA name")
+		_, err := read.NamedLocation(zone)
+		return err
 	}
 	return nil
 }

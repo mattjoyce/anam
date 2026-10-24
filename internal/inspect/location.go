@@ -248,6 +248,8 @@ type locationData struct {
 	Track    *trackView
 	Empty    string // why nothing is drawn, when nothing is
 	Nav      tlNav
+	// Zone is the zone a bare date in From or To is read in (card 236).
+	Zone readZone
 }
 
 // location draws the live place.track hours in a window. Without a window it
@@ -269,9 +271,13 @@ func (s *Server) location(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	q := r.URL.Query()
+	zone, ok := s.zoneOrFail(w, q)
+	if !ok {
+		return
+	}
 	device := q.Get("device")
 
-	data := locationData{W: res.W, Device: device}
+	data := locationData{W: res.W, Device: device, Zone: zone}
 	if len(hours) == 0 {
 		data.Empty = "no place.track facets are live"
 		s.render(w, "location.html", data)
@@ -284,7 +290,7 @@ func (s *Server) location(w http.ResponseWriter, r *http.Request) {
 	from := time.Date(newest.Year(), newest.Month(), newest.Day(), 0, 0, 0, 0, time.UTC)
 	to := from.AddDate(0, 0, 1)
 	if fq, tq := q.Get("from"), q.Get("to"); fq != "" || tq != "" {
-		if from, to, _, err = parseWindow(fq, tq, hours); err != nil {
+		if from, to, _, err = parseWindow(fq, tq, hours, zone.Loc); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}

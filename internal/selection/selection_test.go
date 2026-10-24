@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mattjoyce/anam/internal/selection"
 )
@@ -165,11 +166,70 @@ func TestValidate_Refusals(t *testing.T) {
 
 func TestDays(t *testing.T) {
 	t.Parallel()
-	lo, hi, err := selection.Days("2026-10-01", "2026-10-07")
+	lo, hi, err := selection.Days("2026-10-01", "2026-10-07", time.UTC)
 	if err != nil || lo != oct1 || hi != oct8 {
 		t.Errorf("Days = %q %q %v, want %q %q", lo, hi, err, oct1, oct8)
 	}
-	if _, _, err := selection.Days("10/01/2026", ""); !errors.Is(err, selection.ErrInvalid) {
+	if _, _, err := selection.Days("10/01/2026", "", time.UTC); !errors.Is(err, selection.ErrInvalid) {
 		t.Errorf("a date not YYYY-MM-DD: %v", err)
+	}
+}
+
+// A bare date is a day in the reader's zone (card 236): 12 Oct in Sydney starts at
+// 13:00 UTC on the 11th, and its end is the next Sydney midnight.
+func TestDays_ReadsTheReadersZone(t *testing.T) {
+	t.Parallel()
+	sydney, err := time.LoadLocation("Australia/Sydney")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lo, hi, err := selection.Days("2026-10-12", "2026-10-12", sydney)
+	// Sydney is on daylight time from 4 October: UTC+11.
+	if want := "2026-10-11T13:00:00.000000000Z"; err != nil || lo != want {
+		t.Errorf("from = %q %v, want %q", lo, err, want)
+	}
+	if want := "2026-10-12T13:00:00.000000000Z"; hi != want {
+		t.Errorf("to = %q, want %q", hi, want)
+	}
+}
+
+// The program names the zone its dates were read in, in a comment Parse ignores, and
+// ZoneOf reads it back; a filter with no bound read no date and names none.
+func TestProgramIn_NamesTheZone(t *testing.T) {
+	t.Parallel()
+	f := selection.Filter{From: "2026-10-11T13:00:00.000000000Z", Types: []string{"health.weight"}}
+	text, err := f.ProgramIn("Australia/Sydney")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "% dates read in Australia/Sydney\n"; !strings.Contains(text, want) {
+		t.Errorf("program lacks %q:\n%s", want, text)
+	}
+	if z := selection.ZoneOf(text); z != "Australia/Sydney" {
+		t.Errorf("ZoneOf = %q", z)
+	}
+	back, err := selection.Parse(text)
+	if err != nil || !reflect.DeepEqual(back, f.Canonical()) {
+		t.Errorf("Parse = %+v %v, want %+v", back, err, f.Canonical())
+	}
+	if canon := selection.CanonicalText(text); canon != text {
+		t.Errorf("saving changes the text, so the zone is lost:\n%s", canon)
+	}
+
+	plain, err := selection.Filter{Types: []string{"health.weight"}}.ProgramIn("Australia/Sydney")
+	if err != nil || strings.Contains(plain, "dates read in") {
+		t.Errorf("a filter with no bound names a zone: %v\n%s", err, plain)
+	}
+	for _, bad := range []string{"", "Local", "Mars/Olympus"} {
+		text, err := f.ProgramIn(bad)
+		if err != nil || strings.Contains(text, "dates read in") {
+			t.Errorf("zone %q was written: %v\n%s", bad, err, text)
+		}
+	}
+	if z := selection.ZoneOf("% dates read in Mars/Olympus\npick/1.\n"); z != "" {
+		t.Errorf("ZoneOf an unknown zone = %q", z)
+	}
+	if z := selection.ZoneOf(strings.Replace(text, "Australia/Sydney", "Local", 1)); z != "" {
+		t.Errorf("ZoneOf Local = %q", z)
 	}
 }

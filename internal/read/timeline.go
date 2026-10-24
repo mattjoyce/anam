@@ -50,6 +50,16 @@ func Location(zone string) (*time.Location, error) {
 	return loc, nil
 }
 
+// NamedLocation is Location for a zone another machine named: an IANA name. Local is
+// refused, since on this machine it would mean the daemon's zone, and the reader's is
+// the one that counts.
+func NamedLocation(zone string) (*time.Location, error) {
+	if zone == "Local" {
+		return nil, badQuery(errors.New("zone Local names the daemon's zone, not the reader's: send an IANA name"))
+	}
+	return Location(zone)
+}
+
 // Ledger is the ledger surface the reads need: the fold's, its identity, and the
 // newest version of each facet for the rows a composed read shows.
 type Ledger interface {

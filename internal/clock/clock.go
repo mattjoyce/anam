@@ -43,6 +43,38 @@ func Parse(s string) (time.Time, error) {
 	return t.UTC(), nil
 }
 
+// ParseBound reads a bound a person types: a bare date, or an RFC 3339 instant. A bare
+// date is a day where the reader stands, so "2025-12-23" is the start of that day in
+// loc (UTC when loc is nil), not the UTC day that overlaps it, and dateOnly says it
+// was one so a caller can take the whole day. This is the one place a bare date gets
+// its meaning: the API, the CLI and every Workbench page read a bound through it.
+func ParseBound(s string, loc *time.Location) (t time.Time, dateOnly bool, err error) {
+	if loc == nil {
+		loc = time.UTC
+	}
+	if t, err := time.ParseInLocation(time.DateOnly, s, loc); err == nil {
+		return t, true, nil
+	}
+	t, err = time.Parse(time.RFC3339, s)
+	if err != nil {
+		return time.Time{}, false, fmt.Errorf("%q is neither 2006-01-02 nor RFC 3339", s)
+	}
+	return t, false, nil
+}
+
+// Day reads a bare date and answers the start of that day in loc (UTC when loc is
+// nil). It refuses an instant, which ParseBound accepts.
+func Day(s string, loc *time.Location) (time.Time, error) {
+	if loc == nil {
+		loc = time.UTC
+	}
+	t, err := time.ParseInLocation(time.DateOnly, s, loc)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("%q is not YYYY-MM-DD", s)
+	}
+	return t, nil
+}
+
 // Real reads the system clock.
 type Real struct{}
 

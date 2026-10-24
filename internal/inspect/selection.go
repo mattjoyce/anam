@@ -33,8 +33,10 @@ import (
 
 // selectState is one address of the page.
 type selectState struct {
-	proj     string
-	filter   selection.Filter
+	proj   string
+	filter selection.Filter
+	// zone is the zone the filter's dates are read and written in (card 236).
+	zone     readZone
 	fromSide map[string]bool
 	// program is a hand-edited program, "" while the criteria make it.
 	program string
@@ -45,10 +47,10 @@ type selectState struct {
 
 var errBadSelect = errors.New("bad selection")
 
-// stateOf reads the address. A date bound is a whole day; a fact-time lexeme is an
-// exact bound, which is how a hand-edited bound off midnight stays a chip.
-func stateOf(q url.Values) (selectState, error) {
-	st := selectState{proj: q.Get("p"), program: q.Get("program"), edit: q.Get("edit"), fromSide: map[string]bool{}}
+// stateOf reads the address. A date bound is a whole day in the zone z; a fact-time
+// lexeme is an exact bound, which is how a hand-edited bound off midnight stays a chip.
+func stateOf(q url.Values, z readZone) (selectState, error) {
+	st := selectState{proj: q.Get("p"), program: q.Get("program"), edit: q.Get("edit"), zone: z, fromSide: map[string]bool{}}
 	if st.proj == "" {
 		st.proj = canonicalName
 	}
@@ -57,10 +59,10 @@ func stateOf(q url.Values) (selectState, error) {
 		Ticks: values(q["tick"]), Exclusions: values(q["untick"]),
 	}
 	var err error
-	if f.From, err = bound(q.Get("from"), false); err != nil {
+	if f.From, err = bound(q.Get("from"), false, z.Loc); err != nil {
 		return st, err
 	}
-	if f.To, err = bound(q.Get("to"), true); err != nil {
+	if f.To, err = bound(q.Get("to"), true, z.Loc); err != nil {
 		return st, err
 	}
 	if err := f.Validate(); err != nil {
@@ -78,9 +80,9 @@ func stateOf(q url.Values) (selectState, error) {
 
 const canonicalName = "canonical"
 
-// bound reads a from or to: a date, a fact-time lexeme, or nothing. A to date is the
-// whole day, so its bound is the next midnight.
-func bound(s string, upper bool) (string, error) {
+// bound reads a from or to: a date in loc, a fact-time lexeme, or nothing. A to date is
+// the whole day, so its bound is the next midnight.
+func bound(s string, upper bool, loc *time.Location) (string, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return "", nil
@@ -91,9 +93,9 @@ func bound(s string, upper bool) (string, error) {
 	var lo, hi string
 	var err error
 	if upper {
-		_, hi, err = selection.Days("", s)
+		_, hi, err = selection.Days("", s, loc)
 	} else {
-		lo, _, err = selection.Days(s, "")
+		lo, _, err = selection.Days(s, "", loc)
 	}
 	if err != nil {
 		return "", fmt.Errorf("%w: %v", errBadSelect, err)
@@ -101,18 +103,18 @@ func bound(s string, upper bool) (string, error) {
 	return lo + hi, nil
 }
 
-// dayOf writes a bound back as the address and the form show it: a midnight as its
-// date (a to bound as the day before, since a to date is the whole day), anything
+// dayOf writes a bound back as the address and the form show it: a midnight in loc as
+// its date (a to bound as the day before, since a to date is the whole day), anything
 // else as the lexeme itself.
-func dayOf(lexeme string, upper bool) string {
+func dayOf(lexeme string, upper bool, loc *time.Location) string {
 	t, err := clock.Parse(lexeme)
-	if err != nil || !t.Equal(t.Truncate(24*time.Hour)) {
+	if err != nil {
 		return lexeme
 	}
-	if upper {
-		t = t.AddDate(0, 0, -1)
+	if d, ok := dayIn(t, loc, upper); ok {
+		return d
 	}
-	return t.Format(time.DateOnly)
+	return lexeme
 }
 
 // values is xs without the empty values a form's blank inputs send.
@@ -145,16 +147,19 @@ func (st selectState) query() url.Values {
 	if st.edit != "" {
 		q.Set("edit", st.edit)
 	}
+	if st.zone.Name != "" && (st.zone.Given || f.From != "" || f.To != "") {
+		q.Set("zone", st.zone.Name)
+	}
 	if st.program != "" {
 		q.Set("program", st.program)
 		st.addSides(q)
 		return q
 	}
 	if f.From != "" {
-		q.Set("from", dayOf(f.From, false))
+		q.Set("from", dayOf(f.From, false, st.zone.Loc))
 	}
 	if f.To != "" {
-		q.Set("to", dayOf(f.To, true))
+		q.Set("to", dayOf(f.To, true, st.zone.Loc))
 	}
 	q["type"], q["source"] = f.Types, f.Sources
 	if f.Standing == selection.Superseded {
@@ -201,10 +206,22 @@ func (s *Server) selectPage(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), s.timeout)
 	defer cancel()
 	q := r.URL.Query()
-	st, err := stateOf(q)
+	z, ok := s.zoneOrFail(w, q)
+	if !ok {
+		return
+	}
+	st, err := stateOf(q, z)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+	if name := selection.ZoneOf(st.program); name != "" {
+		// A program says the zone its dates were read in; the page reads it so.
+		if st.zone, err = zoneNamed(name); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		st.zone.Given, st.zone.Dated = true, true
 	}
 	if _, ok := q["shown"]; ok {
 		http.Redirect(w, r, address("/select", applyTicks(st, q).query()), http.StatusSeeOther)
@@ -217,6 +234,10 @@ func (s *Server) selectPage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		saved = &sv
+		if st.zone, err = savedZone(sv); err != nil {
+			httpError(w, err)
+			return
+		}
 		st.filter, st.program = selection.Filter{Standing: selection.Live}, sv.Program
 		if f, err := selection.Parse(sv.Program); err == nil {
 			st.filter, st.program = f, "" // within the grammar: the chips are drawn from it
@@ -247,6 +268,9 @@ func (s *Server) selectPage(w http.ResponseWriter, r *http.Request) {
 	data.CanSave = s.selections != nil
 	if saved != nil {
 		v := savedViewOf(*saved)
+		if selection.ZoneOf(saved.Program) != "" || st.filter.From != "" || st.filter.To != "" {
+			v.Zone = st.zone.Name
+		}
 		data.Saved = &v
 	}
 	s.render(w, "select.html", data)

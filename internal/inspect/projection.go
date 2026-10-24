@@ -63,8 +63,10 @@ type projectionData struct {
 	NExcluded   int
 	NSuperseded int
 
-	// The rows view's request. Type is empty in the summary view.
+	// The rows view's request. Type is empty in the summary view. Zone is the zone
+	// From and To are read in (card 236).
 	Type, Show, From, To string
+	Zone                 readZone
 	// RowsTotal is how many rows match, whether or not all are drawn.
 	RowsTotal int
 }
@@ -84,7 +86,11 @@ func (s *Server) projectionPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vw, err := viewOf(r.URL.Query())
+	z, ok := s.zoneOrFail(w, r.URL.Query())
+	if !ok {
+		return
+	}
+	vw, err := viewOf(r.URL.Query(), z.Loc)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -94,7 +100,7 @@ func (s *Server) projectionPage(w http.ResponseWriter, r *http.Request) {
 		series:   defs,
 		Names:    append([]string{"canonical"}, templates.Names()...),
 		Selected: r.URL.Query().Get("p"),
-		Type:     vw.typ, Show: vw.show, From: vw.rawFrom, To: vw.rawTo,
+		Type:     vw.typ, Show: vw.show, From: vw.rawFrom, To: vw.rawTo, Zone: z,
 	}
 	if data.Selected == "" {
 		data.Selected = "canonical"

@@ -176,3 +176,41 @@ func TestRealClockIsUTCAndAdvances(t *testing.T) {
 		t.Errorf("Real.Now() = %v, implausibly far from now", got)
 	}
 }
+
+// A bare date is a day where the reader stands (card 236): the start of that day in
+// the zone, not the UTC day that overlaps it. An instant is the instant it names.
+func TestParseBound(t *testing.T) {
+	t.Parallel()
+	sydney, err := time.LoadLocation("Australia/Sydney")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		in       string
+		loc      *time.Location
+		want     time.Time
+		dateOnly bool
+		wantErr  bool
+	}{
+		{in: "2026-10-12", loc: sydney, want: time.Date(2026, 10, 11, 13, 0, 0, 0, time.UTC), dateOnly: true},
+		{in: "2026-10-12", loc: time.UTC, want: time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC), dateOnly: true},
+		{in: "2026-10-12", loc: nil, want: time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC), dateOnly: true},
+		{in: "2026-10-12T05:00:00Z", loc: sydney, want: time.Date(2026, 10, 12, 5, 0, 0, 0, time.UTC)},
+		{in: "12 Oct", loc: sydney, wantErr: true},
+	}
+	for _, c := range cases {
+		got, dateOnly, err := clock.ParseBound(c.in, c.loc)
+		if c.wantErr {
+			if err == nil {
+				t.Errorf("ParseBound(%q) was accepted", c.in)
+			}
+			continue
+		}
+		if err != nil || !got.Equal(c.want) || dateOnly != c.dateOnly {
+			t.Errorf("ParseBound(%q) = %s %v %v, want %s %v", c.in, got, dateOnly, err, c.want, c.dateOnly)
+		}
+	}
+	if _, err := clock.Day("2026-10-12T05:00:00Z", sydney); err == nil {
+		t.Error("Day accepted an instant")
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/catchup"
+	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -153,6 +154,9 @@ type timelineData struct {
 	Sel    *tlSelection
 	SelNav tlSelNav
 	ref    selRef
+
+	// Zone is the zone a bare date in from or to is read in (card 236).
+	Zone readZone
 }
 
 // tlSelNav is the selection's links: the window drawn the other way, and without it.
@@ -210,6 +214,10 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	q := r.URL.Query()
+	zone, ok := s.zoneOrFail(w, q)
+	if !ok {
+		return
+	}
 	status, err := parseStatus(q.Get("status"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -226,7 +234,7 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	from, to, zoomed, err := parseWindow(q.Get("from"), q.Get("to"), all)
+	from, to, zoomed, err := parseWindow(q.Get("from"), q.Get("to"), all, zone.Loc)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -248,6 +256,7 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 	}
 	data := buildTimeline(newStyles(reg), res, all, from, to, zoomed, q["type"], status, sel)
 	data.CanLink = s.enterable(catchup.EdgeType)
+	data.Zone = zone
 	if s.checkpoints != nil {
 		states, summary, err := checkpointStates(ctx, s.checkpoints, res, s.buckets)
 		switch {
@@ -295,9 +304,9 @@ func (s *Server) bandFacets(ctx context.Context, res fold.Result, status statusF
 }
 
 // parseWindow resolves the visible window: the caller's from/to when given (a bare
-// date or RFC 3339; --to's bare date includes its whole day), otherwise the full
+// date, a day in loc, or RFC 3339; --to's bare date includes its whole day), otherwise the full
 // extent of the data padded a little so edge diamonds don't sit on the frame.
-func parseWindow(fromQ, toQ string, all []facet.Facet) (from, to time.Time, zoomed bool, err error) {
+func parseWindow(fromQ, toQ string, all []facet.Facet, loc *time.Location) (from, to time.Time, zoomed bool, err error) {
 	if len(all) == 0 {
 		// An empty ledger draws an empty band over an arbitrary week.
 		from = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -319,14 +328,14 @@ func parseWindow(fromQ, toQ string, all []facet.Facet) (from, to time.Time, zoom
 	from, to = min.Add(-pad), max.Add(pad)
 
 	if fromQ != "" {
-		t, _, err := parseInstant(fromQ)
+		t, _, err := clock.ParseBound(fromQ, loc)
 		if err != nil {
 			return time.Time{}, time.Time{}, false, fmt.Errorf("from: %w", err)
 		}
 		from, zoomed = t, true
 	}
 	if toQ != "" {
-		t, dateOnly, err := parseInstant(toQ)
+		t, dateOnly, err := clock.ParseBound(toQ, loc)
 		if err != nil {
 			return time.Time{}, time.Time{}, false, fmt.Errorf("to: %w", err)
 		}
@@ -339,18 +348,6 @@ func parseWindow(fromQ, toQ string, all []facet.Facet) (from, to time.Time, zoom
 		return time.Time{}, time.Time{}, false, fmt.Errorf("empty window: from %s is not before to %s", fromQ, toQ)
 	}
 	return from, to, zoomed, nil
-}
-
-// parseInstant reads a bound as a bare UTC date or an RFC 3339 instant.
-func parseInstant(s string) (t time.Time, dateOnly bool, err error) {
-	if t, err := time.ParseInLocation("2006-01-02", s, time.UTC); err == nil {
-		return t, true, nil
-	}
-	t, err = time.Parse(time.RFC3339, s)
-	if err != nil {
-		return time.Time{}, false, fmt.Errorf("%q is neither 2006-01-02 nor RFC 3339", s)
-	}
-	return t, false, nil
 }
 
 func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.Time, zoomed bool, typeQ []string, status statusFilter, sel *tlSelection) timelineData {

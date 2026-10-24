@@ -105,17 +105,7 @@ func parseBounds(from, to string, loc *time.Location) (bounds, error) {
 
 // parseInstant reads a bound as a bare date in the reader's zone or an RFC 3339
 // instant. A bare date is a day where the person stands, so "2025-12-23" is that day
-// in loc, not the UTC day that overlaps it.
+// in loc, not the UTC day that overlaps it. The rule is clock.ParseBound's.
 func parseInstant(s string, loc *time.Location) (t time.Time, dateOnly bool, err error) {
-	if loc == nil {
-		loc = time.UTC
-	}
-	if t, err := time.ParseInLocation("2006-01-02", s, loc); err == nil {
-		return t, true, nil
-	}
-	t, err = time.Parse(time.RFC3339, s)
-	if err != nil {
-		return time.Time{}, false, fmt.Errorf("%q is neither 2006-01-02 nor RFC 3339", s)
-	}
-	return t, false, nil
+	return clock.ParseBound(s, loc)
 }

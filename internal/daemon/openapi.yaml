@@ -620,11 +620,18 @@ paths:
                       - { version: 5, pointers: [/as_dispensed, /course, /date, /dispensed_at, /dose, /drug, /id, /prescribed_by, /source_note] }
                 rules:
                   name: anam
-                  version: 1
+                  version: 2
                   hash: sha256:1976fb0a4cfc1313ce243c81ae29b34671610d8c3898da3dab3a40a67d737d02
                   text: "instant/1.\ncurrent(E, At) :- before(E, At), not displaced(E, At), not closed(E, At).\n"
                   relations:
                     - { name: current, arity: 2, args: [E, At], kind: rule, doc: the last-known value at At }
+                builtins:
+                  - name: within
+                    doc: true when the fact-times A and B are at most Days days apart, a day being 24 hours of UTC
+                    args:
+                      - { name: A, bound: true, doc: a fact-time lexeme }
+                      - { name: B, bound: true, doc: a fact-time lexeme }
+                      - { name: Days, bound: true, doc: "a number of days, not negative; a decimal is allowed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "504": { $ref: "#/components/responses/Timeout" }
     post:
@@ -1452,7 +1459,7 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
     CannotHonour:
-      description: the receipt names a template version that moved, or another ledger
+      description: the receipt names a template version or a rule set that moved, or another ledger
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -1884,7 +1891,7 @@ components:
         written: { type: boolean }
     QueryCatalogue:
       type: object
-      required: [syntax, relations, instant, types, rules]
+      required: [syntax, relations, instant, types, rules, builtins]
       properties:
         syntax: { type: string }
         relations:
@@ -1931,6 +1938,23 @@ components:
             hash: { type: string }
             text: { type: string }
             relations: { type: array, items: { type: object } }
+        builtins:
+          type: array
+          items:
+            type: object
+            required: [name, args, doc]
+            properties:
+              name: { type: string }
+              doc: { type: string }
+              args:
+                type: array
+                items:
+                  type: object
+                  required: [name, bound, doc]
+                  properties:
+                    name: { type: string }
+                    bound: { type: boolean, description: the program must bind this argument before the builtin is read }
+                    doc: { type: string }
     ReceiptVerified:
       type: object
       required: [hash, receipt, result]

@@ -231,3 +231,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: a Definition may declare `handling.label`, a short template of literal text and `{/pointer}` fields (`def/label.go`); `Parse` checks it and `Definition.Label` renders it, never failing. The selection page's rows and basket and the link form's basket read as the label, falling back to the type and the time. `health.weight` v6, `health.medication.dose` v3, `mind.attention` v2, `health.intake` v2 and `record.edge` v3 declare one, and the earlier versions are in the history. The timeline's own selection gains a "link these…" anchor into `/select`, beside the facet page's "link this…".
 - Bundle: the definition and inspector components say so.
+
+## 2026-10-24, cards 236 and 237
+
+- Code: a bare date on the select page, the projection page's rows view, the timeline and the location page is a day in a `zone` parameter's zone, else the daemon's configured zone (`clock.ParseBound`, `selection.Days(from, to, loc)`, `Deps.Zone`). A selection program carries `% dates read in <zone>` (`Filter.ProgramIn`, `ZoneOf`), kept by `CanonicalText`; a saved selection's page names its zone, UTC when it has no comment. The zoomed timeline links to the select page ("select in this range") and the select page to the timeline ("show on timeline"), carrying the range, the types and the zone.
+- Bundle: the inspector and selection components say so.

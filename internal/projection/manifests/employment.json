@@ -1,0 +1,11 @@
+{
+  "name": "employment",
+  "version": 1,
+  "description": "Who the person worked for, and in what role, on a given day: the latest statement in each period of employment, with ended periods gone. Serve it at a fact-time bound for 'where was I working then'. Concurrent employments each stand.",
+  "types": ["org.employment.started", "org.employment.role-changed", "org.employment.ended"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Confidential",
+  "from": "",
+  "to": "",
+  "shape": "snapshot"
+}

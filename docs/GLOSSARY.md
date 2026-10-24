@@ -92,10 +92,11 @@ idempotency and supersession (a changed source row hashes differently). See *Ide
 captured from a source. Re-enters through the ordinary gate as `proposed`. See *Endorsement*, *Insight*.
 
 **Domain** — The first segment of a *Facet type*, and a closed set of ten: `health`, `activity`, `place`, `record`,
-`mind` (self-reported inner states, where attention is the first concept) and `org` (relationships with
-organisations, where employment is the first concept) are in use; `social`, `money`, `media` and
-`work` are reserved for the next dense sources (`social.message`, `money.transaction`, `media.play`). A new kind of
-fact joins one of the ten. A head is added only by a logged decision, as `mind` and `org` were, so growth is
+`mind` (self-reported inner states, where attention is the first concept), `org` (relationships with
+organisations, where employment is the first concept) and `money` (what the person paid, where
+purchases are the first concept) are in use; `social`, `media` and
+`work` are reserved for the next dense sources (`social.message`, `media.play`). A new kind of
+fact joins one of the ten. A head is added only by a logged decision, as `mind`, `org` and `money` were, so growth is
 in the concept, in a specialisation after it, and in the Definition's `family` (a finer grouping, such as `meds` or `trips`) and `kind`
 (`measure`, `reading` or `event`). Name the common concept and code the open-ended tail: lab results are one type
 with the test code in the payload, not a type per test.

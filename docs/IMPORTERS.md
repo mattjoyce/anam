@@ -245,9 +245,10 @@ importers:
   (`types` for a type no binary bundles is that importer's alone), and the workbench registers no
   Definition. Leave the entry out and `POST /v1/entry` answers 404, saying the file declares no
   workbench principal. `anam retract workbench --facet <id> --yes` undoes one entry. The attention
-  types (`mind.attention`, `mind.attention.started`, `mind.attention.ended`) and `health.intake`
-  are entered by listing them in `types`; the form is drawn from their Definitions, so nothing else
-  changes. The intake form shows every field of every kind, and the gate refuses a drink with a
+  types (`mind.attention`, `mind.attention.started`, `mind.attention.ended`), `health.intake` and
+  `money.purchase` are entered by listing them in `types`; the form is drawn from their Definitions, so nothing else
+  changes. The form draws single values only, so a purchase entered by hand has its totals and no
+  `items`; the lines come from a records file. The intake form shows every field of every kind, and the gate refuses a drink with a
   meal's fields or a meal with a drink's.
 - The same file names principals that are not importers, under `principals`, each with a `name` and
   a `role` (`reader` or `operator`) and no source or types. An importer may be listed there too,

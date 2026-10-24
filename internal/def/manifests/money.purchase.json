@@ -1,0 +1,200 @@
+{
+  "meta": {
+    "facet_type": "money.purchase",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "purchases",
+    "classification": "Confidential",
+    "validation_mode": "strict",
+    "source_schema": "records/money.purchase",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/date",
+        "layout": "2006-01-02",
+        "zone": "Australia/Sydney"
+      }
+    },
+    "identity_key": [
+      "/id"
+    ],
+    "identity_template": "{source}:purchase/{/merchant}/{/order_ref}",
+    "min_binding_assurance": "medium"
+  },
+  "handling": {
+    "guidance": "One purchase is one order or receipt, never one line: the lines are items, inside the one facet. merchant is one agreed spelling per merchant across every source: lower case with words joined by hyphens, the name the person uses for the shop and not its legal entity, which merchant_legal_entity carries, the way a drug has one spelling. A second spelling makes a second merchant, so a query for one misses the other. order_ref is the merchant's own reference for the order, verbatim. When the merchant gives no order reference, use the receipt or invoice number; when there is none, use the date and one word, such as 2026-10-24-lunch, chosen once and then never changed, since it is part of the identity. date is a local date in Australia/Sydney, the day the order was placed or the receipt issued; the Definition reads it in that zone and carries no zone_pointer or source_time, since a date has no clock to read. Amounts are numbers as the document prints them, in currency, the document's own ISO 4217 code, and are never converted: a conversion, or the amount a bank charged in another currency, is a later fact joined to the purchase by an edge, not a field. A refund or a return is likewise a later fact joined by an edge. What the purchase was for, whether it is deductible and which financial year it falls in are the person's judgement, so they go in the note that joins the purchase (a record.edge about this facet) and never in this type. The documents behind it, an invoice or a receipt, are record.document facets joined by the same kind of edge, not named in the payload. The id is declared in identity_template, <source>:purchase/<merchant>/<order_ref>, so one order is one purchase however many times it is written; leave id out and Anam fills it, send it and it must match.",
+    "label": "{/merchant} {/total} {/currency}"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "A purchase of goods or services from a merchant: one order or receipt, with its lines and totals as the merchant's document states them, written down in a records file (source records) from an invoice, receipt or order confirmation. The first type in the money domain.",
+    "type": "object",
+    "required": [
+      "id",
+      "date",
+      "merchant",
+      "order_ref",
+      "currency",
+      "total"
+    ],
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Identity, composed from the rest by the Definition's identity_template: the source prefix, then purchase, the merchant and the order_ref. A writer may leave it out and Anam fills it; one that sends it must send exactly the composition. The same order written twice is one facet.",
+        "examples": [
+          "records:purchase/example-shop/ORD-1042"
+        ]
+      },
+      "date": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+        "description": "The day the order was placed or the receipt issued, YYYY-MM-DD, a local date read in Australia/Sydney. This is the fact time.",
+        "examples": [
+          "2026-10-24"
+        ]
+      },
+      "merchant": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+        "description": "The merchant, in one agreed spelling: lower case, words joined by hyphens, the name the person uses for it and not its legal entity, so the same merchant is always the same string across every source.",
+        "examples": [
+          "example-shop",
+          "amazon-au"
+        ]
+      },
+      "merchant_legal_entity": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The legal entity on the document, verbatim.",
+        "examples": [
+          "Example Shop Pty Ltd"
+        ]
+      },
+      "order_ref": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The merchant's order number, verbatim. With merchant it makes the identity, so it is required: when the merchant gives none, use the receipt or invoice number, else the date and one word, chosen once.",
+        "examples": [
+          "ORD-1042"
+        ]
+      },
+      "invoice_ref": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The invoice or receipt number, verbatim, when it differs from the order number.",
+        "examples": [
+          "INV-7731"
+        ]
+      },
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "description": "The lines, as the document lists them.",
+        "items": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The line's description, verbatim."
+            },
+            "sku": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The merchant's SKU or product code."
+            },
+            "quantity": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "How many of the line were bought."
+            },
+            "unit_price": {
+              "type": "number",
+              "description": "Price per unit in currency, before tax, as the document states it."
+            },
+            "line_total": {
+              "type": "number",
+              "description": "The line's total in currency, as the document states it."
+            }
+          }
+        }
+      },
+      "subtotal": {
+        "type": "number",
+        "description": "Goods before shipping and tax, in currency."
+      },
+      "shipping": {
+        "type": "number",
+        "minimum": 0,
+        "description": "Shipping and handling, in currency."
+      },
+      "tax": {
+        "type": "number",
+        "minimum": 0,
+        "description": "Tax as the document states it (GST, VAT, sales tax), in currency; what the document calls it goes in tax_label."
+      },
+      "tax_label": {
+        "type": "string",
+        "minLength": 1,
+        "description": "What the document calls the tax.",
+        "examples": [
+          "GST",
+          "Tax"
+        ]
+      },
+      "total": {
+        "type": "number",
+        "description": "The grand total charged, in currency.",
+        "examples": [
+          85.8
+        ]
+      },
+      "currency": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[A-Z]{3}$",
+        "description": "ISO 4217 code of every amount here, as the document states it; never a conversion.",
+        "examples": [
+          "USD",
+          "AUD"
+        ]
+      },
+      "paid_via": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+        "description": "The payment method named on the document or receipt, as a slug.",
+        "examples": [
+          "paypal",
+          "visa",
+          "bank-transfer"
+        ]
+      },
+      "payment_ref": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The payment provider's transaction id, when known."
+      },
+      "basis": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Why the date and amounts are believed, in the writer's own words: the documents they rest on.",
+        "examples": [
+          "order confirmation and invoice emails of 24 Oct 2026"
+        ]
+      },
+      "source_note": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Anything else the writer wants the reader to know about how this was written down."
+      }
+    },
+    "additionalProperties": false
+  }
+}

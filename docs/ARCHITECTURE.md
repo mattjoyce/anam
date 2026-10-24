@@ -147,7 +147,7 @@ Two rules make this safe:
 Granularity is a choice: start coarse (one Facet per source fragment) and decompose only where real
 fact-times or finer access control earn the cut. Facet types are **dotted `domain.concept[.specialisation…]`** under a closed set of ten
 domains (`health.blood-pressure`, `health.body-composition`, `activity.steps`, `place.stay`,
-`record.edge`, `mind.attention`, `org.employment.started`), so new sources slot into a domain (`social.message`, `money.transaction`, `media.play`). Where a
+`record.edge`, `mind.attention`, `org.employment.started`, `money.purchase`), so new sources slot into a domain (`social.message`, `money.transaction`, `media.play`). Where a
 distinction goes, in the name or elsewhere, is the decision [where a distinction is encoded](explainer/bundle/decisions/where-a-distinction-is-encoded.md).
 
 ---

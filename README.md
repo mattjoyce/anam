@@ -134,7 +134,7 @@ drops it from the current value and never from the ledger.
 
 Every fact is a **facet** of a named type, and each type has a versioned **Definition**: a JSON
 Schema, which field names the facet, and which field says when it was true. Definitions are
-immutable once published, so a change is a new version. Anam bundles the 43 below, and importers
+immutable once published, so a change is a new version. Anam bundles the 44 below, and importers
 register more. A running daemon lists what it holds at `GET /v1/definitions` and in the
 inspector's definitions page; the bundled files are in
 [`internal/def/manifests/`](internal/def/manifests/), and the gate checks this table against them.
@@ -143,8 +143,8 @@ Adding a type is a Definition file, not code.
 ### Bundled with Anam
 
 Every type is named `domain.concept[.specialisation…]`, and the first word is one of ten: `health`, `activity`, `place`,
-`record`, `mind` and `org` today, with `social`, `money`, `media` and `work` held for later. A new kind of fact joins
-one of them. A head is added only by a logged decision, as `mind` and `org` were. `family` groups types within a domain, and `kind` says whether a type
+`record`, `mind`, `org` and `money` today, with `social`, `media` and `work` held for later. A new kind of fact joins
+one of them. A head is added only by a logged decision, as `mind`, `org` and `money` were. `family` groups types within a domain, and `kind` says whether a type
 records a measure, a reading or an event.
 
 | Type | Version | family | kind | What it records | Identity | Fact time |
@@ -186,6 +186,7 @@ records a measure, a reading or an event.
 | `org.employment.started` | 1 | employment | event | Starting a period of employment with an organisation, in the role started in; opens the series for that org and stint; no pay | `id` | `date` |
 | `org.employment.role-changed` | 1 | employment | event | A change of role within a period of employment, restating the whole role; no pay | `id` | `date` |
 | `org.employment.ended` | 1 | employment | event | The end of a period of employment; closes the series | `id` | `date` |
+| `money.purchase` | 1 | purchases | event | One order or receipt from a merchant, with its lines and totals as the document states them, in the document's currency and never converted; the person's judgement about it (deductible, purpose) is a note, not a field | `id` | `date` |
 | `record.edge` | 3 | notes | event | An edge joining facets, with or without words; a note in the person's own words is one (was `note.annotation` (v1 to v3), then `record.note` (v1, v2)) | `id` | `at` |
 | `record.document` | 2 | documents |  | A pointer to one file in the documents library; the bytes never enter the ledger | `path` | `date` |
 | `health.heart-rate-day` | 2 | vitals | measure | One figure for a day's heart rate, as an Open mHealth heart-rate body (replaced by `health.heart-rate.day`; the garmin importer's snapshot leaves it absent, the operator retracts it, and it is kept for reads as-of before) | `id`, `statistic` | interval start |

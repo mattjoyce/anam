@@ -22,6 +22,7 @@
 * [Operational store](operational-store.md) - The second SQLite file, authoritative for what Anam authors, with each table annotated by where it comes back from.
 * [Principal](principal.md) - A caller the daemon admits, with a name, a role and the SHA-256 of its token; an importer principal also has the one source it submits as and the types it may submit.
 * [Projection](projection.md) - A versioned template that prunes the canonical by metadata only; a consumer selects one and never defines one.
+* [Purchase (the money domain)](purchase.md) - One order or receipt from a merchant, kept as a single fact with its lines and totals as the document states them; the first concept in the money domain.
 * [Query](query.md) - The third read after the timeline and fields; a Datalog program evaluated over the fold at a watermark, through a projection, answering with a derived value and a receipt. Decided 2026-10-17 and built 2026-10-19 (card 173), reached by `anam query`, `POST /v1/query` and `GET /v1/query`.
 * [Receipt](receipt.md) - Proof of exactly what a projection served at a watermark, verifiable from its stored row alone or against the ledger.
 * [Role](role.md) - What a principal's token opens, one of reader, importer or operator; each route names the roles it admits and no handler checks who is calling.

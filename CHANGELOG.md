@@ -9,6 +9,20 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- Anam can hold what a person bought (card 241). `money` is opened from the reserved heads, by
+  Matt's decision of 2026-10-25, so the count of domain heads stays ten and `social`, `media` and
+  `work` remain reserved. One Definition is bundled at v1, `money.purchase`: one order or receipt is
+  one facet, never one per line, and the lines are `items` inside it. `merchant` has one spelling,
+  lower case with hyphens (`example-shop`), and `currency` is the document's own ISO 4217 code.
+  Amounts are numbers as the document prints them and are never converted. `date` is a local date in
+  Australia/Sydney with no `source_time`. The id is declared, `<source>:purchase/<merchant>/<order_ref>`,
+  so `order_ref` is required: the merchant's own reference, else the receipt number, else the date and
+  one word chosen once. The type is Confidential and strict, and has no field for the person's
+  judgement (deductible, purpose, financial year), which belongs in the note that joins the purchase.
+  The bank's charged amount and a refund are later facts joined by edges. A bundled projection,
+  `purchases` (a log over `money.purchase`), serves it; it does not join `recent-life`. To write one,
+  the records importer's `types` and the workbench's `types` in the importers file gain
+  `money.purchase`; the Workbench form enters the totals but draws no `items`.
 - Anam can hold where a person worked and in what role (card 239). `org` is a tenth domain head, for
   relationships with organisations, so a membership can join later as `org.membership`; a head is
   added only by a logged decision. `work` stays reserved for projects, tasks and output. Three

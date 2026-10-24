@@ -35,3 +35,6 @@ graphify-out/
 # Personal source documents kept beside the repo for inspection. Never committed.
 /private/
 __pycache__/
+
+# The maintainer's private operating notes, read beside AGENTS.md on his own machine.
+/CLAUDE.local.md

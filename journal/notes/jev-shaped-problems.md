@@ -268,7 +268,7 @@ concrete groups:
 | 21, 41, 60, 63, 64, 65 | Checkpoint presentation, density, hash design and read performance need code/design, not probabilistic selection. |
 | 30, 32, 33, 40, 47, 67 | Service completion, upgrades, scheduling, merge, backup and retention need operational work. |
 
-The prior [Jev exploration](../../jev-for-anam.md) correctly isolates judgments from the kernel.
+The prior Jev exploration (`jev-for-anam.md`, moved to kanban card 82 on 2026-10-24) correctly isolates judgments from the kernel.
 Its medication-first recommendation was not evaluated. This review changes the order, broadens
 the scope to conversational claim support and discovery, and downgrades document routing and
 duplicate detection where explicit formats/keys already settle the question. The main new

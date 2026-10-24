@@ -101,7 +101,7 @@ in again from the Technogym and Strong importers under new source refs, two roun
 admit for the same facts. It was reverted at 23:27, before any ingest ran it, so the Guard never
 pinned the type and its rules stay free to change.
 
-Two side threads. `jev-for-anam.md` assessed TypeSafe's Jev decision models, suggesting medication
+Two side threads. `jev-for-anam.md` (since moved to kanban card 82) assessed TypeSafe's Jev decision models, suggesting medication
 assertion classification in documents as the first use; nothing was integrated. And two Claude
 sessions in one repo turned out to share one board name, so each one's claims read as the other's
 own. The second session now gets its own worktree and name.

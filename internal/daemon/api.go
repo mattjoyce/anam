@@ -470,7 +470,7 @@ func writeReadError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, err)
 	case errors.Is(err, read.ErrTooManyAbsent):
 		writeError(w, http.StatusRequestEntityTooLarge, err)
-	case errors.Is(err, serve.ErrTemplateMoved), errors.Is(err, serve.ErrOtherLedger):
+	case errors.Is(err, serve.ErrTemplateMoved), errors.Is(err, serve.ErrRuleSetMoved), errors.Is(err, serve.ErrOtherLedger):
 		writeError(w, http.StatusConflict, err)
 	case errors.Is(err, context.DeadlineExceeded):
 		writeError(w, http.StatusGatewayTimeout, err)

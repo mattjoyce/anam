@@ -168,6 +168,18 @@ func TestDocs_WorkedQuestionsRunAgainstARealLedger(t *testing.T) {
 			}
 		})
 	}
+	// The in_force form answers what the instant/1 form does: one question, two ways.
+	var forms []string
+	for _, name := range []string{"regimen-at-each-reading", "regimen-in-force"} {
+		for _, b := range blocks {
+			if b.lang == "answer" && b.attrs["question"] == name {
+				forms = append(forms, strings.TrimSpace(b.body))
+			}
+		}
+	}
+	if len(forms) != 2 || forms[0] == "" || forms[0] != forms[1] {
+		t.Errorf("the in_force form of the regimen question does not answer what the instant/1 form does:\n%q", forms)
+	}
 	if ran < 8 {
 		t.Errorf("ran %d questions from %s, want at least 8", ran, queryDoc)
 	}

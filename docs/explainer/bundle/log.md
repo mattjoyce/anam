@@ -231,3 +231,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: a Definition may declare `handling.label`, a short template of literal text and `{/pointer}` fields (`def/label.go`); `Parse` checks it and `Definition.Label` renders it, never failing. The selection page's rows and basket and the link form's basket read as the label, falling back to the type and the time. `health.weight` v6, `health.medication.dose` v3, `mind.attention` v2, `health.intake` v2 and `record.edge` v3 declare one, and the earlier versions are in the history. The timeline's own selection gains a "link these…" anchor into `/select`, beside the facet page's "link this…".
 - Bundle: the definition and inspector components say so.
+
+## 2026-10-24, card 212
+
+- Code: the bundled rule set is v2. It adds `in_force(E, F)`, and `within(A, B, Days)`, a builtin in a new table (`internal/query/builtin.go`) that the plan check holds to bound arguments and the evaluator answers in Go. Every earlier rule-set text is kept under `rules/history/`: version 1 was served as three different texts, since `anam.dl` changed on 2026-10-21 without a bump. Verify picks the text by the receipt's rule-set hash, and a hash no held text has answers 409, as a moved template does, where it had answered 500.
+- Bundle: the query term says so.

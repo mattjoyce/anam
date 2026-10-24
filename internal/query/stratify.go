@@ -137,7 +137,7 @@ func group(rules []Rule, stratum map[string]int, idb map[string]bool) [][]rule {
 	return strata
 }
 
-// order places each negation and comparison right after the positive atom that
+// order places each negation, comparison and builtin right after the positive atom that
 // binds its last variable, so a guard runs as soon as it can and never before it
 // may. Positive atoms keep the order written.
 func order(body []Literal) []Literal {
@@ -145,7 +145,7 @@ func order(body []Literal) []Literal {
 	bound := map[string]bool{}
 	var pending []Literal
 	for _, l := range body {
-		if l.Atom == nil || l.Negated {
+		if l.guard() {
 			pending = append(pending, l)
 		}
 	}
@@ -162,7 +162,7 @@ func order(body []Literal) []Literal {
 	}
 	flush()
 	for _, l := range body {
-		if l.Atom == nil || l.Negated {
+		if l.guard() {
 			continue
 		}
 		out = append(out, l)

@@ -76,7 +76,7 @@ All three take a reader's, importer's or operator's token. A body with a field o
 Failures say what to change. 400 is a program that cannot run (a syntax error, an unknown relation, an
 unsafe variable, a pointer no Definition declares, an unknown projection). 413 is a derivation or an
 answer over `max_read_bytes`, with `narrow` naming the projection and the program. 409 is a receipt
-verify under a binary whose bundled rules moved.
+verify whose receipt names a template version, a ledger or a rule set this binary does not hold.
 
 The answer to `POST /v1/query` carries `w` (the watermark it stood on), `ledger_id`, `projection`
 (name, version, how many facets it served, its hash), `rules` (name, version, hash), `answer`
@@ -91,9 +91,14 @@ the projection and its hash (an inline projection is marked `template_inline`), 
 block with the rule set (`rule_set`, `rule_set_version`, `rule_set_hash`), the text as written and the
 relation answered. `GET /v1/receipts/{hash}/verify` folds the ledger at that watermark, serves the
 projection, runs the same program and compares hashes. It reports a difference if the record changed
-underneath, and it refuses with 409 when the binary's bundled rules are not the ones the receipt names,
-since another rule set cannot re-derive the answer. A dry run derives the same receipt and files
-nothing.
+underneath, and it refuses with 409, saying the rule set has moved, when no rule set this binary holds
+has the hash the receipt names, since another rule set cannot re-derive the answer. A dry run derives
+the same receipt and files nothing.
+
+Verify picks the rule set by the receipt's `rule_set_hash`, never by `rule_set_version` alone. The
+binary holds its bundled rules and every earlier text a receipt may name, so a receipt cut under rule
+set v1 still verifies under a binary that bundles v2. The versions are in
+[the bundled rules](#the-bundled-rules).
 
 ## The relations
 
@@ -151,6 +156,13 @@ builder writes it this way, and so do the bundled edge rules for a pointer.
 The rule set `anam` ships with the binary. Its text is `internal/query/rules/anam.dl`, with a comment
 per rule, and the catalogue returns it. Its version and hash go into every receipt.
 
+It is at version 2 (card 212, which added `in_force/2`). Every earlier text a receipt may name is kept
+under `internal/query/rules/history/`, byte for byte, and a text there is never edited. Version 1 was
+served as three different texts, because the edge rules landed on 2026-10-21 without a bump and the
+`record.note` to `record.edge` rename followed the same day. The hash told them apart and the version
+did not, which is why verify goes by the hash. A change to `anam.dl` moves the version and puts the
+text it replaces in the history first.
+
 | Rule | Holds when |
 |---|---|
 | `before(E, At)` | E's fact-time is at or before `At`. |
@@ -159,11 +171,12 @@ per rule, and the catalogue returns it. Its version and hash go into every recei
 | `latest(E, At)` | E is the latest of its series at `At`. |
 | `closed(E, At)` | E is the latest of its series at `At`, and its type closes the series. |
 | `current(E, At)` | E is what the record last said at `At`: at or before it, not displaced, not closed. A facet with no series is current from its fact-time on. A test holds this equal to `fold.Snapshot`. |
+| `in_force(E, F)` | E is current at the fact-time of F: the statement standing when F happened. It holds for an F whose fact-time the query names in `instant/1`, and for no other, which is what bounds its cost. A test holds it equal to `current/2` at the blood-pressure readings' instants. |
 | `edge_to(E, F)` | The `record.edge` E names F on its `to` side (its `about` side, for a note). |
 | `edge_from(E, F)` | The edge E names F on its `from` side. |
 | `linked(E, F)` | The edge E names F on either side. The edges touching F are the E with `linked(E, F)`. |
 
-`before`, `displaced`, `latest`, `closed` and `current` need `instant/1` to hold something. A query
+`before`, `displaced`, `latest`, `closed`, `current` and `in_force` need `instant/1` to hold something. A query
 that reaches them with `instant/1` undefined is refused, since reached silently it would be empty and
 the answer wrong. A query that never reaches them needs no definition.
 
@@ -172,11 +185,34 @@ The edge rules read `attr/3`. A program that reads only `entry/7` and `closes/1`
 when the relation the program answers reaches `attr`, directly or through a bundled rule.
 The answer is the same either way.
 
+## Builtins
+
+A builtin is a predicate the evaluator answers in Go, because the language has no arithmetic to write
+it in. It is written like an atom in a rule body, and it is a guard, as a comparison is: it names no
+relation, defines nothing, and is true or false of values already bound. Every argument a builtin
+requires must be bound by a positive body atom, and the plan check refuses a program that leaves one
+unbound, naming the predicate and the argument. `GET /v1/query` and `anam query describe` list the
+builtins with their arguments. `not` in front of one is allowed, since everything is bound by then.
+
+| Builtin | True when |
+|---|---|
+| `within(A, B, Days)` | The fact-times `A` and `B` are at most `Days` days apart, in either order. `A` and `B` are whole fact-time lexemes. `Days` is a number that is not negative and may be a decimal: `0.25` is six hours. A day is 24 hours of UTC, since a fact-time is one UTC instant, so a clock change in a local zone does not lengthen or shorten it. The comparison is exact to the nanosecond. |
+
+A constant that can never be right is refused at plan time: a bare date for `A` or `B`, a string for
+`Days`, a negative `Days`. A value bound from data that is not what the builtin takes makes it false
+and refuses nothing, since the program was right to ask and the record is what it is.
+
+`within` cannot be written as a rule, and the Soufflé check in `scripts/souffle-diff.py` does not
+cover it. That check holds the rules to a second engine. The builtin is held by table tests and by a
+brute-force check against every pair of instants in a real ledger.
+
 ## What the language does not do
 
 - No aggregates. There is no `count`, `sum` or `max`. A count is the number of tuples in the answer,
   which the caller reads, and the receipt pins.
-- No function symbols or arithmetic, so a program always terminates.
+- No function symbols or arithmetic, so a program always terminates. The builtins above are the one
+  exception to reading it that way: they test values, and bind nothing, so they cannot make it run
+  forever.
 - Negation must be stratified, so a relation may not depend on its own negation.
 - Every variable in a head, a negation or a comparison appears in a positive body atom.
 - Different kinds never compare. A string is neither less than nor equal to a number.
@@ -241,6 +277,47 @@ regimen(At, Drug) :- entry(_, "health.blood-pressure", At, _, _, _, _), current(
 2026-07-20T07:00:00.000000000Z ramipril
 2026-08-20T07:00:00.000000000Z ramipril
 2026-08-20T07:00:00.000000000Z vitamin d3 + k2
+```
+
+### The regimen in force at each reading, with `in_force/2`
+
+The same question with the join to the instant written by the rules. `in_force(E, R)` says E was
+current when the reading R happened, so there is no `At` to carry. `instant/1` still has to name the
+readings' fact-times, since that is what bounds the work.
+
+```datalog question=regimen-in-force relation=regimen
+instant(At) :- entry(_, "health.blood-pressure", At, _, _, _, _).
+regimen_type("health.medication.started"). regimen_type("health.medication.dose-changed").
+regimen(At, Drug) :- entry(R, "health.blood-pressure", At, _, _, _, _), in_force(E, R),
+                     entry(E, T, _, _, _, _, _), regimen_type(T), attr(E, "/drug", Drug).
+```
+
+```answer question=regimen-in-force
+2026-04-10T07:00:00.000000000Z ramipril
+2026-06-01T07:00:00.000000000Z ramipril
+2026-06-01T07:00:00.000000000Z vitamin d3 + k2
+2026-07-20T07:00:00.000000000Z ramipril
+2026-08-20T07:00:00.000000000Z ramipril
+2026-08-20T07:00:00.000000000Z vitamin d3 + k2
+```
+
+These are the rows of the previous question, and the docs test checks that the two answers on this page are the same.
+
+### Readings within 56 days of a dose change
+
+`within/3` takes the two fact-times and the number of days, so there are no bounds to work out by
+hand. Each row is a reading and the dose change it is near. Ramipril's dose changed on 15 May, which is
+35 days after the April reading and 17 before the June one, and 66 before the July one, so July is out.
+
+```datalog question=near-a-dose relation=near_dose
+near_dose(At, ChangedAt) :- entry(_, "health.blood-pressure", At, _, _, _, _),
+                            entry(_, "health.medication.dose-changed", ChangedAt, _, _, _, _),
+                            within(At, ChangedAt, 56).
+```
+
+```answer question=near-a-dose
+2026-04-10T07:00:00.000000000Z 2026-05-15T00:00:00.000000000Z
+2026-06-01T07:00:00.000000000Z 2026-05-15T00:00:00.000000000Z
 ```
 
 ### The latest statement of each series
@@ -336,9 +413,27 @@ before_sleep(At, Drink, Next) :- alcohol(At, Drink), sleep_start(Next),
 2026-10-22T08:30:00.000000000Z beer 2026-10-22T12:00:00.000000000Z
 ```
 
-This says the alcohol came before the sleep, not how long before. "Within six hours" would need
-arithmetic on instants, which the language does not have yet (card 212); until then a window is a
-pair of literal bounds, as in the summer question above.
+This says the alcohol came before the sleep, not how long before. The wine and the beer were each
+followed by the next sleep, and the answer would be the same if that sleep were a week away.
+
+To ask for a sleep within six hours, say so with `within/3`. A day is 24 hours, so six hours is
+`0.25`. The rows are the same two here, since each sleep began three and a half hours after its
+drink. `0.125`, three hours, would leave neither. The sleep is no longer the next one: it is any
+sleep that began within six hours after the drink, and a night with two such starts would give two
+rows.
+
+```datalog question=alcohol-within-six-hours relation=within_six_hours
+alcohol(At, Drink) :- entry(A, "health.intake", At, _, _, _, _),
+                      attr(A, "/kind", "alcohol"), attr(A, "/drink", Drink).
+sleep_start(At) :- entry(_, "health.sleep-episode", At, _, _, _, _).
+within_six_hours(At, Drink, Next) :- alcohol(At, Drink), sleep_start(Next),
+                                     At < Next, within(At, Next, 0.25).
+```
+
+```answer question=alcohol-within-six-hours
+2026-10-21T09:00:00.000000000Z red-wine 2026-10-21T12:30:00.000000000Z
+2026-10-22T08:30:00.000000000Z beer 2026-10-22T12:00:00.000000000Z
+```
 
 ### Every medication event, by prefix
 
@@ -388,6 +483,16 @@ now(E) :- instant(At), current(E, At).
 
 ```error refused=bare-date
 instant 2026-07-20 is not a fact-time
+```
+
+A builtin with an argument nothing binds.
+
+```datalog refused=unbound-within relation=near
+near(At) :- entry(_, "health.blood-pressure", At, _, _, _, _), within(At, Other, 56).
+```
+
+```error refused=unbound-within
+within: argument B is Other, which no positive body atom binds
 ```
 
 A rule that reaches `current/2` with no instants to ask about.
@@ -471,7 +576,8 @@ starts.
 
 | Thing | Where |
 |---|---|
-| The bundled rules | `internal/query/rules/anam.dl` |
+| The bundled rules | `internal/query/rules/anam.dl`; earlier texts a receipt may name, `internal/query/rules/history/` |
+| The builtins | `internal/query/builtin.go` |
 | The evaluator, the base relations, `ReadsAttr` | `internal/query` |
 | The query read and its receipt | `internal/read/query.go`, `internal/serve/query.go` |
 | The routes | `internal/daemon/query.go`, described in `GET /v1/openapi.yaml` |

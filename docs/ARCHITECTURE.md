@@ -884,8 +884,8 @@ done by the query, over what the projection served, and the answer is a new valu
 change to any facet. Base relations are the envelope (`entry/7` with the entity, type, fact-time, series,
 status, source, and `definition_version`) and the payload fields read from the served copy
 (`attr(E, Pointer, Value)` for any pointer the schema defines, validated as fields are). Bundled
-rules (`current/2`, `displaced/2`, and `linked/2` over the edge facets, card 104) ship as a named, versioned rule set so an agent builds on
-Anam's reading of its own time semantics rather than rewriting it. The answer is a receipt like any
+rules (`current/2`, `displaced/2`, `in_force/2`, and `linked/2` over the edge facets, card 104) ship as a named, versioned rule set so an agent builds on
+Anam's reading of its own time semantics rather than rewriting it. The set is at version 2; every earlier text a receipt may name is kept, and verify picks the text by the receipt's rule-set hash. `within/3`, a distance between two fact-times, is a builtin the evaluator answers in Go, since the language has no arithmetic. The answer is a receipt like any
 other served thing: it carries the watermark and `ledger_id`, the projection name, version and
 content hash, the definition-set version, the rule-set hash, and the query text; `receipt verify`
 re-runs the same query over the same value and must get the same hash.

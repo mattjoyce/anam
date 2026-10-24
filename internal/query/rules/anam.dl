@@ -33,6 +33,15 @@ closed(E, At) :- latest(E, At), entry(E, Type, _, _, _, _, _), closes(Type).
 % close its series. An entry without a series is current from its fact-time on.
 current(E, At) :- before(E, At), not displaced(E, At), not closed(E, At).
 
+% in_force(E, F): E is current at the instant of F, the statement standing when F was
+% recorded to happen. It answers "which regimen was in force at this reading" without
+% the reading's instant being written out: join F to the series you want and ask. It
+% holds only for an F whose fact-time the query names in instant/1, which is what
+% bounds its cost, so define instant over the facets you ask about, as
+%   instant(At) :- entry(_, "health.blood-pressure", At, _, _, _, _).
+% For those F, in_force(E, F) is current(E, At) at F's fact-time, and nothing more.
+in_force(E, F) :- entry(F, _, At, _, _, _, _), current(E, At).
+
 % edge_to(E, F): the edge E names F on its to side (card 104). An edge is a
 % record.edge whose payload joins facets: `to` lists the facet ids on that side, and
 % `about`, record.note v1's name, is the same side. The kind is the edge's `/kind`

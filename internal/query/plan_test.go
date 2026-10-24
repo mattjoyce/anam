@@ -92,8 +92,8 @@ func TestBundled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Bundled: %v", err)
 	}
-	if rs.Name != "anam" || rs.Version != 1 {
-		t.Errorf("rule set is %s v%d, want anam v1", rs.Name, rs.Version)
+	if rs.Name != "anam" || rs.Version != 2 {
+		t.Errorf("rule set is %s v%d, want anam v2", rs.Name, rs.Version)
 	}
 	if !strings.HasPrefix(rs.Hash, "sha256:") || len(rs.Hash) != len("sha256:")+64 {
 		t.Errorf("hash = %q", rs.Hash)
@@ -105,7 +105,7 @@ func TestBundled(t *testing.T) {
 	for _, r := range rs.Program.Rules {
 		heads[r.Head.Name] = true
 	}
-	for _, want := range []string{"current", "displaced"} {
+	for _, want := range []string{"current", "displaced", "in_force"} {
 		if !heads[want] {
 			t.Errorf("the bundled set defines no %s", want)
 		}

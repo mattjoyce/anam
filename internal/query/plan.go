@@ -75,6 +75,9 @@ func relations(schema Schema, programs []Program) (arities map[string]int, idb m
 	}
 	for _, p := range programs {
 		for name, n := range p.Declared {
+			if _, ok := builtinNamed(name); ok {
+				return nil, nil, fmt.Errorf("%w: %s/%d is a builtin and cannot be declared", ErrInvalid, name, n)
+			}
 			if schema.Arities[name] != 0 {
 				return nil, nil, fmt.Errorf("%w: %s/%d is a base relation and cannot be declared", ErrInvalid, name, n)
 			}
@@ -84,6 +87,10 @@ func relations(schema Schema, programs []Program) (arities map[string]int, idb m
 			idb[name] = true
 		}
 		for _, r := range p.Rules {
+			if _, ok := builtinNamed(r.Head.Name); ok {
+				return nil, nil, fmt.Errorf("%w: line %d: %s/%d is a builtin; a rule cannot define it",
+					ErrInvalid, r.Line, r.Head.Name, len(r.Head.Args))
+			}
 			if schema.Arities[r.Head.Name] != 0 {
 				return nil, nil, fmt.Errorf("%w: line %d: %s/%d is a base relation; a rule cannot add to it",
 					ErrInvalid, r.Line, r.Head.Name, schema.Arities[r.Head.Name])
@@ -104,7 +111,7 @@ func checkRule(r Rule, arities map[string]int, defs Definitions) error {
 	bound := map[string]bool{}
 	atoms := []*Atom{&r.Head}
 	for _, l := range r.Body {
-		if l.Atom != nil {
+		if l.Atom != nil && !l.isBuiltin() {
 			atoms = append(atoms, l.Atom)
 			if !l.Negated {
 				for _, a := range l.Atom.Args {
@@ -130,6 +137,10 @@ func checkRule(r Rule, arities map[string]int, defs Definitions) error {
 	}
 	for _, l := range r.Body {
 		switch {
+		case l.isBuiltin():
+			if err := checkBuiltin(*l.Atom, bound); err != nil {
+				return fmt.Errorf("%w: line %d: %v", ErrInvalid, l.Atom.Line, err)
+			}
 		case l.Negated:
 			for _, a := range l.Atom.Args {
 				if a.IsVar() && a.Var != "_" && !bound[a.Var] {
@@ -285,7 +296,7 @@ func bodyReads(rules []Rule) map[string][]string {
 	reads := map[string][]string{}
 	for _, r := range rules {
 		for _, l := range r.Body {
-			if l.Atom != nil {
+			if l.Atom != nil && !l.isBuiltin() {
 				reads[r.Head.Name] = append(reads[r.Head.Name], l.Atom.Name)
 			}
 		}

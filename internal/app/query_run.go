@@ -288,6 +288,14 @@ func writeCatalogue(cmd *cobra.Command, cat api.QueryCatalogue, asJSON bool) err
 	for _, r := range append(append([]query.Relation{}, cat.Relations...), cat.Rules.Relations...) {
 		_, _ = fmt.Fprintf(out, "  %-10s %s(%s)\n      %s\n", r.Kind, r.Name, strings.Join(r.Args, ", "), r.Doc)
 	}
+	_, _ = fmt.Fprintln(out, "\nbuiltins")
+	for _, b := range cat.Builtins {
+		names := make([]string, len(b.Args))
+		for i, a := range b.Args {
+			names[i] = a.Name
+		}
+		_, _ = fmt.Fprintf(out, "  %s(%s)\n      %s\n", b.Name, strings.Join(names, ", "), b.Doc)
+	}
 	_, _ = fmt.Fprintf(out, "\nrules  %s v%d  %s\n\ntypes\n", cat.Rules.Name, cat.Rules.Version, cat.Rules.Hash)
 	for _, t := range cat.Types {
 		line := fmt.Sprintf("  %s  v%d", t.Type, t.Current)

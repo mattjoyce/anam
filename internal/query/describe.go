@@ -66,6 +66,8 @@ type Catalogue struct {
 	Instant   InstantLexeme    `json:"instant"`
 	Types     []TypeAttributes `json:"types"`
 	Rules     RuleSetInfo      `json:"rules"`
+	// Builtins are the predicates the evaluator answers in Go, each with its contract.
+	Builtins []Builtin `json:"builtins"`
 }
 
 // Syntax is the language in a paragraph, for an agent about to write a program.
@@ -78,7 +80,9 @@ Relation names are lower-case, variables start upper-case, _ matches anything. C
 fact-times compare chronologically; numbers numerically; different kinds are unequal and unordered.
 Every variable in a head, a negation or a comparison must appear in a positive body atom; negation
 may not cycle. The answer is one relation, named with the query. current/2 and displaced/2 need
-instant/1 defined, as facts with the whole fact-time lexeme or as a rule over entry/7.`
+instant/1 defined, as facts with the whole fact-time lexeme or as a rule over entry/7.
+Builtins are guards written like atoms, true or false of values already bound; see the builtins
+in this catalogue for each one's arguments. A day, where one is counted, is 24 hours of UTC.`
 
 // Held is every Definition body Anam holds, by type and version: what the daemon
 // serves at /v1/definitions and def.Manifests carries.
@@ -124,6 +128,7 @@ func Describe(defs Definitions, held Held) (Catalogue, error) {
 		Relations: baseRelations,
 		Instant:   InstantLexeme{Layout: clock.Layout, Example: "2026-06-15T00:00:00.000000000Z"},
 		Rules:     RuleSetInfo{Name: rules.Name, Version: rules.Version, Hash: rules.Hash, Text: rules.Program.Text},
+		Builtins:  Builtins(),
 	}
 	cat.Rules.Relations = ruleRelations(rules.Program)
 	for _, d := range defs.All() {

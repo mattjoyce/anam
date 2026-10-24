@@ -13,7 +13,7 @@ import (
 // Card 107: a part is its envelopes, order aside. A resend of a part number with
 // other envelopes is 409 and admits nothing, while the run is incomplete and after it
 // completes; an exact retry, in any order, is 200 and changes nothing. The audit
-// (reviews/api-pressure-2026-10-11, finding 2) resent a completed 1/1 part with
+// (the API pressure review of 2026-10-11, finding 2, in the private review notes) resent a completed 1/1 part with
 // another facet and watched carried and absent move under a fixed completed_w.
 func TestSnapshotPartIsBoundToItsEnvelopes(t *testing.T) {
 	cfg := importerConfig(t)

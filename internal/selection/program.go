@@ -24,7 +24,10 @@ const (
 
 // header opens every program: what it is, and the declaration that makes pick/1 a
 // relation even when nothing is selected, so an empty selection answers empty.
-const header = "% An Anam selection (card 199): pick/1 holds the facets it selects.\n" + Relation + "/1.\n"
+const (
+	headerComment = "% An Anam selection (card 199): pick/1 holds the facets it selects.\n"
+	headerDecl    = Relation + "/1.\n"
+)
 
 // The variables of the rules' entry atom, one per slot a criterion reads.
 const (
@@ -53,8 +56,8 @@ const ZoneComment = "% dates read in "
 // ProgramIn does.
 func (f Filter) Program() (string, error) { return f.ProgramIn("") }
 
-// ProgramIn is Program with the zone the dates were read in, as a comment line after
-// the header, when the filter has a bound and the zone is one ZoneOf would read back.
+// ProgramIn is Program with the zone the dates were read in, as a comment line under
+// the header's own, when the filter has a bound and the zone is one ZoneOf would read back.
 // A filter without a bound read no date, and a zone that is not an IANA name is not
 // written.
 func (f Filter) ProgramIn(zone string) (string, error) {
@@ -63,10 +66,11 @@ func (f Filter) ProgramIn(zone string) (string, error) {
 	}
 	c := f.Canonical()
 	var b strings.Builder
-	b.WriteString(header)
+	b.WriteString(headerComment)
 	if (c.From != "" || c.To != "") && validZone(zone) {
 		b.WriteString(ZoneComment + zone + "\n")
 	}
+	b.WriteString(headerDecl)
 	if c.HasCriteria() {
 		for _, typ := range orNone(c.Types) {
 			for _, src := range orNone(c.Sources) {

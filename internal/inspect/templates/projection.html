@@ -57,6 +57,10 @@
     <label for="to">to (fact time)</label>
     <input type="date" name="to" id="to" value="{{.To}}">
   </div>
+  <div>
+    <label for="zone">dates are days in (zone)</label>
+    {{template "zoneinput" .Zone}}
+  </div>
   {{end}}
   <div><button type="submit">read</button></div>
   {{if .AsOfSet}}<div><a href="{{.NowLink}}">back to now</a></div>{{end}}
@@ -138,5 +142,6 @@
 </table>
 </div>
 {{end}}
+{{template "readzone.html"}}
 </body>
 </html>

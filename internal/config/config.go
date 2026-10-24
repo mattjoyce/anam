@@ -55,7 +55,8 @@ type Config struct {
 	// Zone is the reader's zone: the one a bare date on the command line is taken in
 	// and fact-times are shown in. It is not a fact-time rule — each Definition
 	// carries the zone its source's clock is read in — it is where the person reading
-	// is standing. Defaults to Local.
+	// is standing. The Workbench's pages read a bare date in it when a request names
+	// no zone of its own (card 236). Defaults to Local.
 	Zone string `mapstructure:"zone"`
 
 	// Listen is the address `anam daemon` serves on. It defaults to loopback, and the

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/url"
 	"sort"
+	"time"
 
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/read"
@@ -38,7 +39,10 @@ type selectData struct {
 	Basket          []basketItem
 	Excluded        []basketItem
 	Handoff         string
-	Limit           int
+	// Timeline is the timeline over the filter as it stands (card 237); "" when the
+	// page has no filter to show, a program outside the criteria that is not saved.
+	Timeline string
+	Limit    int
 	// CanSave says the page can save its program under a code (card 206); Saved is
 	// the saved selection the page was opened at, nil when it was not.
 	CanSave bool
@@ -109,7 +113,7 @@ func (s *Server) selectData(ctx context.Context, st selectState, served fold.Val
 		W: int64(res.W), Served: served.Len(), Chips: st.program == "", Program: st.program, Limit: rowLimit,
 	}
 	if d.Chips {
-		if d.Program, err = st.filter.Program(); err != nil {
+		if d.Program, err = st.filter.ProgramIn(st.zone.Name); err != nil {
 			return selectData{}, err
 		}
 	} else if _, err := selection.Parse(st.program); err != nil {
@@ -254,10 +258,10 @@ func chips(st selectState, rows []selection.Row) []chip {
 		out = append(out, chip{Label: label, Count: n, Remove: st.with(remove).URL()})
 	}
 	if f.From != "" {
-		add("from "+dayOf(f.From, false), func(x *selection.Filter) { x.From = f.From }, func(c *selectState) { c.filter.From = "" })
+		add("from "+dayOf(f.From, false, st.zone.Loc), func(x *selection.Filter) { x.From = f.From }, func(c *selectState) { c.filter.From = "" })
 	}
 	if f.To != "" {
-		add("to "+dayOf(f.To, true), func(x *selection.Filter) { x.To = f.To }, func(c *selectState) { c.filter.To = "" })
+		add("to "+dayOf(f.To, true, st.zone.Loc), func(x *selection.Filter) { x.To = f.To }, func(c *selectState) { c.filter.To = "" })
 	}
 	// Types are a union, as are sources: each one's count is of the ones so far.
 	for _, p := range f.Types {
@@ -351,17 +355,22 @@ func (d selectData) Hidden(except ...string) []hiddenInput {
 type hiddenInput struct{ Name, Value string }
 
 // FromValue and ToValue are the bounds as the form's inputs show them.
-func (d selectData) FromValue() string { return boundValue(d.State.filter.From, false) }
+func (d selectData) FromValue() string {
+	return boundValue(d.State.filter.From, false, d.State.zone.Loc)
+}
 
 // ToValue is the to bound as the form shows it.
-func (d selectData) ToValue() string { return boundValue(d.State.filter.To, true) }
+func (d selectData) ToValue() string { return boundValue(d.State.filter.To, true, d.State.zone.Loc) }
 
-func boundValue(lexeme string, upper bool) string {
+func boundValue(lexeme string, upper bool, loc *time.Location) string {
 	if lexeme == "" {
 		return ""
 	}
-	return dayOf(lexeme, upper)
+	return dayOf(lexeme, upper, loc)
 }
+
+// Zone is the zone the page's dates are read in, for the field beside them.
+func (d selectData) Zone() readZone { return d.State.zone }
 
 // Superseded reports whether the filter reads versions no longer in force.
 func (d selectData) Superseded() bool { return d.State.filter.Standing == selection.Superseded }

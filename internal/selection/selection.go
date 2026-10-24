@@ -204,18 +204,20 @@ func (f Filter) Picks(rows []Row) []string {
 
 // Days is the fact-time bounds of whole days: from the start of from to the start of
 // the day after to, so a range of one day is from and to the same date. Either may be
-// "" for open. The days are UTC's, as the projection page's are.
-func Days(from, to string) (string, string, error) {
+// "" for open. The days are loc's (UTC when loc is nil), the reader's zone, as a bare
+// date is everywhere else (clock.ParseBound); the bounds are instants, so the zone is
+// not part of what they say.
+func Days(from, to string, loc *time.Location) (string, string, error) {
 	var lo, hi string
 	if from != "" {
-		t, err := time.Parse(time.DateOnly, from)
+		t, err := clock.Day(from, loc)
 		if err != nil {
 			return "", "", fmt.Errorf("%w: from %q is not YYYY-MM-DD", ErrInvalid, from)
 		}
 		lo = clock.Format(t)
 	}
 	if to != "" {
-		t, err := time.Parse(time.DateOnly, to)
+		t, err := clock.Day(to, loc)
 		if err != nil {
 			return "", "", fmt.Errorf("%w: to %q is not YYYY-MM-DD", ErrInvalid, to)
 		}

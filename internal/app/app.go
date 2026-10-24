@@ -113,12 +113,13 @@ func inspectCmd(cfgPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			zone, _ := cfg.ZoneName() // a Local zone with no name reads dates in UTC
 
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "inspecting ledger %s (person %s), read-only\nhttp://%s/\n",
 				cfg.LedgerPath, cfg.PersonID, listen)
 			return inspect.Serve(cmd.Context(), listen, inspect.Deps{
 				Ledger: l, Timeout: cfg.Timeout, Buckets: buckets, Library: cfg.LibraryDir,
-				CachedReads: cfg.InspectCachedReads, MaxReadBytes: cfg.MaxReadBytes,
+				CachedReads: cfg.InspectCachedReads, MaxReadBytes: cfg.MaxReadBytes, Zone: zone,
 			}, cfg.HTTPReadHeaderTimeout, cfg.ShutdownGrace)
 		},
 	}

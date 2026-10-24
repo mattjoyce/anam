@@ -90,12 +90,27 @@ func (s *Server) saveSelection(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/select?"+q.Encode(), http.StatusSeeOther)
 }
 
+// savedZone is the zone a saved selection's dates were read in: the one its program
+// names in a comment, else UTC, the days every selection read before the comment
+// existed (card 236). The instants in the program do not change with it; it says what
+// the dates meant.
+func savedZone(saved selection.Saved) (readZone, error) {
+	name := selection.ZoneOf(saved.Program)
+	if name == "" {
+		name = defaultZone
+	}
+	z, err := zoneNamed(name)
+	z.Given, z.Dated = true, true
+	return z, err
+}
+
 // savedView is a saved selection as the selection page shows it: its code and the
-// addresses that open it.
+// addresses that open it. Zone is the zone its dates were read in, "" when it read none.
 type savedView struct {
 	Code, Ref, Hash                 string
 	SelectURL, TimelineURL, LinkURL string
 	HighlightURL                    string
+	Zone                            string
 }
 
 func savedViewOf(saved selection.Saved) savedView {
@@ -222,7 +237,7 @@ func (s *Server) drawSelection(ctx context.Context, w http.ResponseWriter, q url
 	if !zoomed && len(only) > 0 {
 		// The window was the whole record's, so the program ran over all of it;
 		// fitting it to what was picked changes what is drawn, not what is picked.
-		from, to, _, _ = parseWindow("", "", only)
+		from, to, _, _ = parseWindow("", "", only, time.UTC)
 	}
 	return sel, only, from, to, true
 }

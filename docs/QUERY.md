@@ -523,15 +523,38 @@ nothing of it.
 
 ```datalog selection=summer-medication relation=pick
 % An Anam selection (card 199): pick/1 holds the facets it selects.
+% dates read in Australia/Sydney
 pick/1.
 pick(E) :- entry(E, T, At, _, _, S, _),
     T > "health.medication.", T < "health.medication/",
     S = "self-log",
-    At >= "2026-06-01T00:00:00.000000000Z", At < "2026-09-01T00:00:00.000000000Z",
+    At >= "2026-05-31T14:00:00.000000000Z", At < "2026-08-31T14:00:00.000000000Z",
     not unpick(E).
 pick("w1").
 unpick("m4").
 ```
+
+A bare date on the page is a day in the reader's zone, as it is everywhere else (the `zone` parameter,
+below), so "from 1 June to 31 August" typed in Sydney becomes the instants of Sydney's midnights, and the
+program says so in the one comment line under its header: `% dates read in Australia/Sydney`. The
+instants mean the same in any zone; the comment records what the dates meant to the person who chose
+them, and `selection.Parse` ignores it as it ignores every comment. A filter with no bound writes no
+comment. Saving keeps the line, so the same instants read in another zone are another saved selection;
+a program saved before the line existed has none, and its page says its dates were read in UTC.
+
+On the select page, the projection page's rows view, the timeline and the location page, a bare `from` or `to`
+is a day in the zone the `zone` parameter names, an IANA name shown beside the dates and editable. A
+request without one reads in the zone the daemon is configured with (`zone`, `ANAM_ZONE`; UTC when that is
+`Local` with no name to send). The page's script fills the field with the browser's own zone while nothing on
+the page has been read in a zone yet, the way the entry form fills a fact's zone, and the form sends it from
+then on. An unknown zone, and `Local`, are a 400 that names the zone. The `as-of` on the projection page
+stays UTC: it is an anam-time, not a day.
+
+The timeline and the select page hand a range to each other as links: "select in this range", on a
+zoomed timeline only, opens `/select` with the window as `from`/`to`, the type filter and the zone, and
+"show on timeline", on the select page, opens `/` at the filter's `from`/`to`, its types and the zone, with
+`sel` when the page was opened at a saved selection. A bound is written as a date when it is midnight in the
+zone and as an instant otherwise, so a Sydney day stays a Sydney day in both directions.
 
 A program a person edits past what the chips can express (a join, a recursion, an `attr`) still runs,
 as text. `selection.Parse` reads a program back to criteria only when the builder could have written
@@ -543,8 +566,8 @@ A selection is handed on as its program, and also as a short code. "Save this
 selection" on the select page, or `POST /v1/selections` with `{"program": "..."}`, files the program
 as a row of kind `selection`, addressed by the SHA-256 of its canonical text, and answers its
 code, written `sel:<code>`. The canonical text is what `selection.Parse` then `Program` write for a
-program within the chip grammar, so the same selection written in another layout or rule order has
-the same code; any other program is saved as its text, trimmed.
+program within the chip grammar (with the zone line it names, if any), so the same selection written in
+another layout or rule order has the same code; any other program is saved as its text, trimmed.
 
 The code is the first 8 hex digits of the hash. At save, if another saved selection shares those 8,
 the new one's code lengthens to the shortest prefix of its hash that no other saved selection shares,

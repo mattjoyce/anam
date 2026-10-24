@@ -161,6 +161,7 @@
     <div class="row">
       <label>from <input name="from" id="from" value="{{.From}}" placeholder="2026-03-07 or RFC 3339"></label>
       <label>to <input name="to" id="to" value="{{.To}}" placeholder="2026-06-06 or RFC 3339"></label>
+      <label>zone {{template "zoneinput" .Zone}}</label>
       <button type="submit">compose</button>
       <span class="nav">
         <a href="{{.Nav.Left}}" id="nav-left" title="pan left (←)">◀</a>
@@ -169,6 +170,7 @@
         <a href="{{.Nav.Right}}" id="nav-right" title="pan right (→)">▶</a>
       </span>
       {{if or .Zoomed .HasDefault}}<a href="/?view=whole" id="whole">whole person</a>{{end}}
+      {{if .SelectRange}}<a href="{{.SelectRange}}" id="select-range" title="the select page, filtered to this window, these types and this zone">select in this range</a>{{end}}
       <span class="dim hint">drag a span on the band · arrows pan, + − zoom · wheel zooms at the cursor · shift-drag selects marks, ctrl-click toggles one</span>
     </div>
     <div class="row presets">
@@ -407,5 +409,6 @@
       t.addEventListener('change', () => document.querySelector('.controls').submit()));
   })();
 </script>
+{{template "readzone.html"}}
 </body>
 </html>

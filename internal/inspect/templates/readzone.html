@@ -1,0 +1,17 @@
+{{define "zoneinput"}}<input name="zone" id="zone" value="{{.Name}}" size="20" autocomplete="off" spellcheck="false" placeholder="Australia/Sydney" title="an IANA zone name; a bare date is a day in this zone"{{if .Fillable}} data-fill{{end}}>{{end}}
+{{define "readzone.html"}}
+<script>
+  // A bare date is a day where the reader stands (card 236). The field starts as the
+  // zone the daemon is configured with; on a page that has read no date yet it becomes
+  // the browser's own, the way the entry form fills a fact's zone, and the form sends
+  // it from then on. A page that already read a date in a zone keeps that zone: the
+  // field says what the dates on the page mean, and changing it is the person's.
+  (function () {
+    var zone = document.getElementById('zone');
+    if (!zone || !zone.hasAttribute('data-fill')) return;
+    var here = '';
+    try { here = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+    if (here) zone.value = here;
+  })();
+</script>
+{{end}}

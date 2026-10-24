@@ -75,13 +75,16 @@ type Saved struct {
 // Ref is the code as it is written to be read: sel:<code>.
 func (s Saved) Ref() string { return CodePrefix + s.Code }
 
-// CanonicalText is the text a program is saved and hashed as: what Program writes for
-// the filter Parse reads off it when it is within the chip grammar, so a program
+// CanonicalText is the text a program is saved and hashed as: what ProgramIn writes for
+// the filter Parse reads off it, with the zone it names, when it is within the chip grammar, so a program
 // rewritten in another layout or order is the same selection, and otherwise the text
 // as given, trimmed.
 func CanonicalText(text string) string {
 	if f, err := Parse(text); err == nil {
-		if p, err := f.Program(); err == nil {
+		// The zone the dates were read in is part of what the selection says, so it
+		// stays: a selection saved from 12 Oct in Sydney is not the same selection as
+		// the same instants read in UTC.
+		if p, err := f.ProgramIn(ZoneOf(text)); err == nil {
 			return p
 		}
 	}

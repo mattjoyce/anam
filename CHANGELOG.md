@@ -9,6 +9,25 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- A bare date in the Workbench is a day in the reader's zone (card 236), the rule the API, the CLI
+  and anam-mcp already kept. The select page, the projection page's rows view, the timeline and the
+  location page read `from` and `to` in a `zone` parameter (an IANA name), shown in a field beside
+  the dates. A request without one reads in the daemon's configured zone (`zone`, `ANAM_ZONE`; UTC
+  when that is `Local` with no name), and the page's script fills the field with the browser's zone
+  while nothing on the page has been read yet. An unknown zone, and `Local`, are a 400 naming the
+  zone. Before, these pages read a date as a UTC day, so a selection "from 12 Oct" built in Sydney
+  started at 11:00 on the 12th and missed a 07:30 blood draw. A selection program carries one
+  comment line, `% dates read in Australia/Sydney`, which `Parse` ignores and a save keeps; a saved
+  selection keeps its instants, and its page names the zone its dates were read in, UTC when it has no
+  comment. A bound is written back as a date only when it is midnight in the zone. A selection saved
+  from a page now carries the zone line, so it has a different code from the same instants saved
+  without it. The projection page's as-of stays UTC. A caller of `selection.Days` now passes the zone.
+- The timeline and the select page hand a range to each other (card 237). A zoomed timeline offers
+  "select in this range" and the select page offers "show on timeline"; each is a link to the
+  existing route carrying the window, the type filter and the zone (dates when the window lies on
+  the zone's midnights, instants otherwise), so a Sydney day stays a Sydney day both ways. An
+  unzoomed timeline offers no range, a saved selection is drawn as before, and the source filter does
+  not travel. No new route.
 - The query rules say "within" and "in force at" (card 212). `within(A, B, Days)` is true when two
   fact-times are at most `Days` days apart, a day being 24 hours of UTC, and `Days` may be a decimal
   (`0.25` is six hours). It is the first of a table of builtins, predicates the evaluator answers in

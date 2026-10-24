@@ -28,6 +28,7 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/projection"
+	"github.com/mattjoyce/anam/internal/read"
 	"github.com/mattjoyce/anam/internal/span"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
@@ -98,6 +99,10 @@ type Server struct {
 	// POST /v1/query (card 199); zero is no bound.
 	maxReadBytes int
 
+	// zone is the IANA zone a page reads a bare date in when the request names none
+	// (card 236): the daemon's configured zone.
+	zone string
+
 	// selections saves and opens selections by their short code (card 206); nil
 	// means this inspector keeps none, and ?sel= answers so.
 	selections Selections
@@ -163,6 +168,10 @@ type Deps struct {
 	// page runs (max_read_bytes, the bound POST /v1/query answers within); zero is no
 	// bound.
 	MaxReadBytes int
+	// Zone is the daemon's configured zone as an IANA name, the zone a page reads a
+	// bare date in when the request names none (card 236); "" or a name that does not
+	// load reads in UTC.
+	Zone string
 }
 
 // Handler returns the inspector's routes on a fresh mux.
@@ -171,7 +180,7 @@ func Handler(d Deps) http.Handler {
 		ledger: d.Ledger, timeout: d.Timeout, buckets: d.Buckets, library: d.Library,
 		defs: d.Definitions, heldDefs: d.Held, checkpoints: d.Checkpoints, edges: d.Edges, projections: d.Projections,
 		cachedReads: d.CachedReads, bench: d.Workbench, maxReadBytes: d.MaxReadBytes, selections: d.Selections,
-		roster: d.Roster, pages: pagesFor(d.Build, d.Roster != nil),
+		roster: d.Roster, zone: deployedZone(d.Zone), pages: pagesFor(d.Build, d.Roster != nil),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.timeline)
@@ -394,4 +403,13 @@ func (s *Server) render(w http.ResponseWriter, name string, data any) {
 
 func httpError(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), http.StatusInternalServerError)
+}
+
+// deployedZone is the default zone a Deps names, UTC when it names none or one that
+// will not load.
+func deployedZone(name string) string {
+	if _, err := read.NamedLocation(name); err != nil {
+		return defaultZone
+	}
+	return name
 }

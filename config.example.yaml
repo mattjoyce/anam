@@ -113,7 +113,9 @@ checkpoint_budget: 1048576
 
 # --- the reader ---------------------------------------------------------------
 # The zone a bare date on the command line is read in and fact-times are shown in.
-# Local is this machine's; a read sent to a daemon carries its IANA name.
+# Local is this machine's; a read sent to a daemon carries its IANA name. The daemon's
+# Workbench pages read a bare date in this zone when a request names none (the pages
+# take a zone parameter).
 # zone: Australia/Sydney
 
 # A running daemon to ask instead of opening the files (scheme and host only).

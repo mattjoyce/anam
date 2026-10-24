@@ -192,7 +192,8 @@ func TestDocs_SelectionProgramIsWhatTheBuilderWrites(t *testing.T) {
 	filters := map[string]selection.Filter{
 		"summer-medication": {
 			Types: []string{"health.medication."}, Sources: []string{"self-log"},
-			From: day("2026-06-01"), To: day("2026-09-01"), Exclusions: []string{"m4"}, Ticks: []string{"w1"},
+			// 1 June to 31 August in Sydney, where June is UTC+10.
+			From: "2026-05-31T14:00:00.000000000Z", To: "2026-08-31T14:00:00.000000000Z", Exclusions: []string{"m4"}, Ticks: []string{"w1"},
 		},
 	}
 	seen := 0
@@ -206,7 +207,7 @@ func TestDocs_SelectionProgramIsWhatTheBuilderWrites(t *testing.T) {
 		if !ok {
 			t.Fatalf("line %d: no filter named %q in the test", b.line, name)
 		}
-		got, err := f.Program()
+		got, err := f.ProgramIn("Australia/Sydney")
 		if err != nil {
 			t.Fatal(err)
 		}

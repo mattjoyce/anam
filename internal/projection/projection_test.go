@@ -135,7 +135,7 @@ func TestBundled_ParsesBpAndSleep(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Bundled: %v", err)
 	}
-	if got, want := r.Names(), []string{"activity", "attention", "body", "bp", "career", "clinical", "doses", "employment", "intake", "meds", "sleep"}; !reflect.DeepEqual(got, want) {
+	if got, want := r.Names(), []string{"activity", "attention", "body", "bp", "career", "clinical", "doses", "employment", "intake", "meds", "purchases", "sleep"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("bundled names = %v, want %v", got, want)
 	}
 	// Card 147: meds v2 names the types under the health domain, and card 196 gave them

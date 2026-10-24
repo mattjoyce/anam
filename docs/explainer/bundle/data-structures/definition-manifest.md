@@ -25,7 +25,7 @@ references: []
 | `kind` | what sort of fact the type records, for readers: `measure`, `reading` or `event` (card 176); the gate ignores it | none |
 | `family` | the lower-case hyphenated word a reader groups the type under (`meds`, `sleep`); the inspector draws the type on that row (card 176); the gate ignores it | none |
 
-Schema rules at load: top-level object with properties; every required property refuses null and the empty string; the top-level field behind every keying pointer is required; every object sets `additionalProperties`; no `$ref` leaves the manifest; nothing is fetched.
+Schema rules at load: top-level object with properties; every required property refuses null and the empty string; the top-level field behind every keying pointer is required; every object sets `additionalProperties`, except a branch of `if`, `then`, `else`, `allOf`, `anyOf`, `oneOf` or `not`, which narrows the object it sits in and closes nothing (card 233); no `$ref` leaves the manifest; nothing is fetched.
 
 A version that only loosens a rule leaves older values valid: `note.annotation` v3 (card 157) made `about` optional, so v1 and v2 notes stay valid and a note may name no facet yet, because an account can come before the observation it describes. Identity, mechanism and fact time did not change (v2 timed a note by when it was written, not by the moment it is about). A renamed type starts again at v1 under its new name, so the type's lineage is `note.annotation` (v1 to v3), then `record.note` (v1, v2), now `record.edge` (cards 147 and 191), and that body is `record.edge` v1; v2 (card 198) requires `source_time` and is read at its offset.
 

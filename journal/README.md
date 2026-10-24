@@ -52,12 +52,19 @@ Two kinds of note:
   - [[2026-10-15-words-first-then-what-a-model-makes-of-them]] — the sorting reviewed in four questions, the journal and its decision notes caught up, card 93 designed by Matt (words as a note, a model's reading as endorsed drafts), and card 157 lets an assistant save his words; card 89 gives every token a role.
   - [[2026-10-17-the-repos-go-public-the-places-i-stop-and-what-i-was-on-in-june]] — anam and anam-mcp go public; `location.stay` names the places Matt stops, a sibling facet from source `osm`, live with five stays; the supplements hand-written as `med.*` and the three guesses that make card 166's `handling` block; a snapshot projection took its snapshot at the head, not at `--at`.
   - [[2026-10-18-a-facet-with-eleven-versions]] — one sleep facet, two bugs below Anam: the importer stamped Sydney wall clock with `Z` since the container's zone was set, and GarminDB's analyze guard counted tomorrow's row (a Date key against datetime bind strings), rewriting the day every hour; both fixed, the churn's proof pending.
+  - [[2026-10-19-any-type-and-a-board-read-against-the-code]] — any facet under an authorised token (`any_type`, `save_fact`); fifty cards read against the code by three agents; the query's first slice; the taxonomy keeps anam time by supersedence.
+  - [[2026-10-20-the-taxonomy-flips-and-the-examiner-becomes-a-workbench]] — 6,868 facets renamed in one ledger; two receipts stop verifying and a retired series is the cause; links live; the Examiner becomes the Workbench and writes.
+  - [[2026-10-21-the-fact-names-its-zone]] — the note becomes an edge; where a distinction is encoded, vendor leaves and third segments; `source_time` and every writer's offset; the picker becomes a Datalog program.
+  - [[2026-10-22-schema-nine-a-policy-package-and-a-ninth-head]] — checkpoints are a cache; receipts name their reader; the policy package; `mind` as a ninth head; opencode arrives; Anam is not a hospital.
+  - [[2026-10-23-fourteen-thousand-hours-and-a-cap]] — an hour of heart rate, 14,617 of them, backfilled round the gateway when the response outgrew Ductile's 10 MiB cap; the default projection; shearline assessed.
+  - [[2026-10-24-six-cards-two-windows-and-what-it-is-like-to-operate]] — projections by concept, intake, labels, the copy button, the retired type gone; two windows; a stale README; what strictness costs a runner.
 - Decision notes
   - [[the-inversion]] · [[person-substrate-grain]] · [[mint-unit-whole-timeline]]
   - [[facet-types-dotted-namespaced]] · [[facet-definition-format]]
   - [[verbatim-payload-metadata-separation]] · [[guiding-lens-hickey-armstrong]]
   - [[fixed-width-timestamps-lexical-order]] · [[canonicalisation-fixes-serialisation-not-values]]
   - [[invariants-as-structural-tests]]
+  - [[every-writer-says-how-its-clock-was-read]] · [[size-the-risk-to-a-personal-record]] · [[a-domain-head-is-added-by-decision-not-earned]]
   - [[partition-key-has-no-default]] · [[config-explicit-fails-discovered-defaults]]
   - [[brooks-below-the-gate-beck-above-it]] · [[substrate-is-accidental]]
   - [[invariants-enforced-by-the-substrate]]

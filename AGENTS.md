@@ -172,11 +172,11 @@ Go, and these rules hold:
 | Env var | UPPER_SNAKE | `ANAM_LEDGER_PATH` |
 
 Facet types are **dotted `domain.concept[.specialisation…]`** on purpose. The domain is a closed set
-of ten (`health`, `activity`, `place`, `record`, `mind` and `org`, with `social`, `money`, `media` and
+of ten (`health`, `activity`, `place`, `record`, `mind`, `org` and `money`, with `social`, `media` and
 `work` reserved), so growth is in the concept, in a specialisation after it, and in `family`, not in new
 heads (`health.blood-pressure`, `social.message`, `media.play`). A head is added only by a logged
-decision, as `mind` was for self-reported inner states and `org` for relationships with
-organisations. Which of those a distinction
+decision, as `mind` was for self-reported inner states, `org` for relationships with
+organisations and `money` for what the person paid. Which of those a distinction
 belongs in is written down in `docs/explainer/bundle/decisions/where-a-distinction-is-encoded.md`.
 Payload keys stay snake_case; the dotted facet type is deliberate and lives here so it doesn't drift.
 

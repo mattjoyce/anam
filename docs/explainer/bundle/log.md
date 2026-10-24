@@ -245,3 +245,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: `org` is the tenth domain head, decided by Matt on 2026-10-24. Three Definitions are bundled, `org.employment.started`, `org.employment.role-changed` and `org.employment.ended` (a start, a restated role and an end, in a series keyed by org and stint; Confidential, strict, a local date with a precision, no pay field, an id declared by a template), and two projections, `career` (a log over the prefix `org.employment.`) and `employment` (a snapshot that drops an ended period). The timeline draws an employment row.
 - Bundle: the employment term is new, and the definition-manifest, projection-template and where-a-distinction-is-encoded pages say ten domains and the new counts: 43 bundled Definitions, 35 terms.
+
+## 2026-10-25, card 241
+
+- Code: `money` is opened from the reserved four, decided by Matt on 2026-10-25, so the count of domain heads stays ten. One Definition is bundled, `money.purchase` (one order or receipt, with its lines in `items`; Confidential, strict, a local date in Australia/Sydney, no `source_time`, an id declared by a template from the merchant and the order reference, amounts in the document's currency and never converted, no field for the person's judgement about it), and one projection, `purchases` (a log over `money.purchase`). The timeline draws a purchases row.
+- Bundle: the purchase term is new, and the definition-manifest, projection-template and where-a-distinction-is-encoded pages say `money` is in use and give the new counts: 44 bundled Definitions, 36 terms.

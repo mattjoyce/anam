@@ -7,6 +7,7 @@
 * [Canonical](canonical.md) - The live-only value of the fold at a watermark; superseded and tombstoned facets are excluded from it.
 * [Checkpoint](checkpoint.md) - An immutable, content-addressed value of the live-only fold over one bucket at a watermark, there only to bound replay.
 * [Derived span](derived-span.md) - A lens the person names over the timeline, composed on demand from bucket values and never minted.
+* [Employment (the org domain)](employment.md) - Where the person worked and in what role, kept as a start, changes of role and an end, one series per period with an employer; the first concept in the org domain.
 * [Envelope](envelope.md) - The one message an importer hands the gate; the only way anything enters the ledger.
 * [Error kernel](error-kernel.md) - The small trusted core that must not corrupt: the append-only ledger plus the gate's admission invariants.
 * [Facet](facet.md) - The atomic unit Anam keeps, a source fragment held verbatim plus the metadata that governs it.

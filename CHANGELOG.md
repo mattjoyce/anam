@@ -9,6 +9,22 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- Anam can hold where a person worked and in what role (card 239). `org` is a tenth domain head, for
+  relationships with organisations, so a membership can join later as `org.membership`; a head is
+  added only by a logged decision. `work` stays reserved for projects, tasks and output. Three
+  Definitions are bundled at v1, `org.employment.started`, `org.employment.role-changed` and
+  `org.employment.ended`, in a series keyed by `org` and `stint`: `ended` closes it, and leaving and
+  rejoining is a new stint. `org` has one spelling, lower case with hyphens (`example-health`).
+  `date` is a local date in Australia/Sydney with a `date_precision` of `day`, `month` or `year`;
+  a coarser precision requires the first day of that month or year, and the schema refuses any
+  other day. An `ended` row is dated the first day the person was no longer employed. A
+  `role-changed` row restates the whole role, so a snapshot of the latest row of a stint still
+  holds it all. All three are Confidential and strict, carry no `source_time` (a date is a local date, card 198), declare their id
+  (`<source>:employment/<org>/<stint>/started`, the same with `ended`, and
+  `.../role-changed/<date>`) and have no field for pay. Two bundled projections serve them,
+  `career` (a log over `org.employment.`) and `employment` (a snapshot: read at a fact-time bound it
+  answers where the person was working that day, with an ended stint gone). Neither joins
+  `recent-life`. The first writer is a records file by hand.
 - A bare date in the Workbench is a day in the reader's zone (card 236), the rule the API, the CLI
   and anam-mcp already kept. The select page, the projection page's rows view, the timeline and the
   location page read `from` and `to` in a `zone` parameter (an IANA name), shown in a field beside

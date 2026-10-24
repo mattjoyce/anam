@@ -1,0 +1,26 @@
+{
+  "meta": {
+    "facet_type": "org.employment.ended",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "employment",
+    "classification": "Confidential",
+    "validation_mode": "strict",
+    "source_schema": "records/org.employment.ended",
+    "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}},
+    "identity_key": ["/id"],
+    "identity_template": "{source}:employment/{/org}/{/stint}/ended",
+    "min_binding_assurance": "medium",
+    "series": {"name": "org.employment", "key": ["/org", "/stint"], "closes": true}
+  },
+  "handling": {"guidance": "The end of one period of employment. It closes the org.employment series its started opened, and a read after it no longer shows that stint. org is one agreed spelling per organisation across every source and every org type: lower case, words joined by hyphens, the name the person uses for it and not its legal entity (employer and legal_entity carry those). With stint it is the series key, so a typo or a second spelling makes a second employment. stint must be the one the started opened, or nothing closes. date is a local date in Australia/Sydney, wherever the employer is; the Definition reads it in that zone and carries no zone_pointer. When the source knows only the month or the year, date is the first day of that month or year and date_precision says month or year, which the schema holds to (month means a date ending -01, year a date ending -01-01); basis says why the date is believed. Here date is the first day the person was no longer employed, the day after the last day worked, because a date is the start of its day and the stint is closed from then: a last day of 30 June is written 1 July, and a read at any moment on 30 June still finds the stint open. Say the last day worked in basis or source_note. Pay is never written here, in any org.employment type: not salary, rate, allowance or bonus. The id is declared in identity_template, <source>:employment/<org>/<stint>/ended, so there is one end per stint; leave id out and Anam fills it, send it and it must match."},
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "The end of a period of employment, which closes its org.employment series. One row in a records file (source records), written from a separation letter, a CV or the person's own word.",
+    "type": "object",
+    "required": ["date", "date_precision", "id", "org", "stint"],
+    "properties": {"basis": {"type": "string", "minLength": 1, "description": "Why the end date is believed, in the writer's words: the document it rests on, or that it is the person's recollection. Read it before trusting the date.", "examples": ["separation certificate, last day 30 Jun 2019"]}, "date": {"type": "string", "minLength": 1, "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "description": "The first day the person was no longer employed, which is the day after the last day worked, YYYY-MM-DD, a local date read in Australia/Sydney. When date_precision is month or year, the first day of that month or year. This is the fact time, the start of that day, from which the stint is closed.", "examples": ["2019-07-01"]}, "date_precision": {"enum": ["day", "month", "year"], "description": "How much of date the source supports. When it is month, date is the first day of that month; when year, the first day of that year. The schema refuses a coarser precision with any other day."}, "id": {"type": "string", "minLength": 1, "description": "Identity, composed from the rest by the Definition's identity_template: the source prefix, then employment, the org, the stint and ended. A writer may leave it out and Anam fills it; one that sends it must send exactly the composition.", "examples": ["records:employment/example-health/1/ended"]}, "org": {"type": "string", "minLength": 1, "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "description": "The organisation, in one agreed spelling: lower case, words joined by hyphens, the way a drug has one spelling. The name the person uses for it, not its legal entity, so the same employer is always the same string across every source and every org type. With stint it is the key of the org.employment series, so two spellings are two employments.", "examples": ["example-health"]}, "source_note": {"type": "string", "minLength": 1, "description": "What the writer saw in the source and how they reached this row. Writer's text, not the source's."}, "stint": {"type": "integer", "minimum": 1, "description": "Which period of employment with this org, counting from 1; leaving and rejoining is a new stint. Assigned by the writer. With org it names the org.employment series.", "examples": [1]}},
+    "allOf": [{"if": {"properties": {"date_precision": {"const": "month"}}, "required": ["date_precision"], "additionalProperties": {}}, "then": {"properties": {"date": {"pattern": "^[0-9]{4}-[0-9]{2}-01$"}}, "additionalProperties": {}}}, {"if": {"properties": {"date_precision": {"const": "year"}}, "required": ["date_precision"], "additionalProperties": {}}, "then": {"properties": {"date": {"pattern": "^[0-9]{4}-01-01$"}}, "additionalProperties": {}}}],
+    "additionalProperties": false
+  }
+}

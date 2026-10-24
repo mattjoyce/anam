@@ -135,7 +135,7 @@ func TestBundled_ParsesBpAndSleep(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Bundled: %v", err)
 	}
-	if got, want := r.Names(), []string{"activity", "attention", "body", "bp", "clinical", "doses", "intake", "meds", "sleep"}; !reflect.DeepEqual(got, want) {
+	if got, want := r.Names(), []string{"activity", "attention", "body", "bp", "career", "clinical", "doses", "employment", "intake", "meds", "sleep"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("bundled names = %v, want %v", got, want)
 	}
 	// Card 147: meds v2 names the types under the health domain, and card 196 gave them
@@ -177,7 +177,7 @@ func TestBundled_ParsesBpAndSleep(t *testing.T) {
 		if tmpl.Version < 1 {
 			t.Errorf("%s: version %d", tmpl.Name, tmpl.Version)
 		}
-		if len(tmpl.Types) == 0 {
+		if len(tmpl.Types) == 0 && len(tmpl.Prefixes) == 0 {
 			t.Errorf("%s: serves no types — a bundled template that serves nothing is a mistake, not a policy", tmpl.Name)
 		}
 		if tmpl.Span() != "whole-person" {
@@ -601,5 +601,49 @@ func TestBundled_IntakeServesTheIntakeLog(t *testing.T) {
 	}
 	if got, want := ids(served), []string{"i-coffee", "i-wine"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("served %v, want %v", got, want)
+	}
+}
+
+// Card 239: the bundled career projection is a log over the org.employment. prefix, so
+// every start, change of role and end stays, each at its date, and the employment
+// projection is a snapshot of the three types. The gate's employment test shows that
+// snapshot dropping a stint whose end has come. Neither serves anything outside the family.
+func TestBundled_CareerLogsAndEmploymentSnapshotsTheEmploymentTypes(t *testing.T) {
+	t.Parallel()
+	r, err := projection.Bundled()
+	if err != nil {
+		t.Fatalf("Bundled: %v", err)
+	}
+	career, err := r.Lookup("career")
+	if err != nil {
+		t.Fatalf("Lookup career: %v", err)
+	}
+	if career.Shape != "log" || career.MaxClassification != "Confidential" || !reflect.DeepEqual(career.Prefixes, []string{"org.employment."}) {
+		t.Errorf("career = %s up to %s over %v, want a log up to Confidential over org.employment.", career.Shape, career.MaxClassification, career.Prefixes)
+	}
+	employment, err := r.Lookup("employment")
+	if err != nil {
+		t.Fatalf("Lookup employment: %v", err)
+	}
+	wantTypes := []facet.Type{"org.employment.started", "org.employment.role-changed", "org.employment.ended"}
+	if employment.Shape != "snapshot" || employment.MaxClassification != "Confidential" || !reflect.DeepEqual(employment.Types, wantTypes) {
+		t.Errorf("employment = %s up to %s over %v, want a snapshot up to Confidential over %v", employment.Shape, employment.MaxClassification, employment.Types, wantTypes)
+	}
+	v, err := fold.NewValue([]fold.Entry{
+		entry("e-started", "org.employment.started", "2019-09-29T14:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationConfidential),
+		entry("e-role", "org.employment.role-changed", "2022-03-31T13:00:00.000000000Z", facet.StatusEndorsed, facet.ClassificationConfidential),
+		entry("e-ended", "org.employment.ended", "2025-06-29T14:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationConfidential),
+		entry("e-retracted", "org.employment.role-changed", "2023-01-01T00:00:00.000000000Z", facet.StatusTombstoned, facet.ClassificationConfidential),
+		entry("f-bp-1", "health.blood-pressure", "2026-10-21T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
+	})
+	if err != nil {
+		t.Fatalf("fold.NewValue: %v", err)
+	}
+	served, err := projection.Apply(v, career, consent.Open{}, nil)
+	if err != nil {
+		t.Fatalf("Apply career: %v", err)
+	}
+	if got, want := ids(served), []string{"e-started", "e-role", "e-ended"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("career served %v, want %v", got, want)
 	}
 }

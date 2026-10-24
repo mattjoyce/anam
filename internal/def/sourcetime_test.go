@@ -140,21 +140,25 @@ func TestSourceTime_ADefinitionCarriesTheShapeOrIsRefused(t *testing.T) {
 	}
 }
 
-// readsALocalClock are the bundled types whose fact time is a wall clock or a date
-// read in the Definition's zone, and which do not yet say how it was read: their
-// writers have not moved to source_time (card 197's follow-up). The list only
-// shrinks. A type leaves it by requiring source_time, and a new type that reads a
-// local clock must require it from its first version.
+// bareDate reports whether a time layout names a day and no time of day. A date stays a
+// local date (card 198): it has no clock and no offset to state, so a type timed by one is
+// exempt from the rule below and needs no source_time.
+func bareDate(layout string) bool {
+	at := time.Date(2001, 2, 3, 16, 5, 6, 0, time.UTC)
+	return at.Format(layout) == at.Add(-12*time.Hour).Format(layout)
+}
+
+// readsALocalClock are the bundled types whose fact time is a wall clock read in the
+// Definition's zone, and which do not yet say how it was read: their writers have not
+// moved to source_time (card 197's follow-up). A type timed by a bare date is exempt by
+// card 198's rule and is not listed. The list only shrinks. A type leaves it by requiring
+// source_time, and a new type that reads a local clock must require it from its first
+// version.
 var readsALocalClock = map[string]bool{
 	"activity.gym-visit": true, "health.blood-pressure": true, "health.body-composition": true,
-	"health.condition": true, "health.donation": true, "health.encounter": true,
-	"health.heart-rate": true, "health.illness.ended": true, "health.illness.started": true,
-	"health.lab-panel": true, "health.lab-result": true, "health.medication.compliance": true,
-	"health.medication.dose-changed": true,
-	"health.medication.dose-missed":  true, "health.medication.started": true,
-	"health.medication.stopped": true, "health.metric-group": true, "health.sleep": true,
-	"health.vision-prescription": true, "health.weight": true, "place.trip.arrived": true,
-	"place.trip.departed": true, "place.trip.returned": true,
+	"health.donation": true, "health.encounter": true, "health.heart-rate": true,
+	"health.lab-panel": true, "health.lab-result": true, "health.metric-group": true,
+	"health.sleep": true, "health.weight": true,
 }
 
 func TestSourceTime_EveryTypeReadingALocalClockSaysHow(t *testing.T) {
@@ -183,13 +187,14 @@ func TestSourceTime_EveryTypeReadingALocalClockSaysHow(t *testing.T) {
 		required[string(s.Type)] = slices.Contains(m.Schema.Required, def.SourceTimeField)
 	}
 	for _, d := range reg.All() {
-		local := d.FactTime.Zone != "UTC" && !strings.Contains(d.FactTime.Layout, "07") && !strings.Contains(d.FactTime.Layout, "Z")
+		local := d.FactTime.Zone != "UTC" && !strings.Contains(d.FactTime.Layout, "07") && !strings.Contains(d.FactTime.Layout, "Z") &&
+			!bareDate(d.FactTime.Layout)
 		listed := readsALocalClock[string(d.Type)]
 		switch {
 		case local && !required[string(d.Type)] && !listed:
 			t.Errorf("%s reads %q in %s and does not require %s", d.Type, d.FactTime.Layout, d.FactTime.Zone, def.SourceTimeField)
 		case listed && (required[string(d.Type)] || !local):
-			t.Errorf("%s is listed as not yet saying how its clock was read, and it does: take it off the list", d.Type)
+			t.Errorf("%s is listed as not yet saying how its clock was read, and it says how or reads no clock: take it off the list", d.Type)
 		}
 	}
 	for typ := range readsALocalClock {

@@ -28,6 +28,18 @@ account of one instance and carries its data.
   the zone's midnights, instants otherwise), so a Sydney day stays a Sydney day both ways. An
   unzoomed timeline offers no range, a saved selection is drawn as before, and the source filter does
   not travel. No new route.
+- The query rules say "within" and "in force at" (card 212). `within(A, B, Days)` is true when two
+  fact-times are at most `Days` days apart, a day being 24 hours of UTC, and `Days` may be a decimal
+  (`0.25` is six hours). It is the first of a table of builtins, predicates the evaluator answers in
+  Go because the language has no arithmetic; the plan check refuses one whose argument nothing binds,
+  naming the predicate and the argument, and `anam query describe` lists them. `in_force(E, F)` holds
+  when E is current at the fact-time of F, for an F whose fact-time `instant/1` names. The bundled
+  rule set is now version 2. Version 1 had been served as three different texts, because `anam.dl`
+  changed on 2026-10-21 without a bump, so the one live receipt (54e997a0) had stopped verifying.
+  Every earlier text is now kept under `internal/query/rules/history/`, and verify chooses the text
+  by the receipt's `rule_set_hash`, so receipts cut under any of them verify again. A receipt whose
+  hash no held text has is answered 409, saying the rule set has moved, where it was 500. Nothing
+  to do for a reader; a client that checks `rules.version` in an answer sees 2.
 - The schema lint leaves applicator branches alone (card 233). A branch of `if`, `then`, `else`,
   `allOf`, `anyOf`, `oneOf` or `not` narrows the object it sits in, so it no longer needs an
   `additionalProperties` of its own. The top-level object and every object under a `properties`

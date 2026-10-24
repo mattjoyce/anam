@@ -17,22 +17,31 @@ func Run(ctx context.Context, served fold.Value, versions map[string]int, defs D
 	if err != nil {
 		return Answer{}, RuleSet{}, err
 	}
+	ans, err := RunWith(ctx, rules, served, versions, defs, text, relation, maxBytes)
+	return ans, rules, err
+}
+
+// RunWith is Run under a rule set the caller chose, which is how a receipt replays
+// under the text it was answered with (HeldRuleSet) and not the one this binary
+// bundles now.
+func RunWith(ctx context.Context, rules RuleSet, served fold.Value, versions map[string]int, defs Definitions,
+	text, relation string, maxBytes int,
+) (Answer, error) {
 	prog, err := Parse(text)
 	if err != nil {
-		return Answer{}, rules, err
+		return Answer{}, err
 	}
 	plan, err := Compile(BaseSchema, defs, rules.Program, prog)
 	if err != nil {
-		return Answer{}, rules, err
+		return Answer{}, err
 	}
 	base, err := NewBase(served, versions, defs, ReadsAttr([]string{relation}, rules.Program, prog))
 	if err != nil {
-		return Answer{}, rules, err
+		return Answer{}, err
 	}
 	res, err := Evaluate(ctx, plan, base, maxBytes)
 	if err != nil {
-		return Answer{}, rules, err
+		return Answer{}, err
 	}
-	ans, err := res.Relation(relation)
-	return ans, rules, err
+	return res.Relation(relation)
 }

@@ -18,11 +18,13 @@ import (
 // A query receipt (card 173) is a receipt whose served value is a query's answer: the
 // template is the projection the query ran through, FacetIDs are the facets it
 // served, and Program is the rule set, the text and the relation. Verify replays the
-// derivation; the rule set is the binary's, so one whose rules moved cannot replay.
+// derivation under the rule set the receipt names, found by its hash among the texts
+// this binary holds, so a receipt cut under an earlier text still replays.
 
-// ErrRuleSetMoved is returned when a receipt names a bundled rule set other than this
-// binary's. The rules are what derived the answer, so another set cannot re-derive
-// it, and reporting "not reproduced" would blame the ledger for a change in the rules.
+// ErrRuleSetMoved is returned when a receipt names a rule set no text this binary
+// holds has the hash of: the bundled one or any under rules/history. The rules are
+// what derived the answer, so another set cannot re-derive it, and reporting "not
+// reproduced" would blame the ledger for a change in the rules.
 var ErrRuleSetMoved = errors.New("serve: the bundled rule set has moved since this receipt")
 
 // definitions is d's Definitions, or the bundled ones when it names none.
@@ -97,13 +99,20 @@ func PublishQuery(ctx context.Context, d Deps, t projection.Template, w ledger.W
 // which only the fold's live facets carry), the projection, the same program over
 // the served value, and the answer's hash against the receipt's.
 func verifyQuery(ctx context.Context, d Deps, r receipt.Receipt, t projection.Template, notes []string) (receipt.Result, error) {
-	rules, err := query.Bundled()
+	// The text is chosen by the receipt's hash, never by its version: version 1 was
+	// served as three different texts.
+	p := r.Program
+	rules, held, err := query.HeldRuleSet(p.RuleSetHash)
 	if err != nil {
 		return receipt.Result{}, err
 	}
-	if p := r.Program; p.RuleSetHash != rules.Hash {
-		return receipt.Result{}, fmt.Errorf("%w: %s v%d is %s here, the receipt was answered under %s v%d %s",
-			ErrRuleSetMoved, rules.Name, rules.Version, rules.Hash, p.RuleSet, p.RuleSetVersion, p.RuleSetHash)
+	if !held {
+		bundled, err := query.Bundled()
+		if err != nil {
+			return receipt.Result{}, err
+		}
+		return receipt.Result{}, fmt.Errorf("%w: the receipt was answered under %s v%d %s, which no rule set held here has; this build bundles %s v%d %s",
+			ErrRuleSetMoved, p.RuleSet, p.RuleSetVersion, p.RuleSetHash, bundled.Name, bundled.Version, bundled.Hash)
 	}
 	defs, err := d.definitions()
 	if err != nil {
@@ -117,7 +126,7 @@ func verifyQuery(ctx context.Context, d Deps, r receipt.Receipt, t projection.Te
 	if err != nil {
 		return receipt.Result{}, err
 	}
-	ans, _, err := query.Run(ctx, served, query.Versions(res.Live), defs, r.Program.Text, r.Program.Relation, 0)
+	ans, err := query.RunWith(ctx, rules, served, query.Versions(res.Live), defs, p.Text, p.Relation, 0)
 	if err != nil {
 		return receipt.Result{}, err
 	}

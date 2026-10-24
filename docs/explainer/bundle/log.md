@@ -236,3 +236,7 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: a bare date on the select page, the projection page's rows view, the timeline and the location page is a day in a `zone` parameter's zone, else the daemon's configured zone (`clock.ParseBound`, `selection.Days(from, to, loc)`, `Deps.Zone`). A selection program carries `% dates read in <zone>` (`Filter.ProgramIn`, `ZoneOf`), kept by `CanonicalText`; a saved selection's page names its zone, UTC when it has no comment. The zoomed timeline links to the select page ("select in this range") and the select page to the timeline ("show on timeline"), carrying the range, the types and the zone.
 - Bundle: the inspector and selection components say so.
+## 2026-10-24, card 212
+
+- Code: the bundled rule set is v2. It adds `in_force(E, F)`, and `within(A, B, Days)`, a builtin in a new table (`internal/query/builtin.go`) that the plan check holds to bound arguments and the evaluator answers in Go. Every earlier rule-set text is kept under `rules/history/`: version 1 was served as three different texts, since `anam.dl` changed on 2026-10-21 without a bump. Verify picks the text by the receipt's rule-set hash, and a hash no held text has answers 409, as a moved template does, where it had answered 500.
+- Bundle: the query term says so.

@@ -1,8 +1,11 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/mattjoyce/anam/internal/query"
 )
 
 const highProgram = `high(T, S) :- entry(E, "health.blood-pressure", T, _, _, _, _), attr(E, "/systolic_blood_pressure/value", S), S > 110.`
@@ -43,7 +46,7 @@ func TestQueryRun_SameOverTheDaemonAndVerifies(t *testing.T) {
 	if answerOf(local) != answerOf(remote) {
 		t.Errorf("answers differ\n--- local\n%s--- remote\n%s", local, remote)
 	}
-	want := []string{"high  1 tuples  sha256:", "2026-01-23T19:36:00.000000000Z  114", "projection bp v1", "rules      anam v1", "(filed)"}
+	want := []string{"high  1 tuples  sha256:", "2026-01-23T19:36:00.000000000Z  114", "projection bp v1", fmt.Sprintf("rules      anam v%d", query.BundledVersion), "(filed)"}
 	for _, w := range want {
 		if !strings.Contains(local, w) {
 			t.Errorf("output omits %q:\n%s", w, local)
@@ -56,11 +59,11 @@ func TestQueryRun_SameOverTheDaemonAndVerifies(t *testing.T) {
 	for _, side := range []struct{ name, cfg, out string }{{"local", f.cfgPath, local}, {"remote", f.remoteCfg, remote}} {
 		hash := receiptHashOf(t, side.out)
 		verified := f.sameOutput(t, "receipt", "verify", hash)
-		if !strings.Contains(verified, "OK   reproduced") || !strings.Contains(verified, "answered high with anam v1") {
+		if !strings.Contains(verified, "OK   reproduced") || !strings.Contains(verified, fmt.Sprintf("answered high with anam v%d", query.BundledVersion)) {
 			t.Errorf("%s receipt %s did not verify:\n%s", side.name, hash, verified)
 		}
 		shown := f.sameOutput(t, "receipt", "show", hash)
-		if !strings.Contains(shown, "program    high answered with anam v1") || !strings.Contains(shown, "2026-01-23T19:36:00.000000000Z  114") {
+		if !strings.Contains(shown, fmt.Sprintf("program    high answered with anam v%d", query.BundledVersion)) || !strings.Contains(shown, "2026-01-23T19:36:00.000000000Z  114") {
 			t.Errorf("%s receipt %s does not show its program and answer:\n%s", side.name, hash, shown)
 		}
 	}

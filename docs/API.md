@@ -115,14 +115,14 @@ Datalog program run through a projection (decided 2026-10-17, ARCHITECTURE.md §
 
 **The query (2026-10-19).** `POST /v1/query` takes a JSON body: `projection` (required;
 the projection decides which whole facets the query may see), `text`, a Datalog program in Anam's
-own small syntax built on the bundled rules (`current/2`, `displaced/2`), `relation`, the derived
+own small syntax built on the bundled rules (`current/2`, `displaced/2`, `in_force/2`) and the builtin `within/3`, `relation`, the derived
 relation to answer, `as_of` or `w` as a timeline read takes them, and `dry_run`. The base relations
 are `entry/7` (the envelope with the Definition version), `attr/3` (every scalar leaf of each served
 payload by its JSON pointer, read from the served copy) and `closes/1`; `instant/1` is the parameter
 the program defines, as facts with the whole fact-time lexeme or as a rule. The answer is one sorted
 relation that hashes, filed with a receipt whose `program` names the rule set, its hash, the text
 and the relation, and whose `template` is the projection; `/v1/receipts/{hash}/verify` re-runs it
-and must get the same hash, and refuses (409) under a binary whose rules moved. `GET /v1/query` is
+and must get the same hash. It picks the rule set by the receipt's `rule_set_hash`, so a receipt cut under an earlier version still verifies, and refuses (409, "the rule set has moved") when no rule set the binary holds has that hash. `GET /v1/query` is
 the introspection a program is written against: the relations, the fact-time lexeme, each type's
 pointers at each Definition version held, and the rules with their text. A program that cannot run
 is 400 with a message that says what to change; a derivation or an answer over `max_read_bytes` is

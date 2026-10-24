@@ -194,6 +194,11 @@ func (ev *evaluator) join(r rule, i int, env map[string]Const, delta *relation, 
 	}
 	l := r.ordered[i]
 	switch {
+	case l.isBuiltin():
+		if builtinHolds(l, env) {
+			return ev.join(r, i+1, env, delta, deltaPos, emit)
+		}
+		return nil
 	case l.Compare != nil:
 		if holds(*l.Compare, env) {
 			return ev.join(r, i+1, env, delta, deltaPos, emit)

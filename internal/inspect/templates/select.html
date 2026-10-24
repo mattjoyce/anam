@@ -97,6 +97,8 @@
 </p>
 {{end}}
 
+{{if .Timeline}}<p class="meta"><a href="{{.Timeline}}" id="show-on-timeline" title="the timeline over these dates and types, in this zone">show on timeline</a></p>{{end}}
+
 {{if .Problem}}<p class="note">{{if .TooMany}}Too many to select at once: {{end}}{{.Problem}}{{if .TooMany}} Add another criterion.{{end}}</p>{{end}}
 
 {{if not .Problem}}

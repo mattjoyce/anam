@@ -266,6 +266,7 @@ func (s *Server) selectPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data.CanSave = s.selections != nil
+	data.Timeline = s.timelineFor(st, served, saved)
 	if saved != nil {
 		v := savedViewOf(*saved)
 		if selection.ZoneOf(saved.Program) != "" || st.filter.From != "" || st.filter.To != "" {
@@ -337,4 +338,22 @@ func (s *Server) servedFor(ctx context.Context, name string) (fold.Value, fold.R
 	}
 	served, err := serve.Derive(res.Value, t, consent.Open{}, defs, "")
 	return served, res, err
+}
+
+// timelineFor is the "show on timeline" address for the state: its filter's window and
+// types, the zone, and the saved selection when the page was opened at one. A program
+// outside the criteria has no window to show, so only a saved one links, by its code.
+func (s *Server) timelineFor(st selectState, served fold.Value, saved *selection.Saved) string {
+	code := ""
+	if saved != nil {
+		code = saved.Code
+	}
+	if st.program != "" {
+		if code == "" {
+			return ""
+		}
+		return address("/", url.Values{"sel": {code}})
+	}
+	types, _ := suggestions(rowsOf(served))
+	return st.timelineLink(types, code)
 }

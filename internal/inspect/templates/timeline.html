@@ -170,6 +170,7 @@
         <a href="{{.Nav.Right}}" id="nav-right" title="pan right (→)">▶</a>
       </span>
       {{if or .Zoomed .HasDefault}}<a href="/?view=whole" id="whole">whole person</a>{{end}}
+      {{if .SelectRange}}<a href="{{.SelectRange}}" id="select-range" title="the select page, filtered to this window, these types and this zone">select in this range</a>{{end}}
       <span class="dim hint">drag a span on the band · arrows pan, + − zoom · wheel zooms at the cursor · shift-drag selects marks, ctrl-click toggles one</span>
     </div>
     <div class="row presets">

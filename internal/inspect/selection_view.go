@@ -39,7 +39,10 @@ type selectData struct {
 	Basket          []basketItem
 	Excluded        []basketItem
 	Handoff         string
-	Limit           int
+	// Timeline is the timeline over the filter as it stands (card 237); "" when the
+	// page has no filter to show, a program outside the criteria that is not saved.
+	Timeline string
+	Limit    int
 	// CanSave says the page can save its program under a code (card 206); Saved is
 	// the saved selection the page was opened at, nil when it was not.
 	CanSave bool

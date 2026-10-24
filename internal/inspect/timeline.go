@@ -157,6 +157,11 @@ type timelineData struct {
 
 	// Zone is the zone a bare date in from or to is read in (card 236).
 	Zone readZone
+	// Selected is the types the type filter names (nil for all); SelectRange is the
+	// select page over a zoomed window, "" when the window is the whole record's
+	// (card 237).
+	Selected    []facet.Type
+	SelectRange string
 }
 
 // tlSelNav is the selection's links: the window drawn the other way, and without it.
@@ -257,6 +262,9 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 	data := buildTimeline(newStyles(reg), res, all, from, to, zoomed, q["type"], status, sel)
 	data.CanLink = s.enterable(catchup.EdgeType)
 	data.Zone = zone
+	if zoomed {
+		data.SelectRange = selectRangeLink(from, to, data.Selected, zone)
+	}
 	if s.checkpoints != nil {
 		states, summary, err := checkpointStates(ctx, s.checkpoints, res, s.buckets)
 		switch {
@@ -403,7 +411,7 @@ func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.
 		Filtered: selected != nil || none, None: none, Status: status,
 		Dead: len(res.States) - len(res.Live), DeadHidden: !status.wantsDead() && len(res.States) > len(res.Live),
 		Nav: navLinks(from, to, view),
-		Sel: sel, ref: ref,
+		Sel: sel, ref: ref, Selected: selected,
 	}
 	if zoomed {
 		data.From = from.UTC().Format(time.RFC3339)

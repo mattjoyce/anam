@@ -49,12 +49,13 @@ const hueNeutral = -1
 
 // families in row order, top to bottom: the families the Definitions declare (card
 // 147), by domain. Hues are assigned once, here, and never move when a filter hides a
-// family (dataviz: colour follows the entity). Sixteen families and eight hues: the
+// family (dataviz: colour follows the entity). Seventeen families and eight hues: the
 // hue stays with the row that carried it before the taxonomy, through its most
 // telling successor, and the rows of background measures (a day's steps, an hour of
 // positions), of rare events (a condition), of what the person says is absorbing them
 // (attention), of what the person says they took in (intake), of where the person worked
-// (employment) and of what the person wrote or filed take the neutral grey.
+// (employment), of what the person bought (purchases) and of what the person wrote or filed
+// take the neutral grey.
 var families = []family{
 	{"vitals", "vitals", 7},
 	{"body", "body", 0},
@@ -70,6 +71,7 @@ var families = []family{
 	{"trips", "trips", 1},
 	{"attention", "attention", hueNeutral},
 	{"employment", "employment", hueNeutral},
+	{"purchases", "purchases", hueNeutral},
 	{"notes", "notes", hueNeutral},
 	{"documents", "documents", hueNeutral},
 }
@@ -133,6 +135,10 @@ var typeStyles = map[facet.Type]typeStyle{
 	"org.employment.started":      {"employment", shapeTriUp, kindEvent},
 	"org.employment.role-changed": {"employment", shapeDiamond, kindEvent},
 	"org.employment.ended":        {"employment", shapeTriDown, kindEvent},
+
+	// Purchases (card 241): one order or receipt. The row is grey, since the eight hues
+	// are all spent.
+	"money.purchase": {"purchases", shapeDiamond, kindEvent},
 
 	"health.encounter": {"clinical", shapeSquare, kindEvent},
 	"health.donation":  {"clinical", shapeStar, kindEvent},

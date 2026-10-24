@@ -9,6 +9,10 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- The schema lint leaves applicator branches alone (card 233). A branch of `if`, `then`, `else`,
+  `allOf`, `anyOf`, `oneOf` or `not` narrows the object it sits in, so it no longer needs an
+  `additionalProperties` of its own. The top-level object and every object under a `properties`
+  still do. `health.intake` v2 keeps its six placeholders, which now change nothing.
 - The Workbench has a copy button beside every facet id it prints (card 235). The facet page's
   heading, the facet list, the anam-events list, the link and selection pages, a projection's rows
   and the receipt after a save or a retraction each show a small clipboard button that copies the

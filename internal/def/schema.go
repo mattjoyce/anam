@@ -87,7 +87,7 @@ func lintSchema(tree map[string]any, keyed []string) error {
 			return fmt.Errorf("%q keys or places the facet, so it must be required", name)
 		}
 	}
-	return closed("", tree)
+	return closed("", tree, false)
 }
 
 // filledSchema says whether a property's schema refuses null and, for a string, "".
@@ -136,14 +136,17 @@ func TypesOf(sub map[string]any) []string {
 }
 
 // closed walks every subschema and refuses an object left open or a $ref that leaves
-// the manifest.
-func closed(at string, node any) error {
+// the manifest. branch is true for a subschema reached through an applicator keyword
+// (if, then, else, allOf, anyOf, oneOf, not): it narrows the object it sits in and does
+// not close a payload, so it needs no additionalProperties of its own (card 233). The
+// object schemas nested under its properties are real objects and are still held to the rule.
+func closed(at string, node any, branch bool) error {
 	switch n := node.(type) {
 	case map[string]any:
 		if ref, ok := n["$ref"].(string); ok && !strings.HasPrefix(ref, "#") {
 			return fmt.Errorf("%s: $ref %q leaves the manifest", where(at), ref)
 		}
-		if isObjectSchema(n) {
+		if !branch && isObjectSchema(n) {
 			switch ap := n["additionalProperties"].(type) {
 			case bool:
 				if ap {
@@ -164,19 +167,19 @@ func closed(at string, node any) error {
 				// a field called "default" or "enum" is still walked.
 				fields, _ := v.(map[string]any)
 				for name, sub := range fields {
-					if err := closed(at+"/"+k+"/"+name, sub); err != nil {
+					if err := closed(at+"/"+k+"/"+name, sub, false); err != nil {
 						return err
 					}
 				}
 				continue
 			}
-			if err := closed(at+"/"+k, v); err != nil {
+			if err := closed(at+"/"+k, v, applicators[k]); err != nil {
 				return err
 			}
 		}
 	case []any:
 		for i, v := range n {
-			if err := closed(fmt.Sprintf("%s/%d", at, i), v); err != nil {
+			if err := closed(fmt.Sprintf("%s/%d", at, i), v, branch); err != nil {
 				return err
 			}
 		}
@@ -188,6 +191,9 @@ func closed(at string, node any) error {
 // enum or const member. The walk above does not descend into them, so an example whose
 // own data happens to read `"type": "object"` is not taken for an open object.
 var valueKeywords = map[string]bool{"examples": true, "default": true, "enum": true, "const": true}
+
+// applicators combine or condition the schema they sit in; their subschemas are branches.
+var applicators = map[string]bool{"if": true, "then": true, "else": true, "allOf": true, "anyOf": true, "oneOf": true, "not": true}
 
 // namedSchemas map names to subschemas; their keys are names, not keywords.
 var namedSchemas = map[string]bool{"properties": true, "patternProperties": true, "$defs": true}

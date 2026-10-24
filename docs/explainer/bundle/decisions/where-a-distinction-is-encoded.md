@@ -16,9 +16,9 @@ affects:
   - /decisions/a-hard-coded-value-is-a-default-or-an-invariant.md
 ---
 
-**Context.** Card 147 closed the head of a type name at eight domains (card 222 made it nine, below) and wrote that the name stays `domain.concept`. The two-segment half was never argued, and `facet.typePattern` takes any number of dotted segments. Matt, 2026-10-21: "we control our destiny not AGENTS.md". A third or later segment is allowed, for a specialisation. That leaves the question of when a distinction earns a segment at all, and the answer was being found type by type.
+**Context.** Card 147 closed the head of a type name at eight domains (cards 222 and 239 made it nine and then ten, below) and wrote that the name stays `domain.concept`. The two-segment half was never argued, and `facet.typePattern` takes any number of dotted segments. Matt, 2026-10-21: "we control our destiny not AGENTS.md". A third or later segment is allowed, for a specialisation. That leaves the question of when a distinction earns a segment at all, and the answer was being found type by type.
 
-**Choice.** A type is `domain.concept[.specialisation…]`. The domain is one of the closed nine, `health`, `activity`, `place`, `record` and `mind` in use, and `social`, `money`, `media` and `work` held back. A head is added only by a logged decision. A distinction goes in the cheapest of six places that still lets its reader ask the question cleanly, and moves up only when something forces it.
+**Choice.** A type is `domain.concept[.specialisation…]`. The domain is one of the closed ten, `health`, `activity`, `place`, `record`, `mind` and `org` in use, and `social`, `money`, `media` and `work` held back. A head is added only by a logged decision. A distinction goes in the cheapest of six places that still lets its reader ask the question cleanly, and moves up only when something forces it.
 
 | Place | What changing it costs | Holds |
 |---|---|---|
@@ -41,6 +41,7 @@ The list runs from dearest to cheapest. Start at the bottom and promote a distin
 - `family` is for a grouping that crosses concepts.
 - A relation between facts is an edge, never a field on either.
 - A domain head is not a distinction a type earns. `mind`, the domain of self-reported inner states, was added by Matt's decision of 2026-10-22 (card 222), so that mood or energy can join later as concepts without another head. Attention is its first concept: `mind.attention` is a reading, and `mind.attention.started` and `mind.attention.ended` are a pair that closes a series, each of its own type for the reason above.
+- `org`, the domain of relationships with organisations, was added by Matt's decision of 2026-10-24 (card 239): "I authorise expansion of top level domain `org`." It does not take `work`'s place, which stays reserved for projects, tasks and output. Employment is its first concept (`org.employment.started`, `org.employment.role-changed` and `org.employment.ended`, a series keyed by org and stint), and membership comes later as `org.membership`. The cost is accepted: `org` sorts by counterparty where the other heads sort by subject, so a club could sit in `org` or `social`, and a shareholding is `money`'s.
 - A type with no live facets and no writer is history. It is marked superseded (card 184), not renamed.
 
 **Examples.**

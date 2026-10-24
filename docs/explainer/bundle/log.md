@@ -240,3 +240,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: the bundled rule set is v2. It adds `in_force(E, F)`, and `within(A, B, Days)`, a builtin in a new table (`internal/query/builtin.go`) that the plan check holds to bound arguments and the evaluator answers in Go. Every earlier rule-set text is kept under `rules/history/`: version 1 was served as three different texts, since `anam.dl` changed on 2026-10-21 without a bump. Verify picks the text by the receipt's rule-set hash, and a hash no held text has answers 409, as a moved template does, where it had answered 500.
 - Bundle: the query term says so.
+
+## 2026-10-24, card 239
+
+- Code: `org` is the tenth domain head, decided by Matt on 2026-10-24. Three Definitions are bundled, `org.employment.started`, `org.employment.role-changed` and `org.employment.ended` (a start, a restated role and an end, in a series keyed by org and stint; Confidential, strict, a local date with a precision, no pay field, an id declared by a template), and two projections, `career` (a log over the prefix `org.employment.`) and `employment` (a snapshot that drops an ended period). The timeline draws an employment row.
+- Bundle: the employment term is new, and the definition-manifest, projection-template and where-a-distinction-is-encoded pages say ten domains and the new counts: 43 bundled Definitions, 35 terms.

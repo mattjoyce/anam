@@ -1,8 +1,8 @@
 # Importers — sources outside Anam
 
 Design proposal · 2026-10-08, built by 2026-10-13. The service's side is built; §8 is the contract every importer complies with. Importers exist for Withings,
-blood pressure, the DreamStation, Garmin and OwnTracks, in
-`anam-importers`.
+blood pressure, the DreamStation, Garmin, Concept2, OwnTracks, the records files and the document
+folder, among others, in `anam-importers` (its README lists them; §8.8 runs eight in a rebuild).
 
 Anam's capture workers (`healthdb`, `withings`, `bpcsv`, `records`, `documents`) were compiled into
 the binary that owns the ledger. All five have left: `withings`, `bpcsv`,

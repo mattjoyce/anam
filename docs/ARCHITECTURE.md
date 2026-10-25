@@ -561,8 +561,9 @@ Config is **YAML**; Facet Definitions are **JSON** (§3a).
 An earlier draft said *"SQLite holds nothing that cannot be rebuilt by replaying the ledger."* That named
 one recovery source for a store with several, and demoted a real database to a cache. §1's claim is about
 **source facts** — no captured payload exists only inside Anam. It says nothing about Anam's own state,
-and Anam has plenty: definitions, indexes, projection templates, roles, logs, bookmarks. The operational
-store is authoritative for those, and losing it is not free.
+and Anam has plenty: definitions, indexes, registered projection templates, checkpoints, receipts, served
+values, saved selections, importers' snapshot records and admission holds. The operational store is
+authoritative for those, and losing it is not free.
 
 What is worth knowing is not a rule but a fact per table — **where does this come back from?** — because a
 rebuild has to know what it may drop:
@@ -689,7 +690,8 @@ the unit SQLite deletes, locks and opens read-only by:
 
 - the operational store's repair is to delete its file and replay. That repair cannot reach a fact;
 - a command that only reads the ledger opens it read-only, and SQLite refuses any write on that handle.
-  `init` and `ingest` are the only commands that open it for writing;
+  `init`, the daemon, and `retract`, `rename` and `migrate` when given `--yes` are the only things that
+  open it for writing;
 - deleting the operational file and replaying proves the derived tier is derived, because nothing of the
   ledger could have been inside it.
 
@@ -922,7 +924,7 @@ correction, or belonging to a facet no longer live — are not exclusions at all
 template, because the canonical is live-only by construction. They are their own standing, derived from
 the fold.
 
-Projections are **materialised as files**, content-addressed. **Receipts** make a served projection
+Projections are **materialised as rows**, content-addressed: the served bytes are a `served_value` row keyed by their SHA-256. **Receipts** make a served projection
 reproducible: `served_hash = sha256(served bytes)` plus the exact facet-id set, the watermark, the
 template version and its content hash (an inline template is marked as one, and its body is filed under that hash), the definition-set version, the `served_at` time, the span, and the `ledger_id` the
 watermark counts in (since 2026-10-07; a watermark means nothing against another ledger, so `receipt
@@ -1010,24 +1012,26 @@ Anam later as an ordinary source fact.
 ## 13. MVP boundary and deferred items
 
 **MVP** — see `MVP.md`: the vertical slice end-to-end over two real sources (`health-db`, `bp-csv`),
-one or two projections plus a CLI timeline viewer, manual mint, and receipts. Read-only throughout.
+one or two projections plus a CLI timeline viewer, manual mint, and receipts. Read-only throughout. (The daemon has since
+learned to mint on its own, §7.)
 
 **Deferred, not forgotten:**
 
 - **Binary / native-reference facets** — `record.document` is built over a folder source (2026-10-07).
-  Anam never serves the bytes; the inspector shows the path and hash. A removed file is retracted
+  The inspector serves the bytes from the library (`GET /document`, confined to the library root). A removed file is retracted
   by `anam retract`, deliberately; EXIF is not read, a sidecar carries the date.
-- **Adaptive mint cadence (time-OR-size-OR-rate)** — manual `checkpoint` only; the bucket-span seam and
-  the `W`/`Wᵥ` machinery exist from R2, the trigger does not.
+- **Adaptive mint cadence (time-OR-size-OR-rate)** — the daemon mints once batches stop arriving for
+  `mint_quiet` (§7, card 61), and `anam checkpoint` mints by hand; a size or rate trigger is not built,
+  since a mint from the last run is cheap.
 - **Sealed projections / a seal point** — receipts suffice for now.
 - **Token rotation; multi-scope tokens** — one static `source → types` map.
 - **Consent policy and classification-driven gating** — attribute + pass-through gate only (§10).
 - **Storage management** — Anam is append-only and grows; an archive tier is deferred, tractable
   precisely because Anam owns no facts and can re-ingest.
-- **Extensibility to the reserved domains** (`social.*`, `money.*`, `media.*`, `work.*`) — the model already
-  admits them; they are simply not built yet.
-- **Last-known-value reads** (§5a) — built as the snapshot over the series stamp (2026-10-07). Not yet
-  exposed on `timeline` or as a snapshot projection template; and a Definition that changes its series
+- **Extensibility to the reserved domains** (`social.*`, `media.*`, `work.*`) — the model already
+  admits them; they are simply not built yet. `money.*` is open (card 241).
+- **Last-known-value reads** (§5a) — built as the snapshot over the series stamp (2026-10-07), and exposed
+  as `anam timeline --at` and as `shape: snapshot` projection templates (`meds`, `employment`). A Definition that changes its series
   key reaches only facets admitted after the change, because admission is idempotent on content.
 - **The query surface** (§9, card 173) — decided 2026-10-17, built 2026-10-19: the evaluator, the
   bundled rule set and the `current/2` = `fold.Snapshot` equality test (`internal/query`, held on a

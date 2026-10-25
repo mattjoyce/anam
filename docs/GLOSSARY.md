@@ -157,8 +157,8 @@ metadata (attributes, a payload descriptor, an opaque payload). **Not** a normal
 Definition*.
 
 **Facet Definition** — The independently-versioned contract for a Facet *type*: schema, envelope, time
-semantics, linking elements, validation bar, classification. Bundled as embedded JSON; loadable via
-`anam def load`. See *Facet*.
+semantics, linking elements, validation bar, classification. Bundled as embedded JSON; an importer registers
+its own through `POST /v1/definitions`. See *Facet*.
 
 **Facet type** — The kind of a Facet, named **lower-case dotted** as `domain.concept[.specialisation…]`: `health.blood-pressure`,
 `health.sleep-episode`, `health.heart-rate-alert`, `activity.steps`, `place.stay`, `record.edge`. The first word is a
@@ -214,9 +214,10 @@ fact. The share's private folder is the **inbox**, not a library. See *Native re
 **Native reference** — A reference Facet's payload: a pointer to a document in its *Library*, resolved
 live by the inspector from the library root. Built as `record.document`.
 
-**Operational store** — The SQLite database holding Anam's own state: Facet Definitions, projection
-templates, token scopes, the facet and anam-event indexes, the span registry and per-span `V`/`Wᵥ`, the
-checkpoint and receipt index, saved span bookmarks, sync cursors, GC state, the operational log. It is a
+**Operational store** — The SQLite database holding Anam's own state: Facet Definitions, registered
+projection templates, the facet, edge and anam-event indexes, the checkpoint log (per-span `V`/`Wᵥ`) and
+its values, receipts, served values, saved selections, importers' snapshot records, admission holds and
+sync cursors. It is a
 real store, not a cache — authoritative for what Anam authors. Each table records **where it comes back
 from**: the *derived* tier from replaying the *Ledger*, the *provisioned* tier from embedded assets and
 config, the *authored* tier from a backup and nowhere else. Only the derived tier is disposable, and it
@@ -240,7 +241,7 @@ without fields answers in whole facets as before. See *Fields*.
 
 **Projection** *(variant)* — A versioned template that **prunes** the *Canonical* for a purpose: metadata
 filters only (type allow-list, datetime, endorsement status, max classification); whole-Facet
-include/exclude; **never reshapes, never generates**. Materialised as a content-addressed file. A consumer
+include/exclude; **never reshapes, never generates**. Materialised as a content-addressed row (`served_value`). A consumer
 *selects*, never defines; it may name the *Fields* it wants of what the projection serves, which only
 narrows, or run a *Query* over it, which relates what it served and never widens it. The operator
 defines: templates are **bundled** with the binary (the floor) or **registered**

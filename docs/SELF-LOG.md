@@ -13,7 +13,7 @@ Where this document is silent, `ARCHITECTURE.md` governs. Nothing here touches t
 
 Anam already answers two of the three clocks in that sentence. Fact-time (`--from/--to`) asks when
 things happened; anam-time (`--as-of`) asks when Anam found out; both compose. What it cannot do is
-the third thing the question needs, which `ARCHITECTURE.md` §4 names and marks not built: a
+the third thing the question needs, which `ARCHITECTURE.md` §5a names, and which is built since (`anam timeline --at`): a
 **last-known-value read**, one facet per series, the latest at or before a fact-time. Medications are
 the first data where that is the only useful answer.
 
@@ -106,8 +106,9 @@ your word that you went, and the two can be correlated later, never merged.
 to a binary in its source, with `media_type` and `content_hash` in the descriptor. Nothing has needed
 it until now. Rules:
 
-- **The bytes stay in the source.** A folder of scans is a source. Anam holds the path, the hash, the
-  media type, never the bytes. Anam owns no facts, and the ledger payload is for structured bodies.
+- **The bytes stay out of the ledger.** A folder of scans is a source. The ledger holds the path, the
+  hash and the media type, never the bytes, and the payload is for structured bodies. The bytes live in
+  the library folder, named by their sha256, which Anam alone writes (card 150).
 - **Identity is the path, not the hash.** `source_ref` is identity, not content (§6a). A renamed
   file is a new facet and the old one is tombstoned, which is honest.
 - **Fact-time comes from outside the bytes**: EXIF, the document's own date, or the self-log row

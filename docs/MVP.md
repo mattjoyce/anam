@@ -2,6 +2,11 @@
 
 > The first slice, made concrete: what we build to prove the core idea, what we deliberately leave out,
 > and how we know it worked. Companion to `ARCHITECTURE.md` and `GLOSSARY.md`.
+>
+> This is the first slice's record, kept as written. Since then the daemon mints on its own once
+> batches stop arriving, `money.*` is an open domain, binary facets are built as `record.document`,
+> there is no `ingest` command, and `timeline` has no `--span` flag. `ARCHITECTURE.md` and the code are
+> current; read this for what the slice set out to prove.
 
 ---
 

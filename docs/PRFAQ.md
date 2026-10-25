@@ -15,7 +15,7 @@ body, a cuff measures your blood pressure, and each lives in its own silo with i
 place shows you *you*, over time, with the evidence attached — and nothing you'd trust to tell you *what
 it knew, and when*.
 
-Anam is that place. It reads your sources, holds each fragment **verbatim** as a **Facet** — a fact plus
+Anam is that place. Small importers read your sources and hand it what they find; it holds each fragment **verbatim** as a **Facet** — a fact plus
 where it came from and when — and lays them on **one timeline**. You read your whole life by default;
 you can focus on a **span** (a trip, an illness, a training block) when you want to, but you never have
 to. Every fact is immutable and accretes; nothing is ever overwritten, so the past stays exactly as it

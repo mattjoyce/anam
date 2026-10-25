@@ -12,8 +12,8 @@ import (
 
 // The timeline encodes a facet's type three ways, because nineteen types cannot
 // be told apart by colour alone (dataviz: a ninth categorical hue is never
-// generated). Each family gets a row of its own and one of the eight palette
-// hues; within a row, each type gets a shape. Fill says what kind of fact it is:
+// generated). Each domain takes one of the eight palette hues, each family gets a row
+// under its domain's lane; within a row, each type gets a shape. Fill says what kind of fact it is:
 // a filled circle is a periodic measure (a day or a month of readings), a hollow
 // mark is one reading from an instrument, and a filled shape is a thing that
 // happened.
@@ -39,41 +39,34 @@ const (
 type family struct {
 	ID    string
 	Label string
-	Hue   int // palette slot, 0..7, or hueNeutral; the row's colour whatever else is on screen
 }
 
-// hueNeutral is the grey outside the eight palette slots. Documents take it: a
-// library file is a reference, not something that happened to the person, and
-// the eight hues are spent on the families that are.
+// hueNeutral is the grey outside the eight palette slots, taken by a head with no
+// hue of its own (lanes.go).
 const hueNeutral = -1
 
-// families in row order, top to bottom: the families the Definitions declare (card
-// 147), by domain. Hues are assigned once, here, and never move when a filter hides a
-// family (dataviz: colour follows the entity). Seventeen families and eight hues: the
-// hue stays with the row that carried it before the taxonomy, through its most
-// telling successor, and the rows of background measures (a day's steps, an hour of
-// positions), of rare events (a condition), of what the person says is absorbing them
-// (attention), of what the person says they took in (intake), of where the person worked
-// (employment), of what the person bought (purchases) and of what the person wrote or filed
-// take the neutral grey.
+// families in row order, top to bottom within a domain's lane: the families the
+// Definitions declare (card 147). A family carries no colour of its own since card 245:
+// colour follows the domain (lanes.go), and a family is told apart by its row and its
+// shapes. A family can span heads, so a row is keyed by domain and family.
 var families = []family{
-	{"vitals", "vitals", 7},
-	{"body", "body", 0},
-	{"sleep", "sleep", 6},
-	{"movement", "movement", hueNeutral},
-	{"exercise", "exercise", 3},
-	{"labs", "labs", 2},
-	{"conditions", "conditions", hueNeutral},
-	{"meds", "meds", 4},
-	{"intake", "intake", hueNeutral},
-	{"clinical", "clinical", 5},
-	{"location", "location", hueNeutral},
-	{"trips", "trips", 1},
-	{"attention", "attention", hueNeutral},
-	{"employment", "employment", hueNeutral},
-	{"purchases", "purchases", hueNeutral},
-	{"notes", "notes", hueNeutral},
-	{"documents", "documents", hueNeutral},
+	{"vitals", "vitals"},
+	{"body", "body"},
+	{"sleep", "sleep"},
+	{"movement", "movement"},
+	{"exercise", "exercise"},
+	{"labs", "labs"},
+	{"conditions", "conditions"},
+	{"meds", "meds"},
+	{"intake", "intake"},
+	{"clinical", "clinical"},
+	{"location", "location"},
+	{"trips", "trips"},
+	{"attention", "attention"},
+	{"employment", "employment"},
+	{"purchases", "purchases"},
+	{"notes", "notes"},
+	{"documents", "documents"},
 }
 
 // kind is what sort of fact a type records.
@@ -160,15 +153,18 @@ var typeStyles = map[facet.Type]typeStyle{
 // neither declares nor the table names goes to the "other" row as a grey circle.
 type styles struct {
 	lookup func(facet.Type) (def.Definition, bool)
+	// all lists every Definition in force, so a domain with a type has a lane before
+	// it has a facet (card 245).
+	all func() []def.Definition
 }
 
 // newStyles reads declared kind and family from reg. A nil registry declares
 // nothing, so every type draws from the table as it did before card 176.
 func newStyles(reg *def.Registry) styles {
 	if reg == nil {
-		return styles{lookup: func(facet.Type) (def.Definition, bool) { return def.Definition{}, false }}
+		return styles{lookup: func(facet.Type) (def.Definition, bool) { return def.Definition{}, false }, all: func() []def.Definition { return nil }}
 	}
-	return styles{lookup: reg.Lookup}
+	return styles{lookup: reg.Lookup, all: reg.All}
 }
 
 func (s styles) of(t facet.Type) typeStyle {
@@ -197,14 +193,14 @@ func (s styles) of(t facet.Type) typeStyle {
 // or a reading. The "events only" filter keeps these.
 func (s styles) isEvent(t facet.Type) bool { return s.of(t).Kind == kindEvent }
 
-// markClass is the CSS class for a type's marks: its family's hue, hollow for a
+// markClass is the CSS class for a type's marks: its domain's hue, hollow for a
 // reading.
 func (s styles) markClass(t facet.Type) string {
 	st := s.of(t)
 	if st.Kind == kindReading {
-		return hueClass(st.Family) + " hollow"
+		return hueOf(t) + " hollow"
 	}
-	return hueClass(st.Family)
+	return hueOf(t)
 }
 
 // kindOf maps a Definition's declared kind onto the band's.
@@ -227,16 +223,6 @@ func shapeFor(k kind) shape {
 		return shapeDiamond
 	}
 	return shapeCircle
-}
-
-// hueClass is the CSS class that colours a family's marks.
-func hueClass(familyID string) string {
-	for _, f := range families {
-		if f.ID == familyID && f.Hue != hueNeutral {
-			return fmt.Sprintf("h%d", f.Hue)
-		}
-	}
-	return "hx"
 }
 
 // markPath is the SVG path for a shape centred at (x, y).
@@ -292,9 +278,8 @@ func markPath(s shape, x, y float64) string {
 
 // rowsFor lays out the families present among types, in row order, with "other"
 // last if anything fell into it. A family a Definition declares and the table does
-// not know gets a row of its own, under its own word, after the known rows and in
-// the neutral grey: the eight hues are assigned once, here, and a new family earns
-// one by an edit to the table. Each row lists its types in a stable order: measures,
+// not know gets a row of its own, under its own word, after the known rows. A row
+// takes the hue of its types' domain. Each row lists its types in a stable order: measures,
 // then readings, then events, each by name.
 func (s styles) rowsFor(types []facet.Type) []tlRow {
 	byFamily := map[string][]facet.Type{}
@@ -315,9 +300,9 @@ func (s styles) rowsFor(types []facet.Type) []tlRow {
 	}
 	sort.Strings(declared)
 	for _, f := range declared {
-		order = append(order, family{f, f, hueNeutral})
+		order = append(order, family{f, f})
 	}
-	order = append(order, family{otherFamilyID, "other", hueNeutral})
+	order = append(order, family{otherFamilyID, "other"})
 	var rows []tlRow
 	for _, f := range order {
 		ts := byFamily[f.ID]
@@ -331,7 +316,7 @@ func (s styles) rowsFor(types []facet.Type) []tlRow {
 			}
 			return ts[i] < ts[j]
 		})
-		rows = append(rows, tlRow{Family: f.ID, Label: f.Label, Hue: hueClass(f.ID), Types: ts})
+		rows = append(rows, tlRow{Family: f.ID, Label: f.Label, Hue: hueOf(ts[0]), Types: ts})
 	}
 	return rows
 }

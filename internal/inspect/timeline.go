@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"sort"
 	"time"
 
@@ -39,6 +40,19 @@ type tlRow struct {
 	Types              []facet.Type
 	Y, Top, Height     float64
 	Stripe             bool // every other row is shaded, for the eye to follow
+
+	// Domain is the lane the row belongs to. Level 0 is the lane itself, which draws
+	// the marks of all its types when closed (Types) and none when open; Level 1 is a
+	// family row under an open lane (card 245).
+	Domain string
+	Level  int
+	Open   bool
+	// Empty says nothing is drawn in the lane in this window; Count is how many marks.
+	Empty bool
+	Count int
+	// Toggle opens or closes the lane; "" for a lane a filter or the selection holds
+	// open.
+	Toggle string
 }
 
 type tlPoint struct {
@@ -70,8 +84,8 @@ type tlLegendEntry struct {
 }
 
 type tlLegendGroup struct {
-	Family, Label, Hue string
-	Entries            []tlLegendEntry
+	Family, Label, Hue, Domain string
+	Entries                    []tlLegendEntry
 }
 
 type tlStripEntry struct {
@@ -110,7 +124,10 @@ type timelineData struct {
 
 	BandW, BandH, Baseline, PlotLeft, PlotRight float64
 
-	Rows   []tlRow
+	Rows []tlRow
+	// OpenQ is the lanes the address opens, for the form to carry; Held is true while
+	// any lane is open only because a filter or the selection touches it.
+	OpenQ  []string
 	Points []tlPoint
 	Runs   []tlRun // dense stretches drawn as two ends and a line (card 135)
 	Ticks  []tlTick
@@ -204,6 +221,7 @@ type tlNav struct {
 	Left, Right, In, Out          string
 	AllTypes, EventsOnly, NoTypes string
 	AllStatus, LiveOnly, DeadOnly string
+	OpenAll, CloseAll             string
 }
 
 func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
@@ -259,7 +277,7 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err)
 		return
 	}
-	data := buildTimeline(newStyles(reg), res, all, from, to, zoomed, q["type"], status, sel)
+	data := buildTimeline(newStyles(reg), res, all, from, to, zoomed, q["type"], q["open"], status, sel)
 	data.CanLink = s.enterable(catchup.EdgeType)
 	data.Zone = zone
 	if zoomed {
@@ -358,7 +376,7 @@ func parseWindow(fromQ, toQ string, all []facet.Facet, loc *time.Location) (from
 	return from, to, zoomed, nil
 }
 
-func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.Time, zoomed bool, typeQ []string, status statusFilter, sel *tlSelection) timelineData {
+func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.Time, zoomed bool, typeQ, openQ []string, status statusFilter, sel *tlSelection) timelineData {
 	x := func(t time.Time) float64 {
 		frac := float64(t.Sub(from)) / float64(to.Sub(from))
 		return bandLeft + frac*(bandW-bandLeft-bandRight)
@@ -388,11 +406,31 @@ func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.
 	}
 	show, selected, none := typeFilter(typeQ, types)
 	ref := sel.ref()
-	view := tlView{Types: selected, None: none, Status: status, Sel: ref}
 
-	// Rows come from every type in the ledger, not the filtered few, so a filter
-	// hides marks without moving the rows that are left.
-	rows, yOf := layoutRows(st, types)
+	// Lanes come from every type in the ledger and the Definitions, not the filtered
+	// few, so a filter hides marks without moving the rows that are left. A lane is
+	// open when the address says so, or when the type filter or the selection touches
+	// it, so what was asked for is not hidden behind a closed lane (card 245).
+	domainLanes := st.lanesFor(types)
+	laneIDs := map[string]bool{}
+	for _, l := range domainLanes {
+		laneIDs[l.ID] = true
+	}
+	explicit := openLanes(openQ, laneIDs)
+	held := map[string]bool{}
+	for _, t := range selected {
+		held[domainOf(t)] = true
+	}
+	if sel != nil {
+		for _, f := range all {
+			if sel.Picked[f.ID] {
+				held[domainOf(f.Type)] = true
+			}
+		}
+	}
+	isOpen := func(d string) bool { return held[d] || slices.Contains(explicit, d) }
+	view := tlView{Types: selected, None: none, Status: status, Sel: ref, Open: explicit}
+	rows, yOf := layoutLanes(domainLanes, isOpen)
 	rowY := map[facet.Type]float64{}
 	for _, row := range rows {
 		for _, t := range row.Types {
@@ -411,7 +449,7 @@ func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.
 		Filtered: selected != nil || none, None: none, Status: status,
 		Dead: len(res.States) - len(res.Live), DeadHidden: !status.wantsDead() && len(res.States) > len(res.Live),
 		Nav: navLinks(from, to, view),
-		Sel: sel, ref: ref, Selected: selected,
+		Sel: sel, ref: ref, Selected: selected, OpenQ: explicit,
 	}
 	if zoomed {
 		data.From = from.UTC().Format(time.RFC3339)
@@ -424,22 +462,29 @@ func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.
 		}
 	}
 	sort.Slice(events, func(i, j int) bool { return events[i] < events[j] })
-	data.Nav.AllTypes = windowLink(from, to, zoomed, tlView{Status: status, Sel: ref})
-	data.Nav.EventsOnly = windowLink(from, to, zoomed, tlView{Types: events, Status: status, Sel: ref})
-	data.Nav.NoTypes = windowLink(from, to, zoomed, tlView{None: true, Status: status, Sel: ref})
-	data.Nav.AllStatus = windowLink(from, to, zoomed, tlView{Types: selected, None: none, Status: statusAll, Sel: ref})
-	data.Nav.LiveOnly = windowLink(from, to, zoomed, tlView{Types: selected, None: none, Sel: ref})
-	data.Nav.DeadOnly = windowLink(from, to, zoomed, tlView{Types: selected, None: none, Status: statusDead, Sel: ref})
+	data.Nav.AllTypes = windowLink(from, to, zoomed, tlView{Status: status, Sel: ref, Open: explicit})
+	data.Nav.EventsOnly = windowLink(from, to, zoomed, tlView{Types: events, Status: status, Sel: ref, Open: explicit})
+	data.Nav.NoTypes = windowLink(from, to, zoomed, tlView{None: true, Status: status, Sel: ref, Open: explicit})
+	data.Nav.AllStatus = windowLink(from, to, zoomed, tlView{Types: selected, None: none, Status: statusAll, Sel: ref, Open: explicit})
+	data.Nav.LiveOnly = windowLink(from, to, zoomed, tlView{Types: selected, None: none, Sel: ref, Open: explicit})
+	data.Nav.DeadOnly = windowLink(from, to, zoomed, tlView{Types: selected, None: none, Status: statusDead, Sel: ref, Open: explicit})
+	opened, closed := view, view
+	opened.Open, closed.Open = sortedKeys(laneIDs), nil
+	data.Nav.OpenAll = windowLink(from, to, zoomed, opened)
+	data.Nav.CloseAll = windowLink(from, to, zoomed, closed)
 	if sel != nil {
 		data.SelNav = selNav(from, to, zoomed, view)
 	}
 
 	// Each lane (a type, live or dead) collects its marks in time order; runs are
 	// found per lane, so a dead stretch never hides inside a live one.
+	// A closed domain is one lane for all its types, so its marks join into runs
+	// across types; an open domain keeps a lane for each type.
 	type laneKey struct {
-		typ          facet.Type
+		lane         string
 		live, picked bool
 	}
+	shownIn := map[string]int{}
 	lanes := map[laneKey][]laneMark{}
 	var laneOrder []laneKey
 	for _, f := range all {
@@ -451,12 +496,16 @@ func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.
 			continue
 		}
 		style := st.of(f.Type)
-		hue := hueClass(style.Family)
+		hue := hueOf(f.Type)
 		mark := st.markClass(f.Type)
 		when := f.FactTime.UTC().Format("2006-01-02 15:04Z")
 		px, py := x(f.FactTime), yOf[f.Type]
 		picked := sel != nil && sel.Picked[f.ID]
-		key := laneKey{f.Type, state.Live(), picked}
+		laneID := string(f.Type)
+		if !isOpen(domainOf(f.Type)) {
+			laneID = "~" + domainOf(f.Type)
+		}
+		key := laneKey{laneID, state.Live(), picked}
 		if _, ok := lanes[key]; !ok {
 			laneOrder = append(laneOrder, key)
 		}
@@ -469,6 +518,7 @@ func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.
 			Picked: picked && sel.Highlight(), Faded: !picked && sel.Highlight(),
 		}})
 		data.Shown++
+		shownIn[domainOf(f.Type)]++
 		if picked {
 			sel.Count++
 		}
@@ -489,15 +539,34 @@ func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.
 		data.Strip = nil
 	}
 
-	for _, row := range rows {
-		g := tlLegendGroup{Family: row.Family, Label: row.Label, Hue: row.Hue}
-		for _, t := range row.Types {
-			g.Entries = append(g.Entries, tlLegendEntry{
-				Type: t, Swatch: markPath(st.of(t).Shape, 8, 8.5), Class: st.markClass(t),
-				Count: counts[t], Checked: show[t],
-			})
+	// The legend lists every family whether its lane is open or not, so a type can be
+	// ticked without opening anything.
+	for _, l := range domainLanes {
+		for _, row := range l.Families {
+			g := tlLegendGroup{Family: row.Family, Label: row.Label, Hue: row.Hue, Domain: l.ID}
+			for _, t := range row.Types {
+				g.Entries = append(g.Entries, tlLegendEntry{
+					Type: t, Swatch: markPath(st.of(t).Shape, 8, 8.5), Class: st.markClass(t),
+					Count: counts[t], Checked: show[t],
+				})
+			}
+			data.Legend = append(data.Legend, g)
 		}
-		data.Legend = append(data.Legend, g)
+	}
+
+	for i := range data.Rows {
+		row := &data.Rows[i]
+		if row.Level != 0 {
+			continue
+		}
+		row.Count = shownIn[row.Domain]
+		row.Empty = row.Count == 0
+		if held[row.Domain] {
+			continue
+		}
+		toggled := view
+		toggled.Open = toggleLane(explicit, row.Domain)
+		row.Toggle = windowLink(from, to, zoomed, toggled)
 	}
 
 	data.Ticks = monthTicks(from, to, x)
@@ -511,7 +580,7 @@ func bucketStrip(states []bucketState, summary tlCheckpoints, res fold.Result, f
 		frac := float64(t.Sub(from)) / float64(to.Sub(from))
 		return data.PlotLeft + frac*(data.PlotRight-data.PlotLeft)
 	}
-	view := tlView{Status: data.Status, Sel: data.ref}
+	view := tlView{Status: data.Status, Sel: data.ref, Open: data.OpenQ}
 	for _, st := range states {
 		lo, hi := st.Bucket.From(), st.Bucket.To()
 		if lo.Before(from) {
@@ -534,28 +603,6 @@ func bucketStrip(states []bucketState, summary tlCheckpoints, res fold.Result, f
 		})
 	}
 	return summary
-}
-
-// layoutRows places each family's row and each type's sub-lane within it. Types
-// in a row sit a few units apart, so a day's body-composition and weight do not
-// land on the same spot.
-func layoutRows(st styles, types []facet.Type) ([]tlRow, map[facet.Type]float64) {
-	rows := st.rowsFor(types)
-	yOf := map[facet.Type]float64{}
-	for i := range rows {
-		rows[i].Top, rows[i].Height = rowTop+float64(i)*rowH, rowH
-		rows[i].Y = rows[i].Top + rowH/2
-		rows[i].Stripe = i%2 == 0
-		n := len(rows[i].Types)
-		step := 0.0
-		if n > 1 {
-			step = min(7, 18/float64(n-1))
-		}
-		for j, t := range rows[i].Types {
-			yOf[t] = rows[i].Y + (float64(j)-float64(n-1)/2)*step
-		}
-	}
-	return rows, yOf
 }
 
 // monthTicks lays out at most ~8 month-boundary ticks across the window.
@@ -598,8 +645,8 @@ func tallyStrip(st styles, strip []tlStripEntry, types []facet.Type, from, to ti
 			continue
 		}
 		tally = append(tally, tlTally{
-			Type: t, Hue: hueClass(st.of(t).Family), Count: n,
-			Href: windowLink(from, to, zoomed, tlView{Types: []facet.Type{t}, Status: view.Status, Sel: view.Sel}),
+			Type: t, Hue: hueOf(t), Count: n,
+			Href: windowLink(from, to, zoomed, tlView{Types: []facet.Type{t}, Status: view.Status, Sel: view.Sel, Open: view.Open}),
 		})
 	}
 	return tally

@@ -92,27 +92,40 @@ func TestTimeline_DenseMarksDrawAsARunUntilZoomedIn(t *testing.T) {
 		t.Fatalf("GET / = %d", code)
 	}
 	band := whole[:strings.Index(whole, "compose — the canonical")]
-	if n := strings.Count(band, `class="run"`); n != 2 {
-		t.Fatalf("%d runs on the whole-person band, want 2 (the morning and the weights)", n)
+	// Health is a closed lane, so its two types share one line: the morning's readings
+	// fall inside the weights' stretch and join its run (card 245).
+	if n := strings.Count(band, `class="run"`); n != 1 {
+		t.Fatalf("%d runs on the collapsed whole-person band, want 1 (all of health)", n)
 	}
 	if n := strings.Count(band, `/facet?id=`); n != 1 {
 		t.Errorf("%d marks on the whole-person band, want the 2024 reading alone", n)
 	}
-	for _, want := range []string{"40 × health.heart-rate", "1500 × health.weight", "1541 facets in this window, 2 runs", "click to zoom in", `<text x="`} {
+	for _, want := range []string{"1540 × health (2 types)", "1541 facets in this window, 1 run", "click to zoom in", `<text x="`} {
 		if !strings.Contains(whole, want) {
-			t.Errorf("whole-person band missing %q", want)
+			t.Errorf("collapsed whole-person band missing %q", want)
+		}
+	}
+	// Opened, each type has a lane of its own: the morning and the weights are two runs.
+	_, opened := get(t, srv.URL+"/?open=health")
+	openBand := opened[:strings.Index(opened, "compose — the canonical")]
+	if n := strings.Count(openBand, `class="run"`); n != 2 {
+		t.Fatalf("%d runs on the opened band, want 2 (the morning and the weights)", n)
+	}
+	for _, want := range []string{"40 × health.heart-rate", "1500 × health.weight", "1541 facets in this window, 2 runs"} {
+		if !strings.Contains(opened, want) {
+			t.Errorf("opened band missing %q", want)
 		}
 	}
 	// The strip, past 1,500 live facets, tallies by type instead of a square each.
 	strip := whole[len(band):]
 	strip = strip[:strings.Index(strip, "<script>")]
 	if strings.Count(strip, `/facet?id=`) != 0 || !strings.Contains(strip, "1541 live facets composed") ||
-		!strings.Contains(strip, `href="/?type=health.weight"><span class="sw h0"></span>health.weight <span class="dim">(1500)</span>`) {
+		!strings.Contains(strip, `href="/?type=health.weight"><span class="sw h7"></span>health.weight <span class="dim">(1500)</span>`) {
 		t.Errorf("the strip drew a square each instead of tallying by type: %s", strip[:min(len(strip), 1500)])
 	}
-	runAt := strings.Index(whole, `<title>40 × health.heart-rate`)
-	runAt = strings.LastIndex(whole[:runAt], `class="run"`)
-	run := whole[runAt : runAt+strings.Index(whole[runAt:], ">")]
+	runAt := strings.Index(opened, `<title>40 × health.heart-rate`)
+	runAt = strings.LastIndex(opened[:runAt], `class="run"`)
+	run := opened[runAt : runAt+strings.Index(opened[runAt:], ">")]
 	if !strings.Contains(run, "from=2026-07-05T") || !strings.Contains(run, "to=2026-07-05T") {
 		t.Errorf("the run's link is not its own morning: %s", run)
 	}

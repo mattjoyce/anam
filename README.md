@@ -151,12 +151,12 @@ records a measure, a reading or an event.
 |---|---|---|---|---|---|---|
 | `health.heart-rate.day` | 1 | vitals | measure | One day's resting, minimum and maximum heart rate as one fact (replaces `health.heart-rate-day`'s three a day) | `id` | interval start |
 | `health.heart-rate-alert` | 5 | vitals | event | One abnormal high heart rate alert from a watch | `source`, `kind`, `fact_time` | `fact_time` |
-| `health.blood-pressure` | 7 | vitals | reading | One blood pressure reading, as an Open mHealth body | `date_excel`, `reading` | `date_excel` |
-| `health.weight` | 6 | body | reading | One body weight | `id` | `date` |
+| `health.blood-pressure` | 8 | vitals | reading | One blood pressure reading, as an Open mHealth body | `date_excel`, `reading` | `date_excel` |
+| `health.weight` | 7 | body | reading | One body weight | `id` | `date` |
 | `health.body-composition` | 5 | body | measure | A period's body metrics (fat, muscle and the rest) | `group`, `period_type`, `period_start` | `period_start` |
 | `health.sleep-episode` | 2 | sleep | measure | One sleep episode, as an IEEE 1752 sleep-episode body | `id` | interval start |
-| `health.lab-panel` | 2 | labs | event | One pathology request, the header of a draw's report | `id` | `collected` |
-| `health.lab-result` | 2 | labs | reading | One analyte's result from one draw | `id` | `collected` |
+| `health.lab-panel` | 3 | labs | event | One pathology request, the header of a draw's report | `id` | `collected` |
+| `health.lab-result` | 3 | labs | reading | One analyte's result from one draw | `id` | `collected` |
 | `health.condition` | 1 | conditions | event | A condition named in a document | `id` | `date` |
 | `health.illness.started` | 1 | conditions | event | The day an illness began (was `health.illness-started` v1, before the names took a third segment) | `id` | `date` |
 | `health.illness.ended` | 1 | conditions | event | The day an illness ended (was `health.illness-ended` v1, before the names took a third segment) | `id` | `date` |
@@ -166,8 +166,8 @@ records a measure, a reading or an event.
 | `health.medication.dose` | 3 | meds | event | One dose of a medicine taken at a moment, outside any course (was `health.medication-dose` up to v2, before the names took a third segment) | `id` | `taken_at` |
 | `health.medication.dose-missed` | 1 | meds | event | A dose the person says they missed (was `health.medication-missed-dose` v1, before the names took a third segment) | `id` | `date` |
 | `health.medication.compliance` | 1 | meds | measure | The person's own estimate of how well they kept to a course (was `health.medication-compliance` v1, before the names took a third segment) | `id` | `date` |
-| `health.encounter` | 1 | clinical | event | One appointment with a clinic or practitioner | `id` | `date` |
-| `health.donation` | 1 | clinical | event | One visit to give blood | `id` | `date` |
+| `health.encounter` | 2 | clinical | event | One appointment with a clinic or practitioner | `id` | `date` |
+| `health.donation` | 2 | clinical | event | One visit to give blood | `id` | `date` |
 | `health.vision-prescription` | 1 | clinical | reading | One lens prescription as an optometrist issued it, each eye as printed | `id` | `date` |
 | `activity.exercise-session.garmin` | 1 | exercise | event | One session a Garmin watch recorded, as an IEEE 1752 physical activity (was `activity.exercise-session` up to v2, before each vendor had its own leaf) | `id` | session start |
 | `activity.exercise-session.concept2` | 2 | exercise | event | One workout the Concept2 Logbook holds, as an IEEE 1752 physical activity (likewise) | `id` | session start |

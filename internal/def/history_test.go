@@ -33,9 +33,9 @@ func TestManifests_CarryTheHistory(t *testing.T) {
 	// types, which took a third segment, and card 195 for activity.exercise-session,
 	// split into a leaf per vendor.
 	for typ, versions := range map[facet.Type][]int{
-		"health.blood-pressure":     {1, 2, 3, 4, 5, 6},
+		"health.blood-pressure":     {1, 2, 3, 4, 5, 6, 7},
 		"health.measurement":        {1, 2},
-		"health.weight":             {1, 2, 3, 4},
+		"health.weight":             {1, 2, 3, 4, 5, 6},
 		"exercise.session":          {1, 2, 3, 4, 5},
 		"activity.exercise-session": {1, 2},
 		"note.annotation":           {1, 2, 3},
@@ -52,8 +52,8 @@ func TestManifests_CarryTheHistory(t *testing.T) {
 		"place.trip.departed":       {1},
 		// Card 198: source_time's versions.
 		"record.document":                     {1},
-		"health.lab-result":                   {1},
-		"health.lab-panel":                    {1},
+		"health.lab-result":                   {1, 2},
+		"health.lab-panel":                    {1, 2},
 		"activity.exercise-session.concept2":  {1},
 		"activity.exercise-session.strong":    {1},
 		"activity.exercise-session.technogym": {1},
@@ -62,6 +62,9 @@ func TestManifests_CarryTheHistory(t *testing.T) {
 		"health.heart-rate":                   {3},
 		"health.metric-group":                 {3},
 		"health.sleep":                        {3},
+		// The records window: each type's body before it required source_time.
+		"health.encounter": {1},
+		"health.donation":  {1},
 	} {
 		for _, v := range versions {
 			if !held[typ][v] {
@@ -74,8 +77,8 @@ func TestManifests_CarryTheHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bp, ok := reg.Lookup("health.blood-pressure"); !ok || bp.Version != 7 {
-		t.Errorf("Bundled bp = v%d, %v; want the current v7 alone", bp.Version, ok)
+	if bp, ok := reg.Lookup("health.blood-pressure"); !ok || bp.Version != 8 {
+		t.Errorf("Bundled bp = v%d, %v; want the current v8 alone", bp.Version, ok)
 	}
 	if _, ok := reg.Lookup("record.note"); ok {
 		t.Error("Bundled carries record.note, which is record.edge since card 191")

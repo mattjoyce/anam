@@ -32,13 +32,13 @@ func supersededServer(t *testing.T) (*httptest.Server, string) {
 
 	const ref = "bp-csv:2026-1-24 06:30:00:1"
 	v1 := seedFacet(t, ref, "health.blood-pressure",
-		`{"date_excel": "2026-1-24 06:30:00", "reading": "1", "systolic_blood_pressure": {"value": 128, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 79, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-24T06:30:00+11:00"}}`)
+		`{"source_time": {"value": "2026-1-24 06:30:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-1-24 06:30:00", "reading": "1", "systolic_blood_pressure": {"value": 128, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 79, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-24T06:30:00+11:00"}}`)
 	v1.DefinitionVersion = cur.Version
 	if err := l.Admit(ctx, 0, v1, event(facet.EventAdmitted, v1, 1)); err != nil {
 		t.Fatalf("Admit v1: %v", err)
 	}
 	v2 := seedFacet(t, ref, "health.blood-pressure",
-		`{"date_excel": "2026-1-24 06:30:00", "reading": "1", "systolic_blood_pressure": {"value": 130, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 79, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-24T06:30:00+11:00"}, "comment": "redone"}`)
+		`{"source_time": {"value": "2026-1-24 06:30:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-1-24 06:30:00", "reading": "1", "systolic_blood_pressure": {"value": 130, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 79, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-24T06:30:00+11:00"}, "comment": "redone"}`)
 	v2.DefinitionVersion, v2.ArtifactVersion = cur.Version, 2
 	sup := facet.AnamEvent{Kind: facet.EventSuperseded, FacetID: v2.ID, Seq: 2, ArtifactVersion: 2,
 		PriorArtifactVersion: 1, AnamTime: time.Date(2026, 7, 11, 9, 0, 0, 0, time.UTC)}

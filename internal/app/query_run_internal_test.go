@@ -116,7 +116,7 @@ func TestQueryDescribe_SameOverTheDaemon(t *testing.T) {
 	f := newRemoteFixture(t)
 	out := f.sameOutput(t, "query", "describe")
 	for _, want := range []string{"fact-time lexeme  2006-01-02T15:04:05.000000000Z07:00", "base       entry(E, Type, FactTime, Series, Status, Source, DefinitionVersion)",
-		"parameter  instant(At)", "rule       current(E, At)", "health.blood-pressure  v7", "/systolic_blood_pressure/value", "health.medication.started  v1  series med.regimen", "health.medication.stopped  v1  series med.regimen  closes"} {
+		"parameter  instant(At)", "rule       current(E, At)", "health.blood-pressure  v8", "/systolic_blood_pressure/value", "health.medication.started  v1  series med.regimen", "health.medication.stopped  v1  series med.regimen  closes"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("describe omits %q:\n%s", want, out)
 		}

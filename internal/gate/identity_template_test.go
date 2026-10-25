@@ -94,7 +94,7 @@ func TestTemplate_ATypeWithoutOneIsUntouched(t *testing.T) {
 	t.Parallel()
 	g := newDoseGate(t)
 	w := facet.Envelope{Type: "health.weight", Source: "conversation", Injector: "conversation",
-		Payload: []byte(`{"id": "w-1", "date": "2026-10-17 07:00", "kg": 80}`)}
+		Payload: []byte(`{"id": "w-1", "date": "2026-10-17 07:00", "source_time": {"value": "2026-10-17 07:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kg": 80}`)}
 	b, err := g.Resolve(w)
 	if err != nil {
 		t.Fatal(err)

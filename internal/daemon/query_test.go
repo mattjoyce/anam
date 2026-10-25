@@ -35,8 +35,8 @@ func seedReadings(t *testing.T, cfg config.Config) {
 	g := gate.New(l, defs, gate.StaticScopes{"records": {"health.blood-pressure"}}, clock.Real{}, cfg.PersonID,
 		gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	for _, p := range []string{
-		`{"id": "2026-1-24 06:36:00:1", "date_excel": "2026-1-24 06:36:00", "reading": "1", "systolic_blood_pressure": {"value": 114.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 80.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-24T06:36:00+11:00"}, "pulse": "70.0"}`,
-		`{"id": "2026-2-10 05:04:00:1", "date_excel": "2026-2-10 05:04:00", "reading": "1", "systolic_blood_pressure": {"value": 102.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 72.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-02-10T05:04:00+11:00"}, "pulse": "68.0"}`,
+		`{"id": "2026-1-24 06:36:00:1", "source_time": {"value": "2026-1-24 06:36:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-1-24 06:36:00", "reading": "1", "systolic_blood_pressure": {"value": 114.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 80.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-24T06:36:00+11:00"}, "pulse": "70.0"}`,
+		`{"id": "2026-2-10 05:04:00:1", "source_time": {"value": "2026-2-10 05:04:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-2-10 05:04:00", "reading": "1", "systolic_blood_pressure": {"value": 102.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 72.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-02-10T05:04:00+11:00"}, "pulse": "68.0"}`,
 	} {
 		env := facet.Envelope{Type: "health.blood-pressure", Source: "records", Injector: "records", Payload: []byte(p), AssertedPerson: cfg.PersonID}
 		b, err := g.Resolve(env)

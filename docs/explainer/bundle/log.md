@@ -260,3 +260,9 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: five types no writer sends any more move a version and require `source_time`, fact time and identity unchanged: `activity.gym-visit` v2, `health.body-composition` v5, and the retired `health.heart-rate`, `health.metric-group` and `health.sleep` v4. The old bodies join the history, which holds 84. The source-time list in `internal/def/sourcetime_test.go` names six types, all read from hand-made records files.
 - Bundle: the definition-manifest page says 84 earlier versions.
+
+## 2026-10-26, card 198, the records window
+
+- Code: the six types read from hand-made records files move a version and require `source_time`, identity and fact time unchanged: `health.weight` v7, `health.lab-result` v3, `health.lab-panel` v3, `health.blood-pressure` v8, and `health.encounter` v2 and `health.donation` v2, which declare it for the first time. The old bodies join the history, which holds 90. The source-time list in `internal/def/sourcetime_test.go` is empty. The records files state `Australia/Sydney` on every record, basis `source`.
+- Bundle: the blood-pressure importer's pages say v8; the definition-manifest page says 90 earlier versions.
+

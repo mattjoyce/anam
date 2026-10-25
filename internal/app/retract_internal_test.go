@@ -16,9 +16,9 @@ import (
 )
 
 var threeWeights = []record{
-	{"health.weight", `{"id": "w1", "date": "2026-01-01 07:00", "kg": 80.1}`},
-	{"health.weight", `{"id": "w2", "date": "2026-01-02 07:00", "kg": 80.2}`},
-	{"health.weight", `{"id": "w3", "date": "2026-01-03 07:00", "kg": 80.3}`},
+	{"health.weight", `{"id": "w1", "date": "2026-01-01 07:00", "source_time": {"value": "2026-01-01 07:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kg": 80.1}`},
+	{"health.weight", `{"id": "w2", "date": "2026-01-02 07:00", "source_time": {"value": "2026-01-02 07:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kg": 80.2}`},
+	{"health.weight", `{"id": "w3", "date": "2026-01-03 07:00", "source_time": {"value": "2026-01-03 07:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kg": 80.3}`},
 }
 
 // heldOf is the facet id of each records id the source holds now.

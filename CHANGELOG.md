@@ -9,6 +9,16 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- The six types read from hand-made records files require `source_time` (card 198, the records
+  window): `health.weight` v7, `health.lab-result` v3, `health.lab-panel` v3,
+  `health.blood-pressure` v8, and `health.encounter` v2 and `health.donation` v2, which declare it
+  as well. Fact time and identity are the earlier version's and the earlier bodies stay in the
+  history. **This deploys with the records files, never before them**: the gate admits an envelope
+  only at a type's current version and refuses a batch whole, so the records importer is refused
+  until every record of these types in `records_dir` carries `source_time`, and `anam_bp_csv` needs
+  its copy of `health.blood-pressure` at v8. Every record states `Australia/Sydney` with basis
+  `source`; weight also states the offset for its date. The list of types that read a local clock
+  without requiring it is empty.
 - Five bundled types that no writer sends any more require `source_time` (card 198, slice A):
   `activity.gym-visit` v2, `health.body-composition` v5, and the retired health-db types
   `health.heart-rate`, `health.metric-group` and `health.sleep` v4. Fact time and identity are the

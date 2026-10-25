@@ -35,9 +35,11 @@ func serveCoverage(t *testing.T) (*Daemon, string) {
 	return d, url
 }
 
+// weighAt is a weight at date, a Sydney wall clock in daylight time (+11:00) as the
+// callers' dates all are.
 func weighAt(version int, id, date string) string {
-	return fmt.Sprintf(`{"type": "health.weight", "definition_version": %d, "payload": {"id": %q, "date": %q, "kg": 80}}`,
-		version, id, date)
+	return fmt.Sprintf(`{"type": "health.weight", "definition_version": %d, "payload": {"id": %q, "date": %q, "source_time": {"value": %q, "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kg": 80}}`,
+		version, id, date, date)
 }
 
 func readingAt(id, at string) string {

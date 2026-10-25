@@ -200,7 +200,7 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 		BytesNotHeld:      bytesNotHeld(f),
 		AnamTime:          anamTimeOf(mine, f.ArtifactVersion),
 		Bucket:            s.buckets.Of(f.FactTime).ID(),
-		Payload:           highlightJSON(f.Payload.Bytes()),
+		Payload:           highlightPayload(f.Payload.Bytes()),
 		Events:            mine,
 		Track:             facetTrack(f),
 	})

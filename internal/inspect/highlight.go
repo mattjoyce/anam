@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 // jsonToken is one run of JSON text and its kind: key, str, num, lit or pun, or ""
@@ -12,6 +14,10 @@ import (
 type jsonToken struct {
 	Class string
 	Text  string
+	// Ref is the facet id a string token holds, set only by markFacetIDs. The template
+	// draws a link icon after the token, outside the string, so the text shown stays the
+	// bytes the payload holds.
+	Ref string
 }
 
 // highlightJSON splits JSON, indented, into classed tokens: the colour-coding an
@@ -23,7 +29,34 @@ func highlightJSON(raw []byte) []jsonToken {
 	if err := json.Indent(&pretty, raw, "", "  "); err != nil {
 		return []jsonToken{{Text: string(raw)}}
 	}
-	src := pretty.String()
+	return tokenize(pretty.String())
+}
+
+// highlightPayload is highlightJSON for a facet's payload: a string that is a facet id
+// (card 244) carries it in Ref so the page can link it.
+func highlightPayload(raw []byte) []jsonToken { return markFacetIDs(highlightJSON(raw)) }
+
+// markFacetIDs sets Ref on each string token (never a key) whose value is a UUID in its
+// canonical form, the shape facet.NewID makes. A UUID that names no facet links to a
+// 404, which is accepted; checking the ledger for each would cost a read per id.
+func markFacetIDs(toks []jsonToken) []jsonToken {
+	for i, t := range toks {
+		if t.Class != "str" {
+			continue
+		}
+		var v string
+		if json.Unmarshal([]byte(t.Text), &v) != nil || len(v) != 36 {
+			continue
+		}
+		if _, err := uuid.Parse(v); err == nil {
+			toks[i].Ref = v
+		}
+	}
+	return toks
+}
+
+// tokenize splits JSON text into classed tokens, whatever its whitespace.
+func tokenize(src string) []jsonToken {
 	var out []jsonToken
 	emit := func(class, text string) { out = append(out, jsonToken{Class: class, Text: text}) }
 	ws := 0 // start of the pending whitespace run

@@ -66,7 +66,7 @@
     {{range .Rows}}
     <tr{{if not .Present}} class="dim"{{end}}>
       <td class="mono" style="padding-left: {{.Depth}}.2rem">{{if .Depth}}<span class="dim">└ </span>{{end}}{{.Name}}{{range .Roles}} <span class="role">{{.}}</span>{{end}}</td>
-      <td class="mono">{{if .Value}}{{.Value}}{{else if .Present}}<span class="dim">object, below</span>{{else}}<span class="dim">absent</span>{{end}}</td>
+      <td class="mono">{{if .Value}}{{template "json.html" .Tokens}}{{else if .Present}}<span class="dim">object, below</span>{{else}}<span class="dim">absent</span>{{end}}</td>
       <td>{{if .Description}}{{.Description}}{{else}}<span class="undescribed">not described</span>{{end}}</td>
     </tr>
     {{end}}

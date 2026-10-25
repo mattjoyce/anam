@@ -1,1 +1,1 @@
-{{define "json.html"}}{{range .}}{{if .Class}}<span class="j-{{.Class}}">{{.Text}}</span>{{else}}{{.Text}}{{end}}{{end}}{{end}}
+{{define "json.html"}}{{range .}}{{if .Class}}<span class="j-{{.Class}}">{{.Text}}</span>{{else}}{{.Text}}{{end}}{{if .Ref}}{{template "openid" .Ref}}{{end}}{{end}}{{end}}

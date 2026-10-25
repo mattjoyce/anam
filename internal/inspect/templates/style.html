@@ -58,6 +58,10 @@
   button.copyid.copied { opacity: 1; color: #1a7f37; }
   button.copyid.copied svg { display: none; }
   button.copyid.copied .done { display: inline; }
+  /* the link icon after a facet id in a payload (the openid fragment), drawn like the copy button */
+  a.openid { font-size: .75rem; line-height: 1; margin-left: .3rem; padding: .1rem .25rem; border: 1px solid transparent; border-radius: 4px; color: inherit; opacity: .45; text-decoration: none; vertical-align: baseline; }
+  a.openid:hover, a.openid:focus-visible { opacity: 1; border-color: currentColor; }
+  a.openid svg { display: inline-block; vertical-align: -1px; }
   @media (max-width: 40rem) { form.entry .field { grid-template-columns: 1fr; } form.entry .hint, form.entry .problem { grid-column: 1; } }
   @media (max-width: 40rem) {
     body { margin: 1rem auto; font-size: 14px; }

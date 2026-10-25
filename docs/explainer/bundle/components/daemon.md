@@ -45,12 +45,15 @@ One table in `api.go` names each route with the roles whose tokens open it (see 
 | `GET /v1/timeline`, `GET /v1/changes`, `GET /v1/status`, `GET /v1/checkpoints` | any | reads, bounded by `max_read_bytes` |
 | `GET /v1/coverage[?w=&as_of=&projection=]` | any | each type's live count, earliest and latest fact-time, and each source's share, at the head or a named W, counted from the same value the timeline reads (card 90); says what is recorded, never that a source is complete |
 | `POST /v1/receipts`, `GET /v1/receipts[/{hash}[/verify]]`, `GET /v1/receipts/{hash}/facets/{facet_id}` | any | publish, verify, and open one served facet beside its links from the [edge index](/data-structures/facet-edge-row.md) (cards 91, 104); a read over `max_read_bytes` is published once and answered a page at a time, `GET /v1/receipts/{hash}?cursor=` reading each page from the served value (card 92). The list takes `principal`, `since`, `until` and `zone`, which is who read what (card 216); a token set to record every read has `GET /v1/timeline` answered as a publish and opens only the receipts that name it |
+| `GET /v1/query`, `POST /v1/query` | any | the query catalogue (what a program may name), and running a program over what a projection serves, with a receipt (card 173); a program is bounded by `max_manifest_bytes` |
+| `POST /v1/selections`, `GET /v1/selections/{code}` | any | save a program and get its short code, and read it back (card 206); a row is inserted whole or not at all, never the ledger, and takes no turn on the write queue |
+| `POST /v1/facets/{id}/retract` | operator | tombstone one facet of the source the body names, on the write queue, with the plan `anam retract <source> --facet` applies (card 188); 409 for a facet of another source, one not live, or a source an importer declares and has completed a snapshot for |
 | `POST /v1/checkpoints` | operator | mint on the write queue |
 | `POST /v1/backups` | operator | `VACUUM INTO` both stores under `backup_dir` |
 | `POST /v1/entry` | operator | hand-enter a fact as the workbench source (never held) |
 | `/` | operator | the [inspector](/components/inspect.md) |
 
-`/healthz` is outside the table and needs no token. A missing or unknown token is 401; a token whose role the route does not admit is 403 naming the principal.
+`/healthz` and `GET /v1/openapi.yaml` (the spec of every route above, held to the mux by a test) are outside the table and need no token. A missing or unknown token is 401; a token whose role the route does not admit is 403 naming the principal.
 
 Every unsafe request passes `browserGuard` first (card 108): a foreign `Origin`, a `Sec-Fetch-Site` other than `same-origin` or `none`, or on a tokenless daemon a `Host` that is not a loopback name, is 403 before the token is read and before any work is queued. A cached basic-auth token is exactly the credential a page on another site would spend, so the guard runs ahead of `admit`.
 

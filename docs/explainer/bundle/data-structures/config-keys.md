@@ -26,6 +26,7 @@ references: []
 | `backup_dir`, `backup_keep` | `ANAM_BACKUP_DIR`, `ANAM_BACKUP_KEEP` | none, 14 |
 | `long_write_timeout`, `timeout` | `ANAM_LONG_WRITE_TIMEOUT`, `ANAM_TIMEOUT` | 15 m, 5 s (`DefaultLongWriteTimeout`, `DefaultTimeout`); `long_write_timeout` bounds one long write in the daemon (index replay, backup, the mint at start). Its old name `ingest_timeout` (`ANAM_INGEST_TIMEOUT`) is still read, with a warning at load; the two given differently are refused (card 156) |
 | `max_read_bytes` | `ANAM_MAX_READ_BYTES` | 512 KiB; 0 is unbounded |
+| `default_projection` | `ANAM_DEFAULT_PROJECTION` | none; the projection a client should read first, advertised on `GET /v1/status` and `GET /v1/projections` and never applied (card 180); the daemon refuses to start on a name that is neither bundled nor registered |
 | `bucket_width` | `ANAM_BUCKET_WIDTH` | `Monthly`; `Weekly` also accepted |
 | `checkpoint_budget` | `ANAM_CHECKPOINT_BUDGET` | 1 MiB; 0 keeps the fixed width |
 

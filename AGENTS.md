@@ -58,6 +58,8 @@ to save a page of code.
 
 **Structure**
 - Binaries in `cmd/<name>/main.go`; keep `main` thin — call `app.Run(ctx) error`.
+  There are two: `cmd/anam`, the service and CLI, and `cmd/anam-bench`, the read performance bench
+  (`gen`, `run`, `mint`, `sizes`, `compare`), which the container image does not build.
 - Group packages by concern, not layers. Non-public code in `internal/`.
 
 **Errors**

@@ -250,3 +250,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: `money` is opened from the reserved four, decided by Matt on 2026-10-25, so the count of domain heads stays ten. One Definition is bundled, `money.purchase` (one order or receipt, with its lines in `items`; Confidential, strict, a local date in Australia/Sydney, no `source_time`, an id declared by a template from the merchant and the order reference, amounts in the document's currency and never converted, no field for the person's judgement about it), and one projection, `purchases` (a log over `money.purchase`). The timeline draws a purchases row.
 - Bundle: the purchase term is new, and the definition-manifest, projection-template and where-a-distinction-is-encoded pages say `money` is in use and give the new counts: 44 bundled Definitions, 36 terms.
+
+## 2026-10-25, card 246
+
+- Code: `anam daemon --help` lists every route the daemon serves, including `/v1/openapi.yaml`, and says which role's token opens what. No other code changed.
+- Bundle: the index counts are 29 components, 19 data structures and 28 decisions; the def page says 44 manifests; the daemon page lists the query, selection and facet-retract routes and `/v1/openapi.yaml`; the config keys name `default_projection`; the CLI page lists `coverage`, `query`, `daemon ready`, `move-artifacts`, `version` and the `anam-bench` binary; the inspector page lists `/location`, `/importers` and `POST /view`. Three gaps shrank: the API one no longer lists the help text, the ARCHITECTURE sentences one drops `ingest`, and the storage one is now only the unwritten `sync_cursor`.

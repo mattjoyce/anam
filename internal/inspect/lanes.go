@@ -2,6 +2,7 @@ package inspect
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -41,6 +42,11 @@ func domainOf(t facet.Type) string {
 	return head
 }
 
+// inClosedSet says whether a head is one of the ten.
+func inClosedSet(id string) bool {
+	return slices.ContainsFunc(domains, func(d domainInfo) bool { return d.ID == id })
+}
+
 // domainHue is the CSS class that colours a domain's marks; a head outside the
 // palette takes the grey.
 func domainHue(id string) string {
@@ -65,10 +71,12 @@ type lane struct {
 	Types    []facet.Type
 }
 
-// lanesFor lays out the domains: every head with a type in the ledger or in the
-// Definitions, in the order of domains, then a head outside the closed set that a
-// ledger type carries (the table, not the ledger, would be wrong), sorted. A head with
-// no type has no lane.
+// lanesFor lays out the domains: every head of the closed set with a type in the ledger
+// or in the Definitions, in the order of domains, then a head outside the set that a
+// ledger type carries, sorted. A Definition alone gives an off-set head no lane: an
+// old name whose Definition is still held (garmin.day, sleep.episode) would draw an
+// empty lane for a domain that does not exist, while a facet of one still shows, so
+// renamed-away data is not hidden. A head with no type has no lane.
 func (s styles) lanesFor(types []facet.Type) []lane {
 	byDomain := map[string][]facet.Type{}
 	present := map[string]bool{}
@@ -78,7 +86,9 @@ func (s styles) lanesFor(types []facet.Type) []lane {
 		present[d] = true
 	}
 	for _, d := range s.all() {
-		present[domainOf(d.Type)] = true
+		if h := domainOf(d.Type); inClosedSet(h) {
+			present[h] = true
+		}
 	}
 	mk := func(id string) lane {
 		ts := byDomain[id]

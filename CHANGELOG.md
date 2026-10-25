@@ -9,6 +9,15 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- Five bundled types that no writer sends any more require `source_time` (card 198, slice A):
+  `activity.gym-visit` v2, `health.body-composition` v5, and the retired health-db types
+  `health.heart-rate`, `health.metric-group` and `health.sleep` v4. Fact time and identity are the
+  earlier version's, and the earlier bodies stay in the history, so every admitted facet reads as it
+  did. No importer or records file sends these types (nothing live: the health-db facets are
+  tombstoned and no gym visit remains), so no batch changes. A facet written again carries the field.
+  Six types still read a Sydney wall clock without requiring it, all from hand-made records files
+  (`health.weight`, `health.lab-result`, `health.lab-panel`, `health.blood-pressure`,
+  `health.encounter`, `health.donation`).
 - Anam can hold what a person bought (card 241). `money` is opened from the reserved heads, by
   Matt's decision of 2026-10-25, so the count of domain heads stays ten and `social`, `media` and
   `work` remain reserved. One Definition is bundled at v1, `money.purchase`: one order or receipt is

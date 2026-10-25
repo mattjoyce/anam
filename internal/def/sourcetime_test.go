@@ -149,16 +149,15 @@ func bareDate(layout string) bool {
 }
 
 // readsALocalClock are the bundled types whose fact time is a wall clock read in the
-// Definition's zone, and which do not yet say how it was read: their writers have not
-// moved to source_time (card 197's follow-up). A type timed by a bare date is exempt by
+// Definition's zone, and which do not yet say how it was read: they read hand-made
+// records files, and requiring source_time means regenerating those files and
+// re-admitting their live facets (card 198). A type timed by a bare date is exempt by
 // card 198's rule and is not listed. The list only shrinks. A type leaves it by requiring
 // source_time, and a new type that reads a local clock must require it from its first
 // version.
 var readsALocalClock = map[string]bool{
-	"activity.gym-visit": true, "health.blood-pressure": true, "health.body-composition": true,
-	"health.donation": true, "health.encounter": true, "health.heart-rate": true,
-	"health.lab-panel": true, "health.lab-result": true, "health.metric-group": true,
-	"health.sleep": true, "health.weight": true,
+	"health.blood-pressure": true, "health.donation": true, "health.encounter": true,
+	"health.lab-panel": true, "health.lab-result": true, "health.weight": true,
 }
 
 func TestSourceTime_EveryTypeReadingALocalClockSaysHow(t *testing.T) {
@@ -254,6 +253,64 @@ func TestSourceTime_TheImportersTypesCarryIt(t *testing.T) {
 			if got := slices.Contains(m.Schema.Required, def.SourceTimeField); got != want.required {
 				t.Errorf("%s v%d requires %s = %v, want %v", typ, d.Version, def.SourceTimeField, got, want.required)
 			}
+		}
+	}
+}
+
+// Card 198, slice A: five types no writer sends any more require source_time, so a
+// facet written again says how its clock was read. Four are the health ETL's period
+// summaries, retired with health-db at card 55; activity.gym-visit's only writer was the
+// Strong extract, which now writes activity.exercise-session.strong. Fact-time rule and
+// identity are the earlier version's, which def.Guard holds.
+func TestSourceTime_TheWriterlessTypesRequireIt(t *testing.T) {
+	t.Parallel()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := def.Manifests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for typ, version := range map[facet.Type]int{
+		"activity.gym-visit":      2,
+		"health.body-composition": 5,
+		"health.heart-rate":       4,
+		"health.metric-group":     4,
+		"health.sleep":            4,
+	} {
+		d, ok := reg.Lookup(typ)
+		if !ok || d.Version != version {
+			t.Errorf("%s = v%d, %v; want v%d", typ, d.Version, ok, version)
+			continue
+		}
+		held := map[int]bool{}
+		for _, s := range stored {
+			if s.Type != typ {
+				continue
+			}
+			held[s.Version] = true
+			if s.Version != version {
+				continue
+			}
+			var m struct {
+				Schema struct {
+					Required   []string                   `json:"required"`
+					Properties map[string]json.RawMessage `json:"properties"`
+				} `json:"schema"`
+			}
+			if err := json.Unmarshal(s.Body, &m); err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := m.Schema.Properties[def.SourceTimeField]; !ok {
+				t.Errorf("%s v%d does not declare %s", typ, version, def.SourceTimeField)
+			}
+			if !slices.Contains(m.Schema.Required, def.SourceTimeField) {
+				t.Errorf("%s v%d does not require %s", typ, version, def.SourceTimeField)
+			}
+		}
+		if !held[version-1] {
+			t.Errorf("%s v%d is not carried in the history", typ, version-1)
 		}
 	}
 }

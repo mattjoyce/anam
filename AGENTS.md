@@ -146,13 +146,14 @@ would. A value a test must not change is an invariant. No package variable is se
 
 ## Python
 
-Anam holds no Python since card 119: the one-off extraction and reshaping scripts, which turn a
-source export into a records file, live in `anam-importers` under `records/extract` (card 58). A
-script that comes back here never touches the ledger or the operational store, Anam itself stays
-Go, and these rules hold:
+Anam holds no importer Python since card 119: the one-off extraction and reshaping scripts, which turn a
+source export into a records file, live in `anam-importers` under `records/extract` (card 58). Three
+tracked scripts remain here, `scripts/souffle-diff.py` and the explainer's `check.py` and `render.py`
+under `docs/explainer`. A script here never touches the ledger or the operational store, Anam itself
+stays Go, and these rules hold:
 
-- `#!/usr/bin/env python3`, stdlib only, `argparse` for flags. PyYAML is the one third-party module
-  in use; a second one follows the dependency rule above.
+- `#!/usr/bin/env python3`, stdlib only, `argparse` for flags. `check.py` imports PyYAML when it is
+  installed and reads without it when not; a second third-party module follows the dependency rule above.
 - No virtualenv or install step: a script runs as `python3 scripts/<name>.py` on a stock machine.
 - Read external input as untrusted: run with `-I` when the script reads downloaded files, and pass
   paths as arguments.
@@ -166,7 +167,7 @@ Go, and these rules hold:
 |---|---|---|
 | **Facet type** | lower-case **dotted**, `domain.concept[.specialisation…]` | `health.blood-pressure`, `mind.attention` |
 | Source / operator identity | lower-case **hyphenated** | `garmin`, `bp-csv` |
-| CLI command | lower-case hyphenated | `ingest`, `def load` |
+| CLI command | lower-case hyphenated | `move-artifacts`, `daemon ready` |
 | Config / payload / data key | **snake_case** | `db_path`, `ledger_path`, `period_start` |
 | SQL column | snake_case | `fact_time`, `content_hash` |
 | Env var | UPPER_SNAKE | `ANAM_LEDGER_PATH` |

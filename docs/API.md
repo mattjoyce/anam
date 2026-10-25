@@ -1,6 +1,6 @@
 # Anam API — operating the record and reading it
 
-Design proposal · 2026-10-07 · documentation only; these APIs are not implemented.
+Design proposal · 2026-10-07 · the daemon's `/v1` routes are built (below); the conversational design in §1 to §11 is still mostly proposal.
 Split 2026-10-10: the MCP mapping moved to the `anam-mcp` repository (§8).
 
 **The shapes are in the spec (2026-10-19).** `internal/daemon/openapi.yaml` describes every
@@ -10,16 +10,18 @@ and every example decodes into its `internal/api` type. A running daemon serves 
 `GET /v1/openapi.yaml` without a token. This document stays the prose: why the routes are what they
 are, and what is still proposed.
 
-**What runs today (2026-10-08).** `anam daemon` serves an interim `/v1` surface
-that carries the CLI's existing reads, not the `ReadRecord` contract below: `status`, `ingest`
-and `operations/{id}`, `timeline`, `changes`, `receipts` (list, show, verify) and `checkpoints`
-(list, mint). Each answers with a value from `internal/api`, the same value the CLI computes
+**What runs today (2026-10-25).** `anam daemon` serves `/v1`: the CLI's reads (`status`,
+`timeline`, `changes`, `coverage`, `receipts`, `checkpoints`, `projections`, `definitions`,
+`query`, `selections`), the importers' writes and the operator's. It is not the `ReadRecord`
+contract below. Each read answers with a value from `internal/api`, the same value the CLI computes
 from local files, so the CLI renders one type either way. With `server` set (`ANAM_SERVER`,
 `--server`) the CLI asks the daemon and opens no local file. Reads are whole, bounded by the
-daemon's timeout; paging and receipted reads remain this proposal's work. The route list is
-in `anam daemon --help`. An ingest operation that moved W carries `mint`, the mint the daemon ran
-after it: `w`, `full`, `from`, `minted`, `buckets`, or `error` when it failed, which
-fails nothing. `POST /v1/backups` copies the record into `backup_dir` on the write
+daemon's timeout; paging and receipted reads remain this proposal's work. A batch answers with an
+`Admission`: W, how many envelopes changed, and an outcome for each; a batch that moved W also starts
+the mint once batches stop arriving (ARCHITECTURE.md §7), which is not part of the answer and fails
+nothing. The route list is in `anam daemon
+--help`, and the spec above holds the shapes.
+`POST /v1/backups` copies the record into `backup_dir` on the write
 queue and answers where, at what W, and how big. `POST /v1/facets/{id}/retract`
 tombstones one facet by hand, as the operator: the body is `{"source": "workbench"}`, the source the
 facet must belong to, and the answer is the tombstone's `seq`, the `artifact_version` it marks and the

@@ -1,174 +1,106 @@
 # Spans as filters: time-bounded access to the record
 
-Draft for a card, 2026-10-25. Written on Matt's behalf from a design conversation about
-Shearline. Not on the board yet: the board clone is not on this machine.
+Draft for a card. v2, 2026-10-25, after anam-phone-log read v1 against anam master 45e4a67 and
+found eight things, all taken here. v1 is in this file's history. Written on Matt's behalf by
+the Shearline lead; the card is Matt's to cut.
 
 ## Job story
 
-When I give a principal a token to read sensitive facets, I want the grant to name a set of
-time units as well as a set of facet types, so I can share a window of my record (this year's
-blood pressure, last quarter's spend) without sharing the whole of it.
+When I give a principal a token, I want its grant to name a window of time as well as the
+projections it may read, so I can share this year's record, or last quarter's, without
+sharing the whole of it.
 
 ## Summary
 
-Access to the record gains two dimensions beyond the three roles. A grant names *what* may be
-read, as a resource prefix, and *when*, as a set of time units. A request is allowed when its
-resource is under a granted prefix and every unit it asks for is covered by a granted unit.
-Shearline decides; Anam resolves the calendar. Anam owns every word of its own vocabulary.
+A reader's grant gains a window. A read is narrowed to the window before it runs, the way
+`--from` and `--to` narrow it today, and the receipt shows the narrowing. Nothing is refused
+for asking too widely; the read is clamped. No new dependency: the first version is a few
+lines in `internal/policy` and one clamp in `queryOf`. The Datalog version comes at the flip
+card 223 already names, and this draft says what it will look like so the first version does
+not paint it out.
 
 ## Vocabulary
 
-This feature uses the **derived span** of the Glossary: the lens a person names as `[from, to]`.
-It never touches the **bucket span**, the minted checkpoint unit. Three new words:
+This feature uses the **derived span** of the Glossary, the lens a person names as
+`[from, to]`. It never touches the **bucket span**, the minted checkpoint unit. Two words:
 
-- **Unit.** One calendar interval at one resolution, named by its ISO 8601 prefix in UTC:
-  `2026` (year), `2026-06` (month), `2026-06-15` (day), `2026-06-15T09` (hour). The name is
-  a string. Lexical order is chronological. A coarser unit is a string prefix of every finer
-  unit under it, and that property is what makes a month grant cover its days.
-- **Resolution.** The width of a unit: year, month, day, hour. A parameter, never inferred.
-- **Span filter.** A derived span resolved to a set of units at one resolution, carried on a
-  request so the policy can test it.
+- **Window.** A derived span on a principal's grant: `[from, to)` in the record's zone, the
+  zone `clock.ParseBound` already resolves a bare date in. A grant window is resolved exactly
+  as a request's bounds are, by the same code, so the two can never disagree at an edge.
+- **Clamp.** The read's bounds intersected with the window. A request wider than the window is
+  served for the overlap; a request wholly outside it is served empty, with a receipt that
+  says why.
 
-## Resolving a span to units
+Membership is by **fact-time**, as `bounds` decides it today. A facet whose
+`effective_time_frame` straddles the window edge is in or out by its fact-time alone, the same
+rule a `--from` read applies; the draft does not introduce a second rule.
 
-A function in `internal/span`, or beside it:
+## What a grant names
 
-```go
-// Units resolves the half-open interval [from, to) to the units of width w it touches,
-// sorted. from and to are RFC 3339 instants; they are converted to UTC before resolution.
-// A unit is touched when any instant of the interval falls inside it. Units returns an
-// error when to is not after from, or when the interval would resolve to more than max
-// units.
-func Units(from, to time.Time, w Resolution, max int) ([]string, error)
+Doctrine: roles grant projections, projections are the type allow-lists, nothing lower. So a
+grant names **projections**, not facet types, and the window applies to every projection the
+grant names. Today every role reads every projection (`daemon/api.go:83`), so the first gap to
+close is binding a reader to its projections at all; the window rides on that.
+
+In the principals file:
+
+```yaml
+principals:
+  - name: clinician-2026
+    role: reader
+    projections: [heart, sleep]
+    window: {from: 2026-01-01, to: 2027-01-01}   # record's zone, half-open
 ```
 
-Three rules, each a test:
-
-1. **Half-open.** Start inclusive, end exclusive, so adjoining spans tile with no shared unit.
-   `[2026-06-01, 2026-07-01)` at month resolution is exactly `[2026-06]`.
-2. **Explicit resolution.** Six hours at day resolution is one day. A year at day resolution
-   is 365 or 366 days. The caller says which; `Units` never guesses from the inputs.
-3. **One zone.** Units are UTC, the zone of fact-time (`clock.Layout`). A span a person names
-   in Sydney is converted before resolution. Grants are written in UTC units. Two zones would
-   disagree at every edge, and the first refusal at ten in the morning would be a mystery.
-
-## Resources
-
-A resource is an opaque string with `/` as separator, canonical before the request is made.
-Three kinds for now:
-
-| Resource | Example | A grant prefix that covers it |
-|---|---|---|
-| a facet type | `facet/health.blood-pressure` | `facet/health.` covers every health type, present and future |
-| a projection | `projection/recent-life` | `projection/` covers all |
-| a read route | `read/timeline`, `read/changes` | `read/` covers all |
-
-Actions are the verbs the daemon already has: `read`, `submit`, `mint`, `operate`.
-
-## Policy facts
-
-The three roles become standing facts, and the routes keep their role gate as today. The
-policy adds what the role gate cannot say: which resources, and when.
-
-```go
-policy.Role("reader-bp-2026", "reader"),
-policy.Grant("reader", "read", "read/"),                        // every read route
-policy.Grant("reader-bp-2026", "read", "facet/health.blood-pressure"),
-// span grants are Anam's own relation, read by Anam's own rule set:
-anam.SpanGrant("reader-bp-2026", "2026"),                       // the year, as one unit
-```
-
-`span_grant/2` is declared in Anam's rule set and carried as standing facts through
-`Config`, the same way `grants/3` is. Shearline's schema accepts a consumer relation when the
-consumer's rule set declares it.
-
-## Rules
-
-Anam's rule set, loaded after `policy.RBAC()`:
-
-```
-% asked(U): the units the request's span filter resolved to. Request facts.
-asked/1.
-
-% span_grant(Role, Pat): the role may read units under Pat. Standing facts.
-span_grant/2.
-
-% covered(P, U): some role P holds grants a unit that is a prefix of U.
-covered(P, U) :- principal(P), asked(U), holds(P, Role), span_grant(Role, Pat), prefix(Pat, U).
-
-% missing(P): a unit was asked that nothing covers. "Every unit is covered" is written as
-% "no unit is missing", the Datalog way to say for-all.
-missing(P) :- principal(P), asked(U), not covered(P, U).
-
-% allow/3 is the bundled rule plus one more condition. A request with no span filter asks
-% no units, so missing/1 is empty and the rule reduces to the bundled one.
-allow(P, A, R) :- permit(P, A, Pat), resource(R), prefix(Pat, R), not deny(P, A, R), not missing(P).
-```
-
-Stratified negation handles `not missing`; `missing` depends on `covered`, which depends on
-nothing negated. A refusal's why-not names the first uncovered unit, which is the receipt a
-person needs: "you asked for 2027-01 and hold 2026".
-
-A request with no span filter is allowed on resource alone. That is deliberate: the
-operator's own reads name no window. Whether a *reader* must always name one is a policy
-choice for the standing facts, not the rules.
-
-## Carrying the units on a request
-
-Shearline's `Request.Context` holds one value per key. A span filter is many values. Two
-ways through, in order:
-
-1. **Now.** One `Decide` per unit, with the unit in context under a declared key `unit`, and
-   `asked(U) :- context("unit", U).` Allow when all allow. A year of months is twelve
-   decisions, each small. This is decision 5's answer in Shearline and costs nothing to build.
-2. **If spans get large.** A declared context key with a *many* cardinality in Shearline, so
-   `asked/1` arrives as request facts in one decision. A small, well-shaped extension to the
-   `policy` package. The rules above do not change.
-
-`Units` takes `max` so a request for ten years at hour resolution is refused at resolution
-time, before it becomes 87,600 facts or 87,600 decisions.
+A principal with no `window` reads all of time, as today. A principal with a `window` and a
+request with no `--from`/`--to` reads the window, not all of time: the grant bounds the read
+when the request names no bounds. That is the rule v1 got backwards.
 
 ## Where it sits in Anam
 
-- Every read path builds a `policy.Request` beside the `receipt.Query` it already builds
-  (card 92 made that one place: `queryOf` in `internal/read/parse.go`). Principal from the
-  token, action `read`, resource from the route and type, span filter from `bounds`.
-- `Decide` runs before the read. A deny is a 403 that carries `Decision.Why` rendered; an
-  allow may attach `Decision.Proof` to the receipt, so a published read says why it was
-  permitted as well as what it narrows.
-- Standing facts come from the principals file, which already holds roles, extended with
-  resource and span grants per principal. One `Load` at start and on reload; the `Policy`
-  swaps behind a pointer, as `examples/logsvc` in Shearline shows.
-- The policy base and the query base stay separate. A decision about a projection must not
-  evaluate over the ledger it guards.
-
-## Dependencies
-
-- Shearline in `go.mod`: Matt's call under AGENTS.md.
-- The engine split (Shearline's `datalog` into its own module) is independent of this card
-  and can land before or after. Anam imports the engine directly for `anam query` either way.
-
-## Pitfalls
-
-- Mixed resolutions in one decision. A day grant and an hour request never match. `Units`
-  takes one resolution; the policy layer refuses a request whose units are not all the same
-  width.
-- A zone other than UTC anywhere in a unit name.
-- Writing span grants finer than needed. A year grant is one fact; the same year in days is
-  365 facts and 365 lines of proof.
-- Letting a resource name be a raw request path. Grants match by prefix; the resource must be
-  the route the daemon matched and the type it resolved, never the URL.
-
-## Not in scope
-
-Attribute-based access over payload values (`attr/3` stays in the query engine, not the
-policy). Per-field grants. Grants on bucket spans.
+- `internal/policy` (static Go, per card 223) gains two checks: the projection is in the
+  principal's list; the window, if any, is handed to the read.
+- `queryOf` in `internal/read/parse.go` clamps `bounds` to the window before building the
+  `receipt.Query`. Every read already narrows through this one place (card 92), so the
+  timeline, a published read and a saved selection clamp the same way, and the receipt
+  records the clamped `From`/`Before` as the narrowing that was applied.
+- The receipt body is unchanged in shape. A clamp shows as the bounds it produced, not as a
+  new field, so existing receipts hash as they did. Nothing about the decision is attached to
+  the hashed body.
 
 ## Acceptance
 
-- `Units` has table tests for the three rules, plus a leap day and a week across a month end.
-- A reader with `facet/health.` and `2026` reads June 2026 blood pressure and is refused
-  January 2027 with a why-not naming `2027-01`.
-- A reader with no span grant and a request with no span filter is allowed on resource alone.
-- The operator's existing reads are unchanged: same receipts, same hashes.
-- A request whose units mix resolutions is refused before `Decide`.
+- A reader with `window: 2026` and no flags reads 2026 only.
+- The same reader asking `--from 2025-12-01 --to 2026-03-01` is served December excluded,
+  January and February included, and the receipt's `From` is 2026-01-01 in the record's zone.
+- The same reader asking for 2024 is served an empty read with a receipt, not a 403.
+- A Sydney reading at 09:00 on 1 January 2026 is inside a 2026 window; the last hours of
+  31 December 2026 UTC that are 2027 in Sydney are outside it.
+- A principal with no window, and the operator, read exactly as before: same receipts, same
+  hashes.
+- A reader asking a projection not in its list is refused by `internal/policy` with the
+  refusal naming the projection.
+
+## The Datalog version, for the card-223 flip
+
+When `internal/policy` moves to the engine (past a dozen rules or a second class of
+principal), the same feature is expressed as facts and one rule set after `policy.RBAC()`:
+
+- Resources are `projection/<name>`; `Grant(role, "read", "projection/heart")`.
+- A window becomes a set of **units**, ISO prefixes at one resolution, named in the record's
+  zone: `2026`, `2026-06`, `2026-06-15`. A coarser unit is a string prefix of every finer one
+  under it, so `prefix/2` gives the hierarchy. Grants are `span_grant(Role, Unit)`.
+- The request carries the units its bounds resolve to, at the grant's resolution, and the
+  rule set says which are covered. The read then clamps to the covered units, so the Datalog
+  decision stays a filter, not a gate. Why-not names the first uncovered unit for the receipt.
+- Carrying many units on one request needs a many-valued context key in Shearline's `policy`
+  package, a small extension; until then it is one `Decide` per unit.
+
+That version is not this card. It is written down so the first version chooses the same
+resolution rule, the same zone and the same clamp semantics, and the flip is a change of
+mechanism, not of behaviour.
+
+## Not in scope
+
+Attribute-based access over payload values. Per-field grants. Grants on bucket spans. Any
+notion of sensitivity: Anam never assesses it; a window is a window.

@@ -1,7 +1,7 @@
 ---
 type: component
 title: anam_bp_csv
-description: Shapes a blood-pressure app export to health.blood-pressure v7, an Open mHealth body beside the export's own text, one reading sent once from the newest export.
+description: Shapes a blood-pressure app export to health.blood-pressure v8, an Open mHealth body beside the export's own text, one reading sent once from the newest export.
 timestamp: 2026-10-11T00:00:00Z
 resource: ../anam-importers/bp_csv/run.py#handle
 anchor: "def handle(request: Dict[str, Any]) -> Dict[str, Any]:"

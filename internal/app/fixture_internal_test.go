@@ -36,9 +36,9 @@ type record struct {
 // form (date_excel and reading joined by a colon). "114.0" appears once, so a test can
 // correct one reading by replacing it.
 var bpReadings = []record{
-	{"health.blood-pressure", `{"id": "2026-1-24 06:36:00:1", "date_excel": "2026-1-24 06:36:00", "reading": "1", "systolic_blood_pressure": {"value": 114.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 80.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-24T06:36:00+11:00"}, "pulse": "70.0"}`},
-	{"health.blood-pressure", `{"id": "2026-2-10 05:04:00:1", "date_excel": "2026-2-10 05:04:00", "reading": "1", "systolic_blood_pressure": {"value": 102.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 72.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-02-10T05:04:00+11:00"}, "pulse": "68.0"}`},
-	{"health.blood-pressure", `{"id": "2026-2-11 05:10:00:1", "date_excel": "2026-2-11 05:10:00", "reading": "1", "systolic_blood_pressure": {"value": 101.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 72.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-02-11T05:10:00+11:00"}, "pulse": "66.0"}`},
+	{"health.blood-pressure", `{"id": "2026-1-24 06:36:00:1", "source_time": {"value": "2026-1-24 06:36:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-1-24 06:36:00", "reading": "1", "systolic_blood_pressure": {"value": 114.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 80.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-24T06:36:00+11:00"}, "pulse": "70.0"}`},
+	{"health.blood-pressure", `{"id": "2026-2-10 05:04:00:1", "source_time": {"value": "2026-2-10 05:04:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-2-10 05:04:00", "reading": "1", "systolic_blood_pressure": {"value": 102.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 72.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-02-10T05:04:00+11:00"}, "pulse": "68.0"}`},
+	{"health.blood-pressure", `{"id": "2026-2-11 05:10:00:1", "source_time": {"value": "2026-2-11 05:10:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-2-11 05:10:00", "reading": "1", "systolic_blood_pressure": {"value": 101.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 72.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-02-11T05:10:00+11:00"}, "pulse": "66.0"}`},
 }
 
 // corrected is recs with old replaced by new in the first payload that holds it.

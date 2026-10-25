@@ -93,7 +93,7 @@ func TestTimeline_ComposedIsTheFullFold(t *testing.T) {
 
 	// A tail: a correction of one reading and a new one, after the mint.
 	more := append(corrected(bpReadings, "114.0", "115.0"), record{"health.blood-pressure",
-		`{"id": "2026-3-01 07:00:00:1", "date_excel": "2026-3-01 07:00:00", "reading": "1", "systolic_blood_pressure": {"value": 111.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 70.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-03-01T07:00:00+11:00"}, "pulse": "60.0"}`})
+		`{"id": "2026-3-01 07:00:00:1", "source_time": {"value": "2026-3-01 07:00:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-3-01 07:00:00", "reading": "1", "systolic_blood_pressure": {"value": 111.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 70.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-03-01T07:00:00+11:00"}, "pulse": "60.0"}`})
 	f.admit(t, append(more, meds...))
 	same("with a tail")
 }

@@ -102,7 +102,7 @@ func call(t *testing.T, method, url, token, body string, want int, into any) {
 
 func weighIn(id string, kg float64, version int) string {
 	return fmt.Sprintf(`{"type": "health.weight", "definition_version": %d,
-		"payload": {"id": %q, "date": "2026-10-09 07:30", "kg": %v}}`, version, id, kg)
+		"payload": {"id": %q, "date": "2026-10-09 07:30", "source_time": {"value": "2026-10-09 07:30", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kg": %v}}`, version, id, kg)
 }
 
 func batch(envs ...string) string { return `{"envelopes": [` + strings.Join(envs, ",") + `]}` }

@@ -58,7 +58,7 @@ func newFixture(t *testing.T) fixture {
 func (f fixture) admit(t *testing.T, source, id string) string {
 	t.Helper()
 	env := facet.Envelope{Type: "health.weight", Source: source, Injector: source,
-		Payload: []byte(fmt.Sprintf(`{"id": %q, "date": "2026-10-09 07:30", "kg": 80.5}`, id))}
+		Payload: []byte(fmt.Sprintf(`{"id": %q, "date": "2026-10-09 07:30", "source_time": {"value": "2026-10-09 07:30", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kg": 80.5}`, id))}
 	b, err := f.g.Resolve(env)
 	if err != nil {
 		t.Fatal(err)

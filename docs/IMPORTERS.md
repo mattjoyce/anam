@@ -313,8 +313,9 @@ documents and the pathology extractor in Sydney (`assumption`); the Fitbit sleep
 extractors in the zone they are given (`configuration`). A source that gives the end of a session,
 as Concept2 and Technogym do, keeps the end as `value` and its Definition says so. A writer may
 read a wall clock only in the zone its Definition's fact time names, unless the fact time names its
-own zone. The types still read from a Sydney wall clock without requiring it are listed in
-`internal/def/sourcetime_test.go`, and that list only shrinks.
+own zone. Every type that reads a wall clock requires `source_time`; the list of those that did not
+(`internal/def/sourcetime_test.go`) is empty and stays so. The records files state
+`Australia/Sydney` with basis `source` on every record of the types read from them.
 
 A fact may name its own zone. `time_semantics.fact_time` may carry a `zone_pointer`, a
 field of `source_time`; a payload that holds a zone there is read in it, and one that holds none in

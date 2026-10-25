@@ -46,7 +46,7 @@ func TestRetract_PlansAnImportersSourceFromItsSnapshot(t *testing.T) {
 	admit := func(id string) string {
 		t.Helper()
 		env := facet.Envelope{Type: "health.weight", Source: "scale-import", Injector: "scale-import",
-			Payload: []byte(fmt.Sprintf(`{"id": %q, "date": "2026-10-09 07:30", "kg": 80.5}`, id))}
+			Payload: []byte(fmt.Sprintf(`{"id": %q, "date": "2026-10-09 07:30", "source_time": {"value": "2026-10-09 07:30", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kg": 80.5}`, id))}
 		b, err := g.Resolve(env)
 		if err != nil {
 			t.Fatal(err)

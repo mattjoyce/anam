@@ -219,6 +219,7 @@ func TestBundled_LabResultAdmitsAnUntimedDraw(t *testing.T) {
 	}
 	var payload map[string]any
 	if err := json.Unmarshal([]byte(`{"id": "acl:12345678/potassium", "collected": "2026-03-04 00:00",
+		"source_time": {"value": "2026-03-04 00:00", "zone": "Australia/Sydney", "basis": "source"},
 		"analyte": "Potassium", "value": "4.6", "lab_number": "12345678", "time_unknown": true}`), &payload); err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +238,7 @@ func TestBundled_LabResultAdmitsAnUntimedDraw(t *testing.T) {
 // passes and the readings supersede in place; a v3-shaped payload is refused. Card
 // 97: v5 names the six export columns v4 refused, as text, so one ticked checkbox
 // no longer stops the export. Card 147: v6 is v5 declaring kind and family. Card
-// 198: v7 declares source_time, not required. The bundled file is byte for byte the
+// 198: v7 declares source_time, v8 requires it. The bundled file is byte for byte the
 // importer's.
 func TestBundled_BloodPressureIsAnOMHBody(t *testing.T) {
 	t.Parallel()
@@ -249,7 +250,7 @@ func TestBundled_BloodPressureIsAnOMHBody(t *testing.T) {
 	if !ok {
 		t.Fatal("no bundled health.blood-pressure")
 	}
-	if d.Version != 7 || d.FactTime.Pointer != "/date_excel" || len(d.IdentityKey) != 2 || d.Kind != def.KindReading || d.Family != "vitals" {
+	if d.Version != 8 || d.FactTime.Pointer != "/date_excel" || len(d.IdentityKey) != 2 || d.Kind != def.KindReading || d.Family != "vitals" {
 		t.Fatalf("v%d fact time %s identity %v", d.Version, d.FactTime.Pointer, d.IdentityKey)
 	}
 	decode := func(s string) map[string]any {
@@ -261,6 +262,7 @@ func TestBundled_BloodPressureIsAnOMHBody(t *testing.T) {
 		return m
 	}
 	v4 := `{"date_excel": "2026-1-24 06:30:00", "reading": "1",
+		"source_time": {"value": "2026-1-24 06:30:00", "zone": "Australia/Sydney", "basis": "source"},
 		"systolic_blood_pressure": {"value": 128.0, "unit": "mmHg"},
 		"diastolic_blood_pressure": {"value": 79.0, "unit": "mmHg"},
 		"effective_time_frame": {"date_time": "2026-01-24T06:30:00+11:00"},
@@ -275,10 +277,11 @@ func TestBundled_BloodPressureIsAnOMHBody(t *testing.T) {
 		t.Errorf("a v5 payload with every export column was refused: %v", err)
 	}
 	for name, payload := range map[string]string{
-		"v3 shape":  `{"date_excel": "2026-1-24 06:30:00", "reading": "1", "systolic": "128.0", "diastolic": "79.0"}`,
-		"kPa":       strings.Replace(v4, `"value": 128.0, "unit": "mmHg"`, `"value": 17.1, "unit": "kPa"`, 1),
-		"no frame":  strings.Replace(v4, `"effective_time_frame": {"date_time": "2026-01-24T06:30:00+11:00"},`, "", 1),
-		"a posture": strings.Replace(v4, `"sitting"`, `"Seated"`, 1),
+		"v3 shape":       `{"date_excel": "2026-1-24 06:30:00", "reading": "1", "systolic": "128.0", "diastolic": "79.0", "source_time": {"value": "2026-1-24 06:30:00", "zone": "Australia/Sydney", "basis": "source"}}`,
+		"no source_time": strings.Replace(v4, `"source_time": {"value": "2026-1-24 06:30:00", "zone": "Australia/Sydney", "basis": "source"},`, "", 1),
+		"kPa":            strings.Replace(v4, `"value": 128.0, "unit": "mmHg"`, `"value": 17.1, "unit": "kPa"`, 1),
+		"no frame":       strings.Replace(v4, `"effective_time_frame": {"date_time": "2026-01-24T06:30:00+11:00"},`, "", 1),
+		"a posture":      strings.Replace(v4, `"sitting"`, `"Seated"`, 1),
 	} {
 		if err := d.Check(decode(payload)); err == nil {
 			t.Errorf("%s was admitted", name)

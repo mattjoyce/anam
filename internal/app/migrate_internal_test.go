@@ -189,7 +189,7 @@ func newMigrationFixture(t *testing.T) migrationFixture {
 		t.Fatal(err)
 	}
 	admitAs(t, f.ledgerPath, "bp-csv", bundled, []record{
-		{"health.blood-pressure", `{"id": "csv:1", "date_excel": "2026-3-1 07:00:00", "reading": "1", "systolic_blood_pressure": {"value": 120.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 80.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-03-01T07:00:00+11:00"}, "pulse": "60.0"}`},
+		{"health.blood-pressure", `{"id": "csv:1", "source_time": {"value": "2026-3-1 07:00:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-3-1 07:00:00", "reading": "1", "systolic_blood_pressure": {"value": 120.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 80.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-03-01T07:00:00+11:00"}, "pulse": "60.0"}`},
 	})
 	f.changed, f.dead, f.kept = idOf("records", "2026-1-24 06:36:00", "1"), idOf("records", "2026-2-10 05:04:00", "1"), idOf("records", "2026-2-11 05:10:00", "1")
 	tombstone(t, f.ledgerPath, f.dead)

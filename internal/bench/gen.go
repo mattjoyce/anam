@@ -150,6 +150,7 @@ func envelope(r reading) facet.Envelope {
 	mmHg := func(v int) map[string]any { return map[string]any{"value": v, "unit": "mmHg"} }
 	payload, _ := json.Marshal(map[string]any{ // plain values always marshal
 		"date_excel": ts, "reading": ord,
+		"source_time":              map[string]string{"value": ts, "zone": "Australia/Sydney", "basis": "source"},
 		"systolic_blood_pressure":  mmHg(r.systolic),
 		"diastolic_blood_pressure": mmHg(60 + r.systolic%25),
 		"effective_time_frame":     map[string]string{"date_time": r.at.Format(time.RFC3339)},

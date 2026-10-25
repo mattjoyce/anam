@@ -4,7 +4,7 @@ title: Health measures use Open mHealth bodies where one exists
 description: health.blood-pressure v4 and later, and the leaves of activity.exercise-session, conform to a pinned Open mHealth (IEEE 1752) schema, with the source's own text kept beside it.
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/def/manifests/health.blood-pressure.json#required
-anchor: '"required": ["date_excel", "reading", "systolic_blood_pressure", "diastolic_blood_pressure", "effective_time_frame"],'
+anchor: '"required": ["date_excel", "reading", "systolic_blood_pressure", "diastolic_blood_pressure", "effective_time_frame", "source_time"],'
 basis: docs
 tier: detail
 alternatives:

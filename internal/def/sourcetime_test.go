@@ -149,16 +149,11 @@ func bareDate(layout string) bool {
 }
 
 // readsALocalClock are the bundled types whose fact time is a wall clock read in the
-// Definition's zone, and which do not yet say how it was read: they read hand-made
-// records files, and requiring source_time means regenerating those files and
-// re-admitting their live facets (card 198). A type timed by a bare date is exempt by
-// card 198's rule and is not listed. The list only shrinks. A type leaves it by requiring
-// source_time, and a new type that reads a local clock must require it from its first
-// version.
-var readsALocalClock = map[string]bool{
-	"health.blood-pressure": true, "health.donation": true, "health.encounter": true,
-	"health.lab-panel": true, "health.lab-result": true, "health.weight": true,
-}
+// Definition's zone, and which do not yet say how it was read. It is empty (card 198): every
+// type that reads a local clock requires source_time. A type timed by a bare date is exempt by
+// that card's rule. A new type that reads a local clock must require source_time from its first
+// version, so this list does not grow.
+var readsALocalClock = map[string]bool{}
 
 func TestSourceTime_EveryTypeReadingALocalClockSaysHow(t *testing.T) {
 	t.Parallel()
@@ -204,9 +199,8 @@ func TestSourceTime_EveryTypeReadingALocalClockSaysHow(t *testing.T) {
 }
 
 // Card 198: the importers' types say how their clocks were read. A type whose every
-// writer sends source_time requires it; one also written by hand into a records file,
-// or whose source has no export left to extract again, declares it without requiring
-// it, so its old payloads still admit.
+// writer sends source_time requires it; one whose source has no export left to extract
+// again declares it without requiring it, so its old payloads still admit.
 func TestSourceTime_TheImportersTypesCarryIt(t *testing.T) {
 	t.Parallel()
 	reg, err := def.Bundled()
@@ -225,9 +219,9 @@ func TestSourceTime_TheImportersTypesCarryIt(t *testing.T) {
 		"activity.exercise-session.strong":    {2, true},
 		"record.document":                     {2, true},
 		"activity.exercise-session.technogym": {2, false},
-		"health.blood-pressure":               {7, false},
-		"health.lab-result":                   {2, false},
-		"health.lab-panel":                    {2, false},
+		"health.blood-pressure":               {8, true},
+		"health.lab-result":                   {3, true},
+		"health.lab-panel":                    {3, true},
 	} {
 		d, ok := reg.Lookup(typ)
 		if !ok || d.Version != want.version {
@@ -304,6 +298,56 @@ func TestSourceTime_TheWriterlessTypesRequireIt(t *testing.T) {
 			}
 			if _, ok := m.Schema.Properties[def.SourceTimeField]; !ok {
 				t.Errorf("%s v%d does not declare %s", typ, version, def.SourceTimeField)
+			}
+			if !slices.Contains(m.Schema.Required, def.SourceTimeField) {
+				t.Errorf("%s v%d does not require %s", typ, version, def.SourceTimeField)
+			}
+		}
+		if !held[version-1] {
+			t.Errorf("%s v%d is not carried in the history", typ, version-1)
+		}
+	}
+}
+
+// Card 198, the records window: the six types read from hand-made records files require
+// source_time, each at the version after the one that declared it. Fact-time rule and
+// identity are the earlier version's, which def.Guard holds. Weight's carries the offset the
+// date had (shape v2), since its fact time is read at it; the others carry shape v1.
+func TestSourceTime_TheRecordsFilesTypesRequireIt(t *testing.T) {
+	t.Parallel()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored, err := def.Manifests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for typ, version := range map[facet.Type]int{
+		"health.weight": 7, "health.lab-result": 3, "health.lab-panel": 3,
+		"health.blood-pressure": 8, "health.encounter": 2, "health.donation": 2,
+	} {
+		d, ok := reg.Lookup(typ)
+		if !ok || d.Version != version {
+			t.Errorf("%s = v%d, %v; want v%d", typ, d.Version, ok, version)
+			continue
+		}
+		held := map[int]bool{}
+		for _, s := range stored {
+			if s.Type != typ {
+				continue
+			}
+			held[s.Version] = true
+			if s.Version != version {
+				continue
+			}
+			var m struct {
+				Schema struct {
+					Required []string `json:"required"`
+				} `json:"schema"`
+			}
+			if err := json.Unmarshal(s.Body, &m); err != nil {
+				t.Fatal(err)
 			}
 			if !slices.Contains(m.Schema.Required, def.SourceTimeField) {
 				t.Errorf("%s v%d does not require %s", typ, version, def.SourceTimeField)

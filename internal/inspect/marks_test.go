@@ -340,3 +340,30 @@ func TestTypeStyles_LinkDrawsInTheDocumentsRow(t *testing.T) {
 		t.Errorf("record.link: want an event with its own shape, got %s/%d beside %s", got.Shape, got.Kind, ref.Shape)
 	}
 }
+
+// A head of the closed set with a Definition has a lane before it has a facet, but a
+// head outside the set has one only when the ledger holds a facet of it: an old name
+// whose Definition is still held draws no empty lane, and its facets, if any, are not
+// hidden (card 245).
+func TestLanesFor_OnlyTheClosedSetIsDrawnFromDefinitions(t *testing.T) {
+	t.Parallel()
+	st := styles{
+		lookup: func(facet.Type) (def.Definition, bool) { return def.Definition{}, false },
+		all: func() []def.Definition {
+			return []def.Definition{{Type: "money.purchase"}, {Type: "sleep.episode"}, {Type: "garmin.day"}, {Type: "location.stay"}}
+		},
+	}
+	ids := func(types ...facet.Type) string {
+		var out []string
+		for _, l := range st.lanesFor(types) {
+			out = append(out, l.ID)
+		}
+		return strings.Join(out, ",")
+	}
+	if got := ids(); got != "money" {
+		t.Errorf("Definitions alone give lanes %q, want money only: sleep, garmin and location are no domains", got)
+	}
+	if got := ids("garmin.day", "health.weight"); got != "health,money,garmin" {
+		t.Errorf("lanes %q, want the closed set first and the off-set head its facet makes", got)
+	}
+}

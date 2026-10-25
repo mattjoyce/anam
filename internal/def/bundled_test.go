@@ -32,10 +32,10 @@ func TestBundled_HoldsTheHealthDBTypes(t *testing.T) {
 		t.Errorf("health.blood-pressure identity_key = %v, want [/date_excel /reading]", bp.IdentityKey)
 	}
 
-	// The three retired at card 55 are left as written, at v3; body composition stays
-	// live and took kind and family at v4 (card 147).
+	// The three retired at card 55 are left as written but for source_time (card 198), at
+	// v4; body composition took kind and family at v4 (card 147) and source_time at v5.
 	for typ, version := range map[facet.Type]int{
-		"health.sleep": 3, "health.body-composition": 4, "health.heart-rate": 3, "health.metric-group": 3,
+		"health.sleep": 4, "health.body-composition": 5, "health.heart-rate": 4, "health.metric-group": 4,
 	} {
 		d, ok := reg.Lookup(typ)
 		if !ok {

@@ -57,6 +57,11 @@ func TestManifests_CarryTheHistory(t *testing.T) {
 		"activity.exercise-session.concept2":  {1},
 		"activity.exercise-session.strong":    {1},
 		"activity.exercise-session.technogym": {1},
+		"activity.gym-visit":                  {1},
+		"health.body-composition":             {4},
+		"health.heart-rate":                   {3},
+		"health.metric-group":                 {3},
+		"health.sleep":                        {3},
 	} {
 		for _, v := range versions {
 			if !held[typ][v] {

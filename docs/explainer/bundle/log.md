@@ -255,3 +255,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: `anam daemon --help` lists every route the daemon serves, including `/v1/openapi.yaml`, and says which role's token opens what. No other code changed.
 - Bundle: the index counts are 29 components, 19 data structures and 28 decisions; the def page says 44 manifests; the daemon page lists the query, selection and facet-retract routes and `/v1/openapi.yaml`; the config keys name `default_projection`; the CLI page lists `coverage`, `query`, `daemon ready`, `move-artifacts`, `version` and the `anam-bench` binary; the inspector page lists `/location`, `/importers` and `POST /view`. Three gaps shrank: the API one no longer lists the help text, the ARCHITECTURE sentences one drops `ingest`, and the storage one is now only the unwritten `sync_cursor`.
+
+## 2026-10-26, card 198, slice A
+
+- Code: five types no writer sends any more move a version and require `source_time`, fact time and identity unchanged: `activity.gym-visit` v2, `health.body-composition` v5, and the retired `health.heart-rate`, `health.metric-group` and `health.sleep` v4. The old bodies join the history, which holds 84. The source-time list in `internal/def/sourcetime_test.go` names six types, all read from hand-made records files.
+- Bundle: the definition-manifest page says 84 earlier versions.

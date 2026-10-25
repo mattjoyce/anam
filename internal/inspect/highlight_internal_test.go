@@ -112,3 +112,28 @@ func TestChangedFields(t *testing.T) {
 		t.Errorf("atPointer escaped = %v %v", v, ok)
 	}
 }
+
+// A payload string that is a facet id carries it in Ref, once, and no other token does;
+// the text the tokens spell is the same as without the marking (card 244).
+func TestHighlightPayload_MarksOnlyFacetIDs(t *testing.T) {
+	t.Parallel()
+	const id = "bcbf563c-d051-5bfd-85f6-77135ef71daa"
+	src := `{"to":["` + id + `"],"text":"see bcbf563c-d051","id":"note:bcbf563c:1","upper":"BCBF563C-D051-5BFD-85F6-77135EF71DAA ","uuid":"` + id + `"}`
+	var text strings.Builder
+	var refs []string
+	for _, tk := range highlightPayload([]byte(src)) {
+		text.WriteString(tk.Text)
+		if tk.Ref != "" {
+			refs = append(refs, tk.Ref)
+			if tk.Class != "str" {
+				t.Errorf("a %q token carries a Ref", tk.Class)
+			}
+		}
+	}
+	if len(refs) != 2 || refs[0] != id || refs[1] != id {
+		t.Errorf("refs = %v, want the id twice (in the array and as a value), nothing for the short, prefixed or padded strings", refs)
+	}
+	if got := strings.Join(strings.Fields(text.String()), ""); got != strings.ReplaceAll(src, " ", "") {
+		t.Errorf("tokens rejoin to %s", got)
+	}
+}

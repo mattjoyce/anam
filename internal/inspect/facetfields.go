@@ -22,6 +22,7 @@ import (
 type payloadRow struct {
 	fieldRow
 	Value   string
+	Tokens  []jsonToken // Value as classed tokens, a facet id in it marked for a link (card 244)
 	Present bool
 }
 
@@ -63,6 +64,7 @@ func (s *Server) payloadRows(ctx context.Context, f facet.Facet) (rows []payload
 				if _, isObj := v.(map[string]any); !isObj {
 					b, _ := json.Marshal(v)
 					row.Value = string(b)
+					row.Tokens = markFacetIDs(tokenize(row.Value))
 				}
 			}
 		}

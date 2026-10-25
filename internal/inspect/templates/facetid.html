@@ -7,3 +7,9 @@
 {{define "facetid"}}<span class="facetid"><a class="mono" href="/facet?id={{.}}">{{.}}</a>{{template "copyid" .}}</span>{{end}}
 {{define "facetidplain"}}<span class="facetid"><span class="mono">{{.}}</span>{{template "copyid" .}}</span>{{end}}
 {{define "copyid"}}<button type="button" class="copyid" data-copy="{{.}}" aria-label="copy facet id" title="copy facet id"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false"><rect x="5.5" y="5.5" width="8" height="9" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.5 3.5V3a1.2 1.2 0 0 0-1.2-1.2H3.7A1.2 1.2 0 0 0 2.5 3v7.5a1.2 1.2 0 0 0 1.2 1.2h.3" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span class="done" aria-hidden="true">copied</span></button>{{end}}
+{{/*
+  openid is the link icon after a facet id that sits in text the page must not alter, a
+  payload string (card 244): an anchor to the facet with no text of its own, so copying
+  the payload copies the payload and the id stays selectable.
+*/}}
+{{define "openid"}}<a class="openid" href="/facet?id={{.}}" aria-label="open facet {{.}}" title="open facet"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false"><path d="M6.5 9.5l3-3M7 4.5l1-1a2.8 2.8 0 0 1 4 4l-1 1M9 11.5l-1 1a2.8 2.8 0 0 1-4-4l1-1" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></a>{{end}}

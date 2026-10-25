@@ -3,6 +3,7 @@ package inspect
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/clock"
@@ -80,6 +81,7 @@ func laneRuns(marks []laneMark, view tlView) ([]tlPoint, []tlRun) {
 // group at one instant.
 func makeRun(group []laneMark, view tlView) tlRun {
 	first, last := group[0], group[len(group)-1]
+	types, name := groupTypes(group)
 	span := last.at.Sub(first.at)
 	pad := max(span/10, time.Hour)
 	if span == 0 {
@@ -91,15 +93,15 @@ func makeRun(group []laneMark, view tlView) tlRun {
 		Hue: first.point.Hue, Live: first.point.Live, Count: len(group),
 		Picked: first.point.Picked, Faded: first.point.Faded,
 		Href: spanLink(first.at.Add(-pad), last.at.Add(pad), view),
-		Title: fmt.Sprintf("%d × %s · %s to %s · click to zoom in", len(group), first.typ,
+		Title: fmt.Sprintf("%d × %s · %s to %s · click to zoom in", len(group), name,
 			first.at.UTC().Format("2006-01-02 15:04Z"), last.at.UTC().Format("2006-01-02 15:04Z")),
 	}
 	if span == 0 {
 		// Marks at one instant never come apart however far the view zooms, so a
 		// zoom would only draw the same run again. List them instead: the selection
 		// page at that one instant (from included, to not) shows each with its link.
-		r.Href = momentLink(first.typ, first.at)
-		r.Title = fmt.Sprintf("%d × %s · all at %s · click to list them", len(group), first.typ,
+		r.Href = momentLink(types, first.at)
+		r.Title = fmt.Sprintf("%d × %s · all at %s · click to list them", len(group), name,
 			first.at.UTC().Format("2006-01-02 15:04Z"))
 	}
 	if r.X2-r.X1 >= runLabelMin {
@@ -113,10 +115,28 @@ func makeRun(group []laneMark, view tlView) tlRun {
 	return r
 }
 
-// momentLink is the selection page listing the facets of one type at one instant.
-func momentLink(t facet.Type, at time.Time) string {
+// groupTypes names the types a group holds, sorted, and what to call the group: its
+// type, or for a closed domain's lane the domain and how many types joined (card 245).
+func groupTypes(group []laneMark) ([]facet.Type, string) {
+	var types []facet.Type
+	for _, m := range group {
+		if !slices.Contains(types, m.typ) {
+			types = append(types, m.typ)
+		}
+	}
+	slices.Sort(types)
+	if len(types) == 1 {
+		return types, string(types[0])
+	}
+	return types, fmt.Sprintf("%s (%d types)", domainOf(types[0]), len(types))
+}
+
+// momentLink is the selection page listing the facets of these types at one instant.
+func momentLink(types []facet.Type, at time.Time) string {
 	q := url.Values{}
-	q.Set("type", string(t))
+	for _, t := range types {
+		q.Add("type", string(t))
+	}
 	q.Set("from", clock.Format(at))
 	q.Set("to", clock.Format(at.Add(time.Nanosecond)))
 	return "/select?" + q.Encode()

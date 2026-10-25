@@ -6,11 +6,11 @@
 {{template "style.html"}}
 <style>
   .viz {
-    /* validated palette (dataviz reference instance), one hue per family, fixed
-       in marks.go: h0 blue body · h1 orange travel · h2 aqua labs ·
-       h3 yellow activity · h4 magenta meds · h5 green clinical · h6 violet sleep
-       · h7 red heart · hx grey documents and other. Rows and shapes carry
-       identity too, so no family is told apart by colour alone. */
+    /* validated palette (dataviz reference instance), one hue per domain, fixed
+       in lanes.go: h7 red health · h3 yellow activity · h1 orange place ·
+       h0 blue record · h6 violet mind · h5 green org · h2 aqua money ·
+       hx grey a head with no hue yet and other (h4 magenta is spare). Lanes, rows
+       and shapes carry identity too, so no family is told apart by colour alone. */
     --h0: #2a78d6; --h1: #eb6834; --h2: #1baf7a; --h3: #eda100;
     --h4: #e87ba4; --h5: #008300; --h6: #4a3aa7; --h7: #e34948;
     --hx: #898781;
@@ -46,6 +46,14 @@
   .cp-never { color: var(--ink-muted); font-weight: 600; }
   .band .rowbg { fill: var(--row); }
   .band .rowlabel { font-weight: 600; }
+  /* a domain lane (card 245): a colour bar, a label that opens and closes it, greyed
+     when nothing is drawn in it; a family row under an open lane is indented and plain */
+  .band .lanebar { stroke: none; }
+  .band .lane-toggle { cursor: pointer; }
+  .band .lane-toggle:hover text { fill: currentColor; }
+  .band .domain.empty .rowlabel, .band .domain.empty .lanebar { opacity: .4; }
+  .band .famlabel { font-weight: 400; }
+  .band .held { cursor: default; }
   .band .pt path { stroke: var(--ring); stroke-width: 1; }
   .band .pt:hover path { stroke: currentColor; stroke-width: 1.5; }
   .band .dead path, .band .dead line, .band .dead text { opacity: .3; }
@@ -140,7 +148,11 @@
   <svg class="band" viewBox="0 0 {{.BandW}} {{.BandH}}" id="band"
        data-left="{{.PlotLeft}}" data-right="{{.PlotRight}}">
     {{range .Rows}}{{if .Stripe}}<rect class="rowbg" x="0" y="{{.Top}}" width="{{$.BandW}}" height="{{.Height}}"/>{{end}}
-    <text class="rowlabel" x="8" y="{{.Y}}" dy="4">{{.Label}}</text>{{end}}
+    {{if eq .Level 0}}<g class="domain{{if .Open}} open{{end}}{{if .Empty}} empty{{end}}" data-domain="{{.Domain}}">
+      <rect class="lanebar {{.Hue}}" x="0" y="{{.Top}}" width="5" height="{{.Height}}"/>
+      {{if .Toggle}}<a class="lane-toggle" href="{{.Toggle}}"><title>{{if .Open}}close{{else}}open{{end}} the {{.Domain}} lane · {{.Count}} mark{{if ne .Count 1}}s{{end}} in this window</title><rect x="0" y="{{.Top}}" width="{{$.PlotLeft}}" height="{{.Height}}" fill="transparent"/><text class="rowlabel" x="12" y="{{.Y}}" dy="4">{{if .Open}}▾{{else}}▸{{end}} {{.Label}}</text></a>
+      {{else}}<g class="held"><title>{{.Domain}} is held open: the type filter or the selection touches it · {{.Count}} mark{{if ne .Count 1}}s{{end}} in this window</title><text class="rowlabel" x="12" y="{{.Y}}" dy="4">▾ {{.Label}}</text></g>{{end}}
+    </g>{{else}}<text class="rowlabel famlabel" x="26" y="{{.Y}}" dy="4">{{.Label}}</text>{{end}}{{end}}
     {{range .Ticks}}<line class="tick" x1="{{.X}}" y1="20" x2="{{.X}}" y2="{{$.Baseline}}"/>
     <text x="{{.X}}" y="{{$.Baseline}}" dy="16" text-anchor="middle">{{.Label}}</text>{{end}}
     <line class="baseline" x1="{{.PlotLeft}}" y1="{{.Baseline}}" x2="{{.PlotRight}}" y2="{{.Baseline}}"/>
@@ -184,13 +196,18 @@
       {{if eq .Status "all"}}<span id="status-all">all</span>{{else}}<a href="{{.Nav.AllStatus}}" id="status-all">all</a>{{end}}
       {{if eq .Status "dead"}}<span id="status-dead">tombstoned only</span>{{else}}<a href="{{.Nav.DeadOnly}}" id="status-dead">tombstoned only</a>{{end}}
       {{if .DeadHidden}}<a class="dim" href="{{.Nav.AllStatus}}" id="dead-hidden">{{.Dead}} dead hidden</a>{{end}}
+      <strong>lanes</strong>
+      <a href="{{.Nav.OpenAll}}" id="lanes-open">open all</a>
+      <a href="{{.Nav.CloseAll}}" id="lanes-close">close all</a>
+      <span class="dim hint">or click a domain's name on the band</span>
       {{if ne .Status ""}}<input type="hidden" name="status" value="{{.Status}}">{{end}}
+      {{range .OpenQ}}<input type="hidden" name="open" value="{{.}}">{{end}}
       {{if .None}}<input type="hidden" name="type" value="none">{{end}}
       {{with .Sel}}<input type="hidden" name="sel" value="{{.Code}}">{{if .Highlight}}<input type="hidden" name="selmode" value="highlight">{{end}}{{end}}
     </div>
     <div class="legend">
       {{range $g := .Legend}}<fieldset class="fam">
-        <legend><label><input type="checkbox" class="fam-toggle"> <svg class="sw" viewBox="0 0 16 16"><circle class="{{.Hue}}" cx="8" cy="8.5" r="5"/></svg>{{.Label}}</label></legend>
+        <legend title="{{.Domain}}"><label><input type="checkbox" class="fam-toggle"> <svg class="sw" viewBox="0 0 16 16"><circle class="{{.Hue}}" cx="8" cy="8.5" r="5"/></svg>{{.Label}}</label></legend>
         {{range .Entries}}<label{{if not .Checked}} class="off"{{end}}><input type="checkbox" name="type" value="{{.Type}}"{{if .Checked}} checked{{end}}>
           <svg class="sw" viewBox="0 0 16 16"><path class="{{.Class}}" d="{{.Swatch}}"/></svg>{{.Type}} <span class="dim">({{.Count}})</span></label>
         {{end}}

@@ -3,6 +3,7 @@ package inspect
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"sort"
 	"time"
 
@@ -70,6 +71,8 @@ type tlView struct {
 	Status statusFilter
 	// Sel is the saved selection drawn (card 206), the zero value for none.
 	Sel selRef
+	// Open is the domain lanes the address opens (card 245), sorted, each a lane.
+	Open []string
 }
 
 // selRef is a saved selection as a timeline link carries it: its code and how it is
@@ -82,6 +85,9 @@ func (v tlView) addTo(q url.Values) {
 		if v.Sel.Mode == selHighlight {
 			q.Set("selmode", selHighlight)
 		}
+	}
+	for _, d := range v.Open {
+		q.Add("open", d)
 	}
 	for _, t := range v.Types {
 		q.Add("type", string(t))
@@ -168,4 +174,36 @@ func windowLink(from, to time.Time, zoomed bool, view tlView) string {
 		q.Set("view", viewWhole)
 	}
 	return "/?" + q.Encode()
+}
+
+// openLanes reads the open query: the domains it names that are lanes, each once, in
+// order. A name that is no lane is dropped, so a stale link opens what still exists.
+func openLanes(openQ []string, lanes map[string]bool) []string {
+	var out []string
+	for _, d := range openQ {
+		if lanes[d] && !slices.Contains(out, d) {
+			out = append(out, d)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// toggleLane is the open list with a domain flipped.
+func toggleLane(open []string, d string) []string {
+	if i := slices.Index(open, d); i >= 0 {
+		return slices.Delete(slices.Clone(open), i, i+1)
+	}
+	out := append(slices.Clone(open), d)
+	sort.Strings(out)
+	return out
+}
+
+func sortedKeys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }

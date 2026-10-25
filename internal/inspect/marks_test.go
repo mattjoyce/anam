@@ -241,22 +241,48 @@ func TestMarkPath_AlertOutlineIsItsOwn(t *testing.T) {
 	}
 }
 
-// Each family keeps one palette slot of the eight, never shared. A family may
-// instead take the neutral grey.
-func TestFamilies_HuesAreDistinct(t *testing.T) {
+// The ten heads are the closed set of AGENTS.md. Each domain in use keeps one palette
+// slot of the eight, never shared; a reserved head takes the grey (card 245).
+func TestDomains_TenHeadsAndHuesAreDistinct(t *testing.T) {
 	t.Parallel()
+	if len(domains) != 10 {
+		t.Fatalf("%d heads, want the closed set of ten", len(domains))
+	}
 	seen := map[int]string{}
-	for _, f := range families {
-		if f.Hue == hueNeutral {
+	grey := map[string]bool{"social": true, "media": true, "work": true}
+	for _, d := range domains {
+		if grey[d.ID] != (d.Hue == hueNeutral) {
+			t.Errorf("%s: hue %d, but only the reserved heads %v take the grey", d.ID, d.Hue, grey)
+		}
+		if d.Hue == hueNeutral {
 			continue
 		}
-		if f.Hue < 0 || f.Hue > 7 {
-			t.Errorf("%s: hue %d is outside the eight palette slots", f.ID, f.Hue)
+		if d.Hue < 0 || d.Hue > 7 {
+			t.Errorf("%s: hue %d is outside the eight palette slots", d.ID, d.Hue)
 		}
-		if other, dup := seen[f.Hue]; dup {
-			t.Errorf("%s and %s share hue %d", f.ID, other, f.Hue)
+		if other, dup := seen[d.Hue]; dup {
+			t.Errorf("%s and %s share hue %d", d.ID, other, d.Hue)
 		}
-		seen[f.Hue] = f.ID
+		seen[d.Hue] = d.ID
+	}
+}
+
+// Every bundled type's head is one of the ten, so no shipped type draws in a lane
+// outside the closed set.
+func TestDomains_EveryBundledTypeHasAHead(t *testing.T) {
+	t.Parallel()
+	reg, err := def.Bundled()
+	if err != nil {
+		t.Fatalf("Bundled: %v", err)
+	}
+	known := map[string]bool{}
+	for _, d := range domains {
+		known[d.ID] = true
+	}
+	for _, d := range reg.All() {
+		if !known[domainOf(d.Type)] {
+			t.Errorf("%s: head %q is not one of the ten", d.Type, domainOf(d.Type))
+		}
 	}
 }
 

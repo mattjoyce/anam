@@ -161,7 +161,7 @@ func TestEquality_ProgramIsThePredicate(t *testing.T) {
 				t.Fatalf("%s over %s: Run: %v\n%s", name, vname, err, text)
 			}
 			var got []string
-			for _, tu := range ans.Tuples {
+			for _, tu := range ans.Tuples() {
 				got = append(got, tu[0].Text())
 			}
 			if want := f.Canonical().Picks(rows); !reflect.DeepEqual(got, want) {

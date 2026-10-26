@@ -103,7 +103,7 @@ func (s *Server) basketOf(ctx context.Context, q url.Values) (ids []string, prob
 		if err != nil {
 			return nil, "The selection could not be read, so the form has no facets from it: " + err.Error(), nil
 		}
-		for _, t := range ans.Tuples {
+		for _, t := range ans.Tuples() {
 			set[t[0].Text()] = true
 		}
 	}

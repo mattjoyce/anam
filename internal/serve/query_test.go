@@ -72,7 +72,7 @@ func TestPublishQuery_VerifiesAndShows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Show: %v", err)
 	}
-	if shown.Answer == nil || shown.Answer.Hash() != ans.Hash() || shown.Answer.Relation != "high" {
+	if shown.Answer == nil || shown.Answer.Hash() != ans.Hash() || shown.Answer.Relation() != "high" {
 		t.Errorf("Show = %+v, want the answer with its hash", shown.Answer)
 	}
 

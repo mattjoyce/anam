@@ -30,7 +30,7 @@ func TestInlineProjection_AReaderQueriesAndTheReceiptVerifiesAfterARestart(t *te
 	var a api.QueryAnswer
 	call(t, "POST", url+"/v1/query", readerToken, inlineQuery(inlineWeightsBody, ""), http.StatusCreated, &a)
 	r := a.Receipt
-	if a.Answer.Len() != 1 || a.Answer.Tuples[0][1].Text() != "80.5" {
+	if a.Answer.Len() != 1 || a.Answer.Tuples()[0][1].Text() != "80.5" {
 		t.Fatalf("answer = %+v", a.Answer)
 	}
 	if !a.Written || !r.TemplateInline || r.Template != "inline" || r.TemplateVersion != 1 || !strings.HasPrefix(r.TemplateHash, "sha256:") {

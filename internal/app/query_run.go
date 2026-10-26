@@ -176,9 +176,9 @@ func writeQueryAnswer(cmd *cobra.Command, a api.QueryAnswer, asJSON bool) error 
 
 // writeAnswer renders one relation's tuples, a row each, with the answer's hash.
 func writeAnswer(out io.Writer, a query.Answer) error {
-	_, _ = fmt.Fprintf(out, "%s  %d tuples  %s\n", a.Relation, a.Len(), a.Hash())
+	_, _ = fmt.Fprintf(out, "%s  %d tuples  %s\n", a.Relation(), a.Len(), a.Hash())
 	w := tabwriter.NewWriter(out, 2, 0, 2, ' ', 0)
-	for _, t := range a.Tuples {
+	for _, t := range a.Tuples() {
 		cells := make([]string, len(t))
 		for i, c := range t {
 			cells[i] = c.Text()

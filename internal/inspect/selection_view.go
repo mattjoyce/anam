@@ -139,7 +139,7 @@ func (s *Server) selectData(ctx context.Context, st selectState, served fold.Val
 	}
 	d.labeled = newLabels(defs, served)
 	picked := map[string]bool{}
-	for _, t := range ans.Tuples {
+	for _, t := range ans.Tuples() {
 		picked[t[0].Text()] = true
 	}
 	d.Picked = len(picked)

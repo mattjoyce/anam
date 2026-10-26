@@ -29,7 +29,7 @@ func TestInForce_IsCurrentAtTheReadingsInstants(t *testing.T) {
 	}
 
 	byReading := map[string][]string{}
-	for _, tup := range inForce.Tuples {
+	for _, tup := range inForce.Tuples() {
 		byReading[tup[1].Text()] = append(byReading[tup[1].Text()], tup[0].Text())
 	}
 	var readings int

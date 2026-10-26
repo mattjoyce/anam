@@ -89,7 +89,7 @@ func TestQueryRoutes(t *testing.T) {
 	if status := postJSON(t, srv.URL+"/v1/query", req, &a); status != http.StatusCreated {
 		t.Fatalf("POST /v1/query = %d", status)
 	}
-	if a.Answer.Len() != 1 || a.Answer.Tuples[0][1].Text() != "114" || !a.Written || a.Receipt.Program == nil || a.Hash != a.Receipt.ServedHash {
+	if a.Answer.Len() != 1 || a.Answer.Tuples()[0][1].Text() != "114" || !a.Written || a.Receipt.Program == nil || a.Hash != a.Receipt.ServedHash {
 		t.Errorf("answer = %+v", a)
 	}
 	req.DryRun = true

@@ -72,7 +72,7 @@ func edgeHarness(t *testing.T) *harness {
 
 func pairs(ans query.Answer) []string {
 	var out []string
-	for _, tup := range ans.Tuples {
+	for _, tup := range ans.Tuples() {
 		out = append(out, tup[0].Text()+" "+tup[1].Text())
 	}
 	sort.Strings(out)

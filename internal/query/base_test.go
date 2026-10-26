@@ -29,7 +29,7 @@ func TestNewBase_AttrLeavesResolve(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Decode: %v", err)
 	}
-	for _, tup := range ans.Tuples {
+	for _, tup := range ans.Tuples() {
 		got, err := def.Resolve(doc, tup[0].Text())
 		if err != nil {
 			t.Errorf("Resolve(%s): %v", tup[0].Text(), err)

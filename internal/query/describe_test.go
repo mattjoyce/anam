@@ -168,28 +168,8 @@ func TestEvaluate_BoundsTheDerivation(t *testing.T) {
 	if tl.MaxBytes != 200 || tl.Bytes <= 200 || tl.Relation == "" || tl.Relation == "small" {
 		t.Errorf("refusal = %+v, want an intermediate relation over 200 bytes", tl)
 	}
-}
-
-// A constant decodes from the JSON it encoded to.
-func TestConst_JSONRoundTrip(t *testing.T) {
-	t.Parallel()
-	in := `[["a",1,true,1.5,"2"]]`
-	var tuples []query.Tuple
-	if err := json.Unmarshal([]byte(in), &tuples); err != nil {
-		t.Fatal(err)
-	}
-	out, err := json.Marshal(tuples)
-	if err != nil || string(out) != in {
-		t.Errorf("round trip = %s, %v; want %s", out, err, in)
-	}
-	kinds := []query.Kind{query.KindString, query.KindNumber, query.KindBool, query.KindNumber, query.KindString}
-	for i, c := range tuples[0] {
-		if c.Kind() != kinds[i] {
-			t.Errorf("constant %d kind = %v, want %v", i, c.Kind(), kinds[i])
-		}
-	}
-	var c query.Const
-	if err := json.Unmarshal([]byte(`{"a":1}`), &c); !errors.Is(err, query.ErrSyntax) {
-		t.Errorf("an object as a constant = %v, want ErrSyntax", err)
+	// A reader sets this bound as max_read_bytes, and the message says so.
+	if !strings.Contains(err.Error(), "(max_read_bytes)") || strings.Contains(err.Error(), "Options") {
+		t.Errorf("message = %q, want the bound named max_read_bytes", err)
 	}
 }

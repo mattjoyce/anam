@@ -44,7 +44,7 @@ func TestNumber_TheValueTheRecordHoldsIsTheValueThatAnswers(t *testing.T) {
 		t.Fatalf("attr: %v", err)
 	}
 	var got []string
-	for _, tup := range ans.Tuples {
+	for _, tup := range ans.Tuples() {
 		got = append(got, tup[1].Text())
 	}
 	sort.Strings(got)

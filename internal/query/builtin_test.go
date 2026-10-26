@@ -143,21 +143,21 @@ func TestWithin_RefusedAtPlanTime(t *testing.T) {
 		name, text string
 		want       []string
 	}{
-		{"Days unbound", `r(E) :- entry(E, _, A, _, _, _, _), within(A, A, D).`, []string{"within", "Days", "D", "no positive body atom binds"}},
-		{"A unbound", `r(E) :- entry(E, _, B, _, _, _, _), within(X, B, 1).`, []string{"within", "argument A", "X"}},
-		{"B anonymous", `r(E) :- entry(E, _, A, _, _, _, _), within(A, _, 1).`, []string{"within", "argument B"}},
-		{"bound only by a negation", `r(E) :- entry(E, _, A, _, _, _, _), not entry(_, _, A, _, _, _, _), within(A, A, D).`, []string{"within", "Days"}},
-		{"bound only by another builtin", `r(E) :- entry(E, _, A, _, _, _, _), within(A, A, 1), within(A, B, 1).`, []string{"within", "argument B"}},
-		{"negated and unbound", `r(E) :- entry(E, _, A, _, _, _, _), not within(A, B, 1).`, []string{"within", "argument B"}},
-		{"too few arguments", `r(E) :- entry(E, _, A, _, _, _, _), within(A, 1).`, []string{"within takes 3 arguments", "within(A, B, Days)"}},
-		{"too many arguments", `r(E) :- entry(E, _, A, _, _, _, _), within(A, A, 1, 2).`, []string{"within takes 3 arguments"}},
+		{"Days unbound", `r(E) :- entry(E, _, A, _, _, _, _), within(A, A, D).`, []string{"within", "D", "must be bound by a positive body atom"}},
+		{"A unbound", `r(E) :- entry(E, _, B, _, _, _, _), within(X, B, 1).`, []string{"within", "X"}},
+		{"B anonymous", `r(E) :- entry(E, _, A, _, _, _, _), within(A, _, 1).`, []string{"within", "_"}},
+		{"bound only by a negation", `r(E) :- entry(E, _, A, _, _, _, _), not entry(_, _, A, _, _, _, _), within(A, A, D).`, []string{"within", "D"}},
+		{"bound only by another builtin", `r(E) :- entry(E, _, A, _, _, _, _), within(A, A, 1), within(A, B, 1).`, []string{"within", "B"}},
+		{"negated and unbound", `r(E) :- entry(E, _, A, _, _, _, _), not within(A, B, 1).`, []string{"within", "B"}},
+		{"too few arguments", `r(E) :- entry(E, _, A, _, _, _, _), within(A, 1).`, []string{"within has 2 arguments", "within/3"}},
+		{"too many arguments", `r(E) :- entry(E, _, A, _, _, _, _), within(A, A, 1, 2).`, []string{"within has 4 arguments", "within/3"}},
 		{"a bare date", `r(E) :- entry(E, _, A, _, _, _, _), within("2026-06-15", A, 1).`, []string{"within", "argument A", "not a fact-time", "2026-06-15T00:00:00.000000000Z"}},
 		{"a shortened instant", `r(E) :- entry(E, _, A, _, _, _, _), within(A, "2026-06-15T12:00:00Z", 1).`, []string{"argument B", "not a fact-time"}},
 		{"a number for A", `r(E) :- entry(E, _, A, _, _, _, _), within(7, A, 1).`, []string{"argument A", "not a fact-time"}},
 		{"negative days", `r(E) :- entry(E, _, A, _, _, _, _), within(A, A, -1).`, []string{"argument Days", "negative"}},
 		{"days as a string", `r(E) :- entry(E, _, A, _, _, _, _), within(A, A, "1").`, []string{"argument Days", "not a number"}},
-		{"a rule that defines it", `within(A, B, D) :- entry(A, _, B, _, _, _, _), entry(D, _, _, _, _, _, _).`, []string{"within/3 is a builtin"}},
-		{"a declaration of it", "within/3.\nr(1).", []string{"within/3 is a builtin"}},
+		{"a rule that defines it", `within(A, B, D) :- entry(A, _, B, _, _, _, _), entry(D, _, _, _, _, _, _).`, []string{"within is a built-in", "head of a rule"}},
+		{"a declaration of it", "within/3.\nr(1).", []string{"within is a built-in", "cannot be declared"}},
 	}
 	v, versions := value(t, entry("w", "health.weight", noon, "", `{}`))
 	for _, tt := range tests {

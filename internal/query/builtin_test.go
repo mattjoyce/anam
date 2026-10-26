@@ -143,14 +143,14 @@ func TestWithin_RefusedAtPlanTime(t *testing.T) {
 		name, text string
 		want       []string
 	}{
-		{"Days unbound", `r(E) :- entry(E, _, A, _, _, _, _), within(A, A, D).`, []string{"within", "D", "must be bound by a positive body atom"}},
+		{"Days unbound", `r(E) :- entry(E, _, A, _, _, _, _), within(A, A, D).`, []string{"D, argument Days of within(A, B, Days)", "must be bound by a positive body atom"}},
 		{"A unbound", `r(E) :- entry(E, _, B, _, _, _, _), within(X, B, 1).`, []string{"within", "X"}},
 		{"B anonymous", `r(E) :- entry(E, _, A, _, _, _, _), within(A, _, 1).`, []string{"within", "_"}},
 		{"bound only by a negation", `r(E) :- entry(E, _, A, _, _, _, _), not entry(_, _, A, _, _, _, _), within(A, A, D).`, []string{"within", "D"}},
 		{"bound only by another builtin", `r(E) :- entry(E, _, A, _, _, _, _), within(A, A, 1), within(A, B, 1).`, []string{"within", "B"}},
 		{"negated and unbound", `r(E) :- entry(E, _, A, _, _, _, _), not within(A, B, 1).`, []string{"within", "B"}},
-		{"too few arguments", `r(E) :- entry(E, _, A, _, _, _, _), within(A, 1).`, []string{"within has 2 arguments", "within/3"}},
-		{"too many arguments", `r(E) :- entry(E, _, A, _, _, _, _), within(A, A, 1, 2).`, []string{"within has 4 arguments", "within/3"}},
+		{"too few arguments", `r(E) :- entry(E, _, A, _, _, _, _), within(A, 1).`, []string{"within has 2 arguments", "within(A, B, Days)"}},
+		{"too many arguments", `r(E) :- entry(E, _, A, _, _, _, _), within(A, A, 1, 2).`, []string{"within has 4 arguments", "within(A, B, Days)"}},
 		{"a bare date", `r(E) :- entry(E, _, A, _, _, _, _), within("2026-06-15", A, 1).`, []string{"within", "argument A", "not a fact-time", "2026-06-15T00:00:00.000000000Z"}},
 		{"a shortened instant", `r(E) :- entry(E, _, A, _, _, _, _), within(A, "2026-06-15T12:00:00Z", 1).`, []string{"argument B", "not a fact-time"}},
 		{"a number for A", `r(E) :- entry(E, _, A, _, _, _, _), within(7, A, 1).`, []string{"argument A", "not a fact-time"}},

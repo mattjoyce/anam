@@ -504,7 +504,7 @@ near(At) :- entry(_, "health.blood-pressure", At, _, _, _, _), within(At, Other,
 ```
 
 ```error refused=unbound-within
-Other in within must be bound by a positive body atom
+Other, argument B of within(A, B, Days), must be bound by a positive body atom
 ```
 
 A rule that reaches `current/2` with no instants to ask about.

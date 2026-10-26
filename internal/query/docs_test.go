@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/query"
 	"github.com/mattjoyce/anam/internal/selection"
 )
@@ -88,8 +89,10 @@ func pairedWith(blocks []docBlock, i int, lang, key string) (docBlock, bool) {
 	return docBlock{}, false
 }
 
-func TestDocs_WorkedQuestionsRunAgainstARealLedger(t *testing.T) {
-	t.Parallel()
+// docsLedger is the record the page describes, served: the regimen, a note on the
+// April reading, a week of intake and two nights' sleep.
+func docsLedger(t *testing.T) (*harness, fold.Value, map[string]int) {
+	t.Helper()
 	h := edgeHarness(t)
 	h.seedRegimen(t)
 	v, _, _ := h.served(t)
@@ -125,6 +128,13 @@ func TestDocs_WorkedQuestionsRunAgainstARealLedger(t *testing.T) {
 		h.admit(t, "garmin", "health.sleep-episode", s.id, `{"id": "`+s.id+`", "effective_time_frame": {"time_interval": {"start_date_time": "`+s.start+`", "end_date_time": "`+s.end+`"}}, "source_time": {"value": "`+s.start+`", "zone": "UTC", "basis": "source"}}`)
 	}
 	v, versions, _ := h.served(t)
+	return h, v, versions
+
+}
+
+func TestDocs_WorkedQuestionsRunAgainstARealLedger(t *testing.T) {
+	t.Parallel()
+	h, v, versions := docsLedger(t)
 
 	blocks := docBlocks(t)
 	ran := 0

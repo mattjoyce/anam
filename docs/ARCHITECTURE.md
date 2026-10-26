@@ -879,15 +879,14 @@ The third read is a **query** (decided 2026-10-17, card 173; Datalog, because An
 and a query is a pure function of a database value, and `fold.Value` at `W` is that value). A query
 runs **through a projection**, never beside one: the projection decides which whole facets the
 query may see, exactly as it does for a timeline or a frame, and the query then relates them: joins
-across types along fact-time, selection by any payload field the served Definition's schema names,
-aggregates and windows. A query answer is a **derived value read off a projection**, which is why it
+across types along fact-time and selection by any payload field the served Definition's schema names. There are no aggregates: the caller counts the answer's tuples. A query answer is a **derived value read off a projection**, which is why it
 does not break the rule that projections prune. The projection still only prunes; the generating is
 done by the query, over what the projection served, and the answer is a new value that hashes, not a
 change to any facet. Base relations are the envelope (`entry/7` with the entity, type, fact-time, series,
 status, source, and `definition_version`) and the payload fields read from the served copy
 (`attr(E, Pointer, Value)` for any pointer the schema defines, validated as fields are). Bundled
 rules (`current/2`, `displaced/2`, `in_force/2`, and `linked/2` over the edge facets, card 104) ship as a named, versioned rule set so an agent builds on
-Anam's reading of its own time semantics rather than rewriting it. The set is at version 2; every earlier text a receipt may name is kept, and verify picks the text by the receipt's rule-set hash. `within/3`, a distance between two fact-times, is a builtin the evaluator answers in Go, since the language has no arithmetic. The answer is a receipt like any
+Anam's reading of its own time semantics rather than rewriting it. The set is at version 2; every earlier text a receipt may name is kept, and verify picks the text by the receipt's rule-set hash. `within/3`, a distance between two fact-times, is a builtin answered in Go, since the language has no arithmetic. The evaluator is the tarski module (`github.com/mattjoyce/tarski` v0.3.0, card 230); Anam supplies the base relations, the checks, `within/3` and the bundled rules, and refuses the aggregates, string builtins and number spellings its language never had. The answer is a receipt like any
 other served thing: it carries the watermark and `ledger_id`, the projection name, version and
 content hash, the definition-set version, the rule-set hash, and the query text; `receipt verify`
 re-runs the same query over the same value and must get the same hash.

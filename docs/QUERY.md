@@ -11,6 +11,11 @@ program against a new type. [ARCHITECTURE.md](ARCHITECTURE.md) §9 says why the 
 it sits among the reads. The worked questions below are run by `internal/query/docs_test.go` against
 a real ledger, so an answer on this page is an answer the evaluator gives.
 
+The evaluator is the [tarski](https://github.com/mattjoyce/tarski) module, version v0.3.0. It parses
+the program, validates it and runs it. Anam supplies the base relations over a served value, the
+checks on `instant/1` and on a constant `attr/3` pointer, `within/3`, and the bundled rules, and it
+refuses the few things tarski offers that Anam's language does not.
+
 ## What a query is
 
 A query is a Datalog program run over a **served value**. A projection decides which whole facets the
@@ -208,8 +213,15 @@ brute-force check against every pair of instants in a real ledger.
 
 ## What the language does not do
 
-- No aggregates. There is no `count`, `sum` or `max`. A count is the number of tuples in the answer,
-  which the caller reads, and the receipt pins.
+- No aggregates. There is no `count`, `sum`, `min` or `max`. A count is the number of tuples in the
+  answer, which the caller reads, and the receipt pins. Tarski has aggregates, and a program that
+  writes one is refused with that advice.
+- No `prefix`, `suffix` or `contains`. Tarski has them as string builtins and Anam does not offer
+  them, so a program that uses one is refused, and the three names are reserved: a relation of your
+  own may not be called `prefix`, `suffix` or `contains`.
+- `true` and `false` are constants, so neither can be a relation name.
+- A number is written as JSON writes one, so a leading zero (`01`) is refused. The text of a program
+  must be valid UTF-8, and a string holding bytes that are not is refused.
 - No function symbols or arithmetic, so a program always terminates. The builtins above are the one
   exception to reading it that way: they test values, and bind nothing, so they cannot make it run
   forever.
@@ -601,7 +613,8 @@ starts.
 |---|---|
 | The bundled rules | `internal/query/rules/anam.dl`; earlier texts a receipt may name, `internal/query/rules/history/` |
 | The builtins | `internal/query/builtin.go` |
-| The evaluator, the base relations, `ReadsAttr` | `internal/query` |
+| The evaluator | the tarski module, `github.com/mattjoyce/tarski` v0.3.0 |
+| The base relations, the checks, `ReadsAttr`, the refusals | `internal/query` |
 | The query read and its receipt | `internal/read/query.go`, `internal/serve/query.go` |
 | The routes | `internal/daemon/query.go`, described in `GET /v1/openapi.yaml` |
 | The selection builder | `internal/selection` |

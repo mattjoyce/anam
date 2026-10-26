@@ -3,7 +3,6 @@ package query_test
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"strings"
 	"testing"
 
@@ -133,7 +132,7 @@ func tryRun(v fold.Value, versions map[string]int, defs *def.Registry, text, rel
 // rows renders an answer as one string per tuple, for comparing against a table.
 func rows(a query.Answer) []string {
 	out := make([]string, 0, a.Len())
-	for _, tup := range a.Tuples {
+	for _, tup := range a.Tuples() {
 		parts := make([]string, len(tup))
 		for i, c := range tup {
 			parts[i] = c.Text()
@@ -153,28 +152,6 @@ func same(a, b []string) bool {
 		}
 	}
 	return true
-}
-
-// The evaluator reaches a fixpoint through recursion (semi-naive: a path found in
-// one round is joined again in the next), stops, and removes duplicates.
-func TestEvaluate_RecursionReachesTheFixpoint(t *testing.T) {
-	t.Parallel()
-	v, versions := value(t,
-		entry("a", "health.medication.started", day("2026-01-01"), "", `{}`),
-		entry("b", "health.medication.started", day("2026-01-02"), "", `{}`),
-		entry("c", "health.medication.started", day("2026-01-03"), "", `{}`),
-		entry("d", "health.medication.started", day("2026-01-04"), "", `{}`),
-	)
-	ans := run(t, v, versions, `
-		next(E, F) :- entry(E, _, T, _, _, _, _), entry(F, _, U, _, _, _, _), T < U, not between(E, F).
-		between(E, F) :- entry(E, _, T, _, _, _, _), entry(F, _, U, _, _, _, _), entry(_, _, V, _, _, _, _), T < V, V < U.
-		reaches(E, F) :- next(E, F).
-		reaches(E, F) :- reaches(E, G), next(G, F).
-	`, "reaches")
-	want := []string{"a b", "a c", "a d", "b c", "b d", "c d"}
-	if got := rows(ans); !same(got, want) {
-		t.Errorf("reaches = %v, want %v", got, want)
-	}
 }
 
 // Comparisons: numbers numerically, strings lexically, and a mixed pair is unequal
@@ -209,59 +186,5 @@ func TestEvaluate_ComparisonsAndAttributes(t *testing.T) {
 				t.Errorf("%s = %v, want %v", c.relation, got, c.want)
 			}
 		})
-	}
-}
-
-// An answer is a value: sorted, serialised once, hashed; and the same program over
-// the same value hashes the same.
-func TestAnswer_IsAValue(t *testing.T) {
-	t.Parallel()
-	v, versions := value(t,
-		entry("b", "health.medication.started", day("2026-01-02"), "", `{}`),
-		entry("a", "health.medication.started", day("2026-01-01"), "", `{}`),
-	)
-	text := `ids(E, N) :- entry(E, _, _, _, _, _, N).`
-	first, second := run(t, v, versions, text, "ids"), run(t, v, versions, text, "ids")
-	if first.Hash() != second.Hash() {
-		t.Error("two evaluations of one program over one value hash differently")
-	}
-	want := `{"relation":"ids","tuples":[["a",1],["b",1]]}`
-	if string(first.Bytes()) != want {
-		t.Errorf("answer bytes = %s, want %s", first.Bytes(), want)
-	}
-	if !strings.HasPrefix(first.Hash(), "sha256:") {
-		t.Errorf("hash = %s, want sha256:…", first.Hash())
-	}
-	if _, err := tryRun(v, versions, registry(t), text, "nothing"); !errors.Is(err, query.ErrInvalid) {
-		t.Errorf("an unnamed relation = %v, want ErrInvalid", err)
-	}
-}
-
-// A cancelled context stops an evaluation rather than letting it run on.
-func TestEvaluate_HonoursTheDeadline(t *testing.T) {
-	t.Parallel()
-	var entries []fold.Entry
-	for i := 0; i < 200; i++ {
-		entries = append(entries, entry(strings.Repeat("x", 3)+string(rune('0'+i%10))+string(rune('a'+i/10)), "health.medication.started", day("2026-01-01"), "", `{}`))
-	}
-	v, versions := value(t, entries...)
-	rules, _ := query.Bundled()
-	prog, err := query.Parse(`pairs(E, F, G) :- entry(E, _, _, _, _, _, _), entry(F, _, _, _, _, _, _), entry(G, _, _, _, _, _, _).`)
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
-	}
-	defs := registry(t)
-	base, err := query.NewBase(v, versions, defs, true)
-	if err != nil {
-		t.Fatalf("NewBase: %v", err)
-	}
-	plan, err := query.Compile(query.BaseSchema, defs, rules.Program, prog)
-	if err != nil {
-		t.Fatalf("Compile: %v", err)
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	if _, err := query.Evaluate(ctx, plan, base, 0); !errors.Is(err, context.Canceled) {
-		t.Errorf("Evaluate on a cancelled context = %v, want context.Canceled", err)
 	}
 }

@@ -107,7 +107,7 @@ func currentAt(ctx context.Context, rules RuleSet, base Base, defs Definitions, 
 		return nil, err
 	}
 	ids := make([]string, 0, ans.Len())
-	for _, t := range ans.Tuples {
+	for _, t := range ans.Tuples() {
 		ids = append(ids, t[0].Text())
 	}
 	sort.Strings(ids)

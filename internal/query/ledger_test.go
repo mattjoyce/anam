@@ -127,7 +127,7 @@ func (h *harness) seedRegimen(t *testing.T) {
 // currentAt is the set of E with current(E, at) in the answer, sorted.
 func currentAt(ans query.Answer, at string) []string {
 	var ids []string
-	for _, tup := range ans.Tuples {
+	for _, tup := range ans.Tuples() {
 		if tup[1].Text() == at {
 			ids = append(ids, tup[0].Text())
 		}

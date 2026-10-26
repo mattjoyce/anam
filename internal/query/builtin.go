@@ -6,18 +6,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mattjoyce/tarski"
+
 	"github.com/mattjoyce/anam/internal/clock"
 )
 
-// A builtin is a predicate the evaluator answers in Go, because the language has no
-// arithmetic to write it in (card 212). It reads like an atom in a body, but it names
-// no relation: it is a guard, as a comparison is, true or false of constants already
-// bound. The plan check refuses a builtin whose required argument is not bound by a
-// positive body atom, and the evaluator tests it where a comparison is tested. The
-// stratifier sees no relation in it.
-//
-// The table is where the next builtin goes (card 213's month and day functions): a new
-// entry, not a new case in the evaluator.
+// A builtin is a predicate answered in Go, because the language has no arithmetic to
+// write it in (card 212). It reads like an atom in a body, but it names no relation:
+// it is a guard, as a comparison is, true or false of constants already bound. Tarski
+// runs it (tarski.Builtin); this table is where Anam's are declared, and where the
+// next one goes (card 213's month and day functions).
 
 // BuiltinArg is one argument of a builtin: its name, whether the program must bind it
 // before the builtin is read, and what it means.
@@ -76,76 +74,28 @@ func builtinNamed(name string) (Builtin, bool) {
 	return Builtin{}, false
 }
 
-// isBuiltin reports whether l is a builtin literal, negated or not.
-func (l Literal) isBuiltin() bool {
-	if l.Atom == nil {
-		return false
-	}
-	_, ok := builtinNamed(l.Atom.Name)
-	return ok
-}
-
-// guard reports whether l only tests bound values: a negation, a comparison or a
-// builtin. A positive atom over a relation is the only literal that binds.
-func (l Literal) guard() bool { return l.Atom == nil || l.Negated || l.isBuiltin() }
-
-// signature is the builtin as a program writes it, within(A, B, Days).
-func (b Builtin) signature() string {
-	names := make([]string, len(b.Args))
-	for i, a := range b.Args {
-		names[i] = a.Name
-	}
-	return b.Name + "(" + strings.Join(names, ", ") + ")"
-}
-
-// checkBuiltin holds a builtin literal to its table entry: the arity, every required
-// argument bound by a positive body atom (never the anonymous variable), and a
-// constant argument the predicate could never accept refused with the reason.
-func checkBuiltin(a Atom, bound map[string]bool) error {
-	b, _ := builtinNamed(a.Name)
-	if len(a.Args) != len(b.Args) {
-		return fmt.Errorf("%s takes %d arguments, %s, but is written with %d", b.Name, len(b.Args), b.signature(), len(a.Args))
-	}
-	consts := make([]*Const, len(a.Args))
-	for i, t := range a.Args {
-		spec := b.Args[i]
-		switch {
-		case !t.IsVar():
-			c := t.Const
-			consts[i] = &c
-		case spec.Bound && (t.Var == "_" || !bound[t.Var]):
-			return fmt.Errorf("%s: argument %s is %s, which no positive body atom binds; %s needs %s bound before it is read",
-				b.Name, spec.Name, t.Var, b.Name, spec.Name)
+// tarskiBuiltins is the table as tarski declares it.
+func tarskiBuiltins() map[string]tarski.Builtin {
+	out := make(map[string]tarski.Builtin, len(builtins))
+	for _, b := range builtins {
+		args := make([]tarski.BuiltinArg, len(b.Args))
+		for i, a := range b.Args {
+			args[i] = tarski.BuiltinArg{Name: a.Name, Doc: a.Doc}
 		}
+		out[b.Name] = tarski.Builtin{Args: args, Doc: b.Doc, Check: b.check, Holds: b.holds}
 	}
-	if b.check != nil {
-		if err := b.check(consts); err != nil {
-			return fmt.Errorf("%s: %w", b.Name, err)
-		}
-	}
-	return nil
-}
-
-// builtinHolds evaluates a builtin literal under env. Every required argument is
-// bound: the plan check saw to that.
-func builtinHolds(l Literal, env map[string]Const) bool {
-	b, _ := builtinNamed(l.Atom.Name)
-	args := make([]Const, len(l.Atom.Args))
-	for i, t := range l.Atom.Args {
-		args[i] = value(t, env)
-	}
-	return b.holds(args) != l.Negated
+	return out
 }
 
 // factTime reads a whole fact-time lexeme, the fixed-width string clock.Format writes.
 // A shorter or looser spelling is not one: it sorts against the record wrongly, and
 // the same rule holds instant/1.
 func factTime(c Const) (time.Time, bool) {
-	if c.kind != KindString {
+	if c.Kind() != KindString {
 		return time.Time{}, false
 	}
-	t, err := clock.Parse(c.s)
-	if err != nil || clock.Format(t) != c.s {
+	t, err := clock.Parse(c.Text())
+	if err != nil || clock.Format(t) != c.Text() {
 		return time.Time{}, false
 	}
 	return t, true
@@ -163,10 +113,10 @@ func checkWithin(consts []*Const) error {
 		}
 	}
 	if d := consts[2]; d != nil {
-		if d.kind != KindNumber {
+		if d.Kind() != KindNumber {
 			return fmt.Errorf("argument Days, %s, is not a number of days", d.Text())
 		}
-		if d.num.sign() < 0 {
+		if n, ok := readDecimal(d.Text()); ok && n.negative() {
 			return fmt.Errorf("argument Days, %s, is negative; a distance in days is not", d.Text())
 		}
 	}
@@ -176,11 +126,55 @@ func checkWithin(consts []*Const) error {
 func holdsWithin(args []Const) bool {
 	a, okA := factTime(args[0])
 	b, okB := factTime(args[1])
-	days := args[2]
-	if !okA || !okB || days.kind != KindNumber || days.num.sign() < 0 {
+	if !okA || !okB || args[2].Kind() != KindNumber {
 		return false
 	}
-	return coversNanos(days.num, nanosBetween(a, b))
+	days, ok := readDecimal(args[2].Text())
+	if !ok || days.negative() {
+		return false
+	}
+	return coversNanos(days, nanosBetween(a, b))
+}
+
+// decimal is a number's value as digits and a power of ten: the value is
+// digits * 10^exp, with no trailing zero in digits, and neg its sign. It is read from
+// a constant's canonical text, which is exact.
+type decimal struct {
+	neg    bool
+	digits string
+	exp    int
+}
+
+func (d decimal) negative() bool { return d.neg && d.digits != "0" }
+
+// readDecimal reads a number constant's canonical text: an optional minus, digits
+// with an optional fraction, and an optional exponent. ok is false for any other text.
+func readDecimal(text string) (decimal, bool) {
+	var d decimal
+	s := text
+	if strings.HasPrefix(s, "-") {
+		d.neg, s = true, s[1:]
+	}
+	mant, expText, _ := strings.Cut(strings.ToLower(s), "e")
+	whole, frac, _ := strings.Cut(mant, ".")
+	digits := strings.TrimLeft(whole+frac, "0")
+	if whole == "" || strings.Trim(whole+frac, "0123456789") != "" {
+		return decimal{}, false
+	}
+	exp := -len(frac)
+	if expText != "" {
+		var e big.Int
+		if _, ok := e.SetString(strings.TrimPrefix(expText, "+"), 10); !ok || !e.IsInt64() || e.Int64() > 1<<31 || e.Int64() < -(1<<31) {
+			return decimal{}, false
+		}
+		exp += int(e.Int64())
+	}
+	if digits == "" {
+		return decimal{digits: "0"}, true
+	}
+	trimmed := strings.TrimRight(digits, "0")
+	d.digits, d.exp = trimmed, exp+len(digits)-len(trimmed)
+	return d, true
 }
 
 // nanosBetween is |a - b| in nanoseconds, exact over the whole range of times.
@@ -199,7 +193,7 @@ const nanosPerDayOverTen11 = 864
 // ns nanoseconds. It is exact: the days are digits * 10^exp, so the comparison is
 // ns <= digits * 864 * 10^(exp+11), done in integers with a power of ten only as
 // large as the comparison can need.
-func coversNanos(n number, ns *big.Int) bool {
+func coversNanos(n decimal, ns *big.Int) bool {
 	if n.digits == "0" {
 		return ns.Sign() == 0
 	}

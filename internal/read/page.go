@@ -113,7 +113,7 @@ func ReceiptPage(ctx context.Context, d serve.Deps, hash, cursor string, limit i
 		if cursor != "" {
 			return api.ReceiptShown{}, badCursor("receipt %s answers a query, one relation, which is not paged", hash)
 		}
-		if err := Fit(shown.Answer.Tuples, limit,
+		if err := Fit(shown.Answer.Tuples(), limit,
 			"show it locally with anam receipt show; a query's answer is not paged, so ask a narrower query"); err != nil {
 			return api.ReceiptShown{}, err
 		}

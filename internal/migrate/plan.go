@@ -231,7 +231,7 @@ func selectFacets(ctx context.Context, res fold.Result, current *def.Registry, p
 		return nil, nil, fmt.Errorf("migrate: the program: %w", err)
 	}
 	ids := map[string]bool{}
-	for _, t := range ans.Tuples {
+	for _, t := range ans.Tuples() {
 		ids[t[0].Text()] = true
 	}
 	for _, f := range res.Live {

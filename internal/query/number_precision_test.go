@@ -28,7 +28,7 @@ func TestBug_AttrReportsTheNumberTheRecordHolds(t *testing.T) {
 	if ans.Len() != 1 {
 		t.Fatalf("attr bound %d times, want 1", ans.Len())
 	}
-	if got := ans.Tuples[0][1].Text(); got != beyondFloat64 {
+	if got := ans.Tuples()[0][1].Text(); got != beyondFloat64 {
 		t.Errorf("attr reported %s, want the number the record holds, %s", got, beyondFloat64)
 	}
 }

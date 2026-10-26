@@ -189,7 +189,7 @@ func (s *Server) pickedIn(ctx context.Context, res fold.Result, saved selection.
 	case err != nil:
 		return nil, err
 	}
-	for _, t := range ans.Tuples {
+	for _, t := range ans.Tuples() {
 		sel.Picked[t[0].Text()] = true
 	}
 	return sel, nil

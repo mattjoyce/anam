@@ -1,185 +1,125 @@
 package query
 
 import (
-	"errors"
 	"fmt"
-	"sort"
-	"strings"
 	"time"
 
+	"github.com/mattjoyce/tarski"
+
 	"github.com/mattjoyce/anam/internal/clock"
-	"github.com/mattjoyce/anam/internal/def"
 )
 
-// ErrInvalid is returned for a program that parses but cannot run: an unknown
-// relation, a wrong arity, an unsafe variable, a negation that cannot be stratified,
-// a rule over a base relation, or a pointer no Definition declares. Each message says
-// what to change.
-var ErrInvalid = errors.New("query: invalid program")
+// The engine is the tarski module (github.com/mattjoyce/tarski, card 230). This
+// package supplies what is Anam's: the base relations over a served value, the checks
+// a constant is held to, within/3, the bundled rules, and the refusals that keep the
+// language what it was.
 
-// Plan is a validated, stratified program over a schema, ready to evaluate.
-type Plan struct {
-	strata [][]rule
-	idb    map[string]bool
+// refusedNames are the builtins tarski brings that Anam's language does not have,
+// and so names a program may not use. The language stays identical in card 230; a
+// later card lifts the refusal.
+var refusedNames = map[string]bool{"prefix": true, "suffix": true, "contains": true}
+
+// Parse reads a program and refuses what Anam's language does not have: an aggregate,
+// and the names prefix, suffix and contains.
+func Parse(text string) (Program, error) {
+	p, err := tarski.Parse(text)
+	if err != nil {
+		return Program{}, err
+	}
+	for _, r := range p.Rules {
+		if refusedNames[r.Head.Name] {
+			return Program{}, refusedName(r.Head.Name, r.Line)
+		}
+		for _, l := range r.Body {
+			if l.Aggregate != nil {
+				return Program{}, fmt.Errorf("%w: line %d: an aggregate is not part of Anam's language; "+
+					"there is no count, sum, min or max, so count the answer's tuples instead (docs/QUERY.md)",
+					ErrSyntax, l.Aggregate.Line)
+			}
+			if l.Atom != nil && refusedNames[l.Atom.Name] {
+				return Program{}, refusedName(l.Atom.Name, l.Atom.Line)
+			}
+		}
+	}
+	for name := range p.Declared {
+		if refusedNames[name] {
+			return Program{}, refusedName(name, 0)
+		}
+	}
+	return p, nil
 }
 
-// rule is a Rule with its body in evaluation order: positive atoms as written, each
-// followed by the negations and comparisons it binds, and with the positions of the
-// positive atoms whose relation the rule's own stratum derives.
-type rule struct {
-	Rule
-	ordered   []Literal
-	recursive []int
+func refusedName(name string, line int) error {
+	return fmt.Errorf("%w: line %d: %s is not part of Anam's language; prefix, suffix and contains are the engine's "+
+		"string builtins and are not offered, and the name is reserved", ErrInvalid, line, name)
+}
+
+// schemaOf is the schema a plan is compiled under: the base relations, the attr/3
+// pointer check, and the within builtin. instant/1 is a derived relation, not a base
+// one (the bundled set declares it and the query defines it), and tarski attaches a
+// check only to a base relation, so checkInstants holds it instead.
+func schemaOf(schema Schema, defs Definitions) tarski.Schema {
+	return tarski.Schema{
+		Arities: arities(schema),
+		Checks: map[string]func(Atom) error{
+			RelAttr: func(a Atom) error { return checkAttr(a, defs) },
+		},
+		Builtins: tarskiBuiltins(),
+	}
+}
+
+func arities(schema Schema) map[string]int {
+	out := make(map[string]int, len(schema.Arities))
+	for name, n := range schema.Arities {
+		out[name] = n
+	}
+	return out
 }
 
 // Compile validates programs against a schema and groups their rules into strata.
 // The programs are read as one: a later program defines what an earlier one declared,
-// which is how a query builds on the bundled rule set.
+// which is how a query builds on the bundled rule set. It also refuses what Anam's
+// language does not have: a declared relation nothing defines, a constant instant that
+// is not a fact-time, an aggregate.
 func Compile(schema Schema, defs Definitions, programs ...Program) (Plan, error) {
-	arities, idb, err := relations(schema, programs)
+	plan, err := tarski.Compile(schemaOf(schema, defs), programs...)
 	if err != nil {
 		return Plan{}, err
 	}
-	var rules []Rule
-	for _, p := range programs {
-		for _, r := range p.Rules {
-			if err := checkRule(r, arities, defs); err != nil {
-				return Plan{}, err
-			}
-			rules = append(rules, r)
-		}
+	if plan.HasAggregates() {
+		return Plan{}, fmt.Errorf("%w: an aggregate is not part of Anam's language; count the answer's tuples instead", ErrInvalid)
 	}
-	if err := checkDefined(programs, rules, arities, schema); err != nil {
+	if err := checkInstants(programs); err != nil {
 		return Plan{}, err
 	}
-	strata, err := stratify(rules, idb)
-	if err != nil {
+	if err := checkDefined(plan, schema, programs); err != nil {
 		return Plan{}, err
 	}
-	return Plan{strata: strata, idb: idb}, nil
+	return plan, nil
 }
 
-// relations collects every relation's arity: the schema's base relations, the
-// declarations, and the heads. One name, one arity.
-func relations(schema Schema, programs []Program) (arities map[string]int, idb map[string]bool, err error) {
-	arities, idb = map[string]int{}, map[string]bool{}
-	for name, n := range schema.Arities {
-		arities[name] = n
-	}
-	note := func(name string, n, line int) error {
-		if have, ok := arities[name]; ok && have != n {
-			return fmt.Errorf("%w: line %d: %s/%d, but %s is %s/%d", ErrInvalid, line, name, n, name, name, have)
-		}
-		arities[name] = n
-		return nil
-	}
+// checkInstants holds every constant in an instant/1 atom, head or body, to the
+// fact-time lexeme.
+func checkInstants(programs []Program) error {
 	for _, p := range programs {
-		for name, n := range p.Declared {
-			if _, ok := builtinNamed(name); ok {
-				return nil, nil, fmt.Errorf("%w: %s/%d is a builtin and cannot be declared", ErrInvalid, name, n)
-			}
-			if schema.Arities[name] != 0 {
-				return nil, nil, fmt.Errorf("%w: %s/%d is a base relation and cannot be declared", ErrInvalid, name, n)
-			}
-			if err := note(name, n, 0); err != nil {
-				return nil, nil, err
-			}
-			idb[name] = true
-		}
 		for _, r := range p.Rules {
-			if _, ok := builtinNamed(r.Head.Name); ok {
-				return nil, nil, fmt.Errorf("%w: line %d: %s/%d is a builtin; a rule cannot define it",
-					ErrInvalid, r.Line, r.Head.Name, len(r.Head.Args))
-			}
-			if schema.Arities[r.Head.Name] != 0 {
-				return nil, nil, fmt.Errorf("%w: line %d: %s/%d is a base relation; a rule cannot add to it",
-					ErrInvalid, r.Line, r.Head.Name, schema.Arities[r.Head.Name])
-			}
-			if err := note(r.Head.Name, len(r.Head.Args), r.Line); err != nil {
-				return nil, nil, err
-			}
-			idb[r.Head.Name] = true
-		}
-	}
-	return arities, idb, nil
-}
-
-// checkRule holds one rule to the arities, to safety, and to the Definitions: every
-// variable in the head, in a negated atom or in a comparison is bound by a positive
-// body atom, and a constant pointer in attr/3 is a field some Definition declares.
-func checkRule(r Rule, arities map[string]int, defs Definitions) error {
-	bound := map[string]bool{}
-	atoms := []*Atom{&r.Head}
-	for _, l := range r.Body {
-		if l.Atom != nil && !l.isBuiltin() {
-			atoms = append(atoms, l.Atom)
-			if !l.Negated {
-				for _, a := range l.Atom.Args {
-					if a.IsVar() {
-						bound[a.Var] = true
-					}
+			atoms := []Atom{r.Head}
+			for _, l := range r.Body {
+				if l.Atom != nil {
+					atoms = append(atoms, *l.Atom)
 				}
 			}
-		}
-	}
-	for _, a := range atoms {
-		if err := checkAtom(*a, arities, defs); err != nil {
-			return fmt.Errorf("%w: line %d: %v", ErrInvalid, a.Line, err)
-		}
-	}
-	for _, a := range r.Head.Args {
-		if a.Var == "_" {
-			return fmt.Errorf("%w: line %d: _ in the head of %s; name the variable or use a constant", ErrInvalid, r.Line, r.Head.Name)
-		}
-		if a.IsVar() && !bound[a.Var] {
-			return fmt.Errorf("%w: line %d: %s in the head of %s is not bound by a positive body atom", ErrInvalid, r.Line, a.Var, r.Head.Name)
-		}
-	}
-	for _, l := range r.Body {
-		switch {
-		case l.isBuiltin():
-			if err := checkBuiltin(*l.Atom, bound); err != nil {
-				return fmt.Errorf("%w: line %d: %v", ErrInvalid, l.Atom.Line, err)
-			}
-		case l.Negated:
-			for _, a := range l.Atom.Args {
-				if a.IsVar() && a.Var != "_" && !bound[a.Var] {
-					return fmt.Errorf("%w: line %d: %s in not %s is not bound by a positive body atom", ErrInvalid, l.Atom.Line, a.Var, l.Atom.Name)
+			for _, a := range atoms {
+				if a.Name != RelInstant {
+					continue
 				}
-			}
-		case l.Compare != nil:
-			for _, t := range []Term{l.Compare.Left, l.Compare.Right} {
-				if t.Var == "_" {
-					return fmt.Errorf("%w: line %d: _ in a comparison compares nothing", ErrInvalid, l.Compare.Line)
-				}
-				if t.IsVar() && !bound[t.Var] {
-					return fmt.Errorf("%w: line %d: %s in a comparison is not bound by a positive body atom", ErrInvalid, l.Compare.Line, t.Var)
+				if err := checkInstant(a); err != nil {
+					return fmt.Errorf("%w: line %d: %v", ErrInvalid, a.Line, err)
 				}
 			}
 		}
 	}
 	return nil
-}
-
-func checkAtom(a Atom, arities map[string]int, defs Definitions) error {
-	n, ok := arities[a.Name]
-	if !ok {
-		return fmt.Errorf("unknown relation %s/%d; the relations are %s", a.Name, len(a.Args), known(arities))
-	}
-	if n != len(a.Args) {
-		return fmt.Errorf("%s has %d arguments, but %s is %s/%d", a.Name, len(a.Args), a.Name, a.Name, n)
-	}
-	if a.Name == RelInstant {
-		return checkInstant(a)
-	}
-	if a.Name != RelAttr || a.Args[1].IsVar() {
-		return nil
-	}
-	p := a.Args[1].Const
-	if p.Kind() != KindString {
-		return fmt.Errorf("attr: the pointer must be a string, got %s", p.Text())
-	}
-	return checkPointer(p.Text(), defs)
 }
 
 // checkInstant holds a constant in instant/1 to the fact-time lexeme (clock.Layout):
@@ -203,101 +143,50 @@ func checkInstant(a Atom) error {
 	return nil
 }
 
-// checkPointer is the fields' own check (card 138): the pointer is well formed and
-// some Definition declares a field there. The types a value holds decide which
-// Definition answers a given facet; a pointer no type declares cannot answer for any.
-//
-// A pointer that names a container is refused too, when every Definition that
-// declares it declares it as one: attr holds the leaves of a payload, and a
-// container holds none, so the program would answer empty forever and say nothing.
-// The refusal names the leaves to ask for instead.
-func checkPointer(p string, defs Definitions) error {
-	if err := def.CheckPointer(p); err != nil {
-		return fmt.Errorf("attr: %w", err)
-	}
-	var (
-		declared  int
-		leaves    []string
-		container = true
-	)
-	for _, d := range defs.All() {
-		if d.HasPointer(p) != nil {
-			continue
-		}
-		declared++
-		isContainer, l, err := d.ContainerAt(p)
-		if err != nil {
-			return fmt.Errorf("attr: %w", err)
-		}
-		if !isContainer {
-			container = false
-			continue
-		}
-		leaves = append(leaves, l...)
-	}
-	if declared == 0 {
-		var types []string
-		for _, d := range defs.All() {
-			types = append(types, string(d.Type))
-		}
-		return fmt.Errorf("attr: no Definition declares a field at %s (the types are %s)", p, strings.Join(types, ", "))
-	}
-	if !container {
+// checkAttr holds a constant pointer in attr/3 to a string some Definition declares as
+// a field.
+func checkAttr(a Atom, defs Definitions) error {
+	if a.Args[1].IsVar() {
 		return nil
 	}
-	leaves = uniq(leaves)
-	if len(leaves) == 0 {
-		return fmt.Errorf("attr: %s names a container, not a field, and the schema does not say what is in it", p)
+	p := a.Args[1].Const
+	if p.Kind() != KindString {
+		return fmt.Errorf("attr: the pointer must be a string, got %s", p.Text())
 	}
-	return fmt.Errorf("attr: %s names a container, not a field; ask for its leaves: %s", p, strings.Join(leaves, ", "))
-}
-
-// uniq sorts and removes the duplicates, so a leaf several Definitions declare is
-// named once.
-func uniq(in []string) []string {
-	if len(in) == 0 {
-		return nil
-	}
-	sort.Strings(in)
-	out := in[:1]
-	for _, s := range in[1:] {
-		if s != out[len(out)-1] {
-			out = append(out, s)
-		}
-	}
-	return out
+	return checkPointer(p.Text(), defs)
 }
 
 // checkDefined refuses a query whose rules reach, through any chain of rules, a
 // declared relation nothing defines: the bundled current/2 without the instants to
-// ask about, say. Reached silently it would be empty and the answer wrong; a query
-// that never reaches it needs no definition.
-func checkDefined(programs []Program, rules []Rule, arities map[string]int, schema Schema) error {
-	defined, reads := map[string]bool{}, bodyReads(rules)
-	for _, r := range rules {
-		defined[r.Head.Name] = true
-	}
+// ask about, say. Tarski reads such a relation as empty. Reached silently it would be
+// empty and the answer wrong; a query that never reaches it needs no definition.
+func checkDefined(plan Plan, schema Schema, programs []Program) error {
 	if len(programs) == 0 {
 		return nil
 	}
+	reads := bodyReads(programs)
 	for _, r := range programs[len(programs)-1].Rules {
-		seen := map[string]bool{}
-		if hole := reach(r.Head.Name, reads, defined, schema, seen); hole != "" {
+		if hole := reach(plan, schema, r.Head.Name, reads, map[string]bool{}); hole != "" {
+			n, _ := plan.Arity(hole)
 			return fmt.Errorf("%w: line %d: %s reads %s/%d, which is declared but has no rules or facts; define it in the query",
-				ErrInvalid, r.Line, r.Head.Name, hole, arities[hole])
+				ErrInvalid, r.Line, r.Head.Name, hole, n)
 		}
 	}
 	return nil
 }
 
 // bodyReads maps each derived relation to the relations its rules' bodies read,
-// negated or not.
-func bodyReads(rules []Rule) map[string][]string {
+// negated or not. A builtin is a guard, not a relation, and is left out.
+func bodyReads(programs []Program) map[string][]string {
 	reads := map[string][]string{}
-	for _, r := range rules {
-		for _, l := range r.Body {
-			if l.Atom != nil && !l.isBuiltin() {
-				reads[r.Head.Name] = append(reads[r.Head.Name], l.Atom.Name)
+	for _, p := range programs {
+		for _, r := range p.Rules {
+			for _, l := range r.Body {
+				if l.Atom != nil {
+					if _, ok := builtinNamed(l.Atom.Name); !ok {
+						reads[r.Head.Name] = append(reads[r.Head.Name], l.Atom.Name)
+					}
+				}
 			}
 		}
 	}
@@ -305,27 +194,18 @@ func bodyReads(rules []Rule) map[string][]string {
 }
 
 // reach is the first undefined relation reachable from name, or "".
-func reach(name string, reads map[string][]string, defined map[string]bool, schema Schema, seen map[string]bool) string {
+func reach(plan Plan, schema Schema, name string, reads map[string][]string, seen map[string]bool) string {
 	if seen[name] {
 		return ""
 	}
 	seen[name] = true
-	if schema.Arities[name] == 0 && !defined[name] {
+	if schema.Arities[name] == 0 && !plan.Defines(name) {
 		return name
 	}
 	for _, next := range reads[name] {
-		if hole := reach(next, reads, defined, schema, seen); hole != "" {
+		if hole := reach(plan, schema, next, reads, seen); hole != "" {
 			return hole
 		}
 	}
 	return ""
-}
-
-func known(arities map[string]int) string {
-	names := make([]string, 0, len(arities))
-	for name, n := range arities {
-		names = append(names, fmt.Sprintf("%s/%d", name, n))
-	}
-	sort.Strings(names)
-	return strings.Join(names, ", ")
 }

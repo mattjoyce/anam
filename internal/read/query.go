@@ -225,7 +225,7 @@ func asReadError(err error) error {
 
 // fitAnswer is Fit over the answer's tuples, with the query's narrowings.
 func fitAnswer(ans query.Answer, limit int) error {
-	err := Fit(ans.Tuples, limit, queryHint)
+	err := Fit(ans.Tuples(), limit, queryHint)
 	var tl *TooLarge
 	if errors.As(err, &tl) {
 		tl.Narrow = queryNarrowings

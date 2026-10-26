@@ -111,3 +111,36 @@ func TestBundled(t *testing.T) {
 		}
 	}
 }
+
+// The language is what it was before the engine changed (card 230): a few things the
+// engine would accept are refused, and each refusal is pinned here.
+func TestParse_RefusesWhatAnamsLanguageDoesNotHave(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, text string
+		want       error
+		say        string
+	}{
+		{"a leading zero is no number", `a(01).`, query.ErrSyntax, "not a number"},
+		{"nor a negative one", `a(-01).`, query.ErrSyntax, "not a number"},
+		{"a leading zero in a comparison", `b(X) :- entry(X, _, _, _, _, _, V), V = 01.`, query.ErrSyntax, "not a number"},
+		{"a string that is not UTF-8", "a(\"x\xffy\").", query.ErrSyntax, "UTF-8"},
+		{"true is a constant, not a relation", `true(X) :- entry(X, _, _, _, _, _, _).`, query.ErrSyntax, "true"},
+		{"prefix as a head", `prefix(X, Y) :- entry(X, Y, _, _, _, _, _).`, query.ErrInvalid, "prefix is not part of Anam's language"},
+		{"prefix as a fact", `prefix("a", "b").`, query.ErrInvalid, "prefix is not part of Anam's language"},
+		{"suffix declared", `suffix/2.`, query.ErrInvalid, "suffix is not part of Anam's language"},
+		{"contains as a guard", `a(X) :- entry(X, _, _, _, _, _, _), contains("a", X).`, query.ErrInvalid, "contains is not part of Anam's language"},
+		{"a negated prefix", `a(X) :- entry(X, _, _, _, _, _, _), not prefix("a", X).`, query.ErrInvalid, "prefix is not part of Anam's language"},
+		{"count", `n(C) :- C = count : { entry(_, _, _, _, _, _, _) }.`, query.ErrSyntax, "count the answer's tuples"},
+		{"sum", `n(S) :- entry(_, _, _, _, _, _, V), S = sum V : { entry(_, _, _, _, _, _, V) }.`, query.ErrSyntax, "count the answer's tuples"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := query.Parse(c.text)
+			if !errors.Is(err, c.want) || !strings.Contains(err.Error(), c.say) {
+				t.Errorf("Parse = %v, want %v saying %q", err, c.want, c.say)
+			}
+		})
+	}
+}

@@ -6,15 +6,16 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/clock"
+	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/mint"
+	"github.com/mattjoyce/anam/internal/query"
 	"github.com/mattjoyce/anam/internal/read"
 	"github.com/mattjoyce/anam/internal/span"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -57,6 +58,10 @@ type Scenario struct {
 	MedianMS float64 `json:"median_ms"`
 	MaxMS    float64 `json:"max_ms"`
 	Rows     int     `json:"rows"`
+	// Steps and Bytes are what a query scenario's evaluation charged (query.Cost), the
+	// same on every run; zero for a scenario that is not a query.
+	Steps int `json:"steps,omitempty"`
+	Bytes int `json:"bytes,omitempty"`
 }
 
 // Options say what to run against.
@@ -219,8 +224,10 @@ func commonType(entries []fold.Entry) string {
 
 // scenario is one timed read; it returns how many rows it read.
 type scenario struct {
-	name string
-	fn   func(ctx context.Context) (int, error)
+	name  string
+	fn    func(ctx context.Context) (int, error)
+	cost  func() (int, int)
+	query bool
 }
 
 func scenarios(l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) []scenario {
@@ -232,27 +239,28 @@ func scenarios(l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) []scenario 
 			return t.Shown, err
 		}
 	}
-	return []scenario{
+
+	list := []scenario{
 		{"replay all events", func(ctx context.Context) (int, error) {
 			evs, err := l.Replay(ctx, 0, p.head)
 			return len(evs), err
-		}},
+		}, nil, false},
 		{"full fold (fold.ReadAt)", func(ctx context.Context) (int, error) {
 			res, err := fold.ReadAt(ctx, l, p.head)
 			return res.Value.Len(), err
-		}},
+		}, nil, false},
 		{"composed read (mint.ReadAt)", func(ctx context.Context) (int, error) {
 			c, ok, err := mint.ReadAt(ctx, l, db, deps.Values, p.head)
 			if !ok {
 				return 0, err // no mint run to start from: zero rows says so
 			}
 			return c.Value.Len(), err
-		}},
-		{"timeline, whole", timeline(api.TimelineQuery{})},
-		{"timeline, one month", timeline(api.TimelineQuery{From: p.monthFrom, To: p.monthTo})},
-		{"timeline, one type", timeline(api.TimelineQuery{Type: p.commonType})},
-		{"timeline, snapshot --at", timeline(api.TimelineQuery{At: p.at})},
-		{"timeline, --as-of half W", timeline(api.TimelineQuery{AsOf: p.asOf})},
+		}, nil, false},
+		{"timeline, whole", timeline(api.TimelineQuery{}), nil, false},
+		{"timeline, one month", timeline(api.TimelineQuery{From: p.monthFrom, To: p.monthTo}), nil, false},
+		{"timeline, one type", timeline(api.TimelineQuery{Type: p.commonType}), nil, false},
+		{"timeline, snapshot --at", timeline(api.TimelineQuery{At: p.at}), nil, false},
+		{"timeline, --as-of half W", timeline(api.TimelineQuery{AsOf: p.asOf}), nil, false},
 		{"timeline, whole, as JSON", func(ctx context.Context) (int, error) {
 			t, err := read.Timeline(ctx, src, api.TimelineQuery{Zone: "UTC"})
 			if err != nil {
@@ -260,7 +268,7 @@ func scenarios(l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) []scenario 
 			}
 			b, err := json.Marshal(t)
 			return len(b) >> 10, err
-		}},
+		}, nil, false},
 		{"changes, last day", func(ctx context.Context) (int, error) {
 			head, err := l.Head(ctx)
 			if err != nil {
@@ -268,16 +276,45 @@ func scenarios(l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) []scenario 
 			}
 			c, err := read.Changes(ctx, db, int64(head), api.ChangesQuery{Since: p.since, Zone: "UTC"})
 			return len(c.Changes), err
-		}},
+		}, nil, false},
 		{"checkpoint --dry-run", func(ctx context.Context) (int, error) {
 			m, err := mint.Report(ctx, deps, api.MintQuery{DryRun: true})
 			return m.MintedCount(), err
-		}},
+		}, nil, false},
 		{"checkpoint --dry-run --full", func(ctx context.Context) (int, error) {
 			m, err := mint.Report(ctx, deps, api.MintQuery{DryRun: true, Full: true})
 			return m.MintedCount(), err
-		}},
+		}, nil, false},
 	}
+
+	if defs, err := def.Bundled(); err == nil {
+		if served, err := fold.ReadAt(context.Background(), l, p.head); err == nil {
+			versions := query.Versions(served.Live)
+			ctx := context.Background()
+			addQuery := func(name, text, relation string) {
+				sc := scenario{name: name, fn: nil, query: true}
+				sc.fn = func(ctx context.Context) (int, error) {
+					tuples, _, _, err := query.Cost(ctx, served.Value, versions, defs, text, relation)
+					return tuples, err
+				}
+				sc.cost = func() (int, int) {
+					tuples, steps, bytes, err := query.Cost(ctx, served.Value, versions, defs, text, relation)
+					if err != nil {
+						return tuples, 0
+					}
+					_ = tuples
+					return steps, bytes
+				}
+				list = append(list, sc)
+			}
+			addQuery("query, every entry", "all(E, T) :- entry(E, T, _, _, _, _, _).", "all")
+			addQuery("query, every attr", "all(E, P, V) :- attr(E, P, V).", "all")
+			addQuery("query, current at every fact-time", "instant(At) :- entry(_, _, At, _, _, _, _).\nnow(E, At) :- instant(At), current(E, At).", "now")
+			addQuery("query, one type joined to its attrs", fmt.Sprintf("j(E, P, V) :- entry(E, T, _, _, _, _, _), T = %q, attr(E, P, V).", p.commonType), "j")
+		}
+	}
+
+	return list
 }
 
 // measure runs sc o.Reps times, each under o.Timeout.
@@ -296,9 +333,14 @@ func measure(ctx context.Context, o Options, sc scenario) (Scenario, error) {
 		rows = n
 		times = append(times, float64(elapsed.Microseconds())/1000)
 	}
-	sort.Float64s(times)
-	return Scenario{
+	res := Scenario{
 		Name: sc.name, Reps: o.Reps, MinMS: times[0], MedianMS: times[len(times)/2],
 		MaxMS: times[len(times)-1], Rows: rows,
-	}, nil
+	}
+	if sc.cost != nil {
+		steps, bytes := sc.cost()
+		res.Steps = steps
+		res.Bytes = bytes
+	}
+	return res, nil
 }

@@ -47,7 +47,12 @@ func edgeHarness(t *testing.T) *harness {
 	if !ok {
 		t.Fatal("no bundled health.sleep-episode")
 	}
-	defs, err := def.NewRegistry(append(registry(t).All(), note, intake, sleep)...)
+	// The steps are what docs/QUERY.md's steps-per-month question is asked of.
+	steps, ok := bundled.Lookup("activity.steps")
+	if !ok {
+		t.Fatal("no bundled activity.steps")
+	}
+	defs, err := def.NewRegistry(append(registry(t).All(), note, intake, sleep, steps)...)
 	if err != nil {
 		t.Fatalf("def.NewRegistry: %v", err)
 	}
@@ -55,11 +60,11 @@ func edgeHarness(t *testing.T) *harness {
 		"bp-csv":       {"health.blood-pressure"},
 		"records":      {"record.edge"},
 		"conversation": {"health.intake"},
-		"garmin":       {"health.sleep-episode"},
+		"garmin":       {"health.sleep-episode", "activity.steps"},
 		"self-log":     {"health.medication.started", "health.medication.dose-changed", "health.medication.stopped"},
 		"health-db":    {"health.weight"},
 	}
-	tmpl, err := projection.Parse([]byte(strings.Replace(logTemplate, `"health.blood-pressure",`, `"health.blood-pressure", "record.edge", "health.intake", "health.sleep-episode",`, 1)))
+	tmpl, err := projection.Parse([]byte(strings.Replace(logTemplate, `"health.blood-pressure",`, `"health.blood-pressure", "record.edge", "health.intake", "health.sleep-episode", "activity.steps",`, 1)))
 	if err != nil {
 		t.Fatalf("projection.Parse: %v", err)
 	}

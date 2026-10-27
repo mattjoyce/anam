@@ -3,6 +3,7 @@ package query_test
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -126,6 +127,24 @@ func docsLedger(t *testing.T) (*harness, fold.Value, map[string]int) {
 		{"sleep:2026-10-23", "2026-10-22T12:00:00Z", "2026-10-22T19:30:00Z"},
 	} {
 		h.admit(t, "garmin", "health.sleep-episode", s.id, `{"id": "`+s.id+`", "effective_time_frame": {"time_interval": {"start_date_time": "`+s.start+`", "end_date_time": "`+s.end+`"}}, "source_time": {"value": "`+s.start+`", "zone": "UTC", "basis": "source"}}`)
+	}
+	// Five days of steps, two in September and three in October, away from a month's first day:
+	// a day starts at local midnight, which is the evening before in UTC.
+	for _, s := range []struct {
+		day, offset string
+		steps       int
+	}{
+		{"2026-09-20", "+10:00", 4000},
+		{"2026-09-21", "+10:00", 6000},
+		{"2026-10-10", "+11:00", 5000},
+		{"2026-10-11", "+11:00", 7000},
+		{"2026-10-12", "+11:00", 9000},
+	} {
+		start := s.day + "T00:00:00" + s.offset
+		end := s.day + "T23:59:59" + s.offset
+		h.admit(t, "garmin", "activity.steps", "steps:"+s.day, fmt.Sprintf(`{"id": "steps:%s", "step_count": {"value": %d, "unit": "steps"}, `+
+			`"effective_time_frame": {"time_interval": {"start_date_time": "%s", "end_date_time": "%s"}}, `+
+			`"source_time": {"value": "%s", "zone": "Australia/Sydney", "basis": "source"}}`, s.day, s.steps, start, end, start))
 	}
 	v, versions, _ := h.served(t)
 	return h, v, versions

@@ -218,8 +218,10 @@ func PointerWarnings(programs []Program, held Held) ([]string, error) {
 	for _, p := range programs {
 		for _, r := range p.Rules {
 			for _, l := range r.Body {
-				if l.Atom != nil && l.Atom.Name == RelAttr && !l.Atom.Args[1].IsVar() {
-					pointers[l.Atom.Args[1].Const.Text()] = true
+				for _, a := range bodyAtoms(l) {
+					if a.Name == RelAttr && !a.Args[1].IsVar() {
+						pointers[a.Args[1].Const.Text()] = true
+					}
 				}
 			}
 		}

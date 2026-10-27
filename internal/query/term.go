@@ -60,6 +60,13 @@ var (
 	ErrTooLarge = tarski.ErrTooLarge
 )
 
+// Bound names what a *TooLarge crossed, as tarski names them.
+const (
+	BoundBytes  = tarski.BoundBytes
+	BoundSteps  = tarski.BoundSteps
+	BoundNumber = tarski.BoundNumber
+)
+
 // String, Bool and Number make constants.
 var (
 	String = tarski.String

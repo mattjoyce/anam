@@ -9,6 +9,11 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- A query may count, sum, and take a min or max (card 213), in Soufflé's syntax:
+  `N = count : { body }`, `S = sum X : { body }`. A sum is exact; there is no `avg`, so divide
+  the sum by the count. Every evaluation is now bounded at 5,000,000 steps as well as by
+  `max_read_bytes`, and a program over it is refused with 413, carrying `steps` and
+  `max_steps` in `too_large`. A sum past the exact-number bound is refused with 400.
 - The six types read from hand-made records files require `source_time` (card 198, the records
   window): `health.weight` v7, `health.lab-result` v3, `health.lab-panel` v3,
   `health.blood-pressure` v8, and `health.encounter` v2 and `health.donation` v2, which declare it

@@ -19,8 +19,8 @@ import (
 // later card lifts the refusal.
 var refusedNames = map[string]bool{"prefix": true, "suffix": true, "contains": true}
 
-// Parse reads a program and refuses what Anam's language does not have: an aggregate,
-// and the names prefix, suffix and contains.
+// Parse reads a program and refuses what Anam's language does not have: the names
+// prefix, suffix and contains.
 func Parse(text string) (Program, error) {
 	p, err := tarski.Parse(text)
 	if err != nil {
@@ -31,13 +31,10 @@ func Parse(text string) (Program, error) {
 			return Program{}, refusedName(r.Head.Name, r.Line)
 		}
 		for _, l := range r.Body {
-			if l.Aggregate != nil {
-				return Program{}, fmt.Errorf("%w: line %d: an aggregate is not part of Anam's language; "+
-					"there is no count, sum, min or max, so count the answer's tuples instead (docs/QUERY.md)",
-					ErrSyntax, l.Aggregate.Line)
-			}
-			if l.Atom != nil && refusedNames[l.Atom.Name] {
-				return Program{}, refusedName(l.Atom.Name, l.Atom.Line)
+			for _, a := range bodyAtoms(l) {
+				if refusedNames[a.Name] {
+					return Program{}, refusedName(a.Name, a.Line)
+				}
 			}
 		}
 	}
@@ -80,14 +77,11 @@ func arities(schema Schema) map[string]int {
 // The programs are read as one: a later program defines what an earlier one declared,
 // which is how a query builds on the bundled rule set. It also refuses what Anam's
 // language does not have: a declared relation nothing defines, a constant instant that
-// is not a fact-time, an aggregate.
+// is not a fact-time.
 func Compile(schema Schema, defs Definitions, programs ...Program) (Plan, error) {
 	plan, err := tarski.Compile(schemaOf(schema, defs), programs...)
 	if err != nil {
 		return Plan{}, err
-	}
-	if plan.HasAggregates() {
-		return Plan{}, fmt.Errorf("%w: an aggregate is not part of Anam's language; count the answer's tuples instead", ErrInvalid)
 	}
 	if err := checkInstants(programs); err != nil {
 		return Plan{}, err
@@ -105,8 +99,8 @@ func checkInstants(programs []Program) error {
 		for _, r := range p.Rules {
 			atoms := []Atom{r.Head}
 			for _, l := range r.Body {
-				if l.Atom != nil {
-					atoms = append(atoms, *l.Atom)
+				for _, a := range bodyAtoms(l) {
+					atoms = append(atoms, *a)
 				}
 			}
 			for _, a := range atoms {
@@ -182,15 +176,33 @@ func bodyReads(programs []Program) map[string][]string {
 	for _, p := range programs {
 		for _, r := range p.Rules {
 			for _, l := range r.Body {
-				if l.Atom != nil {
-					if _, ok := builtinNamed(l.Atom.Name); !ok {
-						reads[r.Head.Name] = append(reads[r.Head.Name], l.Atom.Name)
+				for _, a := range bodyAtoms(l) {
+					if _, ok := builtinNamed(a.Name); !ok {
+						reads[r.Head.Name] = append(reads[r.Head.Name], a.Name)
 					}
 				}
 			}
 		}
 	}
 	return reads
+}
+
+// bodyAtoms is every atom a body literal reads: the literal's own atom, or each atom
+// inside an aggregate's braces.
+func bodyAtoms(l Literal) []*Atom {
+	if l.Aggregate != nil {
+		out := make([]*Atom, 0, len(l.Aggregate.Body))
+		for i := range l.Aggregate.Body {
+			if l.Aggregate.Body[i].Atom != nil {
+				out = append(out, l.Aggregate.Body[i].Atom)
+			}
+		}
+		return out
+	}
+	if l.Atom != nil {
+		return []*Atom{l.Atom}
+	}
+	return nil
 }
 
 // reach is the first undefined relation reachable from name, or "".

@@ -22,16 +22,21 @@ const maxSteps = 5_000_000
 func Evaluate(ctx context.Context, plan Plan, base Base, maxBytes int) (Result, error) {
 	res, err := tarski.Evaluate(ctx, plan, base, tarski.Options{MaxBytes: maxBytes, MaxSteps: maxSteps})
 	if err != nil {
-		var tl *TooLarge
-		if errors.As(err, &tl) && tl.Bound == tarski.BoundBytes {
-			return Result{}, readerBound{tl}
-		}
-		if errors.As(err, &tl) && tl.Bound == tarski.BoundSteps {
-			return Result{}, readerSteps{tl}
-		}
-		return Result{}, err
+		return Result{}, reword(err)
 	}
 	return res, nil
+}
+
+// reword turns an engine refusal into Anam's wording for the byte and step bounds.
+func reword(err error) error {
+	var tl *TooLarge
+	if errors.As(err, &tl) && tl.Bound == tarski.BoundBytes {
+		return readerBound{tl}
+	}
+	if errors.As(err, &tl) && tl.Bound == tarski.BoundSteps {
+		return readerSteps{tl}
+	}
+	return err
 }
 
 // readerBound is the module's *TooLarge with Anam's wording: the bound is the

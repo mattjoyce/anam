@@ -157,7 +157,11 @@ func TestDocs_WorkedQuestionsRunAgainstARealLedger(t *testing.T) {
 				if !ok {
 					t.Fatalf("line %d: no error block follows", b.line)
 				}
-				if !errors.Is(err, query.ErrInvalid) || !strings.Contains(err.Error(), strings.TrimSpace(want.body)) {
+				wantErr := query.ErrInvalid
+				if strings.Contains(b.body, "avg") {
+					wantErr = query.ErrSyntax
+				}
+				if !errors.Is(err, wantErr) || !strings.Contains(err.Error(), strings.TrimSpace(want.body)) {
 					t.Errorf("line %d: error = %v, want ErrInvalid containing %q", b.line, err, strings.TrimSpace(want.body))
 				}
 				return

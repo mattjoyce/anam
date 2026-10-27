@@ -88,6 +88,7 @@ func TestPointerWarnings(t *testing.T) {
 		want string
 	}{
 		{`a(E) :- attr(E, "/missed_medication", _).`, "health.blood-pressure declares /missed_medication at"},
+		{`a(N) :- N = count : { attr(E, "/missed_medication", _) }.`, "health.blood-pressure declares /missed_medication at"},
 		{`a(E) :- attr(E, "/nothing", _).`, ""},
 		{`a(E, P) :- attr(E, P, _).`, ""},
 	}

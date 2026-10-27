@@ -1,9 +1,7 @@
 package query
 
 import (
-	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/mattjoyce/tarski"
@@ -26,12 +24,6 @@ var refusedNames = map[string]bool{"prefix": true, "suffix": true, "contains": t
 func Parse(text string) (Program, error) {
 	p, err := tarski.Parse(text)
 	if err != nil {
-		// tarski refuses avg and mean as operations, not aggregates; Anam's
-		// language has no average either, so keep the refusal but mark it an
-		// invalid program, as the other refusals are.
-		if errors.Is(err, tarski.ErrSyntax) && strings.Contains(err.Error(), "is not an aggregate here") {
-			return Program{}, fmt.Errorf("%w: %w", ErrInvalid, err)
-		}
 		return Program{}, err
 	}
 	for _, r := range p.Rules {
@@ -39,8 +31,10 @@ func Parse(text string) (Program, error) {
 			return Program{}, refusedName(r.Head.Name, r.Line)
 		}
 		for _, l := range r.Body {
-			if l.Atom != nil && refusedNames[l.Atom.Name] {
-				return Program{}, refusedName(l.Atom.Name, l.Atom.Line)
+			for _, a := range bodyAtoms(l) {
+				if refusedNames[a.Name] {
+					return Program{}, refusedName(a.Name, a.Line)
+				}
 			}
 		}
 	}
@@ -105,8 +99,8 @@ func checkInstants(programs []Program) error {
 		for _, r := range p.Rules {
 			atoms := []Atom{r.Head}
 			for _, l := range r.Body {
-				if l.Atom != nil {
-					atoms = append(atoms, *l.Atom)
+				for _, a := range bodyAtoms(l) {
+					atoms = append(atoms, *a)
 				}
 			}
 			for _, a := range atoms {
@@ -182,19 +176,7 @@ func bodyReads(programs []Program) map[string][]string {
 	for _, p := range programs {
 		for _, r := range p.Rules {
 			for _, l := range r.Body {
-				atoms := []*Atom{}
-				if l.Atom != nil {
-					atoms = append(atoms, l.Atom)
-				}
-				if l.Aggregate != nil {
-					for i := range l.Aggregate.Body {
-						if l.Aggregate.Body[i].Atom != nil {
-							aa := l.Aggregate.Body[i].Atom
-							atoms = append(atoms, aa)
-						}
-					}
-				}
-				for _, a := range atoms {
+				for _, a := range bodyAtoms(l) {
 					if _, ok := builtinNamed(a.Name); !ok {
 						reads[r.Head.Name] = append(reads[r.Head.Name], a.Name)
 					}
@@ -203,6 +185,24 @@ func bodyReads(programs []Program) map[string][]string {
 		}
 	}
 	return reads
+}
+
+// bodyAtoms is every atom a body literal reads: the literal's own atom, or each atom
+// inside an aggregate's braces.
+func bodyAtoms(l Literal) []*Atom {
+	if l.Aggregate != nil {
+		out := make([]*Atom, 0, len(l.Aggregate.Body))
+		for i := range l.Aggregate.Body {
+			if l.Aggregate.Body[i].Atom != nil {
+				out = append(out, l.Aggregate.Body[i].Atom)
+			}
+		}
+		return out
+	}
+	if l.Atom != nil {
+		return []*Atom{l.Atom}
+	}
+	return nil
 }
 
 // reach is the first undefined relation reachable from name, or "".

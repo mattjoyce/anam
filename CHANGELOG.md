@@ -9,6 +9,10 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- Two base relations for grouping a query (card 213): `month_of(At, Month)` and `day_of(At, Day)`,
+  the UTC month (`2006-01`) and day (`2006-01-02`) of each fact-time an entry carries. A program
+  that defined its own `month_of` or `day_of` is now refused, since a base relation cannot be the
+  head of a rule.
 - A query may count, sum, and take a min or max (card 213), in Soufflé's syntax:
   `N = count : { body }`, `S = sum X : { body }`. A sum is exact; there is no `avg`, so divide
   the sum by the count. Every evaluation is now bounded at 5,000,000 steps as well as by

@@ -79,7 +79,7 @@ func TestQueryRoutes(t *testing.T) {
 
 	var cat api.QueryCatalogue
 	getJSON(t, srv.URL+"/v1/query", http.StatusOK, &cat)
-	if len(cat.Relations) != 4 || cat.Rules.Name != "anam" || len(cat.Types) == 0 {
+	if len(cat.Relations) != 6 || cat.Rules.Name != "anam" || len(cat.Types) == 0 {
 		t.Errorf("catalogue = %d relations, rules %s, %d types", len(cat.Relations), cat.Rules.Name, len(cat.Types))
 	}
 

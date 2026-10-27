@@ -1,5 +1,5 @@
 // Package inspect serves the web view over the ledger, the Anam Workbench: pages that
-// read what Anam holds (MVP.md §3), and, when the daemon hands it a Workbench, forms
+// read what Anam holds, and, when the daemon hands it a Workbench, forms
 // that enter, correct and retract a fact by hand through the gate (card 188). The
 // read pages never write; the entry routes are their own handlers (workbench.go), and
 // so is the select page's save, which files a program as an artifact under a short

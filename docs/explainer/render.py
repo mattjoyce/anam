@@ -708,7 +708,8 @@ def build(bundle: Path, out: Path) -> None:
     purposes = [cid for cid, d in c.items() if d["type"] == "purpose"]
     purpose = c[purposes[0]] if purposes else {"title": "?", "description": "", "commit": "", "_body": ""}
     commit = purpose.get("commit", "")
-    repo_name = REPO.name
+    # The repository's name, not the checkout folder's: a worktree has its own folder name.
+    repo_name = "anam"
     by_type: dict[str, list[str]] = defaultdict(list)
     for cid, d in c.items():
         by_type[d["type"]].append(cid)

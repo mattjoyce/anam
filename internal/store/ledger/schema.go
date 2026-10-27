@@ -14,7 +14,7 @@ import _ "embed" // go:embed for the SQL files beside this one
 // History:
 //
 //	1  the three tables and their triggers
-//	2  facet.series, the Definition's series stamp (SELF-LOG.md §2)
+//	2  facet.series, the Definition's series stamp
 //	3  no DDL: the identity encoding (facet.SourceRef, length-prefixed values) and
 //	   the fact-time zone changed what a facet's id and fact_time are. A schema 2
 //	   file holds rows keyed by the old rules and cannot be carried forward; it is

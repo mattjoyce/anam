@@ -8,7 +8,7 @@
 //
 // The shape is the one knob whose verdict depends on other entries. A log serves
 // every surviving facet; a snapshot serves the latest per series, the last-known
-// value at the window's end (SELF-LOG.md §2). Shape lives in the template and not in
+// value at the window's end. Shape lives in the template and not in
 // a read-time flag, because a consumer selects a projection and never defines one.
 //
 // Two things here are structural rather than conventional, because a rule that lives

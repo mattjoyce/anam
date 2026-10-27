@@ -9,6 +9,8 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- `docs/QUERY.md` has a worked question for steps per month, summed and counted with
+  `month_of/2` (card 213).
 - Two base relations for grouping a query (card 213): `month_of(At, Month)` and `day_of(At, Day)`,
   the UTC month (`2006-01`) and day (`2006-01-02`) of each fact-time an entry carries. A program
   that defined its own `month_of` or `day_of` is now refused, since a base relation cannot be the

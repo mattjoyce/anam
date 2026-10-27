@@ -239,6 +239,7 @@ n(T, N) :- entry(_, T, _, _, _, _, _), N = count : { entry(_, T, _, _, _, _, _) 
 ```
 
 ```answer question=types-count
+activity.steps 5
 health.blood-pressure 5
 health.intake 4
 health.medication.dose-changed 1
@@ -399,6 +400,26 @@ summer(N) :- N = count : { entry(_, "health.blood-pressure", At, _, _, _, _), At
 ```
 
 The upper bound is exclusive so that months tile.
+
+### Steps per month
+
+The steps of each month, summed, with the number of days they came from. The average is the sum
+over the count, which the caller divides: 5,000 steps a day in September and 7,000 in October.
+
+```datalog question=steps-per-month relation=steps
+steps(M, S, N) :- entry(_, "activity.steps", At0, _, _, _, _), month_of(At0, M),
+                  S = sum V : { entry(E, "activity.steps", At, _, _, _, _), month_of(At, M), attr(E, "/step_count/value", V) },
+                  N = count : { entry(E, "activity.steps", At, _, _, _, _), month_of(At, M) }.
+```
+
+```answer question=steps-per-month
+2026-09 10000 2
+2026-10 21000 3
+```
+
+`month_of` is the UTC month. A day of steps starts at local midnight, which in Sydney is the evening
+before in UTC, so the first day of a month counts toward the month before. A local month waits on
+the zone work.
 
 ### An absence
 

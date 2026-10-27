@@ -214,9 +214,19 @@ func asReadError(err error) error {
 	switch {
 	case errors.Is(err, query.ErrSyntax), errors.Is(err, query.ErrInvalid), errors.Is(err, query.ErrBase):
 		return badQuery(err)
+	case errors.As(err, &tl) && tl.Bound == query.BoundNumber:
+		return badQuery(err)
 	case errors.As(err, &tl):
+		tooLarge := api.TooLarge{Matched: tl.Tuples, Narrow: queryNarrowings}
+		if tl.Bound == query.BoundSteps {
+			tooLarge.Steps = tl.Steps
+			tooLarge.MaxSteps = tl.MaxSteps
+		} else {
+			tooLarge.Bytes = tl.Bytes
+			tooLarge.MaxBytes = tl.MaxBytes
+		}
 		return &TooLarge{
-			TooLarge: api.TooLarge{Matched: tl.Tuples, Bytes: tl.Bytes, MaxBytes: tl.MaxBytes, Narrow: queryNarrowings},
+			TooLarge: tooLarge,
 			Hint:     fmt.Sprintf("the derivation grew past the bound at %s; %s", tl.Relation, queryHint),
 		}
 	}

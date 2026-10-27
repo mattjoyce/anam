@@ -1,7 +1,9 @@
 package query
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mattjoyce/tarski"
@@ -19,11 +21,17 @@ import (
 // later card lifts the refusal.
 var refusedNames = map[string]bool{"prefix": true, "suffix": true, "contains": true}
 
-// Parse reads a program and refuses what Anam's language does not have: an aggregate,
-// and the names prefix, suffix and contains.
+// Parse reads a program and refuses what Anam's language does not have: the names
+// prefix, suffix and contains.
 func Parse(text string) (Program, error) {
 	p, err := tarski.Parse(text)
 	if err != nil {
+		// tarski refuses avg and mean as operations, not aggregates; Anam's
+		// language has no average either, so keep the refusal but mark it an
+		// invalid program, as the other refusals are.
+		if errors.Is(err, tarski.ErrSyntax) && strings.Contains(err.Error(), "is not an aggregate here") {
+			return Program{}, fmt.Errorf("%w: %w", ErrInvalid, err)
+		}
 		return Program{}, err
 	}
 	for _, r := range p.Rules {
@@ -31,11 +39,6 @@ func Parse(text string) (Program, error) {
 			return Program{}, refusedName(r.Head.Name, r.Line)
 		}
 		for _, l := range r.Body {
-			if l.Aggregate != nil {
-				return Program{}, fmt.Errorf("%w: line %d: an aggregate is not part of Anam's language; "+
-					"there is no count, sum, min or max, so count the answer's tuples instead (docs/QUERY.md)",
-					ErrSyntax, l.Aggregate.Line)
-			}
 			if l.Atom != nil && refusedNames[l.Atom.Name] {
 				return Program{}, refusedName(l.Atom.Name, l.Atom.Line)
 			}
@@ -80,14 +83,11 @@ func arities(schema Schema) map[string]int {
 // The programs are read as one: a later program defines what an earlier one declared,
 // which is how a query builds on the bundled rule set. It also refuses what Anam's
 // language does not have: a declared relation nothing defines, a constant instant that
-// is not a fact-time, an aggregate.
+// is not a fact-time.
 func Compile(schema Schema, defs Definitions, programs ...Program) (Plan, error) {
 	plan, err := tarski.Compile(schemaOf(schema, defs), programs...)
 	if err != nil {
 		return Plan{}, err
-	}
-	if plan.HasAggregates() {
-		return Plan{}, fmt.Errorf("%w: an aggregate is not part of Anam's language; count the answer's tuples instead", ErrInvalid)
 	}
 	if err := checkInstants(programs); err != nil {
 		return Plan{}, err
@@ -182,9 +182,21 @@ func bodyReads(programs []Program) map[string][]string {
 	for _, p := range programs {
 		for _, r := range p.Rules {
 			for _, l := range r.Body {
+				atoms := []*Atom{}
 				if l.Atom != nil {
-					if _, ok := builtinNamed(l.Atom.Name); !ok {
-						reads[r.Head.Name] = append(reads[r.Head.Name], l.Atom.Name)
+					atoms = append(atoms, l.Atom)
+				}
+				if l.Aggregate != nil {
+					for i := range l.Aggregate.Body {
+						if l.Aggregate.Body[i].Atom != nil {
+							aa := l.Aggregate.Body[i].Atom
+							atoms = append(atoms, aa)
+						}
+					}
+				}
+				for _, a := range atoms {
+					if _, ok := builtinNamed(a.Name); !ok {
+						reads[r.Head.Name] = append(reads[r.Head.Name], a.Name)
 					}
 				}
 			}

@@ -211,11 +211,40 @@ and refuses nothing, since the program was right to ask and the record is what i
 cover it. That check holds the rules to a second engine. The builtin is held by table tests and by a
 brute-force check against every pair of instants in a real ledger.
 
+## Aggregates
+
+An aggregate reduces the solutions of a body to one value, written as Soufflé writes it:
+`N = count : { body }`, `S = sum X : { body }`, `M = min X : { body }` and
+`M = max X : { body }`. A rule may hold several, and a variable bound outside the braces
+groups them, as `T` does here: the number of readings of each type.
+
+A sum is exact, since numbers are exact decimals. An empty count or sum is 0; an empty min or
+max derives no tuple. A sum or a min or max over values of more than one kind derives no tuple
+for that group. There is no `avg`: ask for the sum and the count and divide. An aggregate is
+evaluated in a stratum above the relations it reads, as negation is, so a program whose
+aggregate reads its own result is refused at the plan check.
+
+An aggregate derives few bytes however much it reads, so `max_read_bytes` does not bound it.
+Every evaluation is bounded at 5,000,000 steps of work as well, and a program over that bound
+is refused with 413, naming the steps, the bound and the relation.
+
+```datalog question=types-count relation=n
+n(T, N) :- entry(_, T, _, _, _, _, _), N = count : { entry(_, T, _, _, _, _, _) }.
+```
+
+```answer question=types-count
+health.blood-pressure 5
+health.intake 4
+health.medication.dose-changed 1
+health.medication.started 3
+health.medication.stopped 1
+health.sleep-episode 2
+record.edge 1
+```
+
 ## What the language does not do
 
-- No aggregates. There is no `count`, `sum`, `min` or `max`. A count is the number of tuples in the
-  answer, which the caller reads, and the receipt pins. Tarski has aggregates, and a program that
-  writes one is refused with that advice.
+- No `avg` or `mean`. Ask for `sum` and `count` and divide.
 - No `prefix`, `suffix` or `contains`. Tarski has them as string builtins and Anam does not offer
   them, so a program that uses one is refused, and the three names are reserved: a relation of your
   own may not be called `prefix`, `suffix` or `contains`.
@@ -353,18 +382,14 @@ them through `entry/7` by type or by a rule, and treat the text as opaque.
 
 ### A count over a month
 
-The language has no `count`, so ask for the rows and count them. These are the readings from June to
-August, three of them.
+These are the readings from June to August, counted: three of them.
 
 ```datalog question=summer-readings relation=summer
-summer(At) :- entry(_, "health.blood-pressure", At, _, _, _, _),
-              At >= "2026-06-01T00:00:00.000000000Z", At < "2026-09-01T00:00:00.000000000Z".
+summer(N) :- N = count : { entry(_, "health.blood-pressure", At, _, _, _, _), At >= "2026-06-01T00:00:00.000000000Z", At < "2026-09-01T00:00:00.000000000Z" }.
 ```
 
 ```answer question=summer-readings
-2026-06-01T07:00:00.000000000Z
-2026-07-20T07:00:00.000000000Z
-2026-08-20T07:00:00.000000000Z
+3
 ```
 
 The upper bound is exclusive so that months tile.
@@ -515,6 +540,16 @@ now(E) :- current(E, At).
 
 ```error refused=no-instants
 declared but has no rules or facts
+```
+
+An average, which is not an aggregate here.
+
+```datalog refused=avg relation=a
+a(X) :- X = avg S : { attr(_, "/systolic_blood_pressure/value", S) }.
+```
+
+```error refused=avg
+avg is not an aggregate here; derive count and sum
 ```
 
 ## The selection builder's programs

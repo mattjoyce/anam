@@ -131,8 +131,6 @@ func TestParse_RefusesWhatAnamsLanguageDoesNotHave(t *testing.T) {
 		{"suffix declared", `suffix/2.`, query.ErrInvalid, "suffix is not part of Anam's language"},
 		{"contains as a guard", `a(X) :- entry(X, _, _, _, _, _, _), contains("a", X).`, query.ErrInvalid, "contains is not part of Anam's language"},
 		{"a negated prefix", `a(X) :- entry(X, _, _, _, _, _, _), not prefix("a", X).`, query.ErrInvalid, "prefix is not part of Anam's language"},
-		{"count", `n(C) :- C = count : { entry(_, _, _, _, _, _, _) }.`, query.ErrSyntax, "count the answer's tuples"},
-		{"sum", `n(S) :- entry(_, _, _, _, _, _, V), S = sum V : { entry(_, _, _, _, _, _, V) }.`, query.ErrSyntax, "count the answer's tuples"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

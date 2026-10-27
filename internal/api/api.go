@@ -31,9 +31,12 @@ const CodeCursorInvalid = "cursor_invalid"
 // refused so carries NextCursor, the page after that facet, so a reader can open the
 // facet alone (GET /v1/receipts/{hash}/facets/{facet_id}) and walk on.
 type TooLarge struct {
-	Matched    int      `json:"matched"`
-	Bytes      int      `json:"bytes"`
-	MaxBytes   int      `json:"max_bytes"`
+	Matched  int `json:"matched"`
+	Bytes    int `json:"bytes"`
+	MaxBytes int `json:"max_bytes"`
+	// Steps and MaxSteps are set when a query was refused for its work, not its size.
+	Steps      int      `json:"steps,omitempty"`
+	MaxSteps   int      `json:"max_steps,omitempty"`
 	Narrow     []string `json:"narrow,omitempty"`
 	FacetID    string   `json:"facet_id,omitempty"`
 	NextCursor string   `json:"next_cursor,omitempty"`

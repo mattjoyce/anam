@@ -107,17 +107,23 @@ set v1 still verifies under a binary that bundles v2. The versions are in
 
 ## The relations
 
-Four relations are known before the program says anything.
+Six relations are known before the program says anything.
 
 | Relation | Arguments | Meaning |
 |---|---|---|
 | `entry/7` | `E, Type, FactTime, Series, Status, Source, DefinitionVersion` | One served facet's envelope. `Series` is `""` for a facet that stands alone. `DefinitionVersion` is the version the payload was admitted under. |
 | `attr/3` | `E, Pointer, Value` | Every scalar leaf of a served payload, by its JSON pointer (RFC 6901, so `/cuff/arm`, `/tags/0`). A null is no value, and a container is not a value either: ask for the leaves beneath it. Numbers are numbers, strings strings, `true` and `false` booleans. |
 | `closes/1` | `Type` | The types whose Definition closes a series. |
+| `month_of/2` | `At, Month` | The UTC month of each fact-time an entry carries, as `2006-01`, so a query can group by month. |
+| `day_of/2` | `At, Day` | The UTC day of each fact-time an entry carries, as `2006-01-02`. |
 | `instant/1` | `At` | A parameter. The program defines it, as facts or as a rule, and the bundled rules read it. |
 
 A base relation cannot be the head of a rule. `instant/1` is declared by the bundled set and defined
 by the query.
+
+`month_of` and `day_of` are in UTC, since a fact-time is one UTC instant. A reading at 08:00 on
+1 January in Sydney is at 21:00 on 31 December in UTC, so it falls in December. A local day or
+month waits on the zone work.
 
 ### Fact-times
 

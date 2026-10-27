@@ -112,6 +112,10 @@ var baseRelations = []Relation{
 		Doc: "every scalar leaf of a served payload by its JSON pointer; a null is no value and a container is not a value either, so ask for the leaves beneath it; a constant pointer must be one some Definition declares and not one that names a container"},
 	{Name: RelCloses, Arity: 1, Kind: "base", Args: []string{"Type"},
 		Doc: "the types whose Definition closes a series"},
+	{Name: RelMonthOf, Arity: 2, Kind: "base", Args: []string{"At", "Month"},
+		Doc: "the UTC month of each fact-time an entry carries, as 2006-01; a local month waits on the zone work"},
+	{Name: RelDayOf, Arity: 2, Kind: "base", Args: []string{"At", "Day"},
+		Doc: "the UTC day of each fact-time an entry carries, as 2006-01-02; a local day waits on the zone work"},
 	{Name: RelInstant, Arity: 1, Kind: "parameter", Args: []string{"At"},
 		Doc: "the fact-times a query asks about; the query defines it, as facts or a rule"},
 }

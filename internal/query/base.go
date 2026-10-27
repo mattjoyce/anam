@@ -24,6 +24,12 @@ const (
 	RelAttr = "attr"
 	// RelCloses is closes(Type): the types whose Definition closes a series.
 	RelCloses = "closes"
+	// RelMonthOf is month_of(At, Month): the UTC month of each fact-time a served entry
+	// carries, as "2006-01".
+	RelMonthOf = "month_of"
+	// RelDayOf is day_of(At, Day): the UTC day of each fact-time a served entry carries,
+	// as "2006-01-02".
+	RelDayOf = "day_of"
 )
 
 // ErrBase is returned when a served value cannot form the base relations.
@@ -42,7 +48,7 @@ type Schema struct {
 }
 
 // BaseSchema is the schema every Base has.
-var BaseSchema = Schema{Arities: map[string]int{RelEntry: 7, RelAttr: 3, RelCloses: 1}}
+var BaseSchema = Schema{Arities: map[string]int{RelEntry: 7, RelAttr: 3, RelCloses: 1, RelMonthOf: 2, RelDayOf: 2}}
 
 // Versions is each live facet's definition_version by id, from fold.Result.Live at
 // the watermark the value was served at. fold.Entry does not carry it: adding the
@@ -93,6 +99,7 @@ func ReadsAttr(roots []string, programs ...Program) bool {
 // and a rule that reads it derives nothing.
 func NewBase(served fold.Value, versions map[string]int, defs Definitions, withAttr bool) (Base, error) {
 	var facts []tarski.Fact
+	seenTimes := map[string]bool{}
 	for _, e := range served.Entries() {
 		v, ok := versions[e.FacetID]
 		if !ok {
@@ -102,6 +109,14 @@ func NewBase(served fold.Value, versions map[string]int, defs Definitions, withA
 			String(e.FacetID), String(string(e.Type)), String(e.FactTime),
 			String(e.Series), String(string(e.Status)), String(e.Source), tarski.Int(int64(v)),
 		}})
+		if !seenTimes[e.FactTime] {
+			seenTimes[e.FactTime] = true
+			if len(e.FactTime) < 10 {
+				return Base{}, fmt.Errorf("%w: facet %s: fact-time %q is not a lexeme", ErrBase, e.FacetID, e.FactTime)
+			}
+			facts = append(facts, tarski.Fact{Relation: RelMonthOf, Tuple: Tuple{String(e.FactTime), String(e.FactTime[:7])}})
+			facts = append(facts, tarski.Fact{Relation: RelDayOf, Tuple: Tuple{String(e.FactTime), String(e.FactTime[:10])}})
+		}
 		if !withAttr {
 			continue
 		}

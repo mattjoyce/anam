@@ -32,21 +32,19 @@ func WriteComparison(w io.Writer, before, after Report) error {
 	_, _ = fmt.Fprintln(tw, "SCENARIO\tBEFORE ms\tAFTER ms\tSPEED-UP\tROWS\t")
 	for _, s := range after.Scenarios {
 		b, ok := was[s.Name]
+		name := s.Name
+		if b.Steps > 0 || s.Steps > 0 {
+			name = s.Name + "  steps " + fmt.Sprint(b.Steps) + " -> " + fmt.Sprint(s.Steps)
+		} else if !ok && (s.Steps > 0) { // not possible for new missing, but handle generally
+			name = s.Name + "  steps 0 -> " + fmt.Sprint(s.Steps)
+		}
 		if !ok {
-			if s.Steps > 0 || b.Steps > 0 {
-				_, _ = fmt.Fprintf(tw, "%s\t-\t%.1f\t-\t%d\t\n", s.Name+"  steps "+fmt.Sprint(b.Steps)+" -> "+fmt.Sprint(s.Steps), s.MedianMS, s.Rows)
-				continue
-			}
-			_, _ = fmt.Fprintf(tw, "%s\t-\t%.1f\t-\t%d\t\n", s.Name, s.MedianMS, s.Rows)
+			_, _ = fmt.Fprintf(tw, "%s\t-\t%.1f\t-\t%d\t\n", name, s.MedianMS, s.Rows)
 			continue
 		}
 		rows := fmt.Sprint(s.Rows)
 		if b.Rows != s.Rows {
 			rows = fmt.Sprintf("%d (was %d)", s.Rows, b.Rows)
-		}
-		name := s.Name
-		if b.Steps > 0 || s.Steps > 0 {
-			name = s.Name + "  steps " + fmt.Sprint(b.Steps) + " -> " + fmt.Sprint(s.Steps)
 		}
 		_, _ = fmt.Fprintf(tw, "%s\t%.1f\t%.1f\t%.1fx\t%s\t\n", name, b.MedianMS, s.MedianMS, b.MedianMS/max(s.MedianMS, 0.001), rows)
 	}

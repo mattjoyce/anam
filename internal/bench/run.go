@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -102,7 +103,11 @@ func Run(ctx context.Context, o Options, progress func(string)) (Report, error) 
 		return Report{}, err
 	}
 	deps := mint.Deps{Ledger: l, Index: db, Values: db, Buckets: buckets, Clock: clock.Real{}, Budget: o.Budget}
-	for _, sc := range scenarios(l, db, plan, deps) {
+	scs, err := scenarios(ctx, l, db, plan, deps)
+	if err != nil {
+		return Report{}, err
+	}
+	for _, sc := range scs {
 		if !o.wants(sc.name) {
 			continue
 		}
@@ -222,15 +227,19 @@ func commonType(entries []fold.Entry) string {
 	return best
 }
 
-// scenario is one timed read; it returns how many rows it read.
-type scenario struct {
-	name  string
-	fn    func(ctx context.Context) (int, error)
-	cost  func() (int, int)
-	query bool
+type queryCost struct {
+	steps int
+	bytes int
 }
 
-func scenarios(l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) []scenario {
+// scenario is one timed read; it returns how many rows it read.
+type scenario struct {
+	name string
+	fn   func(ctx context.Context) (int, error)
+	cost *queryCost
+}
+
+func scenarios(ctx context.Context, l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) ([]scenario, error) {
 	src := read.Source{Ledger: l, Checkpoints: db, Values: deps.Values}
 	timeline := func(q api.TimelineQuery) func(context.Context) (int, error) {
 		return func(ctx context.Context) (int, error) {
@@ -244,23 +253,23 @@ func scenarios(l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) []scenario 
 		{"replay all events", func(ctx context.Context) (int, error) {
 			evs, err := l.Replay(ctx, 0, p.head)
 			return len(evs), err
-		}, nil, false},
+		}, nil},
 		{"full fold (fold.ReadAt)", func(ctx context.Context) (int, error) {
 			res, err := fold.ReadAt(ctx, l, p.head)
 			return res.Value.Len(), err
-		}, nil, false},
+		}, nil},
 		{"composed read (mint.ReadAt)", func(ctx context.Context) (int, error) {
 			c, ok, err := mint.ReadAt(ctx, l, db, deps.Values, p.head)
 			if !ok {
 				return 0, err // no mint run to start from: zero rows says so
 			}
 			return c.Value.Len(), err
-		}, nil, false},
-		{"timeline, whole", timeline(api.TimelineQuery{}), nil, false},
-		{"timeline, one month", timeline(api.TimelineQuery{From: p.monthFrom, To: p.monthTo}), nil, false},
-		{"timeline, one type", timeline(api.TimelineQuery{Type: p.commonType}), nil, false},
-		{"timeline, snapshot --at", timeline(api.TimelineQuery{At: p.at}), nil, false},
-		{"timeline, --as-of half W", timeline(api.TimelineQuery{AsOf: p.asOf}), nil, false},
+		}, nil},
+		{"timeline, whole", timeline(api.TimelineQuery{}), nil},
+		{"timeline, one month", timeline(api.TimelineQuery{From: p.monthFrom, To: p.monthTo}), nil},
+		{"timeline, one type", timeline(api.TimelineQuery{Type: p.commonType}), nil},
+		{"timeline, snapshot --at", timeline(api.TimelineQuery{At: p.at}), nil},
+		{"timeline, --as-of half W", timeline(api.TimelineQuery{AsOf: p.asOf}), nil},
 		{"timeline, whole, as JSON", func(ctx context.Context) (int, error) {
 			t, err := read.Timeline(ctx, src, api.TimelineQuery{Zone: "UTC"})
 			if err != nil {
@@ -268,7 +277,7 @@ func scenarios(l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) []scenario 
 			}
 			b, err := json.Marshal(t)
 			return len(b) >> 10, err
-		}, nil, false},
+		}, nil},
 		{"changes, last day", func(ctx context.Context) (int, error) {
 			head, err := l.Head(ctx)
 			if err != nil {
@@ -276,45 +285,45 @@ func scenarios(l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) []scenario 
 			}
 			c, err := read.Changes(ctx, db, int64(head), api.ChangesQuery{Since: p.since, Zone: "UTC"})
 			return len(c.Changes), err
-		}, nil, false},
+		}, nil},
 		{"checkpoint --dry-run", func(ctx context.Context) (int, error) {
 			m, err := mint.Report(ctx, deps, api.MintQuery{DryRun: true})
 			return m.MintedCount(), err
-		}, nil, false},
+		}, nil},
 		{"checkpoint --dry-run --full", func(ctx context.Context) (int, error) {
 			m, err := mint.Report(ctx, deps, api.MintQuery{DryRun: true, Full: true})
 			return m.MintedCount(), err
-		}, nil, false},
+		}, nil},
 	}
 
-	if defs, err := def.Bundled(); err == nil {
-		if served, err := fold.ReadAt(context.Background(), l, p.head); err == nil {
-			versions := query.Versions(served.Live)
-			ctx := context.Background()
-			addQuery := func(name, text, relation string) {
-				sc := scenario{name: name, fn: nil, query: true}
-				sc.fn = func(ctx context.Context) (int, error) {
-					tuples, _, _, err := query.Cost(ctx, served.Value, versions, defs, text, relation)
-					return tuples, err
-				}
-				sc.cost = func() (int, int) {
-					tuples, steps, bytes, err := query.Cost(ctx, served.Value, versions, defs, text, relation)
-					if err != nil {
-						return tuples, 0
-					}
-					_ = tuples
-					return steps, bytes
-				}
-				list = append(list, sc)
+	defs, err := def.Bundled()
+	if err != nil {
+		return nil, fmt.Errorf("bench: query scenarios: %w", err)
+	}
+	served, err := fold.ReadAt(ctx, l, p.head)
+	if err != nil {
+		return nil, fmt.Errorf("bench: query scenarios: %w", err)
+	}
+	versions := query.Versions(served.Live)
+	addQuery := func(name, text, relation string) {
+		qc := &queryCost{}
+		sc := scenario{name: name, fn: func(runCtx context.Context) (int, error) {
+			tuples, steps, bytes, err := query.Cost(runCtx, served.Value, versions, defs, text, relation)
+			if err != nil {
+				return 0, err
 			}
-			addQuery("query, every entry", "all(E, T) :- entry(E, T, _, _, _, _, _).", "all")
-			addQuery("query, every attr", "all(E, P, V) :- attr(E, P, V).", "all")
-			addQuery("query, current at every fact-time", "instant(At) :- entry(_, _, At, _, _, _, _).\nnow(E, At) :- instant(At), current(E, At).", "now")
-			addQuery("query, one type joined to its attrs", fmt.Sprintf("j(E, P, V) :- entry(E, T, _, _, _, _, _), T = %q, attr(E, P, V).", p.commonType), "j")
-		}
+			qc.steps = steps
+			qc.bytes = bytes
+			return tuples, nil
+		}, cost: qc}
+		list = append(list, sc)
 	}
+	addQuery("query, every entry", "all(E, T) :- entry(E, T, _, _, _, _, _).", "all")
+	addQuery("query, every attr", "all(E, P, V) :- attr(E, P, V).", "all")
+	addQuery("query, current at every fact-time", "instant(At) :- entry(_, _, At, _, _, _, _).\nnow(E, At) :- instant(At), current(E, At).", "now")
+	addQuery("query, one type joined to its attrs", fmt.Sprintf("j(E, P, V) :- entry(E, T, _, _, _, _, _), T = %q, attr(E, P, V).", p.commonType), "j")
 
-	return list
+	return list, nil
 }
 
 // measure runs sc o.Reps times, each under o.Timeout.
@@ -333,14 +342,14 @@ func measure(ctx context.Context, o Options, sc scenario) (Scenario, error) {
 		rows = n
 		times = append(times, float64(elapsed.Microseconds())/1000)
 	}
+	sort.Float64s(times)
 	res := Scenario{
 		Name: sc.name, Reps: o.Reps, MinMS: times[0], MedianMS: times[len(times)/2],
 		MaxMS: times[len(times)-1], Rows: rows,
 	}
 	if sc.cost != nil {
-		steps, bytes := sc.cost()
-		res.Steps = steps
-		res.Bytes = bytes
+		res.Steps = sc.cost.steps
+		res.Bytes = sc.cost.bytes
 	}
 	return res, nil
 }

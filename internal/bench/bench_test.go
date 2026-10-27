@@ -23,7 +23,7 @@ func TestGenerateThenRun(t *testing.T) {
 		t.Fatalf("Generate: %v", err)
 	}
 	rep, err := bench.Run(context.Background(), bench.Options{
-		Name: "tiny", Person: bench.Person, Paths: bench.PathsIn(dir), Reps: 1, Timeout: time.Minute,
+		Name: "tiny", Person: bench.Person, Paths: bench.PathsIn(dir), Reps: 3, Timeout: time.Minute,
 	}, nil)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -38,6 +38,9 @@ func TestGenerateThenRun(t *testing.T) {
 	for _, s := range rep.Scenarios {
 		rows[s.Name] = s.Rows
 		steps[s.Name] = s.Steps
+		if s.MinMS > s.MedianMS || s.MedianMS > s.MaxMS {
+			t.Errorf("%s: min %f > med %f > max %f", s.Name, s.MinMS, s.MedianMS, s.MaxMS)
+		}
 	}
 	if rows["timeline, whole"] != 123 || rows["timeline, one month"] == 0 || rows["changes, last day"] == 0 {
 		t.Errorf("scenario rows = %v", rows)

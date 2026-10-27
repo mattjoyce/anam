@@ -16,7 +16,7 @@ import (
 // Every field is rebuild-stable: it comes from the source row itself or from the
 // definition applied to it, so drop-the-table → init → re-ingest reproduces it
 // byte for byte. That is what makes the value's hash the equality oracle for
-// "Anam owns no fact" (MVP.md §7). Deliberately absent, because a rebuild
+// "Anam owns no fact". Deliberately absent, because a rebuild
 // reassigns them: the artifact version (a superseded chain collapses to v1) and
 // every seq/watermark. The one exception is Status — endorsed
 // is Anam-authored — and it is carried anyway because projections gate on it;

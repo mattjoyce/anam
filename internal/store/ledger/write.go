@@ -15,7 +15,7 @@ import (
 // Admit appends a facet artifact together with its anam-event, and Mark appends an
 // anam-event alone (a tombstone, an endorsement: status transitions that carry no
 // new artifact). They are two calls, not one with an optional artifact, so that
-// {no artifact, admitted} is unrepresentable (MVP.md §2).
+// {no artifact, admitted} is unrepresentable.
 //
 // Both take the watermark the caller read. The event's Seq must be readW+1: the
 // caller owns the seq because the caller stamps AnamTime, and the two must be

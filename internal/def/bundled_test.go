@@ -78,7 +78,7 @@ func TestBundled_MedTypesShareTheRegimenSeries(t *testing.T) {
 	}
 }
 
-// The life-event types (SELF-LOG.md §4): illness and travel are series, closed by
+// The life-event types: illness and travel are series, closed by
 // their own ending type; donation and gym stand alone. Medical ones are
 // Sensitive, travel and gym Confidential.
 func TestBundled_LifeEventTypes(t *testing.T) {

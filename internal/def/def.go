@@ -67,7 +67,7 @@ type TimeField struct {
 }
 
 // Series says which facets of this type are repeated statements about one thing
-// over time, so that a snapshot read can keep the latest per thing (SELF-LOG.md §2).
+// over time, so that a snapshot read can keep the latest per thing.
 // Identity is too fine for that (every change is its own row) and type is too coarse
 // (`health.medication.started` and `health.medication.stopped` are one regimen).
 //

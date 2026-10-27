@@ -75,7 +75,7 @@ so an archive tier is always an option.)
 **What's actually built first?**
 The thin end-to-end slice over two real sources — a health database and a blood-pressure export —
 proving capture → ingest → ledger → mint → fold → projection → receipt, with a CLI to read your
-timeline. See `MVP.md`.
+timeline.
 
 **What guides the engineering?**
 Matt's Go standards, and a standing design lens — **Hickey × Armstrong** (*structure × runtime*):

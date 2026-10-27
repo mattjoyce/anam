@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Is the health pipeline moving? (docs/pipeline.html, "How to tell a stage has stopped")
+# Is the health pipeline moving?
 #
 # Every stage can stop without an error: the process stays up and the gateway stays
 # healthy. The only reliable sign is that a stage's output stops moving. This reads

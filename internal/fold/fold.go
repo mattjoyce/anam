@@ -5,8 +5,7 @@
 //
 // Fold is pure: anam-events in, per-facet states out. Read composes it with the
 // ledger's two access paths to produce the canonical — the live-only value at a
-// watermark (§7) — whose content hash is the equality oracle for the rebuild test
-// (MVP.md §7).
+// watermark (§7) — whose content hash is the equality oracle for the rebuild test.
 package fold
 
 import (

@@ -35,8 +35,6 @@ func WriteComparison(w io.Writer, before, after Report) error {
 		name := s.Name
 		if b.Steps > 0 || s.Steps > 0 {
 			name = s.Name + "  steps " + fmt.Sprint(b.Steps) + " -> " + fmt.Sprint(s.Steps)
-		} else if !ok && (s.Steps > 0) { // not possible for new missing, but handle generally
-			name = s.Name + "  steps 0 -> " + fmt.Sprint(s.Steps)
 		}
 		if !ok {
 			_, _ = fmt.Fprintf(tw, "%s\t-\t%.1f\t-\t%d\t\n", name, s.MedianMS, s.Rows)

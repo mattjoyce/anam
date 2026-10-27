@@ -1,7 +1,7 @@
 # Anam — the inbox: from a dropped document to facts in the ledger
 
 How a document dropped on the share becomes facets, and what each step promises. The design is
-`SELF-LOG.md`; this is the runbook.
+in `ARCHITECTURE.md`; this is the runbook.
 
 ## The folders
 
@@ -73,7 +73,7 @@ rows a `trip`; those are the series keys, so `health.illness.ended` and `place.t
 `health.illness.started` and `place.trip.departed` opened, and `anam timeline --at` shows what was open on a day.
 
 The three regimen types, `health.medication.started`, `health.medication.dose-changed` and
-`health.medication.stopped`, are a **series** (`docs/SELF-LOG.md` §2): every row carries `drug` and
+`health.medication.stopped`, are a **series**: every row carries `drug` and
 `course`, and a restart after a stop is a new course number. `anam timeline --at <date>` answers "what
 was I on"; `anam serve meds` publishes the current regimen with a receipt.
 

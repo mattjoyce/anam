@@ -1,5 +1,5 @@
 // Package regimen holds the soft derivations over medication facts: computed when an
-// agent asks, used, and dropped (SELF-LOG.md §6).
+// agent asks, used, and dropped.
 //
 // A compliance estimate is a fact — Matt said it, on a date, about a period and a
 // course — and so is a regimen's start, change and stop. An expected-dose schedule is

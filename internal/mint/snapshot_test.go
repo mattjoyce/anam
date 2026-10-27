@@ -70,7 +70,7 @@ func (h *harness) med(t *testing.T, typ facet.Type, id, date, drug string, cours
 		fmt.Sprintf(`{"id": %q, "date": %q, "drug": %q, "course": %d}`, id, date, drug, course))
 }
 
-// The equality oracle for the snapshot (SELF-LOG.md §8): the snapshot at D from the
+// The equality oracle for the snapshot: the snapshot at D from the
 // hard checkpoints composed up to D's bucket equals the snapshot from a full fold,
 // and both equal the answer worked by hand over a seeded regimen — a start, a dose
 // change, a stop, and a restart as a new course.
@@ -148,7 +148,7 @@ func (h *harness) composePrefix(t *testing.T, upto string) fold.Value {
 	return composed
 }
 
-// The bitemporal case (SELF-LOG.md §8): the snapshot at D as Anam knew it before the
+// The bitemporal case: the snapshot at D as Anam knew it before the
 // stop row arrived. --as-of picks the canonical, --at picks the point within it.
 func TestSnapshot_AsOfBeforeTheStopArrived(t *testing.T) {
 	h := newHarness(t)

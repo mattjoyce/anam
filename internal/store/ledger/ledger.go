@@ -360,7 +360,7 @@ func (l *Ledger) ID(ctx context.Context) (string, error) {
 }
 
 // Drop removes every ledger table. It exists for the rebuild test (drop, init,
-// re-ingest, compare the fold; MVP.md §7) and nothing in the CLI calls it. It drops
+// re-ingest, compare the fold) and nothing in the CLI calls it. It drops
 // tables, never rows: append-only governs the rows, and no method here removes one.
 // The handle stays usable, and Init on it starts a new ledger with a new id.
 func (l *Ledger) Drop(ctx context.Context) error {

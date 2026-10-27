@@ -23,7 +23,7 @@ func TestGenerateThenRun(t *testing.T) {
 		t.Fatalf("Generate: %v", err)
 	}
 	rep, err := bench.Run(context.Background(), bench.Options{
-		Name: "tiny", Person: bench.Person, Paths: bench.PathsIn(dir), Reps: 1, Timeout: time.Minute,
+		Name: "tiny", Person: bench.Person, Paths: bench.PathsIn(dir), Reps: 3, Timeout: time.Minute,
 	}, nil)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -34,11 +34,27 @@ func TestGenerateThenRun(t *testing.T) {
 		t.Errorf("dataset = %+v", d)
 	}
 	rows := map[string]int{}
+	steps := map[string]int{}
 	for _, s := range rep.Scenarios {
 		rows[s.Name] = s.Rows
+		steps[s.Name] = s.Steps
+		if s.MinMS > s.MedianMS || s.MedianMS > s.MaxMS {
+			t.Errorf("%s: min %f > med %f > max %f", s.Name, s.MinMS, s.MedianMS, s.MaxMS)
+		}
 	}
 	if rows["timeline, whole"] != 123 || rows["timeline, one month"] == 0 || rows["changes, last day"] == 0 {
 		t.Errorf("scenario rows = %v", rows)
+	}
+	for _, name := range []string{"query, every entry", "query, every attr", "query, current at every fact-time", "query, one type joined to its attrs"} {
+		if steps[name] <= 0 {
+			t.Errorf("%s steps = %d", name, steps[name])
+		}
+	}
+	if rows["query, every entry"] != rep.Dataset.Live {
+		t.Errorf("query, every entry rows = %d live = %d", rows["query, every entry"], rep.Dataset.Live)
+	}
+	if steps["replay all events"] != 0 {
+		t.Errorf("non-query steps = %d", steps["replay all events"])
 	}
 	var out bytes.Buffer
 	if err := bench.WriteComparison(&out, rep, rep); err != nil || !strings.Contains(out.String(), "full fold") {

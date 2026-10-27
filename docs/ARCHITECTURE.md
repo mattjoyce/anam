@@ -263,7 +263,7 @@ The consequence is a division of labour worth stating plainly:
 Anam-time gains real resolution only when ingest becomes incremental — worth knowing before minting
 (§7), because checkpoints are cut against watermarks.
 
-> **The last-known-value read is the snapshot** (`fold.Snapshot`, built 2026-10-07; `SELF-LOG.md` §2).
+> **The last-known-value read is the snapshot** (`fold.Snapshot`, built 2026-10-07).
 > "The facts as of January" most often means *the latest statement before January about each thing*,
 > and "each thing" is neither an identity (every change is its own row) nor a type (`health.medication.started` and
 > `health.medication.stopped` are one regimen). It is the **series**: a Definition declares a series family, the key
@@ -624,7 +624,7 @@ the admission holds, and the receipts, served values, saved selections and their
 against its key (card 224). `anam migrate` carries the same rows into the store it creates. The next bump
 needs no folder: everything authored is already in the old file.
 
-The **derived** tier must stay *provably* derived. The rebuild test (`MVP.md` §7) drops it and re-derives
+The **derived** tier must stay *provably* derived. The rebuild test (`internal/fold/rebuild_test.go`) drops it and re-derives
 it from the ledger: if a facet payload, an anam-event or `W` ever acquired a second home there, the test
 would pass on data it never rebuilt, and "Anam owns no source fact" would stop being falsifiable.
 
@@ -1010,7 +1010,7 @@ Anam later as an ordinary source fact.
 
 ## 13. MVP boundary and deferred items
 
-**MVP** — see `MVP.md`: the vertical slice end-to-end over two real sources (`health-db`, `bp-csv`),
+**MVP** was the vertical slice end-to-end over two real sources (`health-db`, `bp-csv`),
 one or two projections plus a CLI timeline viewer, manual mint, and receipts. Read-only throughout. (The daemon has since
 learned to mint on its own, §7.)
 

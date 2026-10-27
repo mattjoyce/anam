@@ -10,7 +10,7 @@ tier: supporting
 tested_by:
   - internal/daemon/envelopes_test.go#TestPostEnvelopesMints
 alternatives:
-  - A size, time or rate trigger (deferred in MVP.md; refused in card 61 because a mint from the last run is 60 ms on the NAS, so no trigger earns its complexity)
+  - A size, time or rate trigger (deferred in the first slice; refused in card 61 because a mint from the last run is 60 ms on the NAS, so no trigger earns its complexity)
   - Mint inside the batch's transaction (refused; the mint is not part of what the batch admitted, and its failure must fail nothing)
   - Mint before answering a declared ingest, so a caller waiting on it read from checkpoints with no tail (built, and gone with `POST /v1/ingest` in card 119)
 affects:

@@ -281,13 +281,6 @@ To do something:
   importer follows.
 - [`docs/INBOX.md`](docs/INBOX.md): from a dropped document to facts in the ledger.
 
-Records of a slice, kept as written:
-
-- [`docs/MVP.md`](docs/MVP.md): the first slice, its scope and success criteria.
-- [`docs/SELF-LOG.md`](docs/SELF-LOG.md): the self-log, documents as references, and the snapshot read.
-- [`docs/pipeline.html`](docs/pipeline.html): the health pipeline that fed Anam before the importers,
-  retired.
-
 Every path above exists at the last merge; `scripts/check.sh` fails on a dead one.
 
 ## Status

@@ -2,7 +2,7 @@ package fold
 
 import "github.com/mattjoyce/anam/internal/facet"
 
-// The last-known-value read (ARCHITECTURE.md §4; SELF-LOG.md §2): what was true at a
+// The last-known-value read (ARCHITECTURE.md §4): what was true at a
 // fact-time for every series the value knows.
 //
 // Of the entries in hand, the latest in each series is kept, and a series whose

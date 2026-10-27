@@ -86,7 +86,7 @@ func (s source) ingest(t *testing.T, g *gate.Gate) map[string]gate.Result {
 	return results
 }
 
-// The executable specification of "Anam owns no fact" (MVP.md §7): live a history —
+// The executable specification of "Anam owns no fact": live a history —
 // admissions, a correction, a retraction — then drop the ledger, init, re-ingest what
 // the source now holds, and the canonical fold is byte-identical. The value's hash is
 // the equality oracle; the watermark is allowed to differ, because the ledger's

@@ -2,7 +2,7 @@
 // before it is served (ARCHITECTURE.md §10).
 //
 // Today it allows everything. Anam serves one person, so there is no second party to
-// withhold anything from, and the policy that would decide is deferred (MVP.md §4).
+// withhold anything from, and the policy that would decide is deferred.
 // The seam exists anyway, invoked on the real path rather than reserved in a comment,
 // because a gate added later has to be threaded through every caller that already
 // serves, and a gate that was always there does not.

@@ -197,8 +197,7 @@ record** and **log this**. The API supplies record operations and evidence; the 
 client supplies language understanding and dialogue. It must also support an operator keeping
 Anam current, inspecting failures, and recovering derived state.
 
-The governing contracts are [ARCHITECTURE.md](ARCHITECTURE.md),
-[SELF-LOG.md](SELF-LOG.md), and the current records workflow in [INBOX.md](INBOX.md).
+The governing contracts are [ARCHITECTURE.md](ARCHITECTURE.md) and the current records workflow in [INBOX.md](INBOX.md).
 Where this proposal needs a new core capability, it names it rather than silently assigning domain
 logic to a client. Whole-facet projection is retained; a reader may name the fields it wants of
 it (above, 2026-10-12). Before that date element masking was out of scope.

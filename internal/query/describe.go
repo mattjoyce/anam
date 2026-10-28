@@ -82,7 +82,11 @@ Every variable in a head, a negation or a comparison must appear in a positive b
 may not cycle. The answer is one relation, named with the query. current/2 and displaced/2 need
 instant/1 defined, as facts with the whole fact-time lexeme or as a rule over entry/7.
 Builtins are guards written like atoms, true or false of values already bound; see the builtins
-in this catalogue for each one's arguments. A day, where one is counted, is 24 hours of UTC.`
+in this catalogue for each one's arguments. A day, where one is counted, is 24 hours of UTC.
+Aggregates, as Soufflé writes them: N = count : { body }, S = sum X : { body }, and min and max
+the same way; a variable bound outside the braces groups them. A sum is exact; there is no avg,
+so divide the sum by the count. month_of/2 and day_of/2 give a fact-time's UTC month and day.
+Every evaluation is bounded at 5,000,000 steps.`
 
 // Held is every Definition body Anam holds, by type and version: what the daemon
 // serves at /v1/definitions and def.Manifests carries.

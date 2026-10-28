@@ -11,7 +11,7 @@ program against a new type. [ARCHITECTURE.md](ARCHITECTURE.md) §9 says why the 
 it sits among the reads. The worked questions below are run by `internal/query/docs_test.go` against
 a real ledger, so an answer on this page is an answer the evaluator gives.
 
-The evaluator is the [tarski](https://github.com/mattjoyce/tarski) module, version v0.3.0. It parses
+The evaluator is the [tarski](https://github.com/mattjoyce/tarski) module, version v0.3.2. It parses
 the program, validates it and runs it. Anam supplies the base relations over a served value, the
 checks on `instant/1` and on a constant `attr/3` pointer, `within/3`, and the bundled rules, and it
 refuses the few things tarski offers that Anam's language does not.
@@ -675,7 +675,7 @@ starts.
 |---|---|
 | The bundled rules | `internal/query/rules/anam.dl`; earlier texts a receipt may name, `internal/query/rules/history/` |
 | The builtins | `internal/query/builtin.go` |
-| The evaluator | the tarski module, `github.com/mattjoyce/tarski` v0.3.0 |
+| The evaluator | the tarski module, `github.com/mattjoyce/tarski` v0.3.2 |
 | The base relations, the checks, `ReadsAttr`, the refusals | `internal/query` |
 | The query read and its receipt | `internal/read/query.go`, `internal/serve/query.go` |
 | The routes | `internal/daemon/query.go`, described in `GET /v1/openapi.yaml` |

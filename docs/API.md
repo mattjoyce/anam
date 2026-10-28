@@ -69,7 +69,7 @@ would answer with, encoded as it sends them, whole facets only. `GET /v1/timelin
 /v1/receipts` and `GET /v1/receipts/{hash}` refused a larger answer with 413 (the two receipt routes
 page instead since paged reads, below) and a body a program can
 act on: `code: result_too_large`, and `too_large` with `matched` (how many entries), `bytes` (counted
-up to the bound), `max_bytes`, and `narrow`, the query parameters still unused (`type`, `from`, `to`,
+up to the bound), `max_bytes`, `steps` and `max_steps` when a query was refused for its work, and `narrow`, the query parameters still unused (`type`, `from`, `to`,
 `at`, `projection`). A refused publish files nothing. A receipt too large to show still verifies,
 and shows locally. A local read, the operator at their own files, has no bound. The fold still runs
 whole before the refusal: the bound protects the answer and the client's context, not the daemon's
@@ -120,8 +120,11 @@ the projection decides which whole facets the query may see), `text`, a Datalog 
 own small syntax built on the bundled rules (`current/2`, `displaced/2`, `in_force/2`) and the builtin `within/3`, `relation`, the derived
 relation to answer, `as_of` or `w` as a timeline read takes them, and `dry_run`. The base relations
 are `entry/7` (the envelope with the Definition version), `attr/3` (every scalar leaf of each served
-payload by its JSON pointer, read from the served copy) and `closes/1`; `instant/1` is the parameter
-the program defines, as facts with the whole fact-time lexeme or as a rule. The answer is one sorted
+payload by its JSON pointer, read from the served copy), `closes/1`, and `month_of/2` and `day_of/2` (the UTC month and day of each fact-time an entry carries); `instant/1` is the parameter
+the program defines, as facts with the whole fact-time lexeme or as a rule. A program may count,
+sum, and take a min or max (`N = count : { body }`); every evaluation is bounded at 5,000,000 steps
+as well as by `max_read_bytes`, and a program over it is refused with 413, `too_large` carrying
+`steps` and `max_steps` (card 213). The answer is one sorted
 relation that hashes, filed with a receipt whose `program` names the rule set, its hash, the text
 and the relation, and whose `template` is the projection; `/v1/receipts/{hash}/verify` re-runs it
 and must get the same hash. It picks the rule set by the receipt's `rule_set_hash`, so a receipt cut under an earlier version still verifies, and refuses (409, "the rule set has moved") when no rule set the binary holds has that hash. `GET /v1/query` is

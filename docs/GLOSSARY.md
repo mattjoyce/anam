@@ -262,7 +262,7 @@ reference in [QUERY.md](QUERY.md)): a Datalog program evaluated over the *Fold* 
 projection decides which whole facets the query may see; the query relates them: joins across types
 along *Fact-time*, selection by any payload field the served Definition's schema names, aggregates,
 windows. Base relations are the *Envelope* (`entry/7`, with `definition_version`) and the payload
-fields read from the served copy (`attr/3`, any schema pointer). Bundled rules such as `current/2` ship
+fields read from the served copy (`attr/3`, any schema pointer), with `closes/1`, and `month_of/2` and `day_of/2` for grouping by UTC month and day. Bundled rules such as `current/2` ship
 as a versioned rule set; `current/2` is held equal to *Snapshot read* by a standing test. The answer
 is a derived value that hashes, with a *Receipt* naming the projection, the rule-set hash and the
 query text, so `receipt verify` re-runs it. A query reads payload fields from the served copy and

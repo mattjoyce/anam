@@ -121,16 +121,15 @@ own small syntax built on the bundled rules (`current/2`, `displaced/2`, `in_for
 relation to answer, `as_of` or `w` as a timeline read takes them, and `dry_run`. The base relations
 are `entry/7` (the envelope with the Definition version), `attr/3` (every scalar leaf of each served
 payload by its JSON pointer, read from the served copy), `closes/1`, and `month_of/2` and `day_of/2` (the UTC month and day of each fact-time an entry carries); `instant/1` is the parameter
-the program defines, as facts with the whole fact-time lexeme or as a rule. The answer is one sorted
+the program defines, as facts with the whole fact-time lexeme or as a rule. A program may count,
+sum, and take a min or max (`N = count : { body }`); every evaluation is bounded at 5,000,000 steps
+as well as by `max_read_bytes`, and a program over it is refused with 413, `too_large` carrying
+`steps` and `max_steps` (card 213). The answer is one sorted
 relation that hashes, filed with a receipt whose `program` names the rule set, its hash, the text
 and the relation, and whose `template` is the projection; `/v1/receipts/{hash}/verify` re-runs it
 and must get the same hash. It picks the rule set by the receipt's `rule_set_hash`, so a receipt cut under an earlier version still verifies, and refuses (409, "the rule set has moved") when no rule set the binary holds has that hash. `GET /v1/query` is
 the introspection a program is written against: the relations, the fact-time lexeme, each type's
-pointers at each Definition version held, and the rules with their text.
-
-A program may count, sum, and take a min or max (`N = count : { body }`); every evaluation is bounded at 5,000,000 steps as well as by `max_read_bytes`, and a program over it is refused with 413, `too_large` carrying `steps` and `max_steps` (card 213).
-
-A program that cannot run
+pointers at each Definition version held, and the rules with their text. A program that cannot run
 is 400 with a message that says what to change; a derivation or an answer over `max_read_bytes` is
 413 with `instant`, `projection` and `program` as `narrow`. `warnings` names a pointer some versions
 of a type declare and others do not. `anam query run` and `anam query describe` are the CLI, local

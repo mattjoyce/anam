@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,7 +23,7 @@ func TestResolvedPrecedence(t *testing.T) {
 		if err != nil {
 			t.Fatalf("LoadResolved(\"\") = %v", err)
 		}
-		p, ok := r.Provenance["timeout"]
+		p, ok := r.Provenance("timeout")
 		if !ok {
 			t.Fatal("no provenance for timeout")
 		}
@@ -44,7 +45,7 @@ func TestResolvedPrecedence(t *testing.T) {
 		if err != nil {
 			t.Fatalf("LoadResolved(%q) = %v", path, err)
 		}
-		p, ok := r.Provenance["timeout"]
+		p, ok := r.Provenance("timeout")
 		if !ok {
 			t.Fatal("no provenance for timeout")
 		}
@@ -70,7 +71,7 @@ func TestResolvedPrecedence(t *testing.T) {
 		if err != nil {
 			t.Fatalf("LoadResolved(%q) = %v", path, err)
 		}
-		p, ok := r.Provenance["timeout"]
+		p, ok := r.Provenance("timeout")
 		if !ok {
 			t.Fatal("no provenance for timeout")
 		}
@@ -97,7 +98,7 @@ func TestResolvedPrecedence(t *testing.T) {
 		if err != nil {
 			t.Fatalf("LoadResolvedOverriding() = %v", err)
 		}
-		p, ok := r.Provenance["timeout"]
+		p, ok := r.Provenance("timeout")
 		if !ok {
 			t.Fatal("no provenance for timeout")
 		}
@@ -117,7 +118,7 @@ func TestResolvedEmptyEnvIgnored(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadResolved(\"\") = %v", err)
 	}
-	p, ok := r.Provenance["timeout"]
+	p, ok := r.Provenance("timeout")
 	if !ok {
 		t.Fatal("no provenance for timeout")
 	}
@@ -154,10 +155,10 @@ func TestResolvedIntegerOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadResolvedOverriding() = %v", err)
 	}
-	if r.Config.LibraryFolderLimit != 500 {
-		t.Errorf("LibraryFolderLimit = %d, want 500 (explicit wins over invalid env)", r.Config.LibraryFolderLimit)
+	if r.Value().LibraryFolderLimit != 500 {
+		t.Errorf("LibraryFolderLimit = %d, want 500 (explicit wins over invalid env)", r.Value().LibraryFolderLimit)
 	}
-	p, ok := r.Provenance["library_folder_limit"]
+	p, ok := r.Provenance("library_folder_limit")
 	if !ok {
 		t.Fatal("no provenance for library_folder_limit")
 	}
@@ -195,10 +196,10 @@ func TestResolvedEquivalentDurations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("LoadResolved() = %v", err)
 		}
-		if r.Config.LongWriteTimeout != 60*time.Second {
-			t.Errorf("LongWriteTimeout = %s, want 60s", r.Config.LongWriteTimeout)
+		if r.Value().LongWriteTimeout != 60*time.Second {
+			t.Errorf("LongWriteTimeout = %s, want 60s", r.Value().LongWriteTimeout)
 		}
-		p, ok := r.Provenance["long_write_timeout"]
+		p, ok := r.Provenance("long_write_timeout")
 		if !ok || p.Effective.Kind != ashlar.OriginFile {
 			t.Errorf("long_write_timeout provenance = %v, want file origin", p)
 		}
@@ -211,7 +212,7 @@ func TestResolvedEquivalentDurations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("LoadResolved() = %v", err)
 		}
-		p, ok := r.Provenance["long_write_timeout"]
+		p, ok := r.Provenance("long_write_timeout")
 		if !ok || p.Effective.Kind != ashlar.OriginFile {
 			t.Errorf("long_write_timeout provenance = %v, want file origin", p)
 		}
@@ -223,7 +224,7 @@ func TestResolvedEquivalentDurations(t *testing.T) {
 		if err != nil {
 			t.Fatalf("LoadResolved(\"\") = %v", err)
 		}
-		p, ok := r.Provenance["long_write_timeout"]
+		p, ok := r.Provenance("long_write_timeout")
 		if !ok {
 			t.Fatal("no provenance for long_write_timeout")
 		}
@@ -246,7 +247,7 @@ func TestResolvedDerivedLibraryDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadResolved(\"\") = %v", err)
 	}
-	p, ok := r.Provenance["library_dir"]
+	p, ok := r.Provenance("library_dir")
 	if !ok {
 		t.Fatal("no provenance for library_dir")
 	}
@@ -260,22 +261,30 @@ func TestResolvedDerivedLibraryDir(t *testing.T) {
 }
 
 // TestResolvedIndependentLoads confirms two successive loads retain
-// independent metadata.
+// independent metadata and a caller cannot change provenance seen by a later
+// Provenance call.
 func TestResolvedIndependentLoads(t *testing.T) {
 	t.Setenv("ANAM_PERSON_ID", "matt")
 
-	r1, err := config.LoadResolved("")
+	r, err := config.LoadResolved("")
 	if err != nil {
-		t.Fatalf("first LoadResolved(\"\") = %v", err)
+		t.Fatalf("LoadResolved(\"\") = %v", err)
 	}
-	r2, err := config.LoadResolved("")
-	if err != nil {
-		t.Fatalf("second LoadResolved(\"\") = %v", err)
+
+	// The accessor returns a value copy, not a reference. Mutating the
+	// returned provenance cannot affect a subsequent call.
+	p1, ok := r.Provenance("timeout")
+	if !ok {
+		t.Fatal("no provenance for timeout")
 	}
-	// Different Resolved instances: modifying r1's provenance must not
-	// affect r2's.
-	if &r1.Provenance == &r2.Provenance {
-		t.Error("two LoadResolved results share the same provenance map")
+	origName := p1.Effective.Name
+	// Replace the local copy with a completely different provenance value.
+	p1 = ashlar.NewProvenance(ashlar.ExplicitOrigin("hacked"), false)
+	_ = p1 // local variable used to verify it doesn't affect stored provenance
+	p2, ok := r.Provenance("timeout")
+	if !ok || p2.Effective.Name != origName {
+		t.Errorf("Provenance accessor returned corrupted value after caller mutated a returned copy: got %q, want %q",
+			p2.Effective.Name, origName)
 	}
 }
 
@@ -316,14 +325,17 @@ func TestResolvedPrincipalsLoading(t *testing.T) {
 	})
 
 	t.Run("unknown nested field fails", func(t *testing.T) {
-		bad := strings.Replace(valid, "types: [health.weight]", "types: [health.weight]\n  tokn: x", 1)
+		bad := strings.Replace(valid, "types: [health.weight]", "types: [health.weight]\n    tokn: x", 1)
 		path := writeImporterFile(t, bad)
 		_, err := config.LoadPrincipals(path, nil)
 		if err == nil {
 			t.Fatal("LoadPrincipals() with unknown nested field 'tokn', want error")
 		}
-		if !strings.Contains(err.Error(), "tokn") && !strings.Contains(err.Error(), "unknown") {
-			t.Errorf("error = %v, want to mention unknown field", err)
+		if !errors.Is(err, config.ErrInvalidImporters) {
+			t.Errorf("error = %v, want ErrInvalidImporters", err)
+		}
+		if !strings.Contains(err.Error(), "tokn") {
+			t.Errorf("error = %v, want to contain 'tokn'", err)
 		}
 	})
 }

@@ -24,9 +24,18 @@ import (
 // is absent, a key with no default and no value (person_id) is absent, and the retired
 // ingest_timeout is absent: its origin is reported under long_write_timeout instead.
 type Resolved struct {
-	Config     Config
-	Value      ashlar.Value
-	Provenance map[string]ashlar.Provenance
+	value      Config
+	provenance map[string]ashlar.Provenance
+}
+
+// Value returns the resolved Config value.
+func (r Resolved) Value() Config { return r.value }
+
+// Provenance returns the provenance for key, or false when the key is unknown,
+// absent, optional without a value, or the retired ingest_timeout field.
+func (r Resolved) Provenance(key string) (ashlar.Provenance, bool) {
+	v, ok := r.provenance[key]
+	return v, ok
 }
 
 // LoadResolved resolves configuration, reading the YAML file at path when it is
@@ -82,7 +91,7 @@ func LoadResolvedOverriding(path string, set map[string]string) (Resolved, error
 	if derivedLibraryDir {
 		provenance["library_dir"] = ashlar.NewProvenance(ashlar.DefaultOrigin("library_dir beside ledger_path"), false)
 	}
-	return Resolved{Config: c, Value: root, Provenance: provenance}, nil
+	return Resolved{value: c, provenance: provenance}, nil
 }
 
 // readConfigFragments reads path as one strict YAML document. A missing path, an empty

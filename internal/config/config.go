@@ -140,7 +140,7 @@ func Load(path string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return r.Config, nil
+	return r.Value(), nil
 }
 
 // LoadOverriding is Load with set taking precedence over everything else, keyed by
@@ -151,7 +151,7 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return r.Config, nil
+	return r.Value(), nil
 }
 
 // adoptLongWriteTimeout settles long_write_timeout from the two keys that may name

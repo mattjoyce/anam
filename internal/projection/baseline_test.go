@@ -19,7 +19,8 @@ var update = flag.Bool("update", false, "rewrite testdata/baseline.golden instea
 
 // baselineLines hashes every file in a catalog root (fsys at "." and "history/") and
 // returns the manifest lines, then appends the template lines from BundledFS(fsys).
-func baselineLines(fsys fs.FS) []string {
+func baselineLines(t *testing.T, fsys fs.FS) []string {
+	t.Helper()
 	var lines []string
 
 	// Manifest and history files from the catalog root. The golden file uses
@@ -31,7 +32,7 @@ func baselineLines(fsys fs.FS) []string {
 			if dir == "history" {
 				continue // missing history is empty
 			}
-			panic("baselineLines: read " + dir + ": " + err.Error())
+			t.Fatalf("read %s: %v", dir, err)
 		}
 		for _, e := range entries {
 			if !e.Type().IsRegular() {
@@ -50,7 +51,7 @@ func baselineLines(fsys fs.FS) []string {
 			}
 			raw, err := fs.ReadFile(fsys, readPath)
 			if err != nil {
-				panic("baselineLines: read " + readPath + ": " + err.Error())
+				t.Fatalf("read %s: %v", readPath, err)
 			}
 			sum := sha256.Sum256(raw)
 			lines = append(lines, path+" sha256:"+hex.EncodeToString(sum[:]))
@@ -60,7 +61,7 @@ func baselineLines(fsys fs.FS) []string {
 
 	reg, err := BundledFS(fsys)
 	if err != nil {
-		panic("baselineLines: BundledFS: " + err.Error())
+		t.Fatalf("BundledFS: %v", err)
 	}
 	for _, tmpl := range reg.Held() {
 		lines = append(lines, fmt.Sprintf("template %s v%d %s", tmpl.Name, tmpl.Version, tmpl.Hash))
@@ -72,7 +73,7 @@ func baselineLines(fsys fs.FS) []string {
 // The embedded catalog's bytes are pinned so moving it out of the binary cannot change a body, a hash, or the set version unnoticed. Regenerate with -update only when a manifest change is intended.
 func TestBaseline(t *testing.T) {
 	embedded := embedded()
-	lines := baselineLines(embedded)
+	lines := baselineLines(t, embedded)
 	compareAgainstGolden(t, lines)
 }
 
@@ -82,7 +83,7 @@ func TestBaseline(t *testing.T) {
 func TestBaseline_DiskCopy(t *testing.T) {
 	dir := t.TempDir()
 	copyFS := writeCatalogCopy(t, dir)
-	lines := baselineLines(copyFS)
+	lines := baselineLines(t, copyFS)
 	compareAgainstGolden(t, lines)
 }
 

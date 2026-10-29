@@ -19,9 +19,10 @@ var update = flag.Bool("update", false, "rewrite testdata/baseline.golden instea
 
 // baselineLines hashes every file in a catalog root (fsys at "." and "history/") and
 // returns the manifest lines; it also reads the sourcetime files from sourceTimeFS,
-// and appends the set_version computed from fsys. The returned lines are in the same
+// and appends the set_version SetVersionFS reports for fsys. The returned lines are in the same
 // format as the golden file.
-func baselineLines(fsys fs.FS) []string {
+func baselineLines(t *testing.T, fsys fs.FS) []string {
+	t.Helper()
 	var lines []string
 
 	// Manifest and history files from the catalog root. The golden file uses
@@ -34,7 +35,7 @@ func baselineLines(fsys fs.FS) []string {
 			if dir == "history" {
 				continue
 			}
-			panic("baselineLines: read " + dir + ": " + err.Error())
+			t.Fatalf("read %s: %v", dir, err)
 		}
 		for _, e := range entries {
 			if !e.Type().IsRegular() {
@@ -53,7 +54,7 @@ func baselineLines(fsys fs.FS) []string {
 			}
 			raw, err := fs.ReadFile(fsys, readPath)
 			if err != nil {
-				panic("baselineLines: read " + readPath + ": " + err.Error())
+				t.Fatalf("read %s: %v", readPath, err)
 			}
 			sum := sha256.Sum256(raw)
 			lines = append(lines, path+" sha256:"+hex.EncodeToString(sum[:]))
@@ -65,12 +66,12 @@ func baselineLines(fsys fs.FS) []string {
 	var stLines []string
 	entries, err := sourceTimeFS.ReadDir("sourcetime")
 	if err != nil {
-		panic("baselineLines: read sourcetime: " + err.Error())
+		t.Fatalf("read sourcetime: %v", err)
 	}
 	for _, e := range entries {
 		raw, err := sourceTimeFS.ReadFile("sourcetime/" + e.Name())
 		if err != nil {
-			panic("baselineLines: read sourcetime/" + e.Name() + ": " + err.Error())
+			t.Fatalf("read sourcetime/%s: %v", e.Name(), err)
 		}
 		sum := sha256.Sum256(raw)
 		stLines = append(stLines, "sourcetime/"+e.Name()+" sha256:"+hex.EncodeToString(sum[:]))
@@ -78,39 +79,18 @@ func baselineLines(fsys fs.FS) []string {
 	sort.Strings(stLines)
 	lines = append(lines, stLines...)
 
-	sv := setVersionOfFS(fsys)
+	sv, err := SetVersionFS(fsys)
+	if err != nil {
+		t.Fatalf("SetVersionFS: %v", err)
+	}
 	lines = append(lines, "set_version "+sv)
 	return lines
-}
-
-// setVersionOfFS computes the set version of a catalog root: content-address of every
-// *.json at the root.
-func setVersionOfFS(fsys fs.FS) string {
-	entries, err := fs.ReadDir(fsys, ".")
-	if err != nil {
-		return ""
-	}
-	files := make(map[string][]byte)
-	for _, e := range entries {
-		if !e.Type().IsRegular() {
-			continue
-		}
-		if !isJSON(e.Name()) {
-			continue
-		}
-		raw, err := fs.ReadFile(fsys, e.Name())
-		if err != nil {
-			continue
-		}
-		files[e.Name()] = raw
-	}
-	return setVersionOf(files)
 }
 
 // The embedded catalog's bytes are pinned so moving it out of the binary cannot change a body, a hash, or the set version unnoticed. Regenerate with -update only when a manifest change is intended.
 func TestBaseline(t *testing.T) {
 	embedded := embedded()
-	lines := baselineLines(embedded)
+	lines := baselineLines(t, embedded)
 	compareAgainstGolden(t, lines)
 }
 
@@ -120,7 +100,7 @@ func TestBaseline(t *testing.T) {
 func TestBaseline_DiskCopy(t *testing.T) {
 	dir := t.TempDir()
 	copyFS := writeCatalogCopy(t, dir)
-	lines := baselineLines(copyFS)
+	lines := baselineLines(t, copyFS)
 	compareAgainstGolden(t, lines)
 }
 

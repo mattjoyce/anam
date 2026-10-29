@@ -12,10 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-viper/mapstructure/v2"
-	"github.com/spf13/viper"
-
-	"github.com/mattjoyce/anam/internal/safepath"
 	"github.com/mattjoyce/anam/internal/span"
 )
 
@@ -27,16 +23,16 @@ type Config struct {
 	// PersonID names whose timeline this is. It is pinned inside the ledger file when
 	// the ledger is initialised, and a ledger pinned to another person is refused.
 	// Anam serves exactly one person (§4).
-	PersonID string `mapstructure:"person_id"`
+	PersonID string `yaml:"person_id"`
 
 	// LedgerPath is the SQLite file holding the ledger: facet artifacts and
 	// anam-events (§8). It is the record. Back it up; nothing rebuilds the anam-times
 	// in it.
-	LedgerPath string `mapstructure:"ledger_path"`
+	LedgerPath string `yaml:"ledger_path"`
 
 	// DBPath is the SQLite operational store, a separate file from the ledger. Its
 	// derived tables rebuild by replaying the ledger (§8).
-	DBPath string `mapstructure:"db_path"`
+	DBPath string `yaml:"db_path"`
 
 	// LibraryDir is the default library: the folder of primary source documents the
 	// facts were extracted from. Anam alone writes it, each document's bytes named by
@@ -44,72 +40,72 @@ type Config struct {
 	// defaults to `documents` beside the ledger, so the ledger's directory is the whole
 	// record and the backup unit. A folder that does not exist is an empty library,
 	// not an error.
-	LibraryDir string `mapstructure:"library_dir"`
+	LibraryDir string `yaml:"library_dir"`
 
 	// LibraryFolderLimit is how many files one library folder holds before a new
 	// document goes a level deeper, into a subfolder named by the start of its sha256
 	// (card 150). It places new files only: a stored file never moves, and a lookup
 	// finds a document by its name wherever it is, so changing it strands nothing.
-	LibraryFolderLimit int `mapstructure:"library_folder_limit"`
+	LibraryFolderLimit int `yaml:"library_folder_limit"`
 
 	// Zone is the reader's zone: the one a bare date on the command line is taken in
 	// and fact-times are shown in. It is not a fact-time rule — each Definition
 	// carries the zone its source's clock is read in — it is where the person reading
 	// is standing. The Workbench's pages read a bare date in it when a request names
 	// no zone of its own (card 236). Defaults to Local.
-	Zone string `mapstructure:"zone"`
+	Zone string `yaml:"zone"`
 
 	// Listen is the address `anam daemon` serves on. It defaults to loopback, and the
 	// daemon refuses anything else until its requests carry a token.
-	Listen string `mapstructure:"listen"`
+	Listen string `yaml:"listen"`
 
 	// TokenFile names the file holding the daemon's bearer token. With one, every
 	// request but /healthz must present it, and the daemon may listen beyond
 	// loopback. Empty means no token, and loopback only. The CLI presents the token in
 	// the same file when Server is set.
-	TokenFile string `mapstructure:"token_file"`
+	TokenFile string `yaml:"token_file"`
 
 	// ImportersFile names the YAML file of importers the daemon accepts envelopes
 	// from (docs/IMPORTERS.md): each one's source, token hash and facet types. Empty
 	// means none, and POST /v1/envelopes refuses everything. It is read at start.
-	ImportersFile string `mapstructure:"importers_file"`
+	ImportersFile string `yaml:"importers_file"`
 
 	// Server is the URL of a running daemon, such as http://192.168.20.4:8787. With it
 	// set, the CLI asks the daemon and opens no local file: the daemon owns the
 	// stores. Empty means the CLI opens the files itself, which is maintenance mode
 	// and wants the daemon stopped.
-	Server string `mapstructure:"server"`
+	Server string `yaml:"server"`
 
 	// BackupDir is where the daemon writes backups of the record (POST /v1/backups),
 	// one directory each. Empty means the daemon takes none. It should be on another
 	// disk from the record: a backup on the same disk shares its failure.
-	BackupDir string `mapstructure:"backup_dir"`
+	BackupDir string `yaml:"backup_dir"`
 
 	// BackupKeep is how many backups the daemon keeps; each new one removes the
 	// oldest beyond it.
-	BackupKeep int `mapstructure:"backup_keep"`
+	BackupKeep int `yaml:"backup_keep"`
 
 	// LongWriteTimeout bounds one long write inside the daemon: a replay of the
 	// ledger into the index, a backup, the mint at start. It also bounds each phase
 	// of anam migrate (card 200): the fold of the old ledger, the carry. Timeout
 	// still bounds each call within it. Until card 156 the key was ingest_timeout, from when it bounded
 	// an ingest run; Load still reads that name, and ANAM_INGEST_TIMEOUT, as an alias.
-	LongWriteTimeout time.Duration `mapstructure:"long_write_timeout"`
+	LongWriteTimeout time.Duration `yaml:"long_write_timeout"`
 
 	// IngestTimeout is the retired name of LongWriteTimeout. It is decoded so a
 	// config or environment that still sets it is honoured, with a warning, rather
 	// than refused as an unknown key. Load moves its value across and leaves this
 	// zero; nothing reads it after that.
-	IngestTimeout time.Duration `mapstructure:"ingest_timeout"`
+	IngestTimeout time.Duration `yaml:"ingest_timeout"`
 
 	// Timeout bounds every call to a store. Anam fails fast rather than hanging (§8).
-	Timeout time.Duration `mapstructure:"timeout"`
+	Timeout time.Duration `yaml:"timeout"`
 
 	// MaxReadBytes bounds what one read over the daemon answers with: the entries as
 	// the API encodes them, whole facets only, never cut to fit (card 88). A read over
 	// it is refused with the size, the count and which narrowings are left. Zero is no
 	// bound. A local read, the operator at their own files, is never bounded.
-	MaxReadBytes int `mapstructure:"max_read_bytes"`
+	MaxReadBytes int `yaml:"max_read_bytes"`
 
 	// DefaultProjection names the projection an agent should read first, which the
 	// daemon advertises on GET /v1/status and GET /v1/projections (card 180). It is
@@ -117,131 +113,45 @@ type Config struct {
 	// it always was. Empty is none. Load takes any name; only the daemon can see the
 	// registered projections, so it refuses to start on a name that is neither
 	// bundled nor registered.
-	DefaultProjection string `mapstructure:"default_projection"`
+	DefaultProjection string `yaml:"default_projection"`
 
 	// BucketWidth is how much fact-time one checkpoint bucket covers (§4, §7). It is a
 	// tuning knob and changes nothing a read returns — but it is stamped into every
 	// bucket id the operational index persists, so the ops store pins it and refuses a
 	// database that was built at a different width.
-	BucketWidth span.Width `mapstructure:"bucket_width"`
+	BucketWidth span.Width `yaml:"bucket_width"`
 
 	// CheckpointBudget is the most bytes one checkpoint's value may hold before the
 	// mint splits its bucket along the calendar: a year into months, a month into days
 	// (span.Layout). It prices a read: a bucket a late correction dirties is decoded
 	// and re-derived whole. Zero mints at the fixed bucket_width instead. The default,
 	// 1 MiB, re-derives in about 50 ms on the NAS (card 59's bench).
-	CheckpointBudget int `mapstructure:"checkpoint_budget"`
+	CheckpointBudget int `yaml:"checkpoint_budget"`
 
 	// Limits are the daemon's and the client's bounds and waits, each a key with a
 	// default (limits.go). Squashed, so their keys sit at the top level beside these.
-	Limits `mapstructure:",squash"`
+	Limits `yaml:",inline"`
 }
 
 // Load resolves configuration, reading the YAML file at path when it is non-empty.
 // Environment variables override the file, which overrides the defaults.
-func Load(path string) (Config, error) { return LoadOverriding(path, nil) }
+func Load(path string) (Config, error) {
+	r, err := LoadResolved(path)
+	if err != nil {
+		return Config{}, err
+	}
+	return r.Config, nil
+}
 
 // LoadOverriding is Load with set taking precedence over everything else, keyed by
 // config key. It is how a command-line flag such as --server wins over the
 // environment while still passing the same validation.
 func LoadOverriding(path string, set map[string]string) (Config, error) {
-	v := viper.New()
-	v.SetEnvPrefix("ANAM")
-	v.AutomaticEnv()
-
-	// person_id has no default on purpose. It is pinned into the ledger at init, so a
-	// defaulted value would name a person nobody chose for the life of the file.
-	// Validate rejects it when empty.
-	//
-	// BindEnv is still required: Unmarshal decodes from viper's known keys, and a key
-	// with neither a default nor a config entry is unknown, so ANAM_PERSON_ID would be
-	// ignored. BindEnv registers the key without giving it a value.
-	//
-	// It must come after SetEnvPrefix, which BindEnv reads at call time to build the
-	// ANAM_ name. AutomaticEnv happens to paper over the wrong order today; do not rely
-	// on that.
-	if err := v.BindEnv("person_id"); err != nil {
-		return Config{}, fmt.Errorf("bind person_id: %w", err)
-	}
-	// long_write_timeout and its retired name have no viper default either, so that
-	// IsSet says whether each was actually given; the default is applied after both
-	// are read (longWriteTimeout).
-	for _, key := range []string{"long_write_timeout", "ingest_timeout"} {
-		if err := v.BindEnv(key); err != nil {
-			return Config{}, fmt.Errorf("bind %s: %w", key, err)
-		}
-	}
-
-	v.SetDefault("ledger_path", DefaultLedgerPath())
-	v.SetDefault("db_path", DefaultDBPath())
-	v.SetDefault("timeout", DefaultTimeout)
-	v.SetDefault("bucket_width", string(span.Default))
-	v.SetDefault("library_dir", "")
-	v.SetDefault("zone", "Local")
-	v.SetDefault("listen", DefaultListen)
-	v.SetDefault("token_file", "")
-	v.SetDefault("importers_file", "")
-	v.SetDefault("server", "")
-	v.SetDefault("checkpoint_budget", DefaultCheckpointBudget)
-	v.SetDefault("backup_dir", "")
-	v.SetDefault("backup_keep", DefaultBackupKeep)
-	v.SetDefault("max_read_bytes", DefaultMaxReadBytes)
-	v.SetDefault("default_projection", DefaultDefaultProjection)
-	v.SetDefault("library_folder_limit", DefaultLibraryFolderLimit)
-	setLimitDefaults(v)
-
-	if path != "" {
-		v.SetConfigFile(path)
-		if err := v.ReadInConfig(); err != nil {
-			return Config{}, fmt.Errorf("read config %q: %w", path, err)
-		}
-	}
-
-	for k, val := range set {
-		v.Set(k, val)
-	}
-
-	// An unrecognised key is an error, not a shrug. Config is external input, and a
-	// silently-ignored `ledger_pth` would leave Anam writing to the default ledger
-	// while the operator believes it is writing to theirs. Fail fast at startup
-	// instead. The same rule retires the DynamoDB keys: a config that still names
-	// `ddb_endpoint` is refused, which is how its owner learns the ledger moved.
-	var c Config
-	errorOnUnknownKeys := func(dc *mapstructure.DecoderConfig) { dc.ErrorUnused = true }
-	if err := v.Unmarshal(&c, errorOnUnknownKeys); err != nil {
-		return Config{}, fmt.Errorf("decode config: %w: %v", ErrInvalid, err)
-	}
-	if err := c.adoptLongWriteTimeout(v.IsSet("long_write_timeout"), v.IsSet("ingest_timeout")); err != nil {
+	r, err := LoadResolvedOverriding(path, set)
+	if err != nil {
 		return Config{}, err
 	}
-
-	// Filesystem paths are expanded once, here, so every consumer sees the same
-	// absolute path the operator meant — a "~/" that reached SQLite verbatim would
-	// quietly create a directory literally named "~".
-	if c.LibraryDir == "" {
-		c.LibraryDir = filepath.Join(filepath.Dir(c.LedgerPath), "documents")
-	}
-	paths := map[string]*string{
-		"ledger_path": &c.LedgerPath, "db_path": &c.DBPath, "library_dir": &c.LibraryDir,
-	}
-	if c.TokenFile != "" {
-		paths["token_file"] = &c.TokenFile
-	}
-	if c.ImportersFile != "" {
-		paths["importers_file"] = &c.ImportersFile
-	}
-	for name, p := range paths {
-		expanded, err := safepath.Expand(*p)
-		if err != nil {
-			return Config{}, fmt.Errorf("%w: %s: %v", ErrInvalid, name, err)
-		}
-		*p = expanded
-	}
-
-	if err := c.Validate(); err != nil {
-		return Config{}, err
-	}
-	return c, nil
+	return r.Config, nil
 }
 
 // adoptLongWriteTimeout settles long_write_timeout from the two keys that may name

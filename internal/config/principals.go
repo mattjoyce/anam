@@ -4,9 +4,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 
-	"github.com/go-viper/mapstructure/v2"
-	"github.com/spf13/viper"
+	"github.com/mattjoyce/ashlar"
+	"github.com/mattjoyce/ashlar/yamlconfig"
 
 	"github.com/mattjoyce/anam/internal/facet"
 )
@@ -68,40 +70,40 @@ const WorkbenchSource = "workbench"
 type Principal struct {
 	// Name says who the principal is, in a refusal or a log line, without naming
 	// its token. Under importers it defaults to the source.
-	Name string `mapstructure:"name"`
+	Name string `yaml:"name"`
 
 	// Role is what the token opens. Under importers it is importer.
-	Role Role `mapstructure:"role"`
+	Role Role `yaml:"role"`
 
 	// Source is the source every envelope an importer submits is admitted as. A
 	// facet's identity includes its source, so an importer that takes over a
 	// built-in worker's facets submits as that worker's source. Only an importer
 	// has one.
-	Source string `mapstructure:"source"`
+	Source string `yaml:"source"`
 
 	// TokenSHA256 is the hex SHA-256 of the token, without a trailing newline:
 	// printf %s "$token" | sha256sum. The workbench principal has none, and a hash on
 	// it is an error.
-	TokenSHA256 string `mapstructure:"token_sha256"`
+	TokenSHA256 string `yaml:"token_sha256"`
 
 	// Types are the facet types an importer may submit and register Definitions
 	// for: the types it owns. Only an importer has them. For the workbench they are
 	// the allow-list of what may be entered by hand, and it owns none of them: it
 	// registers nothing, so another importer may own a type the workbench lists.
-	Types []facet.Type `mapstructure:"types"`
+	Types []facet.Type `yaml:"types"`
 
 	// AnyType lets an importer submit facets of every type the daemon knows, as
 	// its source, while owning none: it registers no Definition. It is for a
 	// source that is the person speaking (card 177), whose facets are kept apart
 	// from every other source's by the source in their identity. An importer has
 	// Types or AnyType, not both.
-	AnyType bool `mapstructure:"any_type"`
+	AnyType bool `yaml:"any_type"`
 
 	// Receipts is "always" for a principal whose every read is filed as a receipt
 	// naming it, or empty (or "off") for one whose reads are not. Only a reader and
 	// an importer have it: the operator reads the record unprojected, which a
 	// receipt cannot describe, and the workbench principal has no token to read with.
-	Receipts Receipts `mapstructure:"receipts"`
+	Receipts Receipts `yaml:"receipts"`
 }
 
 // Records reports whether every read p makes is filed as a receipt.
@@ -111,8 +113,8 @@ func (p Principal) Records() bool { return p.Receipts == ReceiptsAlways }
 // importers alone, and stays so a deployed file reads as it did; principals names
 // each role.
 type importersFile struct {
-	Principals []Principal `mapstructure:"principals"`
-	Importers  []Principal `mapstructure:"importers"`
+	Principals []Principal `yaml:"principals"`
+	Importers  []Principal `yaml:"importers"`
 }
 
 // LoadPrincipals reads and validates an importers file. Unknown keys are errors, as
@@ -124,16 +126,25 @@ type importersFile struct {
 // importer can register one, so any number of importers may submit it. A nil
 // bundled shares nothing.
 func LoadPrincipals(path string, bundled func(facet.Type) bool) ([]Principal, error) {
-	v := viper.New()
-	v.SetConfigFile(path)
-	v.SetConfigType("yaml")
-	if err := v.ReadInConfig(); err != nil {
+	raw, err := os.ReadFile(path) // #nosec G304 -- path is caller-provided (config path or --importers-file)
+	if err != nil {
 		return nil, fmt.Errorf("read importers %q: %w", path, err)
 	}
+	if isBlankYAML(raw) {
+		return nil, nil
+	}
+	doc, err := yamlconfig.Read(path, raw)
+	if err != nil {
+		return nil, fmt.Errorf("read importers %q: %w", path, err)
+	}
+	// Convert boolean values at "receipts" fields to strings so that
+	// receipts: true is decoded as "true" and caught by validation, matching
+	// Viper's weak decoding. Only the receipts field is a string that might
+	// hold a YAML boolean; any_type and other boolean fields stay as bool.
+	doc = adaptReceiptsBool(doc)
 	var f importersFile
-	errorOnUnknownKeys := func(dc *mapstructure.DecoderConfig) { dc.ErrorUnused = true }
-	if err := v.Unmarshal(&f, errorOnUnknownKeys); err != nil {
-		return nil, fmt.Errorf("decode importers %q: %w: %v", path, ErrInvalidImporters, err)
+	if err := yamlconfig.DecodeValueStrict(doc, &f); err != nil {
+		return nil, fmt.Errorf("decode importers %q: %w: %w", path, ErrInvalidImporters, err)
 	}
 	for i, p := range f.Importers {
 		if p.Role != "" && p.Role != RoleImporter {
@@ -268,4 +279,34 @@ func validWorkbench(p Principal) error {
 		}
 	}
 	return nil
+}
+
+// adaptReceiptsBool converts a KindBool at any object member named "receipts"
+// to KindString. The old Viper-based loader's weak decoding accepted a YAML
+// boolean where a string was expected for the receipts field; any_type and
+// other boolean fields still receive bool values.
+func adaptReceiptsBool(v ashlar.Value) ashlar.Value {
+	switch v.Kind() {
+	case ashlar.KindObject:
+		members := v.Members()
+		for i, m := range members {
+			if m.Key == "receipts" && m.Value.Kind() == ashlar.KindBool {
+				b, _ := m.Value.Bool()
+				s := strconv.FormatBool(b)
+				members[i].Value = ashlar.StringValue(s, m.Value.Provenance())
+			} else {
+				members[i].Value = adaptReceiptsBool(m.Value)
+			}
+		}
+		obj, _ := ashlar.ObjectValue(members, v.Provenance())
+		return obj
+	case ashlar.KindArray:
+		elems := v.Elements()
+		for i, el := range elems {
+			elems[i] = adaptReceiptsBool(el)
+		}
+		return ashlar.ArrayValue(elems, v.Provenance())
+	default:
+		return v
+	}
 }

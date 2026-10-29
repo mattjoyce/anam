@@ -3,8 +3,6 @@ package config
 import (
 	"fmt"
 	"time"
-
-	"github.com/spf13/viper"
 )
 
 // Limits are the daemon's and the client's opinionated defaults (card 151): each is a
@@ -18,82 +16,82 @@ import (
 type Limits struct {
 	// HTTPReadHeaderTimeout bounds reading a request's headers, against a client that
 	// opens a connection and sends nothing.
-	HTTPReadHeaderTimeout time.Duration `mapstructure:"http_read_header_timeout"`
+	HTTPReadHeaderTimeout time.Duration `yaml:"http_read_header_timeout"`
 
 	// HTTPReadTimeout bounds reading a whole request, its body included. The largest
 	// body is a posted document (max_document_bytes).
-	HTTPReadTimeout time.Duration `mapstructure:"http_read_timeout"`
+	HTTPReadTimeout time.Duration `yaml:"http_read_timeout"`
 
 	// HTTPWriteTimeout bounds writing one response. The inspector's whole-record page
 	// is the largest.
-	HTTPWriteTimeout time.Duration `mapstructure:"http_write_timeout"`
+	HTTPWriteTimeout time.Duration `yaml:"http_write_timeout"`
 
 	// HTTPIdleTimeout is how long a kept-alive connection waits for its next request.
-	HTTPIdleTimeout time.Duration `mapstructure:"http_idle_timeout"`
+	HTTPIdleTimeout time.Duration `yaml:"http_idle_timeout"`
 
 	// ShutdownGrace bounds how long shutdown waits for in-flight HTTP requests.
-	ShutdownGrace time.Duration `mapstructure:"shutdown_grace"`
+	ShutdownGrace time.Duration `yaml:"shutdown_grace"`
 
 	// AcceptWait is how long an operator's write (a mint, POST /v1/checkpoints) waits
 	// for the write queue before it is refused as busy.
-	AcceptWait time.Duration `mapstructure:"accept_wait"`
+	AcceptWait time.Duration `yaml:"accept_wait"`
 
 	// ImporterWait is how long an importer's write waits for the write queue before it
 	// is refused as busy: long enough to wait out a mint after the batch before it.
-	ImporterWait time.Duration `mapstructure:"importer_wait"`
+	ImporterWait time.Duration `yaml:"importer_wait"`
 
 	// RetryAfter is what a busy answer (503) asks its caller to wait. It is sent in
 	// whole seconds, so it must be at least one.
-	RetryAfter time.Duration `mapstructure:"retry_after"`
+	RetryAfter time.Duration `yaml:"retry_after"`
 
 	// MintQuiet is how long the mint worker waits for batches to stop arriving before
 	// it mints, so an importer's hundred batches get one mint and not a hundred.
-	MintQuiet time.Duration `mapstructure:"mint_quiet"`
+	MintQuiet time.Duration `yaml:"mint_quiet"`
 
 	// MaxPayloadBytes is the most one envelope's payload may hold. A batch's body is
 	// bounded by it, at the gate's batch size, with room for the envelopes around them.
-	MaxPayloadBytes int `mapstructure:"max_payload_bytes"`
+	MaxPayloadBytes int `yaml:"max_payload_bytes"`
 
 	// CommitRetries is how many times the gate retries a batch that lost the race for
 	// the watermark before it reports contention.
-	CommitRetries int `mapstructure:"commit_retries"`
+	CommitRetries int `yaml:"commit_retries"`
 
 	// MaxManifestBytes is the most a registered Definition may hold.
-	MaxManifestBytes int `mapstructure:"max_manifest_bytes"`
+	MaxManifestBytes int `yaml:"max_manifest_bytes"`
 
 	// MaxDocumentBytes is the most one posted document may hold.
-	MaxDocumentBytes int `mapstructure:"max_document_bytes"`
+	MaxDocumentBytes int `yaml:"max_document_bytes"`
 
 	// SnapshotTTL is how long an incomplete snapshot is kept before it is dropped.
-	SnapshotTTL time.Duration `mapstructure:"snapshot_ttl"`
+	SnapshotTTL time.Duration `yaml:"snapshot_ttl"`
 
 	// SnapshotKeep is how many complete snapshots are kept per source. The newest is
 	// the one retraction plans from.
-	SnapshotKeep int `mapstructure:"snapshot_keep"`
+	SnapshotKeep int `yaml:"snapshot_keep"`
 
 	// MaxSnapshotParts is the most parts one snapshot may declare.
-	MaxSnapshotParts int `mapstructure:"max_snapshot_parts"`
+	MaxSnapshotParts int `yaml:"max_snapshot_parts"`
 
 	// MaxAbsentIDs is the most absent facet ids a snapshot report lists; it still
 	// counts them all.
-	MaxAbsentIDs int `mapstructure:"max_absent_ids"`
+	MaxAbsentIDs int `yaml:"max_absent_ids"`
 
 	// MaxAbsentJudged is the most uncarried live facets one snapshot report judges,
 	// each a query for that facet's events. Past it the report is 413 and the CLI,
 	// local and unbounded, lists them (card 100).
-	MaxAbsentJudged int `mapstructure:"max_absent_judged"`
+	MaxAbsentJudged int `yaml:"max_absent_judged"`
 
 	// MaxResponseBytes is the most the CLI reads of one answer from a daemon.
-	MaxResponseBytes int `mapstructure:"max_response_bytes"`
+	MaxResponseBytes int `yaml:"max_response_bytes"`
 
 	// NetworkMargin is how much longer the CLI waits for an answer than it asks the
 	// daemon to take: the trip there and back.
-	NetworkMargin time.Duration `mapstructure:"network_margin"`
+	NetworkMargin time.Duration `yaml:"network_margin"`
 
 	// InspectCachedReads is how many historical (as-of) folds the inspector keeps,
 	// bounding its memory however many instants a person clicks through. Zero keeps
 	// none.
-	InspectCachedReads int `mapstructure:"inspect_cached_reads"`
+	InspectCachedReads int `yaml:"inspect_cached_reads"`
 }
 
 // The defaults Anam ships. Each says why it is the number it is.
@@ -151,28 +149,32 @@ const (
 	DefaultInspectCachedReads = 4
 )
 
-func setLimitDefaults(v *viper.Viper) {
-	v.SetDefault("http_read_header_timeout", DefaultHTTPReadHeaderTimeout)
-	v.SetDefault("http_read_timeout", DefaultHTTPReadTimeout)
-	v.SetDefault("http_write_timeout", DefaultHTTPWriteTimeout)
-	v.SetDefault("http_idle_timeout", DefaultHTTPIdleTimeout)
-	v.SetDefault("shutdown_grace", DefaultShutdownGrace)
-	v.SetDefault("accept_wait", DefaultAcceptWait)
-	v.SetDefault("importer_wait", DefaultImporterWait)
-	v.SetDefault("retry_after", DefaultRetryAfter)
-	v.SetDefault("mint_quiet", DefaultMintQuiet)
-	v.SetDefault("max_payload_bytes", DefaultMaxPayloadBytes)
-	v.SetDefault("commit_retries", DefaultCommitRetries)
-	v.SetDefault("max_manifest_bytes", DefaultMaxManifestBytes)
-	v.SetDefault("max_document_bytes", DefaultMaxDocumentBytes)
-	v.SetDefault("snapshot_ttl", DefaultSnapshotTTL)
-	v.SetDefault("snapshot_keep", DefaultSnapshotKeep)
-	v.SetDefault("max_snapshot_parts", DefaultMaxSnapshotParts)
-	v.SetDefault("max_absent_ids", DefaultMaxAbsentIDs)
-	v.SetDefault("max_absent_judged", DefaultMaxAbsentJudged)
-	v.SetDefault("max_response_bytes", DefaultMaxResponseBytes)
-	v.SetDefault("network_margin", DefaultNetworkMargin)
-	v.SetDefault("inspect_cached_reads", DefaultInspectCachedReads)
+// limitDefaults returns each limit key and its shipped default. resolved.go
+// collects them into the Ashlar default layer.
+func limitDefaults() []defaultSetting {
+	return []defaultSetting{
+		textDefault("http_read_header_timeout", DefaultHTTPReadHeaderTimeout.String()),
+		textDefault("http_read_timeout", DefaultHTTPReadTimeout.String()),
+		textDefault("http_write_timeout", DefaultHTTPWriteTimeout.String()),
+		textDefault("http_idle_timeout", DefaultHTTPIdleTimeout.String()),
+		textDefault("shutdown_grace", DefaultShutdownGrace.String()),
+		textDefault("accept_wait", DefaultAcceptWait.String()),
+		textDefault("importer_wait", DefaultImporterWait.String()),
+		textDefault("retry_after", DefaultRetryAfter.String()),
+		textDefault("mint_quiet", DefaultMintQuiet.String()),
+		numberDefault("max_payload_bytes", DefaultMaxPayloadBytes),
+		numberDefault("commit_retries", DefaultCommitRetries),
+		numberDefault("max_manifest_bytes", DefaultMaxManifestBytes),
+		numberDefault("max_document_bytes", DefaultMaxDocumentBytes),
+		textDefault("snapshot_ttl", DefaultSnapshotTTL.String()),
+		numberDefault("snapshot_keep", DefaultSnapshotKeep),
+		numberDefault("max_snapshot_parts", DefaultMaxSnapshotParts),
+		numberDefault("max_absent_ids", DefaultMaxAbsentIDs),
+		numberDefault("max_absent_judged", DefaultMaxAbsentJudged),
+		numberDefault("max_response_bytes", DefaultMaxResponseBytes),
+		textDefault("network_margin", DefaultNetworkMargin.String()),
+		numberDefault("inspect_cached_reads", DefaultInspectCachedReads),
+	}
 }
 
 // DefaultLimits is every limit at its default: what a test or a tool that loads no

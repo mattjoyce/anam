@@ -64,7 +64,11 @@ func TestMoveArtifacts_ARecordsFolderComesInAndItsReceiptsVerify(t *testing.T) {
 	f := newLedgerFixture(t)
 	f.admit(t, bpReadings)
 	// A bundled projection serves the readings, and each serve files a receipt.
-	for _, narrow := range [][]string{{}, {"--to", "2026-02-10"}} {
+	// The second serve narrows to before the day after Feb 10 in Sydney, written
+	// with its own offset so the bound is the same whatever zone the machine runs
+	// in (a bare "2026-02-10" is a day in the reader's zone, Local here): it serves
+	// two of the three readings, so its served value is a second, distinct one.
+	for _, narrow := range [][]string{{}, {"--to", "2026-02-11T00:00:00+11:00"}} {
 		if _, _, err := cli(t, f.cfgPath, append([]string{"timeline", "--projection", "bp", "--publish"}, narrow...)...); err != nil {
 			t.Fatalf("publish: %v", err)
 		}

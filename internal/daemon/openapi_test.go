@@ -183,7 +183,12 @@ func TestOpenAPI_IsServedWithoutAToken(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	errc := make(chan error, 1)
 	go func() { errc <- d.Serve(ctx, ln) }()
-	t.Cleanup(func() { cancel(); <-errc })
+	t.Cleanup(func() {
+		cancel()
+		if err := <-errc; err != nil {
+			t.Errorf("serve: %v", err)
+		}
+	})
 	resp, err := http.Get("http://" + ln.Addr().String() + "/v1/openapi.yaml")
 	if err != nil {
 		t.Fatal(err)

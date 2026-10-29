@@ -3,6 +3,8 @@ package def
 import (
 	"embed"
 	"fmt"
+	"io/fs"
+	"strings"
 )
 
 // The bundled manifests: small, static, versioned with the binary (AGENTS.md,
@@ -19,34 +21,72 @@ import (
 //go:embed manifests/*.json manifests/history/*.json
 var manifestFS embed.FS
 
+// embedded returns the embedded catalog root, laid out as a catalog FS: *.json at
+// the root, history/*.json for earlier versions.
+func embedded() fs.FS {
+	root, err := fs.Sub(manifestFS, "manifests")
+	if err != nil {
+		panic("def: cannot sub manifests: " + err.Error())
+	}
+	return root
+}
+
+// readJSONFiles lists regular *.json files from an fs.FS root. Any
+// non-regular-file entry (directories, .DS_Store, README.md) is ignored.
+func readJSONFiles(fsys fs.FS, dir string) ([]string, error) {
+	entries, err := fs.ReadDir(fsys, dir)
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, e := range entries {
+		if !e.Type().IsRegular() {
+			continue
+		}
+		if !isJSON(e.Name()) {
+			continue
+		}
+		names = append(names, e.Name())
+	}
+	return names, nil
+}
+
+// isJSON reports whether name ends in .json.
+func isJSON(name string) bool {
+	return strings.HasSuffix(name, ".json")
+}
+
+// BundledFS parses every current manifest in a catalog root: *.json at the root,
+// earlier versions under history/. Bundled is BundledFS over the embedded catalog.
+func BundledFS(fsys fs.FS) (*Registry, error) {
+	names, err := readJSONFiles(fsys, ".")
+	if err != nil {
+		return nil, fmt.Errorf("def: read bundled manifests: %w", err)
+	}
+
+	defs := make([]Definition, 0, len(names))
+	for _, name := range names {
+		raw, err := fs.ReadFile(fsys, name)
+		if err != nil {
+			return nil, fmt.Errorf("def: read bundled manifest %s: %w", name, err)
+		}
+		d, err := Parse(raw)
+		if err != nil {
+			return nil, fmt.Errorf("def: bundled manifest %s: %w", name, err)
+		}
+		if want := string(d.Type) + ".json"; name != want {
+			return nil, fmt.Errorf("%w: manifest %s declares type %q (file must be named %s)",
+				ErrBadManifest, name, d.Type, want)
+		}
+		defs = append(defs, d)
+	}
+	return NewRegistry(defs...)
+}
+
 // Bundled parses every embedded manifest into a Registry. It fails on any bad
 // manifest rather than loading the rest: a definition set is one contract, and a
 // binary that silently dropped a type would reject that type's every envelope with
 // a misleading "no definition".
 func Bundled() (*Registry, error) {
-	entries, err := manifestFS.ReadDir("manifests")
-	if err != nil {
-		return nil, fmt.Errorf("def: read bundled manifests: %w", err)
-	}
-
-	defs := make([]Definition, 0, len(entries))
-	for _, e := range entries {
-		if e.IsDir() {
-			continue // history: words, not contracts
-		}
-		raw, err := manifestFS.ReadFile("manifests/" + e.Name())
-		if err != nil {
-			return nil, fmt.Errorf("def: read bundled manifest %s: %w", e.Name(), err)
-		}
-		d, err := Parse(raw)
-		if err != nil {
-			return nil, fmt.Errorf("def: bundled manifest %s: %w", e.Name(), err)
-		}
-		if want := string(d.Type) + ".json"; e.Name() != want {
-			return nil, fmt.Errorf("%w: manifest %s declares type %q (file must be named %s)",
-				ErrBadManifest, e.Name(), d.Type, want)
-		}
-		defs = append(defs, d)
-	}
-	return NewRegistry(defs...)
+	return BundledFS(embedded())
 }

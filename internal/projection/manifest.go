@@ -6,7 +6,9 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"sort"
 	"strings"
 
@@ -251,29 +253,58 @@ func (r *Registry) add(t Template) error {
 	return nil
 }
 
-// Bundled parses every embedded manifest into a Registry. Like the definition set, it
-// fails on any bad manifest rather than loading the rest: a binary that silently
-// dropped a projection would answer "unknown projection" for a name that is in the
-// source tree, which is the confusing failure, not the safe one.
-func Bundled() (*Registry, error) {
-	entries, err := manifestFS.ReadDir("manifests")
+// embedded returns the embedded catalog root, laid out as a catalog FS: *.json at
+// the root, history/*.json for earlier versions.
+func embedded() fs.FS {
+	root, err := fs.Sub(manifestFS, "manifests")
+	if err != nil {
+		panic("projection: cannot sub manifests: " + err.Error())
+	}
+	return root
+}
+
+// readJSONFiles lists regular *.json files from an fs.FS root. Any
+// non-regular-file entry (directories, .DS_Store, README.md) is ignored.
+func readJSONFiles(fsys fs.FS, dir string) ([]string, error) {
+	entries, err := fs.ReadDir(fsys, dir)
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, e := range entries {
+		if !e.Type().IsRegular() {
+			continue
+		}
+		if !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		names = append(names, e.Name())
+	}
+	return names, nil
+}
+
+// BundledFS parses every template manifest in a catalog root: *.json at the root,
+// earlier versions under history/. Bundled is BundledFS over the embedded catalog.
+func BundledFS(fsys fs.FS) (*Registry, error) {
+	names, err := readJSONFiles(fsys, ".")
 	if err != nil {
 		return nil, fmt.Errorf("projection: read bundled manifests: %w", err)
 	}
 
-	r := &Registry{held: make(map[string][]Template, len(entries))}
-	current := make(map[string]int, len(entries)) // each bundled template's version, before history joins it
-	for _, e := range entries {
-		if e.IsDir() {
-			continue // history, read below against the current versions
-		}
-		t, err := bundledFile("manifests/" + e.Name())
+	r := &Registry{held: make(map[string][]Template, len(names))}
+	current := make(map[string]int, len(names)) // each bundled template's version, before history joins it
+	for _, name := range names {
+		raw, err := fs.ReadFile(fsys, name)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("projection: read bundled manifest %s: %w", name, err)
 		}
-		if want := t.Name + ".json"; e.Name() != want {
+		t, err := Parse(raw)
+		if err != nil {
+			return nil, fmt.Errorf("projection: bundled manifest %s: %w", name, err)
+		}
+		if want := t.Name + ".json"; name != want {
 			return nil, fmt.Errorf("%w: manifest %s declares name %q (file must be named %s)",
-				ErrBadTemplate, e.Name(), t.Name, want)
+				ErrBadTemplate, name, t.Name, want)
 		}
 		if _, dup := r.held[t.Name]; dup {
 			return nil, fmt.Errorf("%w: duplicate template %q", ErrBadTemplate, t.Name)
@@ -281,22 +312,30 @@ func Bundled() (*Registry, error) {
 		r.held[t.Name] = []Template{t}
 		current[t.Name] = t.Version
 	}
-	history, err := manifestFS.ReadDir("manifests/history")
+	hNames, err := readJSONFiles(fsys, "history")
 	if err != nil {
-		return nil, fmt.Errorf("projection: read bundled history: %w", err)
-	}
-	for _, e := range history {
-		t, err := bundledFile("manifests/history/" + e.Name())
-		if err != nil {
-			return nil, err
+		if errors.Is(err, fs.ErrNotExist) {
+			hNames = nil // missing history is an empty history
+		} else {
+			return nil, fmt.Errorf("projection: read bundled history: %w", err)
 		}
-		if want := fmt.Sprintf("%s.v%d.json", t.Name, t.Version); e.Name() != want {
+	}
+	for _, name := range hNames {
+		raw, err := fs.ReadFile(fsys, "history/"+name)
+		if err != nil {
+			return nil, fmt.Errorf("projection: read bundled manifest history/%s: %w", name, err)
+		}
+		t, err := Parse(raw)
+		if err != nil {
+			return nil, fmt.Errorf("projection: bundled manifest history/%s: %w", name, err)
+		}
+		if want := fmt.Sprintf("%s.v%d.json", t.Name, t.Version); name != want {
 			return nil, fmt.Errorf("%w: history %s declares %s v%d (file must be named %s)",
-				ErrBadTemplate, e.Name(), t.Name, t.Version, want)
+				ErrBadTemplate, name, t.Name, t.Version, want)
 		}
 		cur, ok := current[t.Name]
 		if !ok || t.Version >= cur {
-			return nil, fmt.Errorf("%w: history %s is not an earlier version of a bundled template", ErrBadTemplate, e.Name())
+			return nil, fmt.Errorf("%w: history %s is not an earlier version of a bundled template", ErrBadTemplate, name)
 		}
 		if err := r.add(t); err != nil {
 			return nil, err
@@ -305,17 +344,12 @@ func Bundled() (*Registry, error) {
 	return r, nil
 }
 
-// bundledFile parses one embedded manifest.
-func bundledFile(path string) (Template, error) {
-	raw, err := manifestFS.ReadFile(path)
-	if err != nil {
-		return Template{}, fmt.Errorf("projection: read bundled manifest %s: %w", path, err)
-	}
-	t, err := Parse(raw)
-	if err != nil {
-		return Template{}, fmt.Errorf("projection: bundled manifest %s: %w", path, err)
-	}
-	return t, nil
+// Bundled parses every embedded manifest into a Registry. Like the definition set, it
+// fails on any bad manifest rather than loading the rest: a binary that silently
+// dropped a projection would answer "unknown projection" for a name that is in the
+// source tree, which is the confusing failure, not the safe one.
+func Bundled() (*Registry, error) {
+	return BundledFS(embedded())
 }
 
 // Lookup returns the newest version of the template a consumer selected. An unknown

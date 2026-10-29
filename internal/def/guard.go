@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"sort"
 	"strings"
 
@@ -282,52 +283,48 @@ func (r *Registry) All() []Definition {
 	return out
 }
 
-// Manifests returns every bundled manifest's type, version and raw bytes, the current
-// ones and the history (card 111), which is what the operational store keeps: Guard
-// compares the newest stored against the current, and the inspector and the API read
-// an old facet against the version it was admitted under.
-func Manifests() ([]Stored, error) {
-	entries, err := manifestFS.ReadDir("manifests")
+// ManifestsFS returns every manifest's type, version and raw bytes from a catalog
+// root: *.json at the root for the current ones, and history/*.json for earlier
+// versions.
+func ManifestsFS(fsys fs.FS) ([]Stored, error) {
+	current, err := readJSONFiles(fsys, ".")
 	if err != nil {
 		return nil, fmt.Errorf("def: read bundled manifests: %w", err)
 	}
-	out := make([]Stored, 0, len(entries))
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		raw, err := manifestFS.ReadFile("manifests/" + e.Name())
+	out := make([]Stored, 0, len(current))
+	for _, name := range current {
+		raw, err := fs.ReadFile(fsys, name)
 		if err != nil {
-			return nil, fmt.Errorf("def: read bundled manifest %s: %w", e.Name(), err)
+			return nil, fmt.Errorf("def: read bundled manifest %s: %w", name, err)
 		}
 		d, err := Parse(raw)
 		if err != nil {
-			return nil, fmt.Errorf("def: bundled manifest %s: %w", e.Name(), err)
+			return nil, fmt.Errorf("def: bundled manifest %s: %w", name, err)
 		}
 		out = append(out, Stored{Type: d.Type, Version: d.Version, Body: raw})
 	}
-	history, err := History()
+	history, err := HistoryFS(fsys)
 	if err != nil {
 		return nil, err
 	}
 	return append(out, history...), nil
 }
 
-// History returns every earlier Definition version the binary carries under
-// manifests/history, as manifests/history/<type>.v<n>.json. A history body is the
-// words a facet was admitted under, kept verbatim: it is checked to be JSON whose
-// meta names the type and version its file name says, and not parsed as a contract,
-// since the lint of today need not have held then.
-func History() ([]Stored, error) {
-	entries, err := manifestFS.ReadDir("manifests/history")
+// HistoryFS returns every earlier Definition version from a catalog root's
+// history/ directory. A missing history/ is an empty history, not an error.
+func HistoryFS(fsys fs.FS) ([]Stored, error) {
+	names, err := readJSONFiles(fsys, "history")
 	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("def: read definition history: %w", err)
 	}
-	out := make([]Stored, 0, len(entries))
-	for _, e := range entries {
-		raw, err := manifestFS.ReadFile("manifests/history/" + e.Name())
+	out := make([]Stored, 0, len(names))
+	for _, name := range names {
+		raw, err := fs.ReadFile(fsys, "history/"+name)
 		if err != nil {
-			return nil, fmt.Errorf("def: read definition history %s: %w", e.Name(), err)
+			return nil, fmt.Errorf("def: read definition history %s: %w", name, err)
 		}
 		var m struct {
 			Meta struct {
@@ -336,13 +333,30 @@ func History() ([]Stored, error) {
 			} `json:"meta"`
 		}
 		if err := json.Unmarshal(raw, &m); err != nil {
-			return nil, fmt.Errorf("%w: history %s: %v", ErrBadManifest, e.Name(), err)
+			return nil, fmt.Errorf("%w: history %s: %v", ErrBadManifest, name, err)
 		}
-		if want := fmt.Sprintf("%s.v%d.json", m.Meta.Type, m.Meta.Version); e.Name() != want || m.Meta.Version < 1 {
+		if want := fmt.Sprintf("%s.v%d.json", m.Meta.Type, m.Meta.Version); name != want || m.Meta.Version < 1 {
 			return nil, fmt.Errorf("%w: history %s declares %s v%d (file must be named %s)",
-				ErrBadManifest, e.Name(), m.Meta.Type, m.Meta.Version, want)
+				ErrBadManifest, name, m.Meta.Type, m.Meta.Version, want)
 		}
 		out = append(out, Stored{Type: m.Meta.Type, Version: m.Meta.Version, Body: raw})
 	}
 	return out, nil
+}
+
+// Manifests returns every bundled manifest's type, version and raw bytes, the current
+// ones and the history (card 111), which is what the operational store keeps: Guard
+// compares the newest stored against the current, and the inspector and the API read
+// an old facet against the version it was admitted under.
+func Manifests() ([]Stored, error) {
+	return ManifestsFS(embedded())
+}
+
+// History returns every earlier Definition version the binary carries under
+// manifests/history, as manifests/history/<type>.v<n>.json. A history body is the
+// words a facet was admitted under, kept verbatim: it is checked to be JSON whose
+// meta names the type and version its file name says, and not parsed as a contract,
+// since the lint of today need not have held then.
+func History() ([]Stored, error) {
+	return HistoryFS(embedded())
 }

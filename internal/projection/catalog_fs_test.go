@@ -51,13 +51,13 @@ func copyCatalogToDisk(t *testing.T, srcDir string) fs.FS {
 	if err := os.WriteFile(filepath.Join(dir, ".DS_Store"), []byte("mock ds_store data"), 0o644); err != nil {
 		t.Fatalf("write .DS_Store: %v", err)
 	}
-	// Add a notes/ directory with a file (should be ignored).
+	// Add a notes/ directory with a JSON file (non-regular at root, ignored).
 	notesDir := filepath.Join(dir, "notes")
 	if err := os.MkdirAll(notesDir, 0o755); err != nil {
 		t.Fatalf("mkdir notes: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(notesDir, "readme.txt"), []byte("hello"), 0o644); err != nil {
-		t.Fatalf("write notes/readme.txt: %v", err)
+	if err := os.WriteFile(filepath.Join(notesDir, "extra.json"), []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("write notes/extra.json: %v", err)
 	}
 
 	return os.DirFS(dir)
@@ -110,33 +110,6 @@ func TestBundledFS_MatchEmbedded(t *testing.T) {
 		if got.Name != want.Name || got.Version != want.Version || got.Hash != want.Hash {
 			t.Errorf("template %d: embedded %s v%d %s, copy %s v%d %s",
 				i, want.Name, want.Version, want.Hash, got.Name, got.Version, got.Hash)
-		}
-	}
-}
-
-// TestBaseline_OverDiskCopy verifies that the golden test also passes when run over
-// an os.DirFS copy.
-func TestBaseline_OverDiskCopy(t *testing.T) {
-	srcDir := manifestsDir(t)
-
-	diskReg, err := projection.BundledFS(os.DirFS(srcDir))
-	if err != nil {
-		t.Fatalf("BundledFS(disk): %v", err)
-	}
-	embeddedReg, err := projection.Bundled()
-	if err != nil {
-		t.Fatalf("Bundled: %v", err)
-	}
-
-	diskAll := diskReg.Held()
-	embeddedAll := embeddedReg.Held()
-	if len(diskAll) != len(embeddedAll) {
-		t.Fatalf("BundledFS(disk) has %d templates, embedded has %d", len(diskAll), len(embeddedAll))
-	}
-	for i := range embeddedAll {
-		if diskAll[i].Name != embeddedAll[i].Name || diskAll[i].Version != embeddedAll[i].Version ||
-			diskAll[i].Hash != embeddedAll[i].Hash {
-			t.Errorf("template %d mismatch", i)
 		}
 	}
 }

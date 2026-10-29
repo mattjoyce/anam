@@ -49,8 +49,8 @@ func copyCatalogToDisk(t *testing.T, src fs.FS, dir string) fs.FS {
 	if err := os.MkdirAll(filepath.Join(dir, "notes"), 0o755); err != nil {
 		t.Fatalf("mkdir notes: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "notes", "readme.txt"), []byte("hello"), 0o644); err != nil {
-		t.Fatalf("write notes/readme.txt: %v", err)
+	if err := os.WriteFile(filepath.Join(dir, "notes", "extra.json"), []byte(`{}`), 0o644); err != nil {
+		t.Fatalf("write notes/extra.json: %v", err)
 	}
 	return os.DirFS(dir)
 }
@@ -147,91 +147,6 @@ func fsDir(t *testing.T, dir string) fs.FS {
 		t.Fatalf("embedded source %s: %v", src, err)
 	}
 	return os.DirFS(src)
-}
-
-// The existing TestBaseline must also pass over a disk copy.
-func TestBaseline_OverDiskCopy(t *testing.T) {
-	// The embedded catalog on disk is at internal/def/manifests/.
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	root := wd
-	for {
-		if _, err := os.Stat(filepath.Join(root, "go.mod")); err == nil {
-			break
-		}
-		parent := filepath.Dir(root)
-		if parent == root {
-			t.Fatal("cannot find go.mod")
-		}
-		root = parent
-	}
-	src := filepath.Join(root, "internal", "def", "manifests")
-
-	// The baseline test will produce the same lines when reading from this
-	// directory. We factor the line-building (shamelessly copied from baseline_test's
-	// approach) and run it for both the embedded root (via readJSONFiles /
-	// SetVersionFS / ManifestsFS etc) and the disk copy, comparing both to the golden.
-	//
-	// Since we're in the def_test package, we can't call the unexported helpers.
-	// Instead we compare that BundledFS, ManifestsFS, HistoryFS and SetVersionFS
-	// produce identical results over os.DirFS(src) and the embedded wrappers.
-	//
-	// This is already tested above; the golden is already verified by TestBaseline.
-	// The card asks we exercise the disk copy path explicitly. We do it by running
-	// the same function calls on os.DirFS(src) and comparing against the embedded
-	// results.
-	disk := os.DirFS(src)
-
-	diskReg, err := def.BundledFS(disk)
-	if err != nil {
-		t.Fatalf("BundledFS(disk): %v", err)
-	}
-	embeddedReg, err := def.Bundled()
-	if err != nil {
-		t.Fatalf("Bundled: %v", err)
-	}
-	embeddedAll := embeddedReg.All()
-	diskAll := diskReg.All()
-	if len(embeddedAll) != len(diskAll) {
-		t.Fatalf("Bundled: embedded has %d types, disk has %d", len(embeddedAll), len(diskAll))
-	}
-	for i := range embeddedAll {
-		if embeddedAll[i].Type != diskAll[i].Type || embeddedAll[i].Version != diskAll[i].Version {
-			t.Errorf("Bundled(disk) type %d: embedded %s v%d, disk %s v%d", i, embeddedAll[i].Type, embeddedAll[i].Version, diskAll[i].Type, diskAll[i].Version)
-		}
-	}
-
-	diskMan, err := def.ManifestsFS(disk)
-	if err != nil {
-		t.Fatalf("ManifestsFS(disk): %v", err)
-	}
-	embeddedMan, err := def.Manifests()
-	if err != nil {
-		t.Fatalf("Manifests: %v", err)
-	}
-	if len(embeddedMan) != len(diskMan) {
-		t.Fatalf("Manifests: embedded has %d, disk has %d", len(embeddedMan), len(diskMan))
-	}
-	for i := range embeddedMan {
-		if embeddedMan[i].Type != diskMan[i].Type || embeddedMan[i].Version != diskMan[i].Version ||
-			string(embeddedMan[i].Body) != string(diskMan[i].Body) {
-			t.Errorf("Manifests(disk) %d: mismatch", i)
-		}
-	}
-
-	diskSV, err := def.SetVersionFS(disk)
-	if err != nil {
-		t.Fatalf("SetVersionFS(disk): %v", err)
-	}
-	embeddedSV, err := def.SetVersion()
-	if err != nil {
-		t.Fatalf("SetVersion: %v", err)
-	}
-	if diskSV != embeddedSV {
-		t.Errorf("SetVersionFS(disk) = %s, want %s", diskSV, embeddedSV)
-	}
 }
 
 // TestFS_ChangedManifestMovesSetVersion verifies that changing a manifest's bytes

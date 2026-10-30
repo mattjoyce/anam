@@ -177,6 +177,10 @@ func publishTimeline(ctx context.Context, cfg config.Config, q api.TimelineQuery
 // checkpoint log and its values so the read can start from the last mint run. The
 // returned func closes them.
 func readSource(ctx context.Context, cfg config.Config) (read.Source, func(), error) {
+	cat, err := loadCatalog(ctx, cfg)
+	if err != nil {
+		return read.Source{}, nil, err
+	}
 	l, err := openLedgerReadOnly(ctx, cfg)
 	if err != nil {
 		return read.Source{}, nil, err
@@ -192,17 +196,17 @@ func readSource(ctx context.Context, cfg config.Config) (read.Source, func(), er
 		return read.Source{}, nil, err
 	}
 	closeAll := func() { _ = db.Close(); _ = l.Close() }
-	defs, err := registryOf(ctx, db)
+	defs, err := registryOf(ctx, cat, db)
 	if err != nil {
 		closeAll()
 		return read.Source{}, nil, err
 	}
-	templates, err := projectionsOf(ctx, db)
+	templates, err := projectionsOf(ctx, cat, db)
 	if err != nil {
 		closeAll()
 		return read.Source{}, nil, err
 	}
-	return read.Source{Ledger: l, Checkpoints: db, Values: db, Definitions: defs, Projections: templates}, closeAll, nil
+	return read.Source{Catalog: cat, Ledger: l, Checkpoints: db, Values: db, Definitions: defs, Projections: templates}, closeAll, nil
 }
 
 // timelineHeader describes the read: which watermark, which lens, and the hash that

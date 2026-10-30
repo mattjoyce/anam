@@ -39,7 +39,7 @@ func lanesServer(t *testing.T) *httptest.Server {
 	admit("scales:1", "health.weight", `{"kg": 80}`, time.Date(2026, 1, 10, 7, 0, 0, 0, time.UTC))
 	admit("scales:2", "health.weight", `{"kg": 79}`, time.Date(2026, 4, 10, 7, 0, 0, 0, time.UTC))
 	admit("gym:1", "activity.gym-visit", `{"at": "x"}`, time.Date(2026, 3, 1, 7, 0, 0, 0, time.UTC))
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 	return srv
 }

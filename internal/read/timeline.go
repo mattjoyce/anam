@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/consent"
 	"github.com/mattjoyce/anam/internal/def"
@@ -76,32 +77,45 @@ type Source struct {
 	Ledger      Ledger
 	Checkpoints mint.WindowLog
 	Values      mint.Store
+	// Catalog is the provisioned catalog the process loaded; the three fields below
+	// fall back to it when nil. A read without one fails rather than reach for the
+	// binary's own copy.
+	Catalog *catalog.Catalog
 	// Definitions are the ones the record's facets were admitted against: the
-	// bundled ones and those importers registered. Nil means the bundled ones alone.
+	// catalog's and those importers registered. Nil means the catalog's alone.
 	Definitions *def.Registry
-	// Projections are the templates a read may select: the bundled ones and those
-	// the operator registered (card 125). Nil means the bundled ones alone.
+	// Projections are the templates a read may select: the catalog's and those the
+	// operator registered (card 125). Nil means the catalog's alone.
 	Projections *projection.Registry
 	// Held is every Definition body by type and version, for a query's introspection
-	// and its per-version warnings (card 173). Nil means the bundled ones and their
+	// and its per-version warnings (card 173). Nil means the catalog's and their
 	// history alone.
 	Held query.Held
 }
 
-// projections is src's templates, or the bundled ones when it names none.
+// ErrNoCatalog is a read given neither its registries nor the catalog they come from.
+var ErrNoCatalog = errors.New("read: no catalog")
+
+// projections is src's templates, or its catalog's when it names none.
 func (src Source) projections() (*projection.Registry, error) {
 	if src.Projections != nil {
 		return src.Projections, nil
 	}
-	return projection.Bundled()
+	if src.Catalog == nil {
+		return nil, ErrNoCatalog
+	}
+	return src.Catalog.Projections(), nil
 }
 
-// definitions is src's Definitions, or the bundled ones when it names none.
+// definitions is src's Definitions, or its catalog's when it names none.
 func (src Source) definitions() (*def.Registry, error) {
 	if src.Definitions != nil {
 		return src.Definitions, nil
 	}
-	return def.Bundled()
+	if src.Catalog == nil {
+		return nil, ErrNoCatalog
+	}
+	return src.Catalog.Definitions(), nil
 }
 
 // Timeline performs the read q describes over src: at head or at an anam-time, through

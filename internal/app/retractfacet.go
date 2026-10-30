@@ -23,7 +23,11 @@ import (
 // runFacetRetraction plans, and with yes tombstones, one facet of source. The dry run
 // opens the ledger read-only, so it cannot write.
 func runFacetRetraction(cmd *cobra.Command, cfg config.Config, source, facetID string, yes bool) error {
-	file, err := importersFile(cfg)
+	cat, err := loadCatalog(cmd.Context(), cfg)
+	if err != nil {
+		return err
+	}
+	file, err := importersFile(cfg, cat.Definitions())
 	if err != nil {
 		return err
 	}
@@ -54,12 +58,8 @@ func runFacetRetraction(cmd *cobra.Command, cfg config.Config, source, facetID s
 			f.ArtifactVersion)
 		return err
 	}
-	reg, err := def.Bundled()
-	if err != nil {
-		return err
-	}
 	// A tombstone admits nothing, so the gate needs no scopes for it.
-	g := gate.New(l, reg, gate.StaticScopes{}, clock.Real{}, cfg.PersonID,
+	g := gate.New(l, cat.Definitions(), gate.StaticScopes{}, clock.Real{}, cfg.PersonID,
 		gate.Limits{MaxPayloadBytes: cfg.MaxPayloadBytes, MaxRetries: cfg.CommitRetries})
 	res, w, err := g.Retract(ctx, f.ID)
 	if err != nil {
@@ -84,13 +84,9 @@ func openFacetLedger(ctx context.Context, cfg config.Config, write bool) (*ledge
 
 // importersFile is the importers file's principals, none when no file is configured.
 // The policy reads it for the sources it declares.
-func importersFile(cfg config.Config) ([]config.Principal, error) {
+func importersFile(cfg config.Config, provisioned *def.Registry) ([]config.Principal, error) {
 	if cfg.ImportersFile == "" {
 		return nil, nil
 	}
-	reg, err := def.Bundled()
-	if err != nil {
-		return nil, err
-	}
-	return config.LoadPrincipals(cfg.ImportersFile, reg.Has)
+	return config.LoadPrincipals(cfg.ImportersFile, provisioned.Has)
 }

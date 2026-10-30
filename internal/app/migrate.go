@@ -93,9 +93,13 @@ func (o migrateOptions) run(cmd *cobra.Command, cfg config.Config) error {
 	if err != nil {
 		return err
 	}
+	cat, err := loadCatalog(cmd.Context(), cfg)
+	if err != nil {
+		return err
+	}
 	p := migrate.Params{
 		Person: cfg.PersonID, Timeout: cfg.Timeout, Phase: cfg.LongWriteTimeout,
-		Limits: renameLimits(cfg),
+		Limits: renameLimits(cfg), Catalog: cat,
 	}
 	out := cmd.OutOrStdout()
 

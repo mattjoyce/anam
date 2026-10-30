@@ -445,6 +445,10 @@ func ledgerOrUnnamed(id string) string {
 // checkpoint log so a serve or a verify starts from the last mint run rather than
 // the ledger's first event. The returned func closes them.
 func serveDeps(ctx context.Context, cfg config.Config) (serve.Deps, func(), error) {
+	cat, err := loadCatalog(ctx, cfg)
+	if err != nil {
+		return serve.Deps{}, nil, err
+	}
 	l, err := openLedgerReadOnly(ctx, cfg)
 	if err != nil {
 		return serve.Deps{}, nil, err
@@ -460,17 +464,17 @@ func serveDeps(ctx context.Context, cfg config.Config) (serve.Deps, func(), erro
 		return serve.Deps{}, nil, err
 	}
 	closeAll := func() { _ = db.Close(); _ = l.Close() }
-	defs, err := registryOf(ctx, db)
+	defs, err := registryOf(ctx, cat, db)
 	if err != nil {
 		closeAll()
 		return serve.Deps{}, nil, err
 	}
-	templates, err := projectionsOf(ctx, db)
+	templates, err := projectionsOf(ctx, cat, db)
 	if err != nil {
 		closeAll()
 		return serve.Deps{}, nil, err
 	}
-	deps, err := read.ServeDeps(l, db, db, defs, templates)
+	deps, err := read.ServeDeps(cat, l, db, db, defs, templates)
 	if err != nil {
 		closeAll()
 		return serve.Deps{}, nil, err

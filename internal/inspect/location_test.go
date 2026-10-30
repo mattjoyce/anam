@@ -59,7 +59,7 @@ func locationServer(t *testing.T) (*httptest.Server, string) {
 	admit("owntracks:loc:tokay:2026-10-11T22:00:00Z", "place.track", hourPrev, time.Date(2026, 10, 11, 22, 0, 0, 0, time.UTC))
 	admit("owntracks:loc:other:2026-10-12T02:00:00Z", "place.track", hourOther, time.Date(2026, 10, 12, 2, 0, 0, 0, time.UTC))
 
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Definitions: trackDefinitions(t)}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Definitions: trackDefinitions(t)}))
 	t.Cleanup(srv.Close)
 	return srv, a.ID
 }

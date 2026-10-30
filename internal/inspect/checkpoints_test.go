@@ -61,7 +61,7 @@ func newCheckpointFixture(t *testing.T) *checkpointFixture {
 		t.Fatalf("ops.Open: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Checkpoints: db}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Checkpoints: db}))
 	t.Cleanup(srv.Close)
 	return &checkpointFixture{
 		l: l, srv: srv,

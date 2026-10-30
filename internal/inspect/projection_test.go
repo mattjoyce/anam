@@ -26,7 +26,7 @@ func projectionServer(t *testing.T) *httptest.Server {
 	}
 	t.Cleanup(func() { _ = l.Close() })
 
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 	return srv
 }

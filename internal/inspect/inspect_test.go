@@ -59,7 +59,7 @@ func seededServer(t *testing.T) (*httptest.Server, string, string) {
 	}
 
 	// A generous request timeout: latency is not under test here.
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 	return srv, bp.ID, hr.ID
 }
@@ -129,7 +129,7 @@ func TestServe_ShutsDownOnContextCancel(t *testing.T) {
 	t.Cleanup(func() { _ = l.Close() })
 
 	go func() {
-		done <- inspect.Serve(ctx, "127.0.0.1:0", inspect.Deps{Ledger: l, Timeout: time.Second, Buckets: defaultBuckets},
+		done <- inspect.Serve(ctx, "127.0.0.1:0", inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: time.Second, Buckets: defaultBuckets},
 			config.DefaultHTTPReadHeaderTimeout, config.DefaultShutdownGrace)
 	}()
 	time.Sleep(200 * time.Millisecond) // let ListenAndServe bind

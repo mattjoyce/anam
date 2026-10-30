@@ -34,11 +34,7 @@ type projections struct {
 // receipts against the wrong one. A default_projection that names neither a bundled
 // nor a registered template also stops it: only here are the registered ones visible,
 // and an operator who mistyped the name should learn at start, not from an agent.
-func loadProjections(ctx context.Context, db *ops.DB, defaultName string) (*projections, error) {
-	bundled, err := projection.Bundled()
-	if err != nil {
-		return nil, err
-	}
+func loadProjections(ctx context.Context, db *ops.DB, bundled *projection.Registry, defaultName string) (*projections, error) {
 	rows, err := db.RegisteredProjections(ctx)
 	if err != nil {
 		return nil, err

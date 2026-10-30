@@ -133,11 +133,7 @@ func (d *Daemon) heldDefinitions(ctx context.Context) (map[facet.Type]map[int][]
 	for _, r := range stored {
 		put(facet.Type(r.Type), r.Version, []byte(r.Body), api.OriginBundled)
 	}
-	current, err := def.Manifests()
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, m := range current {
+	for _, m := range d.catalog.Manifests() {
 		put(m.Type, m.Version, m.Body, api.OriginBundled)
 	}
 	return bodies, origin, nil

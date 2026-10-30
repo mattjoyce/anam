@@ -36,7 +36,7 @@ type roster struct {
 // the map: it has no token, so no request authenticates as it. The daemon submits as it
 // for the operator's entries (POST /entry), which is how an importer's token never
 // reaches a browser.
-func loadPrincipals(path string, operator []byte) (roster, error) {
+func loadPrincipals(path string, operator []byte, provisioned *def.Registry) (roster, error) {
 	out := roster{byToken: principals{}}
 	if operator != nil {
 		out.byToken[hashOf(operator)] = config.Principal{Name: config.OperatorName, Role: config.RoleOperator}
@@ -44,11 +44,7 @@ func loadPrincipals(path string, operator []byte) (roster, error) {
 	if path == "" {
 		return out, nil
 	}
-	reg, err := def.Bundled()
-	if err != nil {
-		return roster{}, fmt.Errorf("daemon: %w", err)
-	}
-	list, err := config.LoadPrincipals(path, reg.Has)
+	list, err := config.LoadPrincipals(path, provisioned.Has)
 	if err != nil {
 		return roster{}, fmt.Errorf("daemon: %w", err)
 	}

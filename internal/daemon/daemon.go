@@ -24,10 +24,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
-	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/selection"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -91,6 +91,9 @@ type Daemon struct {
 	// readOps is a read-only handle on the operational store, so the routes that only
 	// read it cannot write it.
 	readOps *ops.DB
+	// catalog is the provisioned catalog loaded at Open: what the guard persisted,
+	// what the registries are built on, and the set version every receipt names.
+	catalog *catalog.Catalog
 	// selections are the saved selections (card 206), filed in the operational store.
 	selections *selection.Store
 	// index is whether the operational index is wrong rather than merely behind.
@@ -146,14 +149,14 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 	if err != nil {
 		return nil, err
 	}
-	whom, err := loadPrincipals(cfg.ImportersFile, tok)
+	// Loaded and validated once, before any store is opened: the principals, the
+	// guard, the registries and every receipt read this one catalog.
+	cat, err := catalog.Load(ctx, "", "")
 	if err != nil {
 		return nil, err
 	}
-
-	// Parsed once, before any deadline: it is the binary's own, and the guard and the
-	// registry both read it.
-	bundled, err := def.Bundled()
+	bundled := cat.Definitions()
+	whom, err := loadPrincipals(cfg.ImportersFile, tok, bundled)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +189,7 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 	}
 	ctx, cancel = context.WithTimeout(parent, cfg.Timeout)
 	defer cancel()
-	if err := guardBundled(ctx, db, bundled); err != nil {
+	if err := guardBundled(ctx, db, cat); err != nil {
 		closeAll()
 		return nil, err
 	}
@@ -195,7 +198,7 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		closeAll()
 		return nil, err
 	}
-	projs, err := loadProjections(ctx, db, cfg.DefaultProjection)
+	projs, err := loadProjections(ctx, db, cat.Projections(), cfg.DefaultProjection)
 	if err != nil {
 		closeAll()
 		return nil, err
@@ -218,6 +221,7 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		principals:  whom.byToken,
 		workbench:   whom.workbench,
 		file:        whom.file,
+		catalog:     cat,
 		defs:        defs,
 		projections: projs,
 		mints:       make(chan struct{}, 1),

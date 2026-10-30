@@ -53,7 +53,7 @@ func (d *Daemon) inspector() http.Handler {
 	zone, _ := d.cfg.ZoneName()
 	index := guardedIndex{ops: d.readOps, state: &d.index}
 	return inspect.Handler(inspect.Deps{
-		Ledger: d.read, Timeout: d.cfg.Timeout, Buckets: buckets, Library: d.cfg.LibraryDir,
+		Ledger: d.read, Timeout: d.cfg.Timeout, Buckets: buckets, Library: d.cfg.LibraryDir, Catalog: d.catalog,
 		Definitions: d.defs.current.Load, Held: d.heldDefinitions, Checkpoints: index, Edges: index,
 		Projections: d.projections.current.Load, CachedReads: d.cfg.InspectCachedReads,
 		Workbench: d.workbenchFor(), MaxReadBytes: d.cfg.MaxReadBytes, Selections: d.selections, Zone: zone,
@@ -178,7 +178,7 @@ func (d *Daemon) getReceipts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q.Principal = principal
-	deps, err := read.ServeDeps(d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
+	deps, err := read.ServeDeps(d.catalog, d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -198,7 +198,7 @@ func (d *Daemon) getReceipts(w http.ResponseWriter, r *http.Request) {
 // cut from the served value, so a receipt published locally, or before the bound,
 // pages like any other and still verifies.
 func (d *Daemon) getReceipt(w http.ResponseWriter, r *http.Request) {
-	deps, err := read.ServeDeps(d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
+	deps, err := read.ServeDeps(d.catalog, d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -220,7 +220,7 @@ func (d *Daemon) getReceipt(w http.ResponseWriter, r *http.Request) {
 // they were read, and a wrong index refuses the whole answer rather than show the
 // entry with links absent, which would read as none.
 func (d *Daemon) getReceiptFacet(w http.ResponseWriter, r *http.Request) {
-	deps, err := read.ServeDeps(d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
+	deps, err := read.ServeDeps(d.catalog, d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -257,7 +257,7 @@ func (d *Daemon) getReceiptFacet(w http.ResponseWriter, r *http.Request) {
 // answers the receipt's facet ids and query text, so the policy gates it as it gates
 // opening the receipt.
 func (d *Daemon) verifyReceipt(w http.ResponseWriter, r *http.Request) {
-	deps, err := read.ServeDeps(d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
+	deps, err := read.ServeDeps(d.catalog, d.read, d.readOps, d.readOps, d.defs.current.Load(), d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -299,7 +299,7 @@ func (d *Daemon) publishRead(w http.ResponseWriter, r *http.Request, status int)
 		return
 	}
 	defs := d.defs.current.Load()
-	deps, err := read.ServeDeps(d.read, d.writes.Ops, d.readOps, defs, d.projections.current.Load())
+	deps, err := read.ServeDeps(d.catalog, d.read, d.writes.Ops, d.readOps, defs, d.projections.current.Load())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -307,7 +307,7 @@ func (d *Daemon) publishRead(w http.ResponseWriter, r *http.Request, status int)
 	deps.Reader = policy.ReaderOf(principalOf(r))
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
-	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Values: d.readOps, Definitions: defs, Projections: d.projections.current.Load()}
+	src := read.Source{Catalog: d.catalog, Ledger: d.read, Checkpoints: d.readOps, Values: d.readOps, Definitions: defs, Projections: d.projections.current.Load()}
 	p, err := read.Publish(ctx, src, deps, q, d.cfg.MaxReadBytes)
 	if err != nil {
 		d.writeFiledReadError(w, err)
@@ -365,7 +365,7 @@ func (d *Daemon) getTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
-	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Values: d.readOps, Definitions: d.defs.current.Load(), Projections: d.projections.current.Load()}
+	src := read.Source{Catalog: d.catalog, Ledger: d.read, Checkpoints: d.readOps, Values: d.readOps, Definitions: d.defs.current.Load(), Projections: d.projections.current.Load()}
 	t, err := read.Timeline(ctx, src, q)
 	if err != nil {
 		writeReadError(w, err)
@@ -542,7 +542,7 @@ func (d *Daemon) getCoverage(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), d.timeout(r))
 	defer cancel()
-	src := read.Source{Ledger: d.read, Checkpoints: d.readOps, Values: d.readOps, Definitions: d.defs.current.Load(), Projections: d.projections.current.Load()}
+	src := read.Source{Catalog: d.catalog, Ledger: d.read, Checkpoints: d.readOps, Values: d.readOps, Definitions: d.defs.current.Load(), Projections: d.projections.current.Load()}
 	c, err := read.Coverage(ctx, src, q)
 	if err != nil {
 		writeReadError(w, err)

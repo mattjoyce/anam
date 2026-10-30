@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
@@ -76,7 +77,11 @@ type Server struct {
 	// the operational index holds for it rather than whatever this package assumed.
 	buckets span.Buckets
 
-	// defs answers the Definitions in force; nil means the bundled ones.
+	// catalog is the provisioned catalog the process loaded; the three answers below
+	// fall back to it.
+	catalog *catalog.Catalog
+
+	// defs answers the Definitions in force; nil means the catalog's.
 	defs func() *def.Registry
 
 	// heldDefs answers every Definition version held, for the Definitions pages and a
@@ -133,17 +138,19 @@ type Server struct {
 // Deps is what the inspector reads from. Ledger and Timeout are required; the rest
 // widen what the pages can show. Library is the default library's root, or "" for
 // none. Definitions answers the Definitions the record's facets were admitted
-// against, asked at each page so a registration shows at once; nil means the bundled
-// ones alone. Held answers every version held of each, for the Definitions pages; nil
-// means the bundled manifests. Checkpoints is the checkpoint log for the bucket strip
+// against, asked at each page so a registration shows at once; nil means Catalog's
+// alone. Held answers every version held of each, for the Definitions pages; nil
+// means Catalog's manifests. Checkpoints is the checkpoint log for the bucket strip
 // under the timeline; nil draws no strip. Edges is the edge index for the links
 // section of the facet page; nil says there is no index to read. Projections answers
-// the templates held; nil means the bundled ones.
+// the templates held; nil means Catalog's. Catalog is the provisioned catalog the
+// process loaded.
 type Deps struct {
 	Ledger      Ledger
 	Timeout     time.Duration
 	Buckets     span.Buckets
 	Library     string
+	Catalog     *catalog.Catalog
 	Definitions func() *def.Registry
 	Held        HeldDefinitions
 	Checkpoints Checkpoints
@@ -177,7 +184,7 @@ type Deps struct {
 // Handler returns the inspector's routes on a fresh mux.
 func Handler(d Deps) http.Handler {
 	s := &Server{
-		ledger: d.Ledger, timeout: d.Timeout, buckets: d.Buckets, library: d.Library,
+		ledger: d.Ledger, timeout: d.Timeout, buckets: d.Buckets, library: d.Library, catalog: d.Catalog,
 		defs: d.Definitions, heldDefs: d.Held, checkpoints: d.Checkpoints, edges: d.Edges, projections: d.Projections,
 		cachedReads: d.CachedReads, bench: d.Workbench, maxReadBytes: d.MaxReadBytes, selections: d.Selections,
 		roster: d.Roster, zone: deployedZone(d.Zone), pages: pagesFor(d.Build, d.Roster != nil),
@@ -210,20 +217,30 @@ func Handler(d Deps) http.Handler {
 	return mux
 }
 
-// definitions is the Definitions in force, or the bundled ones when none are given.
+// ErrNoCatalog is an inspector given neither its registries nor the catalog they
+// come from.
+var ErrNoCatalog = errors.New("inspect: no catalog")
+
+// definitions is the Definitions in force, or the catalog's when none are given.
 func (s *Server) definitions() (*def.Registry, error) {
 	if s.defs != nil {
 		return s.defs(), nil
 	}
-	return def.Bundled()
+	if s.catalog == nil {
+		return nil, ErrNoCatalog
+	}
+	return s.catalog.Definitions(), nil
 }
 
-// templates is the projections held, or the bundled ones when none are given.
+// templates is the projections held, or the catalog's when none are given.
 func (s *Server) templates() (*projection.Registry, error) {
 	if s.projections != nil {
 		return s.projections(), nil
 	}
-	return projection.Bundled()
+	if s.catalog == nil {
+		return nil, ErrNoCatalog
+	}
+	return s.catalog.Projections(), nil
 }
 
 // read returns the whole person at the current head, from cache when the

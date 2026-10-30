@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
@@ -56,13 +57,10 @@ func openLedgerForWrite(ctx context.Context, cfg config.Config) (*ledger.Ledger,
 	return ledger.Open(ctx, cfg.LedgerPath, cfg.PersonID)
 }
 
-// registryOf is the bundled Definitions with those importers registered, as db holds
-// them: the Definitions the record's facets were admitted against.
-func registryOf(ctx context.Context, db *ops.DB) (*def.Registry, error) {
-	bundled, err := def.Bundled()
-	if err != nil {
-		return nil, err
-	}
+// registryOf is the catalog's Definitions with those importers registered, as db
+// holds them: the Definitions the record's facets were admitted against.
+func registryOf(ctx context.Context, cat *catalog.Catalog, db *ops.DB) (*def.Registry, error) {
+	bundled := cat.Definitions()
 	rows, err := db.RegisteredDefinitions(ctx)
 	if err != nil {
 		return nil, err

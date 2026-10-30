@@ -20,6 +20,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/def"
@@ -37,6 +38,9 @@ import (
 type Params struct {
 	Person string
 	Limits gate.Limits
+	// Catalog is the provisioned catalog the run reads the old record under: its
+	// Definitions, with the old store's registered ones beside them.
+	Catalog *catalog.Catalog
 
 	// Timeout bounds each call to a store or to the gate.
 	Timeout time.Duration
@@ -143,7 +147,7 @@ func Read(ctx context.Context, src Source, program string, p Params) (Plan, erro
 	if err != nil {
 		return Plan{}, err
 	}
-	current, held, err := definitionsOf(registered)
+	current, held, err := definitionsOf(p.Catalog, registered)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -187,15 +191,15 @@ func openSource(ctx context.Context, src Source, p Params) (*ledger.Ledger, *ops
 	return l, db, nil
 }
 
-// definitionsOf builds the Definitions in force in the old store (the binary's, with
+// definitionsOf builds the Definitions in force in the old store (the catalog's, with
 // the registered ones beside them, as the daemon would load them) and every version it
-// holds as a contract: the binary's own, the registered rows, and the store's copy of
-// what the binary carried when it last started.
-func definitionsOf(r ops.Registered) (*def.Registry, *def.Versions, error) {
-	bundled, err := def.Bundled()
-	if err != nil {
-		return nil, nil, err
+// holds as a contract: the catalog's own, the registered rows, and the store's copy of
+// what the catalog carried when a daemon last started.
+func definitionsOf(cat *catalog.Catalog, r ops.Registered) (*def.Registry, *def.Versions, error) {
+	if cat == nil {
+		return nil, nil, errors.New("migrate: no catalog")
 	}
+	bundled := cat.Definitions()
 	registered := make([]def.Stored, len(r.Definitions))
 	for i, d := range r.Definitions {
 		registered[i] = def.Stored{Type: facet.Type(d.Type), Version: d.Version, Body: []byte(d.Body)}
@@ -204,10 +208,7 @@ func definitionsOf(r ops.Registered) (*def.Registry, *def.Versions, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	manifests, err := def.Manifests()
-	if err != nil {
-		return nil, nil, err
-	}
+	manifests := cat.Manifests()
 	provisioned := make([]def.Stored, len(r.Provisioned))
 	for i, d := range r.Provisioned {
 		provisioned[i] = def.Stored{Type: facet.Type(d.Type), Version: d.Version, Body: []byte(d.Body)}

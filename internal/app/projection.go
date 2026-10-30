@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/store/ops"
@@ -194,13 +195,10 @@ func joinStrings(ss []string) string {
 	return out
 }
 
-// projectionsOf is the registry a local read selects from: the bundled templates and
-// those registered in db.
-func projectionsOf(ctx context.Context, db *ops.DB) (*projection.Registry, error) {
-	bundled, err := projection.Bundled()
-	if err != nil {
-		return nil, err
-	}
+// projectionsOf is the registry a local read selects from: the catalog's templates
+// and those registered in db.
+func projectionsOf(ctx context.Context, cat *catalog.Catalog, db *ops.DB) (*projection.Registry, error) {
+	bundled := cat.Projections()
 	rows, err := db.RegisteredProjections(ctx)
 	if err != nil {
 		return nil, err
@@ -213,11 +211,15 @@ func projectionsOf(ctx context.Context, db *ops.DB) (*projection.Registry, error
 }
 
 // localProjections is the registry the local files hold. Without an operational store
-// yet (no anam init) it is the bundled set alone: listing the menu must not create a
-// store as a side effect.
+// yet (no anam init) it is the catalog's set alone: listing the menu must not create
+// a store as a side effect.
 func localProjections(ctx context.Context, cfg config.Config) (*projection.Registry, error) {
+	cat, err := loadCatalog(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := os.Stat(cfg.DBPath); errors.Is(err, fs.ErrNotExist) {
-		return projection.Bundled()
+		return cat.Projections(), nil
 	}
 	buckets, err := cfg.Buckets()
 	if err != nil {
@@ -228,5 +230,5 @@ func localProjections(ctx context.Context, cfg config.Config) (*projection.Regis
 		return nil, err
 	}
 	defer func() { _ = db.Close() }()
-	return projectionsOf(ctx, db)
+	return projectionsOf(ctx, cat, db)
 }

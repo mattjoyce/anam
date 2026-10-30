@@ -92,12 +92,8 @@ Every evaluation is bounded at 5,000,000 steps.`
 // serves at /v1/definitions and def.Manifests carries.
 type Held map[facet.Type]map[int][]byte
 
-// HeldBundled is the bundled manifests and their history as a Held.
-func HeldBundled() (Held, error) {
-	stored, err := def.Manifests()
-	if err != nil {
-		return nil, err
-	}
+// HeldOf is a catalog's manifests and their history as a Held.
+func HeldOf(stored []def.Stored) Held {
 	held := Held{}
 	for _, s := range stored {
 		if held[s.Type] == nil {
@@ -105,7 +101,7 @@ func HeldBundled() (Held, error) {
 		}
 		held[s.Type][s.Version] = s.Body
 	}
-	return held, nil
+	return held
 }
 
 // baseRelations is the schema in words.

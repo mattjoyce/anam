@@ -344,6 +344,13 @@ func BundledFS(fsys fs.FS) (*Registry, error) {
 	return r, nil
 }
 
+// EmbeddedFS returns the read-only embedded catalog root: *.json at the root,
+// history/*.json for earlier versions. It is the fallback when no external
+// projections directory is configured.
+func EmbeddedFS() fs.FS {
+	return embedded()
+}
+
 // Bundled parses every embedded manifest into a Registry. Like the definition set, it
 // fails on any bad manifest rather than loading the rest: a binary that silently
 // dropped a projection would answer "unknown projection" for a name that is in the

@@ -83,6 +83,13 @@ func BundledFS(fsys fs.FS) (*Registry, error) {
 	return NewRegistry(defs...)
 }
 
+// EmbeddedFS returns the read-only embedded catalog root: *.json at the root,
+// history/*.json for earlier versions. It is the fallback when no external
+// definitions directory is configured.
+func EmbeddedFS() fs.FS {
+	return embedded()
+}
+
 // Bundled parses every embedded manifest into a Registry. It fails on any bad
 // manifest rather than loading the rest: a definition set is one contract, and a
 // binary that silently dropped a type would reject that type's every envelope with

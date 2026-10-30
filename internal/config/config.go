@@ -70,6 +70,14 @@ type Config struct {
 	// means none, and POST /v1/envelopes refuses everything. It is read at start.
 	ImportersFile string `yaml:"importers_file"`
 
+	// DefinitionsDir and ProjectionsDir name the deployment's catalog: a directory of
+	// Definition manifests (and projection templates), current ones at its root and
+	// earlier versions under history/. Empty means the catalog built into the binary.
+	// A set directory replaces that component; it is not added to the built-in one.
+	// Relative paths are from the working directory. Each is read once, at start.
+	DefinitionsDir string `yaml:"definitions_dir"`
+	ProjectionsDir string `yaml:"projections_dir"`
+
 	// Server is the URL of a running daemon, such as http://192.168.20.4:8787. With it
 	// set, the CLI asks the daemon and opens no local file: the daemon owns the
 	// stores. Empty means the CLI opens the files itself, which is maintenance mode
@@ -315,6 +323,13 @@ const DefaultMaxReadBytes = 512 << 10
 // suits an agent first is the operator's choice, and the useful ones are registered
 // from the importers' types, so core ships no name that might not exist.
 const DefaultDefaultProjection = ""
+
+// DefaultDefinitionsDir and DefaultProjectionsDir are definitions_dir's and
+// projections_dir's defaults: none, which is the catalog built into the binary.
+const (
+	DefaultDefinitionsDir = ""
+	DefaultProjectionsDir = ""
+)
 
 // DefaultLibraryFolderLimit is library_folder_limit's default: 1000 files, few
 // enough that a person listing a folder by hand still reads it.

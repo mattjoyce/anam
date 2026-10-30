@@ -571,7 +571,7 @@ rebuild has to know what it may drop:
 | Tier | Tables | Recovery |
 |---|---|---|
 | **Derived** | facet index, edge index (card 104), anam-event index, checkpoint index and its values (card 215), `span_head`, sync cursors | replay the ledger, and mint again |
-| **Provisioned** | Facet Definitions (bundled and registered), bundled projection templates, token scopes | the embedded assets, config, and each importer registering its Definitions again — i.e. git |
+| **Provisioned** | Facet Definitions (catalog and registered), catalog projection templates (every version each start carried, kept so a receipt still verifies after its file leaves), token scopes | the catalog (embedded, or `definitions_dir` / `projections_dir`), config, and each importer registering its Definitions again — i.e. git |
 | **Authored** | registered projection templates (card 125), receipts, served values and saved selections (card 215), the bodies of inline projections (card 211), `meta` | nowhere Anam can reach. Back it up; a registered template also comes back by registering it again from wherever the operator keeps the file |
 | **Disposable** | importers' complete-resend snapshots (card 78): which parts of a run were admitted and which facet ids they carried | the next resend makes another; nothing is tombstoned from here without an operator's `anam retract --yes`, and an incomplete snapshot is dropped after `snapshot_ttl`, a day by default |
 

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/projection"
@@ -34,12 +35,18 @@ type projections struct {
 // receipts against the wrong one. A default_projection that names neither a bundled
 // nor a registered template also stops it: only here are the registered ones visible,
 // and an operator who mistyped the name should learn at start, not from an agent.
-func loadProjections(ctx context.Context, db *ops.DB, bundled *projection.Registry, defaultName string) (*projections, error) {
+func loadProjections(ctx context.Context, db *ops.DB, cat *catalog.Catalog, defaultName string) (*projections, error) {
+	bundled := cat.Projections()
 	rows, err := db.RegisteredProjections(ctx)
 	if err != nil {
 		return nil, err
 	}
-	reg, err := projection.WithRegistered(bundled, projectionStored(rows))
+	kept, err := db.ProvisionedProjections(ctx)
+	if err != nil {
+		return nil, err
+	}
+	extra := append(retainedProjections(cat, kept), projectionStored(rows)...)
+	reg, err := projection.WithRegistered(bundled, extra)
 	if err != nil {
 		return nil, fmt.Errorf("daemon: registered projections: %w", err)
 	}
@@ -51,6 +58,29 @@ func loadProjections(ctx context.Context, db *ops.DB, bundled *projection.Regist
 	p := &projections{bundled: bundled}
 	p.current.Store(reg)
 	return p, nil
+}
+
+// retainedProjections are the provisioned templates the store kept from earlier starts
+// whose files the catalog no longer carries, so a receipt that names one still
+// verifies. A kept row the catalog carries again is the catalog's: the catalog may
+// replace a prior provisioned copy at the same version, as definitions do, and it is
+// stored over the old one once the daemon has admitted it.
+func retainedProjections(cat *catalog.Catalog, kept []ops.ProjectionRow) []projection.Stored {
+	type key struct {
+		name    string
+		version int
+	}
+	carried := map[key]bool{}
+	for _, t := range cat.ProjectionManifests() {
+		carried[key{t.Name, t.Version}] = true
+	}
+	var out []projection.Stored
+	for _, r := range kept {
+		if !carried[key{r.Name, r.Version}] {
+			out = append(out, projection.Stored{Name: r.Name, Version: r.Version, Body: []byte(r.Body)})
+		}
+	}
+	return out
 }
 
 func projectionStored(rows []ops.ProjectionRow) []projection.Stored {

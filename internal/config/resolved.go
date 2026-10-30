@@ -202,6 +202,8 @@ func defaultSettings() []defaultSetting {
 		textDefault("listen", DefaultListen),
 		textDefault("token_file", ""),
 		textDefault("importers_file", ""),
+		textDefault("definitions_dir", DefaultDefinitionsDir),
+		textDefault("projections_dir", DefaultProjectionsDir),
 		textDefault("server", ""),
 		numberDefault("checkpoint_budget", DefaultCheckpointBudget),
 		textDefault("backup_dir", ""),
@@ -369,6 +371,12 @@ func expandPaths(c *Config) error {
 	}
 	if c.ImportersFile != "" {
 		paths["importers_file"] = &c.ImportersFile
+	}
+	if c.DefinitionsDir != "" {
+		paths["definitions_dir"] = &c.DefinitionsDir
+	}
+	if c.ProjectionsDir != "" {
+		paths["projections_dir"] = &c.ProjectionsDir
 	}
 	for name, p := range paths {
 		expanded, err := safepath.Expand(*p)

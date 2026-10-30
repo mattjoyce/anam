@@ -9,6 +9,18 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- `definitions_dir` and `projections_dir` (`ANAM_DEFINITIONS_DIR`, `ANAM_PROJECTIONS_DIR`) choose
+  the catalog the daemon and the local commands run on (card 257). Unset, each is the catalog built
+  into the binary, as before; set, the directory replaces it for that component, current manifests
+  at its root and earlier versions under `history/`. A relative path is from the working directory.
+  A directory that is missing, unreadable or invalid stops the start; there is no fallback. A
+  directory copied from the built-in files gives the same bodies, hashes, definition set version and
+  receipt verification. The daemon now checks everything before it writes the catalog (a refused
+  start leaves the store as it was), refuses a registered Definition that contradicts the
+  catalog's at the same type and version, keeps every projection template version it has run on
+  (a new `projection` table, filled at start; a receipt naming a template whose file has left still
+  verifies), and logs one `daemon: catalog admitted` line with both sources and the definition set
+  version.
 - `docs/QUERY.md` has a worked question for steps per month, summed and counted with
   `month_of/2` (card 213).
 - Two base relations for grouping a query (card 213): `month_of(At, Month)` and `day_of(At, Day)`,

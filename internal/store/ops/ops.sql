@@ -131,6 +131,19 @@ CREATE TABLE IF NOT EXISTS definition (
   PRIMARY KEY (type, version)
 );
 
+-- tier: provisioned — projection templates, every version, as the catalog carried them
+-- when the daemon last started: current ones and the history beside them. Stored by
+-- upsert and never swept, as definition is, so a template whose file has left the
+-- catalog still lets a receipt that names it verify. A file written before this table
+-- gains it empty and is filled at the next start; every body it would have held was in
+-- that build's own catalog, so absent here never stands for a body that is gone.
+CREATE TABLE IF NOT EXISTS projection (
+  name    TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  body    TEXT NOT NULL,
+  PRIMARY KEY (name, version)
+);
+
 -- tier: provisioned — Facet Definitions registered by importers (POST /v1/definitions),
 -- every version. Each importer's repo holds its Definitions, so a lost table comes
 -- back by registering them again. A registered version is immutable: the triggers

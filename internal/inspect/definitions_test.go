@@ -148,7 +148,7 @@ func TestDefinition_AnOlderVersionIsShownAsHeld(t *testing.T) {
 			}, map[facet.Type]string{"health.blood-pressure": "bundled"},
 			nil
 	}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Held: held}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Held: held}))
 	t.Cleanup(srv.Close)
 
 	code, body := get(t, srv.URL+"/definition?type=health.blood-pressure&v=1")

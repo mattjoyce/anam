@@ -61,7 +61,7 @@ func zoneServer(t *testing.T, zone string) *httptest.Server {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = a.Close() })
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(),
 		Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, MaxReadBytes: 512 << 10,
 		Selections: selection.NewStore(a), Zone: zone,
 	}))

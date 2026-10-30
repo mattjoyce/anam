@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/clock"
-	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/query"
@@ -102,8 +102,12 @@ func Run(ctx context.Context, o Options, progress func(string)) (Report, error) 
 	if err != nil {
 		return Report{}, err
 	}
+	cat, err := catalog.Load(ctx, "", "")
+	if err != nil {
+		return Report{}, err
+	}
 	deps := mint.Deps{Ledger: l, Index: db, Values: db, Buckets: buckets, Clock: clock.Real{}, Budget: o.Budget}
-	scs, err := scenarios(ctx, l, db, plan, deps)
+	scs, err := scenarios(ctx, cat, l, db, plan, deps)
 	if err != nil {
 		return Report{}, err
 	}
@@ -239,8 +243,8 @@ type scenario struct {
 	cost *queryCost
 }
 
-func scenarios(ctx context.Context, l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) ([]scenario, error) {
-	src := read.Source{Ledger: l, Checkpoints: db, Values: deps.Values}
+func scenarios(ctx context.Context, cat *catalog.Catalog, l *ledger.Ledger, db *ops.DB, p plan, deps mint.Deps) ([]scenario, error) {
+	src := read.Source{Catalog: cat, Ledger: l, Checkpoints: db, Values: deps.Values}
 	timeline := func(q api.TimelineQuery) func(context.Context) (int, error) {
 		return func(ctx context.Context) (int, error) {
 			q.Zone = "UTC"
@@ -296,10 +300,7 @@ func scenarios(ctx context.Context, l *ledger.Ledger, db *ops.DB, p plan, deps m
 		}, nil},
 	}
 
-	defs, err := def.Bundled()
-	if err != nil {
-		return nil, fmt.Errorf("bench: query scenarios: %w", err)
-	}
+	defs := cat.Definitions()
 	served, err := fold.ReadAt(ctx, l, p.head)
 	if err != nil {
 		return nil, fmt.Errorf("bench: query scenarios: %w", err)

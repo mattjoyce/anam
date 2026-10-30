@@ -45,7 +45,7 @@ func labelServer(t *testing.T) *httptest.Server {
 			t.Fatalf("Admit %s: %v", p.ref, err)
 		}
 	}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, MaxReadBytes: 512 << 10}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, MaxReadBytes: 512 << 10}))
 	t.Cleanup(srv.Close)
 	return srv
 }

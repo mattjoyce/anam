@@ -104,6 +104,10 @@ func inspectCmd(cfgPath *string) *cobra.Command {
 				return err
 			}
 
+			cat, err := loadCatalog(cmd.Context(), cfg)
+			if err != nil {
+				return err
+			}
 			l, err := openLedgerReadOnly(cmd.Context(), cfg)
 			if err != nil {
 				return err
@@ -118,7 +122,7 @@ func inspectCmd(cfgPath *string) *cobra.Command {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "inspecting ledger %s (person %s), read-only\nhttp://%s/\n",
 				cfg.LedgerPath, cfg.PersonID, listen)
 			return inspect.Serve(cmd.Context(), listen, inspect.Deps{
-				Ledger: l, Timeout: cfg.Timeout, Buckets: buckets, Library: cfg.LibraryDir,
+				Ledger: l, Timeout: cfg.Timeout, Buckets: buckets, Library: cfg.LibraryDir, Catalog: cat,
 				CachedReads: cfg.InspectCachedReads, MaxReadBytes: cfg.MaxReadBytes, Zone: zone,
 			}, cfg.HTTPReadHeaderTimeout, cfg.ShutdownGrace)
 		},

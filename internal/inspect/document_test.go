@@ -59,7 +59,7 @@ func TestDocument_ServedFromTheLibraryAndConfinedToIt(t *testing.T) {
 	if err := l.Admit(ctx, 0, ref, event(facet.EventAdmitted, ref, 1)); err != nil {
 		t.Fatalf("Admit: %v", err)
 	}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Library: dir}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Library: dir}))
 	t.Cleanup(srv.Close)
 
 	link := "/document?name=report.pdf&amp;sha256=" + sum
@@ -88,7 +88,7 @@ func TestDocument_ServedFromTheLibraryAndConfinedToIt(t *testing.T) {
 	}
 
 	// No library configured: the page carries no link and the route serves nothing.
-	bare := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	bare := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(bare.Close)
 	if _, body := get(t, bare.URL+"/facet?id="+ref.ID); strings.Contains(body, "/document?") {
 		t.Errorf("facet page links a document with no library configured")

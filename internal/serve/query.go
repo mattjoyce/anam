@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/mattjoyce/anam/internal/clock"
-	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/query"
@@ -27,12 +26,16 @@ import (
 // reproduced" would blame the ledger for a change in the rules.
 var ErrRuleSetMoved = errors.New("serve: the bundled rule set has moved since this receipt")
 
-// definitions is d's Definitions, or the bundled ones when it names none.
+// ErrNoDefinitions is a query re-derived without the Definitions it was admitted under.
+var ErrNoDefinitions = errors.New("serve: no Definitions given")
+
+// definitions is d's Definitions. There is no fallback to the binary's copy: the
+// caller names the catalog the record is read under.
 func (d Deps) definitions() (query.Definitions, error) {
-	if d.Definitions != nil {
-		return d.Definitions, nil
+	if d.Definitions == nil {
+		return nil, ErrNoDefinitions
 	}
-	return def.Bundled()
+	return d.Definitions, nil
 }
 
 // PublishQuery files a query's answer as what template t served at w, with a receipt

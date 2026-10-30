@@ -22,18 +22,18 @@ import (
 
 // HeldDefinitions answers every Definition body Anam holds, by type and version, and
 // where each type's came from (bundled or registered). The daemon serves the same
-// answer at GET /v1/definitions; nil means the bundled manifests alone.
+// answer at GET /v1/definitions; nil means the catalog's manifests alone.
 type HeldDefinitions func(ctx context.Context) (map[facet.Type]map[int][]byte, map[facet.Type]string, error)
 
-// held is s's held Definitions, or the bundled manifests when none were given.
+// held is s's held Definitions, or the catalog's manifests when none were given.
 func (s *Server) held(ctx context.Context) (map[facet.Type]map[int][]byte, map[facet.Type]string, error) {
 	if s.heldDefs != nil {
 		return s.heldDefs(ctx)
 	}
-	manifests, err := def.Manifests()
-	if err != nil {
-		return nil, nil, err
+	if s.catalog == nil {
+		return nil, nil, ErrNoCatalog
 	}
+	manifests := s.catalog.Manifests()
 	bodies := map[facet.Type]map[int][]byte{}
 	origin := map[facet.Type]string{}
 	for _, m := range manifests {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
@@ -27,6 +28,10 @@ import (
 // unchanged. It answers the Definitions in force, for the plan to use, and the rule
 // each re-placing rename leaves, by its index in the table.
 func checkRenameKeying(ctx context.Context, cfg config.Config, tbl renameTable) (*def.Registry, map[int]def.TimeField, error) {
+	cat, err := loadCatalog(ctx, cfg)
+	if err != nil {
+		return nil, nil, err
+	}
 	buckets, err := cfg.Buckets()
 	if err != nil {
 		return nil, nil, err
@@ -36,11 +41,11 @@ func checkRenameKeying(ctx context.Context, cfg config.Config, tbl renameTable) 
 		return nil, nil, err
 	}
 	defer func() { _ = db.Close() }()
-	defs, err := registryOf(ctx, db)
+	defs, err := registryOf(ctx, cat, db)
 	if err != nil {
 		return nil, nil, err
 	}
-	newest, err := newestHeldBodies(ctx, db)
+	newest, err := newestHeldBodies(ctx, cat, db)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -68,15 +73,12 @@ func checkRenameKeying(ctx context.Context, cfg config.Config, tbl renameTable) 
 	return defs, replaced, nil
 }
 
-// newestHeldBodies is the newest body held of every type: the binary's own
-// manifests, then what the operational store keeps, bundled and registered. The
-// binary's come first because a ledger no daemon has run against has an empty
-// store, and a type the binary dropped is still in the store.
-func newestHeldBodies(ctx context.Context, db *ops.DB) (map[facet.Type][]byte, error) {
-	bundled, err := def.Manifests()
-	if err != nil {
-		return nil, err
-	}
+// newestHeldBodies is the newest body held of every type: the catalog's manifests,
+// then what the operational store keeps, provisioned and registered. The catalog's
+// come first because a ledger no daemon has run against has an empty store, and a
+// type the catalog dropped is still in the store.
+func newestHeldBodies(ctx context.Context, cat *catalog.Catalog, db *ops.DB) (map[facet.Type][]byte, error) {
+	bundled := cat.Manifests()
 	stored, err := db.Definitions(ctx)
 	if err != nil {
 		return nil, err

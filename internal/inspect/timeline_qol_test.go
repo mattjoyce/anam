@@ -75,7 +75,7 @@ func denseServer(t *testing.T) (*httptest.Server, *countingLedger) {
 	}
 
 	cl := &countingLedger{Ledger: l}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: cl, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: cl, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 	return srv, cl
 }

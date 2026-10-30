@@ -27,7 +27,7 @@ func (d *Daemon) querySource(ctx context.Context) (read.Source, error) {
 		return read.Source{}, err
 	}
 	return read.Source{
-		Ledger: d.read, Checkpoints: d.readOps, Values: d.readOps,
+		Catalog: d.catalog, Ledger: d.read, Checkpoints: d.readOps, Values: d.readOps,
 		Definitions: d.defs.current.Load(), Projections: d.projections.current.Load(), Held: query.Held(bodies),
 	}, nil
 }
@@ -74,7 +74,7 @@ func (d *Daemon) postQuery(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	deps, err := read.ServeDeps(d.read, d.writes.Ops, d.readOps, src.Definitions, src.Projections)
+	deps, err := read.ServeDeps(d.catalog, d.read, d.writes.Ops, d.readOps, src.Definitions, src.Projections)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return

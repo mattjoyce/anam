@@ -28,12 +28,15 @@ var queryNarrowings = []string{"instant", "projection", "program"}
 
 const queryHint = "ask about fewer instants (instant/1), through a narrower projection, or with a more selective program"
 
-// held is src's Definition bodies by type and version, or the bundled ones.
+// held is src's Definition bodies by type and version, or its catalog's.
 func (src Source) held() (query.Held, error) {
 	if src.Held != nil {
 		return src.Held, nil
 	}
-	return query.HeldBundled()
+	if src.Catalog == nil {
+		return nil, ErrNoCatalog
+	}
+	return query.HeldOf(src.Catalog.Manifests()), nil
 }
 
 // Describe is the introspection a query is written against: the relations, every

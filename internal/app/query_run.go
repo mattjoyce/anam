@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/query"
@@ -235,7 +236,7 @@ func describeQuery(ctx context.Context, cfg config.Config) (api.QueryCatalogue, 
 		return api.QueryCatalogue{}, err
 	}
 	defer closeSrc()
-	held, err := localHeld(ctx, cfg)
+	held, err := localHeld(ctx, cfg, src.Catalog)
 	if err != nil {
 		return api.QueryCatalogue{}, err
 	}
@@ -243,13 +244,10 @@ func describeQuery(ctx context.Context, cfg config.Config) (api.QueryCatalogue, 
 	return read.Describe(src)
 }
 
-// localHeld is every Definition body the local files hold: the bundled manifests and
-// their history, and the registered ones when there is an operational store.
-func localHeld(ctx context.Context, cfg config.Config) (query.Held, error) {
-	held, err := query.HeldBundled()
-	if err != nil {
-		return nil, err
-	}
+// localHeld is every Definition body the local files hold: the catalog's manifests
+// and their history, and the registered ones when there is an operational store.
+func localHeld(ctx context.Context, cfg config.Config, cat *catalog.Catalog) (query.Held, error) {
+	held := query.HeldOf(cat.Manifests())
 	buckets, err := cfg.Buckets()
 	if err != nil {
 		return nil, err

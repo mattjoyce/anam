@@ -32,7 +32,7 @@ func TestFacet_LinkSaysBytesNotHeldAndOffersNoDownload(t *testing.T) {
 	if err := l.Admit(ctx, 0, link, event(facet.EventAdmitted, link, 1)); err != nil {
 		t.Fatalf("Admit: %v", err)
 	}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Library: t.TempDir()}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Library: t.TempDir()}))
 	t.Cleanup(srv.Close)
 
 	code, body := get(t, srv.URL+"/facet?id="+link.ID)

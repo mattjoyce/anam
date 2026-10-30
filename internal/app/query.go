@@ -102,17 +102,18 @@ func checkConfig(explicit string, cmd *cobra.Command, ledgerPath, person string)
 
 func runQueryCheck(cmd *cobra.Command, cfg config.Config, projName string, every int) error {
 	ctx := cmd.Context()
-	defs, err := def.Bundled()
+	cat, err := loadCatalog(ctx, cfg)
 	if err != nil {
 		return err
 	}
+	defs := cat.Definitions()
 	l, err := openLedgerReadOnly(ctx, cfg)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = l.Close() }()
 
-	served, res, header, err := checkValue(ctx, l, defs, projName)
+	served, res, header, err := checkValue(ctx, l, defs, cat.Projections(), projName)
 	if err != nil {
 		return err
 	}
@@ -137,7 +138,9 @@ func runQueryCheck(cmd *cobra.Command, cfg config.Config, projName string, every
 // whole canonical, or the log a named projection serves. A snapshot-shaped
 // projection has already taken its latest per series, so there would be nothing
 // left to compare; it is refused.
-func checkValue(ctx context.Context, l *ledger.Ledger, defs *def.Registry, projName string) (fold.Value, fold.Result, string, error) {
+func checkValue(ctx context.Context, l *ledger.Ledger, defs *def.Registry, templates *projection.Registry,
+	projName string,
+) (fold.Value, fold.Result, string, error) {
 	id, err := l.ID(ctx)
 	if err != nil {
 		return fold.Value{}, fold.Result{}, "", err
@@ -149,10 +152,6 @@ func checkValue(ctx context.Context, l *ledger.Ledger, defs *def.Registry, projN
 	header := fmt.Sprintf("ledger      %s  W=%d  live=%d\n", id, res.W, res.Value.Len())
 	if projName == "" {
 		return res.Value, res, header, nil
-	}
-	templates, err := projection.Bundled()
-	if err != nil {
-		return fold.Value{}, fold.Result{}, "", err
 	}
 	t, err := templates.Lookup(projName)
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/consent"
 	"github.com/mattjoyce/anam/internal/def"
@@ -22,28 +23,24 @@ import (
 // later, because a gate threaded through afterwards is a gate a caller can forget.
 //
 // checkpoints is the mint's log, so a serve or a verify composes from the last mint
-// run rather than folding the ledger from the beginning; nil folds in full. defs are
-// the Definitions the record's facets were admitted against; nil means the bundled
-// ones alone. templates are the projections held, bundled and registered (card 125);
-// nil means the bundled ones alone.
-func ServeDeps(l serve.Ledger, published serve.Store, checkpoints mint.CheckpointLog, defs *def.Registry,
-	templates *projection.Registry,
+// run rather than folding the ledger from the beginning; nil folds in full. cat is the
+// provisioned catalog the process loaded: a receipt names its definition set version,
+// however many Definitions were registered beside it. defs are the Definitions the
+// record's facets were admitted against; nil means cat's alone. templates are the
+// projections held, provisioned and registered (card 125); nil means cat's alone.
+func ServeDeps(cat *catalog.Catalog, l serve.Ledger, published serve.Store, checkpoints mint.CheckpointLog,
+	defs *def.Registry, templates *projection.Registry,
 ) (serve.Deps, error) {
-	var err error
-	if templates == nil {
-		if templates, err = projection.Bundled(); err != nil {
-			return serve.Deps{}, err
-		}
+	if cat == nil {
+		return serve.Deps{}, ErrNoCatalog
 	}
-	defSet, err := def.SetVersion()
-	if err != nil {
-		return serve.Deps{}, err
+	if templates == nil {
+		templates = cat.Projections()
 	}
 	if defs == nil {
-		if defs, err = def.Bundled(); err != nil {
-			return serve.Deps{}, err
-		}
+		defs = cat.Definitions()
 	}
+	defSet := cat.SetVersion()
 	return serve.Deps{
 		Ledger:               l,
 		Templates:            templates,

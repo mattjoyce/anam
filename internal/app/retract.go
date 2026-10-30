@@ -12,7 +12,6 @@ import (
 
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
-	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/gate"
@@ -223,10 +222,11 @@ func writeRetractionReport(cmd *cobra.Command, source string, absent []facet.Fac
 // mid-way leaves the ones done tombstoned and the rest live; a re-run re-plans and
 // finishes, because a tombstoned facet is no longer live and drops out of the plan.
 func retractAll(cmd *cobra.Command, cfg config.Config, absent []facet.Facet) error {
-	reg, err := def.Bundled()
+	cat, err := loadCatalog(cmd.Context(), cfg)
 	if err != nil {
 		return err
 	}
+	reg := cat.Definitions()
 	l, err := openLedgerForWrite(cmd.Context(), cfg)
 	if err != nil {
 		return err

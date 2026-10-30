@@ -19,10 +19,7 @@ func TestDescribe_FromTheBundledDefinitions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	held, err := query.HeldBundled()
-	if err != nil {
-		t.Fatal(err)
-	}
+	held := heldBundled(t)
 	cat, err := query.Describe(defs, held)
 	if err != nil {
 		t.Fatalf("Describe: %v", err)
@@ -79,10 +76,7 @@ func TestDescribe_FromTheBundledDefinitions(t *testing.T) {
 // version; a pointer every version declares, or none, is not.
 func TestPointerWarnings(t *testing.T) {
 	t.Parallel()
-	held, err := query.HeldBundled()
-	if err != nil {
-		t.Fatal(err)
-	}
+	held := heldBundled(t)
 	cases := []struct {
 		text string
 		want string
@@ -173,4 +167,14 @@ func TestEvaluate_BoundsTheDerivation(t *testing.T) {
 	if !strings.Contains(err.Error(), "(max_read_bytes)") || strings.Contains(err.Error(), "Options") {
 		t.Errorf("message = %q, want the bound named max_read_bytes", err)
 	}
+}
+
+// heldBundled is the embedded manifests and their history as a Held.
+func heldBundled(t *testing.T) query.Held {
+	t.Helper()
+	manifests, err := def.Manifests()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return query.HeldOf(manifests)
 }

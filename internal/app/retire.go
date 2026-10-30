@@ -57,7 +57,11 @@ func refuseDeclared(cmd *cobra.Command, cfg config.Config, source string) error 
 		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "importers: no importers file configured, so no importer declares the source")
 		return nil
 	}
-	file, err := importersFile(cfg)
+	cat, err := loadCatalog(cmd.Context(), cfg)
+	if err != nil {
+		return err
+	}
+	file, err := importersFile(cfg, cat.Definitions())
 	if err != nil {
 		return err
 	}

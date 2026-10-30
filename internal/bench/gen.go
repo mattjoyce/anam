@@ -12,10 +12,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
-	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
 	"github.com/mattjoyce/anam/internal/mint"
@@ -98,10 +98,11 @@ func Generate(ctx context.Context, dir string, sh Shape, progress func(string)) 
 		return err
 	}
 	defer func() { _ = l.Close() }()
-	defs, err := def.Bundled()
+	cat, err := catalog.Load(ctx, "", "")
 	if err != nil {
 		return err
 	}
+	defs := cat.Definitions()
 	clk := &stepClock{}
 	g := gate.New(l, defs, gate.StaticScopes{source: {factType}}, clk, Person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	loc, err := time.LoadLocation(zone)

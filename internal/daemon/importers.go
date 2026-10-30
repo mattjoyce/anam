@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"sync/atomic"
 
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/store/ops"
@@ -42,27 +43,25 @@ func loadDefinitions(ctx context.Context, db *ops.DB, bundled *def.Registry) (*d
 	return d, nil
 }
 
-// guardBundled checks this build's bundled Definitions against the ones the
-// operational store last saw (def.Guard), then stores the current set. It runs at
-// Open, before the gate exists: a Definition that would re-key or re-place the
-// ledger's facets stops the daemon starting, and the error is the remedy.
+// guardBundled checks the catalog's Definitions against the ones the operational
+// store last saw (def.Guard), then stores that same catalog's manifests, current and
+// history: what is persisted is what was guarded. It runs at Open, before the gate
+// exists: a Definition that would re-key or re-place the ledger's facets stops the
+// daemon starting, and the error is the remedy.
 //
-// It stores by upsert, never a sweep: a bundled type the build has dropped stays as a
-// provisioned row at its last version. Its facets were admitted under that body and
-// the inspector still reads them through it, and an importer that takes the type over
-// keeps the version.
-func guardBundled(ctx context.Context, db *ops.DB, bundled *def.Registry) error {
+// It stores by upsert, never a sweep: a provisioned type the catalog has dropped stays
+// as a provisioned row at its last version. Its facets were admitted under that body
+// and the inspector still reads them through it, and an importer that takes the type
+// over keeps the version.
+func guardBundled(ctx context.Context, db *ops.DB, cat *catalog.Catalog) error {
 	rows, err := db.Definitions(ctx)
 	if err != nil {
 		return err
 	}
-	if err := def.Guard(storedOf(rows), bundled); err != nil {
+	if err := def.Guard(storedOf(rows), cat.Definitions()); err != nil {
 		return err
 	}
-	current, err := def.Manifests()
-	if err != nil {
-		return err
-	}
+	current := cat.Manifests()
 	put := make([]ops.DefinitionRow, len(current))
 	for i, m := range current {
 		put[i] = ops.DefinitionRow{Type: string(m.Type), Version: m.Version, Body: string(m.Body)}

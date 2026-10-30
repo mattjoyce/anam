@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -25,13 +26,17 @@ type snapshot struct {
 // takeSnapshot reads a catalog root into memory. A missing history/ is an empty
 // history; any other failure to read it, or a history that is not a directory, is
 // an error. Entries that are not regular *.json files are ignored, as the embedded
-// catalog's pattern ignores them.
-func takeSnapshot(src fs.FS) (*snapshot, error) {
-	root, err := readSelected(src, ".")
+// catalog's pattern ignores them. ctx is checked before every filesystem operation,
+// so a canceled load stops reading.
+func takeSnapshot(ctx context.Context, src fs.FS) (*snapshot, error) {
+	root, err := readSelected(ctx, src, ".")
 	if err != nil {
 		return nil, err
 	}
 	s := &snapshot{root: root}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	info, err := fs.Stat(src, "history")
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
@@ -41,14 +46,18 @@ func takeSnapshot(src fs.FS) (*snapshot, error) {
 	case !info.IsDir():
 		return nil, fmt.Errorf("history is not a directory: %w", fs.ErrInvalid)
 	}
-	if s.history, err = readSelected(src, "history"); err != nil {
+	if s.history, err = readSelected(ctx, src, "history"); err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
-// readSelected reads every regular *.json file directly in dir.
-func readSelected(src fs.FS, dir string) (map[string][]byte, error) {
+// readSelected reads every regular *.json file directly in dir, checking ctx before
+// each read.
+func readSelected(ctx context.Context, src fs.FS, dir string) (map[string][]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	entries, err := fs.ReadDir(src, dir)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", dir, err)
@@ -57,6 +66,9 @@ func readSelected(src fs.FS, dir string) (map[string][]byte, error) {
 	for _, e := range entries {
 		if !e.Type().IsRegular() || !strings.HasSuffix(e.Name(), ".json") {
 			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
 		name := e.Name()
 		if dir != "." {

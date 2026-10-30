@@ -104,7 +104,7 @@ func Load(ctx context.Context, definitionsDir, projectionsDir string) (*Catalog,
 	if err != nil {
 		return nil, fmt.Errorf("%w: definitions_dir: %s: %w", ErrInvalid, defLabel, err)
 	}
-	defSnap, err := takeSnapshot(defSrc)
+	defSnap, err := takeSnapshot(ctx, defSrc)
 	if err != nil {
 		return nil, fmt.Errorf("%w: definitions_dir: %s: %w", ErrInvalid, defLabel, err)
 	}
@@ -116,7 +116,7 @@ func Load(ctx context.Context, definitionsDir, projectionsDir string) (*Catalog,
 	if err != nil {
 		return nil, fmt.Errorf("%w: projections_dir: %s: %w", ErrInvalid, projLabel, err)
 	}
-	projSnap, err := takeSnapshot(projSrc)
+	projSnap, err := takeSnapshot(ctx, projSrc)
 	if err != nil {
 		return nil, fmt.Errorf("%w: projections_dir: %s: %w", ErrInvalid, projLabel, err)
 	}
@@ -133,6 +133,9 @@ func Load(ctx context.Context, definitionsDir, projectionsDir string) (*Catalog,
 	}
 	if err := c.loadProjections(projSnap); err != nil {
 		return nil, fmt.Errorf("%w: projections_dir: %s: %w", ErrInvalid, projLabel, err)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 	return c, nil
 }

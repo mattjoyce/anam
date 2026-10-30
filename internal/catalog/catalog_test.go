@@ -886,3 +886,50 @@ func TestLoadCanceled(t *testing.T) {
 		t.Errorf("err = %v, want catalog.ErrInvalid and context.Canceled", err)
 	}
 }
+
+// cancelAt is a context that reports itself canceled from its nth Err call on, so a
+// test can cancel a load at every point Load checks.
+type cancelAt struct {
+	context.Context
+	n, calls int
+}
+
+func (c *cancelAt) Err() error {
+	c.calls++
+	if c.n > 0 && c.calls >= c.n {
+		return context.Canceled
+	}
+	return nil
+}
+
+// TestLoadCanceledMidway cancels at each check Load makes, from the first to the one
+// before it returns: every point fails with both sentinels and no catalog. Load
+// checks before every file it reads, so it makes more checks than there are files.
+func TestLoadCanceledMidway(t *testing.T) {
+	counter := &cancelAt{Context: context.Background()}
+	if _, err := catalog.Load(counter, "", ""); err != nil {
+		t.Fatalf("Load with a context that never cancels: %v", err)
+	}
+	total := counter.calls
+	files := 0
+	for _, root := range []fs.FS{def.EmbeddedFS(), projection.EmbeddedFS()} {
+		_ = fs.WalkDir(root, ".", func(_ string, d fs.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				files++
+			}
+			return nil
+		})
+	}
+	if total <= files {
+		t.Fatalf("Load checked its context %d times for %d files, want a check per file", total, files)
+	}
+	for n := 1; n <= total; n++ {
+		cat, err := catalog.Load(&cancelAt{Context: context.Background(), n: n}, "", "")
+		if cat != nil {
+			t.Fatalf("cancel at check %d of %d: Load returned a catalog", n, total)
+		}
+		if !errors.Is(err, catalog.ErrInvalid) || !errors.Is(err, context.Canceled) {
+			t.Fatalf("cancel at check %d of %d: err = %v, want catalog.ErrInvalid and context.Canceled", n, total, err)
+		}
+	}
+}

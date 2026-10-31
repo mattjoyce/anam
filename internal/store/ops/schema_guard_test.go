@@ -21,7 +21,7 @@ import (
 //     hash below, in the same commit, with a line saying why it is compatible.
 const (
 	pinnedSchemaVersion  = 9
-	pinnedOpsSQL         = "5038c808ba97be8c1501c97a9784165fc678ed89fbfa75438b902891ca14ad3f"
+	pinnedOpsSQL         = "5aaf155382f7f76810ad8cb19ff9cea2f99b3a2465d44e5b8b12d0091f7e6870"
 	pinnedSnapshotDigest = "825ac2dab2735474a64c9030a5944f77845e2da208f33ba336687072e60f7edf"
 )
 

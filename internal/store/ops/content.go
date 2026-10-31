@@ -34,14 +34,14 @@ const (
 	KindSelection = "selection"
 	// KindSelectionCode is the code of a saved selection that lengthened (authored).
 	KindSelectionCode = "selection-code"
-	// KindInlineProjection is the body of a projection a query carried in its request,
-	// filed so the receipt that names its hash can be replayed (authored).
-	KindInlineProjection = "inline-projection"
+	// KindTemplateBody is a template body, the bytes a receipt's template hash names,
+	// filed so the receipt can be replayed without a catalog file (authored).
+	KindTemplateBody = "template-body"
 )
 
 // Kinds lists every kind, in the order a move reports them.
 func Kinds() []string {
-	return []string{KindCheckpoint, KindReceipt, KindServed, KindSelection, KindSelectionCode, KindInlineProjection}
+	return []string{KindCheckpoint, KindReceipt, KindServed, KindSelection, KindSelectionCode, KindTemplateBody}
 }
 
 // ErrNotFound is returned for a kind and digest with no row.
@@ -95,8 +95,7 @@ var contentTables = map[string]contentTable{
 	KindServed:        newContentTable("served_value"),
 	KindSelection:     newContentTable("saved_selection"),
 	KindSelectionCode: newContentTable("saved_selection_code"),
-
-	KindInlineProjection: newContentTable("inline_projection"),
+	KindTemplateBody:  newContentTable("template_body"),
 }
 
 func tableOf(kind string) (contentTable, error) {

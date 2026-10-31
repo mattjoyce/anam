@@ -408,7 +408,7 @@ func templateOf(ctx context.Context, d Deps, r receipt.Receipt) (projection.Temp
 // that hash. The store re-hashes the bytes it returns, so a body that was altered is
 // refused there, and one that parses to another hash is refused here.
 func inlineTemplate(ctx context.Context, d Deps, hash string) (projection.Template, error) {
-	body, err := d.Published.Get(ctx, receipt.InlineKind, hash)
+	body, err := d.Published.Get(ctx, receipt.TemplateBodyKind, hash)
 	if err != nil {
 		if errors.Is(err, ops.ErrNotFound) {
 			return projection.Template{}, fmt.Errorf("%w: the receipt was served through an inline projection %s, and its body is not held: %v",

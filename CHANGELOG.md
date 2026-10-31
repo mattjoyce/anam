@@ -9,6 +9,12 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- The operational store's `inline_projection` table is now `template_body`, named for what it
+  holds: the bytes a receipt's template hash names (card 257). The first open by this build moves
+  every row across and drops the old table; the schema version stays 9. `anam move-artifacts`
+  reads either name from an older file and reports `template bodies`, and the content kind is
+  `template-body`. A build from before the rename, opened on a renamed file, finds no inline
+  bodies and says an inline receipt's body is not held.
 - `definitions_dir` and `projections_dir` (`ANAM_DEFINITIONS_DIR`, `ANAM_PROJECTIONS_DIR`) choose
   the catalog the daemon and the local commands run on (card 257). Unset, each is the catalog built
   into the binary, as before; set, the directory replaces it for that component, current manifests

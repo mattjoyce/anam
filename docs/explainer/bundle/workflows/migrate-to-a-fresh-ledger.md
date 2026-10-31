@@ -23,7 +23,7 @@ steps:
   - actor: /components/store-ops.md
     caller: /components/cli.md
     label: read the registered rows
-    action: "`ReadRegistered` reads, in one read transaction on a handle SQLite will not write through, every `registered_definition` and `registered_projection` row with its registration moment, every inline projection body and admission hold, every receipt, served value, saved selection and selection code (card 224), and the store's copy of the Definitions the binary carried. The old files are opened read-only throughout."
+    action: "`ReadRegistered` reads, in one read transaction on a handle SQLite will not write through, every `registered_definition` and `registered_projection` row with its registration moment, every template body and admission hold, every receipt, served value, saved selection and selection code (card 224), and the store's copy of the Definitions the binary carried. The old files are opened read-only throughout."
     resource: internal/store/ops/registered.go#ReadRegistered
     anchor: "ReadOnly: true"
   - actor: /components/fold.md

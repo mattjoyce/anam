@@ -136,9 +136,9 @@ func carriedCounts(reg ops.Registered) string {
 	for _, c := range reg.Content {
 		byKind[c.Kind]++
 	}
-	return fmt.Sprintf("%d registered Definitions, %d registered projection templates, %d inline projection bodies, "+
+	return fmt.Sprintf("%d registered Definitions, %d registered projection templates, %d template bodies, "+
 		"%d admission holds, %d receipts, %d served values, %d saved selections and %d selection codes",
-		len(reg.Definitions), len(reg.Projections), len(reg.Inline), len(reg.Holds),
+		len(reg.Definitions), len(reg.Projections), len(reg.TemplateBodies), len(reg.Holds),
 		byKind[ops.KindReceipt], byKind[ops.KindServed], byKind[ops.KindSelection], byKind[ops.KindSelectionCode])
 }
 

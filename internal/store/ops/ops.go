@@ -65,6 +65,13 @@ import (
 // body. A build before it never reads the table, and refuses a receipt carrying the
 // inline marker as one with an unknown field, so neither build misreads the other's file.
 //
+// Renaming inline_projection to template_body does not bump it either. Open moves the
+// rows across in place (renameInlineProjection), as bindSnapshotParts adds a column, so
+// no receipt loses the body it names. A build before the rename opening the file again
+// finds inline_projection empty and says an inline receipt's body is not held: verify
+// fails, it never passes wrongly, and the next open by this build carries across any
+// body the older build filed meanwhile. That is the rollback's known cost.
+//
 // admission_hold (the operator's admission hold over sources) does not bump it either, by
 // the same rule: a version-9 file gains the empty table when Open applies the schema, and
 // a build before it never reads the table. A hold set by this build is not enforced by an
@@ -135,6 +142,10 @@ func Open(ctx context.Context, path string, buckets span.Buckets) (*DB, error) {
 		_ = db.Close()
 		return nil, err
 	}
+	if err := renameInlineProjection(ctx, db); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	if err := pinSchemaVersion(ctx, db); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -196,6 +207,44 @@ func bindSnapshotParts(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
+// templateBodyRename is the step renameInlineProjection runs, in
+// migrations/template-body.sql: copy every inline_projection row into template_body,
+// then drop the old table and its triggers.
+//
+//go:embed migrations/template-body.sql
+var templateBodyRename string
+
+// renameInlineProjection carries a store written before template_body was named into
+// it. Open has already created template_body; the old table's rows move across in one
+// transaction and the old table goes. A store without inline_projection is left alone.
+func renameInlineProjection(ctx context.Context, db *sql.DB) error {
+	if ok, err := hasTable(ctx, db, "inline_projection"); err != nil || !ok {
+		return err
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("ops: rename inline_projection: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }() // no-op after Commit
+	if _, err := tx.ExecContext(ctx, templateBodyRename); err != nil {
+		return fmt.Errorf("ops: rename inline_projection: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("ops: rename inline_projection: %w", err)
+	}
+	return nil
+}
+
+// hasTable says whether the store holds a table of that name.
+func hasTable(ctx context.Context, q queryer, name string) (bool, error) {
+	var n int
+	if err := q.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, name).Scan(&n); err != nil {
+		return false, fmt.Errorf("ops: look for table %s: %w", name, err)
+	}
+	return n > 0, nil
+}
+
 // pinSchemaVersion records the version on first open and refuses a mismatch after.
 func pinSchemaVersion(ctx context.Context, db *sql.DB) error {
 	stored, fresh, err := pin(ctx, db, "schema_version", fmt.Sprintf("%d", schemaVersion))
@@ -207,7 +256,7 @@ func pinSchemaVersion(ctx context.Context, db *sql.DB) error {
 	}
 	return fmt.Errorf("%w: database holds %s, this build writes %d. Set the file aside and re-run init; the derived tier replays and the provisioned tier reloads, "+
 		"and anam move-artifacts --registered-from <the old file> copies across what importers and the operator registered, the admission holds, "+
-		"the receipts and the values they served, the saved selections and their codes, and the inline projection bodies, and moves in any artifact folder",
+		"the receipts and the values they served, the saved selections and their codes, and the template bodies, and moves in any artifact folder",
 		ErrSchemaVersion, stored, schemaVersion)
 }
 

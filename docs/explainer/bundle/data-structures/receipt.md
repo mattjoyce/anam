@@ -28,7 +28,7 @@ references:
 | `served_at` | string | the clock layout |
 | `span` | string | `whole-person` or `fact-time[from,to)` |
 | `query` | object, optional | `{from, before, at, type}` a read narrowed by after the template; nil for a whole serve |
-| `template_inline` | bool, optional | the template was an inline projection a query carried (card 211): `template` is then `inline`, `template_version` 1, and `template_hash` the address of the body filed in the `inline_projection` table. Last, left out when false, so every earlier receipt keeps its bytes and hash |
+| `template_inline` | bool, optional | the template was an inline projection a query carried (card 211): `template` is then `inline`, `template_version` 1, and `template_hash` the address of the body filed in the `template_body` table. Last, left out when false, so every earlier receipt keeps its bytes and hash |
 | `principal` | string, optional | the name, from the importers file, of the principal whose read this files, for a token set to record every read (card 216). Last and left out when empty, so every receipt cut before it has the same bytes and hash and still verifies |
 
 Stored as a row of the `receipt` table, addressed by the SHA-256 of its indented JSON; parsed with unknown fields refused. Verification reports two independent proofs: reproduced (re-derived hash and id set match) and intact (the served file still hashes to `served_hash`).

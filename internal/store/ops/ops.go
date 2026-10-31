@@ -76,12 +76,6 @@ import (
 // the same rule: a version-9 file gains the empty table when Open applies the schema, and
 // a build before it never reads the table. A hold set by this build is not enforced by an
 // older one, which is the rollback's known cost.
-//
-// projection (provisioned templates, kept so a receipt still verifies after its file
-// leaves the catalog) does not bump it either. A version-9 file gains the empty table
-// and is filled from the catalog at the next start; every body it would have held was in
-// that build's embedded catalog, so absent never stands for a body that is gone. A
-// build before it never reads the table.
 const schemaVersion = 9
 
 // ErrSchemaVersion is returned by Open for a database written by a different schema.

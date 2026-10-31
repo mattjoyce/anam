@@ -188,14 +188,18 @@ func Run(ctx context.Context, d Deps, name string, dryRun bool) (Served, error) 
 // Publish files value as what template t served at w, narrowed by q (nil when the
 // whole projection was served), with the receipt that says so. The caller derived
 // value; Verify derives it again from the receipt alone, through Narrow, so a caller
-// that narrowed any other way publishes a receipt that will not reproduce. The served
-// value is filed first and the receipt second: a crash between them leaves a value
-// no receipt names, never a receipt without its value. With dryRun set nothing is
-// written.
+// that narrowed any other way publishes a receipt that will not reproduce. The
+// template's body and the served value are filed first and the receipt second: a
+// crash between them leaves bytes no receipt names, never a receipt without the
+// template and value it names. The body is what lets the receipt verify after its
+// file has left the catalog. With dryRun set nothing is written.
 func Publish(ctx context.Context, d Deps, t projection.Template, w ledger.Watermark, q *receipt.Query,
 	value fold.Value, dryRun bool) (Served, error) {
 	ledgerID, err := d.Ledger.ID(ctx)
 	if err != nil {
+		return Served{}, err
+	}
+	if err := bodyMatches(t); err != nil {
 		return Served{}, err
 	}
 	fr, err := Cut(value, q)
@@ -232,6 +236,9 @@ func Publish(ctx context.Context, d Deps, t projection.Template, w ledger.Waterm
 	if dryRun {
 		return out, nil
 	}
+	if _, err := d.Published.Put(ctx, receipt.TemplateBodyKind, t.Body); err != nil {
+		return Served{}, err
+	}
 	if _, err := d.Published.Put(ctx, receipt.ServedKind, servedBytes); err != nil {
 		return Served{}, err
 	}
@@ -240,6 +247,15 @@ func Publish(ctx context.Context, d Deps, t projection.Template, w ledger.Waterm
 	}
 	out.Written = true
 	return out, nil
+}
+
+// bodyMatches refuses a template whose body does not hash to the hash its receipt will
+// record: the body is filed under that hash, and verify replays whatever it finds there.
+func bodyMatches(t projection.Template) error {
+	if got := ops.Digest(t.Body); got != t.Hash {
+		return fmt.Errorf("serve: template %s v%d body hashes to %s, not its hash %s", t.Name, t.Version, got, t.Hash)
+	}
+	return nil
 }
 
 // Narrow is how a read narrows a template's value before publishing it, and how
@@ -371,37 +387,80 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 }
 
 // templateOf is the template a receipt was served through, and notes on how it was
-// found. A registered template is the exact version the receipt names, not the newest:
-// every version ever held stays readable (card 125), so a receipt served under v1
-// verifies after v2 is registered. An inline one is the body filed under its hash
-// (card 211), parsed again by the loader that checked it. Either missing cannot
-// re-derive the value.
+// found. The body filed under the receipt's template hash comes first: it is the
+// exact template that served, filed with the receipt, so the receipt verifies after
+// its file has left the catalog or been rolled back. A registered template is the
+// exact version the receipt names, not the newest (card 125), and is what a receipt
+// with no filed body replays. An inline one is only ever its filed body (card 211).
+// With neither, the value cannot be re-derived, and the error says why.
 func templateOf(ctx context.Context, d Deps, r receipt.Receipt) (projection.Template, []string, error) {
 	if r.TemplateInline {
 		t, err := inlineTemplate(ctx, d, r.TemplateHash)
 		return t, nil, err
 	}
-	t, err := d.Templates.Version(r.Template, r.TemplateVersion)
-	if err != nil {
-		if errors.Is(err, projection.ErrUnknown) {
-			return projection.Template{}, nil, fmt.Errorf("%w: the receipt was served under %s v%d: %v",
-				ErrTemplateMoved, r.Template, r.TemplateVersion, err)
-		}
-		return projection.Template{}, nil, err
+	held, heldErr := d.Templates.Version(r.Template, r.TemplateVersion)
+	if heldErr != nil && !errors.Is(heldErr, projection.ErrUnknown) {
+		return projection.Template{}, nil, heldErr
 	}
 	var notes []string
-	if cur, err := d.Templates.Lookup(r.Template); err == nil && cur.Version != t.Version {
-		notes = append(notes, fmt.Sprintf("replayed %s v%d from the held history; v%d is current", t.Name, t.Version, cur.Version))
+	if cur, err := d.Templates.Lookup(r.Template); err == nil && heldErr == nil && cur.Version != held.Version {
+		notes = append(notes, fmt.Sprintf("replayed %s v%d from the held history; v%d is current", held.Name, held.Version, cur.Version))
+	}
+
+	if r.TemplateHash != "" {
+		t, filed, err := filedTemplate(ctx, d, r)
+		if err != nil {
+			return projection.Template{}, nil, err
+		}
+		if filed {
+			switch {
+			case heldErr != nil:
+				notes = append(notes, fmt.Sprintf("replayed %s v%d from the body filed with the receipt; the catalog no longer holds that version", t.Name, t.Version))
+			case held.Hash != t.Hash:
+				notes = append(notes, fmt.Sprintf("replayed %s v%d from the body filed with the receipt; the catalog now holds %s at that version, a different body", t.Name, t.Version, held.Hash))
+			}
+			return t, notes, nil
+		}
+	}
+
+	if heldErr != nil {
+		return projection.Template{}, nil, fmt.Errorf("%w: unable to verify: the receipt was served under %s v%d, the catalog no longer holds that version, "+
+			"and no body was filed with the receipt (receipts served before template bodies were filed have none). "+
+			"Put the file for %s v%d back in the catalog, under history/ if a later version is current, to verify it: %v",
+			ErrTemplateMoved, r.Template, r.TemplateVersion, r.Template, r.TemplateVersion, heldErr)
 	}
 	switch r.TemplateHash {
-	case t.Hash:
+	case held.Hash:
 	case "":
 		notes = append(notes, "receipt names no template hash (served before template hashes were recorded); the version held is taken to be the one that served")
 	default:
-		return projection.Template{}, nil, fmt.Errorf("%w: %s v%d is %s here, the receipt was served under %s",
-			ErrTemplateMoved, t.Name, t.Version, t.Hash, r.TemplateHash)
+		return projection.Template{}, nil, fmt.Errorf("%w: unable to verify: %s v%d is %s here, the receipt was served under %s, and no body was filed with the receipt. "+
+			"Put the file that served back in the catalog to verify it",
+			ErrTemplateMoved, held.Name, held.Version, held.Hash, r.TemplateHash)
 	}
-	return t, notes, nil
+	return held, notes, nil
+}
+
+// filedTemplate loads the template body filed under a receipt's template hash, if
+// one was, and checks it is the template the receipt names. The store re-hashes the
+// bytes it returns, so an altered body is refused there.
+func filedTemplate(ctx context.Context, d Deps, r receipt.Receipt) (projection.Template, bool, error) {
+	body, err := d.Published.Get(ctx, receipt.TemplateBodyKind, r.TemplateHash)
+	if errors.Is(err, ops.ErrNotFound) {
+		return projection.Template{}, false, nil
+	}
+	if err != nil {
+		return projection.Template{}, false, err
+	}
+	t, err := projection.Parse(body)
+	if err != nil {
+		return projection.Template{}, false, fmt.Errorf("serve: template body %s: %w", r.TemplateHash, err)
+	}
+	if t.Hash != r.TemplateHash || t.Name != r.Template || t.Version != r.TemplateVersion {
+		return projection.Template{}, false, fmt.Errorf("%w: the body filed as %s is %s v%d %s, the receipt names %s v%d",
+			ErrTemplateMoved, r.TemplateHash, t.Name, t.Version, t.Hash, r.Template, r.TemplateVersion)
+	}
+	return t, true, nil
 }
 
 // inlineTemplate loads the inline projection filed under hash and checks it parses to
@@ -411,7 +470,7 @@ func inlineTemplate(ctx context.Context, d Deps, hash string) (projection.Templa
 	body, err := d.Published.Get(ctx, receipt.TemplateBodyKind, hash)
 	if err != nil {
 		if errors.Is(err, ops.ErrNotFound) {
-			return projection.Template{}, fmt.Errorf("%w: the receipt was served through an inline projection %s, and its body is not held: %v",
+			return projection.Template{}, fmt.Errorf("%w: unable to verify: the receipt was served through an inline projection %s, and its body is not held: %v",
 				ErrTemplateMoved, hash, err)
 		}
 		return projection.Template{}, err

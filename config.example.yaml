@@ -94,7 +94,9 @@ listen: 127.0.0.1:8787
 # daemon never falls back to the built-in catalog or creates the directory. A relative
 # path is from the working directory, so prefer an absolute one in service config.
 # Start from a copy of internal/def/manifests and internal/projection/manifests; keep
-# the file names and bytes, since a receipt names the definition set's version.
+# the file names and bytes, since a receipt names the definition set's version. The
+# files say which templates are current: remove one and it is no longer served, and a
+# receipt served through it still verifies from the template body it filed.
 # definitions_dir: /etc/anam/definitions
 # projections_dir: /etc/anam/projections
 

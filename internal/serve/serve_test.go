@@ -6,7 +6,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -342,7 +344,12 @@ func TestVerify_MissingServedValueIsNotTampering(t *testing.T) {
 // The template is exactly what produced the pruning, so a moved template version
 // cannot re-derive the same value. Saying "not reproduced" would blame the ledger for
 // a change in the code.
-func TestVerify_RefusesAMovedTemplateVersion(t *testing.T) {
+// A receipt files the body of the template it was served through, so it verifies from
+// that body once the catalog has moved on: the version's file gone, or a different body
+// at the same version. The verdict says which. A receipt with no filed body, as every
+// one served before bodies were filed, cannot be re-derived without the file, and the
+// error says so and what to put back.
+func TestVerify_ReplaysTheFiledBodyOnceTheCatalogMovesOn(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	h.seed(t)
@@ -352,19 +359,55 @@ func TestVerify_RefusesAMovedTemplateVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-
-	// A registry whose bp is v2 — the same template, a later revision.
-	moved, err := projection.Parse([]byte(`{"name":"bp","version":2,"types":["health.blood-pressure"],` +
-		`"statuses":["admitted","endorsed"],"max_classification":"Sensitive","from":"","to":""}`))
-	if err != nil {
-		t.Fatalf("Parse: %v", err)
+	parse := func(version int, statuses string) projection.Template {
+		t.Helper()
+		tmpl, err := projection.Parse([]byte(fmt.Sprintf(`{"name":"bp","version":%d,"types":["health.blood-pressure"],`+
+			`"statuses":[%s],"max_classification":"Sensitive","from":"","to":""}`, version, statuses)))
+		if err != nil {
+			t.Fatalf("Parse: %v", err)
+		}
+		return tmpl
 	}
-	deps := h.deps
-	deps.Templates = registryOf(t, moved)
+	for _, tc := range []struct {
+		name    string
+		catalog projection.Template
+		note    string
+	}{
+		{"the version's file has left", parse(2, `"admitted","endorsed"`), "the catalog no longer holds that version"},
+		{"the version holds another body", parse(1, `"admitted"`), "a different body"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			deps := h.deps
+			deps.Templates = registryOf(t, tc.catalog)
+			_, res, err := serve.Verify(ctx, deps, out.ReceiptHash)
+			if err != nil || !res.OK() {
+				t.Fatalf("Verify from the filed body: %v\n%s", err, res.Summary())
+			}
+			if !slices.ContainsFunc(res.Notes, func(n string) bool {
+				return strings.Contains(n, "from the body filed with the receipt") && strings.Contains(n, tc.note)
+			}) {
+				t.Errorf("the verdict does not say it replayed the filed body: %q", res.Notes)
+			}
 
-	if _, _, err := serve.Verify(ctx, deps, out.ReceiptHash); !errors.Is(err, serve.ErrTemplateMoved) {
-		t.Errorf("Verify under a moved template: err = %v, want ErrTemplateMoved", err)
+			deps.Published = noTemplateBodies{deps.Published}
+			_, _, err = serve.Verify(ctx, deps, out.ReceiptHash)
+			if !errors.Is(err, serve.ErrTemplateMoved) || !strings.Contains(err.Error(), "unable to verify") ||
+				!strings.Contains(err.Error(), "no body was filed with the receipt") {
+				t.Errorf("Verify with neither the file nor a filed body: err = %v, want ErrTemplateMoved saying why", err)
+			}
+		})
 	}
+}
+
+// noTemplateBodies is a store that never filed a template body, as one written before
+// receipts filed them.
+type noTemplateBodies struct{ serve.Store }
+
+func (s noTemplateBodies) Get(ctx context.Context, kind, digest string) ([]byte, error) {
+	if kind == receipt.TemplateBodyKind {
+		return nil, ops.ErrNotFound
+	}
+	return s.Store.Get(ctx, kind, digest)
 }
 
 // Definitions govern capture, not the fold, so a moved definition set cannot change

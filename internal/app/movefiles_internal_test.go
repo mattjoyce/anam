@@ -109,7 +109,7 @@ func TestMoveArtifacts_ARecordsFolderComesInAndItsReceiptsVerify(t *testing.T) {
 	}
 	// The old store already holds the two receipts and their served values as rows, so
 	// the carry brings them, and the folder's copies are found already there.
-	if !strings.Contains(out, "copied 0 registered Definitions, 1 registered projection templates, 0 template bodies, "+
+	if !strings.Contains(out, "copied 0 registered Definitions, 1 registered projection templates, 1 template bodies, "+
 		"0 admission holds, 2 receipts, 2 served values, 0 saved selections and 0 selection codes") {
 		t.Errorf("the move does not say what it copied:\n%s", out)
 	}

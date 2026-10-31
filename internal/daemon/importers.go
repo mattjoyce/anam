@@ -95,32 +95,23 @@ func guardCatalog(ctx context.Context, db *ops.DB, cat *catalog.Catalog) error {
 	return def.Guard(storedOf(rows), cat.Definitions())
 }
 
-// persistCatalog stores the catalog the daemon admitted: its Definition manifests and
-// its projection templates, current and history. What is persisted is what was
-// guarded and loaded. It runs last, after every check that can refuse the start, so a
-// catalog the daemon would not run on is never written.
+// persistCatalog stores the Definition manifests of the catalog the daemon admitted,
+// current and history: what is persisted is what was guarded and loaded. It runs last,
+// after every check that can refuse the start, so a catalog the daemon would not run
+// on is never written.
 //
-// It stores by upsert, never a sweep: a provisioned type or template the catalog has
-// dropped stays as a provisioned row at its last version. Its facets were admitted
-// under that body, the inspector still reads them through it, and a receipt that names
-// it still verifies. An importer that takes the type over keeps the version. The two
-// tables are separate files-worth of state with no transaction across them; a crash
-// between the writes leaves the second to the next start, which writes it again.
+// It stores by upsert, never a sweep: a provisioned type the catalog has dropped stays
+// as a provisioned row at its last version. Its facets were admitted under that body
+// and the inspector still reads them through it, and an importer that takes the type
+// over keeps the version. Projection templates are not stored here: the files say
+// which are current, and a receipt files the body it was served through itself.
 func persistCatalog(ctx context.Context, db *ops.DB, cat *catalog.Catalog) error {
 	current := cat.Manifests()
 	put := make([]ops.DefinitionRow, len(current))
 	for i, m := range current {
 		put[i] = ops.DefinitionRow{Type: string(m.Type), Version: m.Version, Body: string(m.Body)}
 	}
-	if err := db.PutDefinitions(ctx, put); err != nil {
-		return err
-	}
-	templates := cat.ProjectionManifests()
-	rows := make([]ops.ProjectionRow, len(templates))
-	for i, t := range templates {
-		rows[i] = ops.ProjectionRow{Name: t.Name, Version: t.Version, Body: string(t.Body)}
-	}
-	return db.PutProjections(ctx, rows)
+	return db.PutDefinitions(ctx, put)
 }
 
 func storedOf(rows []ops.DefinitionRow) []def.Stored {

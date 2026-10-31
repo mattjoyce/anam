@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -60,82 +61,46 @@ func openStore(t *testing.T, ctx context.Context, cfg config.Config) *ops.DB {
 	return db
 }
 
-// A template whose file has left the projections directory is still held after the
-// next start, so a receipt that names it still verifies; the store holds every
-// version the catalog carried.
-func TestOpenRetainsAProjectionAfterItsFileLeaves(t *testing.T) {
-	ctx := context.Background()
-	cfg := newConfig(t)
+// A template whose file has left the projections directory is gone from the next
+// start: the files say what is current, so it is neither listed nor served. A receipt
+// served through it still verifies, from the body the receipt filed when it was served.
+func TestReceiptVerifiesAfterItsTemplateFileLeaves(t *testing.T) {
+	cfg := readerConfig(t)
 	cfg.ProjectionsDir = copyCatalogRoot(t, projection.EmbeddedFS())
 
-	d, err := Open(ctx, cfg, Options{})
-	if err != nil {
-		t.Fatalf("first open: %v", err)
-	}
-	held := d.projections.current.Load().Held()
-	if len(held) == 0 {
-		t.Fatal("the catalog holds no projections")
-	}
-	gone := held[0]
+	d := open(t, cfg)
+	srv := httptest.NewServer(d.Handler())
+	var minted api.Published
+	call(t, "GET", srv.URL+timelineBP, recorderToken, "", http.StatusOK, &minted)
+	srv.Close()
 	if err := d.closeStores(); err != nil {
 		t.Fatal(err)
 	}
 
-	db := openStore(t, ctx, cfg)
-	rows, err := db.ProvisionedProjections(ctx)
-	if err != nil || len(rows) != len(d.catalog.ProjectionManifests()) {
-		t.Fatalf("stored %d provisioned projections, %v; want the catalog's %d", len(rows), err, len(d.catalog.ProjectionManifests()))
-	}
-
-	entries, err := os.ReadDir(cfg.ProjectionsDir)
-	if err != nil {
+	if err := os.Remove(filepath.Join(cfg.ProjectionsDir, "bp.json")); err != nil {
 		t.Fatal(err)
 	}
-	removed := 0
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
-			continue
-		}
-		p := filepath.Join(cfg.ProjectionsDir, e.Name())
-		b, err := os.ReadFile(p)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if tpl, err := projection.Parse(b); err == nil && tpl.Name == gone.Name {
-			if err := os.Remove(p); err != nil {
-				t.Fatal(err)
-			}
-			removed++
-		}
+	d2 := open(t, cfg)
+	t.Cleanup(func() { _ = d2.closeStores() })
+	if _, err := d2.projections.current.Load().Lookup("bp"); err == nil {
+		t.Error("bp is still served after its file left the catalog")
 	}
-	if removed == 0 {
-		t.Fatalf("no file for %s in the directory", gone.Name)
+	srv2 := httptest.NewServer(d2.Handler())
+	defer srv2.Close()
+	var verified api.ReceiptVerified
+	call(t, "GET", srv2.URL+"/v1/receipts/"+minted.ReceiptHash+"/verify", recorderToken, "", http.StatusOK, &verified)
+	if !verified.Result.OK() {
+		t.Fatalf("the receipt does not verify after bp's file left: %s", verified.Result.Summary())
 	}
-	// History beside a template that is gone would not load, and the retained rows
-	// are the point: the earlier versions leave with the file.
-	if err := os.RemoveAll(filepath.Join(cfg.ProjectionsDir, "history")); err != nil {
-		t.Fatal(err)
-	}
-
-	d2, err := Open(ctx, cfg, Options{})
-	if err != nil {
-		t.Fatalf("second open: %v", err)
-	}
-	defer func() { _ = d2.closeStores() }()
-	if _, err := d2.catalog.Projections().Lookup(gone.Name); err == nil {
-		t.Fatalf("the catalog still carries %s; the fixture removed nothing", gone.Name)
-	}
-	var found bool
-	for _, v := range d2.projections.current.Load().Versions(gone.Name) {
-		found = found || (v.Version == gone.Version && v.Hash == gone.Hash)
-	}
-	if !found {
-		t.Errorf("%s v%d is not held after its file left the catalog", gone.Name, gone.Version)
+	if !slices.ContainsFunc(verified.Result.Notes, func(n string) bool {
+		return strings.Contains(n, "from the body filed with the receipt")
+	}) {
+		t.Errorf("the verdict does not say it replayed the filed body: %q", verified.Result.Notes)
 	}
 }
 
 // A start refused by a check writes nothing of the catalog: the check runs before the
-// store takes the catalog's Definitions and templates.
+// store takes the catalog's Definitions.
 func TestOpenRefusedStartWritesNoCatalog(t *testing.T) {
 	ctx := context.Background()
 	cfg := newConfig(t)
@@ -147,9 +112,6 @@ func TestOpenRefusedStartWritesNoCatalog(t *testing.T) {
 	db := openStore(t, ctx, cfg)
 	if rows, err := db.Definitions(ctx); err != nil || len(rows) != 0 {
 		t.Errorf("a refused start stored %d definitions, %v", len(rows), err)
-	}
-	if rows, err := db.ProvisionedProjections(ctx); err != nil || len(rows) != 0 {
-		t.Errorf("a refused start stored %d projections, %v", len(rows), err)
 	}
 }
 

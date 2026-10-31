@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/read"
@@ -44,14 +45,18 @@ receipt is the record of the serve.`,
 			if err != nil {
 				return err
 			}
+			cat, err := loadCatalog(cmd.Context(), cfg)
+			if err != nil {
+				return err
+			}
 			if len(args) == 0 {
-				templates, err := localProjections(cmd.Context(), cfg)
+				templates, err := localProjections(cmd.Context(), cfg, cat)
 				if err != nil {
 					return err
 				}
 				return listProjections(cmd, templates)
 			}
-			deps, closeLedger, err := serveDeps(cmd.Context(), cfg)
+			deps, closeLedger, err := serveDeps(cmd.Context(), cfg, cat)
 			if err != nil {
 				return err
 			}
@@ -341,7 +346,11 @@ func verifyReceipt(ctx context.Context, cfg config.Config, hash string) (api.Rec
 		}
 		return c.VerifyReceipt(ctx, hash)
 	}
-	deps, closeLedger, err := serveDeps(ctx, cfg)
+	cat, err := loadCatalog(ctx, cfg)
+	if err != nil {
+		return api.ReceiptVerified{}, err
+	}
+	deps, closeLedger, err := serveDeps(ctx, cfg, cat)
 	if err != nil {
 		return api.ReceiptVerified{}, err
 	}
@@ -443,12 +452,9 @@ func ledgerOrUnnamed(id string) string {
 // serveDeps assembles the serve path's dependencies from config (read.ServeDeps):
 // the ledger read-only, since serving writes nothing to it, the store that holds receipts, and the
 // checkpoint log so a serve or a verify starts from the last mint run rather than
-// the ledger's first event. The returned func closes them.
-func serveDeps(ctx context.Context, cfg config.Config) (serve.Deps, func(), error) {
-	cat, err := loadCatalog(ctx, cfg)
-	if err != nil {
-		return serve.Deps{}, nil, err
-	}
+// the ledger's first event, over cat, the catalog the command loaded once. The
+// returned func closes them.
+func serveDeps(ctx context.Context, cfg config.Config, cat *catalog.Catalog) (serve.Deps, func(), error) {
 	l, err := openLedgerReadOnly(ctx, cfg)
 	if err != nil {
 		return serve.Deps{}, nil, err

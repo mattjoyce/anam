@@ -151,7 +151,7 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 	}
 	// Loaded and validated once, before any store is opened: the principals, the
 	// guard, the registries and every receipt read this one catalog.
-	cat, err := catalog.Load(ctx, "", "")
+	cat, err := catalog.Load(ctx, cfg.DefinitionsDir, cfg.ProjectionsDir)
 	if err != nil {
 		return nil, err
 	}
@@ -189,20 +189,30 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 	}
 	ctx, cancel = context.WithTimeout(parent, cfg.Timeout)
 	defer cancel()
-	if err := guardBundled(ctx, db, cat); err != nil {
+	// Every check that can refuse the start runs before the catalog is written, so a
+	// bad projection or a contradicted Definition leaves the store as it was.
+	if err := guardCatalog(ctx, db, cat); err != nil {
 		closeAll()
 		return nil, err
 	}
-	defs, err := loadDefinitions(ctx, db, bundled)
+	defs, err := loadDefinitions(ctx, db, cat)
 	if err != nil {
 		closeAll()
 		return nil, err
 	}
-	projs, err := loadProjections(ctx, db, cat.Projections(), cfg.DefaultProjection)
+	projs, err := loadProjections(ctx, db, cat, cfg.DefaultProjection)
 	if err != nil {
 		closeAll()
 		return nil, err
 	}
+	if err := persistCatalog(ctx, db, cat); err != nil {
+		closeAll()
+		return nil, err
+	}
+	slog.Info("daemon: catalog admitted",
+		"definitions_source", cat.DefinitionsSource(),
+		"projections_source", cat.ProjectionsSource(),
+		"definition_set_version", cat.SetVersion())
 	readOps, err := ops.OpenReadOnly(ctx, cfg.DBPath)
 	if err != nil {
 		closeAll()

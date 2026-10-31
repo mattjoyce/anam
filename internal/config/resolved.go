@@ -45,6 +45,32 @@ func LoadResolved(path string) (Resolved, error) { return LoadResolvedOverriding
 // LoadResolvedOverriding is LoadResolved with set taking precedence over everything
 // else, keyed by config key.
 func LoadResolvedOverriding(path string, set map[string]string) (Resolved, error) {
+	r, err := resolve(path, set)
+	if err != nil {
+		return Resolved{}, err
+	}
+	if err := r.value.Validate(); err != nil {
+		return Resolved{}, err
+	}
+	return r, nil
+}
+
+// CatalogDirs is the definitions_dir and projections_dir the configuration at path
+// resolves to, by the same layers, strict decoding and path expansion as
+// LoadResolved, without validating the settings a caller that wants only the catalog
+// never reads. It is for anam-bench, which takes the catalog from the anam config and
+// everything else from its own flags.
+func CatalogDirs(path string) (definitionsDir, projectionsDir string, err error) {
+	r, err := resolve(path, nil)
+	if err != nil {
+		return "", "", err
+	}
+	return r.value.DefinitionsDir, r.value.ProjectionsDir, nil
+}
+
+// resolve composes and decodes the configuration at path with set on top, and expands
+// its paths: LoadResolvedOverriding but for Validate.
+func resolve(path string, set map[string]string) (Resolved, error) {
 	fragments, err := readConfigFragments(path)
 	if err != nil {
 		return Resolved{}, err
@@ -81,9 +107,6 @@ func LoadResolvedOverriding(path string, set map[string]string) (Resolved, error
 		c.LibraryDir = filepath.Join(filepath.Dir(c.LedgerPath), "documents")
 	}
 	if err := expandPaths(&c); err != nil {
-		return Resolved{}, err
-	}
-	if err := c.Validate(); err != nil {
 		return Resolved{}, err
 	}
 
@@ -202,6 +225,8 @@ func defaultSettings() []defaultSetting {
 		textDefault("listen", DefaultListen),
 		textDefault("token_file", ""),
 		textDefault("importers_file", ""),
+		textDefault("definitions_dir", DefaultDefinitionsDir),
+		textDefault("projections_dir", DefaultProjectionsDir),
 		textDefault("server", ""),
 		numberDefault("checkpoint_budget", DefaultCheckpointBudget),
 		textDefault("backup_dir", ""),
@@ -369,6 +394,12 @@ func expandPaths(c *Config) error {
 	}
 	if c.ImportersFile != "" {
 		paths["importers_file"] = &c.ImportersFile
+	}
+	if c.DefinitionsDir != "" {
+		paths["definitions_dir"] = &c.DefinitionsDir
+	}
+	if c.ProjectionsDir != "" {
+		paths["projections_dir"] = &c.ProjectionsDir
 	}
 	for name, p := range paths {
 		expanded, err := safepath.Expand(*p)

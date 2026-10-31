@@ -68,7 +68,11 @@ func readCoverage(ctx context.Context, cfg config.Config, q api.CoverageQuery) (
 		return c.Coverage(ctx, q)
 	}
 	q.Zone = cfg.Zone
-	src, closeAll, err := readSource(ctx, cfg)
+	cat, err := loadCatalog(ctx, cfg)
+	if err != nil {
+		return api.Coverage{}, err
+	}
+	src, closeAll, err := readSource(ctx, cfg, cat)
 	if err != nil {
 		return api.Coverage{}, err
 	}

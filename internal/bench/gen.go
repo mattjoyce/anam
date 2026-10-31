@@ -7,6 +7,7 @@ package bench
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -88,20 +89,19 @@ type stepClock struct{ now time.Time }
 
 func (c *stepClock) Now() time.Time { return c.now }
 
-// Generate builds the record sh describes in dir, which must not hold one. The same
-// shape always yields the same facts, anam-times included; only the ledger's id
-// differs between two builds.
-func Generate(ctx context.Context, dir string, sh Shape, progress func(string)) error {
+// Generate builds the record sh describes in dir, which must not hold one, admitting
+// it against cat's Definitions. The same shape always yields the same facts, anam-times
+// included; only the ledger's id differs between two builds.
+func Generate(ctx context.Context, cat *catalog.Catalog, dir string, sh Shape, progress func(string)) error {
+	if cat == nil {
+		return errors.New("bench: Generate needs a catalog")
+	}
 	p := PathsIn(dir)
 	l, err := ledger.Create(ctx, p.Ledger, Person)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = l.Close() }()
-	cat, err := catalog.Load(ctx, "", "")
-	if err != nil {
-		return err
-	}
 	defs := cat.Definitions()
 	clk := &stepClock{}
 	g := gate.New(l, defs, gate.StaticScopes{source: {factType}}, clk, Person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})

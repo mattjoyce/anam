@@ -10,23 +10,55 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/safepath"
 	"github.com/spf13/cobra"
 )
 
 // Main is the anam-bench command tree.
 func Main(ctx context.Context, build string) error {
+	var cfgPath string
 	root := &cobra.Command{
 		Use:           "anam-bench",
 		Short:         "Anam's read performance bench",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.AddCommand(genCmd(), runCmd(build), mintCmd(), sizesCmd(), compareCmd())
+	root.PersistentFlags().StringVar(&cfgPath, "config", "",
+		"the anam config whose definitions_dir and projections_dir choose the catalog (found as anam finds it when not given)")
+	root.AddCommand(genCmd(&cfgPath), runCmd(build, &cfgPath), mintCmd(), sizesCmd(), compareCmd())
 	return root.ExecuteContext(ctx)
 }
 
-func genCmd() *cobra.Command {
+// loadCatalog loads the catalog one bench invocation reads, once: from the
+// definitions_dir and projections_dir of the anam config found as anam finds it
+// (--config, ANAM_CONFIG, the user config directory) and the environment, the
+// built-in catalog for either left empty. The bench takes nothing else from the
+// config, so a setting it does not read (a daemon's timeout, a person) neither
+// needs to be there nor to be valid.
+func loadCatalog(cmd *cobra.Command, explicit string) (*catalog.Catalog, error) {
+	path, origin, err := config.Resolve(explicit)
+	if err != nil {
+		return nil, err
+	}
+	defs, projs, err := config.CatalogDirs(path)
+	if err != nil {
+		return nil, err
+	}
+	cat, err := catalog.Load(cmd.Context(), defs, projs)
+	if err != nil {
+		return nil, err
+	}
+	if path != "" {
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "config: %s (%s)\n", path, origin)
+	}
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "catalog: definitions %s, projections %s\n",
+		cat.DefinitionsSource(), cat.ProjectionsSource())
+	return cat, nil
+}
+
+func genCmd(cfgPath *string) *cobra.Command {
 	var shape, dir string
 	budget := 0
 	cmd := &cobra.Command{
@@ -48,8 +80,12 @@ Shapes: ` + shapeList(),
 			if _, err := os.Stat(PathsIn(dir).Ledger); err == nil {
 				return fmt.Errorf("%s already holds a ledger", dir)
 			}
+			cat, err := loadCatalog(cmd, *cfgPath)
+			if err != nil {
+				return err
+			}
 			start := time.Now()
-			err := Generate(cmd.Context(), dir, sh, func(s string) {
+			err = Generate(cmd.Context(), cat, dir, sh, func(s string) {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%6.1fs %s\n", time.Since(start).Seconds(), s)
 			})
 			if err != nil {
@@ -75,7 +111,7 @@ func shapeList() string {
 	return strings.Join(out, ", ")
 }
 
-func runCmd(build string) *cobra.Command {
+func runCmd(build string, cfgPath *string) *cobra.Command {
 	o := Options{Build: build}
 	var dir, out string
 	cmd := &cobra.Command{
@@ -88,6 +124,11 @@ a record, never at one a daemon holds.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			o.Paths = PathsIn(dir)
+			cat, err := loadCatalog(cmd, *cfgPath)
+			if err != nil {
+				return err
+			}
+			o.Catalog = cat
 			rep, err := Run(cmd.Context(), o, func(s string) {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "  %s\n", s)
 			})

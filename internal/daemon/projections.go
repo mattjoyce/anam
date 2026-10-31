@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/projection"
@@ -34,7 +35,8 @@ type projections struct {
 // receipts against the wrong one. A default_projection that names neither a bundled
 // nor a registered template also stops it: only here are the registered ones visible,
 // and an operator who mistyped the name should learn at start, not from an agent.
-func loadProjections(ctx context.Context, db *ops.DB, bundled *projection.Registry, defaultName string) (*projections, error) {
+func loadProjections(ctx context.Context, db *ops.DB, cat *catalog.Catalog, defaultName string) (*projections, error) {
+	bundled := cat.Projections()
 	rows, err := db.RegisteredProjections(ctx)
 	if err != nil {
 		return nil, err

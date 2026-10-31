@@ -23,10 +23,15 @@ type definitions struct {
 // loadDefinitions builds the registry from the bundled Definitions and those the
 // operational store holds as registered. A registered type this build bundles is
 // admitted against the bundled Definition, and said so in the log.
-func loadDefinitions(ctx context.Context, db *ops.DB, bundled *def.Registry) (*definitions, error) {
+func loadDefinitions(ctx context.Context, db *ops.DB, cat *catalog.Catalog) (*definitions, error) {
+	bundled := cat.Definitions()
 	rows, err := db.RegisteredDefinitions(ctx)
 	if err != nil {
 		return nil, err
+	}
+	reg, err := cat.WithRegistered(storedOf(rows))
+	if err != nil {
+		return nil, fmt.Errorf("daemon: registered definitions: %w", err)
 	}
 	for _, r := range rows {
 		if _, taken := bundled.Lookup(facet.Type(r.Type)); taken {
@@ -34,33 +39,34 @@ func loadDefinitions(ctx context.Context, db *ops.DB, bundled *def.Registry) (*d
 				"type", r.Type, "version", r.Version)
 		}
 	}
-	reg, err := def.WithRegistered(bundled, storedOf(rows))
-	if err != nil {
-		return nil, fmt.Errorf("daemon: registered definitions: %w", err)
-	}
 	d := &definitions{bundled: bundled}
 	d.current.Store(reg)
 	return d, nil
 }
 
-// guardBundled checks the catalog's Definitions against the ones the operational
-// store last saw (def.Guard), then stores that same catalog's manifests, current and
-// history: what is persisted is what was guarded. It runs at Open, before the gate
-// exists: a Definition that would re-key or re-place the ledger's facets stops the
-// daemon starting, and the error is the remedy.
-//
-// It stores by upsert, never a sweep: a provisioned type the catalog has dropped stays
-// as a provisioned row at its last version. Its facets were admitted under that body
-// and the inspector still reads them through it, and an importer that takes the type
-// over keeps the version.
-func guardBundled(ctx context.Context, db *ops.DB, cat *catalog.Catalog) error {
+// guardCatalog checks the catalog's Definitions against the ones the operational
+// store last saw (def.Guard). It runs at Open, before the gate exists and before any
+// catalog write: a Definition that would re-key or re-place the ledger's facets stops
+// the daemon starting, and the error is the remedy.
+func guardCatalog(ctx context.Context, db *ops.DB, cat *catalog.Catalog) error {
 	rows, err := db.Definitions(ctx)
 	if err != nil {
 		return err
 	}
-	if err := def.Guard(storedOf(rows), cat.Definitions()); err != nil {
-		return err
-	}
+	return def.Guard(storedOf(rows), cat.Definitions())
+}
+
+// persistCatalog stores the Definition manifests of the catalog the daemon admitted,
+// current and history: what is persisted is what was guarded and loaded. It runs last,
+// after every check that can refuse the start, so a catalog the daemon would not run
+// on is never written.
+//
+// It stores by upsert, never a sweep: a provisioned type the catalog has dropped stays
+// as a provisioned row at its last version. Its facets were admitted under that body
+// and the inspector still reads them through it, and an importer that takes the type
+// over keeps the version. Projection templates are not stored here: the files say
+// which are current, and a receipt files the body it was served through itself.
+func persistCatalog(ctx context.Context, db *ops.DB, cat *catalog.Catalog) error {
 	current := cat.Manifests()
 	put := make([]ops.DefinitionRow, len(current))
 	for i, m := range current {

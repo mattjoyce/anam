@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
@@ -22,11 +23,7 @@ import (
 
 // runFacetRetraction plans, and with yes tombstones, one facet of source. The dry run
 // opens the ledger read-only, so it cannot write.
-func runFacetRetraction(cmd *cobra.Command, cfg config.Config, source, facetID string, yes bool) error {
-	cat, err := loadCatalog(cmd.Context(), cfg)
-	if err != nil {
-		return err
-	}
+func runFacetRetraction(cmd *cobra.Command, cfg config.Config, cat *catalog.Catalog, source, facetID string, yes bool) error {
 	file, err := importersFile(cfg, cat.Definitions())
 	if err != nil {
 		return err

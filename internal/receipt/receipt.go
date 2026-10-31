@@ -34,8 +34,9 @@ const Kind = "receipt"
 // (ops.KindServed). It lives here because a receipt is the only thing that names one.
 const ServedKind = "served"
 
-// InlineKind is the kind of stored content the bodies of inline projections are filed
-// under (ops.KindInlineProjection), which a receipt with TemplateInline names by hash.
+// InlineKind is the kind of stored content template bodies are filed under
+// (ops.KindInlineProjection), which a receipt names by its TemplateHash: an inline
+// projection's, and since card 257 a catalog template's too.
 const InlineKind = "inline-projection"
 
 // Receipt is the immutable record of one serve. Its field set is §9's, and each field

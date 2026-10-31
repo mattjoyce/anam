@@ -571,8 +571,8 @@ rebuild has to know what it may drop:
 | Tier | Tables | Recovery |
 |---|---|---|
 | **Derived** | facet index, edge index (card 104), anam-event index, checkpoint index and its values (card 215), `span_head`, sync cursors | replay the ledger, and mint again |
-| **Provisioned** | Facet Definitions (bundled and registered), bundled projection templates, token scopes | the embedded assets, config, and each importer registering its Definitions again — i.e. git |
-| **Authored** | registered projection templates (card 125), receipts, served values and saved selections (card 215), the bodies of inline projections (card 211), `meta` | nowhere Anam can reach. Back it up; a registered template also comes back by registering it again from wherever the operator keeps the file |
+| **Provisioned** | Facet Definitions (catalog and registered), catalog projection templates, token scopes | the catalog (embedded, or `definitions_dir` / `projections_dir`), config, and each importer registering its Definitions again — i.e. git |
+| **Authored** | registered projection templates (card 125), receipts, served values and saved selections (card 215), template bodies, the bytes a receipt's template hash names, filed with every receipt so it verifies after its template's file has left the catalog (card 211, card 257), `meta` | nowhere Anam can reach. Back it up; a registered template also comes back by registering it again from wherever the operator keeps the file |
 | **Disposable** | importers' complete-resend snapshots (card 78): which parts of a run were admitted and which facet ids they carried | the next resend makes another; nothing is tombstoned from here without an operator's `anam retract --yes`, and an incomplete snapshot is dropped after `snapshot_ttl`, a day by default |
 
 The tier belongs in the schema beside each table, because it is the only thing that tells a later reader
@@ -619,7 +619,7 @@ rows naming values it does not hold, and receipts and selections that exist only
 and absent would read as none. The store refuses, as it does for any bump. It is carried forward by
 rebuilding it and moving the folder in with `anam move-artifacts`, which checks every file's bytes against
 its name before it writes anything, and which can copy the whole authored tier across from the old file
-read-only (`--registered-from`): the registered Definitions and projections, the inline projection bodies,
+read-only (`--registered-from`): the registered Definitions and projections, the template bodies,
 the admission holds, and the receipts, served values, saved selections and their codes, each row checked
 against its key (card 224). `anam migrate` carries the same rows into the store it creates. The next bump
 needs no folder: everything authored is already in the old file.

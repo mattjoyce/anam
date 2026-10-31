@@ -301,7 +301,7 @@ func TestRename_TheTableCarriesKindsToTheThirdSegment(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		src, closeAll, err := readSource(ctx, cfg)
+		src, closeAll, err := readSource(ctx, cfg, builtInCatalog(t))
 		if err != nil {
 			t.Fatal(err)
 		}

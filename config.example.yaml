@@ -86,6 +86,20 @@ listen: 127.0.0.1:8787
 #       receipts: always                 # file every read this token makes as a receipt naming it
 # importers_file: ~/.config/anam/importers.yaml
 
+# The catalog: the Facet Definitions and projection templates this deployment runs on.
+# Unset, each is the catalog built into the binary. Set, a directory replaces the
+# built-in one for that component (it is not added to it): current manifests at its
+# root, earlier versions under history/. The two are chosen independently. Each is read
+# once at start; a directory that is missing or unreadable stops the start, and the
+# daemon never falls back to the built-in catalog or creates the directory. A relative
+# path is from the working directory, so prefer an absolute one in service config.
+# Start from a copy of internal/def/manifests and internal/projection/manifests; keep
+# the file names and bytes, since a receipt names the definition set's version. The
+# files say which templates are current: remove one and it is no longer served, and a
+# receipt served through it still verifies from the template body it filed.
+# definitions_dir: /etc/anam/definitions
+# projections_dir: /etc/anam/projections
+
 # Bounds one long write inside the daemon: an index replay, a backup, the mint at
 # start. Also each phase of `anam migrate`: the fold of the old ledger, the carry. Its old name, ingest_timeout (ANAM_INGEST_TIMEOUT), is still read with a
 # warning; the two set differently are refused.

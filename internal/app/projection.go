@@ -56,7 +56,11 @@ func projectionListCmd(cfgPath *string) *cobra.Command {
 				}
 				return writeProjections(cmd, list)
 			}
-			templates, err := localProjections(cmd.Context(), cfg)
+			cat, err := loadCatalog(cmd.Context(), cfg)
+			if err != nil {
+				return err
+			}
+			templates, err := localProjections(cmd.Context(), cfg, cat)
 			if err != nil {
 				return err
 			}
@@ -93,7 +97,11 @@ func projectionShowCmd(cfgPath *string) *cobra.Command {
 				}
 				body = raw
 			} else {
-				templates, err := localProjections(cmd.Context(), cfg)
+				cat, err := loadCatalog(cmd.Context(), cfg)
+				if err != nil {
+					return err
+				}
+				templates, err := localProjections(cmd.Context(), cfg, cat)
 				if err != nil {
 					return err
 				}
@@ -210,14 +218,10 @@ func projectionsOf(ctx context.Context, cat *catalog.Catalog, db *ops.DB) (*proj
 	return projection.WithRegistered(bundled, stored)
 }
 
-// localProjections is the registry the local files hold. Without an operational store
-// yet (no anam init) it is the catalog's set alone: listing the menu must not create
-// a store as a side effect.
-func localProjections(ctx context.Context, cfg config.Config) (*projection.Registry, error) {
-	cat, err := loadCatalog(ctx, cfg)
-	if err != nil {
-		return nil, err
-	}
+// localProjections is the registry the local files hold, over cat. Without an
+// operational store yet (no anam init) it is the catalog's set alone: listing the menu
+// must not create a store as a side effect.
+func localProjections(ctx context.Context, cfg config.Config, cat *catalog.Catalog) (*projection.Registry, error) {
 	if _, err := os.Stat(cfg.DBPath); errors.Is(err, fs.ErrNotExist) {
 		return cat.Projections(), nil
 	}

@@ -34,8 +34,9 @@ const (
 	KindSelection = "selection"
 	// KindSelectionCode is the code of a saved selection that lengthened (authored).
 	KindSelectionCode = "selection-code"
-	// KindInlineProjection is the body of a projection a query carried in its request,
-	// filed so the receipt that names its hash can be replayed (authored).
+	// KindInlineProjection is a template body a receipt was served through, filed so the
+	// receipt that names its hash can be replayed (authored): a projection a query carried
+	// in its request, or a catalog template. The name is from when it held only the first.
 	KindInlineProjection = "inline-projection"
 )
 

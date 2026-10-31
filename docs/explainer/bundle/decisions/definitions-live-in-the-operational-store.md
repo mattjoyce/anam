@@ -22,7 +22,7 @@ affects:
 
 **Context.** An artifact's `definition_version` must still resolve years later, and importers in other repos emit their own types.
 
-**Choice.** Governance, not record. The `definition` table holds every bundled version the store has seen; `registered_definition` holds what importers registered, with triggers refusing update and delete. The live registry is the bundled set plus the newest registered version of each type the binary does not carry. A new version may change schema, classification or series but not `identity_key` or `fact_time`, checked when the daemon opens by `def.Guard` (`guardBundled`, which then stores the bundled set; before card 119 only an ingest ran it) and at registration by `def.Register`.
+**Choice.** Governance, not record. The `definition` table holds every bundled version the store has seen; `registered_definition` holds what importers registered, with triggers refusing update and delete. The live registry is the bundled set plus the newest registered version of each type the binary does not carry. A new version may change schema, classification or series but not `identity_key` or `fact_time`, checked when the daemon opens by `def.Guard` (`guardCatalog`; `persistCatalog` stores the catalog's set once every start check has passed (card 257); before card 119 only an ingest ran it) and at registration by `def.Register`.
 
 **Why.** The error kernel is smaller for it, and a lost operational store comes back from git and from each importer registering again.
 

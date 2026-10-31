@@ -119,8 +119,11 @@ func TestGuardPersistsTheCatalogItGuarded(t *testing.T) {
 		t.Fatalf("ops.Open: %v", err)
 	}
 	defer func() { _ = db.Close() }()
-	if err := guardBundled(ctx, db, cat); err != nil {
-		t.Fatalf("guardBundled: %v", err)
+	if err := guardCatalog(ctx, db, cat); err != nil {
+		t.Fatalf("guardCatalog: %v", err)
+	}
+	if err := persistCatalog(ctx, db, cat); err != nil {
+		t.Fatalf("persistCatalog: %v", err)
 	}
 	rows, err := db.Definitions(ctx)
 	if err != nil {

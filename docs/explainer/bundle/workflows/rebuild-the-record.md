@@ -23,9 +23,9 @@ steps:
     anchor: 'Short: "idempotently create the ledger file and the operational store",'
   - actor: /components/daemon.md
     label: start with the bundled Definitions
-    action: "`Open` runs `guardBundled` over the new store, which holds nothing to disagree with, and stores the bundled Definitions and their history at once. An importer's registered Definition is not there yet."
-    resource: internal/daemon/importers.go#guardBundled
-    anchor: "if err := def.Guard(storedOf(rows), bundled); err != nil {"
+    action: "`Open` runs `guardCatalog` over the new store, which holds nothing to disagree with, loads the catalog's Definitions and projection templates, then `persistCatalog` stores the Definitions and their history at once. An importer's registered Definition is not there yet."
+    resource: internal/daemon/importers.go#persistCatalog
+    anchor: "func persistCatalog(ctx context.Context, db *ops.DB, cat *catalog.Catalog) error {"
   - actor: /components/anam-submit.md
     caller: outside
     label: run each importer's poll

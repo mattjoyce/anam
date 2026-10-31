@@ -27,11 +27,7 @@ import (
 // earlier versions keep their own fact time, so a read as-of before the run is
 // unchanged. It answers the Definitions in force, for the plan to use, and the rule
 // each re-placing rename leaves, by its index in the table.
-func checkRenameKeying(ctx context.Context, cfg config.Config, tbl renameTable) (*def.Registry, map[int]def.TimeField, error) {
-	cat, err := loadCatalog(ctx, cfg)
-	if err != nil {
-		return nil, nil, err
-	}
+func checkRenameKeying(ctx context.Context, cfg config.Config, cat *catalog.Catalog, tbl renameTable) (*def.Registry, map[int]def.TimeField, error) {
 	buckets, err := cfg.Buckets()
 	if err != nil {
 		return nil, nil, err

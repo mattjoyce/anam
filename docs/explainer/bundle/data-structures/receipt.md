@@ -23,7 +23,7 @@ references:
 | `facet_ids` | []string | in served order; an empty list for an empty serve |
 | `watermark` | int64 | the W the derivation ran at |
 | `ledger_id` | string | the ledger that W counts in; empty on receipts from before 2026-10-07, which verify with a note |
-| `template`, `template_version` | string, int | the exact pruning; a moved version refuses verification |
+| `template`, `template_version` | string, int | the exact pruning; verify replays the catalog's file at that version, refusing one whose body moved; once the catalog no longer holds that version, the body filed in `inline_projection` under `template_hash` (card 257); else answers unable to verify |
 | `definition_set_version` | string | hash of the bundled manifests, provenance only |
 | `served_at` | string | the clock layout |
 | `span` | string | `whole-person` or `fact-time[from,to)` |

@@ -16,7 +16,7 @@ depends_on:
 |---|---|
 | `Bundled` | the registry of the 44 manifests under `internal/def/manifests`, embedded in the binary |
 | `Parse` | one [Definition manifest](/data-structures/definition-manifest.md) from bytes, refusing an open schema |
-| `Guard` | at daemon start (`guardBundled`), refuses a stored version whose `identity_key`, `identity_template` or `fact_time` differs from the bundled one, but for two widenings proved from the stored versions (card 198): a `zone_pointer` added to the fact time, and optional placeholders appended to the template |
+| `Guard` | at daemon start (`guardCatalog`), refuses a stored version whose `identity_key`, `identity_template` or `fact_time` differs from the bundled one, but for two widenings proved from the stored versions (card 198): a `zone_pointer` added to the fact time, and optional placeholders appended to the template |
 | `Register` | decides an importer's registration: bundled type is `ErrBundled` unless it is the body the binary carries (unchanged, card 139), same body is adopted, different body at a held version is `ErrRegistered`, older version is `ErrVersionBehind`, re-keyed is `ErrKeyed` |
 | `WithRegistered` | the live registry: bundled first, registered rows for types the binary does not carry |
 | `KeyingOf`, `Definition.SameIdentity` | the keying (`identity_key`, `fact_time`) read from a stored body as Guard reads it, and whether a Definition composes ids from the same identity key; what a rename compares across two types, since a different key would give different ids (card 140). A rename may change the fact-time rule (card 195) |

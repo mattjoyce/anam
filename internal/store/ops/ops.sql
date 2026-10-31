@@ -226,11 +226,13 @@ CREATE TRIGGER IF NOT EXISTS saved_selection_code_no_delete
 BEFORE DELETE ON saved_selection_code
 BEGIN SELECT RAISE(ABORT, 'saved_selection_code is immutable'); END;
 
--- tier: authored, inline projections (card 211): the body of a projection a query carried
--- in its request rather than naming a registered one, keyed by the SHA-256 of it, which is
--- the template hash its receipt records. A receipt for such a query names this row, so
--- verify finds the template to replay. Immutable, like the receipt; a body is only ever
--- filed when a query that used it was answered.
+-- tier: authored, template bodies: the bytes a receipt's template hash names, keyed by
+-- the SHA-256 of them. Every receipt files the body it was served through here, before
+-- the receipt: a projection a query carried in its request (card 211), or a catalog
+-- template, so verify can replay a receipt whose template file has left the catalog.
+-- Immutable, like the receipt; a body is only ever filed when a read that used it was
+-- answered. The table keeps the name it had when it held only inline bodies, since an
+-- older build of this schema version reads it by that name (card 260 renames it).
 CREATE TABLE IF NOT EXISTS inline_projection (
   hash TEXT PRIMARY KEY CHECK (length(hash) = 71 AND hash GLOB 'sha256:*'),
   body BLOB NOT NULL

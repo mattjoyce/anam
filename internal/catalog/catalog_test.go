@@ -2,6 +2,7 @@ package catalog_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -931,5 +932,38 @@ func TestLoadCanceledMidway(t *testing.T) {
 		if !errors.Is(err, catalog.ErrInvalid) || !errors.Is(err, context.Canceled) {
 			t.Fatalf("cancel at check %d of %d: err = %v, want catalog.ErrInvalid and context.Canceled", n, total, err)
 		}
+	}
+}
+
+// CheckRegistered agrees with a registered body equal to the catalog's once
+// canonicalized, ignores versions the catalog does not hold, and refuses a different
+// body at a version it holds, naming the type and version.
+func TestCheckRegistered(t *testing.T) {
+	cat, err := catalog.Load(context.Background(), "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := cat.Manifests()[0]
+	reformatted := append([]byte("\n  "), m.Body...)
+	other := def.Stored{Type: m.Type, Version: m.Version + 1000, Body: []byte(`{"anything":"else"}`)}
+	if err := cat.CheckRegistered([]def.Stored{{Type: m.Type, Version: m.Version, Body: reformatted}, other}); err != nil {
+		t.Errorf("CheckRegistered of a reformatted body and an unheld version = %v, want nil", err)
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(m.Body, &body); err != nil {
+		t.Fatal(err)
+	}
+	body["x_contradiction"] = true
+	changed, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cat.CheckRegistered([]def.Stored{{Type: m.Type, Version: m.Version, Body: changed}})
+	if !errors.Is(err, def.ErrBadManifest) {
+		t.Fatalf("CheckRegistered of a contradicting body = %v, want def.ErrBadManifest", err)
+	}
+	if want := fmt.Sprintf("%s v%d", m.Type, m.Version); !strings.Contains(err.Error(), want) {
+		t.Errorf("error %q does not name %s", err, want)
 	}
 }

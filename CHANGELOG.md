@@ -9,6 +9,32 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- `definitions_dir` and `projections_dir` (`ANAM_DEFINITIONS_DIR`, `ANAM_PROJECTIONS_DIR`) choose
+  the catalog the daemon and the local commands run on (card 257). Unset, each is the catalog built
+  into the binary, as before; set, the directory replaces it for that component, current manifests
+  at its root and earlier versions under `history/`. A relative path is from the working directory.
+  A directory that is missing, unreadable or invalid stops the start; there is no fallback. A
+  directory copied from the built-in files gives the same bodies, hashes, definition set version and
+  receipt verification. The daemon now checks everything before it writes the catalog (a refused
+  start leaves the store as it was), refuses a registered Definition that contradicts the
+  catalog's at the same type and version, and logs one `daemon: catalog admitted` line with both
+  sources and the definition set version. The files say which templates are current: one whose file
+  is removed is no longer listed or served. A local read and `anam migrate` refuse the same
+  contradicting registered Definition the daemon refuses. Each local command loads the catalog once
+  and reads everything through that one copy, so a receipt cannot be derived under one set of files
+  and name another's set version. `anam init` loads the catalog before it creates anything, so a
+  missing directory leaves no files. `anam-bench gen` and `run` read the catalog from the anam
+  config too (`--config`, found as `anam` finds it), taking only the two directories from it, and
+  name it on stderr.
+- Every receipt now files the body of the template it was served through, in the operational
+  store's `inline_projection` table, as inline projections already did (card 257). The table keeps
+  its name and the schema version stays 9, so an older build still reads the file; card 260 renames
+  it behind a version bump. `anam move-artifacts` reports these as `template bodies`. When the
+  catalog no longer holds the receipt's template version, verify replays the filed body, so a
+  receipt still verifies after its template's file has left the catalog, and the verdict says so. A different body at the
+  same version is still refused, as before. A receipt served before this files nothing and replays
+  its catalog file. Without it, verify answers unable to verify, names the template and version,
+  and says to put the file back.
 - `docs/QUERY.md` has a worked question for steps per month, summed and counted with
   `month_of/2` (card 213).
 - Two base relations for grouping a query (card 213): `month_of(At, Month)` and `day_of(At, Day)`,

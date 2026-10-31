@@ -36,7 +36,7 @@ func TestTimeline_ComposedIsTheFullFold(t *testing.T) {
 	same := func(stage string) {
 		t.Helper()
 		ctx := context.Background()
-		src, closeAll, err := readSource(ctx, cfg)
+		src, closeAll, err := readSource(ctx, cfg, builtInCatalog(t))
 		if err != nil {
 			t.Fatal(err)
 		}

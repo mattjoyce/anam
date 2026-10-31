@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/facet"
@@ -76,19 +77,23 @@ reconciles instead. The artifact stays; a read --at before it still shows the fa
 			if err != nil {
 				return err
 			}
+			cat, err := loadCatalog(cmd.Context(), cfg)
+			if err != nil {
+				return err
+			}
 			if facetID != "" {
 				if retired {
 					return errors.New("--facet and --retired are two different retractions; pass one")
 				}
-				return runFacetRetraction(cmd, cfg, source, facetID, yes)
+				return runFacetRetraction(cmd, cfg, cat, source, facetID, yes)
 			}
 			if retired {
-				return runRetirement(cmd, cfg, source, yes, maxFraction)
+				return runRetirement(cmd, cfg, cat, source, yes, maxFraction)
 			}
 			ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
 			defer cancel()
 
-			absent, total, heldN, err := planFromSnapshot(ctx, cmd, cfg, source)
+			absent, total, heldN, err := planFromSnapshot(ctx, cmd, cfg, cat, source)
 			if err != nil {
 				return err
 			}
@@ -103,7 +108,7 @@ reconciles instead. The artifact stays; a read --at before it still shows the fa
 				_, err = fmt.Fprintln(cmd.OutOrStdout(), "dry run: nothing written. Re-run with --yes to tombstone them.")
 				return err
 			}
-			return retractAll(cmd, cfg, absent)
+			return retractAll(cmd, cfg, cat, absent)
 		},
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "write the tombstones; without it the command only reports")
@@ -221,11 +226,7 @@ func writeRetractionReport(cmd *cobra.Command, source string, absent []facet.Fac
 // retractAll tombstones each facet through the gate, one event each. A crash
 // mid-way leaves the ones done tombstoned and the rest live; a re-run re-plans and
 // finishes, because a tombstoned facet is no longer live and drops out of the plan.
-func retractAll(cmd *cobra.Command, cfg config.Config, absent []facet.Facet) error {
-	cat, err := loadCatalog(cmd.Context(), cfg)
-	if err != nil {
-		return err
-	}
+func retractAll(cmd *cobra.Command, cfg config.Config, cat *catalog.Catalog, absent []facet.Facet) error {
 	reg := cat.Definitions()
 	l, err := openLedgerForWrite(cmd.Context(), cfg)
 	if err != nil {
@@ -257,9 +258,9 @@ func retractAll(cmd *cobra.Command, cfg config.Config, absent []facet.Facet) err
 // gives). held is how many facets the run carried, for the guard against an empty
 // "now". With no complete snapshot there is nothing to plan from, which is an error,
 // not an empty plan.
-func planFromSnapshot(ctx context.Context, cmd *cobra.Command, cfg config.Config, source string,
+func planFromSnapshot(ctx context.Context, cmd *cobra.Command, cfg config.Config, cat *catalog.Catalog, source string,
 ) (absent []facet.Facet, total, held int, err error) {
-	src, closeAll, err := readSource(ctx, cfg)
+	src, closeAll, err := readSource(ctx, cfg, cat)
 	if err != nil {
 		return nil, 0, 0, err
 	}

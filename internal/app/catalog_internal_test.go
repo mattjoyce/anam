@@ -26,38 +26,9 @@ func TestLocalReadRefusesARegisteredDefinitionTheCatalogContradicts(t *testing.T
 		t.Fatalf("timeline before the contradiction: %v", err)
 	}
 
-	manifests, err := def.Manifests()
-	if err != nil || len(manifests) == 0 {
-		t.Fatalf("no embedded manifests: %v", err)
-	}
-	m := manifests[0]
-	var body map[string]any
-	if err := json.Unmarshal(m.Body, &body); err != nil {
-		t.Fatal(err)
-	}
-	body["x_contradiction"] = true
-	changed, err := json.Marshal(body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx := context.Background()
-	buckets, err := config.Config{BucketWidth: span.Default}.Buckets()
-	if err != nil {
-		t.Fatal(err)
-	}
-	db, err := ops.Open(ctx, filepath.Join(f.dir, "tracking.db"), buckets)
-	if err != nil {
-		t.Fatal(err)
-	}
-	row := ops.DefinitionRow{Type: string(m.Type), Version: m.Version, Body: string(changed)}
-	if err := db.RegisterDefinition(ctx, row, "2026-10-30T00:00:00.000000000Z"); err != nil {
-		t.Fatalf("RegisterDefinition: %v", err)
-	}
-	if err := db.Close(); err != nil {
-		t.Fatal(err)
-	}
+	m := registerAContradiction(t, f)
 
-	_, _, err = cli(t, f.cfgPath, "timeline")
+	_, _, err := cli(t, f.cfgPath, "timeline")
 	if !errors.Is(err, def.ErrBadManifest) {
 		t.Fatalf("timeline = %v, want def.ErrBadManifest", err)
 	}
@@ -92,4 +63,74 @@ func TestInitRefusesAMissingCatalogDirectoryBeforeCreatingFiles(t *testing.T) {
 			t.Errorf("a refused init left %s (stat: %v)", p, err)
 		}
 	}
+}
+
+// A migration refuses a store holding a registered Definition the catalog contradicts,
+// as the daemon and a local read refuse it, and writes nothing.
+func TestMigrateRefusesARegisteredDefinitionTheCatalogContradicts(t *testing.T) {
+	f := newLedgerFixture(t)
+	m := registerAContradiction(t, f)
+	newLedger, newStore := filepath.Join(f.dir, "new", "ledger.db"), filepath.Join(f.dir, "new", "tracking.db")
+
+	_, _, err := cli(t, f.cfgPath, "migrate", "--from", f.ledgerPath, "--from-store", filepath.Join(f.dir, "tracking.db"),
+		"--to", newLedger, "--to-store", newStore, "--yes")
+	if !errors.Is(err, def.ErrBadManifest) {
+		t.Fatalf("migrate = %v, want def.ErrBadManifest", err)
+	}
+	if want := fmt.Sprintf("%s v%d", m.Type, m.Version); !strings.Contains(err.Error(), want) {
+		t.Errorf("error %q does not name %s", err, want)
+	}
+	for _, p := range []string{newLedger, newStore} {
+		if _, err := os.Stat(p); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("a refused migration made %s (stat: %v)", p, err)
+		}
+	}
+}
+
+// registerAContradiction registers, in the fixture's operational store, the first
+// catalog Definition at its own version with one field added, and returns the
+// catalog's manifest it contradicts.
+func registerAContradiction(t *testing.T, f ledgerFixture) def.Stored {
+	t.Helper()
+	manifests, err := def.Manifests()
+	if err != nil || len(manifests) == 0 {
+		t.Fatalf("no embedded manifests: %v", err)
+	}
+	m := manifests[0]
+	var body map[string]any
+	if err := json.Unmarshal(m.Body, &body); err != nil {
+		t.Fatal(err)
+	}
+	body["x_contradiction"] = true
+	changed, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	buckets, err := config.Config{BucketWidth: span.Default}.Buckets()
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := ops.Open(ctx, filepath.Join(f.dir, "tracking.db"), buckets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := ops.DefinitionRow{Type: string(m.Type), Version: m.Version, Body: string(changed)}
+	if err := db.RegisterDefinition(ctx, row, "2026-10-30T00:00:00.000000000Z"); err != nil {
+		t.Fatalf("RegisterDefinition: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return m
+}
+
+// builtInCatalog is the catalog a test's local command loads with no directories set.
+func builtInCatalog(t *testing.T) *catalog.Catalog {
+	t.Helper()
+	cat, err := catalog.Load(context.Background(), "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cat
 }

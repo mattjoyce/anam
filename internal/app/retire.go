@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/policy"
@@ -24,13 +25,13 @@ import (
 // any retraction (card 120).
 
 // runRetirement plans and, with yes, tombstones every live facet of a retired source.
-func runRetirement(cmd *cobra.Command, cfg config.Config, source string, yes bool, maxFraction float64) error {
-	if err := refuseDeclared(cmd, cfg, source); err != nil {
+func runRetirement(cmd *cobra.Command, cfg config.Config, cat *catalog.Catalog, source string, yes bool, maxFraction float64) error {
+	if err := refuseDeclared(cmd, cfg, cat, source); err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
 	defer cancel()
-	live, err := planRetirement(ctx, cfg, source)
+	live, err := planRetirement(ctx, cfg, cat, source)
 	if err != nil {
 		return err
 	}
@@ -45,21 +46,17 @@ func runRetirement(cmd *cobra.Command, cfg config.Config, source string, yes boo
 		_, err = fmt.Fprintln(cmd.OutOrStdout(), "dry run: nothing written. Re-run with --yes to tombstone them.")
 		return err
 	}
-	return retractAll(cmd, cfg, live)
+	return retractAll(cmd, cfg, cat, live)
 }
 
 // refuseDeclared refuses to retire a source that an importer still declares: a live
 // source is retired by removing its declaration first, so the two steps cannot be
 // confused. With no importers file configured there are no importers; that is said
 // on stderr, so the operator sees what was checked.
-func refuseDeclared(cmd *cobra.Command, cfg config.Config, source string) error {
+func refuseDeclared(cmd *cobra.Command, cfg config.Config, cat *catalog.Catalog, source string) error {
 	if cfg.ImportersFile == "" {
 		_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "importers: no importers file configured, so no importer declares the source")
 		return nil
-	}
-	cat, err := loadCatalog(cmd.Context(), cfg)
-	if err != nil {
-		return err
 	}
 	file, err := importersFile(cfg, cat.Definitions())
 	if err != nil {
@@ -73,8 +70,8 @@ func refuseDeclared(cmd *cobra.Command, cfg config.Config, source string) error 
 
 // planRetirement is every live facet of the source, at the version in force: the
 // retraction plan with nothing held.
-func planRetirement(ctx context.Context, cfg config.Config, source string) ([]facet.Facet, error) {
-	src, closeAll, err := readSource(ctx, cfg)
+func planRetirement(ctx context.Context, cfg config.Config, cat *catalog.Catalog, source string) ([]facet.Facet, error) {
+	src, closeAll, err := readSource(ctx, cfg, cat)
 	if err != nil {
 		return nil, err
 	}

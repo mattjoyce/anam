@@ -29,18 +29,15 @@ func loadDefinitions(ctx context.Context, db *ops.DB, cat *catalog.Catalog) (*de
 	if err != nil {
 		return nil, err
 	}
-	if err := cat.CheckRegistered(storedOf(rows)); err != nil {
-		return nil, fmt.Errorf("daemon: %w", err)
+	reg, err := cat.WithRegistered(storedOf(rows))
+	if err != nil {
+		return nil, fmt.Errorf("daemon: registered definitions: %w", err)
 	}
 	for _, r := range rows {
 		if _, taken := bundled.Lookup(facet.Type(r.Type)); taken {
 			slog.Warn("daemon: a registered definition is shadowed by the bundled one",
 				"type", r.Type, "version", r.Version)
 		}
-	}
-	reg, err := def.WithRegistered(bundled, storedOf(rows))
-	if err != nil {
-		return nil, fmt.Errorf("daemon: registered definitions: %w", err)
 	}
 	d := &definitions{bundled: bundled}
 	d.current.Store(reg)

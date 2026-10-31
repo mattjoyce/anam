@@ -192,19 +192,19 @@ func openSource(ctx context.Context, src Source, p Params) (*ledger.Ledger, *ops
 }
 
 // definitionsOf builds the Definitions in force in the old store (the catalog's, with
-// the registered ones beside them, as the daemon would load them) and every version it
+// the registered ones beside them, as the daemon would load them, refusing one the
+// catalog contradicts at the same version) and every version it
 // holds as a contract: the catalog's own, the registered rows, and the store's copy of
 // what the catalog carried when a daemon last started.
 func definitionsOf(cat *catalog.Catalog, r ops.Registered) (*def.Registry, *def.Versions, error) {
 	if cat == nil {
 		return nil, nil, errors.New("migrate: no catalog")
 	}
-	bundled := cat.Definitions()
 	registered := make([]def.Stored, len(r.Definitions))
 	for i, d := range r.Definitions {
 		registered[i] = def.Stored{Type: facet.Type(d.Type), Version: d.Version, Body: []byte(d.Body)}
 	}
-	current, err := def.WithRegistered(bundled, registered)
+	current, err := cat.WithRegistered(registered)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -110,7 +110,7 @@ func TestRetract_ASnapshotThatNamesAnOldTypeRetiresItsFacts(t *testing.T) {
 	cmd.SetContext(ctx)
 	var out bytes.Buffer
 	cmd.SetOut(&out)
-	absent, total, held, err := planFromSnapshot(ctx, cmd, cfg, "garmin")
+	absent, total, held, err := planFromSnapshot(ctx, cmd, cfg, builtInCatalog(t), "garmin")
 	if err != nil {
 		t.Fatalf("planFromSnapshot: %v", err)
 	}
@@ -126,7 +126,7 @@ func TestRetract_ASnapshotThatNamesAnOldTypeRetiresItsFacts(t *testing.T) {
 	if err := guardRetraction(len(absent), total, held, 0.75); err != nil {
 		t.Fatalf("guard: %v", err)
 	}
-	if err := retractAll(cmd, cfg, absent); err != nil {
+	if err := retractAll(cmd, cfg, builtInCatalog(t), absent); err != nil {
 		t.Fatalf("retractAll: %v", err)
 	}
 	if !strings.Contains(out.String(), fmt.Sprintf("tombstoned %d facets", len(old))) {

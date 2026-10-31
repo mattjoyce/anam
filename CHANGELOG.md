@@ -19,10 +19,13 @@ account of one instance and carries its data.
   start leaves the store as it was), refuses a registered Definition that contradicts the
   catalog's at the same type and version, and logs one `daemon: catalog admitted` line with both
   sources and the definition set version. The files say which templates are current: one whose file
-  is removed is no longer listed or served. A local read refuses the same contradicting registered
-  Definition the daemon refuses. `anam init` loads the catalog before it creates anything, so a
+  is removed is no longer listed or served. A local read and `anam migrate` refuse the same
+  contradicting registered Definition the daemon refuses. Each local command loads the catalog once
+  and reads everything through that one copy, so a receipt cannot be derived under one set of files
+  and name another's set version. `anam init` loads the catalog before it creates anything, so a
   missing directory leaves no files. `anam-bench gen` and `run` read the catalog from the anam
-  config too (`--config`, found as `anam` finds it) and name it on stderr.
+  config too (`--config`, found as `anam` finds it), taking only the two directories from it, and
+  name it on stderr.
 - Every receipt now files the body of the template it was served through, in the operational
   store's `inline_projection` table, as inline projections already did (card 257). The table keeps
   its name and the schema version stays 9, so an older build still reads the file; card 260 renames

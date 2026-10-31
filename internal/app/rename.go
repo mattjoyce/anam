@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
@@ -143,11 +144,15 @@ func (p renamePlan) count(f renameFate) int {
 // left on the one rename that matches it, and asks the gate what it would do with
 // each facet placed. It writes nothing.
 func planRename(ctx context.Context, cfg config.Config, tbl renameTable) (renamePlan, error) {
-	defs, replaced, err := checkRenameKeying(ctx, cfg, tbl)
+	cat, err := loadCatalog(ctx, cfg)
 	if err != nil {
 		return renamePlan{}, err
 	}
-	facets, err := liveFacetsLeaving(ctx, cfg, tbl)
+	defs, replaced, err := checkRenameKeying(ctx, cfg, cat, tbl)
+	if err != nil {
+		return renamePlan{}, err
+	}
+	facets, err := liveFacetsLeaving(ctx, cfg, cat, tbl)
 	if err != nil {
 		return renamePlan{}, err
 	}
@@ -213,10 +218,10 @@ func placeAll(tbl renameTable, facets []facet.Facet) []renameItem {
 
 // liveFacetsLeaving is every live facet of a type the table leaves, at the version
 // in force, in timeline order.
-func liveFacetsLeaving(ctx context.Context, cfg config.Config, tbl renameTable) ([]facet.Facet, error) {
+func liveFacetsLeaving(ctx context.Context, cfg config.Config, cat *catalog.Catalog, tbl renameTable) ([]facet.Facet, error) {
 	rctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()
-	src, closeAll, err := readSource(rctx, cfg)
+	src, closeAll, err := readSource(rctx, cfg, cat)
 	if err != nil {
 		return nil, err
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/read"
@@ -131,7 +132,11 @@ func readTimeline(ctx context.Context, cfg config.Config, q api.TimelineQuery) (
 		return c.Timeline(ctx, q)
 	}
 	q.Zone = cfg.Zone
-	src, closeAll, err := readSource(ctx, cfg)
+	cat, err := loadCatalog(ctx, cfg)
+	if err != nil {
+		return api.Timeline{}, err
+	}
+	src, closeAll, err := readSource(ctx, cfg, cat)
 	if err != nil {
 		return api.Timeline{}, err
 	}
@@ -157,12 +162,16 @@ func publishTimeline(ctx context.Context, cfg config.Config, q api.TimelineQuery
 		return c.Publish(ctx, q)
 	}
 	q.Zone = cfg.Zone
-	src, closeSrc, err := readSource(ctx, cfg)
+	cat, err := loadCatalog(ctx, cfg)
+	if err != nil {
+		return api.Published{}, err
+	}
+	src, closeSrc, err := readSource(ctx, cfg, cat)
 	if err != nil {
 		return api.Published{}, err
 	}
 	defer closeSrc()
-	deps, closeDeps, err := serveDeps(ctx, cfg)
+	deps, closeDeps, err := serveDeps(ctx, cfg, cat)
 	if err != nil {
 		return api.Published{}, err
 	}
@@ -173,14 +182,10 @@ func publishTimeline(ctx context.Context, cfg config.Config, q api.TimelineQuery
 	return read.Publish(ctx, src, deps, q, 0)
 }
 
-// readSource opens what a local read is taken from: the ledger read-only, and the
-// checkpoint log and its values so the read can start from the last mint run. The
-// returned func closes them.
-func readSource(ctx context.Context, cfg config.Config) (read.Source, func(), error) {
-	cat, err := loadCatalog(ctx, cfg)
-	if err != nil {
-		return read.Source{}, nil, err
-	}
+// readSource opens what a local read is taken from, over cat, the catalog the command
+// loaded once: the ledger read-only, and the checkpoint log and its values so the read
+// can start from the last mint run. The returned func closes them.
+func readSource(ctx context.Context, cfg config.Config, cat *catalog.Catalog) (read.Source, func(), error) {
 	l, err := openLedgerReadOnly(ctx, cfg)
 	if err != nil {
 		return read.Source{}, nil, err

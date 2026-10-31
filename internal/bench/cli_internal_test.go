@@ -42,7 +42,7 @@ func TestLoadCatalog_FollowsTheConfig(t *testing.T) {
 		cmd := &cobra.Command{}
 		cmd.SetContext(context.Background())
 		cmd.SetErr(&stderr)
-		cat, err := loadCatalog(cmd, cfgPath, Person)
+		cat, err := loadCatalog(cmd, cfgPath)
 		return cat, stderr.String(), err
 	}
 

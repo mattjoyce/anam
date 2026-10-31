@@ -132,12 +132,16 @@ func runQuery(ctx context.Context, cfg config.Config, q api.QueryRequest) (api.Q
 		return c.Query(ctx, q)
 	}
 	q.Zone = cfg.Zone
-	src, closeSrc, err := readSource(ctx, cfg)
+	cat, err := loadCatalog(ctx, cfg)
+	if err != nil {
+		return api.QueryAnswer{}, err
+	}
+	src, closeSrc, err := readSource(ctx, cfg, cat)
 	if err != nil {
 		return api.QueryAnswer{}, err
 	}
 	defer closeSrc()
-	deps, closeDeps, err := serveDeps(ctx, cfg)
+	deps, closeDeps, err := serveDeps(ctx, cfg, cat)
 	if err != nil {
 		return api.QueryAnswer{}, err
 	}
@@ -231,7 +235,11 @@ func describeQuery(ctx context.Context, cfg config.Config) (api.QueryCatalogue, 
 		}
 		return c.QueryCatalogue(ctx)
 	}
-	src, closeSrc, err := readSource(ctx, cfg)
+	cat, err := loadCatalog(ctx, cfg)
+	if err != nil {
+		return api.QueryCatalogue{}, err
+	}
+	src, closeSrc, err := readSource(ctx, cfg, cat)
 	if err != nil {
 		return api.QueryCatalogue{}, err
 	}

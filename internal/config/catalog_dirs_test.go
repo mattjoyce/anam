@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -103,4 +104,51 @@ func TestResolvedCatalogDirs(t *testing.T) {
 			t.Errorf("projections_dir = %q, want %q (environment-relative)", c.ProjectionsDir, want)
 		}
 	})
+}
+
+// CatalogDirs resolves the two directories by the same layers as a full load, and
+// expands them the same way, but does not validate settings it does not return: a
+// config a daemon would refuse still names its catalog. Strict decoding still holds.
+func TestCatalogDirs(t *testing.T) {
+	for _, k := range []string{"ANAM_PERSON_ID", "ANAM_DEFINITIONS_DIR", "ANAM_PROJECTIONS_DIR"} {
+		t.Setenv(k, "")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	write := func(body string) {
+		t.Helper()
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	defs := filepath.Join(dir, "definitions")
+	write("timeout: 0s\nbucket_width: fortnight\ndefinitions_dir: " + defs + "\n")
+	if _, err := config.Load(path); err == nil {
+		t.Fatal("Load accepted a config with no person_id, a zero timeout and an unknown bucket width")
+	}
+	gotDefs, gotProjs, err := config.CatalogDirs(path)
+	if err != nil {
+		t.Fatalf("CatalogDirs: %v", err)
+	}
+	if gotDefs != defs || gotProjs != "" {
+		t.Errorf("CatalogDirs = %q, %q; want %q and empty", gotDefs, gotProjs, defs)
+	}
+
+	projs := t.TempDir()
+	t.Setenv("ANAM_PROJECTIONS_DIR", projs)
+	if _, gotProjs, err = config.CatalogDirs(path); err != nil || gotProjs != projs {
+		t.Errorf("CatalogDirs projections = %q, %v; want the environment's %q", gotProjs, err, projs)
+	}
+
+	t.Chdir(dir)
+	write("definitions_dir: relative/defs\n")
+	if gotDefs, _, err = config.CatalogDirs(path); err != nil || gotDefs != filepath.Join(dir, "relative", "defs") {
+		t.Errorf("CatalogDirs of a relative path = %q, %v; want it from the working directory", gotDefs, err)
+	}
+
+	write("definitions_dir: " + defs + "\nno_such_key: 1\n")
+	if _, _, err := config.CatalogDirs(path); !errors.Is(err, config.ErrInvalid) {
+		t.Errorf("CatalogDirs with an unknown key = %v, want config.ErrInvalid", err)
+	}
 }

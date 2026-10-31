@@ -91,8 +91,8 @@ func (c *Catalog) ProjectionsSource() string { return c.projectionsSource }
 // Definition shadows a registered type at other versions, which is intended (a release
 // took the type back); at the same version two bodies are two answers to one question,
 // and the shadowing would hide the disagreement. Bodies compare as canonical JSON, so a
-// reformatted body agrees. The daemon and a local command call it before building a
-// registry over the registered rows, so both refuse the same store.
+// reformatted body agrees. WithRegistered runs it, so every registry built over a
+// store's registered rows refuses the same store.
 func (c *Catalog) CheckRegistered(registered []def.Stored) error {
 	held := make(map[string][]byte, len(c.manifests))
 	for _, m := range c.manifests {
@@ -117,6 +117,17 @@ func (c *Catalog) CheckRegistered(registered []def.Stored) error {
 		}
 	}
 	return nil
+}
+
+// WithRegistered is the catalog's Definitions with the registered ones beside them
+// (def.WithRegistered), after CheckRegistered: the registry a store's facets were
+// admitted against. The daemon at start, a local command and a migration all build it
+// here, so none of them can let the catalog's shadow hide a contradicting row.
+func (c *Catalog) WithRegistered(registered []def.Stored) (*def.Registry, error) {
+	if err := c.CheckRegistered(registered); err != nil {
+		return nil, err
+	}
+	return def.WithRegistered(c.definitions, registered)
 }
 
 // Load builds and validates a catalog. An empty directory selects the embedded

@@ -68,7 +68,7 @@ func TestRetract_PlansAnImportersSourceFromItsSnapshot(t *testing.T) {
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 
-	if _, _, _, err := planFromSnapshot(ctx, cmd, cfg, "scale-import"); err == nil ||
+	if _, _, _, err := planFromSnapshot(ctx, cmd, cfg, builtInCatalog(t), "scale-import"); err == nil ||
 		!strings.Contains(err.Error(), "no complete snapshot") {
 		t.Fatalf("with no snapshot: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestRetract_PlansAnImportersSourceFromItsSnapshot(t *testing.T) {
 	_ = db.Close()
 	d := admit("w-4") // sent after the run completed, by an incremental run
 
-	absent, total, held, err := planFromSnapshot(ctx, cmd, cfg, "scale-import")
+	absent, total, held, err := planFromSnapshot(ctx, cmd, cfg, builtInCatalog(t), "scale-import")
 	if err != nil {
 		t.Fatalf("planFromSnapshot: %v", err)
 	}

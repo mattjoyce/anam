@@ -35,17 +35,18 @@ func Main(ctx context.Context, build string) error {
 // definitions_dir and projections_dir of the anam config found as anam finds it
 // (--config, ANAM_CONFIG, the user config directory) and the environment, the
 // built-in catalog for either left empty. The bench takes nothing else from the
-// config; person is set for it, so a machine with no config file still resolves.
-func loadCatalog(cmd *cobra.Command, explicit, person string) (*catalog.Catalog, error) {
+// config, so a setting it does not read (a daemon's timeout, a person) neither
+// needs to be there nor to be valid.
+func loadCatalog(cmd *cobra.Command, explicit string) (*catalog.Catalog, error) {
 	path, origin, err := config.Resolve(explicit)
 	if err != nil {
 		return nil, err
 	}
-	cfg, err := config.LoadOverriding(path, map[string]string{"person_id": person})
+	defs, projs, err := config.CatalogDirs(path)
 	if err != nil {
 		return nil, err
 	}
-	cat, err := catalog.Load(cmd.Context(), cfg.DefinitionsDir, cfg.ProjectionsDir)
+	cat, err := catalog.Load(cmd.Context(), defs, projs)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +80,7 @@ Shapes: ` + shapeList(),
 			if _, err := os.Stat(PathsIn(dir).Ledger); err == nil {
 				return fmt.Errorf("%s already holds a ledger", dir)
 			}
-			cat, err := loadCatalog(cmd, *cfgPath, Person)
+			cat, err := loadCatalog(cmd, *cfgPath)
 			if err != nil {
 				return err
 			}
@@ -123,7 +124,7 @@ a record, never at one a daemon holds.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			o.Paths = PathsIn(dir)
-			cat, err := loadCatalog(cmd, *cfgPath, o.Person)
+			cat, err := loadCatalog(cmd, *cfgPath)
 			if err != nil {
 				return err
 			}

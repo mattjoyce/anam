@@ -65,12 +65,14 @@ import (
 // body. A build before it never reads the table, and refuses a receipt carrying the
 // inline marker as one with an unknown field, so neither build misreads the other's file.
 //
-// Renaming inline_projection to template_body does not bump it either. Open moves the
-// rows across in place (renameInlineProjection), as bindSnapshotParts adds a column, so
-// no receipt loses the body it names. A build before the rename opening the file again
-// finds inline_projection empty and says an inline receipt's body is not held: verify
-// fails, it never passes wrongly, and the next open by this build carries across any
-// body the older build filed meanwhile. That is the rollback's known cost.
+// Naming the bodies template_body does not bump it either, because nothing is taken
+// away. Open copies inline_projection's rows across in place (copyInlineProjection), as
+// bindSnapshotParts adds a column, and leaves the old table where it was, so a build
+// before the rename still finds every body it filed: neither build misreads the other's
+// file. This build files only into template_body and copies across, on its next open,
+// any body an older build filed meanwhile. Dropping inline_projection would make an
+// older build report held bodies as absent, so it waits for a version that refuses
+// such a build (card 260).
 //
 // admission_hold (the operator's admission hold over sources) does not bump it either, by
 // the same rule: a version-9 file gains the empty table when Open applies the schema, and
@@ -136,7 +138,7 @@ func Open(ctx context.Context, path string, buckets span.Buckets) (*DB, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	if err := renameInlineProjection(ctx, db); err != nil {
+	if err := copyInlineProjection(ctx, db); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -201,17 +203,18 @@ func bindSnapshotParts(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
-// templateBodyRename is the step renameInlineProjection runs, in
-// migrations/template-body.sql: copy every inline_projection row into template_body,
-// then drop the old table and its triggers.
+// templateBodyCopy is the step copyInlineProjection runs, in
+// migrations/template-body.sql: copy every inline_projection row into template_body
+// that is not there yet.
 //
 //go:embed migrations/template-body.sql
-var templateBodyRename string
+var templateBodyCopy string
 
-// renameInlineProjection carries a store written before template_body was named into
-// it. Open has already created template_body; the old table's rows move across in one
-// transaction and the old table goes. A store without inline_projection is left alone.
-func renameInlineProjection(ctx context.Context, db *sql.DB) error {
+// copyInlineProjection carries a store written before template_body was named into
+// it. Open has already created template_body; the old table's rows are copied across in
+// one transaction, and the old table stays for an older build to read (card 260 drops
+// it). A store without inline_projection is left alone.
+func copyInlineProjection(ctx context.Context, db *sql.DB) error {
 	if ok, err := hasTable(ctx, db, "inline_projection"); err != nil || !ok {
 		return err
 	}
@@ -220,7 +223,7 @@ func renameInlineProjection(ctx context.Context, db *sql.DB) error {
 		return fmt.Errorf("ops: rename inline_projection: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }() // no-op after Commit
-	if _, err := tx.ExecContext(ctx, templateBodyRename); err != nil {
+	if _, err := tx.ExecContext(ctx, templateBodyCopy); err != nil {
 		return fmt.Errorf("ops: rename inline_projection: %w", err)
 	}
 	if err := tx.Commit(); err != nil {

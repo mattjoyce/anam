@@ -232,8 +232,8 @@ BEGIN SELECT RAISE(ABORT, 'saved_selection_code is immutable'); END;
 -- request (card 211). A body is filed with every receipt, before it, and only then; a
 -- receipt served before bodies were filed for catalog templates replays its file.
 -- Immutable, like the receipt.
--- It was inline_projection until it was named for what it holds; Open moves an older
--- file's rows across (renameInlineProjection).
+-- It was inline_projection until it was named for what it holds; Open copies an older
+-- file's rows across (copyInlineProjection) and leaves that table for an older build.
 CREATE TABLE IF NOT EXISTS template_body (
   hash TEXT PRIMARY KEY CHECK (length(hash) = 71 AND hash GLOB 'sha256:*'),
   body BLOB NOT NULL

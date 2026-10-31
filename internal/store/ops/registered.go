@@ -113,13 +113,14 @@ func (d *DB) ReadRegistered(ctx context.Context) (Registered, error) {
 		return Registered{}, fmt.Errorf("ops: read registered projections: %w", err)
 	}
 
-	// A file this build has not opened yet still holds the bodies under their old
-	// name; a read-only handle cannot rename it, so the read follows the name.
+	// A file can hold bodies under the old name too: all of them if this build has never
+	// opened it, the latest few if an older build filed one after this build copied. A
+	// read-only handle cannot copy, so the read takes the union.
 	bodies := `SELECT hash, body FROM template_body ORDER BY hash`
 	if old, err := hasTable(ctx, tx, "inline_projection"); err != nil {
 		return Registered{}, err
 	} else if old {
-		bodies = `SELECT hash, body FROM inline_projection ORDER BY hash`
+		bodies = `SELECT hash, body FROM template_body UNION SELECT hash, body FROM inline_projection ORDER BY hash`
 	}
 	rows, err = tx.QueryContext(ctx, bodies)
 	if err != nil {

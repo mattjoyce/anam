@@ -25,7 +25,7 @@ steps:
     label: snapshot plan, or retired?
     action: Every source is an importer's, planned from its newest complete snapshot. `--retired` instead plans every live facet of the source and refuses one the importers file still declares. The rescan of a declared import went with the imports file in card 119.
     resource: internal/app/retract.go#retractCmd
-    anchor: "return runRetirement(cmd, cfg, source, yes, maxFraction)"
+    anchor: "return runRetirement(cmd, cfg, cat, source, yes, maxFraction)"
   - actor: /components/store-ops.md
     caller: /components/cli.md
     label: find the newest complete snapshot

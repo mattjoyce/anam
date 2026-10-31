@@ -29,10 +29,10 @@ account of one instance and carries its data.
   is removed is no longer listed or served.
 - Every receipt now files the body of the template it was served through, in `template_body`, as
   inline projections already did (card 257). Verify replays that body, so a receipt still verifies
-  after its template's file has left the catalog, or after a different body is put at the same
-  version; the verdict says which. A receipt served before this files nothing and replays its
-  catalog file. Without it, verify answers unable to verify, names the template and version, and
-  says to put the file back.
+  after its template's file has left the catalog, and the verdict says so. A different body at the
+  same version is still refused, as before. A receipt served before this files nothing and replays
+  its catalog file. Without it, verify answers unable to verify, names the template and version,
+  and says to put the file back.
 - `docs/QUERY.md` has a worked question for steps per month, summed and counted with
   `month_of/2` (card 213).
 - Two base relations for grouping a query (card 213): `month_of(At, Month)` and `day_of(At, Day)`,

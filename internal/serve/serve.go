@@ -387,12 +387,12 @@ func Verify(ctx context.Context, d Deps, receiptHash string) (receipt.Receipt, r
 }
 
 // templateOf is the template a receipt was served through, and notes on how it was
-// found. The body filed under the receipt's template hash comes first: it is the
-// exact template that served, filed with the receipt, so the receipt verifies after
-// its file has left the catalog or been rolled back. A registered template is the
-// exact version the receipt names, not the newest (card 125), and is what a receipt
-// with no filed body replays. An inline one is only ever its filed body (card 211).
-// With neither, the value cannot be re-derived, and the error says why.
+// found. The catalog's version comes first: a registered template is the exact version
+// the receipt names, not the newest (card 125), and must be the body that served. When
+// the catalog no longer holds that version, the body filed with the receipt stands in,
+// so the receipt verifies after its file has left. An inline one is only ever its
+// filed body (card 211). With neither, the value cannot be re-derived, and the error
+// says why.
 func templateOf(ctx context.Context, d Deps, r receipt.Receipt) (projection.Template, []string, error) {
 	if r.TemplateInline {
 		t, err := inlineTemplate(ctx, d, r.TemplateHash)
@@ -407,18 +407,16 @@ func templateOf(ctx context.Context, d Deps, r receipt.Receipt) (projection.Temp
 		notes = append(notes, fmt.Sprintf("replayed %s v%d from the held history; v%d is current", held.Name, held.Version, cur.Version))
 	}
 
-	if r.TemplateHash != "" {
+	// The filed body stands in only for a version the catalog no longer holds. A version
+	// it holds under another body is refused as before, filed body or not: whether a
+	// version may change its body is open question §6, which this rung does not decide.
+	if heldErr != nil && r.TemplateHash != "" {
 		t, filed, err := filedTemplate(ctx, d, r)
 		if err != nil {
 			return projection.Template{}, nil, err
 		}
 		if filed {
-			switch {
-			case heldErr != nil:
-				notes = append(notes, fmt.Sprintf("replayed %s v%d from the body filed with the receipt; the catalog no longer holds that version", t.Name, t.Version))
-			case held.Hash != t.Hash:
-				notes = append(notes, fmt.Sprintf("replayed %s v%d from the body filed with the receipt; the catalog now holds %s at that version, a different body", t.Name, t.Version, held.Hash))
-			}
+			notes = append(notes, fmt.Sprintf("replayed %s v%d from the body filed with the receipt; the catalog no longer holds that version", t.Name, t.Version))
 			return t, notes, nil
 		}
 	}
@@ -434,7 +432,7 @@ func templateOf(ctx context.Context, d Deps, r receipt.Receipt) (projection.Temp
 	case "":
 		notes = append(notes, "receipt names no template hash (served before template hashes were recorded); the version held is taken to be the one that served")
 	default:
-		return projection.Template{}, nil, fmt.Errorf("%w: unable to verify: %s v%d is %s here, the receipt was served under %s, and no body was filed with the receipt. "+
+		return projection.Template{}, nil, fmt.Errorf("%w: unable to verify: %s v%d is %s here, and the receipt was served under %s. "+
 			"Put the file that served back in the catalog to verify it",
 			ErrTemplateMoved, held.Name, held.Version, held.Hash, r.TemplateHash)
 	}

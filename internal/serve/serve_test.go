@@ -345,10 +345,11 @@ func TestVerify_MissingServedValueIsNotTampering(t *testing.T) {
 // cannot re-derive the same value. Saying "not reproduced" would blame the ledger for
 // a change in the code.
 // A receipt files the body of the template it was served through, so it verifies from
-// that body once the catalog has moved on: the version's file gone, or a different body
-// at the same version. The verdict says which. A receipt with no filed body, as every
-// one served before bodies were filed, cannot be re-derived without the file, and the
-// error says so and what to put back.
+// that body once the version's file has left the catalog, and the verdict says so. A
+// receipt with no filed body, as every one served before bodies were filed, cannot be
+// re-derived without the file, and the error says so and what to put back. A version
+// the catalog holds under a different body is refused, filed body or not: whether a
+// version may change its body is open question §6, which this rung leaves as it was.
 func TestVerify_ReplaysTheFiledBodyOnceTheCatalogMovesOn(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
@@ -368,35 +369,36 @@ func TestVerify_ReplaysTheFiledBodyOnceTheCatalogMovesOn(t *testing.T) {
 		}
 		return tmpl
 	}
-	for _, tc := range []struct {
-		name    string
-		catalog projection.Template
-		note    string
-	}{
-		{"the version's file has left", parse(2, `"admitted","endorsed"`), "the catalog no longer holds that version"},
-		{"the version holds another body", parse(1, `"admitted"`), "a different body"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			deps := h.deps
-			deps.Templates = registryOf(t, tc.catalog)
-			_, res, err := serve.Verify(ctx, deps, out.ReceiptHash)
-			if err != nil || !res.OK() {
-				t.Fatalf("Verify from the filed body: %v\n%s", err, res.Summary())
-			}
-			if !slices.ContainsFunc(res.Notes, func(n string) bool {
-				return strings.Contains(n, "from the body filed with the receipt") && strings.Contains(n, tc.note)
-			}) {
-				t.Errorf("the verdict does not say it replayed the filed body: %q", res.Notes)
-			}
 
-			deps.Published = noTemplateBodies{deps.Published}
-			_, _, err = serve.Verify(ctx, deps, out.ReceiptHash)
-			if !errors.Is(err, serve.ErrTemplateMoved) || !strings.Contains(err.Error(), "unable to verify") ||
-				!strings.Contains(err.Error(), "no body was filed with the receipt") {
-				t.Errorf("Verify with neither the file nor a filed body: err = %v, want ErrTemplateMoved saying why", err)
-			}
-		})
-	}
+	t.Run("the version's file has left", func(t *testing.T) {
+		deps := h.deps
+		deps.Templates = registryOf(t, parse(2, `"admitted","endorsed"`))
+		_, res, err := serve.Verify(ctx, deps, out.ReceiptHash)
+		if err != nil || !res.OK() {
+			t.Fatalf("Verify from the filed body: %v\n%s", err, res.Summary())
+		}
+		if !slices.ContainsFunc(res.Notes, func(n string) bool {
+			return strings.Contains(n, "from the body filed with the receipt") && strings.Contains(n, "the catalog no longer holds that version")
+		}) {
+			t.Errorf("the verdict does not say it replayed the filed body: %q", res.Notes)
+		}
+
+		deps.Published = noTemplateBodies{deps.Published}
+		_, _, err = serve.Verify(ctx, deps, out.ReceiptHash)
+		if !errors.Is(err, serve.ErrTemplateMoved) || !strings.Contains(err.Error(), "unable to verify") ||
+			!strings.Contains(err.Error(), "no body was filed with the receipt") {
+			t.Errorf("Verify with neither the file nor a filed body: err = %v, want ErrTemplateMoved saying why", err)
+		}
+	})
+
+	t.Run("the version holds another body", func(t *testing.T) {
+		deps := h.deps
+		deps.Templates = registryOf(t, parse(1, `"admitted"`))
+		_, _, err := serve.Verify(ctx, deps, out.ReceiptHash)
+		if !errors.Is(err, serve.ErrTemplateMoved) || !strings.Contains(err.Error(), "unable to verify") {
+			t.Errorf("Verify against another body at the same version: err = %v, want ErrTemplateMoved, filed body or not", err)
+		}
+	})
 }
 
 // noTemplateBodies is a store that never filed a template body, as one written before

@@ -1,7 +1,6 @@
 package daemon
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -30,8 +29,8 @@ func loadDefinitions(ctx context.Context, db *ops.DB, cat *catalog.Catalog) (*de
 	if err != nil {
 		return nil, err
 	}
-	if err := checkRegisteredAgainst(cat.Manifests(), rows); err != nil {
-		return nil, err
+	if err := cat.CheckRegistered(storedOf(rows)); err != nil {
+		return nil, fmt.Errorf("daemon: %w", err)
 	}
 	for _, r := range rows {
 		if _, taken := bundled.Lookup(facet.Type(r.Type)); taken {
@@ -46,41 +45,6 @@ func loadDefinitions(ctx context.Context, db *ops.DB, cat *catalog.Catalog) (*de
 	d := &definitions{bundled: bundled}
 	d.current.Store(reg)
 	return d, nil
-}
-
-// checkRegisteredAgainst refuses a registered Definition whose body disagrees with the
-// catalog's at the same type and version. The catalog's Definition shadows a registered
-// type at other versions, which is intended (a release took the type back); at the same
-// version two bodies are two answers to one question, and shadowing would hide the
-// disagreement. Bodies compare as canonical JSON, so a reformatted file agrees.
-func checkRegisteredAgainst(catalogDefs []def.Stored, registered []ops.DefinitionRow) error {
-	type key struct {
-		typ     facet.Type
-		version int
-	}
-	held := make(map[key][]byte, len(catalogDefs))
-	for _, m := range catalogDefs {
-		c, err := facet.Canonicalize(m.Body)
-		if err != nil {
-			return fmt.Errorf("daemon: catalog definition %s v%d: %w", m.Type, m.Version, err)
-		}
-		held[key{m.Type, m.Version}] = c.Bytes()
-	}
-	for _, r := range registered {
-		want, ok := held[key{facet.Type(r.Type), r.Version}]
-		if !ok {
-			continue
-		}
-		c, err := facet.Canonicalize([]byte(r.Body))
-		if err != nil {
-			return fmt.Errorf("daemon: registered definition %s v%d: %w", r.Type, r.Version, err)
-		}
-		if !bytes.Equal(want, c.Bytes()) {
-			return fmt.Errorf("daemon: %w: %s v%d is registered with a body the catalog contradicts",
-				def.ErrBadManifest, r.Type, r.Version)
-		}
-	}
-	return nil
 }
 
 // guardCatalog checks the catalog's Definitions against the ones the operational

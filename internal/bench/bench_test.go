@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/bench"
+	"github.com/mattjoyce/anam/internal/catalog"
 )
 
 // A tiny shape built and run end to end: the bench's own correctness, so a timing it
@@ -19,11 +20,15 @@ func TestGenerateThenRun(t *testing.T) {
 		Name: "tiny", Months: 3, PerMonth: 40, CorrectEvery: 10, Retract: 2, TailNew: 5, TailCorrect: 3,
 		Start: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
 	}
-	if err := bench.Generate(context.Background(), dir, sh, nil); err != nil {
+	cat, err := catalog.Load(context.Background(), "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := bench.Generate(context.Background(), cat, dir, sh, nil); err != nil {
 		t.Fatalf("Generate: %v", err)
 	}
 	rep, err := bench.Run(context.Background(), bench.Options{
-		Name: "tiny", Person: bench.Person, Paths: bench.PathsIn(dir), Reps: 3, Timeout: time.Minute,
+		Name: "tiny", Person: bench.Person, Paths: bench.PathsIn(dir), Reps: 3, Timeout: time.Minute, Catalog: cat,
 	}, nil)
 	if err != nil {
 		t.Fatalf("Run: %v", err)

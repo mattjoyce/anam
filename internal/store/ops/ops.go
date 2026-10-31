@@ -65,15 +65,6 @@ import (
 // body. A build before it never reads the table, and refuses a receipt carrying the
 // inline marker as one with an unknown field, so neither build misreads the other's file.
 //
-// Naming the bodies template_body does not bump it either, because nothing is taken
-// away. Open copies inline_projection's rows across in place (copyInlineProjection), as
-// bindSnapshotParts adds a column, and leaves the old table where it was, so a build
-// before the rename still finds every body it filed: neither build misreads the other's
-// file. This build files only into template_body and copies across, on its next open,
-// any body an older build filed meanwhile. Dropping inline_projection would make an
-// older build report held bodies as absent, so it waits for a version that refuses
-// such a build (card 260).
-//
 // admission_hold (the operator's admission hold over sources) does not bump it either, by
 // the same rule: a version-9 file gains the empty table when Open applies the schema, and
 // a build before it never reads the table. A hold set by this build is not enforced by an
@@ -138,10 +129,6 @@ func Open(ctx context.Context, path string, buckets span.Buckets) (*DB, error) {
 		_ = db.Close()
 		return nil, err
 	}
-	if err := copyInlineProjection(ctx, db); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
 	if err := pinSchemaVersion(ctx, db); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -201,45 +188,6 @@ func bindSnapshotParts(ctx context.Context, db *sql.DB) error {
 		return fmt.Errorf("ops: bind snapshot parts: %w", err)
 	}
 	return nil
-}
-
-// templateBodyCopy is the step copyInlineProjection runs, in
-// migrations/template-body.sql: copy every inline_projection row into template_body
-// that is not there yet.
-//
-//go:embed migrations/template-body.sql
-var templateBodyCopy string
-
-// copyInlineProjection carries a store written before template_body was named into
-// it. Open has already created template_body; the old table's rows are copied across in
-// one transaction, and the old table stays for an older build to read (card 260 drops
-// it). A store without inline_projection is left alone.
-func copyInlineProjection(ctx context.Context, db *sql.DB) error {
-	if ok, err := hasTable(ctx, db, "inline_projection"); err != nil || !ok {
-		return err
-	}
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("ops: rename inline_projection: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }() // no-op after Commit
-	if _, err := tx.ExecContext(ctx, templateBodyCopy); err != nil {
-		return fmt.Errorf("ops: rename inline_projection: %w", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("ops: rename inline_projection: %w", err)
-	}
-	return nil
-}
-
-// hasTable says whether the store holds a table of that name.
-func hasTable(ctx context.Context, q queryer, name string) (bool, error) {
-	var n int
-	if err := q.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, name).Scan(&n); err != nil {
-		return false, fmt.Errorf("ops: look for table %s: %w", name, err)
-	}
-	return n > 0, nil
 }
 
 // pinSchemaVersion records the version on first open and refuses a mismatch after.

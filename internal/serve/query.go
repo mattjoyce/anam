@@ -79,7 +79,7 @@ func PublishQuery(ctx context.Context, d Deps, t projection.Template, w ledger.W
 	if dryRun {
 		return out, nil
 	}
-	if _, err := d.Published.Put(ctx, receipt.TemplateBodyKind, t.Body); err != nil {
+	if _, err := d.Published.Put(ctx, receipt.InlineKind, t.Body); err != nil {
 		return Served{}, err
 	}
 	if _, err := d.Published.Put(ctx, receipt.ServedKind, ans.Bytes()); err != nil {

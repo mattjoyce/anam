@@ -26,6 +26,11 @@ func initCmd(cfgPath *string) *cobra.Command {
 			ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout)
 			defer cancel()
 
+			// The catalog is checked before anything is created, so a config naming a
+			// directory that is missing or invalid makes no files.
+			if _, err := loadCatalog(ctx, cfg); err != nil {
+				return err
+			}
 			l, err := ledger.Create(ctx, cfg.LedgerPath, cfg.PersonID)
 			if err != nil {
 				return err
@@ -58,7 +63,9 @@ func openLedgerForWrite(ctx context.Context, cfg config.Config) (*ledger.Ledger,
 }
 
 // registryOf is the catalog's Definitions with those importers registered, as db
-// holds them: the Definitions the record's facets were admitted against.
+// holds them: the Definitions the record's facets were admitted against. A registered
+// Definition the catalog contradicts at the same version is refused, as the daemon
+// refuses it at start.
 func registryOf(ctx context.Context, cat *catalog.Catalog, db *ops.DB) (*def.Registry, error) {
 	bundled := cat.Definitions()
 	rows, err := db.RegisteredDefinitions(ctx)
@@ -68,6 +75,9 @@ func registryOf(ctx context.Context, cat *catalog.Catalog, db *ops.DB) (*def.Reg
 	stored := make([]def.Stored, len(rows))
 	for i, r := range rows {
 		stored[i] = def.Stored{Type: facet.Type(r.Type), Version: r.Version, Body: []byte(r.Body)}
+	}
+	if err := cat.CheckRegistered(stored); err != nil {
+		return nil, err
 	}
 	return def.WithRegistered(bundled, stored)
 }

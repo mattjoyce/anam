@@ -86,6 +86,39 @@ func (c *Catalog) DefinitionsSource() string { return c.definitionsSource }
 // "embedded" or the resolved directory path.
 func (c *Catalog) ProjectionsSource() string { return c.projectionsSource }
 
+// CheckRegistered refuses a registered Definition whose body disagrees with the
+// catalog's at the same type and version, with def.ErrBadManifest. The catalog's
+// Definition shadows a registered type at other versions, which is intended (a release
+// took the type back); at the same version two bodies are two answers to one question,
+// and the shadowing would hide the disagreement. Bodies compare as canonical JSON, so a
+// reformatted body agrees. The daemon and a local command call it before building a
+// registry over the registered rows, so both refuse the same store.
+func (c *Catalog) CheckRegistered(registered []def.Stored) error {
+	held := make(map[string][]byte, len(c.manifests))
+	for _, m := range c.manifests {
+		canon, err := facet.Canonicalize(m.Body)
+		if err != nil {
+			return fmt.Errorf("%w: catalog definition %s v%d: %w", def.ErrBadManifest, m.Type, m.Version, err)
+		}
+		held[fmt.Sprintf("%s v%d", m.Type, m.Version)] = canon.Bytes()
+	}
+	for _, r := range registered {
+		key := fmt.Sprintf("%s v%d", r.Type, r.Version)
+		want, ok := held[key]
+		if !ok {
+			continue
+		}
+		canon, err := facet.Canonicalize(r.Body)
+		if err != nil {
+			return fmt.Errorf("%w: registered definition %s: %w", def.ErrBadManifest, key, err)
+		}
+		if !bytes.Equal(want, canon.Bytes()) {
+			return fmt.Errorf("%w: %s is registered with a body the catalog contradicts", def.ErrBadManifest, key)
+		}
+	}
+	return nil
+}
+
 // Load builds and validates a catalog. An empty directory selects the embedded
 // catalog for that component, labelled "embedded"; a nonempty one is a resolved
 // directory path, which must exist and is used as its label. Load does not expand

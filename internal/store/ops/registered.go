@@ -20,8 +20,8 @@ type RegisteredProjection struct {
 	RegisteredAt string
 }
 
-// TemplateBody is a template body with the digest that addresses it.
-type TemplateBody struct {
+// InlineProjection is the body of an inline projection with the digest that addresses it.
+type InlineProjection struct {
 	Hash string
 	Body []byte
 }
@@ -34,8 +34,8 @@ type Content struct {
 	Body []byte
 }
 
-// carriedContent are the authored content kinds a carry copies besides the template
-// bodies, which Registered holds apart: receipts, the values they served, saved
+// carriedContent are the authored content kinds a carry copies besides the inline
+// projections, which Registered holds apart: receipts, the values they served, saved
 // selections and their codes. Checkpoint values are derived; a mint makes them again.
 var carriedContent = []string{KindReceipt, KindServed, KindSelection, KindSelectionCode}
 
@@ -49,11 +49,11 @@ type Registered struct {
 	Definitions []RegisteredDefinition
 	Projections []RegisteredProjection
 
-	// TemplateBodies are the template bodies receipts name, each addressed by the
-	// hash its receipts record. They are authored and immutable like the registered
-	// rows, and a receipt that names one cannot be replayed without it, so a migration
-	// copies them too.
-	TemplateBodies []TemplateBody
+	// Inline are the bodies of the projections queries carried in their requests
+	// (card 211), each addressed by the hash its receipts record. They are authored
+	// and immutable like the registered rows, and a receipt that names one cannot be
+	// replayed without it, so a migration copies them too.
+	Inline []InlineProjection
 	// Holds are the admission holds the operator has set. They are authored state,
 	// like the registered rows: a migration carries them into the new store, so a
 	// source held before the move is still held after it.
@@ -113,29 +113,20 @@ func (d *DB) ReadRegistered(ctx context.Context) (Registered, error) {
 		return Registered{}, fmt.Errorf("ops: read registered projections: %w", err)
 	}
 
-	// A file can hold bodies under the old name too: all of them if this build has never
-	// opened it, the latest few if an older build filed one after this build copied. A
-	// read-only handle cannot copy, so the read takes the union.
-	bodies := `SELECT hash, body FROM template_body ORDER BY hash`
-	if old, err := hasTable(ctx, tx, "inline_projection"); err != nil {
-		return Registered{}, err
-	} else if old {
-		bodies = `SELECT hash, body FROM template_body UNION SELECT hash, body FROM inline_projection ORDER BY hash`
-	}
-	rows, err = tx.QueryContext(ctx, bodies)
+	rows, err = tx.QueryContext(ctx, `SELECT hash, body FROM inline_projection ORDER BY hash`)
 	if err != nil {
-		return Registered{}, fmt.Errorf("ops: read template bodies: %w", err)
+		return Registered{}, fmt.Errorf("ops: read inline projections: %w", err)
 	}
 	for rows.Next() {
-		var r TemplateBody
+		var r InlineProjection
 		if err := rows.Scan(&r.Hash, &r.Body); err != nil {
 			_ = rows.Close()
-			return Registered{}, fmt.Errorf("ops: scan template body: %w", err)
+			return Registered{}, fmt.Errorf("ops: scan inline projection: %w", err)
 		}
-		out.TemplateBodies = append(out.TemplateBodies, r)
+		out.Inline = append(out.Inline, r)
 	}
 	if err := closeRows(rows); err != nil {
-		return Registered{}, fmt.Errorf("ops: read template bodies: %w", err)
+		return Registered{}, fmt.Errorf("ops: read inline projections: %w", err)
 	}
 
 	rows, err = tx.QueryContext(ctx, `SELECT source, held_at FROM admission_hold ORDER BY source`)
@@ -238,16 +229,16 @@ func (d *DB) CarryRegistered(ctx context.Context, r Registered) error {
 			return fmt.Errorf("ops: carry projection %s v%d: %w", x.Name, x.Version, err)
 		}
 	}
-	for _, x := range r.TemplateBodies {
+	for _, x := range r.Inline {
 		if err := checkDigest(x.Hash); err != nil {
-			return fmt.Errorf("ops: carry template body: %w", err)
+			return fmt.Errorf("ops: carry inline projection: %w", err)
 		}
 		if got := Digest(x.Body); got != x.Hash {
-			return fmt.Errorf("%w: template body %s hashes to %s", ErrCorrupt, x.Hash, got)
+			return fmt.Errorf("%w: inline projection %s hashes to %s", ErrCorrupt, x.Hash, got)
 		}
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO template_body (hash, body) VALUES (?, ?)`, x.Hash, x.Body); err != nil {
-			return fmt.Errorf("ops: carry template body %s: %w", x.Hash, err)
+			`INSERT INTO inline_projection (hash, body) VALUES (?, ?)`, x.Hash, x.Body); err != nil {
+			return fmt.Errorf("ops: carry inline projection %s: %w", x.Hash, err)
 		}
 	}
 	for _, x := range r.Holds {

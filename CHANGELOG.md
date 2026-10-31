@@ -9,13 +9,6 @@ account of one instance and carries its data.
 
 ## Unreleased
 
-- The operational store's `inline_projection` table is now `template_body`, named for what it
-  holds: the bytes a receipt's template hash names (card 257). Each open by this build copies
-  any row not yet carried across and leaves the old table in place, so a build from before the
-  rename still finds every body it filed; the schema version stays 9. `anam move-artifacts`
-  reads both names from an older file and reports `template bodies`, and the content kind is
-  `template-body`. Card 260 drops `inline_projection` once a version bump makes an older build
-  refuse the file.
 - `definitions_dir` and `projections_dir` (`ANAM_DEFINITIONS_DIR`, `ANAM_PROJECTIONS_DIR`) choose
   the catalog the daemon and the local commands run on (card 257). Unset, each is the catalog built
   into the binary, as before; set, the directory replaces it for that component, current manifests
@@ -26,10 +19,16 @@ account of one instance and carries its data.
   start leaves the store as it was), refuses a registered Definition that contradicts the
   catalog's at the same type and version, and logs one `daemon: catalog admitted` line with both
   sources and the definition set version. The files say which templates are current: one whose file
-  is removed is no longer listed or served.
-- Every receipt now files the body of the template it was served through, in `template_body`, as
-  inline projections already did (card 257). Verify replays that body, so a receipt still verifies
-  after its template's file has left the catalog, and the verdict says so. A different body at the
+  is removed is no longer listed or served. A local read refuses the same contradicting registered
+  Definition the daemon refuses. `anam init` loads the catalog before it creates anything, so a
+  missing directory leaves no files. `anam-bench gen` and `run` read the catalog from the anam
+  config too (`--config`, found as `anam` finds it) and name it on stderr.
+- Every receipt now files the body of the template it was served through, in the operational
+  store's `inline_projection` table, as inline projections already did (card 257). The table keeps
+  its name and the schema version stays 9, so an older build still reads the file; card 260 renames
+  it behind a version bump. `anam move-artifacts` reports these as `template bodies`. When the
+  catalog no longer holds the receipt's template version, verify replays the filed body, so a
+  receipt still verifies after its template's file has left the catalog, and the verdict says so. A different body at the
   same version is still refused, as before. A receipt served before this files nothing and replays
   its catalog file. Without it, verify answers unable to verify, names the template and version,
   and says to put the file back.

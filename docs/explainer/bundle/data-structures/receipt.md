@@ -23,12 +23,12 @@ references:
 | `facet_ids` | []string | in served order; an empty list for an empty serve |
 | `watermark` | int64 | the W the derivation ran at |
 | `ledger_id` | string | the ledger that W counts in; empty on receipts from before 2026-10-07, which verify with a note |
-| `template`, `template_version` | string, int | the exact pruning; verify replays the body filed in `template_body` under `template_hash` (card 257), else the catalog's file at that version, else answers unable to verify |
+| `template`, `template_version` | string, int | the exact pruning; verify replays the catalog's file at that version, refusing one whose body moved; once the catalog no longer holds that version, the body filed in `inline_projection` under `template_hash` (card 257); else answers unable to verify |
 | `definition_set_version` | string | hash of the bundled manifests, provenance only |
 | `served_at` | string | the clock layout |
 | `span` | string | `whole-person` or `fact-time[from,to)` |
 | `query` | object, optional | `{from, before, at, type}` a read narrowed by after the template; nil for a whole serve |
-| `template_inline` | bool, optional | the template was an inline projection a query carried (card 211): `template` is then `inline`, `template_version` 1, and `template_hash` the address of the body filed in the `template_body` table. Last, left out when false, so every earlier receipt keeps its bytes and hash |
+| `template_inline` | bool, optional | the template was an inline projection a query carried (card 211): `template` is then `inline`, `template_version` 1, and `template_hash` the address of the body filed in the `inline_projection` table. Last, left out when false, so every earlier receipt keeps its bytes and hash |
 | `principal` | string, optional | the name, from the importers file, of the principal whose read this files, for a token set to record every read (card 216). Last and left out when empty, so every receipt cut before it has the same bytes and hash and still verifies |
 
 Stored as a row of the `receipt` table, addressed by the SHA-256 of its indented JSON; parsed with unknown fields refused. Verification reports two independent proofs: reproduced (re-derived hash and id set match) and intact (the served file still hashes to `served_hash`).

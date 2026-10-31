@@ -34,9 +34,10 @@ const Kind = "receipt"
 // (ops.KindServed). It lives here because a receipt is the only thing that names one.
 const ServedKind = "served"
 
-// TemplateBodyKind is the kind of stored content template bodies are filed under
-// (ops.KindTemplateBody), which a receipt names by its TemplateHash.
-const TemplateBodyKind = "template-body"
+// InlineKind is the kind of stored content template bodies are filed under
+// (ops.KindInlineProjection), which a receipt names by its TemplateHash: an inline
+// projection's, and since card 257 a catalog template's too.
+const InlineKind = "inline-projection"
 
 // Receipt is the immutable record of one serve. Its field set is §9's, and each field
 // earns its place by being something the re-derivation needs or something a reader
@@ -90,7 +91,7 @@ type Receipt struct {
 	// TemplateInline says the template was not a registered one but the body a query
 	// carried (card 211). Template and TemplateVersion then hold the fixed stand-ins
 	// "inline" and 1, and TemplateHash is the body's address in the operational
-	// store's template bodies, which is where verify finds the body to replay.
+	// store's inline-projection rows, which is where verify finds the body to replay.
 	// Last and omitted when false, so every earlier receipt keeps its bytes and its
 	// hash and still verifies.
 	TemplateInline bool `json:"template_inline,omitempty"`

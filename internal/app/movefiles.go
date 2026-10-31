@@ -35,7 +35,7 @@ alone, so running it again is safe. The folder is never changed.
 
 With --registered-from, what an older operational store authored is first copied into
 this one, read-only from the old file: the Definitions and projection templates
-registered, the inline projection bodies, the admission holds, and the receipts, the
+registered, the template bodies, the admission holds, and the receipts, the
 values they served, the saved selections and their codes, byte for byte. The store must
 hold none of its own: that is what a fresh store from init is. Use it when the old store
 was set aside because its schema moved on.
@@ -138,7 +138,7 @@ func carriedCounts(reg ops.Registered) string {
 	}
 	return fmt.Sprintf("%d registered Definitions, %d registered projection templates, %d template bodies, "+
 		"%d admission holds, %d receipts, %d served values, %d saved selections and %d selection codes",
-		len(reg.Definitions), len(reg.Projections), len(reg.TemplateBodies), len(reg.Holds),
+		len(reg.Definitions), len(reg.Projections), len(reg.Inline), len(reg.Holds),
 		byKind[ops.KindReceipt], byKind[ops.KindServed], byKind[ops.KindSelection], byKind[ops.KindSelectionCode])
 }
 

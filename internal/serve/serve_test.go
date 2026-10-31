@@ -406,7 +406,7 @@ func TestVerify_ReplaysTheFiledBodyOnceTheCatalogMovesOn(t *testing.T) {
 type noTemplateBodies struct{ serve.Store }
 
 func (s noTemplateBodies) Get(ctx context.Context, kind, digest string) ([]byte, error) {
-	if kind == receipt.TemplateBodyKind {
+	if kind == receipt.InlineKind {
 		return nil, ops.ErrNotFound
 	}
 	return s.Store.Get(ctx, kind, digest)

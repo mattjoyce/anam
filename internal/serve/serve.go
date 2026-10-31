@@ -236,7 +236,7 @@ func Publish(ctx context.Context, d Deps, t projection.Template, w ledger.Waterm
 	if dryRun {
 		return out, nil
 	}
-	if _, err := d.Published.Put(ctx, receipt.TemplateBodyKind, t.Body); err != nil {
+	if _, err := d.Published.Put(ctx, receipt.InlineKind, t.Body); err != nil {
 		return Served{}, err
 	}
 	if _, err := d.Published.Put(ctx, receipt.ServedKind, servedBytes); err != nil {
@@ -443,7 +443,7 @@ func templateOf(ctx context.Context, d Deps, r receipt.Receipt) (projection.Temp
 // one was, and checks it is the template the receipt names. The store re-hashes the
 // bytes it returns, so an altered body is refused there.
 func filedTemplate(ctx context.Context, d Deps, r receipt.Receipt) (projection.Template, bool, error) {
-	body, err := d.Published.Get(ctx, receipt.TemplateBodyKind, r.TemplateHash)
+	body, err := d.Published.Get(ctx, receipt.InlineKind, r.TemplateHash)
 	if errors.Is(err, ops.ErrNotFound) {
 		return projection.Template{}, false, nil
 	}
@@ -465,7 +465,7 @@ func filedTemplate(ctx context.Context, d Deps, r receipt.Receipt) (projection.T
 // that hash. The store re-hashes the bytes it returns, so a body that was altered is
 // refused there, and one that parses to another hash is refused here.
 func inlineTemplate(ctx context.Context, d Deps, hash string) (projection.Template, error) {
-	body, err := d.Published.Get(ctx, receipt.TemplateBodyKind, hash)
+	body, err := d.Published.Get(ctx, receipt.InlineKind, hash)
 	if err != nil {
 		if errors.Is(err, ops.ErrNotFound) {
 			return projection.Template{}, fmt.Errorf("%w: unable to verify: the receipt was served through an inline projection %s, and its body is not held: %v",

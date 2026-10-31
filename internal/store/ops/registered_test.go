@@ -37,7 +37,7 @@ func TestRegistered_ReadFromOneStoreIsWrittenToAnother(t *testing.T) {
 	// An inline projection, filed the way a query's receipt files it: addressed by the
 	// hash of its own bytes.
 	inlineBody := []byte(`{"max_classification":"Normal","statuses":["admitted"],"types":["test.reading"]}`)
-	inlineHash, err := from.Put(ctx, ops.KindTemplateBody, inlineBody)
+	inlineHash, err := from.Put(ctx, ops.KindInlineProjection, inlineBody)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestRegistered_ReadFromOneStoreIsWrittenToAnother(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(got.Definitions) != 2 || len(got.Projections) != 1 || len(got.Provisioned) != 1 ||
-		len(got.TemplateBodies) != 1 || got.TemplateBodies[0].Hash != inlineHash || !bytes.Equal(got.TemplateBodies[0].Body, inlineBody) || got.Definitions[1].RegisteredAt != "2026-10-22T00:00:00.000000000Z" {
+		len(got.Inline) != 1 || got.Inline[0].Hash != inlineHash || !bytes.Equal(got.Inline[0].Body, inlineBody) || got.Definitions[1].RegisteredAt != "2026-10-22T00:00:00.000000000Z" {
 		t.Fatalf("ReadRegistered = %+v", got)
 	}
 
@@ -67,7 +67,7 @@ func TestRegistered_ReadFromOneStoreIsWrittenToAnother(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(again.Definitions) != 2 || again.Definitions[0] != got.Definitions[0] || again.Projections[0] != got.Projections[0] ||
-		len(again.TemplateBodies) != 1 || again.TemplateBodies[0].Hash != inlineHash {
+		len(again.Inline) != 1 || again.Inline[0].Hash != inlineHash {
 		t.Errorf("the new store holds %+v, want the old store's rows", again)
 	}
 	if len(again.Provisioned) != 0 {
@@ -103,11 +103,11 @@ func TestCarryRegistered_RefusesAnInlineBodyThatDoesNotHashToItsKey(t *testing.T
 	}
 	defer func() { _ = to.Close() }()
 	body := []byte(`{"types":[]}`)
-	bad := ops.Registered{TemplateBodies: []ops.TemplateBody{{Hash: ops.Digest([]byte("other")), Body: body}}}
+	bad := ops.Registered{Inline: []ops.InlineProjection{{Hash: ops.Digest([]byte("other")), Body: body}}}
 	if err := to.CarryRegistered(ctx, bad); !errors.Is(err, ops.ErrCorrupt) {
 		t.Fatalf("CarryRegistered of a body under another hash = %v, want ErrCorrupt", err)
 	}
-	if got, _ := to.List(ctx, ops.KindTemplateBody); len(got) != 0 {
+	if got, _ := to.List(ctx, ops.KindInlineProjection); len(got) != 0 {
 		t.Errorf("a refused carry left %d inline rows", len(got))
 	}
 }
@@ -139,11 +139,11 @@ func TestCarryRegistered_EveryAuthoredRowComesBackByteIdentical(t *testing.T) {
 		t.Fatal(err)
 	}
 	bodies := map[string][][]byte{
-		ops.KindTemplateBody:  {[]byte(`{"types":["test.reading"]}`)},
-		ops.KindReceipt:       {[]byte(`{"served_hash":"a"}`), []byte(`{"served_hash":"b","principal":"assistant"}`)},
-		ops.KindServed:        {[]byte("served value one\x00\xff"), []byte(`[{"facet_id":"f"}]`)},
-		ops.KindSelection:     {[]byte("pick(E) :- entry(E, _, _, _, _, _, _).")},
-		ops.KindSelectionCode: {[]byte(`{"code":"0123abcd9","hash":"sha256:x"}`)},
+		ops.KindInlineProjection: {[]byte(`{"types":["test.reading"]}`)},
+		ops.KindReceipt:          {[]byte(`{"served_hash":"a"}`), []byte(`{"served_hash":"b","principal":"assistant"}`)},
+		ops.KindServed:           {[]byte("served value one\x00\xff"), []byte(`[{"facet_id":"f"}]`)},
+		ops.KindSelection:        {[]byte("pick(E) :- entry(E, _, _, _, _, _, _).")},
+		ops.KindSelectionCode:    {[]byte(`{"code":"0123abcd9","hash":"sha256:x"}`)},
 	}
 	for kind, list := range bodies {
 		for _, b := range list {

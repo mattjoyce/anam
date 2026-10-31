@@ -226,24 +226,23 @@ CREATE TRIGGER IF NOT EXISTS saved_selection_code_no_delete
 BEFORE DELETE ON saved_selection_code
 BEGIN SELECT RAISE(ABORT, 'saved_selection_code is immutable'); END;
 
--- tier: authored, template bodies: the bytes a receipt's template_hash names, keyed by
--- the SHA-256 of their canonical form, so verify finds the template to replay without a
--- catalog file: one whose file has left, or the projection a query carried in its
--- request (card 211). A body is filed with every receipt, before it, and only then; a
--- receipt served before bodies were filed for catalog templates replays its file.
--- Immutable, like the receipt.
--- It was inline_projection until it was named for what it holds; Open copies an older
--- file's rows across (copyInlineProjection) and leaves that table for an older build.
-CREATE TABLE IF NOT EXISTS template_body (
+-- tier: authored, template bodies: the bytes a receipt's template hash names, keyed by
+-- the SHA-256 of them. Every receipt files the body it was served through here, before
+-- the receipt: a projection a query carried in its request (card 211), or a catalog
+-- template, so verify can replay a receipt whose template file has left the catalog.
+-- Immutable, like the receipt; a body is only ever filed when a read that used it was
+-- answered. The table keeps the name it had when it held only inline bodies, since an
+-- older build of this schema version reads it by that name (card 260 renames it).
+CREATE TABLE IF NOT EXISTS inline_projection (
   hash TEXT PRIMARY KEY CHECK (length(hash) = 71 AND hash GLOB 'sha256:*'),
   body BLOB NOT NULL
 );
-CREATE TRIGGER IF NOT EXISTS template_body_no_update
-BEFORE UPDATE ON template_body
-BEGIN SELECT RAISE(ABORT, 'template_body is immutable'); END;
-CREATE TRIGGER IF NOT EXISTS template_body_no_delete
-BEFORE DELETE ON template_body
-BEGIN SELECT RAISE(ABORT, 'template_body is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS inline_projection_no_update
+BEFORE UPDATE ON inline_projection
+BEGIN SELECT RAISE(ABORT, 'inline_projection is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS inline_projection_no_delete
+BEFORE DELETE ON inline_projection
+BEGIN SELECT RAISE(ABORT, 'inline_projection is immutable'); END;
 
 -- tier: provisioned — the static source -> facet-type token map (the gate's
 -- authenticated pillar). One row per grant.

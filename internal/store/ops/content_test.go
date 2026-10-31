@@ -205,7 +205,7 @@ func TestTriggers_RefuseWhatImmutableMeans(t *testing.T) {
 		{ops.KindServed, `UPDATE served_value SET body = x'00' WHERE hash = ?`, `DELETE FROM served_value WHERE hash = ?`},
 		{ops.KindSelection, `UPDATE saved_selection SET body = x'00' WHERE hash = ?`, `DELETE FROM saved_selection WHERE hash = ?`},
 		{ops.KindSelectionCode, `UPDATE saved_selection_code SET body = x'00' WHERE hash = ?`, `DELETE FROM saved_selection_code WHERE hash = ?`},
-		{ops.KindTemplateBody, `UPDATE template_body SET body = x'00' WHERE hash = ?`, `DELETE FROM template_body WHERE hash = ?`},
+		{ops.KindInlineProjection, `UPDATE inline_projection SET body = x'00' WHERE hash = ?`, `DELETE FROM inline_projection WHERE hash = ?`},
 		{ops.KindCheckpoint, `UPDATE checkpoint_value SET body = x'00' WHERE hash = ?`, ""},
 	} {
 		digest, err := d.Put(ctx, tc.kind, []byte("held "+tc.kind))
@@ -301,7 +301,7 @@ func TestKinds_AgreeWithTheirOwners(t *testing.T) {
 		{"receipt.ServedKind", receipt.ServedKind, ops.KindServed},
 		{"selection.Kind", selection.Kind, ops.KindSelection},
 		{"selection.CodeKind", selection.CodeKind, ops.KindSelectionCode},
-		{"receipt.TemplateBodyKind", receipt.TemplateBodyKind, ops.KindTemplateBody},
+		{"receipt.InlineKind", receipt.InlineKind, ops.KindInlineProjection},
 	} {
 		if tc.theirs != tc.ours {
 			t.Errorf("%s = %q, the store names it %q", tc.owner, tc.theirs, tc.ours)

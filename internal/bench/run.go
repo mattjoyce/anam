@@ -3,6 +3,7 @@ package bench
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -75,11 +76,16 @@ type Options struct {
 	Only []string
 	// Budget is the checkpoint_budget the dry-run mint scenario mints with.
 	Budget int
+	// Catalog is the catalog every scenario reads through, loaded once by the caller.
+	Catalog *catalog.Catalog
 }
 
 // Run times every scenario against the record at o.Paths. It catches the index up
 // first, untimed, so a read of it measures the read.
 func Run(ctx context.Context, o Options, progress func(string)) (Report, error) {
+	if o.Catalog == nil {
+		return Report{}, errors.New("bench: Run needs a catalog")
+	}
 	l, err := ledger.OpenReadOnly(ctx, o.Paths.Ledger, o.Person)
 	if err != nil {
 		return Report{}, err
@@ -102,10 +108,7 @@ func Run(ctx context.Context, o Options, progress func(string)) (Report, error) 
 	if err != nil {
 		return Report{}, err
 	}
-	cat, err := catalog.Load(ctx, "", "")
-	if err != nil {
-		return Report{}, err
-	}
+	cat := o.Catalog
 	deps := mint.Deps{Ledger: l, Index: db, Values: db, Buckets: buckets, Clock: clock.Real{}, Budget: o.Budget}
 	scs, err := scenarios(ctx, cat, l, db, plan, deps)
 	if err != nil {

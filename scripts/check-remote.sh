@@ -7,7 +7,7 @@
 #
 # The gate runs in a clean, detached worktree at the commit's exact SHA, so the result
 # names a commit rather than whatever the working tree held. The commit must be pushed:
-# the build host fetches it from origin. The log lands in /tmp/anam-check-<sha>.log here,
+# the build host fetches it from origin. The log lands in /tmp/anam-check-<sha>-*.log here,
 # headed by the host, the anam and anam-importers SHAs, and the tool versions. The exit
 # code is the gate's.
 #
@@ -41,28 +41,35 @@ ref="${1:-HEAD}"
 repo="$(git rev-parse --show-toplevel)"
 sha="$(git -C "$repo" rev-parse --verify "$ref^{commit}")"
 short="${sha:0:7}"
-log="/tmp/anam-check-$short.log"
+log="$(mktemp "/tmp/anam-check-$short-XXXXXX.log")"
 
 # The gate as it runs on either machine: tools present, clean worktree at the SHA,
-# explainer against anam-importers' origin/master. Arguments: sha, clones root.
+# explainer against anam-importers' origin/master. Arguments: sha, clones root (empty
+# means ~/anam-check on the machine that runs it). Any setup failure stops the run:
+# check.sh skips the explainer check when the importers checkout is missing, so a
+# failed clone must not reach it. Runs on one machine queue on a lock held from setup
+# to cleanup, so two runs of one commit never share or remove each other's worktree.
 # shellcheck disable=SC2016
 gate='
-set -uo pipefail
-sha="$1"; root="$2"
+set -euo pipefail
+sha="$1"; root="${2:-$HOME/anam-check}"
 missing=""
 for t in go gofmt goimports golangci-lint gosec python3 git; do
   command -v "$t" >/dev/null 2>&1 || missing="$missing $t"
 done
 if [ -n "$missing" ]; then echo "check-remote: missing on $(hostname):$missing; not running a gate that would skip them"; exit 2; fi
-mkdir -p "$root"
+mkdir -p "$root/runs"
+if command -v flock >/dev/null 2>&1; then
+  exec 8>"$root/.lock"
+  flock -n 8 || { echo "another check-remote is running on $(hostname); waiting"; flock 8; }
+fi
 for r in anam anam-importers; do
   [ -d "$root/$r/.git" ] || git clone -q "https://github.com/mattjoyce/$r.git" "$root/$r"
   git -C "$root/$r" fetch -q origin
 done
 git -C "$root/anam-importers" checkout -q --detach origin/master
 git -C "$root/anam" cat-file -e "$sha^{commit}" 2>/dev/null || { echo "check-remote: $sha is not on origin; push it first"; exit 2; }
-run="$root/runs/$sha"
-git -C "$root/anam" worktree remove --force "$run" 2>/dev/null || true
+run="$root/runs/$sha-$$"
 git -C "$root/anam" worktree add -q --detach "$run" "$sha"
 trap "git -C \"$root/anam\" worktree remove --force \"$run\" >/dev/null 2>&1 || true" EXIT
 echo "host:           $(hostname)"
@@ -70,6 +77,7 @@ echo "anam:           $sha"
 echo "anam-importers: $(git -C "$root/anam-importers" rev-parse HEAD)"
 echo "go:             $(go version)"
 echo "golangci-lint:  $(golangci-lint --version 2>&1 | head -1)"
+echo "gosec:          $(gosec -version 2>&1 | grep -m1 Version || true)"
 echo "started:        $(date -Is)"
 echo
 cd "$run" && EXPLAINER_IMPORTERS_DIR="$root/anam-importers" scripts/check.sh
@@ -92,18 +100,16 @@ if [ "$where" != local ]; then
     echo "check-remote: $short is not on any remote branch; push it, or use --local" >&2
     exit 2
   fi
-  root="${ANAM_CHECK_ROOT:-\$HOME/anam-check}"
   echo "check-remote: $short on $where, log $log" >&2
   set +e
   # shellcheck disable=SC2029
-  ssh -o BatchMode=yes -o ServerAliveInterval=30 "$where" "bash -s -- $sha $root" <<<"$gate" >"$log" 2>&1
+  ssh -o BatchMode=yes -o ServerAliveInterval=30 "$where" \
+    "bash -s -- $(printf %q "$sha") $(printf %q "${ANAM_CHECK_ROOT:-}")" <<<"$gate" >"$log" 2>&1
   status=$?
 else
-  # Locally the clones are the ones beside this checkout's repo, fetched as above.
-  root="${ANAM_CHECK_ROOT:-$HOME/anam-check}"
   echo "check-remote: $short on $(hostname), log $log" >&2
   set +e
-  bash -s -- "$sha" "$root" <<<"$gate" >"$log" 2>&1
+  bash -s -- "$sha" "${ANAM_CHECK_ROOT:-}" <<<"$gate" >"$log" 2>&1
   status=$?
 fi
 set -e

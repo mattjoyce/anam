@@ -121,13 +121,13 @@ scripts/check-links.sh
 python3 docs/explainer/check.py   # needs anam-importers beside this checkout, or EXPLAINER_IMPORTERS_DIR
 go vet ./...
 golangci-lint run ./...
-gosec -severity medium ./...
+gosec -severity medium ./...    # v2.30.0; v2.24.0 spends minutes on rule G120
 go test -race -count=1 -shuffle=on -vet=all ./...
 ```
 `scripts/check-remote.sh [ref]` runs that gate on a pushed commit in a clean worktree, on the build
 host named by `ANAM_CHECK_HOST` when it is reachable and on this machine when it is not. It refuses to
 run without goimports, golangci-lint and gosec, since `check.sh` skips them silently. A host whose Go
-is newer than those tools can read (Go 1.27 against golangci-lint 2.10.1 and gosec 2.24.0) pins
+is newer than those tools can read (Go 1.27 against golangci-lint 2.10.1) pins
 `GOTOOLCHAIN=go1.26.0` for non-interactive shells; the script's header lists the rest of the setup.
 
 ---

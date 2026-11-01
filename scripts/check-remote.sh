@@ -17,7 +17,7 @@
 #
 # Settings (environment):
 #   ANAM_CHECK_HOST  the build host's Tailscale name, e.g. quantize-tower, the B550 tower
-#                    (16 cores; the gate took 318 s there at card 262). Unset: run locally.
+#                    (16 cores; see card 262 for the gate's time there). Unset: run locally.
 #   ANAM_CHECK_ROOT  where the build host keeps its clones (default ~/anam-check)
 #
 # Build host setup, once:
@@ -25,9 +25,9 @@
 #   - Go at or above go.mod's version on PATH for a non-interactive ssh shell, with
 #     $(go env GOPATH)/bin on PATH too.
 #   - go install golang.org/x/tools/cmd/goimports@latest
-#   - go install github.com/securego/gosec/v2/cmd/gosec@v2.24.0
+#   - go install github.com/securego/gosec/v2/cmd/gosec@v2.30.0
 #   - golangci-lint v2 (the ThinkPad runs 2.10.1)
-#   - Go newer than the lint tools can read (1.27 vs golangci-lint 2.10.1, gosec 2.24.0):
+#   - Go newer than the lint tools can read (1.27 vs golangci-lint 2.10.1):
 #     export GOTOOLCHAIN=go1.26.0 near the top of ~/.bashrc, then rebuild the three tools
 #   - python3, git, flock
 #   - HTTPS access to github.com (both repos are public, so no key is needed)

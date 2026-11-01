@@ -69,7 +69,9 @@ fi
 
 run go vet ./...
 if command -v golangci-lint >/dev/null 2>&1; then run golangci-lint run ./...; else echo "golangci-lint not installed — skipping"; fi
-# gosec: the gate passes clean under v2.24.0 and v2.29.0. v2.29.0 adds the rules G703, G710 and
+# gosec: the gate passes clean under v2.24.0, v2.29.0 and v2.30.0; use v2.30.0. Under v2.24.0 rule
+# G120 spent over four minutes on internal/inspect alone (card 262); v2.30.0 runs the whole
+# repo in seconds. v2.29.0 adds the rules G703, G710 and
 # G124. G703 and G710 are fixed. G124, the inspector's default-view cookie without the Secure
 # flag, carries a #nosec Matt approved on 2026-10-22 (internal/inspect/timeline_view.go).
 if command -v gosec >/dev/null 2>&1; then run gosec -severity medium -quiet ./...; else echo "gosec not installed — skipping"; fi

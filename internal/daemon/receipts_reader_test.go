@@ -62,6 +62,7 @@ const timelineBP = "/v1/timeline?zone=UTC&projection=bp"
 // A token set to record leaves one receipt per timeline read, naming its principal,
 // and a token without the setting leaves none.
 func TestRecordingTokenFilesAReceiptPerTimelineRead(t *testing.T) {
+	t.Parallel()
 	d := open(t, readerConfig(t))
 	t.Cleanup(func() { _ = d.closeStores() })
 	srv := httptest.NewServer(d.Handler())
@@ -103,6 +104,7 @@ func TestRecordingTokenFilesAReceiptPerTimelineRead(t *testing.T) {
 // A read a receipt cannot describe is refused to a recording token, not served
 // unrecorded.
 func TestRecordingTokenRefusesAReadNoReceiptCanDescribe(t *testing.T) {
+	t.Parallel()
 	d := open(t, readerConfig(t))
 	t.Cleanup(func() { _ = d.closeStores() })
 	srv := httptest.NewServer(d.Handler())
@@ -124,6 +126,7 @@ func TestRecordingTokenRefusesAReadNoReceiptCanDescribe(t *testing.T) {
 // A query by a recording token is filed naming it; a dry run stays a dry run; a query
 // by any other token names nobody.
 func TestRecordingTokenFilesAReceiptPerQuery(t *testing.T) {
+	t.Parallel()
 	d := open(t, readerConfig(t))
 	t.Cleanup(func() { _ = d.closeStores() })
 	srv := httptest.NewServer(d.Handler())
@@ -156,6 +159,7 @@ func TestRecordingTokenFilesAReceiptPerQuery(t *testing.T) {
 // Who read what: the listing filters by principal and by served time, and a receipt
 // of either kind verifies.
 func TestReceiptsListByPrincipalAndTime(t *testing.T) {
+	t.Parallel()
 	d := open(t, readerConfig(t))
 	t.Cleanup(func() { _ = d.closeStores() })
 	srv := httptest.NewServer(d.Handler())
@@ -209,6 +213,7 @@ func TestReceiptsListByPrincipalAndTime(t *testing.T) {
 // A recording token opens only the receipts that name it, since opening another's
 // would be a read no receipt of its own records. Other tokens open any.
 func TestRecordingTokenOpensOnlyItsOwnReceipts(t *testing.T) {
+	t.Parallel()
 	d := open(t, readerConfig(t))
 	t.Cleanup(func() { _ = d.closeStores() })
 	srv := httptest.NewServer(d.Handler())
@@ -240,6 +245,7 @@ func TestRecordingTokenOpensOnlyItsOwnReceipts(t *testing.T) {
 // When the receipt cannot be filed, the read fails and the reader gets no facets: a
 // recorded read is the receipt and the answer together.
 func TestRecordingTokenReadFailsWhenTheReceiptCannotBeFiled(t *testing.T) {
+	t.Parallel()
 	d := open(t, readerConfig(t))
 	t.Cleanup(func() { _ = d.closeStores() })
 	srv := httptest.NewServer(d.Handler())
@@ -261,6 +267,7 @@ func TestRecordingTokenReadFailsWhenTheReceiptCannotBeFiled(t *testing.T) {
 // reader's is refused; the operator and an ordinary reader list every receipt, by any
 // filter (Matt, 2026-10-22).
 func TestRecordingTokenListsOnlyItsOwnReceipts(t *testing.T) {
+	t.Parallel()
 	d := open(t, readerConfig(t))
 	t.Cleanup(func() { _ = d.closeStores() })
 	srv := httptest.NewServer(d.Handler())
@@ -300,6 +307,7 @@ func TestRecordingTokenListsOnlyItsOwnReceipts(t *testing.T) {
 // A recording token verifies only the receipts that name it, as it opens only those;
 // every other token verifies any (Matt, 2026-10-22).
 func TestRecordingTokenVerifiesOnlyItsOwnReceipts(t *testing.T) {
+	t.Parallel()
 	d := open(t, readerConfig(t))
 	t.Cleanup(func() { _ = d.closeStores() })
 	srv := httptest.NewServer(d.Handler())
@@ -330,6 +338,7 @@ func TestRecordingTokenVerifiesOnlyItsOwnReceipts(t *testing.T) {
 // 503 with Retry-After, as a busy queue does, and nothing is filed or served; a plain
 // read, which files nothing, is unaffected (card 224).
 func TestRecordingTokenReadIsBusyNotAFailureWhenTheStoreIsLocked(t *testing.T) {
+	t.Parallel()
 	cfg := readerConfig(t)
 	// Longer than the store's busy timeout, so the lock, not the request's deadline,
 	// is what the read meets.

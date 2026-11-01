@@ -18,6 +18,7 @@ import (
 // build whose keying differs from what the store last saw refuses to start, leaving
 // the stored set as it was.
 func TestOpenGuardsTheBundledDefinitions(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	cfg := newConfig(t)
 	d, err := Open(ctx, cfg, Options{})
@@ -75,6 +76,7 @@ func TestOpenGuardsTheBundledDefinitions(t *testing.T) {
 // bytes (a trailing space, so the keying is the same and the guard passes) is stored
 // with those bytes.
 func TestGuardPersistsTheCatalogItGuarded(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	dir := t.TempDir()
 	root := def.EmbeddedFS()

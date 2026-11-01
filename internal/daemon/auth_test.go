@@ -24,6 +24,7 @@ func writeToken(t *testing.T, dir, token string) string {
 }
 
 func TestTokenFile(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		token  string
@@ -50,6 +51,7 @@ func TestTokenFile(t *testing.T) {
 }
 
 func TestEverythingButHealthzNeedsTheToken(t *testing.T) {
+	t.Parallel()
 	cfg := newConfig(t)
 	cfg.TokenFile = writeToken(t, t.TempDir(), testToken)
 	d := open(t, cfg)

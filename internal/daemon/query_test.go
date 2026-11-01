@@ -70,6 +70,7 @@ func postJSON(t *testing.T, url string, body any, into any) int {
 // bad program as the reader's error, and bounds the derivation by max_read_bytes
 // with the query's narrowings.
 func TestQueryRoutes(t *testing.T) {
+	t.Parallel()
 	cfg := newConfig(t)
 	seedReadings(t, cfg)
 	d := open(t, cfg)
@@ -116,6 +117,7 @@ func TestQueryRoutes(t *testing.T) {
 // Over max_read_bytes the derivation is refused with its measure and the query's
 // narrowings, before anything is filed.
 func TestQueryRoutes_BoundsTheDerivation(t *testing.T) {
+	t.Parallel()
 	cfg := newConfig(t)
 	cfg.MaxReadBytes = 64
 	seedReadings(t, cfg)

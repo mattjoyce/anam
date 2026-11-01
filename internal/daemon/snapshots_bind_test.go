@@ -16,6 +16,7 @@ import (
 // (the API pressure review of 2026-10-11, finding 2, in the private review notes) resent a completed 1/1 part with
 // another facet and watched carried and absent move under a fixed completed_w.
 func TestSnapshotPartIsBoundToItsEnvelopes(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	d, url, stop := serveImporters(t, cfg)
 	defer func() { _ = stop() }()
@@ -76,6 +77,7 @@ func TestSnapshotPartIsBoundToItsEnvelopes(t *testing.T) {
 // Concurrent exact retries of one part are serialised by the write queue: every one is
 // 200, and the part is recorded once.
 func TestSnapshotConcurrentRetriesRecordOnePart(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	d, url, stop := serveImporters(t, cfg)
 	defer func() { _ = stop() }()
@@ -124,6 +126,7 @@ func TestSnapshotConcurrentRetriesRecordOnePart(t *testing.T) {
 // The promoted audit probe, as written: a completed 1/1 part resent with another
 // facet already in the ledger.
 func TestSnapshotCompletedPartCannotGainFacets(t *testing.T) {
+	t.Parallel()
 	d, url, stop := serveImporters(t, importerConfig(t))
 	defer func() { _ = stop() }()
 	weight, _ := d.defs.current.Load().Lookup("health.weight")

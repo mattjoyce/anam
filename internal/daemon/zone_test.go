@@ -16,6 +16,7 @@ import (
 // alert at 07:30 Sydney on the 21st (20:30 UTC on the 20th) and one at 23:59 the night
 // before.
 func TestSelectReadsADateInTheDaemonsZone(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	cfg.Zone = "Australia/Sydney"
 	raw, err := os.ReadFile(cfg.ImportersFile)

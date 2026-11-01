@@ -14,6 +14,7 @@ import (
 // verify answers it 409 as it does a moved template, not 500 (card 182, card 212).
 // A receipt under the bundled text still verifies, 200.
 func TestVerify_AMovedRuleSetIs409(t *testing.T) {
+	t.Parallel()
 	cfg := rolesConfig(t)
 	d, url, _ := serveImporters(t, cfg)
 

@@ -51,6 +51,7 @@ func drain(t *testing.T, d *Daemon) {
 // that budget, not after importer_wait, and nothing of it is written once the queue
 // frees (card 110; the blue team's TestPressureImporterQueueHonorsCallerBudget).
 func TestQueueWaitSpendsTheCallersBudget(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	cfg.ImporterWait = time.Minute // far beyond the budget, so only the budget can end the wait
 	d := open(t, cfg)
@@ -80,6 +81,7 @@ func TestQueueWaitSpendsTheCallersBudget(t *testing.T) {
 }
 
 func TestQueueBeforeAcceptance(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		budget time.Duration
@@ -121,6 +123,7 @@ func TestQueueBeforeAcceptance(t *testing.T) {
 // A caller already gone when the queue is free offers the select two ready cases. It
 // may take either; the write must not run on either.
 func TestQueueCancelRacesAFreeQueue(t *testing.T) {
+	t.Parallel()
 	d := open(t, newConfig(t))
 	start(t, d)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -144,6 +147,7 @@ func TestQueueCancelRacesAFreeQueue(t *testing.T) {
 // A write the worker takes after its budget has ended is not started, and is busy, as
 // it would have been an instant earlier.
 func TestQueueRunRefusesASpentBudget(t *testing.T) {
+	t.Parallel()
 	d := open(t, newConfig(t))
 	ran := false
 	spent := time.Now().Add(-time.Millisecond)
@@ -161,6 +165,7 @@ func TestQueueRunRefusesASpentBudget(t *testing.T) {
 // the one reported: an answer given before it ended would misreport a write that went
 // on to happen.
 func TestQueueDisconnectAfterAcceptance(t *testing.T) {
+	t.Parallel()
 	d := open(t, newConfig(t))
 	start(t, d)
 	ctx, cancel := context.WithCancel(context.Background())

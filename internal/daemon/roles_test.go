@@ -40,6 +40,7 @@ var wildcard = regexp.MustCompile(`\{[^}]+\}`)
 // token of each role is sent to every route; a role the route names is let through to
 // the handler (whatever it answers to an empty request), and any other is 403.
 func TestEveryRouteAdmitsTheRolesItNames(t *testing.T) {
+	t.Parallel()
 	cfg := rolesConfig(t)
 	d := open(t, cfg)
 	stop := start(t, d)
@@ -74,6 +75,7 @@ func TestEveryRouteAdmitsTheRolesItNames(t *testing.T) {
 // Card 89: what a reader may not do, said apart from the route table, so a change to
 // the table that opened one of these to readers fails here.
 func TestAReaderWritesNothingButReceipts(t *testing.T) {
+	t.Parallel()
 	_, url, _ := serveImporters(t, rolesConfig(t))
 	for _, tt := range []struct{ method, path string }{
 		{"POST", "/v1/envelopes"},
@@ -93,6 +95,7 @@ func TestAReaderWritesNothingButReceipts(t *testing.T) {
 
 // Card 89: a principal in the importers file may not hold the operator's token.
 func TestAReaderMayNotHoldTheOperatorsToken(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	sum := sha256.Sum256([]byte(testToken))
 	body := fmt.Sprintf("principals:\n  - name: assistant\n    role: reader\n    token_sha256: %s\n", hex.EncodeToString(sum[:]))

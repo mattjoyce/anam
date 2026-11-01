@@ -89,6 +89,7 @@ func doseForm(version int, taken, amount string) url.Values {
 // The Definitions page offers an Enter link to the types in the workbench's list and
 // to no other; the daemon tells the pages the list, and the pages do not read the file.
 func TestDefinitionsPageMarksTheEnterableTypes(t *testing.T) {
+	t.Parallel()
 	_, base := workbenchServing(t, "health.medication.dose")
 	status, body := page(t, "GET", base+"/definitions", nil, nil)
 	if status != http.StatusOK {
@@ -116,6 +117,7 @@ func TestDefinitionsPageMarksTheEnterableTypes(t *testing.T) {
 
 // Without a workbench principal the pages offer nothing: no link, no route.
 func TestNoWorkbenchPrincipalMeansNoEntryPages(t *testing.T) {
+	t.Parallel()
 	_, base, _ := serveImporters(t, importerConfig(t))
 	_, body := page(t, "GET", base+"/definitions", nil, nil)
 	if strings.Contains(body, `href="/entry?`) {
@@ -129,6 +131,7 @@ func TestNoWorkbenchPrincipalMeansNoEntryPages(t *testing.T) {
 // The dose form is drawn from the Definition: one control per property in the kind its
 // schema names, the guidance word for word, the version it was drawn from, and no id.
 func TestDoseFormIsDrawnFromTheDefinition(t *testing.T) {
+	t.Parallel()
 	d, base := workbenchServing(t, "health.medication.dose")
 	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
 	status, body := page(t, "GET", base+"/entry?type=health.medication.dose", nil, nil)
@@ -181,6 +184,7 @@ func TestDoseFormIsDrawnFromTheDefinition(t *testing.T) {
 // offset the page read lands at 17:00Z, says how its clock was read, and takes the
 // offset into its id; a correction carries the zone it was said in.
 func TestTheFormSendsTheBrowsersZone(t *testing.T) {
+	t.Parallel()
 	d, base := workbenchServing(t, "health.medication.dose")
 	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
 	form := doseForm(dose.Version, "2026-10-19T18:00", "5")
@@ -222,6 +226,7 @@ func TestTheFormSendsTheBrowsersZone(t *testing.T) {
 // A schema that needs a nested object or a list is refused with a plain message and no
 // form. Blood pressure's body is the bundled type that needs them.
 func TestAFormIsRefusedForANestedSchema(t *testing.T) {
+	t.Parallel()
 	_, base := workbenchServing(t, "health.blood-pressure")
 	status, body := page(t, "GET", base+"/entry?type=health.blood-pressure", nil, nil)
 	if status != http.StatusUnprocessableEntity {
@@ -241,6 +246,7 @@ func TestAFormIsRefusedForANestedSchema(t *testing.T) {
 // composes and the time in the Definition's layout; the same form again is a no-op; a
 // changed amount is a new version.
 func TestSubmittingTheFormLandsTheDose(t *testing.T) {
+	t.Parallel()
 	d, base := workbenchServing(t, "health.medication.dose")
 	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
 	v := dose.Version
@@ -282,6 +288,7 @@ func TestSubmittingTheFormLandsTheDose(t *testing.T) {
 // A refusal, a value that is not a number, and a form drawn from an old version each
 // write nothing and draw the form again with what was typed, in the gate's words.
 func TestAFailedSaveKeepsWhatWasTyped(t *testing.T) {
+	t.Parallel()
 	d, base := workbenchServing(t, "health.medication.dose")
 	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
 	v := dose.Version
@@ -316,6 +323,7 @@ func TestAFailedSaveKeepsWhatWasTyped(t *testing.T) {
 // locked; saving writes a new version of the same facet. Retract tombstones it. A
 // facet of another source has neither button, and its retraction is refused.
 func TestEditAndRetractAreForTheWorkbenchsOwnFacets(t *testing.T) {
+	t.Parallel()
 	d, base := workbenchServing(t, "health.medication.dose")
 	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
 	v := dose.Version
@@ -389,6 +397,7 @@ func TestEditAndRetractAreForTheWorkbenchsOwnFacets(t *testing.T) {
 
 // The browser guard wraps the form routes: a post from another site writes nothing.
 func TestTheFormRoutesRefuseACrossSitePost(t *testing.T) {
+	t.Parallel()
 	d, base := workbenchServing(t, "health.medication.dose")
 	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
 	cross := map[string]string{"Origin": "https://untrusted.example", "Sec-Fetch-Site": "cross-site"}

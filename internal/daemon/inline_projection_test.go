@@ -21,6 +21,7 @@ func inlineQuery(projection string, extra string) string {
 }
 
 func TestInlineProjection_AReaderQueriesAndTheReceiptVerifiesAfterARestart(t *testing.T) {
+	t.Parallel()
 	cfg := rolesConfig(t)
 	d, url, stop := serveImporters(t, cfg)
 
@@ -71,6 +72,7 @@ func TestInlineProjection_AReaderQueriesAndTheReceiptVerifiesAfterARestart(t *te
 // A malformed inline template is refused as the reader's error, naming the field it got
 // wrong, before anything is read: no answer, and no receipt or body filed.
 func TestInlineProjection_AMalformedTemplateIsRefusedNamingTheField(t *testing.T) {
+	t.Parallel()
 	cfg := rolesConfig(t)
 	_, url, _ := serveImporters(t, cfg)
 

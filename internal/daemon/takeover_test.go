@@ -14,6 +14,7 @@ import (
 // at that held version is adopted, and envelopes admit as before. The gap between the
 // deploy and the importer's next batch closes itself.
 func TestATypeDroppedFromTheBinaryIsTakenOverByItsImporter(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	buckets, err := cfg.Buckets()
 	if err != nil {

@@ -58,6 +58,7 @@ func holdCall(t *testing.T, method, url, token, body string) (int, string, strin
 // refused with 503 and a Retry-After, and the body names the hold. Another source
 // carries on, the operator's own writes carry on, and the workbench is never held.
 func TestHoldRefusesAHeldSourceAndOnlyThatSource(t *testing.T) {
+	t.Parallel()
 	d, url, _ := serveImporters(t, holdConfig(t))
 	weight, _ := d.defs.current.Load().Lookup("health.weight")
 	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
@@ -132,6 +133,7 @@ func TestHoldRefusesAHeldSourceAndOnlyThatSource(t *testing.T) {
 
 // A hold is the operator's alone: an importer's token is refused, and so is none.
 func TestHoldIsTheOperatorsAlone(t *testing.T) {
+	t.Parallel()
 	_, url, _ := serveImporters(t, holdConfig(t))
 	for name, tok := range map[string]string{"an importer's token": importerToken, "no token": ""} {
 		t.Run(name, func(t *testing.T) {
@@ -148,6 +150,7 @@ func TestHoldIsTheOperatorsAlone(t *testing.T) {
 // The workbench is never held: a hold names an importer's source, and a hand entry is
 // the operator's own.
 func TestHoldRefusesTheWorkbench(t *testing.T) {
+	t.Parallel()
 	_, url, _ := serveImporters(t, holdConfig(t))
 	status, body, _ := holdCall(t, "POST", url+"/v1/hold", testToken, `{"sources": ["workbench"]}`)
 	if status != http.StatusBadRequest || !strings.Contains(body, "never held") {
@@ -158,6 +161,7 @@ func TestHoldRefusesTheWorkbench(t *testing.T) {
 // A hold needs something to hold: an empty request is refused, and holding a source
 // twice keeps the hold it has.
 func TestHoldNeedsASourceAndKeepsTheOneItHas(t *testing.T) {
+	t.Parallel()
 	_, url, _ := serveImporters(t, holdConfig(t))
 	call(t, "POST", url+"/v1/hold", testToken, `{}`, http.StatusBadRequest, nil)
 
@@ -172,6 +176,7 @@ func TestHoldNeedsASourceAndKeepsTheOneItHas(t *testing.T) {
 // A hold is kept in the operational store, so it outlives the daemon: a daemon that
 // starts on the same store finds the hold and keeps refusing the source.
 func TestHoldSurvivesARestart(t *testing.T) {
+	t.Parallel()
 	cfg := holdConfig(t)
 	d, url, _ := serveImporters(t, cfg)
 	call(t, "POST", url+"/v1/hold", testToken, `{"sources": ["test-import"]}`, http.StatusOK, nil)

@@ -18,6 +18,7 @@ import (
 // An index derived from another ledger, or claiming events this one does not hold,
 // would be served as an answer. The daemon does not start on one.
 func TestOpenRefusesAWrongIndex(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		spoil func(t *testing.T, db *ops.DB)
@@ -54,6 +55,7 @@ func TestOpenRefusesAWrongIndex(t *testing.T) {
 // Once a catch-up has found the index wrong, the routes that read it refuse rather
 // than answer from it.
 func TestAWrongIndexIsRefusedNotServed(t *testing.T) {
+	t.Parallel()
 	d := open(t, newConfig(t))
 	t.Cleanup(func() { _ = d.closeStores() })
 	srv := httptest.NewServer(d.Handler())
@@ -72,6 +74,7 @@ func TestAWrongIndexIsRefusedNotServed(t *testing.T) {
 // A payload reaches the client as it is held: HTML in it is not escaped, so the CLI
 // renders it as it would from local files.
 func TestWriteJSONKeepsPayloadBytes(t *testing.T) {
+	t.Parallel()
 	rec := httptest.NewRecorder()
 	writeJSON(rec, http.StatusOK, fold.Entry{Payload: json.RawMessage(`{"note":"<a&b>"}`)})
 	if body := rec.Body.String(); !strings.Contains(body, `"<a&b>"`) {
@@ -82,6 +85,7 @@ func TestWriteJSONKeepsPayloadBytes(t *testing.T) {
 // The daemon works to the shorter of its timeout and the caller's, so it answers
 // before the caller gives up.
 func TestTimeoutIsTheShorterOfTheTwo(t *testing.T) {
+	t.Parallel()
 	d := &Daemon{}
 	d.cfg.Timeout = 5 * time.Second
 	for _, tt := range []struct {

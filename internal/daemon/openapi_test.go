@@ -87,6 +87,7 @@ func served(d *Daemon) map[string][]string {
 }
 
 func TestOpenAPI_DescribesEveryRouteAndNothingElse(t *testing.T) {
+	t.Parallel()
 	d := open(t, newConfig(t))
 	s := loadSpec(t)
 	want, got := served(d), documented(s)
@@ -110,6 +111,7 @@ func TestOpenAPI_DescribesEveryRouteAndNothingElse(t *testing.T) {
 // Every example decodes into the api type the operation names, strictly: a field in
 // the example the type does not have is a document that drifted from the wire.
 func TestOpenAPI_ExamplesDecodeIntoTheAPITypes(t *testing.T) {
+	t.Parallel()
 	s := loadSpec(t)
 	for path, ops := range s.Paths {
 		for method, op := range ops {
@@ -170,6 +172,7 @@ func TestOpenAPI_ExamplesDecodeIntoTheAPITypes(t *testing.T) {
 
 // The document is served to anyone, as YAML, and is the embedded bytes.
 func TestOpenAPI_IsServedWithoutAToken(t *testing.T) {
+	t.Parallel()
 	cfg := newConfig(t)
 	cfg.TokenFile = filepath.Join(t.TempDir(), "token")
 	if err := os.WriteFile(cfg.TokenFile, []byte("operator-token-0123456789abcdef0123456789abcdef\n"), 0o600); err != nil {

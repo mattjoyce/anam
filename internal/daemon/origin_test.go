@@ -12,6 +12,7 @@ import (
 // cached the token for basic auth. Only the browser's own fetch metadata can say where
 // a request came from, so that is what is checked, before any work.
 func TestBrowserGuard_RefusesForeignOriginsOnUnsafeRoutes(t *testing.T) {
+	t.Parallel()
 	cfg := newConfig(t)
 	cfg.TokenFile = writeToken(t, t.TempDir(), testToken)
 	d := open(t, cfg)
@@ -60,6 +61,7 @@ func TestBrowserGuard_RefusesForeignOriginsOnUnsafeRoutes(t *testing.T) {
 // so the Host must be a loopback name too: a DNS name pointed at this machine is how a
 // page elsewhere would reach it.
 func TestBrowserGuard_TokenlessNeedsALoopbackHost(t *testing.T) {
+	t.Parallel()
 	cfg := newConfig(t)
 	d := open(t, cfg)
 	t.Cleanup(func() { _ = d.closeStores() })

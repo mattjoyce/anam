@@ -24,6 +24,7 @@ func snapBatch(id string, part, parts int, envs ...string) string {
 // what the run left absent. A later run that leaves one out reports it absent, and
 // tombstones nothing.
 func TestSnapshotReportsWhatACompleteResendLeftAbsent(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	d, url, stop := serveImporters(t, cfg)
 	defer func() { _ = stop() }()
@@ -72,6 +73,7 @@ func TestSnapshotReportsWhatACompleteResendLeftAbsent(t *testing.T) {
 
 // A part that does not fit its label is refused before anything is admitted.
 func TestSnapshotPartsAreChecked(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	d, url, stop := serveImporters(t, cfg)
 	defer func() { _ = stop() }()
@@ -103,6 +105,7 @@ func TestSnapshotPartsAreChecked(t *testing.T) {
 // An importer sees only its own source's snapshots; the operator sees any; an unknown
 // id is 404.
 func TestSnapshotReportAccess(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	const otherToken = "other-importer-token-0123456789abcdef0123"
 	sum := sha256.Sum256([]byte(otherToken))
@@ -133,6 +136,7 @@ func TestSnapshotReportAccess(t *testing.T) {
 // resend's to call absent, even though it landed before the resend completed. Absence
 // is judged from the run's start (started_w), not its end.
 func TestSnapshotLeavesAloneWhatLandedWhileItRan(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	d, url, stop := serveImporters(t, cfg)
 	defer func() { _ = stop() }()

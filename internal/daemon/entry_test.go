@@ -42,6 +42,7 @@ func doseEntry(version int, taken string, amount float64) string {
 // the id the Definition composes, entering it again is a no-op, a changed dose is a
 // new version of the same facet, and status lists the workbench once it has written.
 func TestPostEntryAdmitsADoseAsTheWorkbench(t *testing.T) {
+	t.Parallel()
 	serve := workbenchConfig(t)
 	d, url := serve()
 	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
@@ -98,6 +99,7 @@ func TestPostEntryAdmitsADoseAsTheWorkbench(t *testing.T) {
 // words: a type outside the workbench's types, a payload the Definition refuses, an
 // id that disagrees with the rule, and a form drawn from another Definition version.
 func TestPostEntryRefusesAsAnImporterWouldBe(t *testing.T) {
+	t.Parallel()
 	serve := workbenchConfig(t)
 	d, url := serve()
 	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
@@ -145,6 +147,7 @@ func TestPostEntryRefusesAsAnImporterWouldBe(t *testing.T) {
 // does not choose a source, an injector or an id, and a body that is not one bounded
 // value is a 400.
 func TestPostEntryTakesOnlyTheThreeFields(t *testing.T) {
+	t.Parallel()
 	serve := workbenchConfig(t)
 	d, url := serve()
 	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
@@ -179,6 +182,7 @@ func TestPostEntryTakesOnlyTheThreeFields(t *testing.T) {
 // token is the browser's ambient credential, and the guard is what keeps a foreign
 // page from spending it.
 func TestPostEntryIsTheOperatorsAndNotAForeignPages(t *testing.T) {
+	t.Parallel()
 	serve := workbenchConfig(t)
 	d, url := serve()
 	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
@@ -210,6 +214,7 @@ func TestPostEntryIsTheOperatorsAndNotAForeignPages(t *testing.T) {
 // A daemon whose importers file does not declare the workbench answers 404 and says
 // what is missing, and so does one with no importers file at all.
 func TestPostEntryWithoutAWorkbenchPrincipal(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	d, url, _ := serveImporters(t, cfg)
 	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")

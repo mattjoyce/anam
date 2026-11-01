@@ -39,6 +39,7 @@ func postAs(t *testing.T, url, body string, headers map[string]string) (int, str
 // not live and a source reconciled by an importer's snapshot are each 409 and write
 // nothing; an unknown facet is 404; a browser on another site is 403.
 func TestPostFacetRetract(t *testing.T) {
+	t.Parallel()
 	d, url, _ := serveImporters(t, importerConfig(t))
 	weight, _ := d.defs.current.Load().Lookup("health.weight")
 	v := weight.Version

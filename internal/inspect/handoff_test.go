@@ -81,7 +81,7 @@ func TestHandoff_AWindowOffMidnightTravelsAsInstants(t *testing.T) {
 func TestHandoff_AnUnzoomedTimelineOffersNoRange(t *testing.T) {
 	t.Parallel()
 	srv := zoneServer(t, "")
-	_, body := get(t, srv.URL+"/")
+	_, body := get(t, srv.URL+"/?view=whole")
 	if strings.Contains(body, `id="select-range"`) {
 		t.Error("the unzoomed timeline offers to select in a range")
 	}

@@ -396,7 +396,7 @@ func TestEveryPage_OffersTheWidthToggle(t *testing.T) {
 func TestTimeline_MarksCarryWhatSelectionNeeds(t *testing.T) {
 	t.Parallel()
 	srv, bpID, _ := seededServer(t)
-	_, body := get(t, srv.URL+"/")
+	_, body := get(t, srv.URL+"/?view=whole")
 	at := strings.Index(body, `href="/facet?id=`+bpID+`"`)
 	if at < 0 {
 		t.Fatal("live facet not on the band")

@@ -107,6 +107,8 @@ type Server struct {
 	// zone is the IANA zone a page reads a bare date in when the request names none
 	// (card 236): the daemon's configured zone.
 	zone string
+	// now is the clock a bare "/" reads today from (card 263).
+	now func() time.Time
 
 	// selections saves and opens selections by their short code (card 206); nil
 	// means this inspector keeps none, and ?sel= answers so.
@@ -179,6 +181,9 @@ type Deps struct {
 	// bare date in when the request names none (card 236); "" or a name that does not
 	// load reads in UTC.
 	Zone string
+	// Now is the clock a bare "/" reads today from, to open the last 30 days (card 263);
+	// nil reads time.Now.
+	Now func() time.Time
 }
 
 // Handler returns the inspector's routes on a fresh mux.
@@ -187,7 +192,7 @@ func Handler(d Deps) http.Handler {
 		ledger: d.Ledger, timeout: d.Timeout, buckets: d.Buckets, library: d.Library, catalog: d.Catalog,
 		defs: d.Definitions, heldDefs: d.Held, checkpoints: d.Checkpoints, edges: d.Edges, projections: d.Projections,
 		cachedReads: d.CachedReads, bench: d.Workbench, maxReadBytes: d.MaxReadBytes, selections: d.Selections,
-		roster: d.Roster, zone: deployedZone(d.Zone), pages: pagesFor(d.Build, d.Roster != nil),
+		roster: d.Roster, zone: deployedZone(d.Zone), now: nowOr(d.Now), pages: pagesFor(d.Build, d.Roster != nil),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.timeline)
@@ -429,4 +434,12 @@ func deployedZone(name string) string {
 		return defaultZone
 	}
 	return name
+}
+
+// nowOr is the clock a Deps names, the wall clock when it names none (card 263).
+func nowOr(f func() time.Time) func() time.Time {
+	if f == nil {
+		return time.Now
+	}
+	return f
 }

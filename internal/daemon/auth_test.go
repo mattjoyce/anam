@@ -72,7 +72,7 @@ func TestEverythingButHealthzNeedsTheToken(t *testing.T) {
 		{"the right bearer token", "/v1/status",
 			func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+testToken) }, http.StatusOK},
 		{"the token as a basic-auth password", "/",
-			func(r *http.Request) { r.SetBasicAuth("matt", testToken) }, http.StatusOK},
+			func(r *http.Request) { r.SetBasicAuth("matt", testToken); r.URL.RawQuery = "view=whole" }, http.StatusOK},
 		{"the token as a basic-auth user name", "/",
 			func(r *http.Request) { r.SetBasicAuth(testToken, "") }, http.StatusUnauthorized},
 	}

@@ -87,7 +87,7 @@ func TestTimeline_DenseMarksDrawAsARunUntilZoomedIn(t *testing.T) {
 	t.Parallel()
 	srv, _ := denseServer(t)
 
-	code, whole := get(t, srv.URL+"/")
+	code, whole := get(t, srv.URL+"/?view=whole")
 	if code != http.StatusOK {
 		t.Fatalf("GET / = %d", code)
 	}
@@ -153,7 +153,7 @@ func TestTimeline_LiveByDefaultLeavesTheDeadUnread(t *testing.T) {
 	get(t, srv.URL+"/location") // warm the fold's cache: its own batch read is not under test
 	cl.versionReads.Store(0)
 
-	_, body := get(t, srv.URL+"/")
+	_, body := get(t, srv.URL+"/?view=whole")
 	if strings.Contains(body, `class="pt dead"`) {
 		t.Error("a dead mark drawn by default")
 	}
@@ -189,7 +189,7 @@ func TestTimeline_NoneUnchecksEveryType(t *testing.T) {
 	t.Parallel()
 	srv, bpID, _ := seededServer(t)
 
-	_, body := get(t, srv.URL+"/")
+	_, body := get(t, srv.URL+"/?view=whole")
 	if !strings.Contains(body, `href="/?type=none" id="show-none">none</a>`) {
 		t.Error("no none preset beside all types")
 	}
@@ -218,7 +218,7 @@ func TestTimeline_NoneUnchecksEveryType(t *testing.T) {
 }
 
 // A view is a URL, so "make this my default" keeps its query in a cookie and a bare
-// "/" opens it; "forget" returns "/" to the whole person, which stays reachable.
+// "/" opens it; "forget" returns "/" to the last month, and the whole person stays reachable.
 func TestTimeline_DefaultViewIsACookieOverTheQuery(t *testing.T) {
 	t.Parallel()
 	srv, bpID, _ := seededServer(t)
@@ -284,7 +284,7 @@ func TestTimeline_DefaultViewIsACookieOverTheQuery(t *testing.T) {
 		t.Errorf("GET /?view=whole with a default = %d, or claims to be the default", resp.StatusCode)
 	}
 
-	// Forgetting clears the cookie and "/" is the whole person again.
+	// Forgetting clears the cookie and "/" opens the last month again.
 	req, _ = http.NewRequest(http.MethodPost, srv.URL+"/view", strings.NewReader("view="))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(cookie)
@@ -294,8 +294,8 @@ func TestTimeline_DefaultViewIsACookieOverTheQuery(t *testing.T) {
 	}
 	req, _ = http.NewRequest(http.MethodGet, srv.URL+"/", nil)
 	resp, _ = do(req)
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("GET / without a default = %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusSeeOther || !strings.HasPrefix(resp.Header.Get("Location"), "/?from=") {
+		t.Errorf("GET / without a default = %d %s, want 303 to the last month (card 263)", resp.StatusCode, resp.Header.Get("Location"))
 	}
 
 	// A stored view carries only the view's own keys, nothing a page can be sent to.
@@ -304,5 +304,57 @@ func TestTimeline_DefaultViewIsACookieOverTheQuery(t *testing.T) {
 	resp, _ = do(req)
 	if cs := resp.Cookies(); len(cs) != 1 || cs[0].Value != url.QueryEscape("status=all") {
 		t.Errorf("cookie kept a foreign key: %v", cs)
+	}
+}
+
+// A bare "/" with no kept default opens the 30 days ending today in the server's
+// zone, as dates with the zone named, and opens exactly the lanes with a live fact in
+// it; "?view=whole" still draws all time (card 263).
+func TestTimeline_BareRootOpensTheLastMonth(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	l, err := ledger.Create(ctx, filepath.Join(t.TempDir(), "ledger.db"), person)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	t.Cleanup(func() { _ = l.Close() })
+	// 15:00 UTC on 2026-11-02 is already 2026-11-03 in Sydney, so the zone decides today
+	// and the window starts at 2026-10-04 00:00 there, 2026-10-03 13:00 UTC. Health and
+	// activity have a fact inside it, record has one an hour before it starts.
+	for i, c := range []struct {
+		typ string
+		at  time.Time
+	}{
+		{"health.heart-rate", time.Date(2026, 10, 20, 6, 0, 0, 0, time.UTC)},
+		{"activity.walk", time.Date(2026, 11, 3, 10, 0, 0, 0, time.UTC)},
+		{"record.note", time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)},
+	} {
+		f := seedFacet(t, fmt.Sprintf("test:lastmonth:%d", i), c.typ, `{"n": 1}`)
+		f.FactTime = c.at
+		if err := l.Admit(ctx, ledger.Watermark(i), f, event(facet.EventAdmitted, f, int64(i+1))); err != nil {
+			t.Fatalf("Admit %s: %v", c.typ, err)
+		}
+	}
+	now := time.Date(2026, 11, 2, 15, 0, 0, 0, time.UTC)
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{
+		Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets,
+		Zone: "Australia/Sydney", Now: func() time.Time { return now },
+	}))
+	t.Cleanup(srv.Close)
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+
+	resp, err := client.Get(srv.URL + "/")
+	if err != nil {
+		t.Fatalf("GET /: %v", err)
+	}
+	_ = resp.Body.Close()
+	want := "/?from=2026-10-04&open=health&open=activity&to=2026-11-03&zone=Australia%2FSydney"
+	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != want {
+		t.Fatalf("GET / = %d %s, want 303 to %s", resp.StatusCode, resp.Header.Get("Location"), want)
+	}
+
+	code, page := get(t, srv.URL+"/?view=whole")
+	if code != http.StatusOK || strings.Contains(page, "this view is your default") {
+		t.Errorf("GET /?view=whole = %d, want the whole person", code)
 	}
 }

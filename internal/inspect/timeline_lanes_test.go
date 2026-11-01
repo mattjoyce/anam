@@ -78,7 +78,7 @@ func markIDs(band string) []string {
 func TestTimeline_DomainLanesStartCollapsed(t *testing.T) {
 	t.Parallel()
 	srv := lanesServer(t)
-	code, page := get(t, srv.URL+"/")
+	code, page := get(t, srv.URL+"/?view=whole")
 	if code != http.StatusOK {
 		t.Fatalf("GET / = %d", code)
 	}
@@ -121,7 +121,7 @@ func TestTimeline_AnOpenedLaneRoundTripsThroughTheAddress(t *testing.T) {
 	t.Parallel()
 	srv := lanesServer(t)
 
-	_, closed := get(t, srv.URL+"/")
+	_, closed := get(t, srv.URL+"/?view=whole")
 	closedBand := bandOf(closed)
 	var toggle string
 	for _, m := range toggleRe.FindAllStringSubmatch(closedBand, -1) {

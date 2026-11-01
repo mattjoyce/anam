@@ -10,7 +10,7 @@
 **only ingress**. See *Binding*, *Envelope*.
 
 **Anam** — This system: a personal, longitudinal episodic-context store over one person's own sources.
-*anam* is Irish for *soul*. Its default read is the whole person (see *Whole-person read*).
+*anam* is Irish for *soul*. Its default read is the whole person (see *Whole-person read*); the workbench opens at the last 30 days.
 
 **Artifact** — A specific version of a Facet's captured body. Re-versioned on a whole re-capture or a
 maturity change. Immutable once written. See *Facet*, *Supersession*.

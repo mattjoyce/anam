@@ -65,6 +65,7 @@ func openStore(t *testing.T, ctx context.Context, cfg config.Config) *ops.DB {
 // start: the files say what is current, so it is neither listed nor served. A receipt
 // served through it still verifies, from the body the receipt filed when it was served.
 func TestReceiptVerifiesAfterItsTemplateFileLeaves(t *testing.T) {
+	t.Parallel()
 	cfg := readerConfig(t)
 	cfg.ProjectionsDir = copyCatalogRoot(t, projection.EmbeddedFS())
 
@@ -102,6 +103,7 @@ func TestReceiptVerifiesAfterItsTemplateFileLeaves(t *testing.T) {
 // A start refused by a check writes nothing of the catalog: the check runs before the
 // store takes the catalog's Definitions.
 func TestOpenRefusedStartWritesNoCatalog(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	cfg := newConfig(t)
 	cfg.DefaultProjection = "no-such-projection"
@@ -118,6 +120,7 @@ func TestOpenRefusedStartWritesNoCatalog(t *testing.T) {
 // A registered Definition that contradicts the catalog's at the same type and version
 // stops the start, and the catalog is not written.
 func TestOpenRefusesARegisteredDefinitionTheCatalogContradicts(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	cfg := newConfig(t)
 	db := openStore(t, ctx, cfg)
@@ -155,6 +158,8 @@ func TestOpenRefusesARegisteredDefinitionTheCatalogContradicts(t *testing.T) {
 }
 
 // One start event names where the catalog came from and its Definition set version.
+// Not parallel: it swaps the default logger, and Go runs a package's serial tests
+// before any parallel one resumes, so no other test logs into its buffer.
 func TestOpenLogsTheCatalogItAdmitted(t *testing.T) {
 	var buf bytes.Buffer
 	prev := slog.Default()
@@ -186,6 +191,7 @@ func TestOpenLogsTheCatalogItAdmitted(t *testing.T) {
 // from it: same result, same notes, no "definition set has moved". Where the files came
 // from never enters a content hash.
 func TestReceiptVerifiesTheSameOnACopiedCatalog(t *testing.T) {
+	t.Parallel()
 	cfg := readerConfig(t)
 
 	d := open(t, cfg)

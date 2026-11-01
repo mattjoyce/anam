@@ -49,6 +49,7 @@ func readingAt(id, at string) string {
 // Card 90: coverage counts each type's live facets, their fact-time range and the
 // sources they came from, and a W in the past answers the record as it stood then.
 func TestCoverage(t *testing.T) {
+	t.Parallel()
 	d, url := serveCoverage(t)
 	call(t, "POST", url+"/v1/definitions", importerToken, readingManifest, http.StatusCreated, nil)
 	weight, _ := d.defs.current.Load().Lookup("health.weight")

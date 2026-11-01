@@ -103,6 +103,7 @@ var handoffLink = regexp.MustCompile(`<a id="handoff" href="([^"]+)"`)
 // page, use the selection, write a comment and save. One record.edge with four facets
 // in to, its id by the rule, and each facet's page lists it.
 func TestLinkFormLinksFourFacetsAndEachPageListsIt(t *testing.T) {
+	t.Parallel()
 	d, base := workbenchServing(t, "record.edge")
 	ids := weighIns(t, d, base, 4)
 
@@ -169,6 +170,7 @@ func TestLinkFormLinksFourFacetsAndEachPageListsIt(t *testing.T) {
 // The same link saved twice is one fact: the second save is the gate's no-op and the
 // watermark does not move.
 func TestTheSameLinkSavedTwiceIsOneFact(t *testing.T) {
+	t.Parallel()
 	d, base := workbenchServing(t, "record.edge")
 	ids := weighIns(t, d, base, 2)
 	form := linkForm(edgeVersion(t, d), "about", "Both before breakfast.", ids, nil, nil)
@@ -190,6 +192,7 @@ func TestTheSameLinkSavedTwiceIsOneFact(t *testing.T) {
 // longer lists it. The selection page carries the edit through. Retracting it works as
 // for any Workbench facet.
 func TestEditingALinkSupersedesItKeepingItsID(t *testing.T) {
+	t.Parallel()
 	d, base := workbenchServing(t, "record.edge")
 	ids := weighIns(t, d, base, 4)
 	v := edgeVersion(t, d)
@@ -269,6 +272,7 @@ func TestEditingALinkSupersedesItKeepingItsID(t *testing.T) {
 
 // Above 20 facets the form asks for confirmation, and a save without it writes nothing.
 func TestALinkOfMoreThanTwentyFacetsIsConfirmed(t *testing.T) {
+	t.Parallel()
 	d, base := workbenchServing(t, "record.edge")
 	ids := weighIns(t, d, base, 21)
 	v := edgeVersion(t, d)
@@ -299,6 +303,7 @@ func TestALinkOfMoreThanTwentyFacetsIsConfirmed(t *testing.T) {
 // Kind about has no from side: the form says so when the basket puts a facet there,
 // and a save is refused with the same words. Another kind takes it.
 func TestAboutWithAFromSideIsRefused(t *testing.T) {
+	t.Parallel()
 	d, base := workbenchServing(t, "record.edge")
 	ids := weighIns(t, d, base, 2)
 	v := edgeVersion(t, d)
@@ -324,6 +329,7 @@ func TestAboutWithAFromSideIsRefused(t *testing.T) {
 // A pin is written only for a facet whose "link to this version" is ticked, and names
 // its current content hash. Kind about starts with none ticked, another kind with all.
 func TestPinsAreWrittenOnlyWhenTicked(t *testing.T) {
+	t.Parallel()
 	d, base := workbenchServing(t, "record.edge")
 	ids := weighIns(t, d, base, 2)
 	v := edgeVersion(t, d)
@@ -383,6 +389,7 @@ func TestPinsAreWrittenOnlyWhenTicked(t *testing.T) {
 // Without record.edge on the workbench's list the link form is refused and no page
 // offers it; with it, the Definitions page's Enter for record.edge opens the link form.
 func TestTheLinkFormNeedsRecordEdgeOnTheList(t *testing.T) {
+	t.Parallel()
 	d, base := workbenchServing(t, "health.medication.dose")
 	ids := weighIns(t, d, base, 1)
 	if status, body := page(t, "GET", base+"/link?tick="+ids[0], nil, nil); status != http.StatusForbidden ||

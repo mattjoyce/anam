@@ -20,6 +20,7 @@ const weightsV1 = `{"name": "weights", "version": 1, "description": "weigh-ins o
   "from": "", "to": "", "shape": "log"}`
 
 func TestPostProjections(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	d, url, stop := serveImporters(t, cfg)
 	post := func(body string, want int) api.RegisteredProjection {
@@ -112,6 +113,7 @@ func TestPostProjections(t *testing.T) {
 // projections list, applied to nothing, and a name that is neither bundled nor
 // registered stops the daemon at start.
 func TestDefaultProjectionAdvertised(t *testing.T) {
+	t.Parallel()
 	t.Run("none set", func(t *testing.T) {
 		_, url, _ := serveImporters(t, importerConfig(t))
 		var raw map[string]any

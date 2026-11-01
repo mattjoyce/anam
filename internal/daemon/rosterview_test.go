@@ -73,6 +73,7 @@ func operatorPage(t *testing.T, base, path string) string {
 // Card 228: every Workbench page carries the build the daemon reports, the string
 // GET /v1/status gives, with the commit and the build date on hover.
 func TestWorkbenchFrameShowsTheDaemonsVersion(t *testing.T) {
+	t.Parallel()
 	cfg := holdConfig(t)
 	_, base := serveBuilt(t, cfg)
 
@@ -93,6 +94,7 @@ func TestWorkbenchFrameShowsTheDaemonsVersion(t *testing.T) {
 // source's last batch and hold, and a token only as the first eight characters of its
 // stored hash.
 func TestImportersPageShowsThePolicyAndRedactsTheToken(t *testing.T) {
+	t.Parallel()
 	cfg := holdConfig(t)
 	withReader(t, cfg)
 	d, base := serveBuilt(t, cfg)
@@ -135,6 +137,7 @@ func TestImportersPageShowsThePolicyAndRedactsTheToken(t *testing.T) {
 // Card 228: the importers page is the operator's: a reader's or an importer's token is
 // refused, as for every other Workbench page, and a request with no token is not known.
 func TestImportersPageIsTheOperatorsAlone(t *testing.T) {
+	t.Parallel()
 	cfg := holdConfig(t)
 	withReader(t, cfg)
 	_, base := serveBuilt(t, cfg)

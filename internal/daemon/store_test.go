@@ -19,6 +19,7 @@ import (
 // resolves, and a read at an older watermark is the one it was before the mints
 // collected the checkpoints it started from.
 func TestStore_ANewDaemonOnTheTwoFilesServesWhatTheLastPublished(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	d, base, stop := serveImporters(t, cfg)
 	call(t, "POST", base+"/v1/projections", testToken, weightsV1, http.StatusCreated, nil)

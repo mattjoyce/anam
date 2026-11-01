@@ -22,6 +22,7 @@ import (
 // cursor_invalid; new facets admitted between pages change no page; and the receipt
 // still verifies.
 func TestReceiptPages_WalkTheWholePublishedRead(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	cfg.MaxReadBytes = 1200
 	d, base, _ := serveImporters(t, cfg)

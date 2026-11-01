@@ -83,6 +83,7 @@ func start(t *testing.T, d *Daemon) (stop func() error) {
 }
 
 func TestOpenRefuses(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		mutate func(*config.Config)
@@ -107,6 +108,7 @@ func TestOpenRefuses(t *testing.T) {
 }
 
 func TestOpenAcceptsLoopback(t *testing.T) {
+	t.Parallel()
 	for _, addr := range []string{"127.0.0.1:0", "localhost:0", "[::1]:0"} {
 		t.Run(addr, func(t *testing.T) {
 			cfg := newConfig(t)
@@ -120,6 +122,7 @@ func TestOpenAcceptsLoopback(t *testing.T) {
 }
 
 func TestHandlerServesHealthAndInspector(t *testing.T) {
+	t.Parallel()
 	d := open(t, newConfig(t))
 	t.Cleanup(func() { _ = d.closeStores() })
 	srv := httptest.NewServer(d.Handler())
@@ -145,6 +148,7 @@ func TestHandlerServesHealthAndInspector(t *testing.T) {
 }
 
 func TestHealthzNotReadyWhenLedgerUnreadable(t *testing.T) {
+	t.Parallel()
 	d := open(t, newConfig(t))
 	t.Cleanup(func() { _ = d.writes.Ledger.Close(); _ = d.writes.Ops.Close() })
 	if err := d.read.Close(); err != nil {
@@ -161,6 +165,7 @@ func TestHealthzNotReadyWhenLedgerUnreadable(t *testing.T) {
 }
 
 func TestWritesRunOneAtATime(t *testing.T) {
+	t.Parallel()
 	d := open(t, newConfig(t))
 	stop := start(t, d)
 
@@ -194,6 +199,7 @@ func TestWritesRunOneAtATime(t *testing.T) {
 }
 
 func TestWriteDeadline(t *testing.T) {
+	t.Parallel()
 	d := open(t, newConfig(t))
 	start(t, d)
 
@@ -208,6 +214,7 @@ func TestWriteDeadline(t *testing.T) {
 
 // A caller that gives up stops waiting; the write it started does not stop with it.
 func TestCallerGivingUpDoesNotCutTheWrite(t *testing.T) {
+	t.Parallel()
 	d := open(t, newConfig(t))
 	start(t, d)
 
@@ -233,6 +240,7 @@ func TestCallerGivingUpDoesNotCutTheWrite(t *testing.T) {
 // Shutdown during a write lets it finish on open stores, refuses new writes, and only
 // then closes the stores.
 func TestShutdownDuringWrite(t *testing.T) {
+	t.Parallel()
 	d := open(t, newConfig(t))
 	stop := start(t, d)
 
@@ -275,6 +283,7 @@ func TestShutdownDuringWrite(t *testing.T) {
 }
 
 func TestReady(t *testing.T) {
+	t.Parallel()
 	d := open(t, newConfig(t))
 	t.Cleanup(func() { _ = d.closeStores() })
 	srv := httptest.NewServer(d.Handler())

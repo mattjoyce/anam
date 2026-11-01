@@ -20,6 +20,7 @@ import (
 // note itself was not served, so it does not open through this receipt; and a facet
 // nobody served is 404 however real it is.
 func TestGetReceiptFacet_EntryWithItsLinks(t *testing.T) {
+	t.Parallel()
 	cfg := newConfig(t)
 	dir := t.TempDir()
 	cfg.TokenFile = writeToken(t, dir, testToken)
@@ -77,6 +78,7 @@ func TestGetReceiptFacet_EntryWithItsLinks(t *testing.T) {
 // route does, rather than draw the facet with links the index got wrong; the timeline,
 // which is the ledger's, stays up and draws the checkpoint strip red with the words.
 func TestInspector_SaysWhenTheIndexIsWrong(t *testing.T) {
+	t.Parallel()
 	cfg := newConfig(t)
 	dir := t.TempDir()
 	cfg.TokenFile = writeToken(t, dir, testToken)

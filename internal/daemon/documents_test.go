@@ -45,6 +45,7 @@ func reference(version int, path, sum string, size int) string {
 }
 
 func TestPostDocument(t *testing.T) {
+	t.Parallel()
 	cfg := documentsConfig(t)
 	d, base, _ := serveImporters(t, cfg)
 	ref, _ := d.defs.current.Load().Lookup(docType)

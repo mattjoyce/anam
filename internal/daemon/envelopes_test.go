@@ -119,6 +119,7 @@ func head(t *testing.T, d *Daemon) int64 {
 // An importer may not hold the operator's token: it would submit as the importer and
 // run the daemon too.
 func TestOpenRefusesAnImporterWithTheOperatorsToken(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	sum := sha256.Sum256([]byte(testToken))
 	body := fmt.Sprintf("importers:\n  - source: x\n    token_sha256: %s\n    types: [health.weight]\n", hex.EncodeToString(sum[:]))
@@ -134,6 +135,7 @@ func TestOpenRefusesAnImporterWithTheOperatorsToken(t *testing.T) {
 // register a version of it, and each submits under its own source, so the same id
 // from both is two facets. A type no binary bundles still has one owner.
 func TestImportersShareABundledType(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	const secondToken = "second-importer-token-0123456789abcdef01"
 	first, second := sha256.Sum256([]byte(importerToken)), sha256.Sum256([]byte(secondToken))
@@ -171,6 +173,7 @@ func TestImportersShareABundledType(t *testing.T) {
 // own source, and owns none: it registers no Definition, and a type with no
 // Definition is refused to it as to anyone.
 func TestAnyTypeImporterSubmitsEverythingAndDefinesNothing(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	const spokenToken = "spoken-importer-token-0123456789abcdef0123"
 	first, spoken := sha256.Sum256([]byte(importerToken)), sha256.Sum256([]byte(spokenToken))
@@ -211,6 +214,7 @@ func TestAnyTypeImporterSubmitsEverythingAndDefinesNothing(t *testing.T) {
 // Card 53: an importer's token opens the importer routes, and the operator's token
 // submits nothing. Since card 89 an importer also reads (roles_test.go).
 func TestImporterRoutesAuthorize(t *testing.T) {
+	t.Parallel()
 	_, url, _ := serveImporters(t, importerConfig(t))
 
 	tests := []struct {
@@ -236,6 +240,7 @@ func TestImporterRoutesAuthorize(t *testing.T) {
 // Card 53: a batch is admitted whole, again is a no-op, and a refused batch writes
 // nothing and names every envelope that failed.
 func TestPostEnvelopes(t *testing.T) {
+	t.Parallel()
 	d, url, _ := serveImporters(t, importerConfig(t))
 	weight, _ := d.defs.current.Load().Lookup("health.weight")
 	v := weight.Version
@@ -293,6 +298,7 @@ func TestPostEnvelopes(t *testing.T) {
 // recorded, and the source is not marked as seen. A batch padded to the bound exactly
 // is still a submission.
 func TestPostEnvelopesReadTheWholeBody(t *testing.T) {
+	t.Parallel()
 	d, url, _ := serveImporters(t, importerConfig(t))
 	weight, _ := d.defs.current.Load().Lookup("health.weight")
 	one := batch(weighIn("w-1", 80.5, weight.Version))
@@ -338,6 +344,7 @@ func TestPostEnvelopesReadTheWholeBody(t *testing.T) {
 // A handling block registers with its manifest, comes back verbatim on the GET, and a
 // changed block at the same version is another body (card 166).
 func TestDefinitions_HandlingRoundTrips(t *testing.T) {
+	t.Parallel()
 	_, url, _ := serveImporters(t, importerConfig(t))
 	handled := strings.Replace(readingManifest, `"schema"`,
 		`"handling": {"guidance": "value is the meter's reading, not a mean", "date_basis": ["observed"]}, "schema"`, 1)
@@ -356,6 +363,7 @@ func TestDefinitions_HandlingRoundTrips(t *testing.T) {
 }
 
 func TestPostDefinitions(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	d, url, stop := serveImporters(t, cfg)
 	post := func(body string, want int) api.Registered {
@@ -425,6 +433,7 @@ func TestPostDefinitions(t *testing.T) {
 
 // Card 53: an importer's admission is minted without being asked for.
 func TestPostEnvelopesMints(t *testing.T) {
+	t.Parallel()
 	d, url, _ := serveImporters(t, importerConfig(t))
 	weight, _ := d.defs.current.Load().Lookup("health.weight")
 	call(t, "POST", url+"/v1/envelopes", importerToken, batch(weighIn("w-1", 80.5, weight.Version)), http.StatusOK, nil)

@@ -27,6 +27,7 @@ func saveSelection(t *testing.T, base, token, program string, want int) api.Sele
 }
 
 func TestSelections_APIRoundTrip(t *testing.T) {
+	t.Parallel()
 	d, base := workbenchServing(t, "record.edge")
 	ids := weighIns(t, d, base, 4)
 

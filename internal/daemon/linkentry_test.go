@@ -84,6 +84,7 @@ func servingDay(t *testing.T, workbench bool) (d *Daemon, base string, alerts []
 // order the person likes), the ticks settled, a comment written and saved. One
 // record.edge with four facets in to, and each one's page lists it.
 func TestLinkThisFromAnAlertToASavedLinkOfFourFacets(t *testing.T) {
+	t.Parallel()
 	d, base, alerts, session := servingDay(t, true)
 	first, decoy := alerts[0], alerts[4]
 
@@ -174,6 +175,7 @@ func TestLinkThisFromAnAlertToASavedLinkOfFourFacets(t *testing.T) {
 // The same result is reached by adding the concept first and the date second (the
 // card's second acceptance): the address of the picker is the same either way.
 func TestTheOrderOfCriteriaReachesTheSameSelection(t *testing.T) {
+	t.Parallel()
 	_, base, alerts, session := servingDay(t, true)
 	tick := url.Values{"tick": {alerts[0]}}
 	dateFirst := url.Values{"tick": {alerts[0]}, "from": {"2026-10-21"}, "to": {"2026-10-21"}}
@@ -197,6 +199,7 @@ func TestTheOrderOfCriteriaReachesTheSameSelection(t *testing.T) {
 // selection script points at /select with one tick per mark; without a Workbench that
 // enters links, there is none.
 func TestTimelineOffersLinkTheseOnlyWhereLinksCanBeEntered(t *testing.T) {
+	t.Parallel()
 	_, withBench, _, _ := servingDay(t, true)
 	_, plain, _, _ := servingDay(t, false)
 

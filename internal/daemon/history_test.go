@@ -11,6 +11,7 @@ import (
 // facet may have been admitted under, and an importer registering an older version of
 // a type it took over finds it held rather than refused.
 func TestDefinitionHistorySurvivesAFreshStore(t *testing.T) {
+	t.Parallel()
 	cfg := importerConfig(t)
 	_, url, _ := serveImporters(t, cfg)
 

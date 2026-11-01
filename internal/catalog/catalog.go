@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io/fs"
 	"sort"
+	"sync"
 
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
@@ -139,10 +140,37 @@ func (c *Catalog) WithRegistered(registered []def.Stored) (*def.Registry, error)
 // runs over that snapshot. Load returns a catalog only when both components and the
 // duplicate check pass; every failure returns nil and an error wrapping ErrInvalid
 // together with the underlying cause.
+//
+// With both directories empty Load returns the embedded catalog, which is built once
+// per process and shared (see embedded).
 func Load(ctx context.Context, definitionsDir, projectionsDir string) (*Catalog, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
+	if definitionsDir == "" && projectionsDir == "" {
+		c, err := embedded()
+		if err != nil {
+			return nil, err
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrInvalid, err)
+		}
+		return c, nil
+	}
+	return load(ctx, definitionsDir, projectionsDir)
+}
+
+// embedded is the catalog built from the binary's own files. Those cannot change
+// while the process runs, so it is built once, on first use, and every caller shares
+// it: a Catalog has no mutation methods and its accessors copy. The daemon builds a
+// catalog once per start anyway; the saving is in tests, where every daemon and local
+// command used to parse and compile all of it again.
+var embedded = sync.OnceValues(func() (*Catalog, error) {
+	return load(context.Background(), "", "")
+})
+
+// load builds a catalog from its sources, checking ctx before every filesystem read.
+func load(ctx context.Context, definitionsDir, projectionsDir string) (*Catalog, error) {
 
 	defSrc, defLabel, err := source(definitionsDir, def.EmbeddedFS)
 	if err != nil {

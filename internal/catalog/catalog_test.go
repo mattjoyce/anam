@@ -906,9 +906,14 @@ func (c *cancelAt) Err() error {
 // TestLoadCanceledMidway cancels at each check Load makes, from the first to the one
 // before it returns: every point fails with both sentinels and no catalog. Load
 // checks before every file it reads, so it makes more checks than there are files.
+// It loads a disk copy: the embedded catalog is built once per process, so a load of
+// it reads no files after the first.
 func TestLoadCanceledMidway(t *testing.T) {
+	defDir, projDir := t.TempDir(), t.TempDir()
+	copyEmbeddedDefs(t, defDir)
+	copyEmbeddedProjections(t, projDir)
 	counter := &cancelAt{Context: context.Background()}
-	if _, err := catalog.Load(counter, "", ""); err != nil {
+	if _, err := catalog.Load(counter, defDir, projDir); err != nil {
 		t.Fatalf("Load with a context that never cancels: %v", err)
 	}
 	total := counter.calls
@@ -925,12 +930,34 @@ func TestLoadCanceledMidway(t *testing.T) {
 		t.Fatalf("Load checked its context %d times for %d files, want a check per file", total, files)
 	}
 	for n := 1; n <= total; n++ {
-		cat, err := catalog.Load(&cancelAt{Context: context.Background(), n: n}, "", "")
+		cat, err := catalog.Load(&cancelAt{Context: context.Background(), n: n}, defDir, projDir)
 		if cat != nil {
 			t.Fatalf("cancel at check %d of %d: Load returned a catalog", n, total)
 		}
 		if !errors.Is(err, catalog.ErrInvalid) || !errors.Is(err, context.Canceled) {
 			t.Fatalf("cancel at check %d of %d: err = %v, want catalog.ErrInvalid and context.Canceled", n, total, err)
+		}
+	}
+}
+
+// TestLoadEmbeddedIsBuiltOnce: the embedded catalog is shared, and a canceled
+// context still refuses it, even once it is built.
+func TestLoadEmbeddedIsBuiltOnce(t *testing.T) {
+	a, err := catalog.Load(context.Background(), "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := catalog.Load(context.Background(), "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a != b {
+		t.Error("two loads of the embedded catalog built two catalogs, want one shared")
+	}
+	for n := 1; n <= 2; n++ {
+		cat, err := catalog.Load(&cancelAt{Context: context.Background(), n: n}, "", "")
+		if cat != nil || !errors.Is(err, catalog.ErrInvalid) || !errors.Is(err, context.Canceled) {
+			t.Errorf("cancel at check %d: cat %v, err %v, want nil and both sentinels", n, cat, err)
 		}
 	}
 }

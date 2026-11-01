@@ -89,6 +89,15 @@ to save a page of code.
   `t.TempDir()` — never shared: parallel packages and `-shuffle=on` make shared state flaky. No test
   needs a network, so no test skips. Test behaviour, not internals. Tests beside code. No flaky
   tests. Table-driven for multiple meaningful cases. Target >80% coverage.
+- **A test calls `t.Parallel()`** unless it changes process state: the default `slog` logger, the
+  environment, the working directory. Say why on one that doesn't. Go runs a package's serial tests
+  before any parallel one resumes, so a serial test that swaps the logger logs alone. Packages
+  already run side by side, so a package whose tests run one after another is the gate's floor
+  however many cores there are: `internal/daemon`'s 111 tests at about a second each took 168 s
+  serial and 18 s parallel (card 262). `scripts/slow-tests.sh [packages]` ranks packages and tests
+  by time; a package whose test sum is near its wall time is running serially.
+- **The embedded catalog is built once per process** and shared (`catalog.Load` with both
+  directories empty). Never modify a Definition, template or slice a catalog or registry returns.
 
 **Embedded assets**
 - `//go:embed` (`embed.FS`) for small, static, versioned assets only (projection templates, bundled
@@ -115,6 +124,11 @@ golangci-lint run ./...
 gosec -severity medium ./...
 go test -race -count=1 -shuffle=on -vet=all ./...
 ```
+`scripts/check-remote.sh [ref]` runs that gate on a pushed commit in a clean worktree, on the build
+host named by `ANAM_CHECK_HOST` when it is reachable and on this machine when it is not. It refuses to
+run without goimports, golangci-lint and gosec, since `check.sh` skips them silently. A host whose Go
+is newer than those tools can read (Go 1.27 against golangci-lint 2.10.1 and gosec 2.24.0) pins
+`GOTOOLCHAIN=go1.26.0` for non-interactive shells; the script's header lists the rest of the setup.
 
 ---
 

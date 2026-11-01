@@ -14,7 +14,7 @@ account of one instance and carries its data.
   `daemon: catalog drifts from embedded` at Warn with sorted file names, counts and whether the
   definition set version differs. Each field shows up to 20 names and the count left out.
   Reformatting counts as drift. Drift does not refuse a start; a failed embedded comparison load
-  does. A fully embedded start logs neither line.
+  does, before any store opens. A fully embedded start logs neither line.
 
 - `definitions_dir` and `projections_dir` (`ANAM_DEFINITIONS_DIR`, `ANAM_PROJECTIONS_DIR`) choose
   the catalog the daemon and the local commands run on (card 257). Unset, each is the catalog built

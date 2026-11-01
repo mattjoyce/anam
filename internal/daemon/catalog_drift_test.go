@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -20,7 +21,8 @@ import (
 func TestOpenReportsCatalogDrift(t *testing.T) {
 	for _, mode := range []string{"embedded", "copy", "definitions only", "projections only", "changed", "capped"} {
 		t.Run(mode, func(t *testing.T) {
-			cfg, count := driftConfig(t, mode)
+			cfg, changed := driftConfig(t, mode)
+			count := len(changed)
 			var buf bytes.Buffer
 			prev := slog.Default()
 			slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, nil)))
@@ -50,7 +52,7 @@ func TestOpenReportsCatalogDrift(t *testing.T) {
 			if report["msg"] != "daemon: catalog drifts from embedded" || report["level"] != "WARN" || report["set_version_differs"] != true {
 				t.Fatalf("drift report = %+v", report)
 			}
-			checkDriftFields(t, report, mode, count)
+			checkDriftFields(t, report, changed)
 			if mode == "capped" && count <= 20 {
 				t.Fatal("fixture does not exercise truncation")
 			}
@@ -58,7 +60,7 @@ func TestOpenReportsCatalogDrift(t *testing.T) {
 	}
 }
 
-func driftConfig(t *testing.T, mode string) (config.Config, int) {
+func driftConfig(t *testing.T, mode string) (config.Config, []string) {
 	t.Helper()
 	cfg := newConfig(t)
 	if mode != "embedded" && mode != "projections only" {
@@ -67,9 +69,9 @@ func driftConfig(t *testing.T, mode string) (config.Config, int) {
 	if mode != "embedded" && mode != "definitions only" {
 		cfg.ProjectionsDir = copyCatalogRoot(t, projection.EmbeddedFS())
 	}
-	count := 0
+	var names []string
 	if mode == "changed" || mode == "capped" {
-		names := []string{"health.weight.json"}
+		names = []string{"health.weight.json"}
 		if mode == "capped" {
 			entries, err := os.ReadDir(cfg.DefinitionsDir)
 			if err != nil {
@@ -82,7 +84,6 @@ func driftConfig(t *testing.T, mode string) (config.Config, int) {
 				}
 			}
 		}
-		count = len(names)
 		for _, name := range names {
 			path := filepath.Join(cfg.DefinitionsDir, name)
 			raw, err := os.ReadFile(path)
@@ -94,7 +95,8 @@ func driftConfig(t *testing.T, mode string) (config.Config, int) {
 			}
 		}
 	}
-	return cfg, count
+	sort.Strings(names)
+	return cfg, names
 }
 
 func driftReports(t *testing.T, buf *bytes.Buffer) []map[string]any {
@@ -124,13 +126,16 @@ func driftReports(t *testing.T, buf *bytes.Buffer) []map[string]any {
 	return reports
 }
 
-func checkDriftFields(t *testing.T, report map[string]any, mode string, count int) {
+// checkDriftFields wants changed, sorted, as definitions_differ: the count, the first
+// 20 names in order, and how many more. Every other field is empty.
+func checkDriftFields(t *testing.T, report map[string]any, changed []string) {
 	t.Helper()
 	for _, field := range []string{"definitions_only_here", "definitions_only_there", "definitions_differ", "projections_only_here", "projections_only_there", "projections_differ"} {
-		want := 0
+		var wantNames []string
 		if field == "definitions_differ" {
-			want = count
+			wantNames = changed
 		}
+		want := len(wantNames)
 		if report[field+"_count"] != float64(want) || report[field+"_more"] != float64(max(0, want-20)) {
 			t.Errorf("%s counts = %+v", field, report)
 		}
@@ -142,8 +147,10 @@ func checkDriftFields(t *testing.T, report map[string]any, mode string, count in
 		if len(files) != min(want, 20) {
 			t.Errorf("%s names = %v", field, files)
 		}
-		if field == "definitions_differ" && mode == "changed" && (len(files) != 1 || files[0] != "health.weight.json") {
-			t.Errorf("changed file = %v", files)
+		for i, f := range files {
+			if i < len(wantNames) && f != wantNames[i] {
+				t.Errorf("%s names[%d] = %v, want %s", field, i, f, wantNames[i])
+			}
 		}
 	}
 }

@@ -31,6 +31,8 @@ var ErrInvalid = errors.New("catalog: invalid catalog")
 // Accessors return prebuilt values for read-only use under their existing API
 // contracts. There are no mutation methods.
 type Catalog struct {
+	definitionFiles     *snapshot
+	projectionFiles     *snapshot
 	definitions         *def.Registry
 	projections         *projection.Registry
 	manifests           []def.Stored
@@ -196,7 +198,10 @@ func load(ctx context.Context, definitionsDir, projectionsDir string) (*Catalog,
 		return nil, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 
-	c := &Catalog{definitionsSource: defLabel, projectionsSource: projLabel}
+	c := &Catalog{
+		definitionsSource: defLabel, projectionsSource: projLabel,
+		definitionFiles: defSnap, projectionFiles: projSnap,
+	}
 	if err := c.loadDefinitions(defSnap); err != nil {
 		return nil, fmt.Errorf("%w: definitions_dir: %s: %w", ErrInvalid, defLabel, err)
 	}

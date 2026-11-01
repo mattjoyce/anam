@@ -213,6 +213,10 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		"definitions_source", cat.DefinitionsSource(),
 		"projections_source", cat.ProjectionsSource(),
 		"definition_set_version", cat.SetVersion())
+	if err := reportCatalogDrift(ctx, cat); err != nil {
+		closeAll()
+		return nil, err
+	}
 	readOps, err := ops.OpenReadOnly(ctx, cfg.DBPath)
 	if err != nil {
 		closeAll()

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 	"sort"
 	"time"
@@ -224,12 +225,64 @@ type tlNav struct {
 	OpenAll, CloseAll             string
 }
 
+// redirectLastMonth sends a bare "/" to the 30 days ending today as dates, today
+// being the day it is now in the server's zone. It also opens each domain lane that
+// has a live facet in that window by fact time, so the month opens on what happened
+// in it; the lanes are in the address, so the reader can close any (card 263).
+func (s *Server) redirectLastMonth(w http.ResponseWriter, r *http.Request) {
+	z, err := s.zoneOf(url.Values{})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	today := s.now().In(z.Loc)
+	first := today.AddDate(0, 0, -30)
+	q := url.Values{}
+	q.Set("from", first.Format(time.DateOnly))
+	q.Set("to", today.Format(time.DateOnly))
+	q.Set("zone", z.Name)
+
+	ctx, cancel := context.WithTimeout(r.Context(), s.timeout)
+	defer cancel()
+	res, err := s.read(ctx)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+	all, err := s.bandFacets(ctx, res, statusLive)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+	// A date-only to covers its whole day, so the window ends at the next midnight.
+	start := time.Date(first.Year(), first.Month(), first.Day(), 0, 0, 0, 0, z.Loc)
+	end := time.Date(today.Year(), today.Month(), today.Day()+1, 0, 0, 0, 0, z.Loc)
+	active := map[string]bool{}
+	for _, f := range all {
+		if !f.FactTime.Before(start) && f.FactTime.Before(end) {
+			active[domainOf(f.Type)] = true
+		}
+	}
+	for _, d := range domains {
+		if active[d.ID] {
+			q.Add("open", d.ID)
+		}
+	}
+	http.Redirect(w, r, address("/", q), http.StatusSeeOther)
+}
+
 func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 	// A bare "/" opens the default view when one is kept (card 135); the redirect
 	// keeps the URL honest about what is drawn.
 	stored := defaultView(r)
 	if r.URL.RawQuery == "" && len(stored) > 0 {
 		http.Redirect(w, r, address("/", stored), http.StatusSeeOther)
+		return
+	}
+	// With none kept it opens the last 30 days ending today, in the server's zone, so
+	// the first look is recent; "?view=whole" is the whole person (card 263).
+	if r.URL.RawQuery == "" {
+		s.redirectLastMonth(w, r)
 		return
 	}
 

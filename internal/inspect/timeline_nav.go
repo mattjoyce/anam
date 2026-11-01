@@ -60,7 +60,7 @@ func (s statusFilter) wantsDead() bool { return s != statusLive }
 const typeNone = "none"
 
 // viewWhole is the query that names the whole person outright, for when a bare "/"
-// opens the default view instead.
+// opens the default view or the last month instead (card 263).
 const viewWhole = "whole"
 
 // tlView is what every timeline link carries besides the window: the type filter
@@ -161,8 +161,8 @@ func typeFilter(typeQ []string, types []facet.Type) (show map[facet.Type]bool, s
 }
 
 // windowLink is the current window under a different view. The whole person with
-// nothing else to say is named outright, since a bare "/" may open the default
-// view instead.
+// nothing else to say is named outright, since a bare "/" opens the default view or
+// the last month instead.
 func windowLink(from, to time.Time, zoomed bool, view tlView) string {
 	q := url.Values{}
 	if zoomed {

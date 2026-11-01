@@ -18,10 +18,12 @@ fi
 fail=0
 run() {
   echo "→ $*"
+  local start=$SECONDS
   if ! "$@"; then
     echo "  FAILED: $*" >&2
     fail=1
   fi
+  echo "  ($((SECONDS - start))s)"
 }
 
 # Formatting: gofmt -l / goimports -l print offending files (non-empty = failure).

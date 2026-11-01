@@ -17,7 +17,7 @@
 #
 # Settings (environment):
 #   ANAM_CHECK_HOST  the build host's Tailscale name, e.g. quantize-tower, the B550 tower
-#                    (16 cores; the gate takes about 4 minutes there). Unset: run locally.
+#                    (16 cores; the gate took 318 s there at card 262). Unset: run locally.
 #   ANAM_CHECK_ROOT  where the build host keeps its clones (default ~/anam-check)
 #
 # Build host setup, once:

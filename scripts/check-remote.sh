@@ -29,7 +29,7 @@
 #   - golangci-lint v2 (the ThinkPad runs 2.10.1)
 #   - Go newer than the lint tools can read (1.27 vs golangci-lint 2.10.1):
 #     export GOTOOLCHAIN=go1.26.0 near the top of ~/.bashrc, then rebuild the three tools
-#   - python3, git, flock
+#   - python3, git, flock (required: the gate refuses to run without the lock)
 #   - HTTPS access to github.com (both repos are public, so no key is needed)
 #     The script clones both into ANAM_CHECK_ROOT on first use.
 set -euo pipefail
@@ -54,15 +54,13 @@ gate='
 set -euo pipefail
 sha="$1"; root="${2:-$HOME/anam-check}"
 missing=""
-for t in go gofmt goimports golangci-lint gosec python3 git; do
+for t in go gofmt goimports golangci-lint gosec python3 git flock; do
   command -v "$t" >/dev/null 2>&1 || missing="$missing $t"
 done
 if [ -n "$missing" ]; then echo "check-remote: missing on $(hostname):$missing; not running a gate that would skip them"; exit 2; fi
 mkdir -p "$root/runs"
-if command -v flock >/dev/null 2>&1; then
-  exec 8>"$root/.lock"
-  flock -n 8 || { echo "another check-remote is running on $(hostname); waiting"; flock 8; }
-fi
+exec 8>"$root/.lock"
+flock -n 8 || { echo "another check-remote is running on $(hostname); waiting"; flock 8; }
 for r in anam anam-importers; do
   [ -d "$root/$r/.git" ] || git clone -q "https://github.com/mattjoyce/$r.git" "$root/$r"
   git -C "$root/$r" fetch -q origin
@@ -71,7 +69,8 @@ git -C "$root/anam-importers" checkout -q --detach origin/master
 git -C "$root/anam" cat-file -e "$sha^{commit}" 2>/dev/null || { echo "check-remote: $sha is not on origin; push it first"; exit 2; }
 run="$root/runs/$sha-$$"
 git -C "$root/anam" worktree add -q --detach "$run" "$sha"
-trap "git -C \"$root/anam\" worktree remove --force \"$run\" >/dev/null 2>&1 || true" EXIT
+cleanup() { git -C "$root/anam" worktree remove --force "$run" >/dev/null 2>&1 || true; }
+trap cleanup EXIT
 echo "host:           $(hostname)"
 echo "anam:           $sha"
 echo "anam-importers: $(git -C "$root/anam-importers" rev-parse HEAD)"

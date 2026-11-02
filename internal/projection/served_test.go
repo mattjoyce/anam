@@ -42,7 +42,7 @@ var unserved = map[facet.Type]string{
 // is newer, which is what the operator registers.
 func currentProjections(t *testing.T) []projection.Template {
 	t.Helper()
-	bundled, err := projection.Bundled()
+	bundled, err := projection.BundledFS(fixtureProjs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func currentProjections(t *testing.T) []projection.Template {
 // reason.
 func TestEveryBundledTypeIsServedOrNamed(t *testing.T) {
 	t.Parallel()
-	defs, err := def.Bundled()
+	defs, err := def.BundledFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestEveryBundledTypeIsServedOrNamed(t *testing.T) {
 // registered versions add the types an importer registers.
 func TestProjectionsByConcept(t *testing.T) {
 	t.Parallel()
-	defs, err := def.Bundled()
+	defs, err := def.BundledFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestProjectionsByConcept(t *testing.T) {
 	}
 	// The bundled floor names bundled types only: a template cannot name a type an
 	// importer registers, and the registered version adds it.
-	bundled, err := projection.Bundled()
+	bundled, err := projection.BundledFS(fixtureProjs())
 	if err != nil {
 		t.Fatal(err)
 	}

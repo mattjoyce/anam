@@ -157,11 +157,11 @@ var readsALocalClock = map[string]bool{}
 
 func TestSourceTime_EveryTypeReadingALocalClockSaysHow(t *testing.T) {
 	t.Parallel()
-	reg, err := def.Bundled()
+	reg, err := def.BundledFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}
-	stored, err := def.Manifests()
+	stored, err := def.ManifestsFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,11 +203,11 @@ func TestSourceTime_EveryTypeReadingALocalClockSaysHow(t *testing.T) {
 // again declares it without requiring it, so its old payloads still admit.
 func TestSourceTime_TheImportersTypesCarryIt(t *testing.T) {
 	t.Parallel()
-	reg, err := def.Bundled()
+	reg, err := def.BundledFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}
-	stored, err := def.Manifests()
+	stored, err := def.ManifestsFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,11 +258,11 @@ func TestSourceTime_TheImportersTypesCarryIt(t *testing.T) {
 // identity are the earlier version's, which def.Guard holds.
 func TestSourceTime_TheWriterlessTypesRequireIt(t *testing.T) {
 	t.Parallel()
-	reg, err := def.Bundled()
+	reg, err := def.BundledFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}
-	stored, err := def.Manifests()
+	stored, err := def.ManifestsFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,11 +315,11 @@ func TestSourceTime_TheWriterlessTypesRequireIt(t *testing.T) {
 // date had (shape v2), since its fact time is read at it; the others carry shape v1.
 func TestSourceTime_TheRecordsFilesTypesRequireIt(t *testing.T) {
 	t.Parallel()
-	reg, err := def.Bundled()
+	reg, err := def.BundledFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}
-	stored, err := def.Manifests()
+	stored, err := def.ManifestsFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}

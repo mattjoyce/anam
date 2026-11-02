@@ -27,7 +27,7 @@ func held(manifest string, v int) def.Stored {
 // never both.
 func TestRegister(t *testing.T) {
 	t.Parallel()
-	bundled, err := def.Bundled()
+	bundled, err := def.BundledFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func bpManifestBundled(t *testing.T, bundled *def.Registry) string {
 
 func TestWithRegistered(t *testing.T) {
 	t.Parallel()
-	bundled, err := def.Bundled()
+	bundled, err := def.BundledFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,7 +10,7 @@ import (
 // Card 188 S4: a form needs to know which field the rule composes and which fields
 // decide the facet, from the Definition and not from the type's name.
 func TestIdentityFieldsOfATemplatedAndAPlainDefinition(t *testing.T) {
-	reg, err := def.Bundled()
+	reg, err := def.BundledFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -128,6 +128,9 @@ func TestParse_RejectsBadValuesAtLoad(t *testing.T) {
 	}
 }
 
+// TestBundled_ParsesBpAndSleep reads the embedded catalog on purpose: its subject is
+// the personal projections and their history, so it leaves the engine with that
+// catalog (card 255, R4b) instead of moving to a fixture copy.
 func TestBundled_ParsesBpAndSleep(t *testing.T) {
 	t.Parallel()
 
@@ -191,9 +194,9 @@ func TestBundled_ParsesBpAndSleep(t *testing.T) {
 func TestLookup_UnknownNamesTheAlternatives(t *testing.T) {
 	t.Parallel()
 
-	r, err := projection.Bundled()
+	r, err := projection.BundledFS(fixtureProjs())
 	if err != nil {
-		t.Fatalf("Bundled: %v", err)
+		t.Fatalf("BundledFS: %v", err)
 	}
 	_, err = r.Lookup("bloodpressure")
 	if !errors.Is(err, projection.ErrUnknown) {
@@ -538,9 +541,9 @@ func TestPatterns_KeepsPrefixesAsWritten(t *testing.T) {
 // end stays beside its start: a log infers no episode.
 func TestBundled_AttentionServesTheThreeTypes(t *testing.T) {
 	t.Parallel()
-	r, err := projection.Bundled()
+	r, err := projection.BundledFS(fixtureProjs())
 	if err != nil {
-		t.Fatalf("Bundled: %v", err)
+		t.Fatalf("BundledFS: %v", err)
 	}
 	tmpl, err := r.Lookup("attention")
 	if err != nil {
@@ -575,9 +578,9 @@ func TestBundled_AttentionServesTheThreeTypes(t *testing.T) {
 // the time it was said, and serves nothing else.
 func TestBundled_IntakeServesTheIntakeLog(t *testing.T) {
 	t.Parallel()
-	r, err := projection.Bundled()
+	r, err := projection.BundledFS(fixtureProjs())
 	if err != nil {
-		t.Fatalf("Bundled: %v", err)
+		t.Fatalf("BundledFS: %v", err)
 	}
 	tmpl, err := r.Lookup("intake")
 	if err != nil {
@@ -610,9 +613,9 @@ func TestBundled_IntakeServesTheIntakeLog(t *testing.T) {
 // snapshot dropping a stint whose end has come. Neither serves anything outside the family.
 func TestBundled_CareerLogsAndEmploymentSnapshotsTheEmploymentTypes(t *testing.T) {
 	t.Parallel()
-	r, err := projection.Bundled()
+	r, err := projection.BundledFS(fixtureProjs())
 	if err != nil {
-		t.Fatalf("Bundled: %v", err)
+		t.Fatalf("BundledFS: %v", err)
 	}
 	career, err := r.Lookup("career")
 	if err != nil {

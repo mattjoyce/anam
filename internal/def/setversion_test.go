@@ -8,27 +8,27 @@ import (
 )
 
 // The definition-set version is what a receipt records as the interpretation in force
-// when its facets were captured (§9): the same binary must always answer the same
+// when its facets were captured (§9): the same catalog must always answer the same
 // thing, and the answer must be a digest rather than a lucky constant.
 func TestSetVersion_DeterministicDigest(t *testing.T) {
 	t.Parallel()
 
-	first, err := def.SetVersion()
+	first, err := def.SetVersionFS(fixtureDefs())
 	if err != nil {
-		t.Fatalf("SetVersion: %v", err)
+		t.Fatalf("SetVersionFS: %v", err)
 	}
-	second, err := def.SetVersion()
+	second, err := def.SetVersionFS(fixtureDefs())
 	if err != nil {
-		t.Fatalf("SetVersion (again): %v", err)
+		t.Fatalf("SetVersionFS (again): %v", err)
 	}
 	if first != second {
-		t.Errorf("SetVersion is not deterministic: %s then %s", first, second)
+		t.Errorf("SetVersionFS is not deterministic: %s then %s", first, second)
 	}
 	if !regexp.MustCompile(`^sha256:[0-9a-f]{64}$`).MatchString(first) {
-		t.Errorf("SetVersion = %q, want sha256:<64 hex>", first)
+		t.Errorf("SetVersionFS = %q, want sha256:<64 hex>", first)
 	}
 	if empty := def.SetVersionOf(map[string][]byte{}); first == empty {
-		t.Error("the bundled set hashes the same as an empty one — the manifests are not being read")
+		t.Error("the fixture set hashes the same as an empty one — the manifests are not being read")
 	}
 }
 

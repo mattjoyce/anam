@@ -83,9 +83,9 @@ func TestParse_ApplicatorBranchesNeedNoClosing(t *testing.T) {
 func TestBundled_HealthIntakeStillLoads(t *testing.T) {
 	t.Parallel()
 
-	reg, err := def.Bundled()
+	reg, err := def.BundledFS(fixtureDefs())
 	if err != nil {
-		t.Fatalf("Bundled: %v", err)
+		t.Fatalf("BundledFS: %v", err)
 	}
 	if _, ok := reg.Lookup("health.intake"); !ok {
 		t.Fatal("no bundled definition for health.intake")

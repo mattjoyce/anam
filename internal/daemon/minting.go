@@ -17,9 +17,25 @@ import (
 // mintAtHead mints at the head, as its own write: a mint is not part of what a batch
 // admitted, so its failure is reported and fails nothing (ARCHITECTURE.md §7). It
 // starts from the last run, so it costs the buckets the batches touched.
+//
+// It has the long-write budget (long_write_timeout), as catchUp has, not the per-call
+// timeout: no caller waits on it, and with no run to start from, on a carried store
+// or a rebuilt index, it is a full mint over every bucket, which takes as long as the
+// replay before it (card 268). POST /v1/checkpoints keeps the request's budget.
+//
+// A mint cut short while it settles buckets keeps the ones it minted and records no
+// run. The next one starts from the last run, which with none is a full fold again
+// that reuses every checkpoint whose value matches, rather than carrying on where the
+// cut one stopped. A cut that lands while old checkpoints are collected comes after
+// the run is recorded: the mint is done, and the next one collects.
+//
+// The write worker leaves only between writes, so a stop waits for a running mint,
+// and the queue is held by it, for as long as the mint takes: up to the budget, never
+// the budget itself when the mint ends sooner. Catch-up already holds both the same
+// way.
 func (d *Daemon) mintAtHead() *api.MintRun {
 	var m api.Mint
-	err := d.Write(context.Background(), d.cfg.Timeout, func(ctx context.Context, s Stores) error {
+	err := d.Write(context.Background(), d.cfg.LongWriteTimeout, func(ctx context.Context, s Stores) error {
 		var err error
 		m, err = mint.Report(ctx, d.mintDeps(s), api.MintQuery{})
 		return err

@@ -9,6 +9,17 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- The daemon's automatic mint, the one at start when the last run is behind the head and the one
+  after an importer's batch, runs under `long_write_timeout` (15 m by default) rather than
+  `timeout` (card 268). On a carried store or a rebuilt index the first mint has no run to start
+  from and mints every bucket; at 30 s it was cut short twice in card 260's window and needed a
+  `POST /v1/checkpoints` by hand. That step is no longer needed. A mint cut short still keeps the
+  buckets it minted; the next mint folds again and cuts only the buckets that are not already
+  minted. A long mint holds the write queue, and a stop, for as long as it runs, up to
+  `long_write_timeout`, so batches may see more 503s while it runs, as during catch-up.
+  `POST /v1/checkpoints`, full or not, keeps the request's budget: `timeout`, or `Anam-Timeout`
+  when shorter.
+
 - The operational store's schema moves to version 10 (card 260). The table every receipt files its
   template body in is renamed from `inline_projection` to `template_body`, and the content kind and
   artifact folder from `inline-projection` to `template-body`. Receipts, their hashes, template

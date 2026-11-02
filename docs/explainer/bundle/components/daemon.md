@@ -69,4 +69,4 @@ The admission hold is read inside the write, not before it is queued: a hold and
 
 ## Mint cadence
 
-An importer batch that changed W requests a mint on a one-slot channel, and `mintOnRequest` runs `mintAtHead` as its own write after `mint_quiet` (2 s) of quiet. At start `mintIfBehind` requests one when the last run is behind the head. Both live in `internal/daemon/minting.go`. See [mint cadence follows the ledger](/decisions/mint-cadence-follows-the-ledger.md).
+An importer batch that changed W requests a mint on a one-slot channel, and `mintOnRequest` runs `mintAtHead` as its own write after `mint_quiet` (2 s) of quiet. At start `mintIfBehind` requests one when the last run is behind the head. The mint runs under `long_write_timeout`, as catch-up does, since with no run to start from it mints every bucket; a mint cut short keeps the buckets it minted, and the next one folds again and reuses every checkpoint that matches (card 268). `POST /v1/checkpoints` keeps the request's budget. Both live in `internal/daemon/minting.go`. See [mint cadence follows the ledger](/decisions/mint-cadence-follows-the-ledger.md).

@@ -94,7 +94,8 @@ type Config struct {
 	BackupKeep int `yaml:"backup_keep"`
 
 	// LongWriteTimeout bounds one long write inside the daemon: a replay of the
-	// ledger into the index, a backup, the mint at start. It also bounds each phase
+	// ledger into the index, a backup, the automatic mint at start and after a batch
+	// (card 268; a mint asked for over POST /v1/checkpoints keeps the request's budget). It also bounds each phase
 	// of anam migrate (card 200): the fold of the old ledger, the carry. Timeout
 	// still bounds each call within it. Until card 156 the key was ingest_timeout, from when it bounded
 	// an ingest run; Load still reads that name, and ANAM_INGEST_TIMEOUT, as an alias.
@@ -305,7 +306,8 @@ func (c Config) Buckets() (span.Buckets, error) { return span.New(c.BucketWidth)
 const DefaultTimeout = 5 * time.Second
 
 // DefaultLongWriteTimeout is long_write_timeout's default: a full replay of the
-// record into the index takes a few minutes on the NAS.
+// record into the index takes a few minutes on the NAS, and the full mint after it
+// less.
 const DefaultLongWriteTimeout = 15 * time.Minute
 
 // DefaultBackupKeep is backup_keep's default: two weeks of nightly backups.

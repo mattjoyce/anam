@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "facet_type": "place.departed",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "trips",
+    "classification": "Confidential",
+    "validation_mode": "strict",
+    "source_schema": "records/place.departed",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium",
+    "series": {"name": "travel.trip", "key": ["/trip"], "closes": false}
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Leaving home on a trip, one row in a records file (source records), written from itineraries, bookings and emails. Opens a travel.trip series; values are the row's own text.",
+    "type": "object",
+    "required": ["id", "date", "trip"],
+    "properties": {
+      "agency": {"type": "string", "minLength": 1, "description": "The travel agent the trip was booked through, with its reference where the source gave one, as written.", "examples": ["Harbor Travel 40213377"]},
+      "basis": {"type": "string", "minLength": 1, "description": "Why the departure date is believed, in the extraction's own words rather than the source's. Present only on a trip with no itinerary to stand on: it names the documents the date rests on and says no itinerary was found. Read it before trusting the date.", "examples": ["a leave plan of 2 Feb 2019 and an email of 1 Mar 2019; no itinerary found"]},
+      "booking": {"type": "string", "minLength": 1, "description": "The booking reference (airline record locator or agent's code) as written.", "examples": ["K7QXZB"]},
+      "date": {"type": "string", "minLength": 1, "description": "The day of departure. Sydney local date, YYYY-MM-DD, as the records row writes it. This is the fact time.", "examples": ["2019-03-04"]},
+      "destination": {"type": "string", "minLength": 1, "description": "Where the trip went, free text as written: one place, a country, or a list.", "examples": ["Porthaven, Westmere"]},
+      "from": {"type": "string", "minLength": 1, "description": "The city the trip left from, as written.", "examples": ["Lakeport"]},
+      "id": {"type": "string", "minLength": 1, "description": "The row id the records file assigns, chosen once. The travel history writes it as <origin>:<trip>/<kind>, with the date and a place or route appended where a trip has several rows of a kind. This is the identity.", "examples": ["travel:2019-03-westmere/departed"]},
+      "purpose": {"type": "string", "minLength": 1, "description": "Why the trip was made, free text as written.", "examples": ["Walking holiday"]},
+      "trip": {"type": "string", "minLength": 1, "description": "The trip key every row of one trip shares (departed, arrived, returned, flight), written by the extraction as the year and month of departure and a short slug. It names the travel.trip series. place.returned with the same key closes it.", "examples": ["2019-03-westmere"]}
+    },
+    "additionalProperties": false
+  }
+}

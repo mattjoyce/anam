@@ -9,6 +9,12 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- Tests get their catalogs from fixtures (card 255, R4a, first slice). `internal/catalog/fixture`
+  holds `mattjoyce`, a byte copy of the embedded catalog, and `minimal`, a small catalog with
+  `record.edge` and `record.document` in UTC, one measure type and one projection;
+  `internal/catalog/catalogtest` builds registries, a catalog and config paths over the copy.
+  No existing test moves yet. Production code may not import either package, and the gate
+  checks it. The binary, its embedded catalog and its definition set version are unchanged.
 - The daemon's automatic mint, the one at start when the last run is behind the head and the one
   after an importer's batch, runs under `long_write_timeout` (15 m by default) rather than
   `timeout` (card 268). On a carried store or a rebuilt index the first mint has no run to start

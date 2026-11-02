@@ -1,0 +1,74 @@
+{
+  "meta": {
+    "facet_type": "note.annotation",
+    "definition_version": 1,
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "records/note.annotation",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/at",
+        "layout": "2006-01-02 15:04",
+        "zone": "Australia/Sydney"
+      }
+    },
+    "identity_key": [
+      "/id"
+    ],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "A note the person writes about one or more facets already in the record: what was going on, in their words. A fact about facts. The facets it names are never changed by it; the note is appended beside them, carries its own provenance (the person, typed), and is retracted or edited on its own. Its fact time is the moment the note is about, usually the facets' own, so it sits beside them on the timeline; when it was written is the anam-time of its admission, and which version of each facet was current then is read from the ledger at that watermark, not stored here.",
+    "type": "object",
+    "required": [
+      "id",
+      "at",
+      "about",
+      "text"
+    ],
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The note's own id, chosen once in the records file. The convention is note:<first 8 of the first facet id>:<n>, n counting the person's notes that start there from 1, so a second note is a second fact and not an edit of the first.",
+        "examples": [
+          "note:2c6f38a3:1"
+        ]
+      },
+      "at": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The moment the note is about, YYYY-MM-DD HH:MM in Australia/Sydney. Usually the facet's own fact time, written out so the note stands on the timeline beside it. This is the fact time.",
+        "examples": [
+          "2026-10-09 11:29"
+        ]
+      },
+      "about": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": {
+          "type": "string",
+          "minLength": 36,
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "description": "The facet ids the note is about, as the inspector shows them: one or more. A facet id is stable across the facet's versions, so the note follows each facet through supersession. Anam does not check that an id is live when the note is admitted: a note about a facet later tombstoned is still what the person said.",
+        "examples": [
+          [
+            "2c6f38a3-3db7-5e65-b933-9c59980e1c6c"
+          ]
+        ]
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The note, verbatim, as the person typed it.",
+        "examples": [
+          "During a large work meeting, presenting."
+        ]
+      }
+    },
+    "additionalProperties": false
+  }
+}

@@ -1,0 +1,3 @@
+{"name": "measures", "version": 1, "description": "every test.measure, the fixture's one projection",
+  "types": ["test.measure"], "statuses": ["admitted", "endorsed"], "max_classification": "Normal",
+  "from": "", "to": "", "shape": "log"}

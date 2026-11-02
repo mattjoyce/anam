@@ -1,0 +1,11 @@
+{
+  "name": "purchases",
+  "version": 1,
+  "description": "What the person bought, and from whom, as a log: every purchase at its date, with its lines and totals as the merchant's document states them. For an assistant asked what was paid, to whom, or when. It does not serve the person's own notes about a purchase, such as whether it is deductible.",
+  "types": ["money.purchase"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Confidential",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

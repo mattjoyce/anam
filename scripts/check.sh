@@ -55,6 +55,66 @@ if [ -n "$boundary" ]; then
   fail=1
 fi
 
+# Fixture boundary (card 255). The test catalogs in internal/catalog/fixture, and
+# catalogtest built on them, are for tests only: a binary that carried one would carry
+# a catalog nobody chose. The rule reads the real dependency graph, so an import
+# through another package (one under testdata, which ./... leaves out) is caught: no
+# package but fixture and catalogtest may have either among its non-test deps, and no
+# package any of them builds may //go:embed a file of fixture's testdata. These stop a
+# test fixture being relied on by accident; a deliberate way round would show in review.
+# internal/catalog/fixture/boundary_test.go holds the same rule without a go command.
+echo "→ fixture boundary (test catalogs reach no production package)"
+fixture_pkgs='github.com/mattjoyce/anam/internal/catalog/(fixture|catalogtest)'
+prod_pkgs="$(go list ./... 2>/dev/null | grep -vE "^${fixture_pkgs}\$" || true)"
+fixture_data="$(go list -f '{{.Dir}}' github.com/mattjoyce/anam/internal/catalog/fixture 2>/dev/null)/testdata"
+if [ -z "$prod_pkgs" ] || [ ! -d "$fixture_data" ]; then
+  echo "  FAILED: cannot list the packages or find the fixture's testdata" >&2
+  fail=1
+else
+  # shellcheck disable=SC2086 # one argument per package
+  fixture_boundary="$(go list -e -f '{{.ImportPath}}{{range .Deps}} {{.}}{{end}}' $prod_pkgs 2>/dev/null \
+    | grep -E " ${fixture_pkgs}( |\$)" || true)"
+  # shellcheck disable=SC2086
+  fixture_embeds="$(go list -e -deps -f '{{$d := .Dir}}{{.ImportPath}}{{range .EmbedFiles}} {{$d}}/{{.}}{{end}}' $prod_pkgs 2>/dev/null \
+    | grep -F " $fixture_data/" | grep -vE "^${fixture_pkgs} " || true)"
+  # Native sources can carry bytes no import or //go:embed shows (an .incbin in a cgo
+  # preamble or a .s file, a .syso), so no package of this module that production
+  # builds may have any. The module has none; one that needs it revisits this rule.
+  # shellcheck disable=SC2086
+  fixture_native="$(go list -e -deps -f '{{.ImportPath}} {{join .CgoFiles " "}} {{join .CFiles " "}} {{join .CXXFiles " "}} {{join .MFiles " "}} {{join .HFiles " "}} {{join .FFiles " "}} {{join .SFiles " "}} {{join .SwigFiles " "}} {{join .SwigCXXFiles " "}} {{join .SysoFiles " "}}' $prod_pkgs 2>/dev/null \
+    | grep -E '^github.com/mattjoyce/anam(/| )' | awk 'NF > 1' || true)"
+  # A symlink to a directory is an import path the dependency graph cannot see
+  # through: an alias of the fixture builds under another name. None is needed, so
+  # none is allowed, and none may point into the fixture either.
+  fixture_real="$(cd "$fixture_data/.." && pwd -P)"
+  fixture_links="$(find . -path ./.git -prune -o -type l -print | while IFS= read -r link; do
+      target="$(realpath -q "$link" 2>/dev/null || true)"
+      if [ -d "$link" ] || [ "$target" = "$fixture_real" ] || [[ "$target" == "$fixture_real"/* ]]; then
+        echo "$link"
+      fi
+    done)"
+  if [ -n "$fixture_native" ]; then
+    echo "  FAILED: a production package has native sources:" >&2
+    echo "$fixture_native" | awk '{print "    " $0}' >&2
+    fail=1
+  fi
+  if [ -n "$fixture_links" ]; then
+    echo "  FAILED: a symlink aliases a directory or the fixture:" >&2
+    echo "$fixture_links" | awk '{print "    " $0}' >&2
+    fail=1
+  fi
+  if [ -n "$fixture_boundary" ]; then
+    echo "  FAILED: a test catalog is in a production package's dependencies:" >&2
+    echo "$fixture_boundary" | awk '{print "    " $1}' >&2
+    fail=1
+  fi
+  if [ -n "$fixture_embeds" ]; then
+    echo "  FAILED: a production package embeds the fixture's testdata:" >&2
+    echo "$fixture_embeds" | awk '{print "    " $1}' >&2
+    fail=1
+  fi
+fi
+
 # The prose is checked too: a dead link in the README's docs index or in docs/ fails
 # the gate, so the index a stranger follows is true (card 73).
 run scripts/check-links.sh

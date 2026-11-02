@@ -1,0 +1,138 @@
+{
+  "meta": {
+    "facet_type": "health.heart-rate-daily",
+    "definition_version": 1,
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "omh/heart-rate-2.0",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/effective_time_frame/time_interval/start_date_time",
+        "layout": "2006-01-02T15:04:05Z07:00",
+        "zone": "Australia/Sydney"
+      }
+    },
+    "identity_key": [
+      "/id",
+      "/statistic"
+    ],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One figure for one day's heart rate as an Open mHealth heart-rate-2.0 body (omh:heart-rate:2.0, pinned), with the source's day and which figure it is beside it. A day has up to three: resting, the minimum and the maximum. Garmin writes them through the anam_garmin importer (source garmin): resting from GarminDB's resting_hr table, minimum and maximum from its daily_summary.",
+    "type": "object",
+    "required": [
+      "id",
+      "statistic",
+      "heart_rate",
+      "effective_time_frame"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The source's key for the day. For Garmin, the day as GarminDB files it, a local date.",
+        "examples": [
+          "2026-10-09"
+        ]
+      },
+      "statistic": {
+        "type": "string",
+        "enum": [
+          "resting",
+          "minimum",
+          "maximum"
+        ],
+        "description": "Which of the day's figures this is. With id, the identity: one facet per figure per day.",
+        "examples": [
+          "resting"
+        ]
+      },
+      "heart_rate": {
+        "type": "object",
+        "description": "The figure as an OMH unit-value, in beats per minute.",
+        "required": [
+          "value",
+          "unit"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Beats per minute, as the source gave it.",
+            "examples": [
+              61
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "beats/min"
+            ],
+            "description": "Always beats/min."
+          }
+        }
+      },
+      "effective_time_frame": {
+        "type": "object",
+        "description": "The day the figure covers, as an OMH time interval: local midnight to the next, in Australia/Sydney with that day's offset. The start is the fact time.",
+        "required": [
+          "time_interval"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "time_interval": {
+            "type": "object",
+            "required": [
+              "start_date_time",
+              "end_date_time"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "start_date_time": {
+                "type": "string",
+                "minLength": 1,
+                "description": "RFC 3339, the day's local midnight.",
+                "examples": [
+                  "2026-10-09T00:00:00+11:00"
+                ]
+              },
+              "end_date_time": {
+                "type": "string",
+                "minLength": 1,
+                "description": "RFC 3339, the next day's local midnight.",
+                "examples": [
+                  "2026-10-10T00:00:00+11:00"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "temporal_relationship_to_physical_activity": {
+        "type": "string",
+        "enum": [
+          "at rest"
+        ],
+        "description": "OMH's \"at rest\", on the resting figure only.",
+        "examples": [
+          "at rest"
+        ]
+      },
+      "descriptive_statistic": {
+        "type": "string",
+        "enum": [
+          "minimum",
+          "maximum"
+        ],
+        "description": "OMH's statistic over the day, on the minimum and maximum figures only.",
+        "examples": [
+          "minimum"
+        ]
+      }
+    }
+  }
+}

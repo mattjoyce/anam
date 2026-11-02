@@ -1,0 +1,11 @@
+{
+  "name": "doses",
+  "version": 2,
+  "description": "Every dose taken, at its time: the health.medication.dose events as a log, so an occasional or as-needed medicine reads back without standing as a regimen. The meds projection is the current regimen; this is what was actually taken. Version 2 names the type with its third segment (card 196); version 1 named it health.medication.dose.",
+  "types": ["health.medication.dose"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

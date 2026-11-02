@@ -1,0 +1,29 @@
+{
+  "meta": {
+    "facet_type": "health.weight",
+    "definition_version": 3,
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "records/health.weight",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02 15:04", "zone": "Australia/Sydney"}
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One body weight, from a records file. Two records sources write it: the Fitbit weight log export, extracted by scripts/extract-fitbit-weight.py, and weights noted in the blood pressure diary, read into records by hand. Values are the source's own figures.",
+    "type": "object",
+    "required": ["id", "date", "kg"],
+    "properties": {
+      "bmi": {"type": "number", "description": "Body mass index as Fitbit computed it, the export's fourth column. Fitbit rows only, and only when the log has one.", "examples": [25.31]},
+      "date": {"type": "string", "minLength": 1, "description": "When the weight was logged, local Sydney time to the minute. For Fitbit rows the extractor rewrites logged_as in this form; diary rows give the date and time read from the diary. This is the fact time.", "examples": ["2026-01-24 06:33"]},
+      "id": {"type": "string", "minLength": 1, "description": "The records row's id. Fitbit rows are fitbit: and the log's minute, with :2 and up added when two logs share a minute; diary rows carry the diary's own prefix and the day.", "examples": ["fitbit:2026-01-24T06:33"]},
+      "kg": {"type": "number", "description": "Body weight in kilograms as the source wrote it. The Fitbit extractor refuses a log whose unit column is not kilograms.", "examples": [82.4]},
+      "logged_as": {"type": "string", "minLength": 1, "description": "The Fitbit export's log time, first column, verbatim. Fitbit rows only.", "examples": ["January 24, 2026 at 06:33AM"]},
+      "source_note": {"type": "string", "minLength": 1, "description": "Where the row came from, in words. The Fitbit extractor writes a fixed note; diary rows carry the reader's note.", "examples": ["Fitbit weight log (Google Takeout export)"]}
+    },
+    "additionalProperties": false
+  }
+}

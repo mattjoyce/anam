@@ -1,0 +1,33 @@
+{
+  "meta": {
+    "facet_type": "health.medication-stopped",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "meds",
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "records/health.medication-stopped",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium",
+    "series": {"name": "med.regimen", "key": ["/drug", "/course"], "closes": true}
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "A medicine course ending, which closes its med.regimen series. Written into records files by hand, from My Health Record screenshots or the person's own word.",
+    "type": "object",
+    "required": ["id", "date", "drug", "course"],
+    "properties": {
+      "agreed_with": {"type": "string", "minLength": 1, "description": "Who the stop was agreed with, as the writer recorded it.", "examples": ["Dr Jane Example"]},
+      "course": {"type": "number", "description": "Which course of this drug, counting from 1; a restart after a stop is a new course. Assigned by whoever wrote the record, not by the source. With drug it names the regimen series.", "examples": [1]},
+      "date": {"type": "string", "minLength": 1, "description": "The day the course stopped, YYYY-MM-DD, as the writer recorded it. This is the fact time.", "examples": ["2026-03-04"]},
+      "drug": {"type": "string", "minLength": 1, "description": "The generic drug name in lower case, as the record's writer normalised it from the source. With course it names the regimen series.", "examples": ["examplazole"]},
+      "id": {"type": "string", "minLength": 1, "description": "Identity, chosen by the writer: the source prefix, then med, the drug, the course and \"stopped\".", "examples": ["mhr:med/examplazole/1/stopped"]},
+      "reason": {"type": "string", "minLength": 1, "description": "Why the course stopped, in the writer's words."},
+      "source_note": {"type": "string", "minLength": 1, "description": "What the reader saw in the source and how they reached this record (which screenshot, which dispensing). Reader's text, not the source's."}
+    },
+    "additionalProperties": false
+  }
+}

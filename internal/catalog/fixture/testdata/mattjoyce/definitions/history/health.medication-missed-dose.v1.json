@@ -1,0 +1,30 @@
+{
+  "meta": {
+    "facet_type": "health.medication-missed-dose",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "meds",
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "records/health.medication-missed-dose",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "A dose the person says they missed, as a point fact. Written into records files by hand, so far from a blood pressure diary's missed-medication mark.",
+    "type": "object",
+    "required": ["id", "date"],
+    "properties": {
+      "date": {"type": "string", "minLength": 1, "description": "The day the dose was missed, YYYY-MM-DD. This is the fact time.", "examples": ["2026-03-04"]},
+      "id": {"type": "string", "minLength": 1, "description": "Identity, chosen by the writer: the source's prefix and the date.", "examples": ["mydiary:2026-03-04"]},
+      "medication": {"type": "string", "minLength": 1, "description": "Which medicine was missed, in free text. The diary that is the only source so far does not say; the writer filled it from the regimen another source shows on that day, drugs and strengths in words, and said which source. Not normalised to a drug name and not linked to a regimen series.", "examples": ["examplazole 20 mg, the regimen on that date"]},
+      "note": {"type": "string", "minLength": 1, "description": "The source's own words about the miss, verbatim: for the blood pressure diary, the tag its app printed beside each reading of that day."},
+      "source_note": {"type": "string", "minLength": 1, "description": "Where the reader found the miss and what it rests on. Reader's text, not the source's."}
+    },
+    "additionalProperties": false
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "clinical",
+  "version": 1,
+  "description": "What a clinician recorded, for an assistant asked about the person's medical history: conditions, encounters, donations, vision prescriptions, laboratory panels and laboratory results, each at its time. It does not serve medicines taken, the body's own measurements or anything a device wrote.",
+  "types": [
+    "health.condition",
+    "health.encounter",
+    "health.donation",
+    "health.vision-prescription",
+    "health.lab-panel",
+    "health.lab-result"
+  ],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "body",
+  "version": 1,
+  "description": "The body's measurements, for an assistant asked how the person is built or how they are trending: weight, body composition and blood pressure, every reading Anam holds at its reading time. It does not serve medicines, sleep, heart rate or what a clinician recorded.",
+  "types": ["health.weight", "health.body-composition", "health.blood-pressure"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

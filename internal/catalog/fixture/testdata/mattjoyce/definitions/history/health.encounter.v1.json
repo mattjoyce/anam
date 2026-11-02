@@ -1,0 +1,35 @@
+{
+  "meta": {
+    "facet_type": "health.encounter",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "clinical",
+    "classification": "Confidential",
+    "validation_mode": "strict",
+    "source_schema": "records/health.encounter",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02 15:04", "zone": "Australia/Sydney"}
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One appointment with a clinic or practitioner. Written by hand readings of notes compiled from appointment emails, and of documents that show a visit.",
+    "type": "object",
+    "required": ["id", "date", "provider"],
+    "properties": {
+      "date": {"type": "string", "minLength": 1, "description": "The appointment's date and time, YYYY-MM-DD HH:MM in Sydney local time; 00:00 when time_unknown is true. This is the fact time.", "examples": ["2026-03-04 09:45"]},
+      "id": {"type": "string", "minLength": 1, "description": "Identity, chosen by the reader: a slug for the provider and the date.", "examples": ["example-clinic:2026-03-04"]},
+      "kind": {"type": "string", "minLength": 1, "description": "The appointment type as the booking named it, close to its wording; where a visit is known only from a document, what that document records happening (such as a summary being printed)."},
+      "location": {"type": "string", "minLength": 1, "description": "The address as the source gave it."},
+      "note": {"type": "string", "minLength": 1, "description": "Anything else the reader took from the source about this visit."},
+      "outcome": {"type": "string", "minLength": 1, "description": "What came of the visit, in the reader's words: what a later document shows followed from it, or that no result was found."},
+      "provider": {"type": "string", "minLength": 1, "description": "The practitioner or practice as the source named them.", "examples": ["Dr Jane Example"]},
+      "purpose": {"type": "string", "minLength": 1, "description": "What the visit was for, as the booking or the note gave it, briefly; the times of separate parts in brackets when there are several."},
+      "specialty": {"type": "string", "minLength": 1, "description": "The provider's field, in the reader's words, lower case.", "examples": ["general practice"]},
+      "time_unknown": {"type": "boolean", "description": "True when the source gives the day but no time, so the 00:00 in date is a placeholder. Absent otherwise.", "examples": [true]}
+    },
+    "additionalProperties": false
+  }
+}

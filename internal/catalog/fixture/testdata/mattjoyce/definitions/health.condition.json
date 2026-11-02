@@ -1,0 +1,33 @@
+{
+  "meta": {
+    "facet_type": "health.condition",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "conditions",
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "records/health.condition",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Australia/Sydney"}
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "A condition named in a document, as a point fact on the date the document gives it. Written by hand readings, so far from the clinical notes on pathology requests.",
+    "type": "object",
+    "required": ["id", "date", "condition"],
+    "properties": {
+      "as_written": {"type": "string", "minLength": 1, "description": "The condition exactly as the document wrote it, abbreviations and case kept: one item of the clinical notes line."},
+      "clinical_notes": {"type": "string", "minLength": 1, "description": "The whole clinical notes line the condition was taken from, verbatim."},
+      "condition": {"type": "string", "minLength": 1, "description": "The condition in the reader's words, lower case, abbreviations spelled out, sometimes with a gloss in brackets (such as that it was the reason for the request). The reader's normalisation of as_written, not the document's text."},
+      "context": {"type": "string", "minLength": 1, "description": "Where in the document the mention sits, in the reader's words. One reading wrote this field and others wrote the same thing as kind; the two say the same."},
+      "date": {"type": "string", "minLength": 1, "description": "The date the reader took for the mention, YYYY-MM-DD; for a pathology request, the date it was requested (the report's Requested or REFERRED field), not the draw date. This is the fact time.", "examples": ["2026-03-04"]},
+      "id": {"type": "string", "minLength": 1, "description": "Identity, chosen by the reader: the lab's prefix, the lab number, \"clinical-note\", and the condition as a slug.", "examples": ["acl:12345678/clinical-note/example-condition"]},
+      "kind": {"type": "string", "minLength": 1, "description": "What sort of mention this is and where it sits, in the reader's words (so far always a clinical note on a pathology request). Some readings wrote the same thing as context; the two say the same."},
+      "noted_by": {"type": "string", "minLength": 1, "description": "Who wrote the mention, as the document names them; for a pathology request, the requesting doctor.", "examples": ["Dr Jane Example"]}
+    },
+    "additionalProperties": false
+  }
+}

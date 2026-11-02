@@ -9,6 +9,13 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- Tests get their catalogs from fixtures (card 255, R4a, first slice). `internal/catalog/fixture`
+  holds `mattjoyce`, a byte copy of the embedded catalog, and `minimal`, a small catalog with
+  `record.edge` and `record.document` in UTC, one measure type and one projection;
+  `internal/catalog/catalogtest` builds registries, a catalog and config paths over the copy.
+  No existing test moves yet. Production code may not import either package, and the gate
+  checks it. The binary, its embedded catalog and its definition set version are unchanged.
+
 - The operational store's schema moves to version 10 (card 260). The table every receipt files its
   template body in is renamed from `inline_projection` to `template_body`, and the content kind and
   artifact folder from `inline-projection` to `template-body`. Receipts, their hashes, template

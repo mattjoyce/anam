@@ -1,0 +1,11 @@
+{
+  "name": "meds",
+  "version": 1,
+  "description": "The current regimen — the latest statement about each medication course, with stopped courses gone. Serve it at a fact-time bound for 'what was I on, on that day'.",
+  "types": ["med.started", "med.dose-changed", "med.stopped"],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "snapshot"
+}

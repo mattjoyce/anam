@@ -1,0 +1,17 @@
+{
+  "meta": {
+    "facet_type": "health.measurement",
+    "definition_version": 1,
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "withings/measurement",
+    "time_semantics": {
+      "fact_time": {"pointer": "/date", "layout": "2006-01-02 15:04:05", "zone": "UTC"}
+    },
+    "identity_key": ["/withings_id", "/type"],
+    "min_binding_assurance": "high"
+  },
+  "schema": {
+    "required": ["/withings_id", "/date", "/type", "/value", "/unit"]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "career",
+  "version": 1,
+  "description": "The person's working life as a log, for an assistant asked about their career: every start, change of role and end of employment, at its date. It does not serve pay, health or travel, and it names no other org relationship yet.",
+  "types": ["org.employment."],
+  "statuses": ["admitted", "endorsed"],
+  "max_classification": "Confidential",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

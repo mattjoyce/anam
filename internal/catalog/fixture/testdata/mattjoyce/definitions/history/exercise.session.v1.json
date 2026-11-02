@@ -1,0 +1,169 @@
+{
+  "meta": {
+    "facet_type": "exercise.session",
+    "definition_version": 1,
+    "classification": "Confidential",
+    "validation_mode": "strict",
+    "source_schema": "ieee-1752/physical-activity-1.0",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/effective_time_frame/time_interval/start_date_time",
+        "layout": "2006-01-02T15:04:05Z07:00",
+        "zone": "Australia/Sydney"
+      }
+    },
+    "identity_key": ["/id"],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["id", "activity_name", "effective_time_frame"],
+    "properties": {
+      "activity_name": {
+        "type": "string",
+        "enum": [
+          "aerobics", "archery", "badminton", "baseball", "basketball", "biathlon", "biking",
+          "biking.hand", "biking.mountain", "biking.road", "biking.spinning", "biking.stationary",
+          "biking.utility", "boxing", "calisthenics", "circuit_training", "cricket", "crossfit", "curling",
+          "dancing", "diving", "elevator", "elliptical", "ergometer", "escalator", "fencing",
+          "football.american", "football.australian", "football.soccer", "frisbee_disc", "gardening",
+          "golf", "guided_breathing", "gymnastics", "handball", "interval_training.high_intensity",
+          "hiking", "hockey", "horseback_riding", "housework", "ice_skating", "interval_training",
+          "in_vehicle", "jump_rope", "kayaking", "kettlebell_training", "kickboxing", "kick_scooter",
+          "kitesurfing", "martial_arts", "meditation", "martial_arts.mixed", "on_foot", "other", "p90x",
+          "paragliding", "pilates", "polo", "racquetball", "rock_climbing", "rowing", "rowing.machine",
+          "rugby", "running", "running.jogging", "running.sand", "running.treadmill", "sailing",
+          "scuba_diving", "skateboarding", "skating", "skating.cross", "skating.indoor", "skating.inline",
+          "skiing", "skiing.back_country", "skiing.cross_country", "skiing.downhill", "skiing.kite",
+          "skiing.roller", "sledding", "sleep", "sleep.awake", "sleep.deep", "sleep.light", "sleep.rem",
+          "snowboarding", "snowmobile", "snowshoeing", "softball", "squash", "stair_climbing",
+          "stair_climbing.machine", "standup_paddleboarding", "still", "strength_training", "surfing",
+          "swimming", "swimming.open_water", "swimming.pool", "table_tennis", "team_sports", "tennis",
+          "tilting", "treadmill", "unknown", "volleyball", "volleyball.beach", "volleyball.indoor",
+          "wakeboarding", "walking", "walking.fitness", "walking.nordic", "walking.paced",
+          "walking.stroller", "walking.treadmill", "water_polo", "weightlifting", "wheelchair",
+          "windsurfing", "yoga", "zumba"
+        ]
+      },
+      "average_cadence": {
+        "type": "object",
+        "properties": {"unit": {"type": "string", "minLength": 1}, "value": {"type": "number"}},
+        "required": ["unit", "value"],
+        "additionalProperties": false
+      },
+      "avg_hr_bpm": {"type": "number"},
+      "avg_peak_force": {"type": "number"},
+      "avg_power_w": {"type": "number"},
+      "base_movement_quantity": {
+        "type": "object",
+        "properties": {"unit": {"type": "string", "minLength": 1}, "value": {"type": "number"}},
+        "required": ["unit", "value"],
+        "additionalProperties": false
+      },
+      "calories_consumption": {"type": "number"},
+      "distance": {
+        "type": "object",
+        "properties": {"unit": {"type": "string", "minLength": 1}, "value": {"type": "number"}},
+        "required": ["unit", "value"],
+        "additionalProperties": false
+      },
+      "drag_factor": {"type": "number"},
+      "drive_perc": {"type": "number"},
+      "duration": {
+        "type": "object",
+        "properties": {"unit": {"type": "string", "minLength": 1}, "value": {"type": "number"}},
+        "required": ["unit", "value"],
+        "additionalProperties": false
+      },
+      "duration_capped": {"type": "boolean"},
+      "effective_time_frame": {
+        "type": "object",
+        "properties": {
+          "time_interval": {
+            "type": "object",
+            "properties": {
+              "duration": {
+                "type": "object",
+                "properties": {"unit": {"type": "string", "minLength": 1}, "value": {"type": "number"}},
+                "required": ["unit", "value"],
+                "additionalProperties": false
+              },
+              "start_date_time": {"type": "string", "minLength": 1}
+            },
+            "required": ["duration", "start_date_time"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["time_interval"],
+        "additionalProperties": false
+      },
+      "exercises": {"type": "array", "items": {"type": "string", "minLength": 1}},
+      "facility": {"type": "string", "minLength": 1},
+      "floors": {"type": "number"},
+      "id": {"type": "string", "minLength": 1},
+      "kcal_burned": {
+        "type": "object",
+        "properties": {"unit": {"type": "string", "minLength": 1}, "value": {"type": "number"}},
+        "required": ["unit", "value"],
+        "additionalProperties": false
+      },
+      "level": {"type": "number"},
+      "max_hr_bpm": {"type": "number"},
+      "max_power_w": {"type": "number"},
+      "max_spm": {"type": "number"},
+      "mets": {"type": "number"},
+      "mets_min": {"type": "number"},
+      "move": {"type": "number"},
+      "ph_id": {"type": "string", "minLength": 1},
+      "reported_duration_sec": {"type": "number"},
+      "sets": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "distance_m": {"type": "number"},
+            "exercise": {"type": "string", "minLength": 1},
+            "kg": {"type": "number"},
+            "note": {"type": "string", "minLength": 1},
+            "reps": {"type": "number"},
+            "rpe": {"type": "number"},
+            "seconds": {"type": "number"},
+            "set": {"type": "string", "minLength": 1}
+          },
+          "required": ["exercise", "set"],
+          "additionalProperties": false
+        }
+      },
+      "source": {"type": "string", "minLength": 1},
+      "split_500m_sec": {"type": "number"},
+      "splits": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "avg_hr_bpm": {"type": "number"},
+            "avg_power_w": {"type": "number"},
+            "avg_spm": {"type": "number"},
+            "distance_m": {"type": "number"},
+            "duration_sec": {"type": "number"},
+            "kcal": {"type": "number"},
+            "level": {"type": "number"},
+            "max_power_w": {"type": "number"},
+            "max_spm": {"type": "number"},
+            "position": {"type": "number"},
+            "split_500m_sec": {"type": "number"},
+            "strokes": {"type": "number"}
+          },
+          "required": ["avg_power_w", "duration_sec", "level", "position"],
+          "additionalProperties": false
+        }
+      },
+      "user_weight_kg": {"type": "number"},
+      "vo2": {"type": "number"},
+      "workout_name": {"type": "string", "minLength": 1},
+      "workout_notes": {"type": "array", "items": {"type": "string", "minLength": 1}}
+    },
+    "additionalProperties": false
+  }
+}

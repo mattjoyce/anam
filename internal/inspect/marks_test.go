@@ -1,7 +1,7 @@
 package inspect
 
 import (
-	"io/fs"
+	"os"
 	"strings"
 	"testing"
 	"unicode"
@@ -28,11 +28,12 @@ func TestTypeStyles_CoverEveryBundledType(t *testing.T) {
 	for _, f := range families {
 		rows[f.ID] = true
 	}
-	// The embedded catalog by name, not its source directory on disk: this test is
-	// about the catalog the binary carries, and stays on it until R4b (card 255).
-	entries, err := fs.ReadDir(def.EmbeddedFS(), ".")
+	// The catalog's source directory on disk, not the embedded FS: a manifest left out
+	// of the embed then fails here as "not a bundled type". Stays on the personal
+	// catalog until R4b (card 255).
+	entries, err := os.ReadDir("../def/manifests")
 	if err != nil {
-		t.Fatalf("read the embedded catalog: %v", err)
+		t.Fatalf("read manifests: %v", err)
 	}
 	st := newStyles(reg)
 	for _, e := range entries {

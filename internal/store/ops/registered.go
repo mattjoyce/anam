@@ -20,8 +20,9 @@ type RegisteredProjection struct {
 	RegisteredAt string
 }
 
-// InlineProjection is the body of an inline projection with the digest that addresses it.
-type InlineProjection struct {
+// TemplateBody is the body of a template a receipt was served through, with the digest
+// that addresses it.
+type TemplateBody struct {
 	Hash string
 	Body []byte
 }
@@ -34,8 +35,8 @@ type Content struct {
 	Body []byte
 }
 
-// carriedContent are the authored content kinds a carry copies besides the inline
-// projections, which Registered holds apart: receipts, the values they served, saved
+// carriedContent are the authored content kinds a carry copies besides the template
+// bodies, which Registered holds apart: receipts, the values they served, saved
 // selections and their codes. Checkpoint values are derived; a mint makes them again.
 var carriedContent = []string{KindReceipt, KindServed, KindSelection, KindSelectionCode}
 
@@ -49,11 +50,12 @@ type Registered struct {
 	Definitions []RegisteredDefinition
 	Projections []RegisteredProjection
 
-	// Inline are the bodies of the projections queries carried in their requests
-	// (card 211), each addressed by the hash its receipts record. They are authored
-	// and immutable like the registered rows, and a receipt that names one cannot be
-	// replayed without it, so a migration copies them too.
-	Inline []InlineProjection
+	// TemplateBodies are the bodies of the templates receipts were served through, each
+	// addressed by the hash its receipts record: the projections queries carried in
+	// their requests (card 211) and, since card 257, catalog templates. They are
+	// authored and immutable like the registered rows, and a receipt whose template has
+	// left the catalog cannot be replayed without its body, so a migration copies them.
+	TemplateBodies []TemplateBody
 	// Holds are the admission holds the operator has set. They are authored state,
 	// like the registered rows: a migration carries them into the new store, so a
 	// source held before the move is still held after it.
@@ -63,9 +65,11 @@ type Registered struct {
 	// store or from nowhere, so a carry copies every row, byte for byte.
 	Content []Content
 
-	// Provisioned is the store's copy of the Definitions the binary carries, bundled
-	// and history. It is read so a migration can resolve an older version; it is not
-	// written, because the daemon provisions the new store's own at start.
+	// Provisioned is the store's copy of the Definitions the catalog carried, current
+	// and history, including a type the catalog has since dropped (persistCatalog never
+	// sweeps). A ledger migration reads it to resolve an older version and does not write
+	// it, since the new ledger's store is provisioned from the catalog at start. A schema
+	// carry (CarrySchema) writes it, so a dropped type's history survives the bump.
 	Provisioned []DefinitionRow
 }
 
@@ -77,7 +81,24 @@ func (d *DB) ReadRegistered(ctx context.Context) (Registered, error) {
 		return Registered{}, fmt.Errorf("ops: read registered: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }() // a read transaction: nothing to commit
+	return readRegistered(ctx, tx, templateBodies[schemaVersion])
+}
 
+// templateBodies is the template body table by schema version: what ReadCarrySource
+// reads a file of each supported version under, and the one other name it must find
+// empty there.
+var templateBodies = map[int]string{9: "inline_projection", 10: "template_body"}
+
+// templateBodiesAll reads every template body by the table's name in the file's schema,
+// one of templateBodies. The name is never input.
+var templateBodiesAll = map[string]string{
+	"inline_projection": `SELECT hash, body FROM inline_projection ORDER BY hash`,
+	"template_body":     `SELECT hash, body FROM template_body ORDER BY hash`,
+}
+
+// readRegistered reads what a carry copies inside tx, the template bodies from the
+// table named bodies.
+func readRegistered(ctx context.Context, tx *sql.Tx, bodies string) (Registered, error) {
 	var out Registered
 	rows, err := tx.QueryContext(ctx,
 		`SELECT type, version, body, registered_at FROM registered_definition ORDER BY type, version`)
@@ -113,20 +134,24 @@ func (d *DB) ReadRegistered(ctx context.Context) (Registered, error) {
 		return Registered{}, fmt.Errorf("ops: read registered projections: %w", err)
 	}
 
-	rows, err = tx.QueryContext(ctx, `SELECT hash, body FROM inline_projection ORDER BY hash`)
+	query, ok := templateBodiesAll[bodies]
+	if !ok {
+		return Registered{}, fmt.Errorf("%w: %q is not a template body table", ErrInvalid, bodies)
+	}
+	rows, err = tx.QueryContext(ctx, query)
 	if err != nil {
-		return Registered{}, fmt.Errorf("ops: read inline projections: %w", err)
+		return Registered{}, fmt.Errorf("ops: read template bodies from %s: %w", bodies, err)
 	}
 	for rows.Next() {
-		var r InlineProjection
+		var r TemplateBody
 		if err := rows.Scan(&r.Hash, &r.Body); err != nil {
 			_ = rows.Close()
-			return Registered{}, fmt.Errorf("ops: scan inline projection: %w", err)
+			return Registered{}, fmt.Errorf("ops: scan template body: %w", err)
 		}
-		out.Inline = append(out.Inline, r)
+		out.TemplateBodies = append(out.TemplateBodies, r)
 	}
 	if err := closeRows(rows); err != nil {
-		return Registered{}, fmt.Errorf("ops: read inline projections: %w", err)
+		return Registered{}, fmt.Errorf("ops: read template bodies from %s: %w", bodies, err)
 	}
 
 	rows, err = tx.QueryContext(ctx, `SELECT source, held_at FROM admission_hold ORDER BY source`)
@@ -202,19 +227,31 @@ func closeRows(rows *sql.Rows) error {
 	return rows.Close()
 }
 
-// CarryRegistered writes the registered Definitions and projections, the inline
-// projection bodies, the admission holds and the authored content (receipts, served
-// values, saved selections and their codes) of r, each at its registration moment, in
-// one transaction: all of them or none. Every content row is checked against the
-// digest that keys it before it is written. The tables are immutable, so it fits a store
-// with none of these versions, which is what a fresh store is; a version already there
-// fails the call and leaves the store as it was.
+// CarryRegistered writes the registered Definitions and projections, the template
+// bodies, the admission holds and the authored content (receipts, served values, saved
+// selections and their codes) of r, each at its registration moment, in one
+// transaction: all of them or none. Every content row is checked against the digest
+// that keys it before it is written. The tables are immutable, so it fits a store with
+// none of these versions, which is what a fresh store is; a version already there fails
+// the call and leaves the store as it was. It does not write r.Provisioned: a ledger
+// migration's new store is provisioned from the catalog when its daemon starts.
 func (d *DB) CarryRegistered(ctx context.Context, r Registered) error {
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("ops: carry registered: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }() // no-op after Commit
+	if err := carryRows(ctx, tx, r); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("ops: carry registered: %w", err)
+	}
+	return nil
+}
+
+// carryRows writes every authored row of r inside tx, the provisioned Definitions apart.
+func carryRows(ctx context.Context, tx *sql.Tx, r Registered) error {
 	for _, x := range r.Definitions {
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO registered_definition (type, version, body, registered_at) VALUES (?, ?, ?, ?)`,
@@ -229,16 +266,9 @@ func (d *DB) CarryRegistered(ctx context.Context, r Registered) error {
 			return fmt.Errorf("ops: carry projection %s v%d: %w", x.Name, x.Version, err)
 		}
 	}
-	for _, x := range r.Inline {
-		if err := checkDigest(x.Hash); err != nil {
-			return fmt.Errorf("ops: carry inline projection: %w", err)
-		}
-		if got := Digest(x.Body); got != x.Hash {
-			return fmt.Errorf("%w: inline projection %s hashes to %s", ErrCorrupt, x.Hash, got)
-		}
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO inline_projection (hash, body) VALUES (?, ?)`, x.Hash, x.Body); err != nil {
-			return fmt.Errorf("ops: carry inline projection %s: %w", x.Hash, err)
+	for _, x := range r.TemplateBodies {
+		if err := carryContent(ctx, tx, Content{Kind: KindTemplateBody, Hash: x.Hash, Body: x.Body}); err != nil {
+			return err
 		}
 	}
 	for _, x := range r.Holds {
@@ -252,9 +282,6 @@ func (d *DB) CarryRegistered(ctx context.Context, r Registered) error {
 		if err := carryContent(ctx, tx, x); err != nil {
 			return err
 		}
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("ops: carry registered: %w", err)
 	}
 	return nil
 }

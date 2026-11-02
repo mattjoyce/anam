@@ -9,6 +9,13 @@
 // that is refused, or crashes, leaves the folder as it was and the store holding only
 // whole rows, and running it again finishes the job, because a row is inserted once.
 //
+// A folder may name a kind's directory the way an older build did: inline-projection,
+// which schema 10 calls template-body (card 260). Its files are read, checked against
+// their names and filed under the kind's current name; the folder keeps its own names.
+// When both directories hold a file of one digest, both are checked, and the bytes are
+// stored once: two files that hash to one name hold the same bytes, and a file that
+// does not hash to its name refuses the move whichever directory it is in.
+//
 // Every path is resolved through an os.Root scoped to the folder, so a name in it that
 // tried to reach outside is refused by the kernel and not by a check remembered here.
 package artifactdir
@@ -61,6 +68,12 @@ type Result struct {
 	// Leftovers are the temporary files a write that died left behind, which were
 	// never a complete file and are ignored.
 	Leftovers int
+	// Legacy counts the files read from a directory under an older build's name for
+	// its kind, by that name; their counts are in their kind's row.
+	Legacy map[string]int
+	// Twins are the digests filed under both the current and the older name of a
+	// kind: checked in both, stored once.
+	Twins int
 }
 
 // Total sums the counts.
@@ -82,6 +95,10 @@ var namePattern = regexp.MustCompile(`^sha256-([0-9a-f]{64})\.json$`)
 
 // tmpPattern matches the temporary name a write that died left: <name>.<16 hex>.tmp.
 var tmpPattern = regexp.MustCompile(`\.[0-9a-f]{16}\.tmp$`)
+
+// legacyDirs maps the directory name an older build gave a kind to the kind's name now.
+// Only a folder is read under these names; the store knows only the current ones.
+var legacyDirs = map[string]string{"inline-projection": ops.KindTemplateBody}
 
 // Folder is an artifact folder opened for reading. Verify it, then Load it.
 type Folder struct {
@@ -112,7 +129,8 @@ func (f *Folder) Close() error { return f.root.Close() }
 // Verify reads every file and checks its bytes against its name, and reports what the
 // folder holds by kind. A file that does not match refuses the move with ErrMismatch.
 func (f *Folder) Verify(ctx context.Context) (Result, error) {
-	res := Result{Dir: f.dir, Leftovers: f.leftovers}
+	res := Result{Dir: f.dir, Leftovers: f.leftovers, Legacy: map[string]int{}}
+	seen := map[string]int{}
 	counts := map[string]*Counts{}
 	for _, k := range ops.Kinds() {
 		counts[k] = &Counts{Kind: k}
@@ -133,6 +151,15 @@ func (f *Folder) Verify(ctx context.Context) (Result, error) {
 		c := counts[fl.kind]
 		c.Files++
 		c.Bytes += int64(len(b))
+		if fl.dir != fl.kind {
+			res.Legacy[fl.dir]++
+		}
+		seen[fl.kind+" "+fl.digest]++
+	}
+	for _, n := range seen {
+		if n > 1 {
+			res.Twins++
+		}
 	}
 	if len(bad) > 0 {
 		return Result{}, fmt.Errorf("%w: %d of %d files: %s; nothing was moved",
@@ -191,14 +218,16 @@ func (f *Folder) Load(ctx context.Context, st Store, res *Result) error {
 	return nil
 }
 
-// file is one file of the folder: its kind and the digest its name gives.
+// file is one file of the folder: its kind, the directory it is in (the kind's name,
+// or an older build's name for it), and the digest its name gives.
 type file struct {
 	kind   string
+	dir    string
 	digest string
 }
 
 func (f file) name() string {
-	return path.Join(f.kind, "sha256-"+strings.TrimPrefix(f.digest, "sha256:")+".json")
+	return path.Join(f.dir, "sha256-"+strings.TrimPrefix(f.digest, "sha256:")+".json")
 }
 
 // scan lists the folder: every file of every kind, and the count of leftovers. An entry
@@ -208,9 +237,25 @@ func scan(root *os.Root) (files []file, leftovers int, err error) {
 	if err != nil {
 		return nil, 0, fmt.Errorf("artifactdir: list the folder: %w", err)
 	}
-	known := map[string]bool{}
+	// Each directory a folder may hold, and the kind its files are filed under: the
+	// kinds by their own names, then the older names, so a digest in both is stored
+	// from the current directory and found there already from the older one.
+	type dirKind struct{ dir, kind string }
+	var dirs []dirKind
 	for _, k := range ops.Kinds() {
-		known[k] = true
+		dirs = append(dirs, dirKind{k, k})
+	}
+	legacy := make([]string, 0, len(legacyDirs))
+	for d := range legacyDirs {
+		legacy = append(legacy, d)
+	}
+	sort.Strings(legacy)
+	for _, d := range legacy {
+		dirs = append(dirs, dirKind{d, legacyDirs[d]})
+	}
+	known := map[string]bool{}
+	for _, d := range dirs {
+		known[d.dir] = true
 	}
 	var unexpected []string
 	for _, e := range top {
@@ -218,24 +263,24 @@ func scan(root *os.Root) (files []file, leftovers int, err error) {
 			unexpected = append(unexpected, e.Name())
 		}
 	}
-	for _, kind := range ops.Kinds() {
-		entries, err := fs.ReadDir(root.FS(), kind)
+	for _, d := range dirs {
+		entries, err := fs.ReadDir(root.FS(), d.dir)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
 		if err != nil {
-			return nil, 0, fmt.Errorf("artifactdir: list %s: %w", kind, err)
+			return nil, 0, fmt.Errorf("artifactdir: list %s: %w", d.dir, err)
 		}
 		for _, e := range entries {
 			switch m := namePattern.FindStringSubmatch(e.Name()); {
 			case e.IsDir():
-				unexpected = append(unexpected, path.Join(kind, e.Name()))
+				unexpected = append(unexpected, path.Join(d.dir, e.Name()))
 			case m != nil:
-				files = append(files, file{kind: kind, digest: "sha256:" + m[1]})
+				files = append(files, file{kind: d.kind, dir: d.dir, digest: "sha256:" + m[1]})
 			case tmpPattern.MatchString(e.Name()):
 				leftovers++
 			default:
-				unexpected = append(unexpected, path.Join(kind, e.Name()))
+				unexpected = append(unexpected, path.Join(d.dir, e.Name()))
 			}
 		}
 	}

@@ -20,8 +20,8 @@ import (
 //     without misleading either build: leave schemaVersion alone and update only the
 //     hash below, in the same commit, with a line saying why it is compatible.
 const (
-	pinnedSchemaVersion  = 9
-	pinnedOpsSQL         = "f43f31b88a06b17f64be378c3cd32aa9465867e4f3972e13b676a329b4ef5702"
+	pinnedSchemaVersion  = 10
+	pinnedOpsSQL         = "a03ed38d45b57eee47d913d0617dc49205c3ec6f2cb11a70722002fef02be489"
 	pinnedSnapshotDigest = "825ac2dab2735474a64c9030a5944f77845e2da208f33ba336687072e60f7edf"
 )
 

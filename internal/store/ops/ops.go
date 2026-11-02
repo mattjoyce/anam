@@ -69,7 +69,15 @@ import (
 // the same rule: a version-9 file gains the empty table when Open applies the schema, and
 // a build before it never reads the table. A hold set by this build is not enforced by an
 // older one, which is the rollback's known cost.
-const schemaVersion = 9
+//
+// 9 -> 10 renames inline_projection to template_body (card 260): since card 257 every
+// receipt files its template body there, catalog templates as well as inline ones. A
+// rename under version 9 would have let an older build open the file and look for
+// the bodies under the old name, so each build would miss what the other filed. The
+// bump makes each refuse the other's file. A version-9 file is carried, not converted:
+// init a fresh store and run anam move-artifacts --registered-from on the old file,
+// whose reader (ReadCarrySource) knows both names. The old file is never written.
+const schemaVersion = 10
 
 // ErrSchemaVersion is returned by Open for a database written by a different schema.
 var ErrSchemaVersion = errors.New("ops: schema version mismatch")
@@ -121,6 +129,13 @@ func Open(ctx context.Context, path string, buckets span.Buckets) (*DB, error) {
 		return nil, fmt.Errorf("ops: open %q: %w", path, err)
 	}
 
+	// A file of another version is refused before the schema is applied, so a refused
+	// open leaves that file's tables as they were: applying this version's schema first
+	// would add its tables to a file it then declines to read.
+	if err := checkSchemaVersion(ctx, db); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
 	if _, err := db.ExecContext(ctx, schema); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("ops: apply schema: %w", err)
@@ -142,8 +157,27 @@ func Open(ctx context.Context, path string, buckets span.Buckets) (*DB, error) {
 
 // OpenReadOnly opens an operational store that Open has already prepared, on a handle
 // SQLite will not accept a write from. It is for a process that also holds Open's
-// handle and wants its reads to be reads by construction, not by convention.
+// handle and wants its reads to be reads by construction, not by convention. A file of
+// another schema version is refused as Open refuses it; an older file is read only by
+// ReadCarrySource.
 func OpenReadOnly(ctx context.Context, path string) (*DB, error) {
+	db, err := openReadOnly(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	stored, err := storedSchemaVersion(ctx, db)
+	if err == nil && stored != fmt.Sprintf("%d", schemaVersion) {
+		err = schemaMismatch(stored)
+	}
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("ops: open %q read-only: %w", path, err)
+	}
+	return &DB{db: db}, nil
+}
+
+// openReadOnly is the read-only handle on path, checked by a ping and nothing else.
+func openReadOnly(ctx context.Context, path string) (*sql.DB, error) {
 	escaped := strings.NewReplacer("%", "%25", "?", "%3f", "#", "%23").Replace(path)
 	db, err := sql.Open("sqlite", "file:"+escaped+"?mode=ro&_pragma=busy_timeout(5000)")
 	if err != nil {
@@ -153,7 +187,47 @@ func OpenReadOnly(ctx context.Context, path string) (*DB, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("ops: open %q read-only: %w", path, err)
 	}
-	return &DB{db: db}, nil
+	return db, nil
+}
+
+// querier is what reading a version needs: a handle or a transaction.
+type querier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// storedSchemaVersion is the version a file's meta records, or "" for a file with no
+// meta table or no version in it, which is a file no Open has prepared.
+func storedSchemaVersion(ctx context.Context, q querier) (string, error) {
+	var tables int
+	if err := q.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'meta'`).Scan(&tables); err != nil {
+		return "", fmt.Errorf("ops: read schema version: %w", err)
+	}
+	if tables == 0 {
+		return "", nil
+	}
+	var stored string
+	switch err := q.QueryRowContext(ctx,
+		`SELECT value FROM meta WHERE key = 'schema_version'`).Scan(&stored); {
+	case errors.Is(err, sql.ErrNoRows):
+		return "", nil
+	case err != nil:
+		return "", fmt.Errorf("ops: read schema version: %w", err)
+	}
+	return stored, nil
+}
+
+// checkSchemaVersion refuses a file whose meta records another version. A new file, or
+// one with no version recorded yet, passes: pinSchemaVersion records this one.
+func checkSchemaVersion(ctx context.Context, db *sql.DB) error {
+	stored, err := storedSchemaVersion(ctx, db)
+	if err != nil {
+		return err
+	}
+	if stored == "" || stored == fmt.Sprintf("%d", schemaVersion) {
+		return nil
+	}
+	return schemaMismatch(stored)
 }
 
 // snapshotPartDigest is the compatibility step bindSnapshotParts runs, in
@@ -199,9 +273,15 @@ func pinSchemaVersion(ctx context.Context, db *sql.DB) error {
 	case fresh || stored == fmt.Sprintf("%d", schemaVersion):
 		return nil
 	}
+	return schemaMismatch(stored)
+}
+
+// schemaMismatch is the refusal of a file at stored, naming the carry.
+func schemaMismatch(stored string) error {
 	return fmt.Errorf("%w: database holds %s, this build writes %d. Set the file aside and re-run init; the derived tier replays and the provisioned tier reloads, "+
 		"and anam move-artifacts --registered-from <the old file> copies across what importers and the operator registered, the admission holds, "+
-		"the receipts and the values they served, the saved selections and their codes, and the template bodies, and moves in any artifact folder",
+		"the receipts and the values they served, the saved selections and their codes, the template bodies and the provisioned Definition history, "+
+		"and moves in any artifact folder",
 		ErrSchemaVersion, stored, schemaVersion)
 }
 

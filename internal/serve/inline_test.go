@@ -62,7 +62,7 @@ func TestPublishQuery_InlineTemplateIsFiledAndReplayed(t *testing.T) {
 	}
 
 	answerThrough(t, h, tmpl, true)
-	if got, _ := h.db.List(ctx, receipt.InlineKind); len(got) != 0 {
+	if got, _ := h.db.List(ctx, receipt.TemplateBodyKind); len(got) != 0 {
 		t.Fatalf("a dry run filed %d inline bodies", len(got))
 	}
 
@@ -71,7 +71,7 @@ func TestPublishQuery_InlineTemplateIsFiledAndReplayed(t *testing.T) {
 	if !r.TemplateInline || r.Template != projection.InlineName || r.TemplateVersion != 1 || r.TemplateHash != tmpl.Hash {
 		t.Fatalf("receipt = %+v, want inline, named by %s", r, tmpl.Hash)
 	}
-	if got, _ := h.db.List(ctx, receipt.InlineKind); len(got) != 1 || got[0] != tmpl.Hash {
+	if got, _ := h.db.List(ctx, receipt.TemplateBodyKind); len(got) != 1 || got[0] != tmpl.Hash {
 		t.Fatalf("inline bodies = %v, want [%s]", got, tmpl.Hash)
 	}
 	if _, vr, err := serve.Verify(ctx, h.deps, out.ReceiptHash); err != nil || !vr.OK() {
@@ -79,7 +79,7 @@ func TestPublishQuery_InlineTemplateIsFiledAndReplayed(t *testing.T) {
 	}
 	// The same template asked again files the one body again, not a second.
 	answerThrough(t, h, tmpl, false)
-	if got, _ := h.db.List(ctx, receipt.InlineKind); len(got) != 1 {
+	if got, _ := h.db.List(ctx, receipt.TemplateBodyKind); len(got) != 1 {
 		t.Errorf("a second query through the same template left %d bodies", len(got))
 	}
 
@@ -119,7 +119,7 @@ func TestVerify_InlineBodyMissingOrAltered(t *testing.T) {
 	}
 
 	// Now the body is there, but altered: a row that no longer hashes to its key.
-	if err := opstest.Corrupt(ctx, h.db, ops.KindInlineProjection, tmpl.Hash, []byte(`{"types":[]}`)); err != nil {
+	if err := opstest.Corrupt(ctx, h.db, ops.KindTemplateBody, tmpl.Hash, []byte(`{"types":[]}`)); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := serve.Verify(ctx, h.deps, hash); !errors.Is(err, ops.ErrCorrupt) {

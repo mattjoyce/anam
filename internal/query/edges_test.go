@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
-	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
@@ -153,21 +152,15 @@ reach(E, G) :- reach(E, F), linked(X, F), linked(X, G), X != E, G != F.`
 }
 
 // The bundled set names one type by constant, and a rename would empty its rules
-// without a word, so the constant is held to a type every catalog supplies, here the
-// minimal fixture's (card 104, finding 5).
+// without a word, so the constant is held to a type the fixture catalog declares
+// (card 104, finding 5).
 func TestBundled_TypeConstantsAreBundledTypes(t *testing.T) {
 	t.Parallel()
 	rs, err := query.Bundled()
 	if err != nil {
 		t.Fatal(err)
 	}
-	// record.edge is a structural primitive every catalog supplies, so the smallest
-	// one is enough to hold the constant to.
-	minimal, _ := fixture.Minimal()
-	smallest, err := def.BundledFS(minimal)
-	if err != nil {
-		t.Fatal(err)
-	}
+	fixed := catalogtest.Definitions(t)
 	n := 0
 	for _, r := range rs.Program.Rules {
 		for _, l := range r.Body {
@@ -176,8 +169,8 @@ func TestBundled_TypeConstantsAreBundledTypes(t *testing.T) {
 			}
 			n++
 			typ := facet.Type(l.Atom.Args[1].Const.Text())
-			if _, ok := smallest.Lookup(typ); !ok {
-				t.Errorf("line %d names type %s, which the minimal catalog does not declare", l.Atom.Line, typ)
+			if _, ok := fixed.Lookup(typ); !ok {
+				t.Errorf("line %d names type %s, which no fixture Definition declares", l.Atom.Line, typ)
 			}
 		}
 	}

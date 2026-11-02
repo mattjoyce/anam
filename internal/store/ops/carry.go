@@ -3,6 +3,7 @@ package ops
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -238,6 +239,53 @@ func (s CarrySource) check() error {
 	}
 	if len(bad) > 0 {
 		return fmt.Errorf("%w: %d rows do not hash to their keys: %s", ErrCorrupt, len(bad), strings.Join(bad, ", "))
+	}
+	return s.checkReferences()
+}
+
+// receiptRefs is the part of a receipt's JSON that names other rows: the served value it
+// filed, and for an inline template (card 211) the template body it ran. A catalog
+// receipt's template_hash is not required to resolve, because receipts minted before
+// card 257 filed no catalog template body and verify replays those from the catalog.
+type receiptRefs struct {
+	ServedHash     string `json:"served_hash"`
+	TemplateHash   string `json:"template_hash"`
+	TemplateInline bool   `json:"template_inline"`
+}
+
+// checkReferences refuses a source whose receipts name rows it does not hold, naming
+// each one, so a file missing a served value or an inline template body is found by the
+// read, before the new store is touched, and not later by verify.
+func (s CarrySource) checkReferences() error {
+	have := map[string]map[string]bool{KindServed: {}, KindTemplateBody: {}}
+	for _, c := range s.Content {
+		if c.Kind == KindServed {
+			have[KindServed][c.Hash] = true
+		}
+	}
+	for _, b := range s.TemplateBodies {
+		have[KindTemplateBody][b.Hash] = true
+	}
+	var missing []string
+	for _, c := range s.Content {
+		if c.Kind != KindReceipt {
+			continue
+		}
+		var r receiptRefs
+		if err := json.Unmarshal(c.Body, &r); err != nil {
+			missing = append(missing, fmt.Sprintf("receipt %s does not parse: %v", c.Hash, err))
+			continue
+		}
+		if !have[KindServed][r.ServedHash] {
+			missing = append(missing, fmt.Sprintf("receipt %s names served value %q", c.Hash, r.ServedHash))
+		}
+		if r.TemplateInline && !have[KindTemplateBody][r.TemplateHash] {
+			missing = append(missing, fmt.Sprintf("receipt %s names inline template body %q", c.Hash, r.TemplateHash))
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("%w: %d receipt references do not resolve in the file: %s",
+			ErrCorrupt, len(missing), strings.Join(missing, "; "))
 	}
 	return nil
 }

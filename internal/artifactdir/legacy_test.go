@@ -159,3 +159,36 @@ func TestLegacy_TheStoreKnowsOnlyTheCurrentName(t *testing.T) {
 		}
 	}
 }
+
+// A file that changes between Verify and Load is refused before anything is stored for
+// it, under either name: neither its old digest nor its new one gets a row.
+func TestLoad_AFileChangedSinceVerifyStoresNothing(t *testing.T) {
+	t.Parallel()
+	for _, kind := range []string{"inline-projection", ops.KindTemplateBody} {
+		t.Run(kind, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			dir := t.TempDir()
+			named := put(t, dir, kind, inlineBody)
+			f := open(t, dir)
+			res, err := f.Verify(ctx)
+			if err != nil {
+				t.Fatalf("Verify: %v", err)
+			}
+			changed := []byte(catalogBody)
+			file := filepath.Join(dir, kind, "sha256-"+strings.TrimPrefix(named, "sha256:")+".json")
+			if err := os.WriteFile(file, changed, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			db := store(t)
+			if err := f.Load(ctx, db, &res); !errors.Is(err, artifactdir.ErrMismatch) {
+				t.Fatalf("Load = %v, want ErrMismatch", err)
+			}
+			for _, d := range []string{named, ops.Digest(changed)} {
+				if _, err := db.Get(ctx, ops.KindTemplateBody, d); !errors.Is(err, ops.ErrNotFound) {
+					t.Errorf("template body %s after the refused load: %v, want not found", d, err)
+				}
+			}
+		})
+	}
+}

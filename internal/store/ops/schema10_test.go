@@ -89,6 +89,21 @@ func sqlExec(t *testing.T, path string, stmts ...string) {
 	}
 }
 
+// sqlCount runs one COUNT query against the file at path on a handle of its own.
+func sqlCount(t *testing.T, path, query string) int {
+	t.Helper()
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	var n int
+	if err := db.QueryRow(query).Scan(&n); err != nil {
+		t.Fatalf("%s: %v", query, err)
+	}
+	return n
+}
+
 // Proof 1: a fresh store files template bodies in template_body, which refuses an
 // update and a delete for every writer, and has no inline_projection.
 func TestSchema10_AFreshStoreFilesTemplateBodiesInTemplateBody(t *testing.T) {
@@ -189,7 +204,16 @@ func TestSchema9Build_RefusesASchema10FileAndAddsOnlyAnEmptyTable(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, k := range []string{ops.KindReceipt, ops.KindServed, ops.KindSelection, ops.KindSelectionCode} {
+	served, err := d.Put(ctx, ops.KindServed, []byte("a served value"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The carry follows a receipt's references, so the receipt names rows the file holds.
+	rcpt := `{"served_hash":"` + served + `","template_hash":"` + body + `","template_inline":true}`
+	if _, err := d.Put(ctx, ops.KindReceipt, []byte(rcpt)); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{ops.KindSelection, ops.KindSelectionCode} {
 		if _, err := d.Put(ctx, k, []byte("a "+k)); err != nil {
 			t.Fatal(err)
 		}
@@ -320,6 +344,14 @@ func TestReadCarrySource_RefusesASourceItCannotCarryWhole(t *testing.T) {
 		"a corrupt receipt": {[]string{
 			`INSERT OR REPLACE INTO receipt (hash, body) SELECT hash, x'00' FROM receipt ORDER BY hash LIMIT 1`,
 		}, ops.ErrCorrupt, "receipt sha256:"},
+		"a receipt's served value missing": {[]string{
+			`DROP TRIGGER served_value_no_delete`,
+			`DELETE FROM served_value WHERE hash = (SELECT json_extract(CAST(body AS TEXT), '$.served_hash') FROM receipt ORDER BY hash LIMIT 1)`,
+		}, ops.ErrCorrupt, "names served value"},
+		"an inline receipt's template body missing": {[]string{
+			`DROP TRIGGER inline_projection_no_delete`,
+			`DELETE FROM inline_projection WHERE hash IN (SELECT json_extract(CAST(body AS TEXT), '$.template_hash') FROM receipt WHERE json_extract(CAST(body AS TEXT), '$.template_inline'))`,
+		}, ops.ErrCorrupt, "names inline template body"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -335,6 +367,31 @@ func TestReadCarrySource_RefusesASourceItCannotCarryWhole(t *testing.T) {
 			}
 		})
 	}
+
+	// A catalog receipt minted before card 257 filed no template body; verify replays it
+	// from the catalog. Removing a catalog receipt's body imitates that, and the read
+	// still accepts the file.
+	t.Run("a catalog receipt without its body", func(t *testing.T) {
+		t.Parallel()
+		p := schema9(t)
+		all := sqlCount(t, p.Store, `SELECT COUNT(*) FROM inline_projection`)
+		sqlExec(t, p.Store,
+			`DROP TRIGGER inline_projection_no_delete`,
+			`DELETE FROM inline_projection WHERE hash IN (SELECT json_extract(CAST(body AS TEXT), '$.template_hash') FROM receipt WHERE NOT coalesce(json_extract(CAST(body AS TEXT), '$.template_inline'), 0))
+			   AND hash NOT IN (SELECT json_extract(CAST(body AS TEXT), '$.template_hash') FROM receipt WHERE json_extract(CAST(body AS TEXT), '$.template_inline'))`,
+		)
+		before := sqlCount(t, p.Store, `SELECT COUNT(*) FROM inline_projection`)
+		if before >= all {
+			t.Fatal("the fixture has no catalog receipt body to remove")
+		}
+		src, err := ops.ReadCarrySource(context.Background(), p.Store)
+		if err != nil {
+			t.Fatalf("ReadCarrySource = %v, want the file accepted", err)
+		}
+		if len(src.TemplateBodies) != before {
+			t.Fatalf("read %d template bodies, the file holds %d", len(src.TemplateBodies), before)
+		}
+	})
 
 	t.Run("no file", func(t *testing.T) {
 		t.Parallel()

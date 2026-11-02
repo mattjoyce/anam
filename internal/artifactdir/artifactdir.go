@@ -178,8 +178,8 @@ func (f *Folder) Verify(ctx context.Context) (Result, error) {
 // rebuilt loads none, and minting writes the ones that are wanted.
 //
 // Files are read again rather than held, since a folder of checkpoints is far larger
-// than the store they come down to. Each is checked against its name once more as it is
-// stored, by the store, which keys a row by the hash of the bytes it is given.
+// than the store they come down to. Each is checked against its name once more before
+// it is stored, so a file changed since Verify is refused and nothing is written for it.
 func (f *Folder) Load(ctx context.Context, st Store, res *Result) error {
 	wanted, err := namedCheckpoints(ctx, st)
 	if err != nil {
@@ -208,6 +208,11 @@ func (f *Folder) Load(ctx context.Context, st Store, res *Result) error {
 		b, err := f.root.ReadFile(fl.name())
 		if err != nil {
 			return fmt.Errorf("artifactdir: read %s: %w", fl.name(), err)
+		}
+		// Checked before the write, not after it: a file changed since Verify would
+		// otherwise be stored under its new digest and leave a row nobody asked for.
+		if got := ops.Digest(b); got != fl.digest {
+			return fmt.Errorf("%w: %s was named %s and now reads as %s", ErrMismatch, fl.name(), fl.digest, got)
 		}
 		if got, err := st.Put(ctx, fl.kind, b); err != nil {
 			return err

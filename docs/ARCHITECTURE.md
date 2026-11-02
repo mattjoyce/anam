@@ -624,6 +624,18 @@ the admission holds, and the receipts, served values, saved selections and their
 against its key (card 224). `anam migrate` carries the same rows into the store it creates. The next bump
 needs no folder: everything authored is already in the old file.
 
+**Schema 10** (card 260) renames the template body table from `inline_projection` to `template_body`,
+since every receipt files its template there, not only inline ones. A rename at version 9 would have let
+the older build open the renamed file and miss the bodies under the name it knew, so the version moves and
+each build refuses the other's file. `Open` reads the version before it applies its schema, so a refused
+open adds nothing to the file (the version-9 build cannot be changed, and adds an empty `inline_projection`
+and its two triggers before it refuses a version-10 file; no row moves). The carry is still
+`move-artifacts --registered-from`, and its reader, `ReadCarrySource`, is the one place that knows the old
+name: it reads a version-9 or version-10 file read-only, in one transaction, refuses a file with rows under
+the other version's name or a meta key it does not know, and checks every row against its key. `CarrySchema`
+writes it all into a fresh store in one transaction, the provisioned Definitions included, so the history
+of a type the catalog no longer carries is not lost at the bump.
+
 The **derived** tier must stay *provably* derived. The rebuild test (`internal/fold/rebuild_test.go`) drops it and re-derives
 it from the ledger: if a facet payload, an anam-event or `W` ever acquired a second home there, the test
 would pass on data it never rebuilt, and "Anam owns no source fact" would stop being falsifiable.

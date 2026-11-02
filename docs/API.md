@@ -352,7 +352,7 @@ operator's own hand entry, not an importer's submission, so `POST /v1/hold` nami
 `400`, and `all` holds every source but it. `POST /v1/documents` is not held either: the hold is
 over ledger admission, and the document a facet names arrives as an envelope.
 
-The hold is authored state in the operational store (`admission_hold`, schema version 9), so it
+The hold is authored state in the operational store (`admission_hold`, since schema version 9), so it
 outlives a restart of the daemon, and `anam migrate` carries it into a new store. `anam hold garmin`
 holds a source, `anam hold --all` holds every source, `anam hold --release [garmin]` releases, and
 `anam hold` alone lists what is held.

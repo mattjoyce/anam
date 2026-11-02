@@ -9,6 +9,23 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- The operational store's schema moves to version 10 (card 260). The table every receipt files its
+  template body in is renamed from `inline_projection` to `template_body`, and the content kind and
+  artifact folder from `inline-projection` to `template-body`. Receipts, their hashes, template
+  hashes, selection codes and the catalog are unchanged. A version-10 build refuses a version-9
+  file, and the version-9 build refuses a version-10 one, as at every bump; the refusal now comes
+  before the schema is applied, so a refused open adds no table to the file, and `OpenReadOnly`
+  refuses another version too. The store is carried, not converted: `anam init` a fresh store,
+  then `anam move-artifacts --from <folder> --registered-from <the version-9 file> --yes` with the
+  daemon stopped. The carry reads a version-9 or version-10 file read-only in one transaction,
+  checks every row against its key before writing, refuses a store that is not fresh (one a daemon
+  has started on is not), and writes everything in one transaction. It now also copies the
+  provisioned Definitions, so the history of a type the catalog has dropped survives the bump. The
+  report names the source's schema version and ledger, and counts the derived and disposable
+  rows it leaves behind. If the folder step fails after the carry committed, run the command again
+  without `--registered-from`. An artifact folder with an `inline-projection/` directory still
+  loads, into `template-body`.
+
 - At daemon start, an external catalog is compared with the embedded catalog (card 254, R3a).
   A byte-identical copy logs `daemon: catalog matches embedded`. A difference logs
   `daemon: catalog drifts from embedded` at Warn with sorted file names, counts and whether the

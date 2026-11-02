@@ -15,8 +15,8 @@ import (
 )
 
 // Card 260: anam move-artifacts --registered-from over a store the schema-9 daemon
-// wrote (opstest.Schema9): the report, the carry into a fresh schema-10 store, the
-// refusal of a second carry, and every receipt verifying from the new store.
+// wrote (opstest.Schema9). It covers the report, the carry into a fresh schema-10 store,
+// the refusal of a second carry, and every receipt verifying from the new store.
 
 // schema9Move is the fixture, a config over its ledger and a fresh store on the catalog
 // the schema-9 daemon ran on, and an empty artifact folder.
@@ -95,7 +95,7 @@ func TestMoveArtifacts_CarriesASchema9StoreIntoSchema10(t *testing.T) {
 		}
 	}
 
-	// Again with --registered-from: refused, and the store and the old file are as they were.
+	// Again with --registered-from. It is refused, and the store and the old file are as they were.
 	carriedRows := map[string][]string{}
 	for now := range carriedTables {
 		carriedRows[now] = tableRows(t, m.store, now)

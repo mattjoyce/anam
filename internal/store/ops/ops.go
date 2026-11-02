@@ -70,7 +70,7 @@ import (
 // a build before it never reads the table. A hold set by this build is not enforced by an
 // older one, which is the rollback's known cost.
 //
-// 9 -> 10 renames inline_projection to template_body (card 260): since card 257 every
+// 9 -> 10 renames inline_projection to template_body (card 260). Since card 257 every
 // receipt files its template body there, catalog templates as well as inline ones. A
 // rename under version 9 would have let an older build open the file and look for
 // the bodies under the old name, so each build would miss what the other filed. The
@@ -130,7 +130,7 @@ func Open(ctx context.Context, path string, buckets span.Buckets) (*DB, error) {
 	}
 
 	// A file of another version is refused before the schema is applied, so a refused
-	// open leaves that file's tables as they were: applying this version's schema first
+	// open leaves that file's tables as they were. Applying this version's schema first
 	// would add its tables to a file it then declines to read.
 	if err := checkSchemaVersion(ctx, db); err != nil {
 		_ = db.Close()
@@ -190,7 +190,7 @@ func openReadOnly(ctx context.Context, path string) (*sql.DB, error) {
 	return db, nil
 }
 
-// querier is what reading a version needs: a handle or a transaction.
+// querier is what reading a version needs, a handle or a transaction.
 type querier interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
@@ -218,7 +218,7 @@ func storedSchemaVersion(ctx context.Context, q querier) (string, error) {
 }
 
 // checkSchemaVersion refuses a file whose meta records another version. A new file, or
-// one with no version recorded yet, passes: pinSchemaVersion records this one.
+// one with no version recorded yet, passes, and pinSchemaVersion records this one.
 func checkSchemaVersion(ctx context.Context, db *sql.DB) error {
 	stored, err := storedSchemaVersion(ctx, db)
 	if err != nil {

@@ -9,11 +9,12 @@
 // that is refused, or crashes, leaves the folder as it was and the store holding only
 // whole rows, and running it again finishes the job, because a row is inserted once.
 //
-// A folder may name a kind's directory the way an older build did: inline-projection,
-// which schema 10 calls template-body (card 260). Its files are read, checked against
-// their names and filed under the kind's current name; the folder keeps its own names.
+// A folder may name a kind's directory the way an older build did. Before schema 10
+// (card 260) the template-body directory was inline-projection. The files there are
+// read, checked against their names and filed under the current name, and the folder
+// keeps its own names.
 // When both directories hold a file of one digest, both are checked, and the bytes are
-// stored once: two files that hash to one name hold the same bytes, and a file that
+// stored once, since two files that hash to one name hold the same bytes. A file that
 // does not hash to its name refuses the move whichever directory it is in.
 //
 // Every path is resolved through an os.Root scoped to the folder, so a name in it that
@@ -72,7 +73,7 @@ type Result struct {
 	// its kind, by that name; their counts are in their kind's row.
 	Legacy map[string]int
 	// Twins are the digests filed under both the current and the older name of a
-	// kind: checked in both, stored once.
+	// kind. Each copy is checked, and the bytes are stored once.
 	Twins int
 }
 
@@ -218,8 +219,8 @@ func (f *Folder) Load(ctx context.Context, st Store, res *Result) error {
 	return nil
 }
 
-// file is one file of the folder: its kind, the directory it is in (the kind's name,
-// or an older build's name for it), and the digest its name gives.
+// file is one file of the folder, with its kind, the directory it is in (the kind's
+// name, or an older build's name for it), and the digest its name gives.
 type file struct {
 	kind   string
 	dir    string
@@ -237,9 +238,9 @@ func scan(root *os.Root) (files []file, leftovers int, err error) {
 	if err != nil {
 		return nil, 0, fmt.Errorf("artifactdir: list the folder: %w", err)
 	}
-	// Each directory a folder may hold, and the kind its files are filed under: the
-	// kinds by their own names, then the older names, so a digest in both is stored
-	// from the current directory and found there already from the older one.
+	// Each directory a folder may hold, with the kind its files are filed under. The
+	// kinds come first by their own names, then the older names, so a digest in both is
+	// stored from the current directory and found there already from the older one.
 	type dirKind struct{ dir, kind string }
 	var dirs []dirKind
 	for _, k := range ops.Kinds() {

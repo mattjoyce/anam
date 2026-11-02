@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-// The schema-9 fixture (card 260): a ledger and an operational store the schema-9
+// The schema-9 fixture (card 260) is a ledger and an operational store the schema-9
 // daemon at 6abb9d7 wrote itself, kept as SQL dumps of the two files, with the catalog
 // it ran on and what it answered (expect.json). testdata/schema9/generate_test.go.txt is
 // the code that made it and says how it was run. It holds receipts through an inline
@@ -40,8 +40,8 @@ type Schema9Paths struct {
 	Definitions, Projections string
 }
 
-// Schema9 writes the fixture into dir, made if absent and otherwise empty: ledger.db and tracking.db
-// restored from their dumps, and the catalog under catalog/.
+// Schema9 writes the fixture into dir, made if absent and otherwise empty. It restores
+// ledger.db and tracking.db from their dumps and copies the catalog under catalog/.
 func Schema9(ctx context.Context, dir string) (Schema9Paths, error) {
 	p := Schema9Paths{
 		Ledger: filepath.Join(dir, "ledger.db"), Store: filepath.Join(dir, "tracking.db"),
@@ -105,9 +105,10 @@ func restore(ctx context.Context, file, dump string) error {
 var ErrSchema9Refused = errors.New("opstest: the schema-9 build refuses this file")
 
 // ReplaySchema9Open does to the file at path what ops.Open at schema version 9 did,
-// statement for statement (6abb9d7, internal/store/ops/ops.go): open with the same
-// pragmas, apply the shipped schema-9 ops.sql, add snapshot_part's digest column if it
-// is missing, then record version 9 if no version is recorded and refuse any other. It
+// statement for statement (6abb9d7, internal/store/ops/ops.go). It opens with the same
+// pragmas, applies the shipped schema-9 ops.sql, requires snapshot_part's digest column
+// (the pre-card-107 step is not replayed), then records version 9 if no version is
+// recorded and refuses any other. It
 // stands in for running the older binary against a schema-10 file, so a test can show
 // what that binary changes in the file before it refuses it.
 func ReplaySchema9Open(ctx context.Context, path string) error {
@@ -188,7 +189,7 @@ var rowsOf = func() map[string]string {
 }()
 
 // Rows reads every row of table in the SQLite file at path, each row its columns'
-// values written out in column order, sorted: what a test compares to say two files
+// values written out in column order, sorted, which a test compares to say two files
 // hold the same rows, bytes and times included.
 func Rows(ctx context.Context, path, table string) ([]string, error) {
 	query, ok := rowsOf[table]

@@ -35,8 +35,8 @@ const Kind = "receipt"
 const ServedKind = "served"
 
 // TemplateBodyKind is the kind of stored content template bodies are filed under
-// (ops.KindTemplateBody), which a receipt names by its TemplateHash: an inline
-// projection's, and since card 257 a catalog template's too.
+// (ops.KindTemplateBody), which a receipt names by its TemplateHash. It holds an inline
+// projection's body, and since card 257 a catalog template's too.
 const TemplateBodyKind = "template-body"
 
 // Receipt is the immutable record of one serve. Its field set is §9's, and each field

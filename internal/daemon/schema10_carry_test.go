@@ -21,11 +21,11 @@ import (
 
 // Card 260: a store the schema-9 daemon wrote (opstest.Schema9) is carried into a fresh
 // schema-10 store by the functions anam move-artifacts --registered-from calls, and a
-// schema-10 daemon on it answers what the schema-9 daemon answered: the same reads at
-// the same watermarks, every receipt reproduced and intact with the same notes, the
-// same selection codes and the same holds.
+// schema-10 daemon on it answers what the schema-9 daemon answered. The reads at the
+// same watermarks match, every receipt is reproduced and intact with the same notes,
+// and the selection codes and holds are the same.
 
-// schema9Expect is the fixture's expect.json: what the schema-9 daemon answered.
+// schema9Expect is the fixture's expect.json, what the schema-9 daemon answered.
 type schema9Expect struct {
 	W          int64                          `json:"w"`
 	LedgerID   string                         `json:"ledger_id"`

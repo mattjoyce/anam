@@ -145,7 +145,7 @@ func TestLegacy_AMismatchUnderEitherNameRefusesTheMove(t *testing.T) {
 	}
 }
 
-// The older name is a folder's spelling, not a kind: the store refuses it, so nothing
+// The older name is a folder's spelling, not a kind. The store refuses it, so nothing
 // can file a row under it.
 func TestLegacy_TheStoreKnowsOnlyTheCurrentName(t *testing.T) {
 	t.Parallel()

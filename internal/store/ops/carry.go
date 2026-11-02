@@ -18,25 +18,25 @@ import (
 // version guard is not loosened by it: Open and OpenReadOnly still refuse that file.
 
 // ErrCarrySource is returned by ReadCarrySource for a file the carry cannot read as a
-// whole: an unsupported version, a table missing, rows under a name its version does
-// not have, or bookkeeping it does not know where to put.
+// whole, such as an unsupported version, a table missing, rows under a name its version
+// does not have, or bookkeeping it does not know where to put.
 var ErrCarrySource = errors.New("ops: not a store the carry can read")
 
-// ErrCarryTarget is returned by CarrySchema for a store that is not fresh: it already
+// ErrCarryTarget is returned by CarrySchema for a store that is not fresh. It already
 // holds authored rows or provisioned Definitions, so a carry into it could not say
 // which rows were the old file's.
 var ErrCarryTarget = errors.New("ops: the store to carry into is not fresh")
 
-// carryMeta is the meta keys a carry knows, and none is copied: schema_version is this
+// carryMeta is the meta keys a carry knows, and none is copied. schema_version is this
 // build's, bucket_width is pinned by Open from the config, and ledger_id is pinned by
 // the first catch-up from the ledger the daemon follows. A key outside it is
 // bookkeeping the carry would lose, so the source is refused.
 var carryMeta = map[string]bool{"schema_version": true, "bucket_width": true, "ledger_id": true}
 
-// leftBehind are the tables a carry does not copy, by tier: derived (rebuilt by replay
-// and minting), disposable (the snapshot tables, remade by the next resend), and two
-// provisioned tables no code of this build reads or writes (sync_cursor, token_scope:
-// the importers file is read at start instead). Their row counts are reported so a
+// leftBehind are the tables a carry does not copy, by tier. The derived ones are rebuilt
+// by replay and minting, the disposable snapshot tables are remade by the next resend,
+// and no code of this build reads or writes sync_cursor or token_scope (the importers
+// file is read at start instead). Their row counts are reported so a
 // count the operator did not expect is seen, not dropped unread.
 var leftBehind = []string{
 	"facet_index", "anam_event_index", "facet_edge", "replay_cursor",
@@ -60,8 +60,8 @@ type TableCount struct {
 	Rows  int
 }
 
-// CarrySource is an older operational store as the carry read it: its schema version,
-// what it authored, and what it holds that the carry leaves behind.
+// CarrySource is an older operational store as the carry read it, with its schema
+// version, what it authored, and what it holds that the carry leaves behind.
 type CarrySource struct {
 	Schema int
 	Registered
@@ -142,8 +142,8 @@ func readCarrySource(ctx context.Context, tx *sql.Tx) (CarrySource, error) {
 }
 
 // checkOtherBodies refuses a file holding template bodies under the name its version
-// does not use. An empty table under that name is harmless and is ignored: a build of
-// the other version that opened the file and refused it creates its own empty table
+// does not use. An empty table under that name is harmless and is ignored, since a build
+// of the other version that opened the file and refused it creates its own empty table
 // before it reads the version. Rows there were written by a build of neither version,
 // and the carry cannot say which of the two tables is the store's.
 func checkOtherBodies(ctx context.Context, tx *sql.Tx, version int, tables map[string]bool) error {
@@ -255,8 +255,8 @@ var carryTarget = []struct{ table, count string }{
 	{"definition", `SELECT COUNT(*) FROM definition`},
 }
 
-// CarrySchema writes everything r authored into this store, which must be fresh: the
-// registered Definitions and projections with their registration moments, the template
+// CarrySchema writes everything r authored into this store, which must be fresh. That is
+// the registered Definitions and projections with their registration moments, the template
 // bodies, the admission holds, the receipts, served values, saved selections and their
 // codes, and the provisioned Definitions, a type the catalog has dropped included. It is
 // one transaction, all of it or none. A store that already holds any of those rows is

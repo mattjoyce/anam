@@ -16,7 +16,7 @@ func allDefined(facet.Type) bool { return true }
 
 func TestRegister_SameBodyIsUnchangedAndAChangeIsANewVersion(t *testing.T) {
 	t.Parallel()
-	held, err := projection.Bundled()
+	held, err := projection.BundledFS(fixtureProjs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestRegister_SameBodyIsUnchangedAndAChangeIsANewVersion(t *testing.T) {
 
 func TestRegister_ABundledTemplateIsTheFloor(t *testing.T) {
 	t.Parallel()
-	held, err := projection.Bundled()
+	held, err := projection.BundledFS(fixtureProjs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestRegister_ABundledTemplateIsTheFloor(t *testing.T) {
 
 func TestRegister_RefusesATypeWithNoDefinition(t *testing.T) {
 	t.Parallel()
-	held, _ := projection.Bundled()
+	held, _ := projection.BundledFS(fixtureProjs())
 	defined := func(typ facet.Type) bool { return typ == "health.heart-rate-day" }
 	if _, err := projection.Register([]byte(heartV1), held, defined); !errors.Is(err, projection.ErrUndefinedType) ||
 		!strings.Contains(err.Error(), "health.heart-rate-alert") {
@@ -117,7 +117,7 @@ func TestRegister_RefusesATypeWithNoDefinition(t *testing.T) {
 
 func TestWithRegistered_RefusesTwoBodiesAtOneVersion(t *testing.T) {
 	t.Parallel()
-	held, _ := projection.Bundled()
+	held, _ := projection.BundledFS(fixtureProjs())
 	bp, _ := held.Lookup("bp")
 	other := strings.Replace(string(bp.Body), `"endorsed"`, `"admitted"`, 1)
 	if _, err := projection.WithRegistered(held, []projection.Stored{{Name: "bp", Version: 1, Body: []byte(other)}}); !errors.Is(err, projection.ErrBadTemplate) {

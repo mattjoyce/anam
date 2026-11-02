@@ -188,9 +188,9 @@ func TestBundled_DocReferenceIsAReference(t *testing.T) {
 // envelope carries does not change the answer, and a type with no Definition has none.
 func TestRegistry_Identify(t *testing.T) {
 	t.Parallel()
-	reg, err := def.Bundled()
+	reg, err := def.BundledFS(fixtureDefs())
 	if err != nil {
-		t.Fatalf("Bundled: %v", err)
+		t.Fatalf("BundledFS: %v", err)
 	}
 	payload := []byte(`{"path":"scans/bp.jpg","sha256":"00","media_type":"image/jpeg","bytes":10,"date":"2024-09-16"}`)
 	want := facet.SourceRef("documents", "scans/bp.jpg")

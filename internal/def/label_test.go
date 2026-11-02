@@ -91,7 +91,7 @@ func TestLabel_ParseRefusals(t *testing.T) {
 // picker: synthetic payloads, one per shape.
 func TestLabel_BundledOnesRenderTheirOwnExamples(t *testing.T) {
 	t.Parallel()
-	reg, err := def.Bundled()
+	reg, err := def.BundledFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -2,6 +2,7 @@ package def_test
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"strings"
 	"testing"
@@ -11,18 +12,18 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
-// Card 198: a fact names the zone its wall clock was said in. These run on the bundled
-// record.edge, the note the conversation writer saves, and the dose.
+// Card 198: a fact names the zone its wall clock was said in. These run on the
+// fixture catalog's record.edge, the note the conversation writer saves, and the dose.
 
 func bundledDef(t *testing.T, typ string) def.Definition {
 	t.Helper()
-	reg, err := def.Bundled()
+	reg, err := def.BundledFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}
 	d, ok := reg.Lookup(facet.Type(typ))
 	if !ok {
-		t.Fatalf("no bundled %s", typ)
+		t.Fatalf("no %s in the fixture catalog", typ)
 	}
 	return d
 }
@@ -113,7 +114,7 @@ func TestZonePointer_TheFactIsReadAtTheOffsetItNames(t *testing.T) {
 func TestZonePointer_TheDoseIDTakesTheOffset(t *testing.T) {
 	t.Parallel()
 	now := bundledDef(t, "health.medication.dose")
-	raw, err := os.ReadFile("manifests/history/health.medication.dose.v1.json")
+	raw, err := fs.ReadFile(fixtureDefs(), "history/health.medication.dose.v1.json")
 	if err != nil {
 		t.Fatal(err)
 	}

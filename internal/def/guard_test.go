@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 )
@@ -76,21 +77,22 @@ func TestGuard_RefusesAChangedKeyingAndNothingElse(t *testing.T) {
 	if err := def.Guard(stored, bundle(t, fresh)); err != nil {
 		t.Errorf("Guard refused a new type: %v", err)
 	}
-	// And the bundled set is what it compares against itself: a store holding exactly
-	// the bundled manifests passes.
-	manifests, err := def.Manifests()
+	// And a catalog is what it compares against itself: a store holding exactly the
+	// fixture catalog's manifests passes.
+	defs, _ := fixture.Mattjoyce()
+	manifests, err := def.ManifestsFS(defs)
 	if err != nil {
-		t.Fatalf("Manifests: %v", err)
+		t.Fatalf("ManifestsFS: %v", err)
 	}
-	bundled, err := def.Bundled()
+	bundled, err := def.BundledFS(defs)
 	if err != nil {
-		t.Fatalf("Bundled: %v", err)
+		t.Fatalf("BundledFS: %v", err)
 	}
 	if err := def.Guard(manifests, bundled); err != nil {
-		t.Errorf("Guard refused the bundled set against itself: %v", err)
+		t.Errorf("Guard refused the fixture catalog against itself: %v", err)
 	}
-	// Manifests carries the current body of every bundled type plus the history
-	// (card 111); the current ones match Bundled one for one.
+	// ManifestsFS carries the current body of every catalog type plus the history
+	// (card 111); the current ones match BundledFS one for one.
 	current := 0
 	for _, m := range manifests {
 		if m.Type == facet.Type("") {
@@ -101,7 +103,7 @@ func TestGuard_RefusesAChangedKeyingAndNothingElse(t *testing.T) {
 		}
 	}
 	if current != len(bundled.All()) {
-		t.Errorf("Manifests() lists %d current bodies, Bundled() holds %d", current, len(bundled.All()))
+		t.Errorf("ManifestsFS lists %d current bodies, BundledFS holds %d", current, len(bundled.All()))
 	}
 }
 

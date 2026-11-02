@@ -18,7 +18,7 @@ const (
 
 func doseDef(t *testing.T) def.Definition {
 	t.Helper()
-	reg, err := def.Bundled()
+	reg, err := def.BundledFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestComposeID_Cases(t *testing.T) {
 
 func TestComposeID_NoTemplate(t *testing.T) {
 	t.Parallel()
-	reg, err := def.Bundled()
+	reg, err := def.BundledFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestWithID(t *testing.T) {
 		}
 	})
 	t.Run("no template leaves the payload", func(t *testing.T) {
-		reg, _ := def.Bundled()
+		reg, _ := def.BundledFS(fixtureDefs())
 		w, _ := reg.Lookup("health.weight")
 		out, err := w.WithID("withings", []byte(`{"a":1}`))
 		if err != nil || string(out) != `{"a":1}` {
@@ -181,7 +181,7 @@ func TestParse_IdentityTemplate(t *testing.T) {
 // reference. Any other bundled type lets the writer choose the identity field's text.
 func TestBundled_OnlyTheseTypesDeclareATemplate(t *testing.T) {
 	t.Parallel()
-	reg, err := def.Bundled()
+	reg, err := def.BundledFS(fixtureDefs())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/mattjoyce/anam/internal/catalog/fixture"
 )
 
 // update rewrites the golden file instead of comparing, for a deliberate catalog
@@ -87,14 +89,17 @@ func baselineLines(t *testing.T, fsys fs.FS) []string {
 	return lines
 }
 
-// The embedded catalog's bytes are pinned so moving it out of the binary cannot change a body, a hash, or the set version unnoticed. Regenerate with -update only when a manifest change is intended.
+// The fixture catalog's bytes are pinned so moving the catalog out of the binary
+// cannot change a body, a hash, or the set version unnoticed. fixture.Mattjoyce is a
+// byte copy of the catalog the binary embedded, so the golden file is unchanged.
+// Regenerate with -update only when a manifest change is intended.
 func TestBaseline(t *testing.T) {
-	embedded := embedded()
-	lines := baselineLines(t, embedded)
+	defs, _ := fixture.Mattjoyce()
+	lines := baselineLines(t, defs)
 	compareAgainstGolden(t, lines)
 }
 
-// TestBaseline_DiskCopy runs the same baseline checks against a copy of the embedded
+// TestBaseline_DiskCopy runs the same baseline checks against a copy of the fixture
 // catalog on disk, with a .DS_Store and a notes/ directory added, to prove the FS
 // functions ignore them.
 func TestBaseline_DiskCopy(t *testing.T) {
@@ -104,11 +109,11 @@ func TestBaseline_DiskCopy(t *testing.T) {
 	compareAgainstGolden(t, lines)
 }
 
-// writeCatalogCopy copies the embedded catalog to dir, adding a .DS_Store and a
+// writeCatalogCopy copies the fixture catalog to dir, adding a .DS_Store and a
 // notes/extra.json to prove they are ignored. Returns an fs.FS over dir.
 func writeCatalogCopy(t *testing.T, dir string) fs.FS {
 	t.Helper()
-	root := embedded()
+	root, _ := fixture.Mattjoyce()
 	if err := fs.WalkDir(root, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -126,7 +131,7 @@ func writeCatalogCopy(t *testing.T, dir string) fs.FS {
 		}
 		return os.WriteFile(dst, raw, 0o644)
 	}); err != nil {
-		t.Fatalf("walk embedded catalog: %v", err)
+		t.Fatalf("walk fixture catalog: %v", err)
 	}
 	// Add a .DS_Store file (non-JSON, should be ignored).
 	if err := os.WriteFile(filepath.Join(dir, ".DS_Store"), []byte("mock"), 0o644); err != nil {

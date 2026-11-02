@@ -12,8 +12,8 @@ import (
 	"github.com/mattjoyce/anam/internal/def"
 )
 
-// walkEmbedded copies the embedded catalog to t.TempDir(), adding a .DS_Store and a
-// notes/ directory. It returns the copy as an os.DirFS.
+// copyCatalogToDisk copies a catalog root to dir, adding a .DS_Store and a notes/
+// directory. It returns the copy as an os.DirFS.
 func copyCatalogToDisk(t *testing.T, src fs.FS, dir string) fs.FS {
 	t.Helper()
 	add := func(path string, data []byte) {
@@ -25,7 +25,6 @@ func copyCatalogToDisk(t *testing.T, src fs.FS, dir string) fs.FS {
 			t.Fatalf("write %s: %v", dst, err)
 		}
 	}
-	// Walk the embedded manifest FS. The embed root is the manifests/ directory.
 	if err := fs.WalkDir(src, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -40,7 +39,7 @@ func copyCatalogToDisk(t *testing.T, src fs.FS, dir string) fs.FS {
 		add(path, raw)
 		return nil
 	}); err != nil {
-		t.Fatalf("walk embedded catalog: %v", err)
+		t.Fatalf("walk catalog: %v", err)
 	}
 	// Add a .DS_Store file (non-JSON, should be ignored).
 	add(".DS_Store", []byte("mock ds_store data"))
@@ -55,6 +54,10 @@ func copyCatalogToDisk(t *testing.T, src fs.FS, dir string) fs.FS {
 	return os.DirFS(dir)
 }
 
+// TestBundledFS_MatchEmbedded proves a disk copy of fixture.Mattjoyce loads exactly
+// as the catalog embedded in the binary does. It reads the embedded catalog on
+// purpose, to tie the fixture to it, and goes when the embedded catalog does (card
+// 255, R4b).
 func TestBundledFS_MatchEmbedded(t *testing.T) {
 	embeddedReg, err := def.Bundled()
 	if err != nil {
@@ -70,9 +73,7 @@ func TestBundledFS_MatchEmbedded(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	// The embedded catalog under manifests/ — which is what embedded() returns.
-	// Walk the manifestFS at "manifests".
-	copy := copyCatalogToDisk(t, fsDir(t, "manifests"), dir)
+	copy := copyCatalogToDisk(t, fixtureDefs(), dir)
 
 	reg, err := def.BundledFS(copy)
 	if err != nil {
@@ -117,48 +118,16 @@ func TestBundledFS_MatchEmbedded(t *testing.T) {
 	}
 }
 
-// fsDir returns an fs.FS rooted at the given subdirectory within the embedded
-// manifestFS, for use in copying to disk.
-func fsDir(t *testing.T, dir string) fs.FS {
-	t.Helper()
-	// Use the package's own test approach: access the embedded FS through a
-	// test-only sub. We can't reference manifestFS from def_test, so we use
-	// os.DirFS on the live manifests/ directory which is what the embedded FS
-	// contains.
-	// The manifests are at internal/def/manifests/ in the repo. Find them.
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	// Walk up to find the module root.
-	root := wd
-	for {
-		if _, err := os.Stat(filepath.Join(root, "go.mod")); err == nil {
-			break
-		}
-		parent := filepath.Dir(root)
-		if parent == root {
-			t.Fatal("cannot find go.mod")
-		}
-		root = parent
-	}
-	src := filepath.Join(root, "internal", "def", dir)
-	if _, err := os.Stat(src); err != nil {
-		t.Fatalf("embedded source %s: %v", src, err)
-	}
-	return os.DirFS(src)
-}
-
 // TestFS_ChangedManifestMovesSetVersion verifies that changing a manifest's bytes
 // changes the set version.
 func TestFS_ChangedManifestMovesSetVersion(t *testing.T) {
-	embeddedSV, err := def.SetVersion()
+	fixtureSV, err := def.SetVersionFS(fixtureDefs())
 	if err != nil {
-		t.Fatalf("SetVersion: %v", err)
+		t.Fatalf("SetVersionFS(fixture): %v", err)
 	}
 
 	dir := t.TempDir()
-	_ = copyCatalogToDisk(t, fsDir(t, "manifests"), dir)
+	_ = copyCatalogToDisk(t, fixtureDefs(), dir)
 
 	// Read one manifest, change its bytes, write it back.
 	names, err := filepath.Glob(filepath.Join(dir, "*.json"))
@@ -179,7 +148,7 @@ func TestFS_ChangedManifestMovesSetVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetVersionFS(changed): %v", err)
 	}
-	if changedSV == embeddedSV {
+	if changedSV == fixtureSV {
 		t.Errorf("SetVersionFS did not change after modifying a manifest: %s", changedSV)
 	}
 }
@@ -188,7 +157,7 @@ func TestFS_ChangedManifestMovesSetVersion(t *testing.T) {
 // match its declared type is refused.
 func TestFS_BadManifestNameFails(t *testing.T) {
 	dir := t.TempDir()
-	_ = copyCatalogToDisk(t, fsDir(t, "manifests"), dir)
+	_ = copyCatalogToDisk(t, fixtureDefs(), dir)
 
 	// Rename one manifest to a mismatched name.
 	names, err := filepath.Glob(filepath.Join(dir, "*.json"))
@@ -247,28 +216,28 @@ func TestFS_HistoryCanBeEmpty(t *testing.T) {
 // TestFS_IgnoresNonJSONFiles verifies that .DS_Store and notes/ are ignored.
 func TestFS_IgnoresNonJSONFiles(t *testing.T) {
 	dir := t.TempDir()
-	copy := copyCatalogToDisk(t, fsDir(t, "manifests"), dir)
+	copy := copyCatalogToDisk(t, fixtureDefs(), dir)
 
 	// BundledFS should work exactly the same, ignoring .DS_Store and notes/.
 	reg, err := def.BundledFS(copy)
 	if err != nil {
 		t.Fatalf("BundledFS with extra files: %v", err)
 	}
-	embeddedReg, err := def.Bundled()
+	fixtureReg, err := def.BundledFS(fixtureDefs())
 	if err != nil {
-		t.Fatalf("Bundled: %v", err)
+		t.Fatalf("BundledFS(fixture): %v", err)
 	}
 	all := reg.All()
-	embeddedAll := embeddedReg.All()
-	if len(all) != len(embeddedAll) {
-		t.Errorf("BundledFS has %d types (embedded %d), ignoring extra files", len(all), len(embeddedAll))
+	fixtureAll := fixtureReg.All()
+	if len(all) != len(fixtureAll) {
+		t.Errorf("BundledFS has %d types (fixture %d), ignoring extra files", len(all), len(fixtureAll))
 	}
-	for i := range embeddedAll {
+	for i := range fixtureAll {
 		if i >= len(all) {
 			break
 		}
-		if all[i].Type != embeddedAll[i].Type || all[i].Version != embeddedAll[i].Version {
-			t.Errorf("type mismatch at %d: %s v%d vs %s v%d", i, all[i].Type, all[i].Version, embeddedAll[i].Type, embeddedAll[i].Version)
+		if all[i].Type != fixtureAll[i].Type || all[i].Version != fixtureAll[i].Version {
+			t.Errorf("type mismatch at %d: %s v%d vs %s v%d", i, all[i].Type, all[i].Version, fixtureAll[i].Type, fixtureAll[i].Version)
 		}
 	}
 
@@ -277,20 +246,22 @@ func TestFS_IgnoresNonJSONFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetVersionFS with extra files: %v", err)
 	}
-	embeddedSV, err := def.SetVersion()
+	fixtureSV, err := def.SetVersionFS(fixtureDefs())
 	if err != nil {
-		t.Fatalf("SetVersion: %v", err)
+		t.Fatalf("SetVersionFS(fixture): %v", err)
 	}
-	if sv != embeddedSV {
-		t.Errorf("SetVersionFS with extra files = %s, want %s", sv, embeddedSV)
+	if sv != fixtureSV {
+		t.Errorf("SetVersionFS with extra files = %s, want %s", sv, fixtureSV)
 	}
 }
 
-// TestBundledFS_ManifestsHistoryMatch verifies that ManifestsFS and HistoryFS
-// return the same results as their embedded counterparts.
+// TestBundledFS_ManifestsHistoryMatch verifies that ManifestsFS and HistoryFS over a
+// disk copy of fixture.Mattjoyce return what their embedded counterparts do. Like
+// TestBundledFS_MatchEmbedded it reads the embedded catalog on purpose, and goes with
+// it at R4b.
 func TestBundledFS_ManifestsHistoryMatch(t *testing.T) {
 	dir := t.TempDir()
-	_ = copyCatalogToDisk(t, fsDir(t, "manifests"), dir)
+	_ = copyCatalogToDisk(t, fixtureDefs(), dir)
 
 	// ManifestsFS vs Manifests.
 	want, err := def.Manifests()

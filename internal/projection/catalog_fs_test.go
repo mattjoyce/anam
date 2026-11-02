@@ -10,6 +10,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/projection"
 )
@@ -115,7 +116,7 @@ func TestBundledFS_IgnoresNonJSONFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BundledFS with extra files: %v", err)
 	}
-	fixtureAll := fixtureProjections(t).Held()
+	fixtureAll := catalogtest.Projections(t).Held()
 	all := reg.Held()
 	if len(all) != len(fixtureAll) {
 		t.Fatalf("BundledFS has %d templates (fixture %d), ignoring extra files", len(all), len(fixtureAll))

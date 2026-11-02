@@ -57,18 +57,35 @@ fi
 
 # Fixture boundary (card 255). The test catalogs in internal/catalog/fixture, and
 # catalogtest built on them, are for tests only: a binary that carried one would carry
-# a catalog nobody chose. Only catalogtest may import fixture outside a _test.go file.
+# a catalog nobody chose. The rule reads the real dependency graph, so an import
+# through another package (one under testdata, which ./... leaves out) is caught: no
+# package but fixture and catalogtest may have either among its non-test deps, and no
+# package any of them builds may //go:embed a file of fixture's testdata.
 # internal/catalog/fixture/boundary_test.go holds the same rule without a go command.
-echo "→ fixture boundary (test catalogs imported by tests only)"
-prod_imports="$(go list -f '{{.ImportPath}}{{range .Imports}} {{.}}{{end}}' ./... 2>/dev/null)"
-fixture_boundary="$(echo "$prod_imports" \
-  | grep -E ' github.com/mattjoyce/anam/internal/catalog/(fixture|catalogtest)( |$)' \
-  | grep -vE '^github.com/mattjoyce/anam/internal/catalog/catalogtest ' \
-  || true)"
-if [ -n "$fixture_boundary" ]; then
-  echo "  FAILED: a test catalog is imported outside a test:" >&2
-  echo "$fixture_boundary" | awk '{print "    " $1}' >&2
+echo "→ fixture boundary (test catalogs reach no production package)"
+fixture_pkgs='github.com/mattjoyce/anam/internal/catalog/(fixture|catalogtest)'
+prod_pkgs="$(go list ./... 2>/dev/null | grep -vE "^${fixture_pkgs}\$" || true)"
+fixture_data="$(go list -f '{{.Dir}}' github.com/mattjoyce/anam/internal/catalog/fixture 2>/dev/null)/testdata"
+if [ -z "$prod_pkgs" ] || [ ! -d "$fixture_data" ]; then
+  echo "  FAILED: cannot list the packages or find the fixture's testdata" >&2
   fail=1
+else
+  # shellcheck disable=SC2086 # one argument per package
+  fixture_boundary="$(go list -e -f '{{.ImportPath}}{{range .Deps}} {{.}}{{end}}' $prod_pkgs 2>/dev/null \
+    | grep -E " ${fixture_pkgs}( |\$)" || true)"
+  # shellcheck disable=SC2086
+  fixture_embeds="$(go list -e -deps -f '{{$d := .Dir}}{{.ImportPath}}{{range .EmbedFiles}} {{$d}}/{{.}}{{end}}' $prod_pkgs 2>/dev/null \
+    | grep -F " $fixture_data/" | grep -vE "^${fixture_pkgs} " || true)"
+  if [ -n "$fixture_boundary" ]; then
+    echo "  FAILED: a test catalog is in a production package's dependencies:" >&2
+    echo "$fixture_boundary" | awk '{print "    " $1}' >&2
+    fail=1
+  fi
+  if [ -n "$fixture_embeds" ]; then
+    echo "  FAILED: a production package embeds the fixture's testdata:" >&2
+    echo "$fixture_embeds" | awk '{print "    " $1}' >&2
+    fail=1
+  fi
 fi
 
 # The prose is checked too: a dead link in the README's docs index or in docs/ fails

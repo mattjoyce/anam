@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -45,7 +46,7 @@ func labelServer(t *testing.T) *httptest.Server {
 			t.Fatalf("Admit %s: %v", p.ref, err)
 		}
 	}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, MaxReadBytes: 512 << 10}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, MaxReadBytes: 512 << 10}))
 	t.Cleanup(srv.Close)
 	return srv
 }

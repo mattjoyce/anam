@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -62,7 +63,7 @@ func selectServerWith(t *testing.T, edit func(*inspect.Deps)) *httptest.Server {
 			t.Fatalf("Admit %s: %v", p.ref, err)
 		}
 	}
-	deps := inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, MaxReadBytes: 512 << 10}
+	deps := inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, MaxReadBytes: 512 << 10}
 	edit(&deps)
 	srv := httptest.NewServer(inspect.Handler(deps))
 	t.Cleanup(srv.Close)

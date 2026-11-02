@@ -1,11 +1,12 @@
 package inspect
 
 import (
-	"os"
+	"io/fs"
 	"strings"
 	"testing"
 	"unicode"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 )
@@ -27,9 +28,11 @@ func TestTypeStyles_CoverEveryBundledType(t *testing.T) {
 	for _, f := range families {
 		rows[f.ID] = true
 	}
-	entries, err := os.ReadDir("../def/manifests")
+	// The embedded catalog by name, not its source directory on disk: this test is
+	// about the catalog the binary carries, and stays on it until R4b (card 255).
+	entries, err := fs.ReadDir(def.EmbeddedFS(), ".")
 	if err != nil {
-		t.Fatalf("read manifests: %v", err)
+		t.Fatalf("read the embedded catalog: %v", err)
 	}
 	st := newStyles(reg)
 	for _, e := range entries {
@@ -97,10 +100,7 @@ func TestTypeStyles_ShapesMeanWhatTheLegendSays(t *testing.T) {
 // earlier watermark.
 func TestTypeStyles_GarminTypesTakeTheRowsTheyReplaced(t *testing.T) {
 	t.Parallel()
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatalf("Bundled: %v", err)
-	}
+	reg := catalogtest.Definitions(t)
 	cases := []struct {
 		typ, replaced facet.Type
 	}{

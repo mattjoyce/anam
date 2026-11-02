@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
+	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 )
@@ -154,14 +156,8 @@ func TestFillAndLockForACorrection(t *testing.T) {
 // dose, which needs none, is drawn.
 func TestDrawFormRefusesNestedSchemas(t *testing.T) {
 	t.Parallel()
-	manifests, err := def.Manifests()
-	if err != nil {
-		t.Fatal(err)
-	}
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
+	manifests := fixtureManifests(t)
+	reg := catalogtest.Definitions(t)
 	for _, m := range manifests {
 		d, ok := reg.Lookup(m.Type)
 		if !ok || d.Version != m.Version || (m.Type != "health.blood-pressure" && m.Type != "health.medication.dose") {
@@ -186,14 +182,8 @@ func TestDrawFormRefusesNestedSchemas(t *testing.T) {
 // drawing it, and every type that drew at its version before still draws, now zoned.
 func TestEveryTypeThatDrewStillDrawsOnceZoned(t *testing.T) {
 	t.Parallel()
-	manifests, err := def.Manifests()
-	if err != nil {
-		t.Fatal(err)
-	}
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
+	manifests := fixtureManifests(t)
+	reg := catalogtest.Definitions(t)
 	bodies := map[string][]byte{}
 	for _, m := range manifests {
 		bodies[string(m.Type)+"@"+strconv.Itoa(m.Version)] = m.Body
@@ -239,15 +229,9 @@ func TestEveryTypeThatDrewStillDrawsOnceZoned(t *testing.T) {
 // when it has no offset.
 func TestAZonedFormSendsTheBrowsersZone(t *testing.T) {
 	t.Parallel()
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
+	reg := catalogtest.Definitions(t)
 	d, _ := reg.Lookup("health.medication.dose")
-	manifests, err := def.Manifests()
-	if err != nil {
-		t.Fatal(err)
-	}
+	manifests := fixtureManifests(t)
 	var body []byte
 	for _, m := range manifests {
 		if m.Type == d.Type && m.Version == d.Version {
@@ -298,14 +282,8 @@ func TestAZonedFormSendsTheBrowsersZone(t *testing.T) {
 // the typed JSON the Definition takes.
 func TestTheAttentionTypesDrawAsForms(t *testing.T) {
 	t.Parallel()
-	manifests, err := def.Manifests()
-	if err != nil {
-		t.Fatal(err)
-	}
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
+	manifests := fixtureManifests(t)
+	reg := catalogtest.Definitions(t)
 	drawType := func(typ string) entryForm {
 		t.Helper()
 		d, ok := reg.Lookup(facet.Type(typ))
@@ -392,19 +370,16 @@ func TestTheAttentionTypesDrawAsForms(t *testing.T) {
 // the page, refuses a drink with a meal's fields.
 func TestTheIntakeTypeDrawsAsAForm(t *testing.T) {
 	t.Parallel()
-	manifests, err := def.Manifests()
-	if err != nil {
-		t.Fatal(err)
-	}
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
+	manifests := fixtureManifests(t)
+	reg := catalogtest.Definitions(t)
 	d, ok := reg.Lookup("health.intake")
 	if !ok {
 		t.Fatal("health.intake is not bundled")
 	}
-	var form entryForm
+	var (
+		form entryForm
+		err  error
+	)
 	for _, m := range manifests {
 		if m.Type == d.Type && m.Version == d.Version {
 			if form, err = drawForm(m.Body, d, false); err != nil {
@@ -455,4 +430,16 @@ func TestTheIntakeTypeDrawsAsAForm(t *testing.T) {
 	if !ok || !strings.Contains(string(meal), `"rich":true`) || !strings.Contains(string(meal), `"out":false`) {
 		t.Errorf("meal = %s, ok %v; want rich and out sent as booleans, out false kept", meal, ok)
 	}
+}
+
+// fixtureManifests is every manifest of the fixture catalog, current and history,
+// with its raw bytes: the bodies the entry form is drawn from.
+func fixtureManifests(t *testing.T) []def.Stored {
+	t.Helper()
+	defs, _ := fixture.Mattjoyce()
+	ms, err := def.ManifestsFS(defs)
+	if err != nil {
+		t.Fatalf("def.ManifestsFS: %v", err)
+	}
+	return ms
 }

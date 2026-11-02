@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/selection"
@@ -61,7 +62,7 @@ func zoneServer(t *testing.T, zone string) *httptest.Server {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = a.Close() })
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(),
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t),
 		Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, MaxReadBytes: 512 << 10,
 		Selections: selection.NewStore(a), Zone: zone,
 	}))

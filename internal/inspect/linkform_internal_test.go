@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mattjoyce/anam/internal/def"
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 )
 
 const (
@@ -43,11 +43,7 @@ func TestEdgeIDIsTheRule(t *testing.T) {
 // server: its kinds and its at field.
 func linkFormAt(t *testing.T) linkForm {
 	t.Helper()
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
-	d, ok := reg.Lookup("record.edge")
+	d, ok := catalogtest.Definitions(t).Lookup("record.edge")
 	if !ok {
 		t.Fatal("record.edge is not bundled")
 	}

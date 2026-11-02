@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
+	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
@@ -24,15 +26,13 @@ import (
 // previous version, then read and sent again under the new one, keep their instant
 // and their id.
 
-// zonedTypes are the bundled types whose fact time reads a zone from the fact, each
-// with the version before that one, from the binary's history.
+// zonedTypes are the fixture's types whose fact time reads a zone from the fact, each
+// with the version before that one, from its history.
 func zonedTypes(t *testing.T) (now, before []def.Definition, bodies [][]byte) {
 	t.Helper()
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
-	history, err := def.History()
+	reg := catalogtest.Definitions(t)
+	defs, _ := fixture.Mattjoyce()
+	history, err := def.HistoryFS(defs)
 	if err != nil {
 		t.Fatal(err)
 	}

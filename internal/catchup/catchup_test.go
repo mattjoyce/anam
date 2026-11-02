@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
@@ -82,8 +83,9 @@ func newHarness(t *testing.T) (*gate.Gate, *ledger.Ledger, *ops.DB) {
 	return gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}), l, db
 }
 
-// noteHarness is newHarness with the bundled record.edge beside the readings, and a
-// records source allowed to write it, so a test can assert an edge about a reading.
+// noteHarness is newHarness with the minimal fixture's record.edge beside the
+// readings, and a records source allowed to write it, so a test can assert an edge
+// about a reading.
 func noteHarness(t *testing.T) (*gate.Gate, *ledger.Ledger, *ops.DB) {
 	t.Helper()
 	ctx := context.Background()
@@ -101,13 +103,14 @@ func noteHarness(t *testing.T) (*gate.Gate, *ledger.Ledger, *ops.DB) {
 	if err != nil {
 		t.Fatalf("def.Parse: %v", err)
 	}
-	bundled, err := def.Bundled()
+	minimal, _ := fixture.Minimal()
+	structural, err := def.BundledFS(minimal)
 	if err != nil {
-		t.Fatalf("def.Bundled: %v", err)
+		t.Fatalf("def.BundledFS: %v", err)
 	}
-	note, ok := bundled.Lookup(catchup.EdgeType)
+	note, ok := structural.Lookup(catchup.EdgeType)
 	if !ok {
-		t.Fatalf("no bundled %s", catchup.EdgeType)
+		t.Fatalf("no %s in the minimal fixture", catchup.EdgeType)
 	}
 	reg, err := def.NewRegistry(bp, note)
 	if err != nil {
@@ -445,17 +448,19 @@ func TestSync_DerivesTheEdgeIndex(t *testing.T) {
 	}
 }
 
-// The edge index reads fields the bundled Definition of the edge type declares, and
-// nothing else; the Definition is held to declaring them.
+// The edge index reads fields the catalog's Definition of the edge type declares, and
+// nothing else; the Definition is held to declaring them. Every catalog supplies the
+// edge type, so the minimal fixture's stands for them.
 func TestEdgeType_DeclaresItsEnds(t *testing.T) {
 	t.Parallel()
-	bundled, err := def.Bundled()
+	minimal, _ := fixture.Minimal()
+	structural, err := def.BundledFS(minimal)
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, ok := bundled.Lookup(catchup.EdgeType)
+	d, ok := structural.Lookup(catchup.EdgeType)
 	if !ok {
-		t.Fatalf("no bundled %s", catchup.EdgeType)
+		t.Fatalf("no %s in the minimal fixture", catchup.EdgeType)
 	}
 	for _, p := range []string{"/kind", "/from/0", "/to/0", "/about/0"} {
 		if err := d.HasPointer(p); err != nil {

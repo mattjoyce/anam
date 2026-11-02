@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/consent"
@@ -19,7 +20,7 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
-// Card 241: money.purchase over the bundled Definition, a real gate and a real ledger.
+// Card 241: money.purchase over the fixture's Definition, a real gate and a real ledger.
 // The merchant and the orders here are made up. One order is one facet whose id the
 // Definition composes from the merchant and the order reference, and the person's
 // judgement about it (deductible, purpose) has no field in it.
@@ -33,10 +34,7 @@ func newPurchaseGate(t *testing.T) (*gate.Gate, *ledger.Ledger, *def.Registry) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = l.Close() })
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
+	reg := catalogtest.Definitions(t)
 	scopes := gate.StaticScopes{"records": {purchaseType}}
 	g := gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	return g, l, reg
@@ -215,11 +213,8 @@ func TestPurchase_ThePurchasesProjectionServesItAndRecentLifeDoesNot(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	bundled, err := projection.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
-	purchases, err := bundled.Lookup("purchases")
+	projs := catalogtest.Projections(t)
+	purchases, err := projs.Lookup("purchases")
 	if err != nil {
 		t.Fatal(err)
 	}

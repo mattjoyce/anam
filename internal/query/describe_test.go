@@ -6,20 +6,20 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
+	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/query"
 )
 
 // The catalogue says what can be asked: the base relations and the parameter, the
 // instant lexeme, every type's pointers at every held version, and the bundled rules
-// with their docs, from the Definitions and the rules alone.
+// with their docs, from the Definitions and the rules alone. The Definitions are the
+// fixture catalog's.
 func TestDescribe_FromTheBundledDefinitions(t *testing.T) {
 	t.Parallel()
-	defs, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
-	held := heldBundled(t)
+	defs := catalogtest.Definitions(t)
+	held := heldFixture(t)
 	cat, err := query.Describe(defs, held)
 	if err != nil {
 		t.Fatalf("Describe: %v", err)
@@ -76,7 +76,7 @@ func TestDescribe_FromTheBundledDefinitions(t *testing.T) {
 // version; a pointer every version declares, or none, is not.
 func TestPointerWarnings(t *testing.T) {
 	t.Parallel()
-	held := heldBundled(t)
+	held := heldFixture(t)
 	cases := []struct {
 		text string
 		want string
@@ -169,10 +169,11 @@ func TestEvaluate_BoundsTheDerivation(t *testing.T) {
 	}
 }
 
-// heldBundled is the embedded manifests and their history as a Held.
-func heldBundled(t *testing.T) query.Held {
+// heldFixture is the fixture catalog's manifests and their history as a Held.
+func heldFixture(t *testing.T) query.Held {
 	t.Helper()
-	manifests, err := def.Manifests()
+	defs, _ := fixture.Mattjoyce()
+	manifests, err := def.ManifestsFS(defs)
 	if err != nil {
 		t.Fatal(err)
 	}

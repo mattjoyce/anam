@@ -8,11 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/consent"
-	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
-	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/query"
 	"github.com/mattjoyce/anam/internal/selection"
 	"github.com/mattjoyce/anam/internal/serve"
@@ -113,15 +112,8 @@ func id(ref string) string { return facet.NewID(ref) }
 func TestEquality_ProgramIsThePredicate(t *testing.T) {
 	t.Parallel()
 	res := seed(t)
-	defs, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
-	bp, err := projection.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
-	tmpl, err := bp.Lookup("bp")
+	defs := catalogtest.Definitions(t)
+	tmpl, err := catalogtest.Projections(t).Lookup("bp")
 	if err != nil {
 		t.Fatal(err)
 	}

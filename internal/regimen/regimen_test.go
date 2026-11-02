@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
@@ -64,10 +65,7 @@ func TestExpected_LeavesTheLedgerUntouched(t *testing.T) {
 		t.Fatalf("ledger.Create: %v", err)
 	}
 	defer func() { _ = l.Close() }()
-	defs, err := def.Bundled()
-	if err != nil {
-		t.Fatalf("def.Bundled: %v", err)
-	}
+	defs := catalogtest.Definitions(t)
 	g := gate.New(l, defs, gate.StaticScopes{"records": {"health.medication.compliance"}}, clock.Real{}, "matt", gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 
 	env := facet.Envelope{
@@ -112,13 +110,10 @@ func TestExpected_LeavesTheLedgerUntouched(t *testing.T) {
 // [0, 1]. A number written as text is refused, as any wrong type is.
 func TestComplianceEstimate_IsBoundedAtTheGate(t *testing.T) {
 	t.Parallel()
-	defs, err := def.Bundled()
-	if err != nil {
-		t.Fatalf("def.Bundled: %v", err)
-	}
+	defs := catalogtest.Definitions(t)
 	d, ok := defs.Lookup("health.medication.compliance")
 	if !ok {
-		t.Fatal("no bundled definition for health.medication.compliance")
+		t.Fatal("no definition for health.medication.compliance in the fixture")
 	}
 	for value, want := range map[string]bool{`0.95`: true, `1`: true, `0`: true, `"0.5"`: false, `95`: false, `1.5`: false, `-0.1`: false} {
 		doc, err := def.Decode([]byte(`{"id": "e", "date": "2026-02-03", "drug": "x", "course": 1,

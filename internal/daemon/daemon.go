@@ -29,6 +29,7 @@ import (
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/inspect"
+	"github.com/mattjoyce/anam/internal/mint"
 	"github.com/mattjoyce/anam/internal/selection"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
@@ -116,6 +117,9 @@ type Daemon struct {
 	// mints asks the mint worker to mint at the head. It holds one request, so any
 	// number of batches landing during a mint cost one more mint, not one each.
 	mints chan struct{}
+	// mintClock stamps minted_at on what a mint writes. It is the real clock; a test
+	// that needs a mint slower than a budget gives it one that sleeps.
+	mintClock mint.Clock
 
 	jobs chan job
 	quit chan struct{}
@@ -240,6 +244,7 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		defs:        defs,
 		projections: projs,
 		mints:       make(chan struct{}, 1),
+		mintClock:   clock.Real{},
 		jobs:        make(chan job),
 		quit:        make(chan struct{}),
 	}, nil

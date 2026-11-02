@@ -100,8 +100,9 @@ listen: 127.0.0.1:8787
 # definitions_dir: /etc/anam/definitions
 # projections_dir: /etc/anam/projections
 
-# Bounds one long write inside the daemon: an index replay, a backup, the mint at
-# start. Also each phase of `anam migrate`: the fold of the old ledger, the carry. Its old name, ingest_timeout (ANAM_INGEST_TIMEOUT), is still read with a
+# Bounds one long write inside the daemon: an index replay, a backup, the automatic
+# mint, at start and after a batch (a mint asked for over POST /v1/checkpoints keeps
+# the request's timeout). Also each phase of `anam migrate`: the fold of the old ledger, the carry. Its old name, ingest_timeout (ANAM_INGEST_TIMEOUT), is still read with a
 # warning; the two set differently are refused.
 long_write_timeout: 15m
 

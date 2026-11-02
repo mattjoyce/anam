@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/mint"
@@ -122,7 +123,7 @@ func (d *Daemon) getCheckpoints(w http.ResponseWriter, r *http.Request) {
 func (d *Daemon) mintDeps(s Stores) mint.Deps {
 	buckets, _ := d.cfg.Buckets() // Open has already accepted the width.
 	return mint.Deps{
-		Ledger: s.Ledger, Index: s.Ops, Values: s.Ops, Buckets: buckets, Clock: d.mintClock,
+		Ledger: s.Ledger, Index: s.Ops, Values: s.Ops, Buckets: buckets, Clock: clock.Real{},
 		Budget: d.cfg.CheckpointBudget,
 	}
 }

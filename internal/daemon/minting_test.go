@@ -1,232 +1,270 @@
 package daemon
 
 import (
-	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"log/slog"
+	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
-	"sync"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/config"
+	"github.com/mattjoyce/anam/internal/gate"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
-// slowClock is a mint's clock that sleeps before each reading. A mint reads it once
-// for every bucket it cuts and once for the run, so a mint over n buckets takes more
-// than n+1 times per, however small the ledger: a mint longer than a budget, made
-// without a ledger large enough to be slow.
-type slowClock struct{ per time.Duration }
+// manyMonths is how many monthly buckets a store made slow to mint holds. A mint
+// writes three rows for each bucket it cuts, so a full mint over this many takes far
+// longer than shortTimeout on any machine, while seeding it costs a few batches.
+const manyMonths = 120
 
-func (c slowClock) Now() time.Time {
-	time.Sleep(c.per)
-	return time.Now()
-}
+// shortTimeout is a per-call timeout no full mint over manyMonths buckets finishes in:
+// such a mint takes most of a second under -race on an idle machine, and seconds on a
+// busy one. It is long enough for the mint to start.
+const shortTimeout = 100 * time.Millisecond
 
-// logBuffer is the default logger's output, safe to read while the daemon writes it.
-type logBuffer struct {
-	mu  sync.Mutex
-	buf bytes.Buffer
-}
-
-func (l *logBuffer) Write(p []byte) (int, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return l.buf.Write(p)
-}
-
-func (l *logBuffer) String() string {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return l.buf.String()
-}
-
-// captureLogs sends the default logger to a buffer until the test ends. A test that
-// calls it must not be parallel. Call it before start, so the daemon stops before the
-// logger is put back.
-func captureLogs(t *testing.T) *logBuffer {
+// weighInOn is a weigh-in at 07:30 on day in Sydney, a date like 2001-02-15.
+func weighInOn(t *testing.T, id, day string, version int) string {
 	t.Helper()
-	logs := &logBuffer{}
-	prev := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(logs, nil)))
-	t.Cleanup(func() { slog.SetDefault(prev) })
-	return logs
-}
-
-// waitMint is waitFor with room for a mint made slow on purpose, on a machine the
-// gate keeps busy.
-func waitMint(t *testing.T, what string, cond func() bool) {
-	t.Helper()
-	deadline := time.Now().Add(30 * time.Second)
-	for !cond() {
-		if time.Now().After(deadline) {
-			t.Fatalf("timed out waiting for %s", what)
-		}
-		time.Sleep(10 * time.Millisecond)
+	syd, err := time.LoadLocation("Australia/Sydney")
+	if err != nil {
+		t.Fatal(err)
 	}
-}
-
-// weighInOn is a weigh-in on day, a date in Sydney's summer time, so each month's
-// falls in its own bucket.
-func weighInOn(id, day string, version int) string {
-	at := day + " 07:30"
+	at, err := time.ParseInLocation("2006-01-02 15:04", day+" 07:30", syd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	local := at.Format("2006-01-02 15:04")
 	return fmt.Sprintf(`{"type": "health.weight", "definition_version": %d,
-		"payload": {"id": %q, "date": %q, "source_time": {"value": %q, "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kg": 80}}`,
-		version, id, at, at)
+		"payload": {"id": %q, "date": %q, "source_time": {"value": %q, "zone": "Australia/Sydney", "offset": %q, "basis": "source"}, "kg": 80}}`,
+		version, id, local, local, at.Format("-07:00"))
 }
 
-// seedUnminted admits a weigh-in in each of the first months of six on a daemon that
-// stops before it mints, as one stopped just after a batch, or a store carried with
-// no mint runs, leaves it: the next daemon on cfg starts behind and mints every
-// bucket. It returns the head.
+// seedUnminted admits a weigh-in in each of months months, from January 1990, on a
+// daemon that stops before it mints, as one stopped just after a batch, or a store
+// carried with no mint runs, leaves it: the next daemon on cfg starts behind, with no
+// run to start from, and its mint cuts every bucket. It returns the head.
 func seedUnminted(t *testing.T, cfg config.Config, months int) int64 {
 	t.Helper()
 	cfg.MintQuiet = time.Hour // stopped long before the mint would run
 	d, url, stop := serveImporters(t, cfg)
 	weight, _ := d.defs.current.Load().Lookup("health.weight")
 	var envs []string
-	for i, day := range []string{"2025-10-15", "2025-11-15", "2025-12-15", "2026-01-15", "2026-02-15", "2026-03-15"}[:months] {
-		envs = append(envs, weighInOn(fmt.Sprintf("w-%d", i), day, weight.Version))
+	for i := range months {
+		day := time.Date(1990, time.January, 15, 0, 0, 0, 0, time.UTC).AddDate(0, i, 0).Format("2006-01-02")
+		envs = append(envs, weighInOn(t, fmt.Sprintf("w-%d", i), day, weight.Version))
 	}
-	call(t, "POST", url+"/v1/envelopes", importerToken, batch(envs...), http.StatusOK, nil)
+	for len(envs) > 0 {
+		n := min(len(envs), gate.MaxBatch)
+		call(t, "POST", url+"/v1/envelopes", importerToken, batch(envs[:n]...), http.StatusOK, nil)
+		envs = envs[n:]
+	}
 	w := head(t, d)
 	if err := stop(); err != nil {
 		t.Fatalf("stop the seeding daemon: %v", err)
 	}
-	if w != int64(len(envs)) {
-		t.Fatalf("head %d after %d weigh-ins", w, len(envs))
+	if w != int64(months) {
+		t.Fatalf("head %d after %d weigh-ins", w, months)
 	}
 	return w
 }
 
-// Card 268: the automatic mint runs under long_write_timeout, not the per-call
-// timeout. A daemon that starts behind mints from its start (mintIfBehind, through
-// the mint worker), and this mint takes longer than timeout. It must finish, not be
-// cut at timeout as the first mint on the carried schema-10 store was twice.
-// Not parallel: it swaps the default logger.
-func TestAutomaticMintHasTheLongWriteBudget(t *testing.T) {
-	logs := captureLogs(t)
-	cfg := importerConfig(t)
-	w := seedUnminted(t, cfg, 2)
-
-	cfg.LongWriteTimeout = time.Minute
-	d := open(t, cfg)
-	// Open spends timeout on its own reads, so it is shortened once the daemon is
-	// open: under -race on a busy machine those reads may need more than this.
-	d.cfg.Timeout = 500 * time.Millisecond
-	d.mintClock = slowClock{per: 600 * time.Millisecond} // each bucket alone outlasts timeout
-	start(t, d)
-
-	waitMint(t, "the mint at start to end", func() bool {
-		out := logs.String()
-		return strings.Contains(out, "daemon: minted") || strings.Contains(out, "mint at head failed")
-	})
-	if out := logs.String(); strings.Contains(out, "mint at head failed") {
-		t.Fatalf("the automatic mint was cut short:\n%s", out)
+// copyStores is cfg on a copy of its ledger and operational store, in a directory of
+// its own, so each attempt at a mint starts from the same files. The daemon on cfg
+// must be stopped.
+func copyStores(t *testing.T, cfg config.Config) config.Config {
+	t.Helper()
+	dir := t.TempDir()
+	out := cfg
+	out.LedgerPath = filepath.Join(dir, filepath.Base(cfg.LedgerPath))
+	out.DBPath = filepath.Join(dir, filepath.Base(cfg.DBPath))
+	out.LibraryDir = filepath.Join(dir, "documents")
+	for from, to := range map[string]string{cfg.LedgerPath: out.LedgerPath, cfg.DBPath: out.DBPath} {
+		for _, suffix := range []string{"", "-wal", "-shm"} {
+			copyFile(t, from+suffix, to+suffix)
+		}
 	}
-	if run, ok, err := d.readOps.LastMintRun(context.Background(), w); err != nil || !ok || run != w {
-		t.Fatalf("last mint run = %d, %v, %v; want %d", run, ok, err, w)
+	return out
+}
+
+func copyFile(t *testing.T, from, to string) {
+	t.Helper()
+	src, err := os.Open(from)
+	if errors.Is(err, os.ErrNotExist) {
+		return
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = src.Close() }()
+	dst, err := os.OpenFile(to, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.Copy(dst, src); err != nil {
+		t.Fatal(err)
+	}
+	if err := dst.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// openIdle opens and runs a daemon on cfg that mints only when the test calls
+// mintAtHead, with timeout and long_write_timeout as given. They are set once Open
+// has returned, since Open spends timeout on its own reads; nothing has run yet.
+// Catch-up at start has nothing to do: the seeding daemon caught up inside each
+// batch. It returns once catch-up has run, with how to stop the daemon.
+func openIdle(t *testing.T, cfg config.Config, timeout, long time.Duration) (*Daemon, func() error) {
+	t.Helper()
+	cfg.MintQuiet = time.Hour // the mint at start is requested but never runs
+	d := open(t, cfg)
+	d.cfg.Timeout, d.cfg.LongWriteTimeout = timeout, long
+	stop := start(t, d)
+	drain(t, d)
+	return d, stop
+}
+
+// Card 268: the automatic mint runs under long_write_timeout, not the per-call
+// timeout. Both its callers, the mint worker after a batch and mintIfBehind at start,
+// run mintAtHead, which logs "daemon: minted" or "mint at head failed" as the run it
+// returns says. On a store with no run and many buckets, a full mint takes far longer
+// than timeout. It must finish, not be cut at timeout as the first mint on the
+// carried schema-10 store was twice.
+func TestAutomaticMintHasTheLongWriteBudget(t *testing.T) {
+	t.Parallel()
+	cfg := importerConfig(t)
+	w := seedUnminted(t, cfg, manyMonths)
+	d, _ := openIdle(t, cfg, shortTimeout, time.Minute)
+
+	began := time.Now()
+	run := d.mintAtHead()
+	took := time.Since(began)
+	if run.Error != "" {
+		t.Fatalf("the automatic mint was cut short: %s", run.Error)
+	}
+	t.Logf("a full mint of %d buckets took %s against a timeout of %s", run.Buckets, took, shortTimeout)
+	if !run.Full || run.W != w || run.Minted != manyMonths || run.Buckets != manyMonths {
+		t.Errorf("mint = %+v, want a full mint of %d buckets at W=%d", *run, manyMonths, w)
+	}
+	if last, ok, err := d.readOps.LastMintRun(context.Background(), w); err != nil || !ok || last != w {
+		t.Fatalf("last mint run = %d, %v, %v; want %d", last, ok, err, w)
 	}
 }
 
 // Card 268: a mint that the long budget does cut short leaves the store as a cut
 // mint always has. What it minted stays minted, it records no run, W does not move,
-// and the next mint resumes: it cuts only the buckets the first did not reach, and
-// re-cuts none. Not parallel: it swaps the default logger.
+// and the next mint, a full one since there is still no run, cuts only the buckets
+// the first did not reach and re-cuts none.
+//
+// The cut is made by long_write_timeout alone, so where it lands depends on how fast
+// the machine is. Each attempt runs on a fresh copy of the seeded store and moves the
+// budget toward the middle of the mint from what it saw: nothing minted means too
+// short, a finished mint (or one cut only after it recorded its run) too long.
 func TestMintCutShortResumes(t *testing.T) {
-	logs := captureLogs(t)
-	cfg := importerConfig(t)
-	w := seedUnminted(t, cfg, 6)
-
-	cut := cfg
-	cut.LongWriteTimeout = time.Second
-	d := open(t, cut)
-	d.mintClock = slowClock{per: 300 * time.Millisecond} // six buckets and a run take 2.1 s
-	stop := start(t, d)
-	waitMint(t, "the mint at start to be cut short", func() bool {
-		return strings.Contains(logs.String(), "mint at head failed")
-	})
+	t.Parallel()
+	seeded := importerConfig(t)
+	w := seedUnminted(t, seeded, manyMonths)
 	ctx := context.Background()
-	partial, err := d.readOps.Checkpoints(ctx)
+
+	var cfg config.Config
+	var partial []ops.CheckpointRow
+	budget := 50 * time.Millisecond
+	for attempt := 0; ; attempt++ {
+		if attempt == 12 {
+			t.Fatalf("no budget cut the mint partway; last tried %s", budget)
+		}
+		cfg = copyStores(t, seeded)
+		d, stop := openIdle(t, cfg, testTimeout, budget)
+		run := d.mintAtHead()
+		rows, err := d.readOps.Checkpoints(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, recorded, err := d.readOps.LastMintRun(ctx, w)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := head(t, d); got != w {
+			t.Fatalf("W moved to %d after a mint, want %d", got, w)
+		}
+		if err := stop(); err != nil {
+			t.Fatal(err)
+		}
+		switch {
+		case run.Error == "" || recorded || len(rows) == manyMonths:
+			budget /= 2
+		case len(rows) == 0:
+			budget *= 2
+		default:
+			partial = rows
+		}
+		if partial != nil {
+			t.Logf("attempt %d: %s cut the mint after %d of %d buckets: %s", attempt, budget, len(rows), manyMonths, run.Error)
+			break
+		}
+	}
+
+	d, _ := openIdle(t, cfg, testTimeout, time.Minute)
+	run := d.mintAtHead()
+	if run.Error != "" {
+		t.Fatalf("the resumed mint failed: %s", run.Error)
+	}
+	if !run.Full || run.Buckets != manyMonths || run.Minted != manyMonths-len(partial) {
+		t.Errorf("resumed mint = %+v, want a full mint that cuts the %d buckets the cut one did not reach",
+			*run, manyMonths-len(partial))
+	}
+	all, err := d.readOps.Checkpoints(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok, err := d.readOps.LastMintRun(ctx, w); err != nil || ok {
-		t.Fatalf("a cut mint recorded a run: %v, %v", ok, err)
+	if len(all) != manyMonths {
+		t.Errorf("%d checkpoints after resuming, want %d", len(all), manyMonths)
+	}
+	for _, r := range all {
+		if r.V != 1 {
+			t.Errorf("bucket %s cut again, at v%d", r.SpanID, r.V)
+		}
+	}
+	if last, ok, err := d.readOps.LastMintRun(ctx, w); err != nil || !ok || last != w {
+		t.Fatalf("last mint run after resuming = %d, %v, %v; want %d", last, ok, err, w)
 	}
 	if got := head(t, d); got != w {
-		t.Fatalf("W moved to %d after a cut mint, want %d", got, w)
-	}
-	if err := stop(); err != nil {
-		t.Fatal(err)
-	}
-
-	d2 := open(t, cfg)
-	start(t, d2)
-	waitMint(t, "the resumed mint", func() bool { return strings.Contains(logs.String(), "daemon: minted") })
-	if run, ok, err := d2.readOps.LastMintRun(ctx, w); err != nil || !ok || run != w {
-		t.Fatalf("last mint run after resuming = %d, %v, %v; want %d", run, ok, err, w)
-	}
-	all, err := d2.readOps.Checkpoints(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(partial) == 0 || len(partial) >= len(all) {
-		t.Fatalf("the cut mint wrote %d of %d buckets, want some but not all", len(partial), len(all))
-	}
-	if !versionsAre1(all) {
-		t.Errorf("a bucket the cut mint reached was cut again: %+v", all)
-	}
-	want := fmt.Sprintf("minted=%d buckets=%d", len(all)-len(partial), len(all))
-	if out := logs.String(); !strings.Contains(out, want) {
-		t.Errorf("the resumed mint did not log %q:\n%s", want, out)
-	}
-	if got := head(t, d2); got != w {
 		t.Errorf("W moved to %d, want %d", got, w)
 	}
 }
 
-func versionsAre1(rows []ops.CheckpointRow) bool {
-	for _, r := range rows {
-		if r.V != 1 {
-			return false
-		}
-	}
-	return true
-}
-
 // Card 268: the manual POST /v1/checkpoints keeps the request's budget, full or not:
-// timeout, or Anam-Timeout when it is shorter, cuts a mint that outlasts it (504).
+// timeout, or Anam-Timeout when it is shorter, cuts a mint that outlasts it. With the
+// long budget the mint would finish and answer 200 with a run recorded. A cut mint
+// usually answers 504; a deadline that lands inside a store call can surface as
+// that call's own error, so the test asks only that the mint did not finish.
 func TestPostCheckpointsKeepsTheRequestBudget(t *testing.T) {
 	t.Parallel()
+	seeded := importerConfig(t)
+	w := seedUnminted(t, seeded, manyMonths)
 	tests := []struct {
 		name    string
 		timeout time.Duration
 		header  string
+		query   string
 	}{
-		{"timeout", 150 * time.Millisecond, ""},
-		{"Anam-Timeout shorter than timeout", testTimeout, "150ms"},
+		{"timeout", shortTimeout, "", ""},
+		{"timeout, full", shortTimeout, "", "?full=true"},
+		{"Anam-Timeout shorter than timeout", testTimeout, shortTimeout.String(), ""},
+		{"Anam-Timeout shorter than timeout, full", testTimeout, shortTimeout.String(), "?full=true"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			cfg := importerConfig(t)
-			w := seedUnminted(t, cfg, 2)
-			cfg.LongWriteTimeout = time.Minute
-			cfg.MintQuiet = time.Hour // only the POST mints
-			d := open(t, cfg)
-			d.cfg.Timeout = tt.timeout // after Open, which spends timeout on its own reads
-			d.mintClock = slowClock{per: 200 * time.Millisecond}
-			start(t, d)
+			d, _ := openIdle(t, copyStores(t, seeded), tt.timeout, time.Minute)
 			srv := httptest.NewServer(d.Handler())
 			t.Cleanup(srv.Close)
-			drain(t, d) // catch-up has run
 
-			req, err := http.NewRequest("POST", srv.URL+"/v1/checkpoints?full=true", nil)
+			req, err := http.NewRequest("POST", srv.URL+"/v1/checkpoints"+tt.query, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -239,23 +277,25 @@ func TestPostCheckpointsKeepsTheRequestBudget(t *testing.T) {
 				t.Fatal(err)
 			}
 			_ = resp.Body.Close()
-			if resp.StatusCode != http.StatusGatewayTimeout {
-				t.Fatalf("POST /v1/checkpoints?full=true: %d, want 504", resp.StatusCode)
+			t.Logf("POST /v1/checkpoints%s: %d", tt.query, resp.StatusCode)
+			if resp.StatusCode == http.StatusOK {
+				t.Fatalf("POST /v1/checkpoints%s: 200, a mint that outlasts the request's budget finished", tt.query)
 			}
 			if _, ok, err := d.readOps.LastMintRun(context.Background(), w); err != nil || ok {
-				t.Errorf("a mint cut at the request budget recorded a run: %v, %v", ok, err)
+				t.Errorf("a mint held to the request budget recorded a run: %v, %v", ok, err)
 			}
 		})
 	}
 }
 
-// Card 268: while a write holds the queue, POST /v1/checkpoints answers busy within
+// Card 268: while a write holds the queue, POST /v1/checkpoints answers busy after
 // accept_wait, as before: the automatic mint's long budget is not the manual one's.
 func TestPostCheckpointsBusyWithinAcceptWait(t *testing.T) {
 	t.Parallel()
+	const acceptWait = 100 * time.Millisecond
 	cfg := newConfig(t)
 	cfg.TokenFile = writeToken(t, t.TempDir(), testToken)
-	cfg.AcceptWait = 100 * time.Millisecond
+	cfg.AcceptWait = acceptWait
 	d := open(t, cfg)
 	start(t, d)
 	srv := httptest.NewServer(d.Handler())
@@ -264,7 +304,8 @@ func TestPostCheckpointsBusyWithinAcceptWait(t *testing.T) {
 
 	began := time.Now()
 	call(t, "POST", srv.URL+"/v1/checkpoints", testToken, "", http.StatusServiceUnavailable, nil)
-	if took := time.Since(began); took > 2*time.Second {
-		t.Errorf("busy after %s, want about accept_wait (%s)", took, cfg.AcceptWait)
+	// Room for scheduling, but well short of a wait of a second or of timeout.
+	if took := time.Since(began); took < acceptWait || took > acceptWait+500*time.Millisecond {
+		t.Errorf("busy after %s, want about accept_wait (%s)", took, acceptWait)
 	}
 }

@@ -136,7 +136,9 @@ func TestParse_ShapeDefaultsToLog(t *testing.T) {
 	}
 }
 
-// The bundled meds template is snapshot-shaped over the three regimen types.
+// The bundled meds template is snapshot-shaped over the three regimen types. It reads
+// the embedded catalog on purpose, being about a personal projection, and leaves the
+// engine with that catalog (card 255, R4b).
 func TestBundled_MedsIsASnapshot(t *testing.T) {
 	t.Parallel()
 	reg, err := projection.Bundled()

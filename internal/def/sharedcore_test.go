@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
@@ -95,6 +97,9 @@ func sharedCoreDrift(s split, leaves []Definition) error {
 	return nil
 }
 
+// TestSharedCore_LeavesAgree reads the embedded catalog on purpose: its subject is
+// the personal catalog's own leaves, so it leaves the engine with that catalog (card
+// 255, R4b) instead of moving to a fixture copy.
 func TestSharedCore_LeavesAgree(t *testing.T) {
 	t.Parallel()
 	reg, err := Bundled()
@@ -124,10 +129,11 @@ func TestSharedCore_LeavesAgree(t *testing.T) {
 }
 
 // The check fails when one leaf's distance drifts from another's, and passes when
-// only the words differ.
+// only the words differ. It needs one real leaf body to edit, from the fixture catalog.
 func TestSharedCore_FailsOnADrift(t *testing.T) {
 	t.Parallel()
-	raw, err := os.ReadFile("manifests/activity.exercise-session.garmin.json")
+	defs, _ := fixture.Mattjoyce()
+	raw, err := fs.ReadFile(defs, "activity.exercise-session.garmin.json")
 	if err != nil {
 		t.Fatal(err)
 	}

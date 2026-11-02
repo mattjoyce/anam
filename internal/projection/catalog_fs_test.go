@@ -10,11 +10,13 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
+	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/projection"
 )
 
-// copyCatalogToDisk copies the embedded catalog at manifests/ to t.TempDir(), adding
-// a .DS_Store file and a notes/ directory. Returns the copy as an os.DirFS.
+// copyCatalogToDisk copies the catalog root at srcDir to t.TempDir(), adding a
+// .DS_Store file and a notes/ directory. Returns the copy as an os.DirFS.
 func copyCatalogToDisk(t *testing.T, srcDir string) fs.FS {
 	t.Helper()
 	dir := t.TempDir()
@@ -63,35 +65,26 @@ func copyCatalogToDisk(t *testing.T, srcDir string) fs.FS {
 	return os.DirFS(dir)
 }
 
-// manifestsDir returns the absolute path to the embedded projection manifests/
-// directory.
-func manifestsDir(t *testing.T) string {
+// fixtureDir writes the projections root of fixture.Mattjoyce under t.TempDir() and
+// returns its path, for the tests that edit a catalog on disk.
+func fixtureDir(t *testing.T) string {
 	t.Helper()
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	root := wd
-	for {
-		if _, err := os.Stat(filepath.Join(root, "go.mod")); err == nil {
-			break
-		}
-		parent := filepath.Dir(root)
-		if parent == root {
-			t.Fatal("cannot find go.mod")
-		}
-		root = parent
-	}
-	return filepath.Join(root, "internal", "projection", "manifests")
+	_, projs := fixture.Mattjoyce()
+	_, dir := fixture.Dirs(t, fstest.MapFS{}, projs)
+	return dir
 }
 
+// TestBundledFS_MatchEmbedded proves a disk copy of fixture.Mattjoyce loads exactly
+// as the catalog embedded in the binary does. It reads the embedded catalog on
+// purpose, to tie the fixture to it, and goes when the embedded catalog does (card
+// 255, R4b).
 func TestBundledFS_MatchEmbedded(t *testing.T) {
 	embeddedReg, err := projection.Bundled()
 	if err != nil {
 		t.Fatalf("Bundled: %v", err)
 	}
 
-	srcDir := manifestsDir(t)
+	srcDir := fixtureDir(t)
 	copy := copyCatalogToDisk(t, srcDir)
 
 	reg, err := projection.BundledFS(copy)
@@ -116,30 +109,25 @@ func TestBundledFS_MatchEmbedded(t *testing.T) {
 
 // TestBundledFS_IgnoresNonJSONFiles verifies that .DS_Store and notes/ are ignored.
 func TestBundledFS_IgnoresNonJSONFiles(t *testing.T) {
-	srcDir := manifestsDir(t)
+	srcDir := fixtureDir(t)
 	copy := copyCatalogToDisk(t, srcDir)
 
 	reg, err := projection.BundledFS(copy)
 	if err != nil {
 		t.Fatalf("BundledFS with extra files: %v", err)
 	}
-	embeddedReg, err := projection.Bundled()
-	if err != nil {
-		t.Fatalf("Bundled: %v", err)
-	}
-
+	fixtureAll := catalogtest.Projections(t).Held()
 	all := reg.Held()
-	embeddedAll := embeddedReg.Held()
-	if len(all) != len(embeddedAll) {
-		t.Fatalf("BundledFS has %d templates (embedded %d), ignoring extra files", len(all), len(embeddedAll))
+	if len(all) != len(fixtureAll) {
+		t.Fatalf("BundledFS has %d templates (fixture %d), ignoring extra files", len(all), len(fixtureAll))
 	}
-	for i := range embeddedAll {
+	for i := range fixtureAll {
 		if i >= len(all) {
 			break
 		}
-		if all[i].Name != embeddedAll[i].Name || all[i].Version != embeddedAll[i].Version || all[i].Hash != embeddedAll[i].Hash {
+		if all[i].Name != fixtureAll[i].Name || all[i].Version != fixtureAll[i].Version || all[i].Hash != fixtureAll[i].Hash {
 			t.Errorf("template %d mismatch: %s v%d %s vs %s v%d %s",
-				i, all[i].Name, all[i].Version, all[i].Hash, embeddedAll[i].Name, embeddedAll[i].Version, embeddedAll[i].Hash)
+				i, all[i].Name, all[i].Version, all[i].Hash, fixtureAll[i].Name, fixtureAll[i].Version, fixtureAll[i].Hash)
 		}
 	}
 }
@@ -168,10 +156,10 @@ func TestBundledFS_HistoryCanBeEmpty(t *testing.T) {
 // TestBundledFS_BadTemplateNameFails verifies that a template whose file name does
 // not match its declared name is refused.
 func TestBundledFS_BadTemplateNameFails(t *testing.T) {
-	srcDir := manifestsDir(t)
+	srcDir := fixtureDir(t)
 	dir := t.TempDir()
 
-	// Copy manifests, but rename one to a mismatched name.
+	// Copy the templates, but rename one to a mismatched name.
 	entries, err := os.ReadDir(srcDir)
 	if err != nil {
 		t.Fatalf("read %s: %v", srcDir, err)
@@ -184,7 +172,7 @@ func TestBundledFS_BadTemplateNameFails(t *testing.T) {
 		}
 	}
 	if firstJSON == "" {
-		t.Fatal("no JSON files in manifests")
+		t.Fatal("no JSON files in the fixture catalog")
 	}
 	raw, err := os.ReadFile(filepath.Join(srcDir, firstJSON))
 	if err != nil {
@@ -220,7 +208,7 @@ func TestBundledFS_BadTemplateNameFails(t *testing.T) {
 // TestBundledFS_ChangedTemplateMovesHash verifies that changing a template's bytes
 // changes its hash.
 func TestBundledFS_ChangedTemplateMovesHash(t *testing.T) {
-	srcDir := manifestsDir(t)
+	srcDir := fixtureDir(t)
 
 	// Get a simple reference hash for the unchanged set.
 	originalReg, err := projection.BundledFS(os.DirFS(srcDir))
@@ -228,7 +216,7 @@ func TestBundledFS_ChangedTemplateMovesHash(t *testing.T) {
 		t.Fatalf("BundledFS(original): %v", err)
 	}
 
-	// Copy the manifests to a temp dir by directly copying files from srcDir.
+	// Copy the templates to a temp dir by directly copying files from srcDir.
 	dir := t.TempDir()
 	entries, err := os.ReadDir(srcDir)
 	if err != nil {
@@ -251,7 +239,7 @@ func TestBundledFS_ChangedTemplateMovesHash(t *testing.T) {
 	// Read one template file, change the "version" field to a new value.
 	names, err := filepath.Glob(filepath.Join(dir, "*.json"))
 	if err != nil || len(names) == 0 {
-		t.Fatalf("glob manifests: %v (%d)", err, len(names))
+		t.Fatalf("glob templates: %v (%d)", err, len(names))
 	}
 	first := names[0]
 	raw, err := os.ReadFile(first)

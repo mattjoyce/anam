@@ -21,7 +21,7 @@ affects:
 
 **Context.** Card 61. Freshness comes from the ledger; a mint exists to bound replay, so it should follow the writes rather than a clock.
 
-**Choice.** One trigger, one mint. An importer batch that changed W requests a mint on a one-slot channel; `mintOnRequest` waits until no batch has arrived for `mint_quiet` (2 s by default, a config key since card 151) and then `mintAtHead` mints once, as its own write. At start, `mintIfBehind` requests a mint when the last run is behind the head, so a batch admitted just before a shutdown is minted. The operator can also mint by hand, `anam checkpoint` (`POST /v1/checkpoints`).
+**Choice.** One trigger, one mint. An importer batch that changed W requests a mint on a one-slot channel; `mintOnRequest` waits until no batch has arrived for `mint_quiet` (2 s by default, a config key since card 151) and then `mintAtHead` mints once, as its own write. At start, `mintIfBehind` requests a mint when the last run is behind the head, so a batch admitted just before a shutdown is minted. Either way the mint runs under `long_write_timeout`, not the per-call `timeout`: on a carried store or a rebuilt index the first one mints every bucket, and 30 s cut it short twice in card 260's window (card 268). The operator can also mint by hand, `anam checkpoint` (`POST /v1/checkpoints`).
 
 **Why.** Importers send batches of 49 in bursts; minting after each would cost a rebuild per batch for nothing.
 

@@ -1,0 +1,3 @@
+{"name": "weights", "version": 1, "description": "weigh-ins, from the catalog",
+  "types": ["health.weight"], "statuses": ["admitted", "endorsed"], "max_classification": "Sensitive",
+  "from": "", "to": "", "shape": "log"}

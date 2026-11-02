@@ -1,0 +1,269 @@
+package daemon
+
+// Generates the schema-9 fixture card 260 carries to schema 10 (opstest.Schema9). It
+// runs against the daemon code at 6abb9d7, the live revision when card 260 was built,
+// never at head: the point is a store the schema-9 build wrote itself. It is kept here
+// as testdata, outside any build, and was run as:
+//
+//	git archive 6abb9d7 | tar -x -C <tree>
+//	cp generate_test.go.txt <tree>/internal/daemon/zz_schema9_fixture_test.go
+//	cd <tree> && ANAM_SCHEMA9_OUT=<out> go test ./internal/daemon -run TestGenerateSchema9Fixture
+//	sqlite3 <out>/tracking.db .dump > tracking.sql
+//	sqlite3 <out>/ledger.db .dump > ledger.sql
+//	cp -r <out>/catalog <out>/expect.json .
+//
+// What it leaves in ANAM_SCHEMA9_OUT: ledger.db and tracking.db as the stopped daemon
+// left them, the catalog it ran on (catalog/definitions, catalog/projections), and
+// expect.json, what the schema-9 build answered at the end. The receipts carry the
+// moment they were served, so a second run makes other hashes; the tests read the
+// files committed here.
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/selection"
+)
+
+const goneManifest = `{
+  "meta": {
+    "facet_type": "test.gone",
+    "definition_version": 1,
+    "classification": "Normal",
+    "validation_mode": "strict",
+    "source_schema": "test/gone",
+    "time_semantics": {"fact_time": {"pointer": "/at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}},
+    "identity_key": ["/id"]
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["id", "at", "value"],
+    "properties": {
+      "id": {"type": "string", "minLength": 1},
+      "at": {"type": "string", "minLength": 1},
+      "value": {"type": "number"}
+    },
+    "additionalProperties": false
+  }
+}`
+
+const weightsCatalogV1 = `{"name": "weights", "version": 1, "description": "weigh-ins, from the catalog",
+  "types": ["health.weight"], "statuses": ["admitted", "endorsed"], "max_classification": "Sensitive",
+  "from": "", "to": "", "shape": "log"}`
+
+const regWeightsV1 = `{"name": "regweights", "version": 1, "description": "weigh-ins, registered",
+  "types": ["health.weight"], "statuses": ["admitted", "endorsed"], "max_classification": "Sensitive",
+  "from": "", "to": "", "shape": "log"}`
+
+const regWeightsV2 = `{"name": "regweights", "version": 2, "description": "weigh-ins and readings, registered",
+  "types": ["health.weight", "test.reading"], "statuses": ["admitted", "endorsed"], "max_classification": "Sensitive",
+  "from": "", "to": "", "shape": "log"}`
+
+// Schema9Expect is what the schema-9 daemon answered once the fixture was written.
+type Schema9Expect struct {
+	Revision   string                         `json:"revision"`
+	W          int64                          `json:"w"`
+	LedgerID   string                         `json:"ledger_id"`
+	Canonical  string                         `json:"canonical"`
+	Live       int                            `json:"live"`
+	Reads      map[string]string              `json:"reads"`
+	Receipts   map[string]Schema9Receipt      `json:"receipts"`
+	Selections []api.Selection                `json:"selections"`
+	Holds      []string                       `json:"holds"`
+	Verified   map[string]api.ReceiptVerified `json:"verified"`
+}
+
+// Schema9Receipt says how a fixture receipt was made.
+type Schema9Receipt struct {
+	How          string `json:"how"`
+	Template     string `json:"template"`
+	Version      int    `json:"template_version"`
+	TemplateHash string `json:"template_hash"`
+	Inline       bool   `json:"template_inline,omitempty"`
+}
+
+func fxReadingAt(version int, id string, v float64) string {
+	return fmt.Sprintf(`{"type": "test.reading", "definition_version": %d, "payload": {"id": %q, "at": "2026-10-0%dT07:00:00Z", "value": %v}}`,
+		version, id, version, v)
+}
+
+func goneAt(id string, v float64) string {
+	return fmt.Sprintf(`{"type": "test.gone", "definition_version": 1, "payload": {"id": %q, "at": "2026-10-05T07:00:00Z", "value": %v}}`, id, v)
+}
+
+func copyFile(t *testing.T, from, to string) {
+	t.Helper()
+	b, err := os.ReadFile(from) //nolint:gosec // fixture generator, paths it chose
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(to), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(to, b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGenerateSchema9Fixture(t *testing.T) {
+	out := os.Getenv("ANAM_SCHEMA9_OUT")
+	if out == "" {
+		t.Skip("set ANAM_SCHEMA9_OUT to generate the card 260 fixture")
+	}
+	cfg := rolesConfig(t)
+	// The importer may submit the gone type as well.
+	raw, err := os.ReadFile(cfg.ImportersFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cfg.ImportersFile,
+		[]byte(strings.Replace(string(raw), "types: [health.weight, test.reading]", "types: [health.weight, test.reading, test.gone]", 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Catalog A: health.weight with its history, test.gone (which catalog B drops), and
+	// the weights template at version 1 (catalog B moves it to version 2).
+	cat := filepath.Join(out, "catalog")
+	defs, projs := filepath.Join(cat, "definitions"), filepath.Join(cat, "projections")
+	copyFile(t, "../def/manifests/health.weight.json", filepath.Join(defs, "health.weight.json"))
+	hist, err := filepath.Glob("../def/manifests/history/health.weight.v*.json")
+	if err != nil || len(hist) == 0 {
+		t.Fatalf("history: %v %v", hist, err)
+	}
+	for _, h := range hist {
+		copyFile(t, h, filepath.Join(defs, "history", filepath.Base(h)))
+	}
+	if err := os.WriteFile(filepath.Join(defs, "test.gone.json"), []byte(goneManifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(projs, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(projs, "weights.json"), []byte(weightsCatalogV1), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg.DefinitionsDir, cfg.ProjectionsDir = defs, projs
+
+	d, url, stop := serveImporters(t, cfg)
+	weight, _ := d.defs.current.Load().Lookup("health.weight")
+
+	// Registered Definitions: test.reading at two versions.
+	call(t, "POST", url+"/v1/definitions", importerToken, readingManifest, http.StatusCreated, nil)
+	call(t, "POST", url+"/v1/envelopes", importerToken, batch(
+		weighIn("w-1", 80.5, weight.Version), weighIn("w-2", 79.0, weight.Version), weighIn("w-3", 81.2, weight.Version),
+		fxReadingAt(1, "r-1", 1.5), goneAt("g-1", 3.5),
+	), http.StatusOK, nil)
+	call(t, "POST", url+"/v1/definitions", importerToken,
+		strings.Replace(readingManifest, `"definition_version": 1`, `"definition_version": 2`, 1), http.StatusCreated, nil)
+	call(t, "POST", url+"/v1/envelopes", importerToken, batch(fxReadingAt(2, "r-2", 2.5)), http.StatusOK, nil)
+
+	exp := Schema9Expect{Revision: "6abb9d7", Reads: map[string]string{}, Receipts: map[string]Schema9Receipt{},
+		Verified: map[string]api.ReceiptVerified{}}
+	record := func(how, hash string, r api.Published) {
+		exp.Receipts[hash] = Schema9Receipt{How: how, Template: r.Receipt.Template, Version: r.Receipt.TemplateVersion,
+			TemplateHash: r.Receipt.TemplateHash, Inline: r.Receipt.TemplateInline}
+	}
+	publish := func(how, query string) {
+		t.Helper()
+		var p api.Published
+		call(t, "POST", url+"/v1/receipts?zone=UTC&"+query, testToken, "", http.StatusCreated, &p)
+		record(how, p.ReceiptHash, p)
+	}
+
+	// Registered projection: a receipt through each version.
+	call(t, "POST", url+"/v1/projections", testToken, regWeightsV1, http.StatusCreated, nil)
+	publish("registered regweights v1", "projection=regweights")
+	call(t, "POST", url+"/v1/projections", testToken, regWeightsV2, http.StatusCreated, nil)
+	publish("registered regweights v2", "projection=regweights")
+
+	// Catalog template weights v1: whole, and narrowed to a type and a window.
+	publish("catalog weights v1", "projection=weights")
+	publish("catalog weights v1 narrowed", "projection=weights&from=2026-10-01&to=2026-10-10")
+
+	// Queries: one through an inline projection, one through the catalog template.
+	var a api.QueryAnswer
+	call(t, "POST", url+"/v1/query", readerToken, inlineQuery(inlineWeightsBody, ""), http.StatusCreated, &a)
+	exp.Receipts[a.ReceiptHash] = Schema9Receipt{How: "inline query", Template: a.Receipt.Template, Version: a.Receipt.TemplateVersion,
+		TemplateHash: a.Receipt.TemplateHash, Inline: a.Receipt.TemplateInline}
+	var c api.QueryAnswer
+	call(t, "POST", url+"/v1/query", readerToken, inlineQuery(`"weights"`, ""), http.StatusCreated, &c)
+	exp.Receipts[c.ReceiptHash] = Schema9Receipt{How: "catalog query weights v1", Template: c.Receipt.Template, Version: c.Receipt.TemplateVersion,
+		TemplateHash: c.Receipt.TemplateHash, Inline: c.Receipt.TemplateInline}
+
+	call(t, "POST", url+"/v1/checkpoints", testToken, "", http.StatusOK, nil)
+
+	// Saved selections, two of whose codes collide in their first eight digits.
+	for _, p := range []string{weightProgram, ticks(t, "n65980"), ticks(t, "n81192")} {
+		exp.Selections = append(exp.Selections, saveSelection(t, url, testToken, p, http.StatusCreated))
+	}
+
+	var tl api.Timeline
+	call(t, "GET", url+"/v1/timeline?zone=UTC", testToken, "", http.StatusOK, &tl)
+	exp.W, exp.Canonical, exp.Live = tl.W, tl.Canonical, tl.Live
+	for name, q := range map[string]string{
+		"timeline":               "zone=UTC&w=%d",
+		"timeline weights":       "zone=UTC&w=%d&projection=weights",
+		"timeline regweights":    "zone=UTC&w=%d&projection=regweights",
+		"timeline earlier":       "zone=UTC&w=%d",
+		"timeline type narrowed": "zone=UTC&w=%d&type=health.weight",
+	} {
+		w := tl.W
+		if name == "timeline earlier" {
+			w = 3
+		}
+		var r api.Timeline
+		call(t, "GET", url+"/v1/timeline?"+fmt.Sprintf(q, w), testToken, "", http.StatusOK, &r)
+		exp.Reads[name] = fmt.Sprintf("w=%d canonical=%s live=%d shown=%d", r.W, r.Canonical, r.Live, r.Shown)
+	}
+	for hash := range exp.Receipts {
+		var v api.ReceiptVerified
+		call(t, "GET", url+"/v1/receipts/"+hash+"/verify", testToken, "", http.StatusOK, &v)
+		if !v.Result.OK() {
+			t.Fatalf("%s does not verify under the schema-9 build: %s", hash, v.Result.Summary())
+		}
+		exp.Verified[hash] = v
+	}
+	exp.LedgerID = a.LedgerID
+
+	// Holds last: one source, then every source.
+	var held api.Holds
+	call(t, "POST", url+"/v1/hold", testToken, `{"sources": ["test-import"]}`, http.StatusOK, &held)
+	call(t, "POST", url+"/v1/hold", testToken, `{"all": true}`, http.StatusOK, &held)
+	exp.Holds = held.Held
+
+	if err := stop(); err != nil {
+		t.Fatal(err)
+	}
+	copyFile(t, cfg.LedgerPath, filepath.Join(out, "ledger.db"))
+	copyFile(t, cfg.DBPath, filepath.Join(out, "tracking.db"))
+	for _, suffix := range []string{"-wal", "-shm"} {
+		for _, p := range []string{cfg.LedgerPath, cfg.DBPath} {
+			if _, err := os.Stat(p + suffix); err == nil {
+				copyFile(t, p+suffix, filepath.Join(out, filepath.Base(p)+suffix))
+			}
+		}
+	}
+	b, err := json.MarshalIndent(exp, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(out, "expect.json"), append(b, '\n'), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func ticks(t *testing.T, tick string) string {
+	t.Helper()
+	p, err := selection.Filter{Ticks: []string{tick}}.Program()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}

@@ -1,0 +1,22 @@
+{
+  "meta": {
+    "facet_type": "test.gone",
+    "definition_version": 1,
+    "classification": "Normal",
+    "validation_mode": "strict",
+    "source_schema": "test/gone",
+    "time_semantics": {"fact_time": {"pointer": "/at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}},
+    "identity_key": ["/id"]
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["id", "at", "value"],
+    "properties": {
+      "id": {"type": "string", "minLength": 1},
+      "at": {"type": "string", "minLength": 1},
+      "value": {"type": "number"}
+    },
+    "additionalProperties": false
+  }
+}

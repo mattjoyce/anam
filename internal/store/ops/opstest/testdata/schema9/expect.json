@@ -1,0 +1,253 @@
+{
+  "revision": "6abb9d7",
+  "w": 6,
+  "ledger_id": "fa824c51-6b73-437b-a987-25396ea2ced0",
+  "canonical": "sha256:e653404fab2cf7e5bdf310abb61b804a1c5bb8eab404aeeb9909a7aba2dd3ca2",
+  "live": 6,
+  "reads": {
+    "timeline": "w=6 canonical=sha256:e653404fab2cf7e5bdf310abb61b804a1c5bb8eab404aeeb9909a7aba2dd3ca2 live=6 shown=6",
+    "timeline earlier": "w=3 canonical=sha256:06dff22a1f55539b27b86fca56ab2e98cb83e9f2b8c6cb4a899a4cc46c4ad9f1 live=3 shown=3",
+    "timeline regweights": "w=6 canonical=sha256:e653404fab2cf7e5bdf310abb61b804a1c5bb8eab404aeeb9909a7aba2dd3ca2 live=6 shown=5",
+    "timeline type narrowed": "w=6 canonical=sha256:e653404fab2cf7e5bdf310abb61b804a1c5bb8eab404aeeb9909a7aba2dd3ca2 live=6 shown=3",
+    "timeline weights": "w=6 canonical=sha256:e653404fab2cf7e5bdf310abb61b804a1c5bb8eab404aeeb9909a7aba2dd3ca2 live=6 shown=3"
+  },
+  "receipts": {
+    "sha256:42c66b2e0d6a22903cfd735e37a64f30acafd1ecf2657d0a9873c8a4e25e6841": {
+      "how": "catalog weights v1 narrowed",
+      "template": "weights",
+      "template_version": 1,
+      "template_hash": "sha256:859a0d750ee547485cf4d7b474d0509abcd4f40730627182d1fb09ba468e4107"
+    },
+    "sha256:8a2270d507683d71f6814fa6acb1cd95338daf884fc980a87aa1fca577a0b8ef": {
+      "how": "catalog weights v1",
+      "template": "weights",
+      "template_version": 1,
+      "template_hash": "sha256:859a0d750ee547485cf4d7b474d0509abcd4f40730627182d1fb09ba468e4107"
+    },
+    "sha256:cdf06219d3d3ecbaeef5c6c62a91a644a37de1858b812c76b9e461188f1bb8d0": {
+      "how": "catalog query weights v1",
+      "template": "weights",
+      "template_version": 1,
+      "template_hash": "sha256:859a0d750ee547485cf4d7b474d0509abcd4f40730627182d1fb09ba468e4107"
+    },
+    "sha256:d0c40941e485f1c7625379e9e8c89f46a0f7cc49ccbd35d9c42982043952b953": {
+      "how": "registered regweights v1",
+      "template": "regweights",
+      "template_version": 1,
+      "template_hash": "sha256:dd5a639f85b1874d88922748f3462f49c6d2efddc9347330317d7759e03fc9f7"
+    },
+    "sha256:d3900ecf2ececc5b0dfee2b38023bfa56c906ecee1add0e513af6a7459f0f1d8": {
+      "how": "inline query",
+      "template": "inline",
+      "template_version": 1,
+      "template_hash": "sha256:637fdf637ee6f26af203acc59c0d3b65e80d358721eeabdd06e3ee256d37b0f8",
+      "template_inline": true
+    },
+    "sha256:db1e72be403f9b44bfdafb506b30baa13233abe456b368fce51811e497f143f7": {
+      "how": "registered regweights v2",
+      "template": "regweights",
+      "template_version": 2,
+      "template_hash": "sha256:e6d864a81dc96cd7c936e43eb98257e4c5c5aa87c24765f29dc55b6ef86629a1"
+    }
+  },
+  "selections": [
+    {
+      "code": "e45dd065",
+      "hash": "sha256:e45dd0655f82a14212d687877ef8f106215acedb4f0b2e29737f82644c8f651a",
+      "url": "/?sel=e45dd065",
+      "program": "% An Anam selection (card 199): pick/1 holds the facets it selects.\npick/1.\npick(E) :- entry(E, T, _, _, _, _, _),\n    T = \"health.weight\".\n"
+    },
+    {
+      "code": "f7c90470",
+      "hash": "sha256:f7c90470b5cf4b9e3ed839f97a5e0278badb262d3f0e85970b088f7c6bf3ca44",
+      "url": "/?sel=f7c90470",
+      "program": "% An Anam selection (card 199): pick/1 holds the facets it selects.\npick/1.\npick(\"n65980\").\n"
+    },
+    {
+      "code": "f7c90470d",
+      "hash": "sha256:f7c90470d995ef6a9ac73816469c21c0e9545d15406292017373565adb0c28b2",
+      "url": "/?sel=f7c90470d",
+      "program": "% An Anam selection (card 199): pick/1 holds the facets it selects.\npick/1.\npick(\"n81192\").\n"
+    }
+  ],
+  "holds": [
+    "*",
+    "test-import"
+  ],
+  "verified": {
+    "sha256:42c66b2e0d6a22903cfd735e37a64f30acafd1ecf2657d0a9873c8a4e25e6841": {
+      "hash": "sha256:42c66b2e0d6a22903cfd735e37a64f30acafd1ecf2657d0a9873c8a4e25e6841",
+      "receipt": {
+        "served_hash": "sha256:06dff22a1f55539b27b86fca56ab2e98cb83e9f2b8c6cb4a899a4cc46c4ad9f1",
+        "facet_ids": [
+          "15fd02c5-b872-5c78-853d-2128968b8bfa",
+          "ed4af0f9-ae12-5def-8b77-1dfdfcb9f54e",
+          "fe61ec2a-6d8b-56b0-8930-e3270f4ad44c"
+        ],
+        "watermark": 6,
+        "template": "weights",
+        "template_version": 1,
+        "definition_set_version": "sha256:eb800f346494ea1a3073ad7688c230bf70acbc677405ff2c3f8c58e26fef9a8b",
+        "served_at": "2026-11-02T06:56:27.334863701Z",
+        "span": "whole-person",
+        "ledger_id": "fa824c51-6b73-437b-a987-25396ea2ced0",
+        "query": {
+          "from": "2026-10-01T00:00:00.000000000Z",
+          "before": "2026-10-11T00:00:00.000000000Z"
+        },
+        "template_hash": "sha256:859a0d750ee547485cf4d7b474d0509abcd4f40730627182d1fb09ba468e4107"
+      },
+      "result": {
+        "reproduced": true,
+        "intact": true,
+        "stored_hash": "sha256:06dff22a1f55539b27b86fca56ab2e98cb83e9f2b8c6cb4a899a4cc46c4ad9f1",
+        "derived_hash": "sha256:06dff22a1f55539b27b86fca56ab2e98cb83e9f2b8c6cb4a899a4cc46c4ad9f1"
+      }
+    },
+    "sha256:8a2270d507683d71f6814fa6acb1cd95338daf884fc980a87aa1fca577a0b8ef": {
+      "hash": "sha256:8a2270d507683d71f6814fa6acb1cd95338daf884fc980a87aa1fca577a0b8ef",
+      "receipt": {
+        "served_hash": "sha256:06dff22a1f55539b27b86fca56ab2e98cb83e9f2b8c6cb4a899a4cc46c4ad9f1",
+        "facet_ids": [
+          "15fd02c5-b872-5c78-853d-2128968b8bfa",
+          "ed4af0f9-ae12-5def-8b77-1dfdfcb9f54e",
+          "fe61ec2a-6d8b-56b0-8930-e3270f4ad44c"
+        ],
+        "watermark": 6,
+        "template": "weights",
+        "template_version": 1,
+        "definition_set_version": "sha256:eb800f346494ea1a3073ad7688c230bf70acbc677405ff2c3f8c58e26fef9a8b",
+        "served_at": "2026-11-02T06:56:27.327993521Z",
+        "span": "whole-person",
+        "ledger_id": "fa824c51-6b73-437b-a987-25396ea2ced0",
+        "template_hash": "sha256:859a0d750ee547485cf4d7b474d0509abcd4f40730627182d1fb09ba468e4107"
+      },
+      "result": {
+        "reproduced": true,
+        "intact": true,
+        "stored_hash": "sha256:06dff22a1f55539b27b86fca56ab2e98cb83e9f2b8c6cb4a899a4cc46c4ad9f1",
+        "derived_hash": "sha256:06dff22a1f55539b27b86fca56ab2e98cb83e9f2b8c6cb4a899a4cc46c4ad9f1"
+      }
+    },
+    "sha256:cdf06219d3d3ecbaeef5c6c62a91a644a37de1858b812c76b9e461188f1bb8d0": {
+      "hash": "sha256:cdf06219d3d3ecbaeef5c6c62a91a644a37de1858b812c76b9e461188f1bb8d0",
+      "receipt": {
+        "served_hash": "sha256:010871b6b4eba9075fcebcac9cb0dde7bcfdb10616a81a193b694302cf43145e",
+        "facet_ids": [
+          "15fd02c5-b872-5c78-853d-2128968b8bfa",
+          "ed4af0f9-ae12-5def-8b77-1dfdfcb9f54e",
+          "fe61ec2a-6d8b-56b0-8930-e3270f4ad44c"
+        ],
+        "watermark": 6,
+        "template": "weights",
+        "template_version": 1,
+        "definition_set_version": "sha256:eb800f346494ea1a3073ad7688c230bf70acbc677405ff2c3f8c58e26fef9a8b",
+        "served_at": "2026-11-02T06:56:27.350208212Z",
+        "span": "whole-person",
+        "ledger_id": "fa824c51-6b73-437b-a987-25396ea2ced0",
+        "template_hash": "sha256:859a0d750ee547485cf4d7b474d0509abcd4f40730627182d1fb09ba468e4107",
+        "program": {
+          "rule_set": "anam",
+          "rule_set_version": 2,
+          "rule_set_hash": "sha256:e4cb7eb07d4896eff81b417bf12df74b17e548acb10db3fb7e4042294144e1d3",
+          "text": "high(E, V) :- entry(E, \"health.weight\", _, _, _, _, _), attr(E, \"/kg\", V), V \u003e 80.",
+          "relation": "high"
+        }
+      },
+      "result": {
+        "reproduced": true,
+        "intact": true,
+        "stored_hash": "sha256:010871b6b4eba9075fcebcac9cb0dde7bcfdb10616a81a193b694302cf43145e",
+        "derived_hash": "sha256:010871b6b4eba9075fcebcac9cb0dde7bcfdb10616a81a193b694302cf43145e"
+      }
+    },
+    "sha256:d0c40941e485f1c7625379e9e8c89f46a0f7cc49ccbd35d9c42982043952b953": {
+      "hash": "sha256:d0c40941e485f1c7625379e9e8c89f46a0f7cc49ccbd35d9c42982043952b953",
+      "receipt": {
+        "served_hash": "sha256:06dff22a1f55539b27b86fca56ab2e98cb83e9f2b8c6cb4a899a4cc46c4ad9f1",
+        "facet_ids": [
+          "15fd02c5-b872-5c78-853d-2128968b8bfa",
+          "ed4af0f9-ae12-5def-8b77-1dfdfcb9f54e",
+          "fe61ec2a-6d8b-56b0-8930-e3270f4ad44c"
+        ],
+        "watermark": 6,
+        "template": "regweights",
+        "template_version": 1,
+        "definition_set_version": "sha256:eb800f346494ea1a3073ad7688c230bf70acbc677405ff2c3f8c58e26fef9a8b",
+        "served_at": "2026-11-02T06:56:27.302170464Z",
+        "span": "whole-person",
+        "ledger_id": "fa824c51-6b73-437b-a987-25396ea2ced0",
+        "template_hash": "sha256:dd5a639f85b1874d88922748f3462f49c6d2efddc9347330317d7759e03fc9f7"
+      },
+      "result": {
+        "reproduced": true,
+        "intact": true,
+        "stored_hash": "sha256:06dff22a1f55539b27b86fca56ab2e98cb83e9f2b8c6cb4a899a4cc46c4ad9f1",
+        "derived_hash": "sha256:06dff22a1f55539b27b86fca56ab2e98cb83e9f2b8c6cb4a899a4cc46c4ad9f1",
+        "notes": [
+          "replayed regweights v1 from the held history; v2 is current"
+        ]
+      }
+    },
+    "sha256:d3900ecf2ececc5b0dfee2b38023bfa56c906ecee1add0e513af6a7459f0f1d8": {
+      "hash": "sha256:d3900ecf2ececc5b0dfee2b38023bfa56c906ecee1add0e513af6a7459f0f1d8",
+      "receipt": {
+        "served_hash": "sha256:010871b6b4eba9075fcebcac9cb0dde7bcfdb10616a81a193b694302cf43145e",
+        "facet_ids": [
+          "15fd02c5-b872-5c78-853d-2128968b8bfa",
+          "ed4af0f9-ae12-5def-8b77-1dfdfcb9f54e",
+          "fe61ec2a-6d8b-56b0-8930-e3270f4ad44c"
+        ],
+        "watermark": 6,
+        "template": "inline",
+        "template_version": 1,
+        "definition_set_version": "sha256:eb800f346494ea1a3073ad7688c230bf70acbc677405ff2c3f8c58e26fef9a8b",
+        "served_at": "2026-11-02T06:56:27.339526017Z",
+        "span": "whole-person",
+        "ledger_id": "fa824c51-6b73-437b-a987-25396ea2ced0",
+        "template_hash": "sha256:637fdf637ee6f26af203acc59c0d3b65e80d358721eeabdd06e3ee256d37b0f8",
+        "program": {
+          "rule_set": "anam",
+          "rule_set_version": 2,
+          "rule_set_hash": "sha256:e4cb7eb07d4896eff81b417bf12df74b17e548acb10db3fb7e4042294144e1d3",
+          "text": "high(E, V) :- entry(E, \"health.weight\", _, _, _, _, _), attr(E, \"/kg\", V), V \u003e 80.",
+          "relation": "high"
+        },
+        "template_inline": true
+      },
+      "result": {
+        "reproduced": true,
+        "intact": true,
+        "stored_hash": "sha256:010871b6b4eba9075fcebcac9cb0dde7bcfdb10616a81a193b694302cf43145e",
+        "derived_hash": "sha256:010871b6b4eba9075fcebcac9cb0dde7bcfdb10616a81a193b694302cf43145e"
+      }
+    },
+    "sha256:db1e72be403f9b44bfdafb506b30baa13233abe456b368fce51811e497f143f7": {
+      "hash": "sha256:db1e72be403f9b44bfdafb506b30baa13233abe456b368fce51811e497f143f7",
+      "receipt": {
+        "served_hash": "sha256:c456f09886977223730a3babdace243ee6e91310be1a4138914af00be4322e82",
+        "facet_ids": [
+          "2f107449-3dc6-594e-9e52-916eb6008cf5",
+          "3741dcc9-46d1-5b95-84c5-a98e94c3ac53",
+          "15fd02c5-b872-5c78-853d-2128968b8bfa",
+          "ed4af0f9-ae12-5def-8b77-1dfdfcb9f54e",
+          "fe61ec2a-6d8b-56b0-8930-e3270f4ad44c"
+        ],
+        "watermark": 6,
+        "template": "regweights",
+        "template_version": 2,
+        "definition_set_version": "sha256:eb800f346494ea1a3073ad7688c230bf70acbc677405ff2c3f8c58e26fef9a8b",
+        "served_at": "2026-11-02T06:56:27.318611418Z",
+        "span": "whole-person",
+        "ledger_id": "fa824c51-6b73-437b-a987-25396ea2ced0",
+        "template_hash": "sha256:e6d864a81dc96cd7c936e43eb98257e4c5c5aa87c24765f29dc55b6ef86629a1"
+      },
+      "result": {
+        "reproduced": true,
+        "intact": true,
+        "stored_hash": "sha256:c456f09886977223730a3babdace243ee6e91310be1a4138914af00be4322e82",
+        "derived_hash": "sha256:c456f09886977223730a3babdace243ee6e91310be1a4138914af00be4322e82"
+      }
+    }
+  }
+}

@@ -231,18 +231,19 @@ BEGIN SELECT RAISE(ABORT, 'saved_selection_code is immutable'); END;
 -- the receipt: a projection a query carried in its request (card 211), or a catalog
 -- template, so verify can replay a receipt whose template file has left the catalog.
 -- Immutable, like the receipt; a body is only ever filed when a read that used it was
--- answered. The table keeps the name it had when it held only inline bodies, since an
--- older build of this schema version reads it by that name (card 260 renames it).
-CREATE TABLE IF NOT EXISTS inline_projection (
+-- answered. Schema 9 named this table inline_projection, from when it held only the
+-- bodies queries carried; schema 10 renames it (card 260), and the carry
+-- (ops.ReadCarrySource) reads a version-9 file under the old name.
+CREATE TABLE IF NOT EXISTS template_body (
   hash TEXT PRIMARY KEY CHECK (length(hash) = 71 AND hash GLOB 'sha256:*'),
   body BLOB NOT NULL
 );
-CREATE TRIGGER IF NOT EXISTS inline_projection_no_update
-BEFORE UPDATE ON inline_projection
-BEGIN SELECT RAISE(ABORT, 'inline_projection is immutable'); END;
-CREATE TRIGGER IF NOT EXISTS inline_projection_no_delete
-BEFORE DELETE ON inline_projection
-BEGIN SELECT RAISE(ABORT, 'inline_projection is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS template_body_no_update
+BEFORE UPDATE ON template_body
+BEGIN SELECT RAISE(ABORT, 'template_body is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS template_body_no_delete
+BEFORE DELETE ON template_body
+BEGIN SELECT RAISE(ABORT, 'template_body is immutable'); END;
 
 -- tier: provisioned — the static source -> facet-type token map (the gate's
 -- authenticated pillar). One row per grant.

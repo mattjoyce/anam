@@ -20,7 +20,7 @@ var errBodyRefused = errors.New("template body refused")
 type refusingTemplateBodies struct{ serve.Store }
 
 func (s refusingTemplateBodies) Put(ctx context.Context, kind string, body []byte) (string, error) {
-	if kind == receipt.InlineKind {
+	if kind == receipt.TemplateBodyKind {
 		return "", errBodyRefused
 	}
 	return s.Store.Put(ctx, kind, body)

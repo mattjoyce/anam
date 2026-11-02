@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
@@ -180,4 +181,16 @@ func TestHeartV3ServesOneFactADay(t *testing.T) {
 	if want := []facet.Type{"health.heart-rate-alert", "health.heart-rate.day"}; !slices.Equal(got, want) {
 		t.Errorf("heart v3 covers %v, want %v", got, want)
 	}
+}
+
+// builtInCatalog is the catalog a local command loads with no directories set: the
+// embedded one. Allow-listed for R4a (card 255) with this corpus test; R4b moves both
+// to the deployment repo.
+func builtInCatalog(t *testing.T) *catalog.Catalog {
+	t.Helper()
+	cat, err := catalog.Load(context.Background(), "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cat
 }

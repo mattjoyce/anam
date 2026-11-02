@@ -11,9 +11,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
-	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
 	"github.com/mattjoyce/anam/internal/span"
@@ -33,16 +33,13 @@ func TestRetract_PlansAnImportersSourceFromItsSnapshot(t *testing.T) {
 		PersonID:    "matt",
 		BucketWidth: span.Default, Timeout: testTimeout, Limits: config.DefaultLimits(),
 	}
+	catalogtest.Config(t, &cfg)
 	l, err := ledger.Create(ctx, cfg.LedgerPath, cfg.PersonID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = l.Close() }()
-	defs, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
-	g := gate.New(l, defs, gate.StaticScopes{"scale-import": {"health.weight"}}, clock.Real{}, cfg.PersonID, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
+	g := gate.New(l, catalogtest.Definitions(t), gate.StaticScopes{"scale-import": {"health.weight"}}, clock.Real{}, cfg.PersonID, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	admit := func(id string) string {
 		t.Helper()
 		env := facet.Envelope{Type: "health.weight", Source: "scale-import", Injector: "scale-import",
@@ -68,7 +65,7 @@ func TestRetract_PlansAnImportersSourceFromItsSnapshot(t *testing.T) {
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 
-	if _, _, _, err := planFromSnapshot(ctx, cmd, cfg, builtInCatalog(t), "scale-import"); err == nil ||
+	if _, _, _, err := planFromSnapshot(ctx, cmd, cfg, catalogtest.Catalog(t), "scale-import"); err == nil ||
 		!strings.Contains(err.Error(), "no complete snapshot") {
 		t.Fatalf("with no snapshot: %v", err)
 	}
@@ -81,7 +78,7 @@ func TestRetract_PlansAnImportersSourceFromItsSnapshot(t *testing.T) {
 	_ = db.Close()
 	d := admit("w-4") // sent after the run completed, by an incremental run
 
-	absent, total, held, err := planFromSnapshot(ctx, cmd, cfg, builtInCatalog(t), "scale-import")
+	absent, total, held, err := planFromSnapshot(ctx, cmd, cfg, catalogtest.Catalog(t), "scale-import")
 	if err != nil {
 		t.Fatalf("planFromSnapshot: %v", err)
 	}

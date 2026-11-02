@@ -17,14 +17,14 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
-	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
-// copyCatalogRoot writes the files of an embedded catalog root into a new directory,
-// history included, the way an operator would provision one.
+// copyCatalogRoot writes the files of a catalog root into a new directory, history
+// included, the way an operator would provision one.
 func copyCatalogRoot(t *testing.T, root fs.FS) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -66,8 +66,8 @@ func openStore(t *testing.T, ctx context.Context, cfg config.Config) *ops.DB {
 // served through it still verifies, from the body the receipt filed when it was served.
 func TestReceiptVerifiesAfterItsTemplateFileLeaves(t *testing.T) {
 	t.Parallel()
+	// readerConfig's projections directory is the test's own copy of the fixture.
 	cfg := readerConfig(t)
-	cfg.ProjectionsDir = copyCatalogRoot(t, projection.EmbeddedFS())
 
 	d := open(t, cfg)
 	srv := httptest.NewServer(d.Handler())
@@ -125,9 +125,10 @@ func TestOpenRefusesARegisteredDefinitionTheCatalogContradicts(t *testing.T) {
 	cfg := newConfig(t)
 	db := openStore(t, ctx, cfg)
 
-	manifests, err := def.Manifests()
+	defs, _ := fixture.Mattjoyce()
+	manifests, err := def.ManifestsFS(defs)
 	if err != nil || len(manifests) == 0 {
-		t.Fatalf("no embedded manifests: %v", err)
+		t.Fatalf("no catalog manifests: %v", err)
 	}
 	m := manifests[0]
 	var body map[string]any
@@ -167,7 +168,6 @@ func TestOpenLogsTheCatalogItAdmitted(t *testing.T) {
 	t.Cleanup(func() { slog.SetDefault(prev) })
 
 	cfg := newConfig(t)
-	cfg.DefinitionsDir = copyCatalogRoot(t, def.EmbeddedFS())
 	d, err := Open(context.Background(), cfg, Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -178,7 +178,7 @@ func TestOpenLogsTheCatalogItAdmitted(t *testing.T) {
 	for _, want := range []string{
 		"catalog admitted",
 		"definitions_source=" + cfg.DefinitionsDir,
-		"projections_source=embedded",
+		"projections_source=" + cfg.ProjectionsDir,
 		"definition_set_version=" + d.catalog.SetVersion(),
 	} {
 		if !strings.Contains(out, want) {
@@ -187,9 +187,9 @@ func TestOpenLogsTheCatalogItAdmitted(t *testing.T) {
 	}
 }
 
-// A receipt minted on the built-in catalog verifies the same on a directory copied
-// from it: same result, same notes, no "definition set has moved". Where the files came
-// from never enters a content hash.
+// A receipt minted on one catalog directory verifies the same on another directory
+// copied from the same files: same result, same notes, no "definition set has moved".
+// Where the files came from never enters a content hash.
 func TestReceiptVerifiesTheSameOnACopiedCatalog(t *testing.T) {
 	t.Parallel()
 	cfg := readerConfig(t)
@@ -198,18 +198,18 @@ func TestReceiptVerifiesTheSameOnACopiedCatalog(t *testing.T) {
 	srv := httptest.NewServer(d.Handler())
 	var minted api.Published
 	call(t, "GET", srv.URL+timelineBP, recorderToken, "", http.StatusOK, &minted)
-	var embedded api.ReceiptVerified
-	call(t, "GET", srv.URL+"/v1/receipts/"+minted.ReceiptHash+"/verify", recorderToken, "", http.StatusOK, &embedded)
+	var first api.ReceiptVerified
+	call(t, "GET", srv.URL+"/v1/receipts/"+minted.ReceiptHash+"/verify", recorderToken, "", http.StatusOK, &first)
 	srv.Close()
 	if err := d.closeStores(); err != nil {
 		t.Fatal(err)
 	}
-	if !embedded.Result.OK() {
-		t.Fatalf("the receipt does not verify on the built-in catalog: %s", embedded.Result.Summary())
+	if !first.Result.OK() {
+		t.Fatalf("the receipt does not verify on the first directory: %s", first.Result.Summary())
 	}
 
-	cfg.DefinitionsDir = copyCatalogRoot(t, def.EmbeddedFS())
-	cfg.ProjectionsDir = copyCatalogRoot(t, projection.EmbeddedFS())
+	defs, projs := fixture.Mattjoyce()
+	cfg.DefinitionsDir, cfg.ProjectionsDir = fixture.Dirs(t, defs, projs)
 	d2 := open(t, cfg)
 	t.Cleanup(func() { _ = d2.closeStores() })
 	srv2 := httptest.NewServer(d2.Handler())
@@ -217,11 +217,11 @@ func TestReceiptVerifiesTheSameOnACopiedCatalog(t *testing.T) {
 	var copied api.ReceiptVerified
 	call(t, "GET", srv2.URL+"/v1/receipts/"+minted.ReceiptHash+"/verify", recorderToken, "", http.StatusOK, &copied)
 
-	if copied.Result.OK() != embedded.Result.OK() || copied.Result.Summary() != embedded.Result.Summary() {
-		t.Errorf("verification differs on a copied catalog:\n built-in: %s\n copied:   %s",
-			embedded.Result.Summary(), copied.Result.Summary())
+	if copied.Result.OK() != first.Result.OK() || copied.Result.Summary() != first.Result.Summary() {
+		t.Errorf("verification differs on a copied catalog:\n first:  %s\n copied: %s",
+			first.Result.Summary(), copied.Result.Summary())
 	}
-	if !reflect.DeepEqual(copied.Result, embedded.Result) {
-		t.Errorf("verification result differs on a copied catalog:\n built-in: %+v\n copied:   %+v", embedded.Result, copied.Result)
+	if !reflect.DeepEqual(copied.Result, first.Result) {
+		t.Errorf("verification result differs on a copied catalog:\n first:  %+v\n copied: %+v", first.Result, copied.Result)
 	}
 }

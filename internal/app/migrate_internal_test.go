@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
@@ -59,14 +60,11 @@ func readingPayload(at string, level int, note string) string {
 	return fmt.Sprintf(`{"measured_at": %q, "level": %d, "note": %q}`, at, level, note)
 }
 
-// registryAt is the bundled Definitions with test.reading registered at the versions
+// registryAt is the catalog's Definitions with test.reading registered at the versions
 // given, as the daemon would load them.
 func registryAt(t *testing.T, bodies ...string) *def.Registry {
 	t.Helper()
-	bundled, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
+	bundled := catalogtest.Definitions(t)
 	var stored []def.Stored
 	for i, b := range bodies {
 		stored = append(stored, def.Stored{Type: "test.reading", Version: i + 1, Body: []byte(b)})
@@ -115,11 +113,7 @@ func tombstone(t *testing.T, path string, id string) {
 		t.Fatal(err)
 	}
 	defer func() { _ = l.Close() }()
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
-	g := gate.New(l, reg, gate.StaticScopes{}, clock.Real{}, "matt",
+	g := gate.New(l, catalogtest.Definitions(t), gate.StaticScopes{}, clock.Real{}, "matt",
 		gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	if _, _, err := g.Retract(ctx, id); err != nil {
 		t.Fatal(err)
@@ -184,11 +178,7 @@ func newMigrationFixture(t *testing.T) migrationFixture {
 	// two versions, and one is retracted.
 	f.admit(t, bpReadings)
 	f.admit(t, corrected(bpReadings, "114.0", "115.0")[:1])
-	bundled, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
-	admitAs(t, f.ledgerPath, "bp-csv", bundled, []record{
+	admitAs(t, f.ledgerPath, "bp-csv", catalogtest.Definitions(t), []record{
 		{"health.blood-pressure", `{"id": "csv:1", "source_time": {"value": "2026-3-1 07:00:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-3-1 07:00:00", "reading": "1", "systolic_blood_pressure": {"value": 120.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 80.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-03-01T07:00:00+11:00"}, "pulse": "60.0"}`},
 	})
 	f.changed, f.dead, f.kept = idOf("records", "2026-1-24 06:36:00", "1"), idOf("records", "2026-2-10 05:04:00", "1"), idOf("records", "2026-2-11 05:10:00", "1")
@@ -210,7 +200,7 @@ func newMigrationFixture(t *testing.T) migrationFixture {
 
 	// An edge naming a reading that is live and one that is retracted.
 	f.edge = idOf("records", "note:t1:1")
-	admitAs(t, f.ledgerPath, "records", bundled, []record{{"record.edge", fmt.Sprintf(
+	admitAs(t, f.ledgerPath, "records", catalogtest.Definitions(t), []record{{"record.edge", fmt.Sprintf(
 		`{"id": "note:t1:1", "at": "2026-03-01 10:00", "source_time": {"value": "2026-03-01 10:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kind": "about", "to": [%q, %q], "text": "two readings"}`,
 		f.kept, f.dead)}})
 

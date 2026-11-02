@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
@@ -194,10 +195,7 @@ func TestRename_TheTableGivesEachVendorItsLeaf(t *testing.T) {
 		t.Errorf("W %d, want %d: one event per facet carried", w, before+ledger.Watermark(len(recs)))
 	}
 
-	bundled, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
+	bundled := catalogtest.Definitions(t)
 	l, err := ledger.Open(ctx, f.ledgerPath, "matt")
 	if err != nil {
 		t.Fatal(err)

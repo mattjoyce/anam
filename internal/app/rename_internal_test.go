@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
@@ -221,15 +222,11 @@ func TestRename_TheTableCarriesRecordNoteToRecordEdge(t *testing.T) {
 	}
 }
 
-// heldNote is a registry holding record.note as the binary's history keeps it, the
+// heldNote is a registry holding record.note as the catalog's history keeps it, the
 // newest version a facet was admitted under before card 191.
 func heldNote(t *testing.T) *def.Registry {
 	t.Helper()
-	held, err := def.History()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, s := range held {
+	for _, s := range catalogtest.Catalog(t).History() {
 		if s.Type == "record.note" && s.Version == 2 {
 			d, err := def.Parse(s.Body)
 			if err != nil {
@@ -301,7 +298,7 @@ func TestRename_TheTableCarriesKindsToTheThirdSegment(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		src, closeAll, err := readSource(ctx, cfg, builtInCatalog(t))
+		src, closeAll, err := readSource(ctx, cfg, catalogtest.Catalog(t))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -367,16 +364,12 @@ func TestRename_TheTableCarriesKindsToTheThirdSegment(t *testing.T) {
 	}
 }
 
-// heldDefs is a registry holding each named type as the binary's history keeps it, the
+// heldDefs is a registry holding each named type as the catalog's history keeps it, the
 // newest version of it, as a ledger written before a rename holds the type.
 func heldDefs(t *testing.T, types ...facet.Type) *def.Registry {
 	t.Helper()
-	held, err := def.History()
-	if err != nil {
-		t.Fatal(err)
-	}
 	newest := map[facet.Type]def.Stored{}
-	for _, s := range held {
+	for _, s := range catalogtest.Catalog(t).History() {
 		if slices.Contains(types, s.Type) && s.Version > newest[s.Type].Version {
 			newest[s.Type] = s
 		}

@@ -1,0 +1,66 @@
+{
+  "meta": {
+    "facet_type": "test.course.stopped",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "course",
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "fixture/test.course.stopped",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/date",
+        "layout": "2006-01-02",
+        "zone": "Europe/Berlin"
+      }
+    },
+    "identity_key": [
+      "/id"
+    ],
+    "min_binding_assurance": "medium",
+    "series": {
+      "name": "test.course",
+      "key": [
+        "/name",
+        "/course"
+      ],
+      "closes": true
+    }
+  },
+  "handling": {
+    "guidance": "name and course name one series; a restart after a stop is the next course."
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "A course stopping, the row that closes its test.course series. Named test.retired until it was renamed, so a facet admitted then is a test.retired. It is nobody's record.",
+    "type": "object",
+    "required": [
+      "id",
+      "date",
+      "name",
+      "course"
+    ],
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "date": {
+        "type": "string",
+        "minLength": 1
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1
+      },
+      "course": {
+        "type": "number"
+      },
+      "note": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "additionalProperties": false
+  }
+}

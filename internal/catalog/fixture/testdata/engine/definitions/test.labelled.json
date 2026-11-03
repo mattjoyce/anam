@@ -1,0 +1,61 @@
+{
+  "meta": {
+    "facet_type": "test.labelled",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "labelled",
+    "classification": "Normal",
+    "validation_mode": "strict",
+    "source_schema": "fixture/test.labelled",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/at",
+        "layout": "2006-01-02 15:04",
+        "zone": "UTC"
+      }
+    },
+    "identity_key": [
+      "/id"
+    ],
+    "min_binding_assurance": "medium"
+  },
+  "handling": {
+    "label": "{/kind} {/what}{/text}"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Something noted at a moment, drawn by its label: a drink with what it was, or anything else in words. It is nobody's record.",
+    "type": "object",
+    "required": [
+      "id",
+      "at",
+      "kind"
+    ],
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "at": {
+        "type": "string",
+        "minLength": 1
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "drink",
+          "other"
+        ]
+      },
+      "what": {
+        "type": "string",
+        "minLength": 1
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "additionalProperties": false
+  }
+}

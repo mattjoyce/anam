@@ -1,0 +1,59 @@
+{
+  "meta": {
+    "facet_type": "test.entry",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "course",
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "fixture/test.entry",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/date",
+        "layout": "2006-01-02",
+        "zone": "Europe/Berlin"
+      }
+    },
+    "identity_key": [
+      "/id"
+    ],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One row of a course, of any sort, before the rows were split by what they say into test.course.started, .changed and .stopped. Only history names it. It is nobody's record.",
+    "type": "object",
+    "required": [
+      "id",
+      "date",
+      "name",
+      "course"
+    ],
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "date": {
+        "type": "string",
+        "minLength": 1
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1
+      },
+      "course": {
+        "type": "number"
+      },
+      "dose": {
+        "type": "string",
+        "minLength": 1
+      },
+      "note": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "additionalProperties": false
+  }
+}

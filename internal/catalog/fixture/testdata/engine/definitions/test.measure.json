@@ -1,0 +1,79 @@
+{
+  "meta": {
+    "facet_type": "test.measure",
+    "definition_version": 2,
+    "kind": "measure",
+    "family": "measures",
+    "classification": "Normal",
+    "validation_mode": "strict",
+    "source_schema": "fixture/test.measure",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/at",
+        "layout": "2006-01-02 15:04:05",
+        "zone": "Europe/Berlin"
+      }
+    },
+    "identity_key": [
+      "/at",
+      "/seq"
+    ],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "A period's figure, keyed by the moment and its sequence number together, as a spreadsheet row is, read in Europe/Berlin. Version 2 requires source_time, every other rule unchanged. It is nobody's record.",
+    "type": "object",
+    "required": [
+      "at",
+      "seq",
+      "count",
+      "source_time"
+    ],
+    "properties": {
+      "source_time": {
+        "type": "object",
+        "required": [
+          "value",
+          "zone",
+          "basis"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": "string",
+            "minLength": 1
+          },
+          "zone": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^([A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "source",
+              "configuration",
+              "assumption"
+            ]
+          }
+        }
+      },
+      "at": {
+        "type": "string",
+        "minLength": 1
+      },
+      "seq": {
+        "type": "number"
+      },
+      "count": {
+        "type": "number"
+      },
+      "note": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "additionalProperties": false
+  }
+}

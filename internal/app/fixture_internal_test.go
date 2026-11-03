@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
@@ -53,18 +54,10 @@ func corrected(recs []record, old, new string) []record {
 	return out
 }
 
-// admitRecords commits recs from source "records" through the gate, in one batch, and
-// returns the watermark it left.
-func admitRecords(ctx context.Context, l *ledger.Ledger, recs []record) (ledger.Watermark, error) {
-	defs, err := def.Bundled()
-	if err != nil {
-		return 0, err
-	}
-	return admitUnder(ctx, l, defs, recs)
-}
-
-// admitUnder is admitRecords under the Definitions in defs, so a test can admit a type
-// the binary no longer bundles, as a ledger written before a rename holds it.
+// admitUnder commits recs from source "records" through the gate under the Definitions
+// in defs, in one batch, and returns the watermark it left. A test admits under
+// catalogtest.Definitions, or under a registry holding a type the catalog no longer
+// carries, as a ledger written before a rename holds it.
 func admitUnder(ctx context.Context, l *ledger.Ledger, defs *def.Registry, recs []record) (ledger.Watermark, error) {
 	var err error
 	types := make([]facet.Type, len(recs))
@@ -87,7 +80,18 @@ func admitUnder(ctx context.Context, l *ledger.Ledger, defs *def.Registry, recs 
 	return w, err
 }
 
-// ledgerFixture is a real ledger and a real config under the test's own directory.
+// catalogKeys is the config file lines naming a copy of fixture.Mattjoyce under the
+// test's own directory, for a config a test writes as YAML.
+func catalogKeys(t *testing.T) string {
+	t.Helper()
+	var cfg config.Config
+	catalogtest.Config(t, &cfg)
+	return fmt.Sprintf("definitions_dir: %s\nprojections_dir: %s\n", cfg.DefinitionsDir, cfg.ProjectionsDir)
+}
+
+// ledgerFixture is a real ledger and a real config under the test's own directory. The
+// config reads a copy of fixture.Mattjoyce (card 255), so every local command and every
+// daemon opened on it loads that catalog.
 type ledgerFixture struct {
 	dir, cfgPath, ledgerPath string
 }
@@ -101,7 +105,7 @@ func newLedgerFixture(t *testing.T) ledgerFixture {
 		ledgerPath: filepath.Join(dir, "ledger.db"),
 	}
 	cfg := fmt.Sprintf("person_id: matt\nledger_path: %s\ndb_path: %s\ntimeout: %s\n",
-		f.ledgerPath, filepath.Join(dir, "tracking.db"), testTimeout)
+		f.ledgerPath, filepath.Join(dir, "tracking.db"), testTimeout) + catalogKeys(t)
 	if err := os.WriteFile(f.cfgPath, []byte(cfg), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +128,7 @@ func (f ledgerFixture) admit(t *testing.T, recs []record) ledger.Watermark {
 		t.Fatalf("open ledger: %v", err)
 	}
 	defer func() { _ = l.Close() }()
-	w, err := admitRecords(ctx, l, recs)
+	w, err := admitUnder(ctx, l, catalogtest.Definitions(t), recs)
 	if err != nil {
 		t.Fatalf("admit records: %v", err)
 	}

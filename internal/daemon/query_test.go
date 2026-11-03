@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
-	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -28,11 +28,7 @@ func seedReadings(t *testing.T, cfg config.Config) {
 		t.Fatal(err)
 	}
 	defer func() { _ = l.Close() }()
-	defs, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
-	g := gate.New(l, defs, gate.StaticScopes{"records": {"health.blood-pressure"}}, clock.Real{}, cfg.PersonID,
+	g := gate.New(l, catalogtest.Definitions(t), gate.StaticScopes{"records": {"health.blood-pressure"}}, clock.Real{}, cfg.PersonID,
 		gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	for _, p := range []string{
 		`{"id": "2026-1-24 06:36:00:1", "source_time": {"value": "2026-1-24 06:36:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-1-24 06:36:00", "reading": "1", "systolic_blood_pressure": {"value": 114.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 80.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-24T06:36:00+11:00"}, "pulse": "70.0"}`,

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/read"
 )
@@ -36,7 +37,7 @@ func TestTimeline_ComposedIsTheFullFold(t *testing.T) {
 	same := func(stage string) {
 		t.Helper()
 		ctx := context.Background()
-		src, closeAll, err := readSource(ctx, cfg, builtInCatalog(t))
+		src, closeAll, err := readSource(ctx, cfg, catalogtest.Catalog(t))
 		if err != nil {
 			t.Fatal(err)
 		}

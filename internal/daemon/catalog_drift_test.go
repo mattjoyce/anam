@@ -60,9 +60,13 @@ func TestOpenReportsCatalogDrift(t *testing.T) {
 	}
 }
 
+// driftConfig starts from the embedded catalog and copies its roots, since drift is
+// measured against the binary's own catalog. Allow-listed for R4a (card 255); R4b
+// rewrites it with the new drift baseline.
 func driftConfig(t *testing.T, mode string) (config.Config, []string) {
 	t.Helper()
 	cfg := newConfig(t)
+	cfg.DefinitionsDir, cfg.ProjectionsDir = "", ""
 	if mode != "embedded" && mode != "projections only" {
 		cfg.DefinitionsDir = copyCatalogRoot(t, def.EmbeddedFS())
 	}

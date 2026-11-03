@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/config"
 )
 
@@ -387,7 +389,8 @@ func TestPostDefinitions(t *testing.T) {
 	post(strings.Replace(readingManifest, `"test.reading"`, `"test.other"`, 1), http.StatusForbidden)
 	post(`{"meta": {}}`, http.StatusUnprocessableEntity)
 	weight, _ := d.defs.bundled.Lookup("health.weight")
-	bundledBody, err := os.ReadFile("../def/manifests/health.weight.json")
+	defs, _ := fixture.Mattjoyce()
+	bundledBody, err := fs.ReadFile(defs, "health.weight.json")
 	if err != nil {
 		t.Fatal(err)
 	}

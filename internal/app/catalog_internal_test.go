@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/catalog"
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/span"
@@ -92,9 +93,9 @@ func TestMigrateRefusesARegisteredDefinitionTheCatalogContradicts(t *testing.T) 
 // catalog's manifest it contradicts.
 func registerAContradiction(t *testing.T, f ledgerFixture) def.Stored {
 	t.Helper()
-	manifests, err := def.Manifests()
-	if err != nil || len(manifests) == 0 {
-		t.Fatalf("no embedded manifests: %v", err)
+	manifests := catalogtest.Catalog(t).Manifests()
+	if len(manifests) == 0 {
+		t.Fatal("no catalog manifests")
 	}
 	m := manifests[0]
 	var body map[string]any
@@ -123,14 +124,4 @@ func registerAContradiction(t *testing.T, f ledgerFixture) def.Stored {
 		t.Fatal(err)
 	}
 	return m
-}
-
-// builtInCatalog is the catalog a test's local command loads with no directories set.
-func builtInCatalog(t *testing.T) *catalog.Catalog {
-	t.Helper()
-	cat, err := catalog.Load(context.Background(), "", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return cat
 }

@@ -3,18 +3,18 @@ package daemon
 import (
 	"context"
 	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/catalog"
+	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
-// Card 14, at the daemon (card 119): Open stores the bundled Definitions, and a later
+// Card 14, at the daemon (card 119): Open stores the catalog's Definitions, and a later
 // build whose keying differs from what the store last saw refuses to start, leaving
 // the stored set as it was.
 func TestOpenGuardsTheBundledDefinitions(t *testing.T) {
@@ -34,9 +34,10 @@ func TestOpenGuardsTheBundledDefinitions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ops.Open: %v", err)
 	}
-	// The store holds the current body of every bundled type and the history the
-	// binary carries (card 111).
-	manifests, err := def.Manifests()
+	// The store holds the current body of every catalog type and the history the
+	// catalog carries (card 111).
+	defs, _ := fixture.Mattjoyce()
+	manifests, err := def.ManifestsFS(defs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,30 +72,15 @@ func TestOpenGuardsTheBundledDefinitions(t *testing.T) {
 	}
 }
 
-// The guard persists the catalog it guarded, not the binary's own copy: a catalog read
-// from a directory whose current manifest differs from the embedded one only in its
-// bytes (a trailing space, so the keying is the same and the guard passes) is stored
-// with those bytes.
+// The guard persists the catalog it guarded, not any other copy: a catalog read from a
+// directory whose current manifest differs from fixture.Mattjoyce's (and the binary's)
+// only in its bytes (a trailing space, so the keying is the same and the guard passes)
+// is stored with those bytes.
 func TestGuardPersistsTheCatalogItGuarded(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	dir := t.TempDir()
-	root := def.EmbeddedFS()
-	if err := fs.WalkDir(root, ".", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		raw, err := fs.ReadFile(root, p)
-		if err != nil {
-			return err
-		}
-		if err := os.MkdirAll(filepath.Join(dir, filepath.Dir(p)), 0o755); err != nil {
-			return err
-		}
-		return os.WriteFile(filepath.Join(dir, p), raw, 0o644)
-	}); err != nil {
-		t.Fatalf("copy the embedded definitions: %v", err)
-	}
+	defs, projs := fixture.Mattjoyce()
+	dir, projsDir := fixture.Dirs(t, defs, projs)
 	const typ = "health.blood-pressure"
 	path := filepath.Join(dir, typ+".json")
 	raw, err := os.ReadFile(path)
@@ -105,7 +91,7 @@ func TestGuardPersistsTheCatalogItGuarded(t *testing.T) {
 	if err := os.WriteFile(path, changed, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cat, err := catalog.Load(ctx, dir, "")
+	cat, err := catalog.Load(ctx, dir, projsDir)
 	if err != nil {
 		t.Fatalf("catalog.Load: %v", err)
 	}
@@ -137,7 +123,7 @@ func TestGuardPersistsTheCatalogItGuarded(t *testing.T) {
 	for _, r := range rows {
 		if r.Type == typ && r.Version == current.Version {
 			if r.Body != string(changed) {
-				t.Errorf("stored %s v%d is not the guarded catalog's body (the embedded copy was stored instead)", typ, r.Version)
+				t.Errorf("stored %s v%d is not the guarded catalog's body (another copy was stored instead)", typ, r.Version)
 			}
 			return
 		}

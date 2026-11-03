@@ -66,7 +66,7 @@ Types today: `health.lab-result`, `health.lab-panel`, `health.condition`, `healt
 `health.illness.started`, `health.illness.ended`,
 `place.trip.departed`, `place.trip.arrived`, `place.trip.returned`, `place.trip.flight`, `health.encounter`, `activity.gym-visit`,
 `health.vision-prescription`, and `health.blood-pressure` for diary readings. Each is a manifest in
-`internal/def/manifests/`, strict, Sensitive (visits, gym, travel and the lens prescription
+the deployment's catalog (`definitions_dir`), strict, Sensitive (visits, gym, travel and the lens prescription
 Confidential). Each schema is closed: a records row may
 carry only the fields its Definition declares, so a new field means a line in the manifest first. Illness rows carry an `episode` and travel
 rows a `trip`; those are the series keys, so `health.illness.ended` and `place.trip.returned` close what

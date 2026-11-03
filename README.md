@@ -52,6 +52,10 @@ export ANAM_PERSON_ID=me
 # The ledger and the operational store are two SQLite files. Both default to
 # ~/.local/share/anam/ (ledger.db and tracking.db); override with
 # ANAM_LEDGER_PATH and ANAM_DB_PATH.
+# The binary carries no Definitions: point it at a catalog. The smallest that boots is
+# the minimal test fixture, two record types, one measure and one projection.
+export ANAM_DEFINITIONS_DIR=$PWD/internal/catalog/fixture/testdata/minimal/definitions
+export ANAM_PROJECTIONS_DIR=$PWD/internal/catalog/fixture/testdata/minimal/projections
 ./anam init
 
 # Run the daemon. On loopback it needs no token. Leave it running and use another terminal.
@@ -76,7 +80,7 @@ of the files. Unset it for those two commands.
 
 ```sh
 ./anam projection list                             # the templates: a reader selects one, the operator registers one
-./anam timeline --projection bp --publish          # publish: a served value and a receipt, content-addressed
+./anam timeline --projection measures --publish    # publish: a served value and a receipt, content-addressed
 ./anam receipt list
 ./anam receipt show <hash>          # what was served, from the stored receipt alone
 ./anam receipt verify <hash>        # re-derive it from the ledger, and re-hash the file
@@ -85,9 +89,9 @@ of the files. Unset it for those two commands.
 **Check a projection before publishing it**, and ask why a facet is in or out.
 
 ```sh
-./anam timeline --projection bp                                # the served view, with its receipt hash
-./anam timeline --projection bp --explain                      # every facet's verdict, and the reason
-./anam timeline --projection bp --as-of 2026-07-10T20:00:00Z   # what it stood on when Anam knew less
+./anam timeline --projection measures                          # the served view, with its receipt hash
+./anam timeline --projection measures --explain                # every facet's verdict, and the reason
+./anam timeline --projection measures --as-of 2026-07-10T20:00:00Z   # what it stood on when Anam knew less
 ```
 
 **Mint.** A checkpoint caches the fold, one value per monthly bucket, to bound replay.
@@ -134,65 +138,22 @@ drops it from the current value and never from the ledger.
 
 Every fact is a **facet** of a named type, and each type has a versioned **Definition**: a JSON
 Schema, which field names the facet, and which field says when it was true. Definitions are
-immutable once published, so a change is a new version. Anam bundles the 44 below, and importers
-register more. A running daemon lists what it holds at `GET /v1/definitions` and in the
-inspector's definitions page; the bundled files are in
-[`internal/def/manifests/`](internal/def/manifests/), and the gate checks this table against them.
-Adding a type is a Definition file, not code.
+immutable once published, so a change is a new version. The binary carries none. A deployment keeps
+its catalog of Definitions and projection templates in two directories, `definitions_dir` and
+`projections_dir`, and importers register more over the API. A running daemon lists what it holds
+at `GET /v1/definitions` and in the inspector's definitions page. Adding a type is a Definition
+file, not code.
 
-### Bundled with Anam
+With neither directory set the daemon starts on an empty catalog and logs a WARN saying so. A
+catalog supplies `record.edge` and `record.document`, the two types the engine reads by name for
+links and documents, in the zone the person lives in; the
+[minimal fixture](internal/catalog/fixture/testdata/minimal/definitions/) holds UTC copies to start
+from.
 
-Every type is named `domain.concept[.specialisation…]`, and the first word is one of ten: `health`, `activity`, `place`,
-`record`, `mind`, `org` and `money` today, with `social`, `media` and `work` held for later. A new kind of fact joins
-one of them. A head is added only by a logged decision, as `mind`, `org` and `money` were. `family` groups types within a domain, and `kind` says whether a type
-records a measure, a reading or an event.
-
-| Type | Version | family | kind | What it records | Identity | Fact time |
-|---|---|---|---|---|---|---|
-| `health.heart-rate.day` | 1 | vitals | measure | One day's resting, minimum and maximum heart rate as one fact (replaces `health.heart-rate-day`'s three a day) | `id` | interval start |
-| `health.heart-rate-alert` | 5 | vitals | event | One abnormal high heart rate alert from a watch | `source`, `kind`, `fact_time` | `fact_time` |
-| `health.blood-pressure` | 8 | vitals | reading | One blood pressure reading, as an Open mHealth body | `date_excel`, `reading` | `date_excel` |
-| `health.weight` | 7 | body | reading | One body weight | `id` | `date` |
-| `health.body-composition` | 5 | body | measure | A period's body metrics (fat, muscle and the rest) | `group`, `period_type`, `period_start` | `period_start` |
-| `health.sleep-episode` | 2 | sleep | measure | One sleep episode, as an IEEE 1752 sleep-episode body | `id` | interval start |
-| `health.lab-panel` | 3 | labs | event | One pathology request, the header of a draw's report | `id` | `collected` |
-| `health.lab-result` | 3 | labs | reading | One analyte's result from one draw | `id` | `collected` |
-| `health.condition` | 1 | conditions | event | A condition named in a document | `id` | `date` |
-| `health.illness.started` | 1 | conditions | event | The day an illness began (was `health.illness-started` v1, before the names took a third segment) | `id` | `date` |
-| `health.illness.ended` | 1 | conditions | event | The day an illness ended (was `health.illness-ended` v1, before the names took a third segment) | `id` | `date` |
-| `health.medication.started` | 1 | meds | event | A medicine course starting (was `health.medication-started` v1, before the names took a third segment) | `id` | `date` |
-| `health.medication.dose-changed` | 1 | meds | event | A change of dose within a course (was `health.medication-dose-changed` v1, before the names took a third segment) | `id` | `date` |
-| `health.medication.stopped` | 1 | meds | event | A course ending (was `health.medication-stopped` v1, before the names took a third segment) | `id` | `date` |
-| `health.medication.dose` | 3 | meds | event | One dose of a medicine taken at a moment, outside any course (was `health.medication-dose` up to v2, before the names took a third segment) | `id` | `taken_at` |
-| `health.medication.dose-missed` | 1 | meds | event | A dose the person says they missed (was `health.medication-missed-dose` v1, before the names took a third segment) | `id` | `date` |
-| `health.medication.compliance` | 1 | meds | measure | The person's own estimate of how well they kept to a course (was `health.medication-compliance` v1, before the names took a third segment) | `id` | `date` |
-| `health.encounter` | 2 | clinical | event | One appointment with a clinic or practitioner | `id` | `date` |
-| `health.donation` | 2 | clinical | event | One visit to give blood | `id` | `date` |
-| `health.vision-prescription` | 1 | clinical | reading | One lens prescription as an optometrist issued it, each eye as printed | `id` | `date` |
-| `activity.exercise-session.garmin` | 1 | exercise | event | One session a Garmin watch recorded, as an IEEE 1752 physical activity (was `activity.exercise-session` up to v2, before each vendor had its own leaf) | `id` | session start |
-| `activity.exercise-session.concept2` | 2 | exercise | event | One workout the Concept2 Logbook holds, as an IEEE 1752 physical activity (likewise) | `id` | session start |
-| `activity.exercise-session.technogym` | 2 | exercise | event | One indoor session on a Technogym machine, as an IEEE 1752 physical activity (likewise) | `id` | session start |
-| `activity.exercise-session.strong` | 2 | exercise | event | One Strong app workout, as an IEEE 1752 physical activity (likewise) | `id` | session start |
-| `activity.gym-visit` | 2 | exercise | event | One gym visit | `id` | `date` |
-| `activity.steps` | 2 | movement | measure | One day's steps, as an Open mHealth step-count body | `id` | interval start |
-| `place.trip.departed` | 1 | trips | event | Leaving home on a trip (was `place.departed` v1, before the names took a third segment) | `id` | `date` |
-| `place.trip.flight` | 1 | trips | event | One flight leg (was `place.flight` v1, before the names took a third segment) | `id` | `date` |
-| `place.trip.arrived` | 1 | trips | event | Arriving at one place during a trip (was `place.arrived` v1, before the names took a third segment) | `id` | `date` |
-| `place.trip.returned` | 1 | trips | event | Getting home from a trip (was `place.returned` v1, before the names took a third segment) | `id` | `date` |
-| `mind.attention` | 2 | attention | reading | What is absorbing the person at a moment, with a topic and an intensity from 1 to 5, as the person says it | `id` | `at` |
-| `mind.attention.started` | 1 | attention | event | The moment the person says a topic began to hold their attention; opens an episode of that topic | `id` | `at` |
-| `mind.attention.ended` | 1 | attention | event | The moment the person says a topic stopped holding their attention; closes the episode | `id` | `at` |
-| `health.intake` | 2 | intake | event | One caffeine drink, alcohol drink or notable meal, said in a few words at a moment: which drink and how many, or the meal in the person's words with rich and out; no nutrition | `id` | `at` |
-| `org.employment.started` | 1 | employment | event | Starting a period of employment with an organisation, in the role started in; opens the series for that org and stint; no pay | `id` | `date` |
-| `org.employment.role-changed` | 1 | employment | event | A change of role within a period of employment, restating the whole role; no pay | `id` | `date` |
-| `org.employment.ended` | 1 | employment | event | The end of a period of employment; closes the series | `id` | `date` |
-| `money.purchase` | 1 | purchases | event | One order or receipt from a merchant, with its lines and totals as the document states them, in the document's currency and never converted; the person's judgement about it (deductible, purpose) is a note, not a field | `id` | `date` |
-| `record.edge` | 3 | notes | event | An edge joining facets, with or without words; a note in the person's own words is one (was `note.annotation` (v1 to v3), then `record.note` (v1, v2)) | `id` | `at` |
-| `record.document` | 2 | documents |  | A pointer to one file in the documents library; the bytes never enter the ledger | `path` | `date` |
-| `health.heart-rate-day` | 2 | vitals | measure | One figure for a day's heart rate, as an Open mHealth heart-rate body (replaced by `health.heart-rate.day`; the garmin importer's snapshot leaves it absent, the operator retracts it, and it is kept for reads as-of before) | `id`, `statistic` | interval start |
-| `health.heart-rate` | 4 |  |  | A period's heart rate metrics (retired; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
-| `health.sleep` | 4 |  |  | A period's sleep metrics (retired; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
-| `health.metric-group` | 4 |  |  | A period's metrics for the health groups with no type of their own (retired; tombstoned, kept for reads as-of before it) | `group`, `period_type`, `period_start` | `period_start` |
+Every type is named `domain.concept[.specialisation…]`. The author's catalog keeps the first word
+to one of ten: `health`, `activity`, `place`, `record`, `mind`, `org` and `money` today, with
+`social`, `media` and `work` held for later. `family` groups types within a domain, and `kind`
+says whether a type records a measure, a reading or an event.
 
 ### Registered by importers
 
@@ -302,5 +263,4 @@ its status page.
 
 ## Licence
 
-Apache-2.0, see [`LICENSE`](LICENSE). Third-party material, the IEEE 1752 schemas bundled for
-conformance tests, is listed in [`NOTICE`](NOTICE).
+Apache-2.0, see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).

@@ -101,8 +101,10 @@ to save a page of code.
   template or slice a catalog or registry returns.
 
 **Embedded assets**
-- `//go:embed` (`embed.FS`) for small, static, versioned assets only (projection templates, bundled
-  facet definitions). Never embed large, mutable, or environment-specific content.
+- `//go:embed` (`embed.FS`) for small, static, versioned assets only (the inspector's HTML templates,
+  SQL schemas, the Datalog rule set, the `source_time` shapes). Never embed large, mutable, or
+  environment-specific content. The binary carries no catalog: Definitions and projection templates
+  are the deployment's, read from `definitions_dir` and `projections_dir` (card 255).
 
 **Security**
 - `gosec` must pass. `#nosec` requires rule ID + reason + approval. Never log secrets.

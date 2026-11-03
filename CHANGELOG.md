@@ -9,6 +9,17 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- The binary carries no catalog (card 255, R4b, slice 5). The Definitions and projection
+  templates that were built into it, with their history, are gone from the engine, along with the
+  registered templates under `projections/`, the rename tables under `renames/`, the IEEE 1752
+  conformance schemas and their `NOTICE` paragraph, `shared-core.json` and `internal/regimen`;
+  they live in the author's deployment repository. A deployment that set no `definitions_dir` and
+  `projections_dir` was already on an empty catalog since slice 3; it must now set them, or
+  register its types over the API, and there is no fallback to restore. The definition set
+  version of a catalog read from a directory does not move, so receipts verify as before.
+  `anam-bench gen` takes `--type` and reads that type's Definition from the configured catalog,
+  writing its fact time in the Definition's layout and zone and the two numbers its schema
+  requires; a type that does not fit is refused.
 - The daemon starts with no catalog configured, and says so (card 255, R4b, slice 3). An unset
   `definitions_dir` or `projections_dir` is now an empty component labelled `none`, never the
   catalog built into the binary: with both unset, `catalog admitted` reads

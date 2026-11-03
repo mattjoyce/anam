@@ -118,8 +118,8 @@ func TestRename_RefusesBeforeWriting(t *testing.T) {
 	t.Parallel()
 	f := newLedgerFixture(t)
 	start := record{"test.course.started", `{"id": "start:trip/1", "date": "2026-04-01", "name": "trip", "course": 1, "dose": "1 u"}`}
-	before := f.admitHeld(t, heldDefs(t, "test.retired"), stops)
-	before = f.admit(t, []record{start})
+	f.admitHeld(t, heldDefs(t, "test.retired"), stops)
+	before := f.admit(t, []record{start})
 
 	// test.measure composes its id from /at and /seq, where a stop's is its id: another
 	// identity key, so the ids would not meet. A different fact-time rule alone is no

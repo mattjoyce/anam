@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -75,7 +76,7 @@ func denseServer(t *testing.T) (*httptest.Server, *countingLedger) {
 	}
 
 	cl := &countingLedger{Ledger: l}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: cl, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: cl, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 	return srv, cl
 }
@@ -337,7 +338,7 @@ func TestTimeline_BareRootOpensTheLastMonth(t *testing.T) {
 	}
 	now := time.Date(2026, 11, 2, 15, 0, 0, 0, time.UTC)
 	srv := httptest.NewServer(inspect.Handler(inspect.Deps{
-		Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets,
+		Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets,
 		Zone: "Australia/Sydney", Now: func() time.Time { return now },
 	}))
 	t.Cleanup(srv.Close)

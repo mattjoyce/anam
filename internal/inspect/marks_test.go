@@ -6,6 +6,7 @@ import (
 	"testing"
 	"unicode"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 )
@@ -27,6 +28,9 @@ func TestTypeStyles_CoverEveryBundledType(t *testing.T) {
 	for _, f := range families {
 		rows[f.ID] = true
 	}
+	// The catalog's source directory on disk, not the embedded FS: a manifest left out
+	// of the embed then fails here as "not a bundled type". Stays on the personal
+	// catalog until R4b (card 255).
 	entries, err := os.ReadDir("../def/manifests")
 	if err != nil {
 		t.Fatalf("read manifests: %v", err)
@@ -97,10 +101,7 @@ func TestTypeStyles_ShapesMeanWhatTheLegendSays(t *testing.T) {
 // earlier watermark.
 func TestTypeStyles_GarminTypesTakeTheRowsTheyReplaced(t *testing.T) {
 	t.Parallel()
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatalf("Bundled: %v", err)
-	}
+	reg := catalogtest.Definitions(t)
 	cases := []struct {
 		typ, replaced facet.Type
 	}{

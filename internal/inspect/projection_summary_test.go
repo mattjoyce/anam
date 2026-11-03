@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -180,7 +181,7 @@ func TestProjectionSummary_ReadsNoVersionsFromTheLedger(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = l.Close() })
 	c := &readCounter{Ledger: l}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: c, Timeout: 30 * time.Second, Buckets: defaultBuckets, CachedReads: 4}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: c, Timeout: 30 * time.Second, Buckets: defaultBuckets, CachedReads: 4}))
 	t.Cleanup(srv.Close)
 
 	// The first read folds the head, which fetches the live versions in one batch.
@@ -255,7 +256,7 @@ func seedBig(t *testing.T, n int) *httptest.Server {
 	w := seedFacetNoT("weight:1", "health.weight", `{"kg": 70}`)
 	admit(w, facet.EventAdmitted, 0)
 
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: 60 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 60 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 	return srv
 }

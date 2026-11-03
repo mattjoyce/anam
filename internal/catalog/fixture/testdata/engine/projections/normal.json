@@ -1,0 +1,22 @@
+{
+  "name": "normal",
+  "version": 1,
+  "description": "Every type the catalog holds, but only the facets classified Normal: the ceiling withholds the rest. It is nobody's record.",
+  "types": [
+    "record.document",
+    "record.edge",
+    "test.course.",
+    "test.labelled",
+    "test.measure",
+    "test.reading",
+    "test.templated"
+  ],
+  "statuses": [
+    "admitted",
+    "endorsed"
+  ],
+  "max_classification": "Normal",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

@@ -1,0 +1,89 @@
+{
+  "meta": {
+    "facet_type": "test.reading",
+    "definition_version": 2,
+    "kind": "reading",
+    "family": "readings",
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "fixture/test.reading",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/at",
+        "layout": "2006-01-02 15:04",
+        "zone": "Europe/Berlin",
+        "zone_pointer": "/source_time/offset"
+      }
+    },
+    "identity_key": [
+      "/id"
+    ],
+    "min_binding_assurance": "medium"
+  },
+  "handling": {
+    "label": "{/value} {/unit}"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One instrument value said at a wall clock, read at the offset source_time names, or in Europe/Berlin when it names none. Version 2 requires source_time and reads its offset; version 1 read every value in Europe/Berlin. It is nobody's record.",
+    "type": "object",
+    "required": [
+      "id",
+      "at",
+      "value",
+      "unit",
+      "source_time"
+    ],
+    "properties": {
+      "source_time": {
+        "type": "object",
+        "required": [
+          "value",
+          "zone",
+          "offset",
+          "basis"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": "string",
+            "minLength": 1
+          },
+          "zone": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^([A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$"
+          },
+          "offset": {
+            "type": "string",
+            "pattern": "^[+-]([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "source",
+              "configuration",
+              "assumption"
+            ]
+          }
+        }
+      },
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "at": {
+        "type": "string",
+        "minLength": 1
+      },
+      "value": {
+        "type": "number"
+      },
+      "unit": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "additionalProperties": false
+  }
+}

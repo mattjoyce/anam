@@ -1,0 +1,18 @@
+{
+  "name": "course",
+  "version": 2,
+  "description": "The latest statement about each course, with stopped courses gone. Version 2 names the stop test.course.stopped; version 1 named it test.retired. It is nobody's record.",
+  "types": [
+    "test.course.started",
+    "test.course.changed",
+    "test.course.stopped"
+  ],
+  "statuses": [
+    "admitted",
+    "endorsed"
+  ],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "snapshot"
+}

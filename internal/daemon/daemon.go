@@ -155,10 +155,6 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 	if err != nil {
 		return nil, err
 	}
-	drift, err := catalogDrift(ctx, cfg.DefinitionsDir, cfg.ProjectionsDir, cat)
-	if err != nil {
-		return nil, err
-	}
 	bundled := cat.Definitions()
 	whom, err := loadPrincipals(cfg.ImportersFile, tok, bundled)
 	if err != nil {
@@ -217,7 +213,7 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 		"definitions_source", cat.DefinitionsSource(),
 		"projections_source", cat.ProjectionsSource(),
 		"definition_set_version", cat.SetVersion())
-	logCatalogDrift(drift)
+	logCatalogGaps(cfg, cat)
 	readOps, err := ops.OpenReadOnly(ctx, cfg.DBPath)
 	if err != nil {
 		closeAll()

@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mattjoyce/anam/internal/catalog"
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
@@ -183,14 +184,11 @@ func TestHeartV3ServesOneFactADay(t *testing.T) {
 	}
 }
 
-// builtInCatalog is the catalog a local command loads with no directories set: the
-// embedded one. Allow-listed for R4a (card 255) with this corpus test; R4b moves both
-// to the deployment repo.
+// builtInCatalog is the personal catalog this corpus test reads, loaded from
+// directories: a byte copy of the one the binary carries, since no directory now
+// selects the empty catalog (card 255, R4b). R4b moves the test to the deployment
+// repo.
 func builtInCatalog(t *testing.T) *catalog.Catalog {
 	t.Helper()
-	cat, err := catalog.Load(context.Background(), "", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return cat
+	return catalogtest.Catalog(t)
 }

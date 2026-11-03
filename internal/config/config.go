@@ -72,8 +72,8 @@ type Config struct {
 
 	// DefinitionsDir and ProjectionsDir name the deployment's catalog: a directory of
 	// Definition manifests (and projection templates), current ones at its root and
-	// earlier versions under history/. Empty means the catalog built into the binary.
-	// A set directory replaces that component; it is not added to the built-in one.
+	// earlier versions under history/. Empty means no files for that component: the
+	// daemon starts on what is registered in its store and logs a WARN (card 255).
 	// Relative paths are from the working directory. Each is read once, at start.
 	DefinitionsDir string `yaml:"definitions_dir"`
 	ProjectionsDir string `yaml:"projections_dir"`
@@ -327,7 +327,7 @@ const DefaultMaxReadBytes = 512 << 10
 const DefaultDefaultProjection = ""
 
 // DefaultDefinitionsDir and DefaultProjectionsDir are definitions_dir's and
-// projections_dir's defaults: none, which is the catalog built into the binary.
+// projections_dir's defaults: none, which is the empty catalog (card 255).
 const (
 	DefaultDefinitionsDir = ""
 	DefaultProjectionsDir = ""

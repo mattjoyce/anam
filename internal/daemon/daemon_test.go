@@ -68,7 +68,7 @@ func TestNewConfig_ReadsTheFixtureCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cat.DefinitionsSource() == "embedded" || cat.ProjectionsSource() == "embedded" {
+	if cat.DefinitionsSource() != cfg.DefinitionsDir || cat.ProjectionsSource() != cfg.ProjectionsDir || cfg.DefinitionsDir == "" {
 		t.Errorf("newConfig loads definitions from %s and projections from %s, want a fixture copy for both",
 			cat.DefinitionsSource(), cat.ProjectionsSource())
 	}

@@ -59,17 +59,18 @@ var embeddedAllowList = []allowed{
 		funcs:  []string{"TestBundled_MedsIsASnapshot"},
 		reason: "the personal meds projection; to the deployment repo"},
 
-	// Slice 3 (#32): catalog.
-	{file: "internal/catalog/embedded_test.go",
-		reason: "the embedded path of catalog.Load: a disk copy loads the same catalog, built once per process; rewritten for the empty embedded catalog"},
+	// Slice 3 (#32): catalog. R4b slice 3 rewrote it for the empty catalog.
+	{file: "internal/catalog/empty_test.go",
+		reason: "catalog.Load with an empty directory is its subject: the empty catalog labelled none, its V, built once per process; it reads nothing embedded, and stays listed while the rule flags every empty directory"},
 
-	// Slice 4 (#34): daemon and app.
-	{file: "internal/daemon/catalog_drift_test.go",
-		reason: "the drift report compares against the embedded catalog (driftConfig clears the directories); rewritten with the new drift baseline"},
-	{file: "internal/daemon/catalog_dirs_embedded_test.go",
-		reason: "a receipt minted on the embedded catalog verifies after the switch to directory copies (R2b's transition oracle); goes in R4b"},
+	// Slice 4 (#34): daemon and app. R4b slice 3 deleted catalog_drift_test.go with
+	// the drift report, and catalog_dirs_embedded_test.go, since an empty directory no
+	// longer selects the embedded catalog to mint on; builtInCatalog now reads the fixture.
+	{file: "internal/daemon/catalog_start_test.go",
+		funcs:  []string{"TestOpen_NoCatalogStartsEmpty"},
+		reason: "a daemon on a config with no catalog directories starts on the empty catalog and logs the WARN and structural lines (R4b slice 3); reads nothing embedded"},
 	{file: "internal/app/heartrateday_retire_internal_test.go",
-		reason: "corpus retirement (card 205) over def.Bundled, projection.Bundled and builtInCatalog; to the deployment repo with the corpus tests"},
+		reason: "corpus retirement (card 205) over def.Bundled and projection.Bundled; to the deployment repo with the corpus tests"},
 
 	// Slice 5 (#33): inspect.
 	{file: "internal/inspect/marks_test.go",

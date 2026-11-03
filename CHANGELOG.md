@@ -9,6 +9,22 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- The daemon starts with no catalog configured, and says so (card 255, R4b, slice 3). An unset
+  `definitions_dir` or `projections_dir` is now an empty component labelled `none`, never the
+  catalog built into the binary: with both unset, `catalog admitted` reads
+  `definitions_source=none projections_source=none` with the set version of no files
+  (`sha256:e3b0c442...b855`), followed by
+  `WARN daemon: no catalog configured; set definitions_dir and projections_dir, or register definitions over the API`.
+  Local commands load the same empty catalog. The engine reads `record.edge` and `record.document`
+  by name, and each catalog supplies them. One lacking either starts and logs
+  `INFO daemon: structural type not in the catalog` with the `type` and its `effect` (links, or
+  documents, are off). One declaring them in a shape the engine cannot read is refused at start,
+  before any store opens, naming the type, version and pointer: `record.edge` `from`, `to` or
+  `about` other than an array of strings, `kind` without a non-empty enum, or a `record.document`
+  that does not require `sha256`. The drift report against the embedded catalog is gone, and with it
+  the `daemon: catalog matches embedded` and `catalog drifts from embedded` lines, so a deploy
+  check that requires the first must drop it. A deployment that sets both directories, as the
+  example config advises, sees the same V and no new line.
 - Tests get their catalogs from fixtures (card 255, R4a, first slice). `internal/catalog/fixture`
   holds `mattjoyce`, a byte copy of the embedded catalog, and `minimal`, a small catalog with
   `record.edge` and `record.document` in UTC, one measure type and one projection;

@@ -82,11 +82,11 @@ func (c *Catalog) ProjectionManifests() []projection.Stored {
 func (c *Catalog) SetVersion() string { return c.setVersion }
 
 // DefinitionsSource returns the source label for definitions:
-// "embedded" or the resolved directory path.
+// "none" or the resolved directory path.
 func (c *Catalog) DefinitionsSource() string { return c.definitionsSource }
 
 // ProjectionsSource returns the source label for projections:
-// "embedded" or the resolved directory path.
+// "none" or the resolved directory path.
 func (c *Catalog) ProjectionsSource() string { return c.projectionsSource }
 
 // CheckRegistered refuses a registered Definition whose body disagrees with the
@@ -133,24 +133,27 @@ func (c *Catalog) WithRegistered(registered []def.Stored) (*def.Registry, error)
 	return def.WithRegistered(c.definitions, registered)
 }
 
-// Load builds and validates a catalog. An empty directory selects the embedded
-// catalog for that component, labelled "embedded"; a nonempty one is a resolved
-// directory path, which must exist and is used as its label. Load does not expand
-// paths, read configuration, inspect the environment, or log, and it writes nothing.
+// Load builds and validates a catalog. An empty directory selects the empty
+// component, labelled "none": no files, so no definitions, projections or history. A
+// nonempty one is a resolved directory path, which must exist and is used as its
+// label. Load does not expand paths, read configuration, inspect the environment, or
+// log, and it writes nothing. It never reads the catalog the binary carries.
 //
 // Each component is read once into memory and every parser, and the set version,
-// runs over that snapshot. Load returns a catalog only when both components and the
-// duplicate check pass; every failure returns nil and an error wrapping ErrInvalid
-// together with the underlying cause.
+// runs over that snapshot. A current record.edge or record.document whose declared
+// shape the engine cannot read is refused (checkStructural); one that is absent is
+// not, and AbsentStructural names it. Load returns a catalog only when both
+// components, the duplicate check and the structural check pass; every failure
+// returns nil and an error wrapping ErrInvalid together with the underlying cause.
 //
-// With both directories empty Load returns the embedded catalog, which is built once
-// per process and shared (see embedded).
+// With both directories empty Load returns the empty catalog, whose set version is
+// SHA-256 over nothing. It is built once per process and shared (see empty).
 func Load(ctx context.Context, definitionsDir, projectionsDir string) (*Catalog, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 	if definitionsDir == "" && projectionsDir == "" {
-		c, err := embedded()
+		c, err := empty()
 		if err != nil {
 			return nil, err
 		}
@@ -162,19 +165,17 @@ func Load(ctx context.Context, definitionsDir, projectionsDir string) (*Catalog,
 	return load(ctx, definitionsDir, projectionsDir)
 }
 
-// embedded is the catalog built from the binary's own files. Those cannot change
-// while the process runs, so it is built once, on first use, and every caller shares
-// it: a Catalog has no mutation methods and its accessors copy. The daemon builds a
-// catalog once per start anyway; the saving is in tests, where every daemon and local
-// command used to parse and compile all of it again.
-var embedded = sync.OnceValues(func() (*Catalog, error) {
+// empty is the catalog of no files. It cannot change, so it is built once, on first
+// use, and every caller shares it: a Catalog has no mutation methods and its
+// accessors copy.
+var empty = sync.OnceValues(func() (*Catalog, error) {
 	return load(context.Background(), "", "")
 })
 
 // load builds a catalog from its sources, checking ctx before every filesystem read.
 func load(ctx context.Context, definitionsDir, projectionsDir string) (*Catalog, error) {
 
-	defSrc, defLabel, err := source(definitionsDir, def.EmbeddedFS)
+	defSrc, defLabel, err := source(definitionsDir)
 	if err != nil {
 		return nil, fmt.Errorf("%w: definitions_dir: %s: %w", ErrInvalid, defLabel, err)
 	}
@@ -186,7 +187,7 @@ func load(ctx context.Context, definitionsDir, projectionsDir string) (*Catalog,
 		return nil, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 
-	projSrc, projLabel, err := source(projectionsDir, projection.EmbeddedFS)
+	projSrc, projLabel, err := source(projectionsDir)
 	if err != nil {
 		return nil, fmt.Errorf("%w: projections_dir: %s: %w", ErrInvalid, projLabel, err)
 	}
@@ -217,10 +218,14 @@ func load(ctx context.Context, definitionsDir, projectionsDir string) (*Catalog,
 	return c, nil
 }
 
-// source selects a component's root and its label.
-func source(dir string, embedded func() fs.FS) (fs.FS, string, error) {
+// noSource labels a component no directory was configured for.
+const noSource = "none"
+
+// source selects a component's root and its label: a configured directory, or for
+// none the empty root.
+func source(dir string) (fs.FS, string, error) {
 	if dir == "" {
-		return embedded(), "embedded", nil
+		return &snapshot{root: map[string][]byte{}}, noSource, nil
 	}
 	root, err := dirRoot(dir)
 	return root, dir, err
@@ -245,7 +250,11 @@ func (c *Catalog) loadDefinitions(snap *snapshot) error {
 	if err != nil {
 		return err
 	}
-	if err := checkDuplicateDefs(manifests[:len(manifests)-len(history)], history); err != nil {
+	current := manifests[:len(manifests)-len(history)]
+	if err := checkDuplicateDefs(current, history); err != nil {
+		return err
+	}
+	if err := checkStructural(current); err != nil {
 		return err
 	}
 	c.definitions, c.manifests, c.history, c.setVersion = reg, manifests, history, setVersion

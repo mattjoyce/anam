@@ -87,16 +87,23 @@ listen: 127.0.0.1:8787
 # importers_file: ~/.config/anam/importers.yaml
 
 # The catalog: the Facet Definitions and projection templates this deployment runs on.
-# Unset, each is the catalog built into the binary. Set, a directory replaces the
-# built-in one for that component (it is not added to it): current manifests at its
-# root, earlier versions under history/. The two are chosen independently. Each is read
-# once at start; a directory that is missing or unreadable stops the start, and the
-# daemon never falls back to the built-in catalog or creates the directory. A relative
+# Each is a directory: current manifests at its root, earlier versions under history/.
+# The two are chosen independently. Unset, a component is empty: the daemon starts with
+# no catalog Definitions or templates, serves what is registered in its store, and logs
+# `WARN daemon: no catalog configured`. Each is read once at start; a directory that is
+# missing or unreadable stops the start, and the daemon never creates it. A relative
 # path is from the working directory, so prefer an absolute one in service config.
-# Start from a copy of internal/def/manifests and internal/projection/manifests; keep
-# the file names and bytes, since a receipt names the definition set's version. The
-# files say which templates are current: remove one and it is no longer served, and a
-# receipt served through it still verifies from the template body it filed.
+# Keep the file names and bytes once receipts name them, since a receipt names the
+# definition set's version. The files say which templates are current: remove one and
+# it is no longer served, and a receipt served through it still verifies from the
+# template body it filed.
+# The engine reads two types by name, and ships neither: record.edge (links) and
+# record.document (documents in the library). Supply both, with your zone; copies of
+# internal/catalog/fixture/testdata/minimal/definitions/record.*.json, read in UTC, are
+# a start. A catalog without one starts and logs `structural type not in the catalog`
+# for it, and that feature is off. A record.edge whose from, to or about is not a list
+# of strings, or whose kind has no enum, or a record.document that does not require
+# sha256, stops the start.
 # definitions_dir: /etc/anam/definitions
 # projections_dir: /etc/anam/projections
 

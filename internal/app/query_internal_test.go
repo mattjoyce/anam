@@ -14,7 +14,7 @@ import (
 func TestQueryCheck_OverARealLedger(t *testing.T) {
 	t.Parallel()
 	f := newLedgerFixture(t)
-	before := f.admit(t, bpReadings)
+	before := f.admit(t, measureRows)
 
 	out, _, err := cli(t, f.cfgPath, "query", "check")
 	if err != nil {
@@ -26,17 +26,17 @@ func TestQueryCheck_OverARealLedger(t *testing.T) {
 		}
 	}
 
-	out, _, err = cli(t, f.cfgPath, "query", "check", "--every", "2", "--projection", "bp", "--ledger", f.ledgerPath, "--person", "matt")
+	out, _, err = cli(t, f.cfgPath, "query", "check", "--every", "2", "--projection", "measures", "--ledger", f.ledgerPath, "--person", "matt")
 	if err != nil {
-		t.Fatalf("query check --every 2 --projection bp: %v\n%s", err, out)
+		t.Fatalf("query check --every 2 --projection measures: %v\n%s", err, out)
 	}
-	for _, want := range []string{"projection  bp v1", "served=3", "compared    2 of 3 fact-times (every 2)", "OK"} {
+	for _, want := range []string{"projection  measures v1", "served=3", "compared    2 of 3 fact-times (every 2)", "OK"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output omits %q:\n%s", want, out)
 		}
 	}
 
-	if _, _, err := cli(t, f.cfgPath, "query", "check", "--projection", "meds"); err == nil || !strings.Contains(err.Error(), "snapshot-shaped") {
+	if _, _, err := cli(t, f.cfgPath, "query", "check", "--projection", "course"); err == nil || !strings.Contains(err.Error(), "snapshot-shaped") {
 		t.Errorf("a snapshot-shaped projection = %v, want a refusal naming the shape", err)
 	}
 	if _, _, err := cli(t, f.cfgPath, "query", "check", "--every", "0"); err == nil {

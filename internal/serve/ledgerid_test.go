@@ -19,7 +19,7 @@ func TestVerify_AgainstAnotherLedgerSaysSo(t *testing.T) {
 	h.seed(t)
 	ctx := context.Background()
 
-	out, err := serve.Run(ctx, h.deps, "bp", false)
+	out, err := serve.Run(ctx, h.deps, "measures", false)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestVerify_UnnamedLedgerIsANote(t *testing.T) {
 	h.seed(t)
 	ctx := context.Background()
 
-	out, err := serve.Run(ctx, h.deps, "bp", false)
+	out, err := serve.Run(ctx, h.deps, "measures", false)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}

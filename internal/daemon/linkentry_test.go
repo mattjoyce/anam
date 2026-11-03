@@ -15,30 +15,29 @@ import (
 )
 
 // Card 199, slice 3: the entry points into the selection page and the whole walk from a
-// facet's page to a saved link, through a real daemon. The facets are synthetic Garmin
-// heart-rate alerts and a session on one day; nothing here is a real reading.
+// facet's page to a saved link, through a real daemon. The facets are five test.labelled
+// alerts and a test.course.started on one UTC day; nothing here is a real reading.
 
 var linkThisRE = regexp.MustCompile(`<a href="(/select\?tick=[^"]+)">link this…</a>`)
 
-// alertEnv is a heart-rate alert at a UTC minute on 21 October 2026.
+// alertEnv is a test.labelled alert at a UTC minute on 21 October 2026.
 func alertEnv(t *testing.T, version int, minute string) string {
 	t.Helper()
-	at := "2026-10-21T" + minute + ":00Z"
-	return fmt.Sprintf(`{"type": "health.heart-rate-alert", "definition_version": %d, "payload": {
-		"source": "garmin", "kind": "hr_high_alert", "fact_time": %q, "heart_rate": 124, "threshold": 120, "unit": "bpm",
-		"source_time": {"value": %q, "zone": "UTC", "basis": "source"}}}`, version, at, at)
+	return fmt.Sprintf(`{"type": "test.labelled", "definition_version": %d, "payload": {
+		"id": "alert:%[2]s", "at": "2026-10-21 %[2]s", "kind": "other", "text": "a high heart rate"}}`, version, minute)
 }
 
-// sessionEnv is a walking session on 21 October 2026.
+// sessionEnv is a walk starting a test.course on 22 October 2026 in Berlin, whose
+// midnight is 22:00 UTC on the 21st: the same UTC day as the alerts, under the
+// test.course. prefix.
 func sessionEnv(version int) string {
-	return fmt.Sprintf(`{"type": "activity.exercise-session.garmin", "definition_version": %d, "payload": {
-		"id": "garmin:session:2026-10-21T04:00:00Z", "activity_name": "walking",
-		"effective_time_frame": {"time_interval": {"start_date_time": "2026-10-21T15:00:00+11:00", "duration": {"value": 1800, "unit": "sec"}}}}}`, version)
+	return fmt.Sprintf(`{"type": "test.course.started", "definition_version": %d, "payload": {
+		"id": "course:walking:1", "date": "2026-10-22", "name": "walking", "course": 1, "dose": "30 minutes"}}`, version)
 }
 
 // servingDay starts a daemon whose Workbench enters links and whose test importer may
-// write heart-rate alerts and Garmin sessions, and admits five alerts and a session. It
-// returns the alerts' facet ids in minute order and the session's.
+// write test.labelled and test.course.started, and admits five alerts and a session.
+// It returns the alerts' facet ids in minute order and the session's.
 func servingDay(t *testing.T, workbench bool) (d *Daemon, base string, alerts []string, session string) {
 	t.Helper()
 	cfg := importerConfig(t)
@@ -46,8 +45,8 @@ func servingDay(t *testing.T, workbench bool) (d *Daemon, base string, alerts []
 	if err != nil {
 		t.Fatal(err)
 	}
-	body := strings.Replace(string(raw), "types: [health.weight, test.reading]",
-		"types: [health.weight, test.reading, health.heart-rate-alert, activity.exercise-session.garmin]", 1)
+	body := strings.Replace(string(raw), "types: [test.reading, test.registered]",
+		"types: [test.reading, test.registered, test.labelled, test.course.started]", 1)
 	if workbench {
 		body += "  - source: workbench\n    types: [record.edge]\n"
 	}
@@ -55,8 +54,8 @@ func servingDay(t *testing.T, workbench bool) (d *Daemon, base string, alerts []
 		t.Fatal(err)
 	}
 	d, base, _ = serveImporters(t, cfg)
-	alertDef, _ := d.defs.current.Load().Lookup("health.heart-rate-alert")
-	sessionDef, _ := d.defs.current.Load().Lookup("activity.exercise-session.garmin")
+	alertDef, _ := d.defs.current.Load().Lookup("test.labelled")
+	sessionDef, _ := d.defs.current.Load().Lookup("test.course.started")
 	envs := []string{
 		alertEnv(t, alertDef.Version, "03:10"), alertEnv(t, alertDef.Version, "03:20"), alertEnv(t, alertDef.Version, "03:30"),
 		alertEnv(t, alertDef.Version, "03:40"), alertEnv(t, alertDef.Version, "03:50"), sessionEnv(sessionDef.Version),
@@ -115,8 +114,8 @@ func TestLinkThisFromAnAlertToASavedLinkOfFourFacets(t *testing.T) {
 	if !strings.Contains(dated, `<strong id="matched">6</strong>`) {
 		t.Fatalf("the day should match 6 facets:\n%s", dated)
 	}
-	q.Add("type", "health.heart-rate-alert")
-	q.Add("type", "activity.exercise-session.")
+	q.Add("type", "test.labelled")
+	q.Add("type", "test.course.")
 	_, listed := page(t, "GET", base+"/select?"+q.Encode(), nil, nil)
 	if !strings.Contains(listed, `<strong id="matched">6</strong>`) {
 		t.Fatalf("the concepts should match 6 facets:\n%s", listed)
@@ -179,8 +178,8 @@ func TestTheOrderOfCriteriaReachesTheSameSelection(t *testing.T) {
 	_, base, alerts, session := servingDay(t, true)
 	tick := url.Values{"tick": {alerts[0]}}
 	dateFirst := url.Values{"tick": {alerts[0]}, "from": {"2026-10-21"}, "to": {"2026-10-21"}}
-	dateFirst.Add("type", "health.heart-rate-alert")
-	conceptFirst := url.Values{"tick": tick["tick"], "type": {"health.heart-rate-alert"}}
+	dateFirst.Add("type", "test.labelled")
+	conceptFirst := url.Values{"tick": tick["tick"], "type": {"test.labelled"}}
 	conceptFirst.Set("from", "2026-10-21")
 	conceptFirst.Set("to", "2026-10-21")
 	_, a := page(t, "GET", base+"/select?"+dateFirst.Encode(), nil, nil)

@@ -12,9 +12,9 @@ import (
 // types it reads through, with no projection registered first. The receipt verifies
 // after the daemon restarts, because the template's body is filed by its hash.
 
-const inlineWeightsBody = `{"types": ["health.weight"], "statuses": ["admitted", "endorsed"], "max_classification": "Sensitive"}`
+const inlineWeightsBody = `{"types": ["test.reading"], "statuses": ["admitted", "endorsed"], "max_classification": "Sensitive"}`
 
-const weightQuery = `high(E, V) :- entry(E, "health.weight", _, _, _, _, _), attr(E, "/kg", V), V > 80.`
+const weightQuery = `high(E, V) :- entry(E, "test.reading", _, _, _, _, _), attr(E, "/value", V), V > 80.`
 
 func inlineQuery(projection string, extra string) string {
 	return `{"projection": ` + projection + `, "relation": "high", "text": "` + strings.ReplaceAll(weightQuery, `"`, `\"`) + `"` + extra + `}`
@@ -25,7 +25,7 @@ func TestInlineProjection_AReaderQueriesAndTheReceiptVerifiesAfterARestart(t *te
 	cfg := rolesConfig(t)
 	d, url, stop := serveImporters(t, cfg)
 
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	call(t, "POST", url+"/v1/envelopes", importerToken, batch(weighIn("w-1", 80.5, weight.Version), weighIn("w-2", 79.0, weight.Version)), http.StatusOK, nil)
 
 	var a api.QueryAnswer
@@ -45,7 +45,7 @@ func TestInlineProjection_AReaderQueriesAndTheReceiptVerifiesAfterARestart(t *te
 	// is another.
 	var same api.QueryAnswer
 	call(t, "POST", url+"/v1/query", readerToken,
-		inlineQuery(`{"max_classification":"Sensitive","statuses":["admitted","endorsed"],"types":["health.weight"]}`, `, "dry_run": true`),
+		inlineQuery(`{"max_classification":"Sensitive","statuses":["admitted","endorsed"],"types":["test.reading"]}`, `, "dry_run": true`),
 		http.StatusOK, &same)
 	if same.Receipt.TemplateHash != r.TemplateHash || same.Written {
 		t.Errorf("same template: hash %s written %v, want %s and a dry run", same.Receipt.TemplateHash, same.Written, r.TemplateHash)
@@ -85,9 +85,9 @@ func TestInlineProjection_AMalformedTemplateIsRefusedNamingTheField(t *testing.T
 		"a bad from":       {`{"types": [], "statuses": [], "max_classification": "Normal", "from": "yesterday"}`, "from"},
 		"a name":           {`{"name": "x", "types": [], "statuses": [], "max_classification": "Normal"}`, "name"},
 		"an unknown key":   {`{"types": [], "statuses": [], "max_classification": "Normal", "bogus": 1}`, "bogus"},
-		"no Definition":    {`{"types": ["health.nothing"], "statuses": [], "max_classification": "Normal"}`, "health.nothing"},
+		"no Definition":    {`{"types": ["test.nothing"], "statuses": [], "max_classification": "Normal"}`, "test.nothing"},
 		"a number":         {`7`, "projection"},
-		"an array":         {`["health.weight"]`, "projection"},
+		"an array":         {`["test.reading"]`, "projection"},
 		"an empty object":  {`{}`, "types"},
 		"neither name nor": {`""`, "projection"},
 	} {

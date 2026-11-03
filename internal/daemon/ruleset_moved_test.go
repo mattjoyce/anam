@@ -18,7 +18,7 @@ func TestVerify_AMovedRuleSetIs409(t *testing.T) {
 	cfg := rolesConfig(t)
 	d, url, _ := serveImporters(t, cfg)
 
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	call(t, "POST", url+"/v1/envelopes", importerToken, batch(weighIn("w-1", 80.5, weight.Version)), http.StatusOK, nil)
 
 	var a api.QueryAnswer

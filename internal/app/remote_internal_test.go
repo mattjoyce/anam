@@ -47,7 +47,7 @@ func newRemoteFixtureIn(t *testing.T, zone string) remoteFixture {
 func newRemoteFixtureWith(t *testing.T, zone string, tweak func(t *testing.T, f remoteFixture, cfg *config.Config)) remoteFixture {
 	t.Helper()
 	f := remoteFixture{ledgerFixture: newLedgerFixture(t)}
-	f.admit(t, bpReadings)
+	f.admit(t, measureRows)
 	// Both sides read the reader's zone from config; UTC keeps the expected output
 	// independent of the machine running the test.
 	appendFile(t, f.cfgPath, "zone: "+zone+"\n")
@@ -255,7 +255,7 @@ func TestAWrongTokenIsRefused(t *testing.T) {
 func TestUnroutedCommandsRefuseWithAServer(t *testing.T) {
 	t.Parallel()
 	f := newRemoteFixture(t)
-	for _, args := range [][]string{{"init"}, {"serve", "meds"}, {"retract", "x"}, {"daemon"}} {
+	for _, args := range [][]string{{"init"}, {"serve", "course"}, {"retract", "x"}, {"daemon"}} {
 		_, _, err := cli(t, f.remoteCfg, args...)
 		if err == nil || !strings.Contains(err.Error(), "opens local files") {
 			t.Errorf("%v with a server: %v, want a refusal", args, err)
@@ -269,14 +269,14 @@ func TestUnroutedCommandsRefuseWithAServer(t *testing.T) {
 
 func TestTimeline_SameOverTheDaemon(t *testing.T) {
 	t.Parallel()
-	f := newRemoteFixtureIn(t, "Australia/Sydney")
+	f := newRemoteFixtureIn(t, "Europe/Berlin")
 	for _, args := range [][]string{
 		{"timeline"},
 		{"timeline", "--json"},
 		{"timeline", "--from", "2026-02-10"},
 		{"timeline", "--to", "2026-02-10"},
 		{"timeline", "--at", "2026-02-10"},
-		{"timeline", "--type", "health.blood-pressure"},
+		{"timeline", "--type", "test.measure"},
 		{"timeline", "--type", "no.such-type", "--json"},
 		{"timeline", "--as-of", "2000-01-01"},
 		{"timeline", "--explain"},
@@ -326,14 +326,14 @@ func TestCoverage_SameOverTheDaemon(t *testing.T) {
 	t.Parallel()
 	f := newRemoteFixture(t)
 	out := f.sameOutput(t, "coverage")
-	if !strings.Contains(out, "health.blood-pressure  3") {
+	if !strings.Contains(out, "test.measure  3") {
 		t.Errorf("coverage missed the readings:\n%s", out)
 	}
 	for _, args := range [][]string{
 		{"coverage", "--json"},
 		{"coverage", "--w", "1"},
 		{"coverage", "--as-of", "2000-01-01"},
-		{"coverage", "--projection", "bp"},
+		{"coverage", "--projection", "measures"},
 	} {
 		f.sameOutput(t, args...)
 	}
@@ -360,8 +360,8 @@ func TestReceipts_SameOverTheDaemon(t *testing.T) {
 	f.sameOutput(t, "receipt", "list")
 
 	// A serve publishes a receipt into the artifact directory the daemon reads.
-	if _, _, err := cli(t, f.cfgPath, "serve", "bp"); err != nil {
-		t.Fatalf("serve bp: %v", err)
+	if _, _, err := cli(t, f.cfgPath, "serve", "measures"); err != nil {
+		t.Fatalf("serve measures: %v", err)
 	}
 	list := f.sameOutput(t, "receipt", "list")
 	hash := ""

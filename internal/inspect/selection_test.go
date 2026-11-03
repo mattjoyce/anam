@@ -21,8 +21,9 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
-// The selection page (card 199) over a real ledger: a weigh-in of two readings and a
-// blood pressure at one moment, two heart-rate alerts, a run, an older weight.
+// The selection page (card 199) over a real ledger: two readings and a measure at one
+// moment (one sitting), two course starts, a session, an older reading. The types are
+// the engine fixture's, but for the session, which no Definition names.
 
 type pick struct{ ref, typ, source string }
 
@@ -30,13 +31,13 @@ var picks = []struct {
 	pick
 	at time.Time
 }{
-	{pick{"w1", "health.weight", "withings"}, time.Date(2026, 10, 2, 7, 0, 0, 0, time.UTC)},
-	{pick{"w2", "health.weight", "withings"}, time.Date(2026, 10, 2, 7, 0, 0, 0, time.UTC)},
-	{pick{"bp1", "health.blood-pressure", "withings"}, time.Date(2026, 10, 2, 7, 0, 0, 0, time.UTC)},
-	{pick{"hr1", "health.heart-rate.alert", "garmin"}, time.Date(2026, 10, 3, 9, 0, 0, 0, time.UTC)},
-	{pick{"hr2", "health.heart-rate.alert", "garmin"}, time.Date(2026, 10, 3, 10, 0, 0, 0, time.UTC)},
-	{pick{"run1", "activity.exercise-session.run", "garmin"}, time.Date(2026, 10, 3, 11, 0, 0, 0, time.UTC)},
-	{pick{"old", "health.weight", "withings"}, time.Date(2026, 9, 1, 7, 0, 0, 0, time.UTC)},
+	{pick{"w1", "test.reading", "withings"}, time.Date(2026, 10, 2, 7, 0, 0, 0, time.UTC)},
+	{pick{"w2", "test.reading", "withings"}, time.Date(2026, 10, 2, 7, 0, 0, 0, time.UTC)},
+	{pick{"bp1", "test.measure", "withings"}, time.Date(2026, 10, 2, 7, 0, 0, 0, time.UTC)},
+	{pick{"hr1", "test.course.started", "garmin"}, time.Date(2026, 10, 3, 9, 0, 0, 0, time.UTC)},
+	{pick{"hr2", "test.course.started", "garmin"}, time.Date(2026, 10, 3, 10, 0, 0, 0, time.UTC)},
+	{pick{"run1", "test.session.run", "garmin"}, time.Date(2026, 10, 3, 11, 0, 0, 0, time.UTC)},
+	{pick{"old", "test.reading", "withings"}, time.Date(2026, 9, 1, 7, 0, 0, 0, time.UTC)},
 }
 
 func pid(ref string) string { return facet.NewID("sel:" + ref) }
@@ -63,7 +64,7 @@ func selectServerWith(t *testing.T, edit func(*inspect.Deps)) *httptest.Server {
 			t.Fatalf("Admit %s: %v", p.ref, err)
 		}
 	}
-	deps := inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, MaxReadBytes: 512 << 10}
+	deps := inspect.Deps{Catalog: catalogtest.Engine.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, MaxReadBytes: 512 << 10}
 	edit(&deps)
 	srv := httptest.NewServer(inspect.Handler(deps))
 	t.Cleanup(srv.Close)
@@ -139,7 +140,7 @@ func program(t *testing.T, body string) string {
 func TestSelect_CountIsItsRowsAndAWeighInIsOneRow(t *testing.T) {
 	t.Parallel()
 	srv := selectServer(t)
-	code, body, _ := fetch(t, srv.URL+"/select?type=health.weight&from=2026-10-01")
+	code, body, _ := fetch(t, srv.URL+"/select?type=test.reading&from=2026-10-01")
 	if code != 200 {
 		t.Fatalf("GET = %d\n%s", code, body)
 	}
@@ -151,7 +152,7 @@ func TestSelect_CountIsItsRowsAndAWeighInIsOneRow(t *testing.T) {
 		t.Errorf("boxes %v ticked %v, want %v all ticked", all, ticked, want)
 	}
 	if !strings.Contains(body, "in 1 row.") {
-		t.Error("the two readings of one weigh-in are not one row")
+		t.Error("the two readings of one sitting are not one row")
 	}
 	if number(t, pickedRE, body) != 2 {
 		t.Error("the program does not pick what the criteria match")
@@ -168,6 +169,10 @@ func TestSelect_NoCriteriaListsNothingAndPicksTheBasket(t *testing.T) {
 	if number(t, pickedRE, body) != 1 {
 		t.Error("the basket alone is not the selection")
 	}
+	// The type field's example is the shape of a prefix, not a type of anyone's record.
+	if !strings.Contains(body, `id="type" list="types" placeholder="domain.concept."`) {
+		t.Error("the type field does not show a prefix's shape as its example")
+	}
 }
 
 // A tick and its side outlive the criterion that found it.
@@ -175,7 +180,7 @@ func TestSelect_TheBasketSurvivesACriteriaChange(t *testing.T) {
 	t.Parallel()
 	srv := selectServer(t)
 	hr1 := pid("hr1")
-	_, body, _ := fetch(t, srv.URL+"/select?type=health.heart-rate.&tick="+hr1+"&fromside="+hr1)
+	_, body, _ := fetch(t, srv.URL+"/select?type=test.course.&tick="+hr1+"&fromside="+hr1)
 	chips := removeRE.FindAllStringSubmatch(body, -1)
 	if len(chips) != 1 {
 		t.Fatalf("chips = %v, want the one type", chips)
@@ -196,13 +201,13 @@ func TestSelect_TheBasketSurvivesACriteriaChange(t *testing.T) {
 
 	// Adding a criterion through the form keeps the basket too: it rides as hidden inputs.
 	q := formState(body)
-	q.Add("type", "activity.exercise-session.")
+	q.Add("type", "test.session.")
 	_, added, landed := fetch(t, srv.URL+"/select?"+q.Encode())
 	if landed.Query().Get("tick") != hr1 || !strings.Contains(added, `<span class="side">from</span>`) {
 		t.Errorf("adding a criterion lost the basket: %s", landed)
 	}
 	if all, _ := boxes(added); len(all) != 3 {
-		t.Errorf("two types listed %d facets, want the two alerts and the run", len(all))
+		t.Errorf("two types listed %d facets, want the two course starts and the session", len(all))
 	}
 }
 
@@ -236,7 +241,7 @@ func TestSelect_TheOrderOfCriteriaDoesNotMatter(t *testing.T) {
 		return next
 	}
 	date := url.Values{"from": {"2026-10-02"}, "to": {"2026-10-03"}}
-	typ := url.Values{"type": {"health.weight"}}
+	typ := url.Values{"type": {"test.reading"}}
 	_, start, _ := fetch(t, srv.URL+"/select")
 
 	dateFirst := step(step(start, date), typ)
@@ -256,7 +261,7 @@ func TestSelect_TicksAndKeep(t *testing.T) {
 	t.Parallel()
 	srv := selectServer(t)
 	w1, w2 := pid("w1"), pid("w2")
-	q := url.Values{"type": {"health.weight"}, "from": {"2026-10-01"}, "shown": {w1, w2}, "on": {w1}, "act": {"update"}}
+	q := url.Values{"type": {"test.reading"}, "from": {"2026-10-01"}, "shown": {w1, w2}, "on": {w1}, "act": {"update"}}
 	_, body, landed := fetch(t, srv.URL+"/select?"+q.Encode())
 	if landed.Query().Get("untick") != w2 || landed.Query().Has("shown") {
 		t.Fatalf("unticking w2 landed on %s", landed)
@@ -279,16 +284,16 @@ func TestSelect_TicksAndKeep(t *testing.T) {
 func TestSelect_AnEditedProgram(t *testing.T) {
 	t.Parallel()
 	srv := selectServer(t)
-	inside := `pick(E) :- entry(E, T, _, _, _, S, _), T = "health.weight", S = "withings".`
+	inside := `pick(E) :- entry(E, T, _, _, _, S, _), T = "test.reading", S = "withings".`
 	_, body, landed := fetch(t, srv.URL+"/select?program="+url.QueryEscape(inside))
-	if landed.Query().Get("type") != "health.weight" || landed.Query().Get("source") != "withings" || landed.Query().Has("program") {
+	if landed.Query().Get("type") != "test.reading" || landed.Query().Get("source") != "withings" || landed.Query().Has("program") {
 		t.Errorf("a program in the grammar landed on %s", landed)
 	}
 	if len(removeRE.FindAllString(body, -1)) != 2 {
 		t.Error("the criteria are not drawn from the program")
 	}
 
-	outside := `pick(E) :- entry(E, "health.weight", _, _, _, _, _), entry(F, "health.blood-pressure", At, _, _, _, _), entry(E, _, At, _, _, _, _).`
+	outside := `pick(E) :- entry(E, "test.reading", _, _, _, _, _), entry(F, "test.measure", At, _, _, _, _), entry(E, _, At, _, _, _, _).`
 	code, body, landed := fetch(t, srv.URL+"/select?program="+url.QueryEscape(outside))
 	if code != 200 || !landed.Query().Has("program") {
 		t.Fatalf("a program outside the grammar = %d at %s", code, landed)
@@ -306,7 +311,7 @@ func TestSelect_AnEditedProgram(t *testing.T) {
 	}
 	sort.Strings(got)
 	if want := ids("w1", "w2"); strings.Join(got, ",") != strings.Join(want, ",") || number(t, matchedRE, body) != 2 {
-		t.Errorf("the join picked %v, want the weigh-in's weights %v", got, want)
+		t.Errorf("the join picked %v, want the sitting's readings %v", got, want)
 	}
 
 	_, bad, _ := fetch(t, srv.URL+"/select?program="+url.QueryEscape("pick(E) :- nothing(E)."))
@@ -318,14 +323,14 @@ func TestSelect_AnEditedProgram(t *testing.T) {
 func TestSelect_OverTheLimitListsNothing(t *testing.T) {
 	t.Parallel()
 	srv := seedBig(t, 520)
-	_, body, _ := fetch(t, srv.URL+"/select?type=activity.steps")
+	_, body, _ := fetch(t, srv.URL+"/select?type=test.pair")
 	if all, _ := boxes(body); len(all) != 0 || !strings.Contains(body, `id="too-many"`) {
 		t.Errorf("520 rows drew %d boxes and the page does not ask for another criterion", len(all))
 	}
 	if number(t, matchedRE, body) != 520 {
 		t.Error("the count is not stated when the rows are not drawn")
 	}
-	_, day, _ := fetch(t, srv.URL+"/select?type=activity.steps&from=2026-03-02&to=2026-03-02")
+	_, day, _ := fetch(t, srv.URL+"/select?type=test.pair&from=2026-03-02&to=2026-03-02")
 	if all, _ := boxes(day); len(all) != 50 || strings.Contains(day, `id="too-many"`) {
 		t.Errorf("one day drew %d boxes, want 50", len(all))
 	}
@@ -335,7 +340,7 @@ func TestSelect_HandoffAndRefusals(t *testing.T) {
 	t.Parallel()
 	srv := selectServer(t)
 	hr1 := pid("hr1")
-	_, body, _ := fetch(t, srv.URL+"/select?p=bp&type=health.blood-pressure&tick="+hr1+"&fromside="+hr1)
+	_, body, _ := fetch(t, srv.URL+"/select?p=measures&type=test.measure&tick="+hr1+"&fromside="+hr1)
 	m := regexp.MustCompile(`<a id="handoff" href="([^"]+)"`).FindStringSubmatch(body)
 	if m == nil {
 		t.Fatal("no handoff link")
@@ -344,8 +349,8 @@ func TestSelect_HandoffAndRefusals(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if h.Path != "/link" || h.Query().Get("p") != "bp" || h.Query().Get("tick") != hr1 || h.Query().Get("fromside") != hr1 ||
-		!strings.Contains(h.Query().Get("program"), `T = "health.blood-pressure"`) {
+	if h.Path != "/link" || h.Query().Get("p") != "measures" || h.Query().Get("tick") != hr1 || h.Query().Get("fromside") != hr1 ||
+		!strings.Contains(h.Query().Get("program"), `T = "test.measure"`) {
 		t.Errorf("handoff = %s", h)
 	}
 	if !strings.Contains(body, "not served by this projection") {
@@ -355,7 +360,7 @@ func TestSelect_HandoffAndRefusals(t *testing.T) {
 	for u, want := range map[string]int{
 		"/select?p=nope":                  404,
 		"/select?from=2026-13-01":         400,
-		"/select?type=health.":            400,
+		"/select?type=test.":              400,
 		"/select?standing=sometimes":      400,
 		"/select?to=2026-10-01T00:00:00Z": 400,
 	} {

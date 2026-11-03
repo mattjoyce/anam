@@ -23,7 +23,7 @@ func TestStore_ANewDaemonOnTheTwoFilesServesWhatTheLastPublished(t *testing.T) {
 	cfg := importerConfig(t)
 	d, base, stop := serveImporters(t, cfg)
 	call(t, "POST", base+"/v1/projections", testToken, weightsV1, http.StatusCreated, nil)
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	admit := func(from, n int) {
 		t.Helper()
 		var envs []string

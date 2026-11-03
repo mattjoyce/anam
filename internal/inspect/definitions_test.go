@@ -28,9 +28,9 @@ func TestDefinitions_IndexListsEveryType(t *testing.T) {
 		t.Fatalf("GET /definitions = %d", code)
 	}
 	for _, want := range []string{
-		`href="/definition?type=health.blood-pressure"`,
-		`href="/definition?type=activity.exercise-session.garmin"`,
-		` of `, // the described count, "0 of 15"
+		`href="/definition?type=test.measure"`,
+		`href="/definition?type=test.course.started"`,
+		` of `, // the described count, "0 of 5"
 		`name="viewport"`,
 		`href="/definitions"`, // the shared nav
 	} {
@@ -45,27 +45,56 @@ func TestDefinitions_IndexListsEveryType(t *testing.T) {
 func TestDefinition_PageMarksRolesOnTheirRows(t *testing.T) {
 	t.Parallel()
 	srv, _, _ := seededServer(t)
-	code, body := get(t, srv.URL+"/definition?type=activity.exercise-session")
+	code, body := get(t, srv.URL+"/definition?type=test.measure")
 	if code != http.StatusOK {
 		t.Fatalf("GET /definition = %d: %s", code, body)
 	}
 	for _, want := range []string{
-		`id="f/effective_time_frame/time_interval/start_date_time"`, // a nested row, keyed by pointer
+		`id="f/source_time/basis"`, // a nested row, keyed by pointer
 		`<span class="role">fact time</span>`,
 		`<span class="role">identity</span>`,
 		`described</span>`,
 		`class="j-key"`,
-		`href="/?type=activity.exercise-session"`,
+		`href="/?type=test.measure"`,
 	} {
 		if !strings.Contains(body, want) {
-			t.Errorf("/definition?type=activity.exercise-session lacks %q", want)
+			t.Errorf("/definition?type=test.measure lacks %q", want)
 		}
 	}
-	// blood pressure writes its numbers as text: the type says so, once, not as a regex.
-	_, bp := get(t, srv.URL+"/definition?type=health.blood-pressure")
-	if !strings.Contains(bp, "number as text") {
-		t.Error("blood pressure's numeric strings are not named as number as text")
+	if strings.Contains(body, "number as text") {
+		t.Error("test.measure's numbers are numbers, yet the page names one as text")
 	}
+	// test.described writes its figure as text: the type says so, once, not as a regex.
+	srv = httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: inspect.ExtraCatalog.Catalog(t), Ledger: emptyLedger(t),
+		Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	t.Cleanup(srv.Close)
+	_, described := get(t, srv.URL+"/definition?type=test.described")
+	if !strings.Contains(described, "number as text") || strings.Contains(described, numericPattern) {
+		t.Error("test.described's numeric string is not named as number as text, or its regex is shown")
+	}
+	if !strings.Contains(described, "3 of 11 described") {
+		t.Error("test.described's three described fields are not counted")
+	}
+	// Its fact time is a nested field: the role sits on that row, below the top.
+	row, _, _ := strings.Cut(described[strings.Index(described, `<tr id="f/span/start">`)+1:], "</tr>")
+	if !strings.Contains(row, `<span class="role">fact time</span>`) {
+		t.Errorf("the nested fact-time row lacks its role: %s", row)
+	}
+}
+
+// numericPattern is the regex the page names "number as text", as the page would
+// print it.
+const numericPattern = `pattern ^-?[0-9]+`
+
+// emptyLedger is a ledger with nothing in it, for a page that reads only the catalog.
+func emptyLedger(t *testing.T) *ledger.Ledger {
+	t.Helper()
+	l, err := ledger.Create(context.Background(), filepath.Join(t.TempDir(), "ledger.db"), person)
+	if err != nil {
+		t.Fatalf("ledger.Create: %v", err)
+	}
+	t.Cleanup(func() { _ = l.Close() })
+	return l
 }
 
 // A Definition with a handling block shows its guidance as prose and the rest of the
@@ -73,23 +102,23 @@ func TestDefinition_PageMarksRolesOnTheirRows(t *testing.T) {
 func TestDefinition_PageShowsTheHandlingBlock(t *testing.T) {
 	t.Parallel()
 	srv, _, _ := seededServer(t)
-	code, body := get(t, srv.URL+"/definition?type=health.medication.started")
+	code, body := get(t, srv.URL+"/definition?type=test.course.started")
 	if code != http.StatusOK {
-		t.Fatalf("GET /definition?type=health.medication.started = %d: %s", code, body)
+		t.Fatalf("GET /definition?type=test.course.started = %d: %s", code, body)
 	}
-	for _, want := range []string{"<h2>handling", "one spelling per substance", "slugged with hyphens"} {
+	for _, want := range []string{"<h2>handling", "name and course name one series", "a restart after a stop is the next course"} {
 		if !strings.Contains(body, want) {
-			t.Errorf("health.medication.started's page lacks %q", want)
+			t.Errorf("test.course.started's page lacks %q", want)
 		}
 	}
-	_, bp := get(t, srv.URL+"/definition?type=health.blood-pressure")
-	if strings.Contains(bp, "<h2>handling") {
-		t.Error("blood pressure declares no handling, yet its page has the section")
+	_, measure := get(t, srv.URL+"/definition?type=test.measure")
+	if strings.Contains(measure, "<h2>handling") {
+		t.Error("test.measure declares no handling, yet its page has the section")
 	}
 
 	// The split itself: guidance comes out as text, the other keys as JSON, and a block
 	// of guidance alone leaves no JSON to show.
-	d, err := def.Parse([]byte(strings.Replace(string(bundledBody(t, "health.blood-pressure")), `"schema"`,
+	d, err := def.Parse([]byte(strings.Replace(string(bundledBody(t, "test.measure")), `"schema"`,
 		`"handling": {"guidance": "sitting", "date_basis": ["observed", "estimated"]}, "schema"`, 1)))
 	if err != nil {
 		t.Fatalf("def.Parse: %v", err)
@@ -116,8 +145,8 @@ func TestDefinition_Refusals(t *testing.T) {
 	}{
 		{"", http.StatusBadRequest},
 		{"?type=no.such-type", http.StatusNotFound},
-		{"?type=health.blood-pressure&v=x", http.StatusBadRequest},
-		{"?type=health.blood-pressure&v=99", http.StatusNotFound},
+		{"?type=test.measure&v=x", http.StatusBadRequest},
+		{"?type=test.measure&v=99", http.StatusNotFound},
 	} {
 		if code, _ := get(t, srv.URL+"/definition"+tc.q); code != tc.want {
 			t.Errorf("GET /definition%s = %d, want %d", tc.q, code, tc.want)
@@ -136,24 +165,24 @@ func TestDefinition_AnOlderVersionIsShownAsHeld(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = l.Close() })
 
-	current := bundledBody(t, "health.blood-pressure")
+	current := bundledBody(t, "test.measure")
 	cur, err := def.Parse(current)
 	if err != nil {
 		t.Fatalf("def.Parse: %v", err)
 	}
 	held := func(context.Context) (map[facet.Type]map[int][]byte, map[facet.Type]string, error) {
 		return map[facet.Type]map[int][]byte{
-				"health.blood-pressure": {
-					1:           []byte(`{"meta": {"facet_type": "health.blood-pressure", "definition_version": 1, "<b>": 1}}`),
+				"test.measure": {
+					1:           []byte(`{"meta": {"facet_type": "test.measure", "definition_version": 1, "<b>": 1}}`),
 					cur.Version: current,
 				},
-			}, map[facet.Type]string{"health.blood-pressure": "bundled"},
+			}, map[facet.Type]string{"test.measure": "bundled"},
 			nil
 	}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Held: held}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Engine.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Held: held}))
 	t.Cleanup(srv.Close)
 
-	code, body := get(t, srv.URL+"/definition?type=health.blood-pressure&v=1")
+	code, body := get(t, srv.URL+"/definition?type=test.measure&v=1")
 	if code != http.StatusOK {
 		t.Fatalf("GET v1 = %d", code)
 	}
@@ -174,9 +203,9 @@ func TestFacet_LinksToItsAdmittedDefinition(t *testing.T) {
 	srv, bp, _ := seededServer(t)
 	_, body := get(t, srv.URL+"/facet?id="+bp)
 	for _, want := range []string{
-		`href="/definition?type=health.blood-pressure&amp;v=1"`,
-		` is current</a>`,
-		`<span class="j-key">&#34;systolic&#34;</span>`,
+		`href="/definition?type=test.measure&amp;v=1"`,
+		`v2 is current</a>`,
+		`<span class="j-key">&#34;count&#34;</span>`,
 		`<span class="j-str">&#34;Before breakfast&#34;</span>`,
 	} {
 		if !strings.Contains(body, want) {
@@ -188,7 +217,7 @@ func TestFacet_LinksToItsAdmittedDefinition(t *testing.T) {
 // bundledBody is the current manifest of t in the fixture catalog the pages serve.
 func bundledBody(t *testing.T, typ facet.Type) []byte {
 	t.Helper()
-	defs, _ := fixture.Mattjoyce()
+	defs, _ := fixture.Engine()
 	ms, err := def.ManifestsFS(defs)
 	if err != nil {
 		t.Fatalf("def.ManifestsFS: %v", err)

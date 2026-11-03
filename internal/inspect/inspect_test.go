@@ -44,13 +44,13 @@ func seededServer(t *testing.T) (*httptest.Server, string, string) {
 	}
 	t.Cleanup(func() { _ = l.Close() })
 
-	bp := seedFacet(t, "bp-csv:2026-01-24T06:30:00", "health.blood-pressure",
-		`{"systolic": 118, "diastolic": 76, "comment": "Before breakfast"}`)
+	bp := seedFacet(t, "meter:2026-01-24T06:30:00", "test.measure",
+		`{"count": 118, "seq": 76, "comment": "Before breakfast"}`)
 	if err := l.Admit(ctx, 0, bp, event(facet.EventAdmitted, bp, 1)); err != nil {
 		t.Fatalf("Admit bp: %v", err)
 	}
 
-	hr := seedFacet(t, "health-db:hr:2026-07-05", "health.heart-rate", `{"resting": 54}`)
+	hr := seedFacet(t, "logger:2026-07-05", "test.reading", `{"value": 54}`)
 	if err := l.Admit(ctx, 1, hr, event(facet.EventAdmitted, hr, 2)); err != nil {
 		t.Fatalf("Admit hr: %v", err)
 	}
@@ -60,7 +60,7 @@ func seededServer(t *testing.T) (*httptest.Server, string, string) {
 	}
 
 	// A generous request timeout: latency is not under test here.
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Engine.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 	return srv, bp.ID, hr.ID
 }
@@ -130,7 +130,7 @@ func TestServe_ShutsDownOnContextCancel(t *testing.T) {
 	t.Cleanup(func() { _ = l.Close() })
 
 	go func() {
-		done <- inspect.Serve(ctx, "127.0.0.1:0", inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: time.Second, Buckets: defaultBuckets},
+		done <- inspect.Serve(ctx, "127.0.0.1:0", inspect.Deps{Catalog: catalogtest.Engine.Catalog(t), Ledger: l, Timeout: time.Second, Buckets: defaultBuckets},
 			config.DefaultHTTPReadHeaderTimeout, config.DefaultShutdownGrace)
 	}()
 	time.Sleep(200 * time.Millisecond) // let ListenAndServe bind
@@ -158,7 +158,7 @@ func TestFacetList_ShowsFoldedStatus(t *testing.T) {
 	// the seeded fact-time falls in, so changing span.Default is a width change and
 	// not a test failure.
 	bucket := defaultBuckets.Of(time.Date(2026, 7, 5, 6, 30, 0, 0, time.UTC)).ID()
-	for _, want := range []string{"W = 3", bpID, hrID, "tombstoned", "health.blood-pressure", bucket} {
+	for _, want := range []string{"W = 3", bpID, hrID, "tombstoned", "test.measure", bucket} {
 		if !strings.Contains(body, want) {
 			t.Errorf("facet list missing %q", want)
 		}
@@ -196,7 +196,7 @@ func TestTimeline_DrawsLedgerBandAndCanonicalStrip(t *testing.T) {
 	}
 }
 
-// Narrowing is a lens over the same read: a span that excludes the bp facet
+// Narrowing is a lens over the same read: a span that excludes the measure facet
 // composes an empty strip while the header still names the whole-person value.
 func TestTimeline_SpanNarrowsTheStrip(t *testing.T) {
 	t.Parallel()
@@ -227,7 +227,7 @@ func TestFacetPage_ShowsVerbatimPayloadAndItsEvents(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("GET /facet = %d", code)
 	}
-	for _, want := range []string{"Before breakfast", "sha256:", "bp-csv:2026-01-24T06:30:00", "admitted"} {
+	for _, want := range []string{"Before breakfast", "sha256:", "meter:2026-01-24T06:30:00", "admitted"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("facet page missing %q", want)
 		}
@@ -292,23 +292,23 @@ func TestTimeline_TypeFilterNarrowsBandAndStripAndRidesTheLinks(t *testing.T) {
 	t.Parallel()
 	srv, bpID, hrID := seededServer(t)
 
-	code, body := get(t, srv.URL+"/?status=all&type=health.heart-rate")
+	code, body := get(t, srv.URL+"/?status=all&type=test.reading")
 	if code != http.StatusOK {
 		t.Fatalf("GET /?type = %d", code)
 	}
 	if strings.Contains(body, "/facet?id="+bpID) {
-		t.Error("blood pressure facet drawn under a heart-rate filter")
+		t.Error("measure facet drawn under a reading filter")
 	}
 	if !strings.Contains(body, "/facet?id="+hrID) {
-		t.Error("heart-rate facet missing under its own filter")
+		t.Error("reading facet missing under its own filter")
 	}
-	if !strings.Contains(body, "type=health.heart-rate") || !strings.Contains(body, "filtered by type") {
+	if !strings.Contains(body, "type=test.reading") || !strings.Contains(body, "filtered by type") {
 		t.Error("nav links or caption lost the filter")
 	}
 
 	// Unfiltered, both types are in the legend with a checkbox each.
 	_, all := get(t, srv.URL+"/?status=all")
-	for _, want := range []string{`value="health.blood-pressure" checked`, `value="health.heart-rate" checked`} {
+	for _, want := range []string{`value="test.measure" checked`, `value="test.reading" checked`} {
 		if !strings.Contains(all, want) {
 			t.Errorf("legend missing %s", want)
 		}
@@ -359,10 +359,10 @@ func TestTimeline_StatusFilterNarrowsTheBandAndRidesTheLinks(t *testing.T) {
 
 	// Combined with a type filter, both ride the links; the default status rides
 	// as nothing.
-	_, both := get(t, srv.URL+"/?status=all&type=health.blood-pressure")
+	_, both := get(t, srv.URL+"/?status=all&type=test.measure")
 	at := strings.Index(both, `id="nav-left"`)
 	left := both[strings.LastIndex(both[:at], "<a href="):at]
-	if !strings.Contains(left, "status=all") || !strings.Contains(left, "type=health.blood-pressure") {
+	if !strings.Contains(left, "status=all") || !strings.Contains(left, "type=test.measure") {
 		t.Errorf("pan-left link dropped the status or the type filter: %s", left)
 	}
 	at = strings.Index(live, `id="nav-left"`)

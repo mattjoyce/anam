@@ -18,13 +18,13 @@ func TestDefinitionHistorySurvivesAFreshStore(t *testing.T) {
 	var list api.Definitions
 	call(t, "GET", url+"/v1/definitions", testToken, "", http.StatusOK, &list)
 	for _, s := range list.Definitions {
-		if s.Type == "health.blood-pressure" && len(s.Versions) != 8 {
-			t.Errorf("health.blood-pressure versions = %v, want 1 to 8", s.Versions)
+		if s.Type == "test.measure" && len(s.Versions) != 2 {
+			t.Errorf("test.measure versions = %v, want 1 to 2", s.Versions)
 		}
 	}
 	var body map[string]any
-	call(t, "GET", url+"/v1/definitions/health.blood-pressure/1", testToken, "", http.StatusOK, &body)
-	call(t, "GET", url+"/v1/definitions/health.blood-pressure/4", testToken, "", http.StatusOK, &body)
-	call(t, "GET", url+"/v1/definitions/health.weight/1", testToken, "", http.StatusOK, &body)
-	call(t, "GET", url+"/v1/definitions/health.blood-pressure/9", testToken, "", http.StatusNotFound, nil)
+	call(t, "GET", url+"/v1/definitions/test.measure/1", testToken, "", http.StatusOK, &body)
+	call(t, "GET", url+"/v1/definitions/test.measure/2", testToken, "", http.StatusOK, &body)
+	call(t, "GET", url+"/v1/definitions/test.reading/1", testToken, "", http.StatusOK, &body)
+	call(t, "GET", url+"/v1/definitions/test.measure/3", testToken, "", http.StatusNotFound, nil)
 }

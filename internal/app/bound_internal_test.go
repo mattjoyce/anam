@@ -61,7 +61,7 @@ func TestTimeline_OverTheBoundIsRefusedWithWhatToNarrowBy(t *testing.T) {
 	}
 
 	// Narrowed by type alone it is still every reading; the refusal says what is left.
-	_, _, err = cli(t, f.remoteCfg, "timeline", "--type", "health.blood-pressure")
+	_, _, err = cli(t, f.remoteCfg, "timeline", "--type", "test.measure")
 	if got := strings.Join(tooLarge(t, err, "narrowed by type").TooLarge.Narrow, " "); got != "from to at projection fields" {
 		t.Errorf("narrow after a type = %q, want the window, snapshot and projection", got)
 	}
@@ -84,7 +84,7 @@ func TestPublish_OverTheBoundPublishesOnceAndPages(t *testing.T) {
 	t.Parallel()
 	f := boundedFixture(t)
 
-	out, stderr, err := cli(t, f.remoteCfg, "timeline", "--projection", "bp", "--publish", "--json")
+	out, stderr, err := cli(t, f.remoteCfg, "timeline", "--projection", "measures", "--publish", "--json")
 	if err != nil {
 		t.Fatalf("a publish over the bound was refused: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestPublish_OneFacetOverTheBoundFilesNothing(t *testing.T) {
 		cfg.MaxReadBytes = 40
 	})
 
-	_, _, err := cli(t, f.remoteCfg, "timeline", "--projection", "bp", "--publish")
+	_, _, err := cli(t, f.remoteCfg, "timeline", "--projection", "measures", "--publish")
 	refused := tooLarge(t, err, "a publish with a facet over the bound")
 	if refused.TooLarge.Matched != 1 || refused.TooLarge.FacetID == "" || !strings.Contains(err.Error(), "alone") {
 		t.Errorf("the refusal should name the one facet: %+v %v", refused.TooLarge, err)
@@ -154,7 +154,7 @@ func TestReceipt_ShowOverTheBoundWalksEveryPage(t *testing.T) {
 	t.Parallel()
 	f := boundedFixture(t)
 
-	_, stderr, err := cli(t, f.cfgPath, "timeline", "--projection", "bp", "--publish")
+	_, stderr, err := cli(t, f.cfgPath, "timeline", "--projection", "measures", "--publish")
 	if err != nil {
 		t.Fatalf("local publish: %v", err)
 	}

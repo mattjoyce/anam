@@ -21,11 +21,12 @@ import (
 // and operational store under t.TempDir(), the inspector mounted at "/", and the
 // workbench principal declared in the importers file as an operator would declare it.
 
-// workbenchServing is a running daemon whose importers file lists the workbench with
-// the given types, and its URL.
+// workbenchServing is a running daemon over doseFixture whose importers file lists
+// the workbench with the given types, and its URL.
 func workbenchServing(t *testing.T, types string) (*Daemon, string) {
 	t.Helper()
 	cfg := importerConfig(t)
+	withDose(t, &cfg)
 	f, err := os.OpenFile(cfg.ImportersFile, os.O_APPEND|os.O_WRONLY, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -80,9 +81,9 @@ func inputTag(t *testing.T, body, name string) string {
 // doseForm is what the dose form posts for a melatonin dose.
 func doseForm(version int, taken, amount string) url.Values {
 	return url.Values{
-		"type": {"health.medication.dose"}, "v": {strconv.Itoa(version)},
-		"f.drug": {"melatonin"}, "f.amount": {amount}, "f.unit": {"mg"},
-		"f.taken_at": {taken}, "f.reason": {"to help sleep"}, "zone": {"Australia/Sydney"}, "offset": {"+11:00"},
+		"type": {"test.dose"}, "v": {strconv.Itoa(version)},
+		"f.name": {"melatonin"}, "f.amount": {amount}, "f.unit": {"mg"},
+		"f.taken_at": {taken}, "f.reason": {"to help sleep"}, "zone": {"Europe/Berlin"}, "offset": {"+02:00"},
 	}
 }
 
@@ -90,7 +91,7 @@ func doseForm(version int, taken, amount string) url.Values {
 // to no other; the daemon tells the pages the list, and the pages do not read the file.
 func TestDefinitionsPageMarksTheEnterableTypes(t *testing.T) {
 	t.Parallel()
-	_, base := workbenchServing(t, "health.medication.dose")
+	_, base := workbenchServing(t, "test.dose")
 	status, body := page(t, "GET", base+"/definitions", nil, nil)
 	if status != http.StatusOK {
 		t.Fatalf("GET /definitions = %d", status)
@@ -98,19 +99,19 @@ func TestDefinitionsPageMarksTheEnterableTypes(t *testing.T) {
 	if n := strings.Count(body, `href="/entry?type=`); n != 1 {
 		t.Fatalf("the page links %d forms, want exactly 1", n)
 	}
-	if !strings.Contains(body, `href="/entry?type=health.medication.dose"`) {
+	if !strings.Contains(body, `href="/entry?type=test.dose"`) {
 		t.Fatalf("the dose type has no Enter link:\n%s", body)
 	}
-	row := regexp.MustCompile(`(?s)<tr>\s*<td><a class="mono" href="/definition\?type=health.weight">.*?</tr>`).FindString(body)
+	row := regexp.MustCompile(`(?s)<tr>\s*<td><a class="mono" href="/definition\?type=test.reading">.*?</tr>`).FindString(body)
 	if !strings.Contains(row, "not enterable") || strings.Contains(row, "/entry?") {
-		t.Fatalf("health.weight's row = %s, want no link and a reason", row)
+		t.Fatalf("test.reading's row = %s, want no link and a reason", row)
 	}
 
 	// A direct request for a form off the list is refused.
-	if status, _ := page(t, "GET", base+"/entry?type=health.weight", nil, nil); status != http.StatusForbidden {
+	if status, _ := page(t, "GET", base+"/entry?type=test.reading", nil, nil); status != http.StatusForbidden {
 		t.Fatalf("GET /entry for a type off the list = %d, want 403", status)
 	}
-	if status, _ := page(t, "POST", base+"/entry", url.Values{"type": {"health.weight"}, "v": {"1"}}, nil); status != http.StatusForbidden {
+	if status, _ := page(t, "POST", base+"/entry", url.Values{"type": {"test.reading"}, "v": {"1"}}, nil); status != http.StatusForbidden {
 		t.Fatalf("POST /entry for a type off the list = %d, want 403", status)
 	}
 }
@@ -123,7 +124,7 @@ func TestNoWorkbenchPrincipalMeansNoEntryPages(t *testing.T) {
 	if strings.Contains(body, `href="/entry?`) {
 		t.Fatalf("a daemon with no workbench links a form")
 	}
-	if status, _ := page(t, "GET", base+"/entry?type=health.medication.dose", nil, nil); status != http.StatusNotFound {
+	if status, _ := page(t, "GET", base+"/entry?type=test.dose", nil, nil); status != http.StatusNotFound {
 		t.Fatalf("GET /entry with no workbench = %d, want 404", status)
 	}
 }
@@ -132,15 +133,15 @@ func TestNoWorkbenchPrincipalMeansNoEntryPages(t *testing.T) {
 // schema names, the guidance word for word, the version it was drawn from, and no id.
 func TestDoseFormIsDrawnFromTheDefinition(t *testing.T) {
 	t.Parallel()
-	d, base := workbenchServing(t, "health.medication.dose")
-	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
-	status, body := page(t, "GET", base+"/entry?type=health.medication.dose", nil, nil)
+	d, base := workbenchServing(t, "test.dose")
+	dose, _ := d.defs.current.Load().Lookup("test.dose")
+	status, body := page(t, "GET", base+"/entry?type=test.dose", nil, nil)
 	if status != http.StatusOK {
 		t.Fatalf("GET /entry = %d: %s", status, body)
 	}
 	for name, want := range map[string][]string{
 		"taken_at":    {`type="datetime-local"`, "required"},
-		"drug":        {`type="text"`, "required", `placeholder="melatonin"`},
+		"name":        {`type="text"`, "required", `placeholder="melatonin"`},
 		"amount":      {`type="number"`, `step="any"`, "required", `placeholder="5"`},
 		"unit":        {`type="text"`, "required", `placeholder="mg"`},
 		"course":      {`type="number"`, `step="any"`},
@@ -166,8 +167,8 @@ func TestDoseFormIsDrawnFromTheDefinition(t *testing.T) {
 	for _, want := range []string{
 		`name="v" value="` + strconv.Itoa(dose.Version) + `"`,         // the version it was drawn from
 		"One dose, taken at a moment: a fact that an intake happened", // the guidance, word for word
-		"greater than 0", // exclusiveMinimum as a hint
-		"or as Australia/Sydney time without one", // the declared zone, when the browser names none
+		"greater than 0",                       // exclusiveMinimum as a hint
+		"or as Europe/Berlin time without one", // the declared zone, when the browser names none
 		`<input type="hidden" id="zone" name="zone" value="">`,
 		`<input id="offset" name="offset" type="text" value=""`,
 		"Intl.DateTimeFormat().resolvedOptions().timeZone", // the page fills the zone from the browser
@@ -185,13 +186,13 @@ func TestDoseFormIsDrawnFromTheDefinition(t *testing.T) {
 // offset into its id; a correction carries the zone it was said in.
 func TestTheFormSendsTheBrowsersZone(t *testing.T) {
 	t.Parallel()
-	d, base := workbenchServing(t, "health.medication.dose")
-	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
+	d, base := workbenchServing(t, "test.dose")
+	dose, _ := d.defs.current.Load().Lookup("test.dose")
 	form := doseForm(dose.Version, "2026-10-19T18:00", "5")
 	form.Set("zone", "Europe/London")
 	form.Set("offset", "+01:00")
 	status, body := page(t, "POST", base+"/entry", form, nil)
-	key := "workbench:med/melatonin/dose/2026-10-19T18:00+01:00"
+	key := "workbench:dose/melatonin/2026-10-19T18:00+01:00"
 	wantID := facet.NewID(facet.SourceRef("workbench", key))
 	if status != http.StatusOK || !strings.Contains(body, "admitted") || !strings.Contains(body, wantID) {
 		t.Fatalf("save = %d, want %s admitted:\n%s", status, wantID, body)
@@ -210,7 +211,7 @@ func TestTheFormSendsTheBrowsersZone(t *testing.T) {
 		}
 	}
 
-	_, edit := page(t, "GET", base+"/entry?type=health.medication.dose&edit="+wantID, nil, nil)
+	_, edit := page(t, "GET", base+"/entry?type=test.dose&edit="+wantID, nil, nil)
 	for _, want := range []string{`name="zone" value="Europe/London"`, `name="offset" type="text" value="&#43;01:00"`, "the zone this fact was said in"} {
 		if !strings.Contains(edit, want) {
 			t.Errorf("the correction form lacks %s:\n%s", want, edit)
@@ -224,15 +225,15 @@ func TestTheFormSendsTheBrowsersZone(t *testing.T) {
 }
 
 // A schema that needs a nested object or a list is refused with a plain message and no
-// form. Blood pressure's body is the bundled type that needs them.
+// form. record.edge's lists of facet ids are what the catalog has that needs them.
 func TestAFormIsRefusedForANestedSchema(t *testing.T) {
 	t.Parallel()
-	_, base := workbenchServing(t, "health.blood-pressure")
-	status, body := page(t, "GET", base+"/entry?type=health.blood-pressure", nil, nil)
+	_, base := workbenchServing(t, "record.edge")
+	status, body := page(t, "GET", base+"/entry?type=record.edge", nil, nil)
 	if status != http.StatusUnprocessableEntity {
-		t.Fatalf("GET /entry for blood pressure = %d, want 422", status)
+		t.Fatalf("GET /entry for record.edge = %d, want 422", status)
 	}
-	for _, want := range []string{"A form cannot be drawn for this type yet", "effective_time_frame", "Nested objects and lists are not drawn"} {
+	for _, want := range []string{"A form cannot be drawn for this type yet", "about (", "pins (", "Nested objects and lists are not drawn"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the refusal lacks %q:\n%s", want, body)
 		}
@@ -247,10 +248,10 @@ func TestAFormIsRefusedForANestedSchema(t *testing.T) {
 // changed amount is a new version.
 func TestSubmittingTheFormLandsTheDose(t *testing.T) {
 	t.Parallel()
-	d, base := workbenchServing(t, "health.medication.dose")
-	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
+	d, base := workbenchServing(t, "test.dose")
+	dose, _ := d.defs.current.Load().Lookup("test.dose")
 	v := dose.Version
-	wantID := facet.NewID(facet.SourceRef("workbench", "workbench:med/melatonin/dose/2026-10-19T22:00+11:00"))
+	wantID := facet.NewID(facet.SourceRef("workbench", "workbench:dose/melatonin/2026-10-19T22:00+02:00"))
 
 	status, body := page(t, "POST", base+"/entry", doseForm(v, "2026-10-19T22:00", "5"), nil)
 	if status != http.StatusOK || !strings.Contains(body, "admitted") || !strings.Contains(body, `href="/facet?id=`+wantID+`"`) {
@@ -263,8 +264,8 @@ func TestSubmittingTheFormLandsTheDose(t *testing.T) {
 	if f.Provenance.Source != "workbench" {
 		t.Fatalf("source = %q, want workbench", f.Provenance.Source)
 	}
-	for _, want := range []string{`"taken_at":"2026-10-19 22:00"`, `"amount":5`, `"unit":"mg"`, `"drug":"melatonin"`,
-		`"id":"workbench:med/melatonin/dose/2026-10-19T22:00+11:00"`, `"reason":"to help sleep"`} {
+	for _, want := range []string{`"taken_at":"2026-10-19 22:00"`, `"amount":5`, `"unit":"mg"`, `"name":"melatonin"`,
+		`"id":"workbench:dose/melatonin/2026-10-19T22:00+02:00"`, `"reason":"to help sleep"`} {
 		if !strings.Contains(string(f.Payload.Bytes()), want) {
 			t.Errorf("payload %s lacks %s", f.Payload.Bytes(), want)
 		}
@@ -289,8 +290,8 @@ func TestSubmittingTheFormLandsTheDose(t *testing.T) {
 // write nothing and draw the form again with what was typed, in the gate's words.
 func TestAFailedSaveKeepsWhatWasTyped(t *testing.T) {
 	t.Parallel()
-	d, base := workbenchServing(t, "health.medication.dose")
-	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
+	d, base := workbenchServing(t, "test.dose")
+	dose, _ := d.defs.current.Load().Lookup("test.dose")
 	v := dose.Version
 
 	status, body := page(t, "POST", base+"/entry", doseForm(v, "2026-10-19T22:00", "-1"), nil)
@@ -311,8 +312,8 @@ func TestAFailedSaveKeepsWhatWasTyped(t *testing.T) {
 		!strings.Contains(body, "drawn from the Definition now in force") {
 		t.Fatalf("a stale form = %d, want 409 and a redrawn form:\n%s", status, body)
 	}
-	if tag := inputTag(t, body, "drug"); !strings.Contains(tag, `value="melatonin"`) {
-		t.Errorf("drug = %s, want the typed value kept", tag)
+	if tag := inputTag(t, body, "name"); !strings.Contains(tag, `value="melatonin"`) {
+		t.Errorf("name = %s, want the typed value kept", tag)
 	}
 	if w := head(t, d); w != 0 {
 		t.Fatalf("W = %d after failed saves, want 0", w)
@@ -324,28 +325,28 @@ func TestAFailedSaveKeepsWhatWasTyped(t *testing.T) {
 // facet of another source has neither button, and its retraction is refused.
 func TestEditAndRetractAreForTheWorkbenchsOwnFacets(t *testing.T) {
 	t.Parallel()
-	d, base := workbenchServing(t, "health.medication.dose")
-	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
+	d, base := workbenchServing(t, "test.dose")
+	dose, _ := d.defs.current.Load().Lookup("test.dose")
 	v := dose.Version
-	wantID := facet.NewID(facet.SourceRef("workbench", "workbench:med/melatonin/dose/2026-10-19T22:00+11:00"))
+	wantID := facet.NewID(facet.SourceRef("workbench", "workbench:dose/melatonin/2026-10-19T22:00+02:00"))
 	page(t, "POST", base+"/entry", doseForm(v, "2026-10-19T22:00", "5"), nil)
 
 	_, facetPage := page(t, "GET", base+"/facet?id="+wantID, nil, nil)
-	if !strings.Contains(facetPage, `href="/entry?type=health.medication.dose&edit=`+wantID+`"`) ||
+	if !strings.Contains(facetPage, `href="/entry?type=test.dose&edit=`+wantID+`"`) ||
 		!strings.Contains(facetPage, `action="/retract"`) {
 		t.Fatalf("the workbench facet's page lacks Edit or Retract:\n%s", facetPage)
 	}
 
-	status, form := page(t, "GET", base+"/entry?type=health.medication.dose&edit="+wantID, nil, nil)
+	status, form := page(t, "GET", base+"/entry?type=test.dose&edit="+wantID, nil, nil)
 	if status != http.StatusOK {
 		t.Fatalf("GET edit = %d: %s", status, form)
 	}
-	for _, name := range []string{"drug", "taken_at"} {
+	for _, name := range []string{"name", "taken_at"} {
 		if tag := inputTag(t, form, name); !strings.Contains(tag, "readonly") {
 			t.Errorf("identity field %s is not locked: %s", name, tag)
 		}
 	}
-	for name, value := range map[string]string{"drug": "melatonin", "taken_at": "2026-10-19T22:00", "amount": "5", "unit": "mg"} {
+	for name, value := range map[string]string{"name": "melatonin", "taken_at": "2026-10-19T22:00", "amount": "5", "unit": "mg"} {
 		if tag := inputTag(t, form, name); !strings.Contains(tag, `value="`+value+`"`) {
 			t.Errorf("control %s = %s, want it filled with %q", name, tag, value)
 		}
@@ -361,7 +362,7 @@ func TestEditAndRetractAreForTheWorkbenchsOwnFacets(t *testing.T) {
 	}
 
 	// A facet of another source: no buttons, and the retraction is refused.
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	var adm api.Admission
 	call(t, "POST", base+"/v1/envelopes", importerToken, batch(weighIn("w-1", 80.1, weight.Version)), http.StatusOK, &adm)
 	other := adm.Results[0].FacetID
@@ -398,8 +399,8 @@ func TestEditAndRetractAreForTheWorkbenchsOwnFacets(t *testing.T) {
 // The browser guard wraps the form routes: a post from another site writes nothing.
 func TestTheFormRoutesRefuseACrossSitePost(t *testing.T) {
 	t.Parallel()
-	d, base := workbenchServing(t, "health.medication.dose")
-	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
+	d, base := workbenchServing(t, "test.dose")
+	dose, _ := d.defs.current.Load().Lookup("test.dose")
 	cross := map[string]string{"Origin": "https://untrusted.example", "Sec-Fetch-Site": "cross-site"}
 	if status, _ := page(t, "POST", base+"/entry", doseForm(dose.Version, "2026-10-19T22:00", "5"), cross); status != http.StatusForbidden {
 		t.Fatalf("cross-site POST /entry = %d, want 403", status)

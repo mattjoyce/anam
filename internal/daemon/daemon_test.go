@@ -28,7 +28,7 @@ import (
 const testTimeout = 30 * time.Second
 
 // newConfig is a config over a real, initialised ledger under the test's own directory,
-// reading a copy of fixture.Mattjoyce from its own definitions and projections
+// reading a copy of fixture.Engine from its own definitions and projections
 // directories (card 255).
 func newConfig(t *testing.T) config.Config {
 	t.Helper()
@@ -46,7 +46,7 @@ func newConfig(t *testing.T) config.Config {
 		Listen:             "127.0.0.1:0",
 		Limits:             config.DefaultLimits(),
 	}
-	catalogtest.Config(t, &cfg)
+	catalogtest.Engine.Config(t, &cfg)
 	l, err := ledger.Create(context.Background(), cfg.LedgerPath, cfg.PersonID)
 	if err != nil {
 		t.Fatalf("create ledger: %v", err)

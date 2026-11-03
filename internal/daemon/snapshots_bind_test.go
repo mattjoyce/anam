@@ -20,7 +20,7 @@ func TestSnapshotPartIsBoundToItsEnvelopes(t *testing.T) {
 	cfg := importerConfig(t)
 	d, url, stop := serveImporters(t, cfg)
 	defer func() { _ = stop() }()
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	v := weight.Version
 
 	// a, b and c are live before the run; the run will carry a and b.
@@ -81,7 +81,7 @@ func TestSnapshotConcurrentRetriesRecordOnePart(t *testing.T) {
 	cfg := importerConfig(t)
 	d, url, stop := serveImporters(t, cfg)
 	defer func() { _ = stop() }()
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	v := weight.Version
 	body := snapBatch("run", 1, 1, weighIn("a", 80, v), weighIn("b", 81, v))
 
@@ -129,7 +129,7 @@ func TestSnapshotCompletedPartCannotGainFacets(t *testing.T) {
 	t.Parallel()
 	d, url, stop := serveImporters(t, importerConfig(t))
 	defer func() { _ = stop() }()
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	call(t, "POST", url+"/v1/envelopes", importerToken, batch(weighIn("a", 80, weight.Version), weighIn("b", 81, weight.Version)), http.StatusOK, nil)
 	call(t, "POST", url+"/v1/envelopes", importerToken, snapBatch("sealed", 1, 1, weighIn("a", 80, weight.Version)), http.StatusOK, nil)
 	var before, after api.SnapshotReport

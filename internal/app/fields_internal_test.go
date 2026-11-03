@@ -14,16 +14,17 @@ import (
 // of the payload but those fields (card 138).
 func TestTimeline_FieldsAnswerWithAFrame(t *testing.T) {
 	t.Parallel()
-	f := newRemoteFixtureIn(t, "Australia/Sydney")
-	read := []string{"timeline", "--type", "health.blood-pressure", "--field", "/systolic_blood_pressure/value", "--field", "/pulse"}
+	f := newRemoteFixtureIn(t, "Europe/Berlin")
+	// A nested pointer and a top-level one: the frame cuts source_time to its basis.
+	read := []string{"timeline", "--type", "test.measure", "--field", "/source_time/basis", "--field", "/note"}
 
 	out := f.sameOutput(t, read...)
-	for _, want := range []string{"shown=3", "/SYSTOLIC_BLOOD_PRESSURE/VALUE", "/PULSE", "FACET_ID", "114", "70.0"} {
+	for _, want := range []string{"shown=3", "/SOURCE_TIME/BASIS", "/NOTE", "FACET_ID", "configuration", "70.0"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the frame does not show %q:\n%s", want, out)
 		}
 	}
-	if strings.Contains(out, "diastolic") || strings.Contains(out, "mmHg") {
+	if strings.Contains(out, "/SEQ") || strings.Contains(out, "/COUNT") || strings.Contains(out, "Europe/Berlin") {
 		t.Errorf("a field not named reached the answer:\n%s", out)
 	}
 
@@ -35,7 +36,7 @@ func TestTimeline_FieldsAnswerWithAFrame(t *testing.T) {
 	if fr.Len() != 3 || len(fr.Columns) != len(frame.Envelope)+2 {
 		t.Errorf("frame has %d rows and %d columns", fr.Len(), len(fr.Columns))
 	}
-	if fr.Columns[len(fr.Columns)-1] != "/pulse" {
+	if fr.Columns[len(fr.Columns)-1] != "/note" {
 		t.Errorf("columns = %v", fr.Columns)
 	}
 	// Narrowing composes under the cut: a window keeps one row.
@@ -55,10 +56,10 @@ func TestTimeline_FieldsAreCheckedAgainstTheSchema(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"undeclared", []string{"timeline", "--type", "health.blood-pressure", "--field", "/nope"}, `declares no field /nope`},
-		{"no type", []string{"timeline", "--field", "/pulse"}, `declares no field /pulse`},
-		{"not a pointer", []string{"timeline", "--type", "health.blood-pressure", "--field", "pulse"}, `must start with '/'`},
-		{"explained", []string{"timeline", "--explain", "--field", "/pulse"}, `explain shows verdicts`},
+		{"undeclared", []string{"timeline", "--type", "test.measure", "--field", "/nope"}, `declares no field /nope`},
+		{"no type", []string{"timeline", "--field", "/note"}, `declares no field /note`},
+		{"not a pointer", []string{"timeline", "--type", "test.measure", "--field", "pulse"}, `must start with '/'`},
+		{"explained", []string{"timeline", "--explain", "--field", "/note"}, `explain shows verdicts`},
 	} {
 		for _, cfg := range []string{f.cfgPath, f.remoteCfg} {
 			_, _, err := cli(t, cfg, tt.args...)
@@ -74,7 +75,7 @@ func TestTimeline_FieldsAreCheckedAgainstTheSchema(t *testing.T) {
 func TestPublish_FieldsFileAFrameThatVerifiesAndShows(t *testing.T) {
 	t.Parallel()
 	f := newRemoteFixture(t)
-	read := []string{"timeline", "--projection", "bp", "--field", "/systolic_blood_pressure/value"}
+	read := []string{"timeline", "--projection", "measures", "--field", "/source_time/basis"}
 
 	shown := f.sameOutput(t, read...)
 	published := f.sameOutput(t, append(read, "--publish")...)
@@ -91,7 +92,7 @@ func TestPublish_FieldsFileAFrameThatVerifiesAndShows(t *testing.T) {
 		t.Errorf("the fields receipt did not reproduce:\n%s", out)
 	}
 	show := f.sameOutput(t, "receipt", "show", hash)
-	for _, want := range []string{"fields /systolic_blood_pressure/value", "/SYSTOLIC_BLOOD_PRESSURE/VALUE", "114"} {
+	for _, want := range []string{"fields /source_time/basis", "/SOURCE_TIME/BASIS", "configuration"} {
 		if !strings.Contains(show, want) {
 			t.Errorf("receipt show lacks %q:\n%s", want, show)
 		}
@@ -103,7 +104,7 @@ func TestPublish_FieldsFileAFrameThatVerifiesAndShows(t *testing.T) {
 	var cols struct {
 		Columns []string `json:"columns"`
 	}
-	if json.Unmarshal([]byte(asJSON), &cols) != nil || cols.Columns[len(cols.Columns)-1] != "/systolic_blood_pressure/value" {
+	if json.Unmarshal([]byte(asJSON), &cols) != nil || cols.Columns[len(cols.Columns)-1] != "/source_time/basis" {
 		t.Errorf("the shown frame's columns: %v", cols.Columns)
 	}
 }
@@ -122,13 +123,13 @@ func TestTimeline_FieldsNarrowAReadUnderTheBound(t *testing.T) {
 		cfg.MaxReadBytes = len(whole) - 2 // the array without its newline, less one
 	})
 
-	_, _, err := cli(t, f.remoteCfg, "timeline", "--type", "health.blood-pressure")
+	_, _, err := cli(t, f.remoteCfg, "timeline", "--type", "test.measure")
 	refused := tooLarge(t, err, "the whole type")
 	if got := strings.Join(refused.TooLarge.Narrow, " "); got != "from to at projection fields" {
 		t.Errorf("narrow = %q, want fields among what is left", got)
 	}
 
-	out, _, err := cli(t, f.remoteCfg, "timeline", "--type", "health.blood-pressure", "--field", "/pulse")
+	out, _, err := cli(t, f.remoteCfg, "timeline", "--type", "test.measure", "--field", "/note")
 	if err != nil || !strings.Contains(out, "shown=3") {
 		t.Errorf("the same read cut to one field: %v\n%s", err, out)
 	}

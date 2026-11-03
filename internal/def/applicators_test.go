@@ -77,17 +77,3 @@ func TestParse_ApplicatorBranchesNeedNoClosing(t *testing.T) {
 		})
 	}
 }
-
-// health.intake carries an additionalProperties placeholder on each of its branches;
-// the lint no longer asks for them, but the manifest still loads as it is.
-func TestBundled_HealthIntakeStillLoads(t *testing.T) {
-	t.Parallel()
-
-	reg, err := def.BundledFS(fixtureDefs())
-	if err != nil {
-		t.Fatalf("BundledFS: %v", err)
-	}
-	if _, ok := reg.Lookup("health.intake"); !ok {
-		t.Fatal("no bundled definition for health.intake")
-	}
-}

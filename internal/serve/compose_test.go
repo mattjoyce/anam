@@ -27,8 +27,8 @@ func (h *harness) composed() serve.Deps {
 
 // A serve composed from the last mint run and its tail publishes the same value, with
 // the same receipt, as one folded from the ledger's first event; and a receipt served
-// either way verifies either way. Both template shapes are held to it: bp is a log,
-// meds a snapshot over the composed whole value (card 64 is about reading a prefix of
+// either way verifies either way. Both template shapes are held to it: measures is a log,
+// course a snapshot over the composed whole value (card 64 is about reading a prefix of
 // it, not this).
 func TestRun_ComposedFromTheLastRunIsTheFullFold(t *testing.T) {
 	t.Parallel()
@@ -38,24 +38,24 @@ func TestRun_ComposedFromTheLastRunIsTheFullFold(t *testing.T) {
 		tail           func(h *harness)
 	}{
 		{
-			name: "log shape", template: "bp",
+			name: "log shape", template: "measures",
 			seed: func(h *harness) { h.seed(t) },
 			tail: func(h *harness) {
-				h.admit(t, "bp-csv", "health.blood-pressure", "2026-01-24T06:30:00Z", `"systolic": 116, "diastolic": 74`) // corrected
-				h.admit(t, "bp-csv", "health.blood-pressure", "2026-02-01T06:30:00Z", `"systolic": 120, "diastolic": 78`) // a new month
-				h.admit(t, "health-db", "health.sleep", "2026-02-01T22:00:00Z", `"deep_minutes": 55`)
+				h.admit(t, "meter", "test.measure", "2026-01-24T06:30:00Z", `"value": 116, "extra": 74`) // corrected
+				h.admit(t, "meter", "test.measure", "2026-02-01T06:30:00Z", `"value": 120, "extra": 78`) // a new month
+				h.admit(t, "logger", "test.reading", "2026-02-01T22:00:00Z", `"minutes": 55`)
 			},
 		},
 		{
-			name: "snapshot shape", template: "meds",
+			name: "snapshot shape", template: "course",
 			seed: func(h *harness) {
-				h.med(t, "health.medication.started", "m1", "2026-03-01", "ramipril", 1)
-				h.med(t, "health.medication.dose-changed", "m2", "2026-05-10", "ramipril", 1)
-				h.med(t, "health.medication.started", "m5", "2026-04-01", "atorvastatin", 1)
+				h.event(t, "test.course.started", "m1", "2026-03-01", "alpha", 1)
+				h.event(t, "test.course.changed", "m2", "2026-05-10", "alpha", 1)
+				h.event(t, "test.course.started", "m5", "2026-04-01", "beta", 1)
 			},
 			tail: func(h *harness) {
-				h.med(t, "health.medication.stopped", "m3", "2026-08-01", "ramipril", 1) // closes a course started before the run
-				h.med(t, "health.medication.started", "m4", "2026-10-01", "ramipril", 2)
+				h.event(t, "test.course.stopped", "m3", "2026-08-01", "alpha", 1) // closes a course started before the run
+				h.event(t, "test.course.started", "m4", "2026-10-01", "alpha", 2)
 			},
 		},
 	} {
@@ -63,8 +63,8 @@ func TestRun_ComposedFromTheLastRunIsTheFullFold(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
 			var h *harness
-			if tc.template == "meds" {
-				h = medHarness(t)
+			if tc.template == "course" {
+				h = courseHarness(t)
 			} else {
 				h = newHarness(t)
 			}
@@ -134,17 +134,17 @@ func TestVerify_ComposedAfterTheLedgerAdvances(t *testing.T) {
 	h.seed(t)
 	ctx := context.Background()
 	h.mintRun(t)
-	h.admit(t, "bp-csv", "health.blood-pressure", "2026-02-01T06:30:00Z", `"systolic": 120, "diastolic": 78`)
+	h.admit(t, "meter", "test.measure", "2026-02-01T06:30:00Z", `"value": 120, "extra": 78`)
 
-	out, err := serve.Run(ctx, h.composed(), "bp", false)
+	out, err := serve.Run(ctx, h.composed(), "measures", false)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
 	// The world moves on both sides of the checkpoint: a correction to a served
 	// reading from before the run, a new reading, and a second mint run after them.
-	h.admit(t, "bp-csv", "health.blood-pressure", "2026-01-24T06:30:00Z", `"systolic": 116, "diastolic": 74`)
-	h.admit(t, "bp-csv", "health.blood-pressure", "2026-02-02T06:30:00Z", `"systolic": 119, "diastolic": 77`)
+	h.admit(t, "meter", "test.measure", "2026-01-24T06:30:00Z", `"value": 116, "extra": 74`)
+	h.admit(t, "meter", "test.measure", "2026-02-02T06:30:00Z", `"value": 119, "extra": 77`)
 	h.mintRun(t)
 
 	_, res, err := serve.Verify(ctx, h.composed(), out.ReceiptHash)
@@ -154,7 +154,7 @@ func TestVerify_ComposedAfterTheLedgerAdvances(t *testing.T) {
 	if !res.OK() {
 		t.Fatalf("a sound receipt did not verify from checkpoints after later ingest and a later mint:\n%s", res.Summary())
 	}
-	fresh, err := serve.Run(ctx, h.composed(), "bp", true)
+	fresh, err := serve.Run(ctx, h.composed(), "measures", true)
 	if err != nil {
 		t.Fatalf("Run (after ingest): %v", err)
 	}

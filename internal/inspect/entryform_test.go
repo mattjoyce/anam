@@ -2,6 +2,7 @@ package inspect
 
 import (
 	"encoding/json"
+	"io/fs"
 	"net/url"
 	"strconv"
 	"strings"
@@ -152,43 +153,50 @@ func TestFillAndLockForACorrection(t *testing.T) {
 	}
 }
 
-// The bundled types whose schemas need nested objects are refused by name, and the
-// dose, which needs none, is drawn.
+// A catalog type whose schema needs a nested object is refused by name: test.measure
+// requires source_time and its fact time reads no zone from it, so the form has nothing
+// to fill it from. test.templated, which needs none it cannot fill, is drawn.
 func TestDrawFormRefusesNestedSchemas(t *testing.T) {
 	t.Parallel()
 	manifests := fixtureManifests(t)
-	reg := catalogtest.Definitions(t)
+	reg := catalogtest.Engine.Definitions(t)
+	seen := 0
 	for _, m := range manifests {
 		d, ok := reg.Lookup(m.Type)
-		if !ok || d.Version != m.Version || (m.Type != "health.blood-pressure" && m.Type != "health.medication.dose") {
+		if !ok || d.Version != m.Version || (m.Type != "test.measure" && m.Type != "test.templated") {
 			continue
 		}
+		seen++
 		_, err := drawForm(m.Body, d, false)
 		switch m.Type {
-		case "health.blood-pressure":
-			if err == nil || !strings.Contains(err.Error(), "effective_time_frame") || !strings.Contains(err.Error(), "Nested objects") {
-				t.Errorf("blood pressure: err = %v, want a refusal naming effective_time_frame", err)
+		case "test.measure":
+			if err == nil || !strings.Contains(err.Error(), "source_time") || !strings.Contains(err.Error(), "Nested objects") {
+				t.Errorf("test.measure: err = %v, want a refusal naming source_time", err)
 			}
 		default:
 			if err != nil {
-				t.Errorf("the dose is not drawn: %v", err)
+				t.Errorf("test.templated is not drawn: %v", err)
 			}
 		}
+	}
+	if seen != 2 {
+		t.Errorf("%d of the two types found at their current version", seen)
 	}
 }
 
 // Card 198 gave each self-report type timed by a wall clock a version whose fact time
 // reads the offset the fact names, from source_time, which the form cannot draw. So the form fills it rather than
 // drawing it, and every type that drew at its version before still draws, now zoned.
+// The engine fixture's test.reading and test.templated are two such types.
 func TestEveryTypeThatDrewStillDrawsOnceZoned(t *testing.T) {
 	t.Parallel()
 	manifests := fixtureManifests(t)
-	reg := catalogtest.Definitions(t)
+	reg := catalogtest.Engine.Definitions(t)
 	bodies := map[string][]byte{}
 	for _, m := range manifests {
 		bodies[string(m.Type)+"@"+strconv.Itoa(m.Version)] = m.Body
 	}
-	zoned := 0
+	zoned, drew := 0, 0
 	for _, d := range reg.All() {
 		if d.FactTime.ZonePointer == "" {
 			continue
@@ -205,6 +213,7 @@ func TestEveryTypeThatDrewStillDrawsOnceZoned(t *testing.T) {
 		if _, err := drawForm(before, old, false); err != nil {
 			continue // it did not draw before either
 		}
+		drew++
 		form, err := drawForm(bodies[string(d.Type)+"@"+strconv.Itoa(d.Version)], d, false)
 		if err != nil {
 			t.Errorf("%s v%d drew at v%d and does not now: %v", d.Type, d.Version, d.Version-1, err)
@@ -220,17 +229,23 @@ func TestEveryTypeThatDrewStillDrawsOnceZoned(t *testing.T) {
 		}
 	}
 	if zoned < 3 {
-		t.Errorf("%d bundled types read a zone from the fact, want the three self-report types timed by a wall clock", zoned)
+		t.Errorf("%d catalog types read a zone from the fact, want record.edge, test.reading and test.templated", zoned)
+	}
+	if drew < 2 {
+		t.Errorf("%d types drew at the version before their zoned one, want test.reading and test.templated", drew)
 	}
 }
 
 // A zoned form sends source_time from the fields the browser fills, keeps the wall
-// clock's digits as typed even where Sydney skips them, and sends nothing, saying why,
-// when it has no offset.
+// clock's digits as typed even where the Definition's zone (Berlin) skips them, and
+// sends nothing, saying why, when it has no offset.
 func TestAZonedFormSendsTheBrowsersZone(t *testing.T) {
 	t.Parallel()
-	reg := catalogtest.Definitions(t)
-	d, _ := reg.Lookup("health.medication.dose")
+	reg := catalogtest.Engine.Definitions(t)
+	d, ok := reg.Lookup("test.templated")
+	if !ok || d.FactTime.Zone != "Europe/Berlin" {
+		t.Fatalf("test.templated = %+v, want it read in Europe/Berlin", d.FactTime)
+	}
 	manifests := fixtureManifests(t)
 	var body []byte
 	for _, m := range manifests {
@@ -238,7 +253,7 @@ func TestAZonedFormSendsTheBrowsersZone(t *testing.T) {
 			body = m.Body
 		}
 	}
-	vals := url.Values{"f.drug": {"melatonin"}, "f.amount": {"5"}, "f.unit": {"mg"}}
+	vals := url.Values{"f.name": {"salt"}, "f.amount": {"5"}, "f.unit": {"g"}}
 	for _, c := range []struct {
 		name, taken, zone, offset string
 		want                      string
@@ -247,8 +262,8 @@ func TestAZonedFormSendsTheBrowsersZone(t *testing.T) {
 			`"source_time":{"basis":"source","offset":"+01:00","value":"2026-10-19 18:00","zone":"Europe/London"}`},
 		{"an offset and no zone: the offset names it", "2026-10-19T18:00", "", "+01:00",
 			`"source_time":{"basis":"source","offset":"+01:00","value":"2026-10-19 18:00","zone":"+01:00"}`},
-		{"a wall clock Sydney skips keeps its digits", "2026-10-04T02:30", "Europe/London", "+01:00",
-			`"taken_at":"2026-10-04 02:30"`},
+		{"a wall clock Berlin skips keeps its digits", "2026-03-29T02:30", "Europe/London", "+01:00",
+			`"at":"2026-03-29 02:30"`},
 	} {
 		form, err := drawForm(body, d, false)
 		if err != nil {
@@ -258,7 +273,7 @@ func TestAZonedFormSendsTheBrowsersZone(t *testing.T) {
 		for k, x := range vals {
 			v[k] = x
 		}
-		v.Set("f.taken_at", c.taken)
+		v.Set("f.at", c.taken)
 		v.Set("zone", c.zone)
 		v.Set("offset", c.offset)
 		payload, ok := form.read(v)
@@ -267,7 +282,7 @@ func TestAZonedFormSendsTheBrowsersZone(t *testing.T) {
 		}
 	}
 	form, _ := drawForm(body, d, false)
-	vals.Set("f.taken_at", "2026-10-19T18:00")
+	vals.Set("f.at", "2026-10-19T18:00")
 	vals.Set("zone", "Europe/London")
 	payload, ok := form.read(vals)
 	if ok || payload != nil || !strings.Contains(form.OffsetProblem, "Anam needs the offset") {
@@ -275,20 +290,21 @@ func TestAZonedFormSendsTheBrowsersZone(t *testing.T) {
 	}
 }
 
-// Card 222: the attention types are entered by hand, and the form is drawn from their
-// Definitions with nothing about them in the page. The fact time leads and is zoned,
-// the composed id is left to the gate, intensity is a whole number with its bounds
-// stated, the topic and the note are text, and what the person types reads back as
-// the typed JSON the Definition takes.
-func TestTheAttentionTypesDrawAsForms(t *testing.T) {
+// Card 222: a type entered by hand is drawn from its Definition with nothing about it
+// in the page. The fact time leads and is zoned, the composed id is left to the gate,
+// intensity is a whole number with its bounds stated, the topic and the note are text,
+// and what the person types reads back as the typed JSON the Definition takes. The
+// types are test.attended, which ExtraCatalog adds to the engine fixture, and the
+// engine fixture's own test.templated.
+func TestTheEnteredTypesDrawAsForms(t *testing.T) {
 	t.Parallel()
-	manifests := fixtureManifests(t)
-	reg := catalogtest.Definitions(t)
+	manifests := extraManifests(t)
+	reg := ExtraCatalog.Definitions(t)
 	drawType := func(typ string) entryForm {
 		t.Helper()
 		d, ok := reg.Lookup(facet.Type(typ))
 		if !ok {
-			t.Fatalf("%s is not bundled", typ)
+			t.Fatalf("%s is not in the catalog", typ)
 		}
 		for _, m := range manifests {
 			if m.Type == d.Type && m.Version == d.Version {
@@ -318,7 +334,7 @@ func TestTheAttentionTypesDrawAsForms(t *testing.T) {
 		return out
 	}
 
-	form := drawType("mind.attention")
+	form := drawType("test.attended")
 	if form.Fields[0].Name != "at" || form.Fields[0].Input != "datetime-local" || !form.Fields[0].FactTime {
 		t.Errorf("first field = %+v, want the fact time as a date and time", form.Fields[0])
 	}
@@ -335,7 +351,7 @@ func TestTheAttentionTypesDrawAsForms(t *testing.T) {
 	}
 
 	good := url.Values{"f.at": {"2026-10-22T21:40"}, "f.topic": {"deskcam"}, "f.intensity": {"4"}, "f.note": {"prints straight"},
-		"zone": {"Australia/Sydney"}, "offset": {"+11:00"}}
+		"zone": {"Europe/Berlin"}, "offset": {"+02:00"}}
 	payload, ok := form.read(good)
 	if !ok {
 		t.Fatalf("read refused good values: %+v", form.Fields)
@@ -350,31 +366,30 @@ func TestTheAttentionTypesDrawAsForms(t *testing.T) {
 	if !strings.Contains(string(payload), `"intensity":4`) {
 		t.Errorf("intensity was sent as text: %s", payload)
 	}
-	bad := url.Values{"f.at": {"2026-10-22T21:40"}, "f.topic": {"deskcam"}, "f.intensity": {"4.5"}, "zone": {"Australia/Sydney"}, "offset": {"+11:00"}}
+	bad := url.Values{"f.at": {"2026-10-22T21:40"}, "f.topic": {"deskcam"}, "f.intensity": {"4.5"}, "zone": {"Europe/Berlin"}, "offset": {"+02:00"}}
 	if _, ok := form.read(bad); ok || byName(form)["intensity"].Problem == "" {
 		t.Errorf("a fractional intensity was read; problem %q", byName(form)["intensity"].Problem)
 	}
 
-	for _, typ := range []string{"mind.attention.started", "mind.attention.ended"} {
-		f := byName(drawType(typ))
-		if f["at"].Input != "datetime-local" || f["topic"].Input != "text" || f["note"].Required {
-			t.Errorf("%s: at %+v, topic %+v, note %+v", typ, f["at"], f["topic"], f["note"])
-		}
+	f := byName(drawType("test.templated"))
+	if f["at"].Input != "datetime-local" || f["name"].Input != "text" || !f["name"].Required || f["note"].Required {
+		t.Errorf("test.templated: at %+v, name %+v, note %+v", f["at"], f["name"], f["note"])
 	}
 }
 
-// Card 232: health.intake is entered by hand too, and its form is drawn from the
-// Definition. The kind and the part of the day are selects, a meal's two answers are
-// yes or no selects, the count is a whole number from 1, and what the person types
-// reads back as typed JSON. The form shows every field of every kind; the gate, not
-// the page, refuses a drink with a meal's fields.
-func TestTheIntakeTypeDrawsAsAForm(t *testing.T) {
+// Card 232: a type of choices entered by hand has its form drawn from the Definition.
+// The kind and the part of the day are selects, a meal's two answers are yes or no
+// selects, the count is a whole number from 1, and what the person types reads back as
+// typed JSON. The form shows every field of every kind; the gate, not the page, refuses
+// a drink with a meal's fields. The type is test.taken, which ExtraCatalog adds to the
+// engine fixture.
+func TestAChoicesTypeDrawsAsAForm(t *testing.T) {
 	t.Parallel()
-	manifests := fixtureManifests(t)
-	reg := catalogtest.Definitions(t)
-	d, ok := reg.Lookup("health.intake")
+	manifests := extraManifests(t)
+	reg := ExtraCatalog.Definitions(t)
+	d, ok := reg.Lookup("test.taken")
 	if !ok {
-		t.Fatal("health.intake is not bundled")
+		t.Fatal("test.taken is not in the catalog")
 	}
 	var (
 		form entryForm
@@ -410,8 +425,8 @@ func TestTheIntakeTypeDrawsAsAForm(t *testing.T) {
 	}
 
 	payload, ok := form.read(url.Values{
-		"f.kind": {"alcohol"}, "f.at": {"2026-10-22T19:30"}, "f.drink": {"red-wine"}, "f.count": {"2"}, "f.abv": {"13.5"},
-		"zone": {"Australia/Sydney"}, "offset": {"+11:00"},
+		"f.kind": {"drink"}, "f.at": {"2026-10-22T19:30"}, "f.drink": {"red-wine"}, "f.count": {"2"}, "f.abv": {"13.5"},
+		"zone": {"Europe/Berlin"}, "offset": {"+02:00"},
 	})
 	if !ok {
 		t.Fatalf("read refused good values: %+v", form.Fields)
@@ -420,23 +435,35 @@ func TestTheIntakeTypeDrawsAsAForm(t *testing.T) {
 	if err := json.Unmarshal(payload, &got); err != nil {
 		t.Fatal(err)
 	}
-	if got["kind"] != "alcohol" || got["at"] != "2026-10-22 19:30" || got["drink"] != "red-wine" || got["count"] != float64(2) || got["abv"] != 13.5 {
+	if got["kind"] != "drink" || got["at"] != "2026-10-22 19:30" || got["drink"] != "red-wine" || got["count"] != float64(2) || got["abv"] != 13.5 {
 		t.Errorf("payload = %s", payload)
 	}
 	meal, ok := form.read(url.Values{
 		"f.kind": {"meal"}, "f.at": {"2026-10-22T19:30"}, "f.text": {"ate out, rich"}, "f.rich": {"true"}, "f.out": {"false"},
-		"zone": {"Australia/Sydney"}, "offset": {"+11:00"},
+		"zone": {"Europe/Berlin"}, "offset": {"+02:00"},
 	})
 	if !ok || !strings.Contains(string(meal), `"rich":true`) || !strings.Contains(string(meal), `"out":false`) {
 		t.Errorf("meal = %s, ok %v; want rich and out sent as booleans, out false kept", meal, ok)
 	}
 }
 
-// fixtureManifests is every manifest of the fixture catalog, current and history,
-// with its raw bytes: the bodies the entry form is drawn from.
+// fixtureManifests is every manifest of the engine fixture, current and history, with
+// its raw bytes: the bodies the entry form is drawn from.
 func fixtureManifests(t *testing.T) []def.Stored {
 	t.Helper()
-	defs, _ := fixture.Mattjoyce()
+	defs, _ := fixture.Engine()
+	return manifestsOf(t, defs)
+}
+
+// extraManifests is fixtureManifests for ExtraCatalog.
+func extraManifests(t *testing.T) []def.Stored {
+	t.Helper()
+	defs, _ := engineWith(addExtras)()
+	return manifestsOf(t, defs)
+}
+
+func manifestsOf(t *testing.T, defs fs.FS) []def.Stored {
+	t.Helper()
 	ms, err := def.ManifestsFS(defs)
 	if err != nil {
 		t.Fatalf("def.ManifestsFS: %v", err)

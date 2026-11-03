@@ -28,36 +28,15 @@ var embeddedAllowList = []allowed{
 		funcs:  []string{"TestFixture_SetVersionMatchesEmbedded", "TestFixture_BytesMatchEmbedded"},
 		reason: "the fixture's V and bytes equal the embedded catalog's; deleted with the catalog"},
 
-	// Slice 2 (#31): def and projection.
-	{file: "internal/def/bundled_test.go",
-		funcs: []string{"TestBundled_HoldsTheHealthDBTypes", "TestBundled_MedTypesShareTheRegimenSeries",
-			"TestBundled_LifeEventTypes", "TestBundled_FlightIsDatedWhereItLeft", "TestBundled_DocReferenceIsAReference",
-			"TestBundled_LabResultAdmitsAnUntimedDraw", "TestBundled_BloodPressureIsAnOMHBody",
-			"TestBundled_NoteAnnotationIsThePersonsWords", "TestBundledVisionPrescription", "TestBundled_WordsNameNoCard"},
-		reason: "properties of personal types and their words (WordsNameNoCard reads manifests/ by path); to the deployment repo"},
-	{file: "internal/def/heartrateday_test.go",
-		reason: "corpus retirement (card 205); to the deployment repo with the corpus tests"},
-	{file: "internal/def/readme_test.go",
-		reason: "the README table matches the manifests, globbed from manifests/ on disk; to the deployment repo"},
-	{file: "internal/def/sharedcore_test.go",
-		funcs:  []string{"TestSharedCore_LeavesAgree"},
-		reason: "vendor leaves agree with shared-core.json; to the deployment repo"},
-	{file: "internal/def/conformance_test.go",
-		reason: "IEEE 1752 examples pass the definitions; to the deployment repo"},
-	{file: "internal/def/history_test.go",
-		reason: "the embedded history carries the renamed types; to the deployment repo"},
+	// Slice 2 (#31): def and projection. R4b slice 4a moved the tests about the personal
+	// catalog to the deployment overlay and the rest to fixture.Engine; the two
+	// cross-checks below go with the catalog in slice 5.
 	{file: "internal/def/catalog_fs_test.go",
 		funcs:  []string{"TestBundledFS_MatchEmbedded", "TestBundledFS_ManifestsHistoryMatch"},
 		reason: "a disk copy of fixture.Mattjoyce loads as the embedded definitions do; deleted with the catalog"},
 	{file: "internal/projection/catalog_fs_test.go",
 		funcs:  []string{"TestBundledFS_MatchEmbedded"},
 		reason: "the same cross-check for projections; deleted with the catalog"},
-	{file: "internal/projection/projection_test.go",
-		funcs:  []string{"TestBundled_ParsesBpAndSleep"},
-		reason: "personal projections and the third-segment history; to the deployment repo"},
-	{file: "internal/projection/snapshot_test.go",
-		funcs:  []string{"TestBundled_MedsIsASnapshot"},
-		reason: "the personal meds projection; to the deployment repo"},
 
 	// Slice 3 (#32): catalog. R4b slice 3 rewrote it for the empty catalog.
 	{file: "internal/catalog/empty_test.go",
@@ -65,30 +44,24 @@ var embeddedAllowList = []allowed{
 
 	// Slice 4 (#34): daemon and app. R4b slice 3 deleted catalog_drift_test.go with
 	// the drift report, and catalog_dirs_embedded_test.go, since an empty directory no
-	// longer selects the embedded catalog to mint on; builtInCatalog now reads the fixture.
+	// longer selects the embedded catalog to mint on. R4b slice 4c moved the corpus
+	// retirement test, heartrateday_retire_internal_test.go, to the deployment repo.
 	{file: "internal/daemon/catalog_start_test.go",
 		funcs:  []string{"TestOpen_NoCatalogStartsEmpty"},
 		reason: "a daemon on a config with no catalog directories starts on the empty catalog and logs the WARN and structural lines (R4b slice 3); reads nothing embedded"},
-	{file: "internal/app/heartrateday_retire_internal_test.go",
-		reason: "corpus retirement (card 205) over def.Bundled and projection.Bundled; to the deployment repo with the corpus tests"},
 
-	// Slice 5 (#33): inspect.
-	{file: "internal/inspect/marks_test.go",
-		funcs:  []string{"TestTypeStyles_CoverEveryBundledType", "TestDomains_EveryBundledTypeHasAHead"},
-		reason: "marks.go covers every type the binary ships (CoverEveryBundledType lists ../def/manifests on disk); R5 (card 256) rewrites them against inspector.yaml"},
+	// Slice 5 (#33): inspect. R4b slice 4d moved its two marks coverage tests to the
+	// deployment overlay, which lists the deployment's definitions/.
 }
 
 // pathLabels are strings that spell an embedded catalog path but read nothing from
 // disk. The parser cannot tell a label from a path, so they are named here. Each
 // entry names one small formatter that builds the label and does nothing else, so a
-// read beside it is not excused. They are not reaches, and R4b need not empty this
-// list.
-var pathLabels = []allowed{
-	{file: "internal/def/baseline_test.go", funcs: []string{"goldenLabel"},
-		reason: `"manifests/" prefixes the golden file's line labels; the bytes are read from the fixture FS`},
-	{file: "internal/projection/baseline_test.go", funcs: []string{"goldenLabel"},
-		reason: `"manifests/" prefixes the golden file's line labels; the bytes are read from the fixture FS`},
-}
+// read beside it is not excused. They are not reaches. It is empty since R4b slice
+// 4a, when the def and projection baselines took labels under definitions/ and
+// projections/ with their move to fixture.Engine; it stays for a label a later test
+// needs.
+var pathLabels = []allowed{}
 
 // TestTests_ReadNoEmbeddedCatalog parses every _test.go in the module and fails on
 // any read of the embedded catalog outside embeddedAllowList: a use of an embedded

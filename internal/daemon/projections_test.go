@@ -16,7 +16,7 @@ import (
 // and still does once a newer version is registered.
 
 const weightsV1 = `{"name": "weights", "version": 1, "description": "weigh-ins only",
-  "types": ["health.weight"], "statuses": ["admitted", "endorsed"], "max_classification": "Sensitive",
+  "types": ["test.reading"], "statuses": ["admitted", "endorsed"], "max_classification": "Sensitive",
   "from": "", "to": "", "shape": "log"}`
 
 func TestPostProjections(t *testing.T) {
@@ -41,16 +41,21 @@ func TestPostProjections(t *testing.T) {
 	if again := post(strings.ReplaceAll(weightsV1, "\n", " "), http.StatusOK); again.New || again.Hash != reg.Hash {
 		t.Fatalf("the same body again: %+v", again)
 	}
-	post(strings.Replace(weightsV1, `"endorsed"`, `"admitted"`, 1), http.StatusConflict)                       // another body at v1
-	post(strings.Replace(weightsV1, `"health.weight"`, `"health.nothing"`, 1), http.StatusUnprocessableEntity) // no Definition
-	post(`{"name": "weights"}`, http.StatusUnprocessableEntity)                                                // not a template
-	call(t, "POST", url+"/v1/projections", importerToken, weightsV1, http.StatusForbidden, nil)                // not the operator's
-	// The bundled bp again is unchanged; bp v2 over it is new, and v1 stays held.
-	bp, _ := d.projections.bundled.Lookup("bp")
-	if r := post(string(bp.Body), http.StatusOK); r.New {
-		t.Fatalf("the bundled bp body: %+v", r)
+	post(strings.Replace(weightsV1, `"endorsed"`, `"admitted"`, 1), http.StatusConflict)                    // another body at v1
+	post(strings.Replace(weightsV1, `"test.reading"`, `"test.nothing"`, 1), http.StatusUnprocessableEntity) // no Definition
+	post(`{"name": "weights"}`, http.StatusUnprocessableEntity)                                             // not a template
+	call(t, "POST", url+"/v1/projections", importerToken, weightsV1, http.StatusForbidden, nil)             // not the operator's
+	// The bundled measures again is unchanged; measures v2 over it is new, and v1
+	// stays held.
+	measures, _ := d.projections.bundled.Lookup("measures")
+	if r := post(string(measures.Body), http.StatusOK); r.New {
+		t.Fatalf("the bundled measures body: %+v", r)
 	}
-	post(strings.Replace(string(bp.Body), `"version":1`, `"version":2`, 1), http.StatusCreated)
+	measuresV2 := strings.Replace(string(measures.Body), `"version":1`, `"version":2`, 1)
+	if measuresV2 == string(measures.Body) {
+		t.Fatalf("the bundled measures body names no version 1: %s", measures.Body)
+	}
+	post(measuresV2, http.StatusCreated)
 
 	var list api.Projections
 	call(t, "GET", url+"/v1/projections", testToken, "", http.StatusOK, &list)
@@ -61,23 +66,23 @@ func TestPostProjections(t *testing.T) {
 	if w := seen["weights"]; w.Origin != api.OriginRegistered || w.Current != 1 || len(w.Versions) != 1 || w.Hash != reg.Hash {
 		t.Errorf("weights listed as %+v", w)
 	}
-	if b := seen["bp"]; b.Origin != api.OriginRegistered || b.Current != 2 || len(b.Versions) != 2 {
-		t.Errorf("bp listed as %+v", b)
+	if b := seen["measures"]; b.Origin != api.OriginRegistered || b.Current != 2 || len(b.Versions) != 2 {
+		t.Errorf("measures listed as %+v", b)
 	}
-	if m := seen["meds"]; m.Origin != api.OriginBundled || m.Current != 4 || len(m.Versions) != 4 {
-		t.Errorf("meds listed as %+v", m)
+	if c := seen["course"]; c.Origin != api.OriginBundled || c.Current != 2 || len(c.Versions) != 2 {
+		t.Errorf("course listed as %+v", c)
 	}
 	var body map[string]any
 	call(t, "GET", url+"/v1/projections/weights", testToken, "", http.StatusOK, &body)
-	call(t, "GET", url+"/v1/projections/bp/1", testToken, "", http.StatusOK, &body)
+	call(t, "GET", url+"/v1/projections/measures/1", testToken, "", http.StatusOK, &body)
 	if body["version"] != float64(1) {
-		t.Errorf("bp v1 as held: %v", body)
+		t.Errorf("measures v1 as held: %v", body)
 	}
-	call(t, "GET", url+"/v1/projections/bp/3", testToken, "", http.StatusNotFound, nil)
+	call(t, "GET", url+"/v1/projections/measures/3", testToken, "", http.StatusNotFound, nil)
 	call(t, "GET", url+"/v1/projections/none", testToken, "", http.StatusNotFound, nil)
 
 	// A read selects the registered template, and a receipt pins its hash.
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	var a api.Admission
 	call(t, "POST", url+"/v1/envelopes", importerToken, batch(weighIn("w-1", 80.5, weight.Version)), http.StatusOK, &a)
 	var pub api.Published
@@ -130,17 +135,17 @@ func TestDefaultProjectionAdvertised(t *testing.T) {
 
 	t.Run("bundled", func(t *testing.T) {
 		cfg := importerConfig(t)
-		cfg.DefaultProjection = "bp"
+		cfg.DefaultProjection = "measures"
 		_, url, _ := serveImporters(t, cfg)
 		var st api.Status
 		call(t, "GET", url+"/v1/status", testToken, "", http.StatusOK, &st)
-		if st.DefaultProjection != "bp" {
-			t.Errorf("status default_projection = %q, want bp", st.DefaultProjection)
+		if st.DefaultProjection != "measures" {
+			t.Errorf("status default_projection = %q, want measures", st.DefaultProjection)
 		}
 		var list api.Projections
 		call(t, "GET", url+"/v1/projections", testToken, "", http.StatusOK, &list)
-		if list.Default != "bp" {
-			t.Errorf("projections default = %q, want bp", list.Default)
+		if list.Default != "measures" {
+			t.Errorf("projections default = %q, want measures", list.Default)
 		}
 		// Advertised, not applied: a read naming no projection serves no template.
 		var tl api.Timeline

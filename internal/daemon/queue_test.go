@@ -59,7 +59,7 @@ func TestQueueWaitSpendsTheCallersBudget(t *testing.T) {
 	before := head(t, d)
 	release := hold(t, d)
 
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	req := httptest.NewRequest(http.MethodPost, "/v1/envelopes", strings.NewReader(batch(weighIn("budget", 80, weight.Version))))
 	req.Header.Set("Authorization", "Bearer "+importerToken)
 	req.Header.Set(TimeoutHeader, "50ms")

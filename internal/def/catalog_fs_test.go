@@ -73,7 +73,7 @@ func TestBundledFS_MatchEmbedded(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	copy := copyCatalogToDisk(t, fixtureDefs(), dir)
+	copy := copyCatalogToDisk(t, personalDefs(), dir)
 
 	reg, err := def.BundledFS(copy)
 	if err != nil {
@@ -261,7 +261,7 @@ func TestFS_IgnoresNonJSONFiles(t *testing.T) {
 // it at R4b.
 func TestBundledFS_ManifestsHistoryMatch(t *testing.T) {
 	dir := t.TempDir()
-	_ = copyCatalogToDisk(t, fixtureDefs(), dir)
+	_ = copyCatalogToDisk(t, personalDefs(), dir)
 
 	// ManifestsFS vs Manifests.
 	want, err := def.Manifests()

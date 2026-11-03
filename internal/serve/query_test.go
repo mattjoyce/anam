@@ -18,7 +18,7 @@ import (
 // artifact alone. A receipt answered under other rules cannot replay here.
 func TestPublishQuery_VerifiesAndShows(t *testing.T) {
 	t.Parallel()
-	h := medHarness(t)
+	h := courseHarness(t)
 	h.deps.Definitions = h.deps.Series.(query.Definitions)
 	h.seed(t)
 	ctx := context.Background()
@@ -31,7 +31,7 @@ func TestPublishQuery_VerifiesAndShows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tmpl, err := h.deps.Templates.Lookup("bp")
+	tmpl, err := h.deps.Templates.Lookup("measures")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestPublishQuery_VerifiesAndShows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const text = `high(E, S) :- attr(E, "/systolic", S), S > 120.`
+	const text = `high(E, S) :- attr(E, "/value", S), S > 120.`
 	ans, rules, err := query.Run(ctx, served, query.Versions(res.Live), h.deps.Definitions, text, "high", 0)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -95,7 +95,7 @@ func TestPublishQuery_VerifiesAndShows(t *testing.T) {
 // text has is a moved rule set.
 func TestVerifyQuery_SelectsTheRuleSetByHash(t *testing.T) {
 	t.Parallel()
-	h := medHarness(t)
+	h := courseHarness(t)
 	h.deps.Definitions = h.deps.Series.(query.Definitions)
 	h.seed(t)
 	ctx := context.Background()
@@ -107,7 +107,7 @@ func TestVerifyQuery_SelectsTheRuleSetByHash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tmpl, err := h.deps.Templates.Lookup("bp")
+	tmpl, err := h.deps.Templates.Lookup("measures")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestVerifyQuery_SelectsTheRuleSetByHash(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The text asks for current/2, so the rules in it decide the answer's meaning.
-	const text = `instant(At) :- entry(_, "health.blood-pressure", At, _, _, _, _).
+	const text = `instant(At) :- entry(_, "test.measure", At, _, _, _, _).
 standing(E, At) :- current(E, At).`
 
 	tests := []struct {

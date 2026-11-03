@@ -18,7 +18,7 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
-// seedReadings admits two blood-pressure readings through the real gate before the
+// seedReadings admits two test.measure counts through the real gate before the
 // daemon opens the ledger.
 func seedReadings(t *testing.T, cfg config.Config) {
 	t.Helper()
@@ -28,13 +28,13 @@ func seedReadings(t *testing.T, cfg config.Config) {
 		t.Fatal(err)
 	}
 	defer func() { _ = l.Close() }()
-	g := gate.New(l, catalogtest.Definitions(t), gate.StaticScopes{"records": {"health.blood-pressure"}}, clock.Real{}, cfg.PersonID,
+	g := gate.New(l, catalogtest.Engine.Definitions(t), gate.StaticScopes{"records": {"test.measure"}}, clock.Real{}, cfg.PersonID,
 		gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	for _, p := range []string{
-		`{"id": "2026-1-24 06:36:00:1", "source_time": {"value": "2026-1-24 06:36:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-1-24 06:36:00", "reading": "1", "systolic_blood_pressure": {"value": 114.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 80.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-24T06:36:00+11:00"}, "pulse": "70.0"}`,
-		`{"id": "2026-2-10 05:04:00:1", "source_time": {"value": "2026-2-10 05:04:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-2-10 05:04:00", "reading": "1", "systolic_blood_pressure": {"value": 102.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 72.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-02-10T05:04:00+11:00"}, "pulse": "68.0"}`,
+		`{"at": "2026-01-24 06:36:00", "seq": 1, "count": 114.0, "source_time": {"value": "2026-01-24 06:36:00", "zone": "Europe/Berlin", "basis": "source"}, "note": "70.0"}`,
+		`{"at": "2026-02-10 05:04:00", "seq": 1, "count": 102.0, "source_time": {"value": "2026-02-10 05:04:00", "zone": "Europe/Berlin", "basis": "source"}, "note": "68.0"}`,
 	} {
-		env := facet.Envelope{Type: "health.blood-pressure", Source: "records", Injector: "records", Payload: []byte(p), AssertedPerson: cfg.PersonID}
+		env := facet.Envelope{Type: "test.measure", Source: "records", Injector: "records", Payload: []byte(p), AssertedPerson: cfg.PersonID}
 		b, err := g.Resolve(env)
 		if err != nil {
 			t.Fatal(err)
@@ -80,8 +80,8 @@ func TestQueryRoutes(t *testing.T) {
 		t.Errorf("catalogue = %d relations, rules %s, %d types", len(cat.Relations), cat.Rules.Name, len(cat.Types))
 	}
 
-	req := api.QueryRequest{Projection: api.Named("bp"), Relation: "high",
-		Text: `high(T, S) :- entry(E, "health.blood-pressure", T, _, _, _, _), attr(E, "/systolic_blood_pressure/value", S), S > 110.`}
+	req := api.QueryRequest{Projection: api.Named("measures"), Relation: "high",
+		Text: `high(T, S) :- entry(E, "test.measure", T, _, _, _, _), attr(E, "/count", S), S > 110.`}
 	var a api.QueryAnswer
 	if status := postJSON(t, srv.URL+"/v1/query", req, &a); status != http.StatusCreated {
 		t.Fatalf("POST /v1/query = %d", status)
@@ -100,7 +100,7 @@ func TestQueryRoutes(t *testing.T) {
 	if status := postJSON(t, srv.URL+"/v1/query", bad, &e); status != http.StatusBadRequest || !strings.Contains(e.Error, "unknown relation nothing/1") {
 		t.Errorf("bad program = %d %q", status, e.Error)
 	}
-	resp, err := http.Post(srv.URL+"/v1/query", "application/json", strings.NewReader(`{"projection": "bp", "nope": 1}`)) // #nosec G107 -- loopback
+	resp, err := http.Post(srv.URL+"/v1/query", "application/json", strings.NewReader(`{"projection": "measures", "nope": 1}`)) // #nosec G107 -- loopback
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ func TestQueryRoutes_BoundsTheDerivation(t *testing.T) {
 	srv := httptest.NewServer(d.Handler())
 	defer srv.Close()
 
-	req := api.QueryRequest{Projection: api.Named("bp"), Relation: "leaf", Text: `leaf(E, P, V) :- attr(E, P, V).`}
+	req := api.QueryRequest{Projection: api.Named("measures"), Relation: "leaf", Text: `leaf(E, P, V) :- attr(E, P, V).`}
 	var e api.Error
 	if status := postJSON(t, srv.URL+"/v1/query", req, &e); status != http.StatusRequestEntityTooLarge {
 		t.Fatalf("POST /v1/query over the bound = %d %q", status, e.Error)

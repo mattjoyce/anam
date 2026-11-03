@@ -19,16 +19,16 @@ import (
 func TestTimeline_ComposedIsTheFullFold(t *testing.T) {
 	t.Parallel()
 	f := newLedgerFixture(t)
-	// A medicine course opened, closed and reopened across three months, so a snapshot
+	// A course opened, closed and reopened across three months, so a snapshot
 	// read from a prefix of buckets has a series begun in an earlier bucket and a
 	// closing event to see (card 64).
-	meds := []record{
-		{"health.medication.started", `{"id": "m/1/started", "date": "2025-12-01", "drug": "examplazole", "course": 1, "dose": "10 mg daily"}`},
-		{"health.medication.dose-changed", `{"id": "m/1/dose", "date": "2026-01-05", "drug": "examplazole", "course": 1, "dose": "20 mg daily"}`},
-		{"health.medication.stopped", `{"id": "m/1/stopped", "date": "2026-01-20", "drug": "examplazole", "course": 1}`},
-		{"health.medication.started", `{"id": "m/2/started", "date": "2026-02-05", "drug": "examplazole", "course": 2, "dose": "10 mg daily"}`},
+	courseRows := []record{
+		{"test.course.started", `{"id": "m/1/started", "date": "2025-12-01", "name": "examplazole", "course": 1, "dose": "10 mg daily"}`},
+		{"test.course.changed", `{"id": "m/1/dose", "date": "2026-01-05", "name": "examplazole", "course": 1, "dose": "20 mg daily"}`},
+		{"test.course.stopped", `{"id": "m/1/stopped", "date": "2026-01-20", "name": "examplazole", "course": 1}`},
+		{"test.course.started", `{"id": "m/2/started", "date": "2026-02-05", "name": "examplazole", "course": 2, "dose": "10 mg daily"}`},
 	}
-	f.admit(t, append(append([]record(nil), bpReadings...), meds...))
+	f.admit(t, append(append([]record(nil), measureRows...), courseRows...))
 	cfg, err := config.Load(f.cfgPath)
 	if err != nil {
 		t.Fatal(err)
@@ -37,7 +37,7 @@ func TestTimeline_ComposedIsTheFullFold(t *testing.T) {
 	same := func(stage string) {
 		t.Helper()
 		ctx := context.Background()
-		src, closeAll, err := readSource(ctx, cfg, catalogtest.Catalog(t))
+		src, closeAll, err := readSource(ctx, cfg, catalogtest.Engine.Catalog(t))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -47,9 +47,9 @@ func TestTimeline_ComposedIsTheFullFold(t *testing.T) {
 		for _, q := range []api.TimelineQuery{
 			{}, {From: "2026-02-01"}, {To: "2026-02-10"}, {At: "2026-02-10"},
 			{At: "2025-12-15"}, {At: "2026-01-10"}, {At: "2026-01-25"}, {At: "2026-03-01"},
-			{At: "2026-01-10", From: "2026-01-01"}, {At: "2026-02-10", Type: "health.medication.started"},
+			{At: "2026-01-10", From: "2026-01-01"}, {At: "2026-02-10", Type: "test.course.started"},
 			{At: "2026-01-10", AsOf: "2099-01-01"},
-			{Type: "health.blood-pressure"}, {Projection: "bp"}, {AsOf: "2000-01-01"},
+			{Type: "test.measure"}, {Projection: "measures"}, {AsOf: "2000-01-01"},
 			{AsOf: "2099-01-01"},
 		} {
 			q.Zone = "UTC"
@@ -68,20 +68,20 @@ func TestTimeline_ComposedIsTheFullFold(t *testing.T) {
 		// And the snapshots say what the course was: on the dose change in January,
 		// closed after the stop, the second course open in February.
 		for at, want := range map[string]string{
-			"2026-01-10": "health.medication.dose-changed", "2026-01-25": "", "2026-02-10": "health.medication.started",
+			"2026-01-10": "test.course.changed", "2026-01-25": "", "2026-02-10": "test.course.started",
 		} {
 			got, err := read.Timeline(ctx, src, api.TimelineQuery{At: at, Zone: "UTC"})
 			if err != nil {
 				t.Fatal(err)
 			}
-			var meds []string
+			var courseRows []string
 			for _, e := range got.Entries {
-				if strings.HasPrefix(string(e.Type), "health.medication.") {
-					meds = append(meds, string(e.Type))
+				if strings.HasPrefix(string(e.Type), "test.course.") {
+					courseRows = append(courseRows, string(e.Type))
 				}
 			}
-			if (want == "" && len(meds) != 0) || (want != "" && (len(meds) != 1 || meds[0] != want)) {
-				t.Errorf("%s: snapshot at %s holds %v, want [%s]", stage, at, meds, want)
+			if (want == "" && len(courseRows) != 0) || (want != "" && (len(courseRows) != 1 || courseRows[0] != want)) {
+				t.Errorf("%s: snapshot at %s holds %v, want [%s]", stage, at, courseRows, want)
 			}
 		}
 	}
@@ -93,8 +93,8 @@ func TestTimeline_ComposedIsTheFullFold(t *testing.T) {
 	same("at the mint")
 
 	// A tail: a correction of one reading and a new one, after the mint.
-	more := append(corrected(bpReadings, "114.0", "115.0"), record{"health.blood-pressure",
-		`{"id": "2026-3-01 07:00:00:1", "source_time": {"value": "2026-3-01 07:00:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-3-01 07:00:00", "reading": "1", "systolic_blood_pressure": {"value": 111.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 70.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-03-01T07:00:00+11:00"}, "pulse": "60.0"}`})
-	f.admit(t, append(more, meds...))
+	more := append(corrected(measureRows, "114.0", "115.0"), record{"test.measure",
+		`{"at": "2026-03-01 07:00:00", "seq": 1, "count": 111.0, "note": "60.0", "source_time": {"value": "2026-03-01 07:00:00", "zone": "Europe/Berlin", "basis": "configuration"}}`})
+	f.admit(t, append(more, courseRows...))
 	same("with a tail")
 }

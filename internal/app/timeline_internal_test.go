@@ -34,10 +34,10 @@ func TestTimelineHeader(t *testing.T) {
 		t.Parallel()
 		v := base
 		v.Shown = 0
-		v.Projection = &api.ProjectionRead{Name: "bp", Version: 1, Served: 0, Hash: "served-hash"}
+		v.Projection = &api.ProjectionRead{Name: "measures", Version: 1, Served: 0, Hash: "served-hash"}
 
 		h := timelineHeader(v)
-		for _, want := range []string{"served=0", "projection bp v1  served-hash"} {
+		for _, want := range []string{"served=0", "projection measures v1  served-hash"} {
 			if !strings.Contains(h, want) {
 				t.Errorf("header omits %q:\n%s", want, h)
 			}

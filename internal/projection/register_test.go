@@ -75,31 +75,34 @@ func TestRegister_ABundledTemplateIsTheFloor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bp, _ := held.Lookup("bp")
+	measures, _ := held.Lookup("measures")
 	// The bundled body again: unchanged, not an error.
-	if reg, err := projection.Register(bp.Body, held, allDefined); err != nil || reg.New {
-		t.Errorf("the bundled bp body again: %+v, %v", reg, err)
+	if reg, err := projection.Register(measures.Body, held, allDefined); err != nil || reg.New {
+		t.Errorf("the bundled measures body again: %+v, %v", reg, err)
 	}
-	// bp v2 registered over the bundled v1: allowed, and v1 stays held for receipts.
-	v2 := strings.Replace(string(bp.Body), `"version":1`, `"version":2`, 1)
+	// measures v2 registered over the bundled v1: allowed, and v1 stays held for receipts.
+	v2 := strings.Replace(string(measures.Body), `"version":1`, `"version":2`, 1)
+	if v2 == string(measures.Body) {
+		t.Fatal("the version did not change")
+	}
 	if reg, err := projection.Register([]byte(v2), held, allDefined); err != nil || !reg.New {
-		t.Fatalf("bp v2: %+v, %v", reg, err)
+		t.Fatalf("measures v2: %+v, %v", reg, err)
 	}
-	merged, err := projection.WithRegistered(held, []projection.Stored{{Name: "bp", Version: 2, Body: []byte(v2)}})
+	merged, err := projection.WithRegistered(held, []projection.Stored{{Name: "measures", Version: 2, Body: []byte(v2)}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cur, _ := merged.Lookup("bp"); cur.Version != 2 {
-		t.Errorf("bp current = v%d, want v2", cur.Version)
+	if cur, _ := merged.Lookup("measures"); cur.Version != 2 {
+		t.Errorf("measures current = v%d, want v2", cur.Version)
 	}
-	if old, err := merged.Version("bp", 1); err != nil || old.Hash != bp.Hash {
-		t.Errorf("bp v1 is no longer the bundled body: %v", err)
+	if old, err := merged.Version("measures", 1); err != nil || old.Hash != measures.Hash {
+		t.Errorf("measures v1 is no longer the bundled body: %v", err)
 	}
-	if got := len(merged.Versions("bp")); got != 2 {
-		t.Errorf("bp holds %d versions, want 2", got)
+	if got := len(merged.Versions("measures")); got != 2 {
+		t.Errorf("measures holds %d versions, want 2", got)
 	}
 	// A version below the bundled one is behind.
-	v0 := strings.Replace(string(bp.Body), `"version":1`, `"version":0`, 1)
+	v0 := strings.Replace(string(measures.Body), `"version":1`, `"version":0`, 1)
 	if _, err := projection.Register([]byte(v0), held, allDefined); !errors.Is(err, projection.ErrBadTemplate) {
 		t.Errorf("v0: %v, want ErrBadTemplate (version must be positive)", err)
 	}
@@ -118,13 +121,13 @@ func TestRegister_RefusesATypeWithNoDefinition(t *testing.T) {
 func TestWithRegistered_RefusesTwoBodiesAtOneVersion(t *testing.T) {
 	t.Parallel()
 	held, _ := projection.BundledFS(fixtureProjs())
-	bp, _ := held.Lookup("bp")
-	other := strings.Replace(string(bp.Body), `"endorsed"`, `"admitted"`, 1)
-	if _, err := projection.WithRegistered(held, []projection.Stored{{Name: "bp", Version: 1, Body: []byte(other)}}); !errors.Is(err, projection.ErrBadTemplate) {
-		t.Errorf("a registered bp v1 with another body: %v, want ErrBadTemplate", err)
+	measures, _ := held.Lookup("measures")
+	other := strings.Replace(string(measures.Body), `"endorsed"`, `"admitted"`, 1)
+	if _, err := projection.WithRegistered(held, []projection.Stored{{Name: "measures", Version: 1, Body: []byte(other)}}); !errors.Is(err, projection.ErrBadTemplate) {
+		t.Errorf("a registered measures v1 with another body: %v, want ErrBadTemplate", err)
 	}
 	// A row whose body names another template is refused too.
-	if _, err := projection.WithRegistered(held, []projection.Stored{{Name: "sleep", Version: 9, Body: bp.Body}}); !errors.Is(err, projection.ErrBadTemplate) {
+	if _, err := projection.WithRegistered(held, []projection.Stored{{Name: "course", Version: 9, Body: measures.Body}}); !errors.Is(err, projection.ErrBadTemplate) {
 		t.Errorf("a mislabelled row: %v", err)
 	}
 }

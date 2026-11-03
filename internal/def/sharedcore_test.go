@@ -1,49 +1,29 @@
 package def
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/fs"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
 // Card 194: a type split into leaves keeps a shared core, the fields every leaf
 // carries with one meaning. A manifest cannot reference another file, so each leaf
-// spells the core out in full, and shared-core.json names the agreement once: for
-// each split type, its leaves and the pointers they share. This test holds the schema
-// at each shared pointer identical across the leaves, apart from description and
-// examples, which may say what a field holds for that leaf's source.
+// spells the core out in full, and a table names the agreement once: for each split
+// type, its leaves and the pointers they share. sharedCoreDrift holds the schema at
+// each shared pointer identical across the leaves, apart from description and
+// examples, which may say what a field holds for that leaf's source. The deployment
+// runs it over its own table and leaves.
 
-// split is one row of shared-core.json.
+// split is one row of the table.
 type split struct {
 	Type   facet.Type   `json:"type"`
 	Leaves []facet.Type `json:"leaves"`
 	Shared []string     `json:"shared"`
-}
-
-func loadSplits(t *testing.T) []split {
-	t.Helper()
-	raw, err := os.ReadFile("shared-core.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	var tbl struct {
-		Splits []split `json:"splits"`
-	}
-	if err := dec.Decode(&tbl); err != nil {
-		t.Fatalf("shared-core.json: %v", err)
-	}
-	return tbl.Splits
 }
 
 // schemaAt is the schema node the tree declares at a payload pointer.
@@ -97,50 +77,38 @@ func sharedCoreDrift(s split, leaves []Definition) error {
 	return nil
 }
 
-// TestSharedCore_LeavesAgree reads the embedded catalog on purpose: its subject is
-// the personal catalog's own leaves, so it leaves the engine with that catalog (card
-// 255, R4b) instead of moving to a fixture copy.
-func TestSharedCore_LeavesAgree(t *testing.T) {
-	t.Parallel()
-	reg, err := Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, s := range loadSplits(t) {
-		if len(s.Shared) == 0 {
-			t.Errorf("%s names no shared pointers", s.Type)
-		}
-		var leaves []Definition
-		for _, leaf := range s.Leaves {
-			if !strings.HasPrefix(string(leaf), string(s.Type)+".") {
-				t.Errorf("%s is not a leaf of %s", leaf, s.Type)
-			}
-			d, ok := reg.Lookup(leaf)
-			if !ok {
-				t.Errorf("%s: leaf %s is not bundled", s.Type, leaf)
-				continue
-			}
-			leaves = append(leaves, d)
-		}
-		if err := sharedCoreDrift(s, leaves); err != nil {
-			t.Error(err)
-		}
-	}
-}
+// sessionLeaf is a leaf the test writes: a session with an id, a time interval and a
+// distance, the fields a split type's leaves would share.
+const sessionLeaf = `{
+  "meta": {"facet_type": "test.session.a", "definition_version": 1, "classification": "Normal",
+    "validation_mode": "strict", "source_schema": "test/session",
+    "time_semantics": {"fact_time": {"pointer": "/at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}},
+    "identity_key": ["/id"]},
+  "schema": {
+    "type": "object", "required": ["id", "at", "effective_time_frame", "distance"], "additionalProperties": false,
+    "properties": {
+      "id": {"type": "string", "minLength": 1, "description": "The source's own id."},
+      "at": {"type": "string", "minLength": 1},
+      "effective_time_frame": {"type": "object", "required": ["time_interval"], "additionalProperties": false,
+        "properties": {"time_interval": {"type": "object", "required": ["start_date_time", "end_date_time"], "additionalProperties": false,
+          "properties": {"start_date_time": {"type": "string", "minLength": 1}, "end_date_time": {"type": "string", "minLength": 1}}}}},
+      "distance": {"type": "object", "required": ["value", "unit"], "additionalProperties": false,
+        "description": "How far, as the source reports it.",
+        "properties": {"value": {"type": "number", "description": "The distance."}, "unit": {"type": "string", "enum": ["m", "km"]}}}
+    }
+  }
+}`
 
 // The check fails when one leaf's distance drifts from another's, and passes when
-// only the words differ. It needs one real leaf body to edit, from the fixture catalog.
+// only the words differ. Its subject is the check, so it reads a leaf the test writes,
+// not a catalog's: which leaves a deployment splits, and whether they agree, is the
+// deployment's to test.
 func TestSharedCore_FailsOnADrift(t *testing.T) {
 	t.Parallel()
-	defs, _ := fixture.Mattjoyce()
-	raw, err := fs.ReadFile(defs, "activity.exercise-session.garmin.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	leaf := func(typ facet.Type, edit func(distance map[string]any)) Definition {
 		t.Helper()
 		var m map[string]any
-		if err := json.Unmarshal(raw, &m); err != nil {
+		if err := json.Unmarshal([]byte(sessionLeaf), &m); err != nil {
 			t.Fatal(err)
 		}
 		m["meta"].(map[string]any)["facet_type"] = string(typ)
@@ -158,8 +126,8 @@ func TestSharedCore_FailsOnADrift(t *testing.T) {
 	}
 	same := func(map[string]any) {}
 	s := split{
-		Type:   "activity.exercise-session",
-		Leaves: []facet.Type{"activity.exercise-session.garmin", "activity.exercise-session.concept2"},
+		Type:   "test.session",
+		Leaves: []facet.Type{"test.session.a", "test.session.b"},
 		Shared: []string{"/id", "/effective_time_frame/time_interval", "/distance"},
 	}
 	cases := []struct {
@@ -171,7 +139,7 @@ func TestSharedCore_FailsOnADrift(t *testing.T) {
 		{"only the words differ", func(d map[string]any) {
 			d["description"] = "Metres rowed, as the Logbook reports them."
 			d["examples"] = []any{map[string]any{"value": 2000, "unit": "m"}}
-			d["properties"].(map[string]any)["value"].(map[string]any)["description"] = "Concept2's distance."
+			d["properties"].(map[string]any)["value"].(map[string]any)["description"] = "The rower's distance."
 		}, false},
 		{"a value that may not be a decimal", func(d map[string]any) {
 			d["properties"].(map[string]any)["value"].(map[string]any)["type"] = "integer"

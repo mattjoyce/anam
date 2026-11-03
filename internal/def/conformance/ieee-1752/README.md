@@ -7,4 +7,6 @@ relative to that base, and every file they reach is here, so nothing is fetched.
 
 `physical-activity-1.0.json` is what the four leaves of `activity.exercise-session` (`.garmin`,
 `.concept2`, `.technogym` and `.strong`, each with `source_schema` `ieee-1752/physical-activity-1.0`)
-conform to. `internal/def/conformance_test.go` holds each leaf's examples to it.
+conform to. The deployment holds each leaf's examples to it, in `anam_mattjoyce`'s
+`engine-tests/internal/def/mattjoyce_conformance_test.go`; this copy leaves the engine with the
+personal catalog (card 255, R4b).

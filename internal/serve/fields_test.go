@@ -23,9 +23,9 @@ func TestPublish_FieldsServeAFrameThatVerifies(t *testing.T) {
 		t.Fatalf("Head: %v", err)
 	}
 
-	q := &receipt.Query{Type: "health.blood-pressure", Fields: []string{"/systolic"}}
-	tmpl, _ := h.deps.Templates.Lookup("bp")
-	value := h.narrowedBP(t, head, q)
+	q := &receipt.Query{Type: "test.measure", Fields: []string{"/value"}}
+	tmpl, _ := h.deps.Templates.Lookup("measures")
+	value := h.narrowedMeasures(t, head, q)
 	if value.Len() != 3 {
 		t.Fatalf("the type holds %d readings, want 3", value.Len())
 	}
@@ -40,10 +40,10 @@ func TestPublish_FieldsServeAFrameThatVerifies(t *testing.T) {
 	if out.Receipt.ServedHash != out.Frame.Hash() || out.Receipt.ServedHash == value.Hash() {
 		t.Errorf("served_hash = %s, want the frame's %s, not the value's %s", out.Receipt.ServedHash, out.Frame.Hash(), value.Hash())
 	}
-	if len(out.Receipt.FacetIDs) != 3 || strings.Join(out.Receipt.Query.Fields, " ") != "/systolic" {
+	if len(out.Receipt.FacetIDs) != 3 || strings.Join(out.Receipt.Query.Fields, " ") != "/value" {
 		t.Errorf("the receipt names %d facets and fields %v", len(out.Receipt.FacetIDs), out.Receipt.Query.Fields)
 	}
-	if s := string(out.Frame.Bytes()); strings.Contains(s, "diastolic") || !strings.Contains(s, "118") {
+	if s := string(out.Frame.Bytes()); strings.Contains(s, "extra") || !strings.Contains(s, "118") {
 		t.Errorf("the frame holds the wrong cells: %s", s)
 	}
 
@@ -54,7 +54,7 @@ func TestPublish_FieldsServeAFrameThatVerifies(t *testing.T) {
 	if shown.Frame == nil || shown.Entries != nil || shown.Frame.Hash() != r.ServedHash {
 		t.Errorf("Show of a fields receipt: frame %v, entries %v", shown.Frame, shown.Entries)
 	}
-	if got := strings.Join(shown.Frame.Columns, " "); got != strings.Join(frame.Envelope, " ")+" /systolic" {
+	if got := strings.Join(shown.Frame.Columns, " "); got != strings.Join(frame.Envelope, " ")+" /value" {
 		t.Errorf("columns = %q", got)
 	}
 
@@ -75,9 +75,9 @@ func TestPublish_AFieldARowLacksIsNull(t *testing.T) {
 	h.seed(t)
 	ctx := context.Background()
 	head, _ := h.l.Head(ctx)
-	q := &receipt.Query{Type: "health.blood-pressure", Fields: []string{"/pulse"}}
-	tmpl, _ := h.deps.Templates.Lookup("bp")
-	out, err := serve.Publish(ctx, h.deps, tmpl, head, q, h.narrowedBP(t, head, q), true)
+	q := &receipt.Query{Type: "test.measure", Fields: []string{"/pulse"}}
+	tmpl, _ := h.deps.Templates.Lookup("measures")
+	out, err := serve.Publish(ctx, h.deps, tmpl, head, q, h.narrowedMeasures(t, head, q), true)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}

@@ -16,18 +16,18 @@ import (
 )
 
 // Card 199, slice 3: a Definition's label reads a row as a thing. Synthetic facets of
-// two labelled types (a weight, a dose), one type whose Definition declares no label (a
-// heart-rate alert), a weight whose payload holds nothing the label reads, and a type no
-// Definition names.
+// two labelled types of the engine fixture (a reading, a templated intake), one type
+// whose Definition declares no label (a measure), a reading whose payload holds nothing
+// the label reads, and a type no Definition names.
 var labelled = []struct {
 	pick
 	at      time.Time
 	payload string
 }{
-	{pick{"wt", "health.weight", "records"}, time.Date(2026, 10, 2, 7, 0, 0, 0, time.UTC), `{"kg": 80.4}`},
-	{pick{"dose", "health.medication.dose", "conversation"}, time.Date(2026, 10, 2, 8, 0, 0, 0, time.UTC), `{"drug": "melatonin", "amount": 5, "unit": "mg"}`},
-	{pick{"alert", "health.heart-rate-alert", "garmin"}, time.Date(2026, 10, 2, 9, 0, 0, 0, time.UTC), `{"heart_rate": 101}`},
-	{pick{"bare", "health.weight", "records"}, time.Date(2026, 10, 2, 10, 0, 0, 0, time.UTC), `{"n": 1}`},
+	{pick{"wt", "test.reading", "records"}, time.Date(2026, 10, 2, 7, 0, 0, 0, time.UTC), `{"value": 80.4, "unit": "kg"}`},
+	{pick{"dose", "test.templated", "conversation"}, time.Date(2026, 10, 2, 8, 0, 0, 0, time.UTC), `{"name": "salt", "amount": 5, "unit": "g"}`},
+	{pick{"alert", "test.measure", "meter"}, time.Date(2026, 10, 2, 9, 0, 0, 0, time.UTC), `{"count": 101}`},
+	{pick{"bare", "test.reading", "records"}, time.Date(2026, 10, 2, 10, 0, 0, 0, time.UTC), `{"n": 1}`},
 	{pick{"odd", "x.unnamed", "records"}, time.Date(2026, 10, 2, 11, 0, 0, 0, time.UTC), `{"kg": 1}`},
 }
 
@@ -46,7 +46,7 @@ func labelServer(t *testing.T) *httptest.Server {
 			t.Fatalf("Admit %s: %v", p.ref, err)
 		}
 	}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, MaxReadBytes: 512 << 10}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Engine.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, MaxReadBytes: 512 << 10}))
 	t.Cleanup(srv.Close)
 	return srv
 }
@@ -67,7 +67,7 @@ func TestSelect_ARowReadsAsItsLabelAndFallsBackWithout(t *testing.T) {
 			got[m[1]] = m[4]
 		}
 	}
-	for ref, want := range map[string]string{"wt": "80.4 kg", "dose": "melatonin 5 mg"} {
+	for ref, want := range map[string]string{"wt": "80.4 kg", "dose": "salt 5 g"} {
 		if got[pid(ref)] != want {
 			t.Errorf("%s reads %q, want %q\n%s", ref, got[pid(ref)], want, body)
 		}
@@ -86,7 +86,7 @@ func TestSelect_ARowReadsAsItsLabelAndFallsBackWithout(t *testing.T) {
 	if len(got) != 5 {
 		t.Errorf("%d members drawn, want 5", len(got))
 	}
-	for _, want := range []string{"<h2>health.weight</h2>", "<h2>health.medication.dose</h2>", "2026-10-02T07:00:00.000000000Z"} {
+	for _, want := range []string{"<h2>test.reading</h2>", "<h2>test.templated</h2>", "2026-10-02T07:00:00.000000000Z"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the page lost %q: a labelled row still shows its type and time", want)
 		}
@@ -98,15 +98,15 @@ func TestSelect_TheBasketReadsAsTheLabelToo(t *testing.T) {
 	srv := labelServer(t)
 	_, body, _ := fetch(t, srv.URL+"/select?tick="+pid("wt")+"&tick="+pid("alert")+"&untick="+pid("dose")+"&from=2026-10-02&to=2026-10-02")
 	basket := body[strings.Index(body, `<section class="basket">`):]
-	for _, want := range []string{`<strong class="label">80.4 kg</strong> health.weight`, `<strong class="label">melatonin 5 mg</strong> health.medication.dose`} {
+	for _, want := range []string{`<strong class="label">80.4 kg</strong> test.reading`, `<strong class="label">salt 5 g</strong> test.templated`} {
 		if !strings.Contains(basket, want) {
 			t.Errorf("the basket lacks %q:\n%s", want, basket)
 		}
 	}
 	if strings.Count(basket, `class="label"`) != 2 {
-		t.Errorf("the alert has no label, so the basket shows its type alone:\n%s", basket)
+		t.Errorf("the measure has no label, so the basket shows its type alone:\n%s", basket)
 	}
-	if !strings.Contains(basket, "health.heart-rate-alert") {
-		t.Error("the unlabelled alert lost its type")
+	if !strings.Contains(basket, "test.measure") {
+		t.Error("the unlabelled measure lost its type")
 	}
 }

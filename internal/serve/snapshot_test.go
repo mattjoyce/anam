@@ -16,29 +16,29 @@ import (
 	"github.com/mattjoyce/anam/internal/serve"
 )
 
-func medManifest(typ string, closes bool) string {
+func courseEventManifest(typ string, closes bool) string {
 	return fmt.Sprintf(`{
   "meta": {
     "facet_type": %q, "definition_version": 1, "classification": "Sensitive",
     "validation_mode": "strict", "source_schema": "records/%s",
     "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "UTC"}},
     "identity_key": ["/id"],
-    "series": {"name": "med.regimen", "key": ["/drug", "/course"], "closes": %t}
+    "series": {"name": "test.course", "key": ["/name", "/course"], "closes": %t}
   },
-  "schema": {"type": "object", "required": ["id", "date", "drug", "course"],
-    "properties": {"id": {"type": "string", "minLength": 1}, "date": {"type": "string", "minLength": 1}, "drug": {"type": "string", "minLength": 1}, "course": {"type": "number"}, "dose": {"type": "string", "minLength": 1}},
+  "schema": {"type": "object", "required": ["id", "date", "name", "course"],
+    "properties": {"id": {"type": "string", "minLength": 1}, "date": {"type": "string", "minLength": 1}, "name": {"type": "string", "minLength": 1}, "course": {"type": "number"}, "dose": {"type": "string", "minLength": 1}},
     "additionalProperties": false}
 }`, typ, typ, closes)
 }
 
-// medHarness widens the harness to the regimen types and hands the serve path the
+// courseHarness widens the harness to the course types and hands the serve path the
 // Definitions' series rules, as app.serveDeps does.
-func medHarness(t *testing.T) *harness {
+func courseHarness(t *testing.T) *harness {
 	t.Helper()
 	h := newHarness(t)
 	var defs []def.Definition
-	for _, m := range []string{bpManifest, sleepManifest,
-		medManifest("health.medication.started", false), medManifest("health.medication.dose-changed", false), medManifest("health.medication.stopped", true)} {
+	for _, m := range []string{measureManifest, readingManifest,
+		courseEventManifest("test.course.started", false), courseEventManifest("test.course.changed", false), courseEventManifest("test.course.stopped", true)} {
 		d, err := def.Parse([]byte(m))
 		if err != nil {
 			t.Fatalf("def.Parse: %v", err)
@@ -50,19 +50,19 @@ func medHarness(t *testing.T) *harness {
 		t.Fatalf("def.NewRegistry: %v", err)
 	}
 	scopes := gate.StaticScopes{
-		"bp-csv": {"health.blood-pressure"}, "health-db": {"health.sleep"},
-		"self-log": {"health.medication.started", "health.medication.dose-changed", "health.medication.stopped"},
+		"meter": {"test.measure"}, "logger": {"test.reading"},
+		"self-log": {"test.course.started", "test.course.changed", "test.course.stopped"},
 	}
 	h.gate = gate.New(h.l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	h.deps.Series = reg
 	return h
 }
 
-func (h *harness) med(t *testing.T, typ facet.Type, id, date, drug string, course int) {
+func (h *harness) event(t *testing.T, typ facet.Type, id, date, name string, course int) {
 	t.Helper()
 	env := facet.Envelope{
 		Type: typ, Source: "self-log", Injector: "self-log", SourceRef: facet.SourceRef("self-log", id),
-		Payload: []byte(fmt.Sprintf(`{"id": %q, "date": %q, "drug": %q, "course": %d}`, id, date, drug, course)),
+		Payload: []byte(fmt.Sprintf(`{"id": %q, "date": %q, "name": %q, "course": %d}`, id, date, name, course)),
 	}
 	binding, err := h.gate.Resolve(env)
 	if err != nil {
@@ -73,26 +73,26 @@ func (h *harness) med(t *testing.T, typ facet.Type, id, date, drug string, cours
 	}
 }
 
-// The meds projection serves the snapshot and a receipt proves it: re-deriving at
+// The course projection serves the snapshot and a receipt proves it: re-deriving at
 // the receipt's watermark, through the same template and the same series rules,
 // reproduces the served bytes.
 func TestRun_MedsServesTheSnapshotWithAReceipt(t *testing.T) {
 	t.Parallel()
-	h := medHarness(t)
+	h := courseHarness(t)
 	ctx := context.Background()
 
-	h.med(t, "health.medication.started", "m1", "2026-03-01", "ramipril", 1)
-	h.med(t, "health.medication.dose-changed", "m2", "2026-05-10", "ramipril", 1)
-	h.med(t, "health.medication.stopped", "m3", "2026-08-01", "ramipril", 1)
-	h.med(t, "health.medication.started", "m4", "2026-10-01", "ramipril", 2)
-	h.med(t, "health.medication.started", "m5", "2026-04-01", "atorvastatin", 1)
+	h.event(t, "test.course.started", "m1", "2026-03-01", "alpha", 1)
+	h.event(t, "test.course.changed", "m2", "2026-05-10", "alpha", 1)
+	h.event(t, "test.course.stopped", "m3", "2026-08-01", "alpha", 1)
+	h.event(t, "test.course.started", "m4", "2026-10-01", "alpha", 2)
+	h.event(t, "test.course.started", "m5", "2026-04-01", "beta", 1)
 
-	out, err := serve.Run(ctx, h.deps, "meds", false)
+	out, err := serve.Run(ctx, h.deps, "course", false)
 	if err != nil {
-		t.Fatalf("Run(meds): %v", err)
+		t.Fatalf("Run(course): %v", err)
 	}
 	if len(out.Receipt.FacetIDs) != 2 {
-		t.Errorf("meds served %d facets, want 2 (the two open courses)", len(out.Receipt.FacetIDs))
+		t.Errorf("course served %d facets, want 2 (the two open courses)", len(out.Receipt.FacetIDs))
 	}
 	if out.CanonicalLen != 5 {
 		t.Errorf("canonical has %d, want 5", out.CanonicalLen)
@@ -109,27 +109,27 @@ func TestRun_MedsServesTheSnapshotWithAReceipt(t *testing.T) {
 	// Without the series rules the serve path refuses the snapshot shape outright.
 	bare := h.deps
 	bare.Series = nil
-	if _, err := serve.Run(ctx, bare, "meds", true); err == nil {
-		t.Error("Run(meds) without series rules succeeded")
+	if _, err := serve.Run(ctx, bare, "course", true); err == nil {
+		t.Error("Run(course) without series rules succeeded")
 	}
 }
 
-// The meds template at a past fact-time serves the courses running then, a course
+// The course template at a past fact-time serves the courses running then, a course
 // stopped after it included, and a receipt for that read verifies (card 172). The
 // template's own snapshot is taken at the bound, not at the head and trimmed after:
 // trimmed, a course closed by now is gone at every date.
 func TestDerive_MedsAtAPastDateKeepsACourseStoppedLater(t *testing.T) {
 	t.Parallel()
-	h := medHarness(t)
+	h := courseHarness(t)
 	ctx := context.Background()
 
-	h.med(t, "health.medication.started", "m1", "2024-09-13", "felodipine", 1)
-	h.med(t, "health.medication.stopped", "m2", "2025-12-23", "felodipine", 1)
-	h.med(t, "health.medication.started", "m3", "2024-08-16", "ramipril", 1)
+	h.event(t, "test.course.started", "m1", "2024-09-13", "gamma", 1)
+	h.event(t, "test.course.stopped", "m2", "2025-12-23", "gamma", 1)
+	h.event(t, "test.course.started", "m3", "2024-08-16", "alpha", 1)
 
-	tmpl, err := h.deps.Templates.Lookup("meds")
+	tmpl, err := h.deps.Templates.Lookup("course")
 	if err != nil {
-		t.Fatalf("Lookup(meds): %v", err)
+		t.Fatalf("Lookup(course): %v", err)
 	}
 	head, err := h.l.Head(ctx)
 	if err != nil {
@@ -145,8 +145,8 @@ func TestDerive_MedsAtAPastDateKeepsACourseStoppedLater(t *testing.T) {
 		want int
 	}{
 		{"2024-01-01T23:59:59.999999999Z", 0}, // before either course
-		{"2025-06-15T23:59:59.999999999Z", 2}, // both running; felodipine stops in December
-		{"2026-10-17T23:59:59.999999999Z", 1}, // felodipine stopped
+		{"2025-06-15T23:59:59.999999999Z", 2}, // both running; gamma stops in December
+		{"2026-10-17T23:59:59.999999999Z", 1}, // gamma stopped
 	}
 	for _, c := range cases {
 		q := &receipt.Query{At: c.at}
@@ -158,7 +158,7 @@ func TestDerive_MedsAtAPastDateKeepsACourseStoppedLater(t *testing.T) {
 			t.Fatalf("Narrow at %s: %v", c.at[:10], err)
 		}
 		if v.Len() != c.want {
-			t.Errorf("meds at %s served %d courses, want %d", c.at[:10], v.Len(), c.want)
+			t.Errorf("course at %s served %d courses, want %d", c.at[:10], v.Len(), c.want)
 		}
 		if c.want == 0 {
 			continue // an empty value has no receipt worth proving

@@ -31,11 +31,11 @@ var zoneRecord = []struct {
 	ref, typ string
 	at       time.Time
 }{
-	{"draw", "health.weight", time.Date(2026, 10, 11, 20, 30, 0, 0, time.UTC)},   // 07:30 on 12 Oct in Sydney
-	{"before", "health.weight", time.Date(2026, 10, 11, 12, 59, 0, 0, time.UTC)}, // 23:59 on 11 Oct in Sydney
-	{"bp", "health.blood-pressure", time.Date(2026, 10, 12, 1, 0, 0, 0, time.UTC)},
-	{"hr-alert", "health.heart-rate.alert", time.Date(2026, 10, 12, 2, 0, 0, 0, time.UTC)},
-	{"hr-day", "health.heart-rate.day", time.Date(2026, 10, 12, 3, 0, 0, 0, time.UTC)},
+	{"draw", "test.reading", time.Date(2026, 10, 11, 20, 30, 0, 0, time.UTC)},   // 07:30 on 12 Oct in Sydney
+	{"before", "test.reading", time.Date(2026, 10, 11, 12, 59, 0, 0, time.UTC)}, // 23:59 on 11 Oct in Sydney
+	{"bp", "test.measure", time.Date(2026, 10, 12, 1, 0, 0, 0, time.UTC)},
+	{"hr-alert", "test.course.started", time.Date(2026, 10, 12, 2, 0, 0, 0, time.UTC)},
+	{"hr-day", "test.course.changed", time.Date(2026, 10, 12, 3, 0, 0, 0, time.UTC)},
 }
 
 func zoneServer(t *testing.T, zone string) *httptest.Server {
@@ -62,7 +62,7 @@ func zoneServer(t *testing.T, zone string) *httptest.Server {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = a.Close() })
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t),
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Engine.Catalog(t),
 		Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, MaxReadBytes: 512 << 10,
 		Selections: selection.NewStore(a), Zone: zone,
 	}))
@@ -106,7 +106,7 @@ func TestSelect_AFromDateIsADayInTheReadersZone(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			code, body, _ := fetch(t, srv.URL+"/select?type=health.weight&from=2026-10-12&zone="+c.zone)
+			code, body, _ := fetch(t, srv.URL+"/select?type=test.reading&from=2026-10-12&zone="+c.zone)
 			if code != 200 {
 				t.Fatalf("GET = %d\n%s", code, body)
 			}
@@ -175,7 +175,7 @@ func TestSelect_WithoutAZoneItReadsInTheDaemonsZone(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			srv := zoneServer(t, c.zone)
-			_, body, _ := fetch(t, srv.URL+"/select?type=health.weight&from=2026-10-12")
+			_, body, _ := fetch(t, srv.URL+"/select?type=test.reading&from=2026-10-12")
 			if got := number(t, matchedRE, body); got != c.matched {
 				t.Errorf("matched %d, want %d", got, c.matched)
 			}
@@ -199,7 +199,7 @@ func TestSelect_WithoutAZoneItReadsInTheDaemonsZone(t *testing.T) {
 func TestPages_RefuseAZoneTheyCannotRead(t *testing.T) {
 	t.Parallel()
 	srv := zoneServer(t, "")
-	for _, page := range []string{"/select?from=2026-10-12", "/?from=2026-10-12", "/projection?type=health.weight", "/location"} {
+	for _, page := range []string{"/select?from=2026-10-12", "/?from=2026-10-12", "/projection?type=test.reading", "/location"} {
 		for _, zone := range []string{"Mars/Olympus", "Local"} {
 			sep := "&"
 			if !strings.Contains(page, "?") {
@@ -217,9 +217,9 @@ func TestPages_RefuseAZoneTheyCannotRead(t *testing.T) {
 func TestProjection_RowsReadTheirDaysInTheReadersZone(t *testing.T) {
 	t.Parallel()
 	srv := zoneServer(t, "")
-	rows := regexp.MustCompile(`<strong>health.weight</strong>, served: (\d+) row`)
+	rows := regexp.MustCompile(`<strong>test.reading</strong>, served: (\d+) row`)
 	for zone, want := range map[string]string{sydney: "1", "UTC": "0"} {
-		_, body := get(t, srv.URL+"/projection?type=health.weight&from=2026-10-12&to=2026-10-12&zone="+zone)
+		_, body := get(t, srv.URL+"/projection?type=test.reading&from=2026-10-12&to=2026-10-12&zone="+zone)
 		if m := rows.FindStringSubmatch(body); m == nil || m[1] != want {
 			t.Errorf("zone %s: rows = %v, want %s", zone, m, want)
 		}
@@ -259,7 +259,7 @@ func TestTimeline_ABareDateIsADayInTheReadersZone(t *testing.T) {
 func TestSelectSaved_NamesTheZoneItsDatesWereReadIn(t *testing.T) {
 	t.Parallel()
 	srv := zoneServer(t, "")
-	_, page, _ := fetch(t, srv.URL+"/select?type=health.weight&from=2026-10-12&zone="+sydney)
+	_, page, _ := fetch(t, srv.URL+"/select?type=test.reading&from=2026-10-12&zone="+sydney)
 	_, body := save(t, srv, program(t, page))
 	if !strings.Contains(body, "Its dates were read in "+sydney+".") {
 		t.Errorf("the saved page does not name its zone:\n%s", body)
@@ -275,7 +275,7 @@ func TestSelectSaved_NamesTheZoneItsDatesWereReadIn(t *testing.T) {
 	}
 
 	// Saved before the comment: the same kind of program with no zone line reads UTC.
-	old, err := selection.Filter{From: "2026-10-12T00:00:00.000000000Z", Types: []string{"health.weight"}}.Program()
+	old, err := selection.Filter{From: "2026-10-12T00:00:00.000000000Z", Types: []string{"test.reading"}}.Program()
 	if err != nil {
 		t.Fatal(err)
 	}

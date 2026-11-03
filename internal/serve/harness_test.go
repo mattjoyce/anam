@@ -28,39 +28,39 @@ import (
 
 const person = "matt"
 
-// Two definitions, so a projection has something to prune away. The bundled bp and
-// sleep templates are the ones under test, so the types must be theirs.
-const bpManifest = `{
+// Two definitions, so a projection has something to prune away. The engine fixture's
+// measures and everything templates are the ones under test, so the types must be theirs.
+const measureManifest = `{
   "meta": {
-    "facet_type": "health.blood-pressure",
+    "facet_type": "test.measure",
     "definition_version": 1,
     "classification": "Normal",
     "validation_mode": "strict",
-    "source_schema": "bp-csv/reading",
+    "source_schema": "meter/measure",
     "time_semantics": {
       "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
     },
     "identity_key": ["/measured_at"]
   },
-  "schema": {"type": "object", "required": ["measured_at", "systolic"],
-    "properties": {"measured_at": {"type": "string", "minLength": 1}, "systolic": {"type": "number"}, "diastolic": {"type": "number"}},
+  "schema": {"type": "object", "required": ["measured_at", "value"],
+    "properties": {"measured_at": {"type": "string", "minLength": 1}, "value": {"type": "number"}, "extra": {"type": "number"}},
     "additionalProperties": false}
 }`
 
-const sleepManifest = `{
+const readingManifest = `{
   "meta": {
-    "facet_type": "health.sleep",
+    "facet_type": "test.reading",
     "definition_version": 1,
     "classification": "Normal",
     "validation_mode": "strict",
-    "source_schema": "health-db/sleep",
+    "source_schema": "logger/reading",
     "time_semantics": {
       "fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}
     },
     "identity_key": ["/measured_at"]
   },
-  "schema": {"type": "object", "required": ["measured_at", "deep_minutes"],
-    "properties": {"measured_at": {"type": "string", "minLength": 1}, "deep_minutes": {"type": "number"}},
+  "schema": {"type": "object", "required": ["measured_at", "minutes"],
+    "properties": {"measured_at": {"type": "string", "minLength": 1}, "minutes": {"type": "number"}},
     "additionalProperties": false}
 }`
 
@@ -86,24 +86,24 @@ func newHarness(t *testing.T) *harness {
 	}
 	t.Cleanup(func() { _ = l.Close() })
 
-	bp, err := def.Parse([]byte(bpManifest))
+	measure, err := def.Parse([]byte(measureManifest))
 	if err != nil {
-		t.Fatalf("def.Parse(bp): %v", err)
+		t.Fatalf("def.Parse(measure): %v", err)
 	}
-	sleep, err := def.Parse([]byte(sleepManifest))
+	reading, err := def.Parse([]byte(readingManifest))
 	if err != nil {
-		t.Fatalf("def.Parse(sleep): %v", err)
+		t.Fatalf("def.Parse(reading): %v", err)
 	}
-	defs, err := def.NewRegistry(bp, sleep)
+	defs, err := def.NewRegistry(measure, reading)
 	if err != nil {
 		t.Fatalf("def.NewRegistry: %v", err)
 	}
 	scopes := gate.StaticScopes{
-		"bp-csv":    {"health.blood-pressure"},
-		"health-db": {"health.sleep"},
+		"meter":  {"test.measure"},
+		"logger": {"test.reading"},
 	}
 
-	templates := catalogtest.Projections(t)
+	templates := catalogtest.Engine.Projections(t)
 	buckets, err := span.New(span.Monthly)
 	if err != nil {
 		t.Fatalf("span.New: %v", err)
@@ -150,13 +150,13 @@ func (h *harness) admit(t *testing.T, source string, typ facet.Type, measuredAt,
 	}
 }
 
-// seed admits three blood-pressure readings and two sleep periods, so `bp` has
+// seed admits three measures and two readings, so `measures` has
 // something to serve and something to leave behind.
 func (h *harness) seed(t *testing.T) {
 	t.Helper()
-	h.admit(t, "bp-csv", "health.blood-pressure", "2026-01-24T06:30:00Z", `"systolic": 118, "diastolic": 76`)
-	h.admit(t, "bp-csv", "health.blood-pressure", "2026-01-25T06:30:00Z", `"systolic": 121, "diastolic": 79`)
-	h.admit(t, "bp-csv", "health.blood-pressure", "2026-01-26T06:30:00Z", `"systolic": 117, "diastolic": 75`)
-	h.admit(t, "health-db", "health.sleep", "2026-01-24T22:00:00Z", `"deep_minutes": 62`)
-	h.admit(t, "health-db", "health.sleep", "2026-01-25T22:00:00Z", `"deep_minutes": 71`)
+	h.admit(t, "meter", "test.measure", "2026-01-24T06:30:00Z", `"value": 118, "extra": 76`)
+	h.admit(t, "meter", "test.measure", "2026-01-25T06:30:00Z", `"value": 121, "extra": 79`)
+	h.admit(t, "meter", "test.measure", "2026-01-26T06:30:00Z", `"value": 117, "extra": 75`)
+	h.admit(t, "logger", "test.reading", "2026-01-24T22:00:00Z", `"minutes": 62`)
+	h.admit(t, "logger", "test.reading", "2026-01-25T22:00:00Z", `"minutes": 71`)
 }

@@ -59,7 +59,7 @@ func denseServer(t *testing.T) (*httptest.Server, *countingLedger) {
 		}
 		return f
 	}
-	admit("bp-csv:2024-01-01T06:30:00", "health.blood-pressure", `{"systolic": 118}`, time.Date(2024, 1, 1, 6, 30, 0, 0, time.UTC))
+	admit("meter:2024-01-01T06:30:00", "test.measure", `{"count": 118}`, time.Date(2024, 1, 1, 6, 30, 0, 0, time.UTC))
 	for i := 0; i < 40; i++ {
 		at := time.Date(2026, 7, 5, 6, 0, 0, 0, time.UTC).Add(time.Duration(i) * 10 * time.Minute)
 		admit(fmt.Sprintf("health-db:hr:%d", i), "health.heart-rate", fmt.Sprintf(`{"resting": %d}`, 50+i), at)
@@ -76,7 +76,7 @@ func denseServer(t *testing.T) (*httptest.Server, *countingLedger) {
 	}
 
 	cl := &countingLedger{Ledger: l}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: cl, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Engine.Catalog(t), Ledger: cl, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 	return srv, cl
 }
@@ -213,7 +213,7 @@ func TestTimeline_NoneUnchecksEveryType(t *testing.T) {
 		t.Errorf("pan-left link dropped none: %s", left)
 	}
 	// Legend boxes are all unticked, so one tick shows one type alone.
-	if strings.Contains(none, `value="health.blood-pressure" checked`) {
+	if strings.Contains(none, `value="test.measure" checked`) {
 		t.Error("a type still ticked under none")
 	}
 }
@@ -234,7 +234,7 @@ func TestTimeline_DefaultViewIsACookieOverTheQuery(t *testing.T) {
 		return resp, string(body)
 	}
 
-	view := "from=2026-07-01T00:00:00Z&to=2026-07-10T00:00:00Z&type=health.blood-pressure"
+	view := "from=2026-07-01T00:00:00Z&to=2026-07-10T00:00:00Z&type=test.measure"
 	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/?"+view, nil)
 	_, page := do(req)
 	if !strings.Contains(page, `id="default-set"`) || strings.Contains(page, `id="default-forget"`) {
@@ -262,7 +262,7 @@ func TestTimeline_DefaultViewIsACookieOverTheQuery(t *testing.T) {
 	resp, _ = do(req)
 	loc := resp.Header.Get("Location")
 	if resp.StatusCode != http.StatusSeeOther || !strings.HasPrefix(loc, "/?") ||
-		!strings.Contains(loc, "type=health.blood-pressure") || !strings.Contains(loc, "from=2026-07-01") {
+		!strings.Contains(loc, "type=test.measure") || !strings.Contains(loc, "from=2026-07-01") {
 		t.Fatalf("GET / with a default = %d %s, want 303 to the view", resp.StatusCode, loc)
 	}
 	req, _ = http.NewRequest(http.MethodGet, srv.URL+loc, nil)
@@ -338,7 +338,7 @@ func TestTimeline_BareRootOpensTheLastMonth(t *testing.T) {
 	}
 	now := time.Date(2026, 11, 2, 15, 0, 0, 0, time.UTC)
 	srv := httptest.NewServer(inspect.Handler(inspect.Deps{
-		Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets,
+		Catalog: catalogtest.Engine.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets,
 		Zone: "Australia/Sydney", Now: func() time.Time { return now },
 	}))
 	t.Cleanup(srv.Close)

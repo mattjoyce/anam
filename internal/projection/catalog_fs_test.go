@@ -65,9 +65,18 @@ func copyCatalogToDisk(t *testing.T, srcDir string) fs.FS {
 	return os.DirFS(dir)
 }
 
-// fixtureDir writes the projections root of fixture.Mattjoyce under t.TempDir() and
+// fixtureDir writes the projections root of fixture.Engine under t.TempDir() and
 // returns its path, for the tests that edit a catalog on disk.
 func fixtureDir(t *testing.T) string {
+	t.Helper()
+	_, dir := fixture.Dirs(t, fstest.MapFS{}, fixtureProjs())
+	return dir
+}
+
+// personalDir is fixtureDir over fixture.Mattjoyce, read only by the test that ties
+// that byte copy to the catalog the binary embeds. It goes with the embedded catalog
+// in R4b slice 5.
+func personalDir(t *testing.T) string {
 	t.Helper()
 	_, projs := fixture.Mattjoyce()
 	_, dir := fixture.Dirs(t, fstest.MapFS{}, projs)
@@ -84,7 +93,7 @@ func TestBundledFS_MatchEmbedded(t *testing.T) {
 		t.Fatalf("Bundled: %v", err)
 	}
 
-	srcDir := fixtureDir(t)
+	srcDir := personalDir(t)
 	copy := copyCatalogToDisk(t, srcDir)
 
 	reg, err := projection.BundledFS(copy)
@@ -116,7 +125,7 @@ func TestBundledFS_IgnoresNonJSONFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BundledFS with extra files: %v", err)
 	}
-	fixtureAll := catalogtest.Projections(t).Held()
+	fixtureAll := catalogtest.Engine.Projections(t).Held()
 	all := reg.Held()
 	if len(all) != len(fixtureAll) {
 		t.Fatalf("BundledFS has %d templates (fixture %d), ignoring extra files", len(all), len(fixtureAll))

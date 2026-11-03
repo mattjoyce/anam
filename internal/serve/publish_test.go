@@ -14,10 +14,10 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
-// narrowedBP is the bp template's value at w, narrowed by q: what a read publishes.
-func (h *harness) narrowedBP(t *testing.T, w ledger.Watermark, q *receipt.Query) fold.Value {
+// narrowedMeasures is the measures template's value at w, narrowed by q: what a read publishes.
+func (h *harness) narrowedMeasures(t *testing.T, w ledger.Watermark, q *receipt.Query) fold.Value {
 	t.Helper()
-	tmpl, err := h.deps.Templates.Lookup("bp")
+	tmpl, err := h.deps.Templates.Lookup("measures")
 	if err != nil {
 		t.Fatalf("Lookup: %v", err)
 	}
@@ -47,9 +47,9 @@ func TestPublish_ANarrowedReadVerifiesAfterACorrection(t *testing.T) {
 	}
 
 	// Two of the three readings: the 24th and the 25th.
-	q := &receipt.Query{From: "2026-01-24T00:00:00.000000000Z", Before: "2026-01-26T00:00:00.000000000Z", Type: "health.blood-pressure"}
-	tmpl, _ := h.deps.Templates.Lookup("bp")
-	value := h.narrowedBP(t, head, q)
+	q := &receipt.Query{From: "2026-01-24T00:00:00.000000000Z", Before: "2026-01-26T00:00:00.000000000Z", Type: "test.measure"}
+	tmpl, _ := h.deps.Templates.Lookup("measures")
+	value := h.narrowedMeasures(t, head, q)
 	if value.Len() != 2 {
 		t.Fatalf("the window holds %d readings, want 2", value.Len())
 	}
@@ -66,7 +66,7 @@ func TestPublish_ANarrowedReadVerifiesAfterACorrection(t *testing.T) {
 	}
 
 	// A correction inside the window, after the read.
-	h.admit(t, "bp-csv", "health.blood-pressure", "2026-01-24T06:30:00Z", `"systolic": 116, "diastolic": 74`)
+	h.admit(t, "meter", "test.measure", "2026-01-24T06:30:00Z", `"value": 116, "extra": 74`)
 
 	_, res, err := serve.Verify(ctx, h.deps, out.ReceiptHash)
 	if err != nil {
@@ -78,7 +78,7 @@ func TestPublish_ANarrowedReadVerifiesAfterACorrection(t *testing.T) {
 
 	// Verifying replayed the query: without it the whole projection, three readings,
 	// would not have reproduced two.
-	whole := h.narrowedBP(t, head, nil)
+	whole := h.narrowedMeasures(t, head, nil)
 	if whole.Hash() == value.Hash() {
 		t.Fatal("the narrowing changed nothing; the test is vacuous")
 	}
@@ -92,8 +92,8 @@ func TestPublish_ASnapshotVerifies(t *testing.T) {
 	head, _ := h.l.Head(ctx)
 
 	q := &receipt.Query{At: "2026-01-25T23:59:59.999999999Z"}
-	tmpl, _ := h.deps.Templates.Lookup("bp")
-	value := h.narrowedBP(t, head, q)
+	tmpl, _ := h.deps.Templates.Lookup("measures")
+	value := h.narrowedMeasures(t, head, q)
 	out, err := serve.Publish(ctx, h.deps, tmpl, head, q, value, false)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
@@ -110,12 +110,12 @@ func TestPublish_AWholeProjectionIsTheSameReceiptAsServe(t *testing.T) {
 	ctx := context.Background()
 	head, _ := h.l.Head(ctx)
 
-	run, err := serve.Run(ctx, h.deps, "bp", true)
+	run, err := serve.Run(ctx, h.deps, "measures", true)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	tmpl, _ := h.deps.Templates.Lookup("bp")
-	pub, err := serve.Publish(ctx, h.deps, tmpl, head, nil, h.narrowedBP(t, head, nil), true)
+	tmpl, _ := h.deps.Templates.Lookup("measures")
+	pub, err := serve.Publish(ctx, h.deps, tmpl, head, nil, h.narrowedMeasures(t, head, nil), true)
 	if err != nil {
 		t.Fatalf("Publish: %v", err)
 	}

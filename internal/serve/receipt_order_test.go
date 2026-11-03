@@ -36,7 +36,7 @@ func TestPublish_FilesNoReceiptWhenItsTemplateBodyFails(t *testing.T) {
 
 	deps := h.deps
 	deps.Published = refusingTemplateBodies{deps.Published}
-	if _, err := serve.Run(ctx, deps, "bp", false); !errors.Is(err, errBodyRefused) {
+	if _, err := serve.Run(ctx, deps, "measures", false); !errors.Is(err, errBodyRefused) {
 		t.Fatalf("Run = %v, want the body's failure", err)
 	}
 	if got, err := h.db.List(ctx, receipt.Kind); err != nil || len(got) != 0 {
@@ -47,7 +47,7 @@ func TestPublish_FilesNoReceiptWhenItsTemplateBodyFails(t *testing.T) {
 // The same holds for a query's receipt.
 func TestPublishQuery_FilesNoReceiptWhenItsTemplateBodyFails(t *testing.T) {
 	t.Parallel()
-	h := medHarness(t)
+	h := courseHarness(t)
 	h.deps.Definitions = h.deps.Series.(query.Definitions)
 	h.seed(t)
 	ctx := context.Background()
@@ -60,7 +60,7 @@ func TestPublishQuery_FilesNoReceiptWhenItsTemplateBodyFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tmpl, err := h.deps.Templates.Lookup("bp")
+	tmpl, err := h.deps.Templates.Lookup("measures")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestPublishQuery_FilesNoReceiptWhenItsTemplateBodyFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const text = `high(E, S) :- attr(E, "/systolic", S), S > 120.`
+	const text = `high(E, S) :- attr(E, "/value", S), S > 120.`
 	ans, rules, err := query.Run(ctx, served, query.Versions(res.Live), h.deps.Definitions, text, "high", 0)
 	if err != nil {
 		t.Fatalf("Run: %v", err)

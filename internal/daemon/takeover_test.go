@@ -24,8 +24,8 @@ func TestATypeDroppedFromTheBinaryIsTakenOverByItsImporter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// test.reading stands for a type an earlier build bundled at v1.
-	if err := db.PutDefinitions(context.Background(), []ops.DefinitionRow{{Type: "test.reading", Version: 1, Body: readingManifest}}); err != nil {
+	// test.registered stands for a type an earlier build bundled at v1.
+	if err := db.PutDefinitions(context.Background(), []ops.DefinitionRow{{Type: "test.registered", Version: 1, Body: registeredManifest}}); err != nil {
 		t.Fatal(err)
 	}
 	_ = db.Close()
@@ -33,17 +33,17 @@ func TestATypeDroppedFromTheBinaryIsTakenOverByItsImporter(t *testing.T) {
 	_, url, stop := serveImporters(t, cfg)
 	defer func() { _ = stop() }()
 
-	call(t, "GET", url+"/v1/definitions/test.reading/1", importerToken, "", http.StatusNotFound, nil)
+	call(t, "GET", url+"/v1/definitions/test.registered/1", importerToken, "", http.StatusNotFound, nil)
 	var reg struct {
 		Type    string `json:"type"`
 		Version int    `json:"version"`
 	}
-	call(t, "POST", url+"/v1/definitions", importerToken, readingManifest, http.StatusCreated, &reg)
-	if reg.Type != "test.reading" || reg.Version != 1 {
+	call(t, "POST", url+"/v1/definitions", importerToken, registeredManifest, http.StatusCreated, &reg)
+	if reg.Type != "test.registered" || reg.Version != 1 {
 		t.Fatalf("registration = %+v", reg)
 	}
-	call(t, "GET", url+"/v1/definitions/test.reading/1", importerToken, "", http.StatusOK, nil)
+	call(t, "GET", url+"/v1/definitions/test.registered/1", importerToken, "", http.StatusOK, nil)
 	call(t, "POST", url+"/v1/envelopes", importerToken,
-		batch(`{"type": "test.reading", "definition_version": 1, "payload": {"id": "r-1", "at": "2026-10-10T07:00:00Z", "value": 1.5}}`),
+		batch(`{"type": "test.registered", "definition_version": 1, "payload": {"id": "r-1", "at": "2026-10-10T07:00:00Z", "value": 1.5}}`),
 		http.StatusOK, nil)
 }

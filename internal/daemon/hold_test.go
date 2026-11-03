@@ -19,15 +19,16 @@ import (
 // that another carries on.
 const secondToken = "second-hold-token-0123456789abcdef01234"
 
-// holdConfig is importerConfig with a second importer and the workbench declared
-// beside them.
+// holdConfig is importerConfig over doseFixture, with a second importer and the
+// workbench declared beside them.
 func holdConfig(t *testing.T) config.Config {
 	t.Helper()
 	cfg := importerConfig(t)
+	withDose(t, &cfg)
 	first, second := sha256.Sum256([]byte(importerToken)), sha256.Sum256([]byte(secondToken))
-	body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [health.weight, test.reading]\n"+
-		"  - source: second-import\n    token_sha256: %s\n    types: [health.weight]\n"+
-		"  - source: workbench\n    types: [health.medication.dose]\n",
+	body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [test.reading, test.registered]\n"+
+		"  - source: second-import\n    token_sha256: %s\n    types: [test.reading]\n"+
+		"  - source: workbench\n    types: [test.dose]\n",
 		hex.EncodeToString(first[:]), hex.EncodeToString(second[:]))
 	if err := os.WriteFile(cfg.ImportersFile, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
@@ -60,8 +61,8 @@ func holdCall(t *testing.T, method, url, token, body string) (int, string, strin
 func TestHoldRefusesAHeldSourceAndOnlyThatSource(t *testing.T) {
 	t.Parallel()
 	d, url, _ := serveImporters(t, holdConfig(t))
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
-	dose, _ := d.defs.current.Load().Lookup("health.medication.dose")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
+	dose, _ := d.defs.current.Load().Lookup("test.dose")
 
 	var held api.Holds
 	call(t, "POST", url+"/v1/hold", testToken, `{"sources": ["test-import"]}`, http.StatusOK, &held)
@@ -83,7 +84,7 @@ func TestHoldRefusesAHeldSourceAndOnlyThatSource(t *testing.T) {
 	}
 
 	// Its Definition registration is refused too.
-	status, body, _ = holdCall(t, "POST", url+"/v1/definitions", importerToken, readingManifest)
+	status, body, _ = holdCall(t, "POST", url+"/v1/definitions", importerToken, registeredManifest)
 	if status != http.StatusServiceUnavailable || !strings.Contains(body, "held") {
 		t.Fatalf("a held source's registration: %d %s, want 503 naming the hold", status, body)
 	}
@@ -193,7 +194,7 @@ func TestHoldSurvivesARestart(t *testing.T) {
 	if len(st.Held) != 1 || st.Held[0] != "test-import" {
 		t.Fatalf("status holds after a restart = %+v, want test-import held", st.Held)
 	}
-	weight, _ := again.defs.current.Load().Lookup("health.weight")
+	weight, _ := again.defs.current.Load().Lookup("test.reading")
 	status, body, _ := holdCall(t, "POST", srv.URL+"/v1/envelopes", importerToken,
 		batch(weighIn("w-restart", 80.5, weight.Version)))
 	if status != http.StatusServiceUnavailable || !strings.Contains(body, "held") {

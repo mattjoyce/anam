@@ -31,7 +31,7 @@ func documentsConfig(t *testing.T) config.Config {
 	otherSum := sha256.Sum256([]byte(importerToken))
 	body := fmt.Sprintf("importers:\n"+
 		"  - source: documents\n    token_sha256: %s\n    types: [record.document]\n"+
-		"  - source: test-import\n    token_sha256: %s\n    types: [health.weight]\n",
+		"  - source: test-import\n    token_sha256: %s\n    types: [test.reading]\n",
 		hex.EncodeToString(docSum[:]), hex.EncodeToString(otherSum[:]))
 	if err := os.WriteFile(cfg.ImportersFile, []byte(body), 0o600); err != nil {
 		t.Fatal(err)

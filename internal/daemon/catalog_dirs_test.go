@@ -47,26 +47,26 @@ func TestReceiptVerifiesAfterItsTemplateFileLeaves(t *testing.T) {
 	d := open(t, cfg)
 	srv := httptest.NewServer(d.Handler())
 	var minted api.Published
-	call(t, "GET", srv.URL+timelineBP, recorderToken, "", http.StatusOK, &minted)
+	call(t, "GET", srv.URL+timelineMeasures, recorderToken, "", http.StatusOK, &minted)
 	srv.Close()
 	if err := d.closeStores(); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := os.Remove(filepath.Join(cfg.ProjectionsDir, "bp.json")); err != nil {
+	if err := os.Remove(filepath.Join(cfg.ProjectionsDir, "measures.json")); err != nil {
 		t.Fatal(err)
 	}
 	d2 := open(t, cfg)
 	t.Cleanup(func() { _ = d2.closeStores() })
-	if _, err := d2.projections.current.Load().Lookup("bp"); err == nil {
-		t.Error("bp is still served after its file left the catalog")
+	if _, err := d2.projections.current.Load().Lookup("measures"); err == nil {
+		t.Error("measures is still served after its file left the catalog")
 	}
 	srv2 := httptest.NewServer(d2.Handler())
 	defer srv2.Close()
 	var verified api.ReceiptVerified
 	call(t, "GET", srv2.URL+"/v1/receipts/"+minted.ReceiptHash+"/verify", recorderToken, "", http.StatusOK, &verified)
 	if !verified.Result.OK() {
-		t.Fatalf("the receipt does not verify after bp's file left: %s", verified.Result.Summary())
+		t.Fatalf("the receipt does not verify after the measures file left: %s", verified.Result.Summary())
 	}
 	if !slices.ContainsFunc(verified.Result.Notes, func(n string) bool {
 		return strings.Contains(n, "from the body filed with the receipt")
@@ -100,7 +100,7 @@ func TestOpenRefusesARegisteredDefinitionTheCatalogContradicts(t *testing.T) {
 	cfg := newConfig(t)
 	db := openStore(t, ctx, cfg)
 
-	defs, _ := fixture.Mattjoyce()
+	defs, _ := fixture.Engine()
 	manifests, err := def.ManifestsFS(defs)
 	if err != nil || len(manifests) == 0 {
 		t.Fatalf("no catalog manifests: %v", err)
@@ -164,8 +164,7 @@ func TestOpenLogsTheCatalogItAdmitted(t *testing.T) {
 
 // A receipt minted on one catalog directory verifies the same on another directory
 // copied from the same files: same result, same notes, no "definition set has moved".
-// Where the files came from never enters a content hash. The embedded-to-directory
-// transition is TestReceiptMintedOnTheEmbeddedCatalogVerifiesOnACopy.
+// Where the files came from never enters a content hash.
 func TestReceiptVerifiesTheSameOnACopiedCatalog(t *testing.T) {
 	t.Parallel()
 	cfg := readerConfig(t)
@@ -173,7 +172,7 @@ func TestReceiptVerifiesTheSameOnACopiedCatalog(t *testing.T) {
 	d := open(t, cfg)
 	srv := httptest.NewServer(d.Handler())
 	var minted api.Published
-	call(t, "GET", srv.URL+timelineBP, recorderToken, "", http.StatusOK, &minted)
+	call(t, "GET", srv.URL+timelineMeasures, recorderToken, "", http.StatusOK, &minted)
 	var first api.ReceiptVerified
 	call(t, "GET", srv.URL+"/v1/receipts/"+minted.ReceiptHash+"/verify", recorderToken, "", http.StatusOK, &first)
 	srv.Close()
@@ -184,7 +183,7 @@ func TestReceiptVerifiesTheSameOnACopiedCatalog(t *testing.T) {
 		t.Fatalf("the receipt does not verify on the first directory: %s", first.Result.Summary())
 	}
 
-	defs, projs := fixture.Mattjoyce()
+	defs, projs := fixture.Engine()
 	cfg.DefinitionsDir, cfg.ProjectionsDir = fixture.Dirs(t, defs, projs)
 	d2 := open(t, cfg)
 	t.Cleanup(func() { _ = d2.closeStores() })

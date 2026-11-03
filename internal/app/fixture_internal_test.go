@@ -33,13 +33,13 @@ type record struct {
 	payload string
 }
 
-// bpReadings is a blood pressure diary as records: three readings, ids in the diary's
-// form (date_excel and reading joined by a colon). "114.0" appears once, so a test can
-// correct one reading by replacing it.
-var bpReadings = []record{
-	{"health.blood-pressure", `{"id": "2026-1-24 06:36:00:1", "source_time": {"value": "2026-1-24 06:36:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-1-24 06:36:00", "reading": "1", "systolic_blood_pressure": {"value": 114.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 80.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-24T06:36:00+11:00"}, "pulse": "70.0"}`},
-	{"health.blood-pressure", `{"id": "2026-2-10 05:04:00:1", "source_time": {"value": "2026-2-10 05:04:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-2-10 05:04:00", "reading": "1", "systolic_blood_pressure": {"value": 102.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 72.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-02-10T05:04:00+11:00"}, "pulse": "68.0"}`},
-	{"health.blood-pressure", `{"id": "2026-2-11 05:10:00:1", "source_time": {"value": "2026-2-11 05:10:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-2-11 05:10:00", "reading": "1", "systolic_blood_pressure": {"value": 101.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 72.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-02-11T05:10:00+11:00"}, "pulse": "66.0"}`},
+// measureRows are three test.measure rows as records: a figure keyed by its moment
+// and sequence number together, as a spreadsheet row is, so each id is composed from
+// two fields. "114.0" appears once, so a test can correct one row by replacing it.
+var measureRows = []record{
+	{"test.measure", `{"at": "2026-01-24 06:36:00", "seq": 1, "count": 114.0, "note": "70.0", "source_time": {"value": "2026-01-24 06:36:00", "zone": "Europe/Berlin", "basis": "configuration"}}`},
+	{"test.measure", `{"at": "2026-02-10 05:04:00", "seq": 1, "count": 102.0, "note": "68.0", "source_time": {"value": "2026-02-10 05:04:00", "zone": "Europe/Berlin", "basis": "configuration"}}`},
+	{"test.measure", `{"at": "2026-02-11 05:10:00", "seq": 1, "count": 101.0, "note": "66.0", "source_time": {"value": "2026-02-11 05:10:00", "zone": "Europe/Berlin", "basis": "configuration"}}`},
 }
 
 // corrected is recs with old replaced by new in the first payload that holds it.
@@ -56,7 +56,7 @@ func corrected(recs []record, old, new string) []record {
 
 // admitUnder commits recs from source "records" through the gate under the Definitions
 // in defs, in one batch, and returns the watermark it left. A test admits under
-// catalogtest.Definitions, or under a registry holding a type the catalog no longer
+// catalogtest.Engine.Definitions, or under a registry holding a type the catalog no longer
 // carries, as a ledger written before a rename holds it.
 func admitUnder(ctx context.Context, l *ledger.Ledger, defs *def.Registry, recs []record) (ledger.Watermark, error) {
 	var err error
@@ -80,17 +80,17 @@ func admitUnder(ctx context.Context, l *ledger.Ledger, defs *def.Registry, recs 
 	return w, err
 }
 
-// catalogKeys is the config file lines naming a copy of fixture.Mattjoyce under the
+// catalogKeys is the config file lines naming a copy of fixture.Engine under the
 // test's own directory, for a config a test writes as YAML.
 func catalogKeys(t *testing.T) string {
 	t.Helper()
 	var cfg config.Config
-	catalogtest.Config(t, &cfg)
+	catalogtest.Engine.Config(t, &cfg)
 	return fmt.Sprintf("definitions_dir: %s\nprojections_dir: %s\n", cfg.DefinitionsDir, cfg.ProjectionsDir)
 }
 
 // ledgerFixture is a real ledger and a real config under the test's own directory. The
-// config reads a copy of fixture.Mattjoyce (card 255), so every local command and every
+// config reads a copy of fixture.Engine (card 255), so every local command and every
 // daemon opened on it loads that catalog.
 type ledgerFixture struct {
 	dir, cfgPath, ledgerPath string
@@ -163,14 +163,14 @@ func (f ledgerFixture) admit(t *testing.T, recs []record) ledger.Watermark {
 		t.Fatalf("open ledger: %v", err)
 	}
 	defer func() { _ = l.Close() }()
-	w, err := admitUnder(ctx, l, catalogtest.Definitions(t), recs)
+	w, err := admitUnder(ctx, l, catalogtest.Engine.Definitions(t), recs)
 	if err != nil {
 		t.Fatalf("admit records: %v", err)
 	}
 	return w
 }
 
-// admitHeld is admit under the Definitions in defs, for a type the binary keeps only
+// admitHeld is admit under the Definitions in defs, for a type the catalog keeps only
 // in its history.
 func (f ledgerFixture) admitHeld(t *testing.T, defs *def.Registry, recs []record) ledger.Watermark {
 	t.Helper()

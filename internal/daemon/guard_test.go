@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -36,7 +37,7 @@ func TestOpenGuardsTheBundledDefinitions(t *testing.T) {
 	}
 	// The store holds the current body of every catalog type and the history the
 	// catalog carries (card 111).
-	defs, _ := fixture.Mattjoyce()
+	defs, _ := fixture.Engine()
 	manifests, err := def.ManifestsFS(defs)
 	if err != nil {
 		t.Fatal(err)
@@ -45,19 +46,20 @@ func TestOpenGuardsTheBundledDefinitions(t *testing.T) {
 	if err != nil || len(rows) != len(manifests) {
 		t.Fatalf("stored %d definitions, %v; want %d", len(rows), err, len(manifests))
 	}
-	// Pretend the store last saw blood pressure keyed another way, at its newest
+	// Pretend the store last saw test.measure keyed another way, at its newest
 	// version: the guard compares the newest stored body with the current one.
-	var bp ops.DefinitionRow
+	var measure ops.DefinitionRow
 	for _, r := range rows {
-		if r.Type == "health.blood-pressure" && r.Version > bp.Version {
-			bp = r
+		if r.Type == "test.measure" && r.Version > measure.Version {
+			measure = r
 		}
 	}
-	bp.Body = strings.Replace(bp.Body, `"identity_key": ["/date_excel", "/reading"]`, `"identity_key": ["/date_excel"]`, 1)
-	if !strings.Contains(bp.Body, `"identity_key": ["/date_excel"]`) {
+	keyed := regexp.MustCompile(`"identity_key":\s*\[\s*"/at",\s*"/seq"\s*\]`)
+	measure.Body = keyed.ReplaceAllString(measure.Body, `"identity_key": ["/at"]`)
+	if !strings.Contains(measure.Body, `"identity_key": ["/at"]`) {
 		t.Fatalf("fixture did not change the stored body")
 	}
-	if err := db.PutDefinitions(ctx, []ops.DefinitionRow{bp}); err != nil {
+	if err := db.PutDefinitions(ctx, []ops.DefinitionRow{measure}); err != nil {
 		t.Fatalf("PutDefinitions: %v", err)
 	}
 	if err := db.Close(); err != nil {
@@ -73,15 +75,15 @@ func TestOpenGuardsTheBundledDefinitions(t *testing.T) {
 }
 
 // The guard persists the catalog it guarded, not any other copy: a catalog read from a
-// directory whose current manifest differs from fixture.Mattjoyce's (and the binary's)
-// only in its bytes (a trailing space, so the keying is the same and the guard passes)
-// is stored with those bytes.
+// directory whose current manifest differs from fixture.Engine's only in its bytes (a
+// trailing space, so the keying is the same and the guard passes) is stored with those
+// bytes.
 func TestGuardPersistsTheCatalogItGuarded(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	defs, projs := fixture.Mattjoyce()
+	defs, projs := fixture.Engine()
 	dir, projsDir := fixture.Dirs(t, defs, projs)
-	const typ = "health.blood-pressure"
+	const typ = "test.measure"
 	path := filepath.Join(dir, typ+".json")
 	raw, err := os.ReadFile(path)
 	if err != nil {

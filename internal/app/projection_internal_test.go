@@ -12,9 +12,9 @@ import (
 func TestProjection_RegisterListShowOverTheDaemon(t *testing.T) {
 	t.Parallel()
 	f := newRemoteFixture(t)
-	manifest := filepath.Join(f.dir, "bptest.v1.json")
-	body := `{"name": "bptest", "version": 1, "description": "a test view of blood pressure",
-  "types": ["health.blood-pressure"], "statuses": ["admitted", "endorsed"], "max_classification": "Sensitive",
+	manifest := filepath.Join(f.dir, "measurestest.v1.json")
+	body := `{"name": "measurestest", "version": 1, "description": "a test view of the measures",
+  "types": ["test.measure"], "statuses": ["admitted", "endorsed"], "max_classification": "Sensitive",
   "from": "", "to": "", "shape": "log"}`
 	if err := os.WriteFile(manifest, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
@@ -24,11 +24,11 @@ func TestProjection_RegisterListShowOverTheDaemon(t *testing.T) {
 		t.Errorf("registering against local files: %v, want a refusal naming the daemon", err)
 	}
 	out, _, err := cli(t, f.remoteCfg, "projection", "register", manifest)
-	if err != nil || !strings.Contains(out, "registered bptest v1  sha256:") {
+	if err != nil || !strings.Contains(out, "registered measurestest v1  sha256:") {
 		t.Fatalf("register: %v\n%s", err, out)
 	}
 	out, _, err = cli(t, f.remoteCfg, "projection", "register", manifest)
-	if err != nil || !strings.Contains(out, "already held (unchanged) bptest v1") {
+	if err != nil || !strings.Contains(out, "already held (unchanged) measurestest v1") {
 		t.Fatalf("register again: %v\n%s", err, out)
 	}
 	if err := os.WriteFile(manifest, []byte(strings.Replace(body, `"endorsed"`, `"admitted"`, 1)), 0o600); err != nil {
@@ -40,11 +40,11 @@ func TestProjection_RegisterListShowOverTheDaemon(t *testing.T) {
 
 	for _, cfg := range []string{f.remoteCfg, f.cfgPath} {
 		out, _, err = cli(t, cfg, "projection", "list")
-		if err != nil || !strings.Contains(out, "bptest") || !strings.Contains(out, "bp ") {
+		if err != nil || !strings.Contains(out, "measurestest") || !strings.Contains(out, "measures ") {
 			t.Errorf("list with %s: %v\n%s", filepath.Base(cfg), err, out)
 		}
-		out, _, err = cli(t, cfg, "projection", "show", "bptest")
-		if err != nil || !strings.Contains(out, `"name": "bptest"`) {
+		out, _, err = cli(t, cfg, "projection", "show", "measurestest")
+		if err != nil || !strings.Contains(out, `"name": "measurestest"`) {
 			t.Errorf("show with %s: %v\n%s", filepath.Base(cfg), err, out)
 		}
 	}
@@ -52,12 +52,12 @@ func TestProjection_RegisterListShowOverTheDaemon(t *testing.T) {
 	if !strings.Contains(remoteList, "registered") || !strings.Contains(remoteList, "bundled") {
 		t.Errorf("the daemon's list names no origins:\n%s", remoteList)
 	}
-	if _, _, err := cli(t, f.remoteCfg, "projection", "show", "bptest", "2"); err == nil {
-		t.Error("show bptest 2 found a version never registered")
+	if _, _, err := cli(t, f.remoteCfg, "projection", "show", "measurestest", "2"); err == nil {
+		t.Error("show measurestest 2 found a version never registered")
 	}
 
 	// A read through the registered template is the same on both sides.
-	if got := f.sameOutput(t, "timeline", "--projection", "bptest"); !strings.Contains(got, "health.blood-pressure") {
-		t.Errorf("timeline --projection bptest served nothing:\n%s", got)
+	if got := f.sameOutput(t, "timeline", "--projection", "measurestest"); !strings.Contains(got, "test.measure") {
+		t.Errorf("timeline --projection measurestest served nothing:\n%s", got)
 	}
 }

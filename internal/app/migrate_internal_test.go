@@ -33,7 +33,7 @@ import (
 // note, and keys and places facets as v1 does.
 const readingV1 = `{
   "meta": {
-    "facet_type": "test.reading", "definition_version": 1, "classification": "Normal",
+    "facet_type": "test.registered", "definition_version": 1, "classification": "Normal",
     "validation_mode": "strict", "source_schema": "test/reading",
     "time_semantics": {"fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}},
     "identity_key": ["/measured_at"]
@@ -50,7 +50,7 @@ var readingV2 = strings.NewReplacer(`"definition_version": 1`, `"definition_vers
 	`"level": {"type": "number"}}`, `"level": {"type": "number"}, "note": {"type": "string"}}`).Replace(readingV1)
 
 // heartTemplate is a registered projection, so the carry has one to hold.
-const heartTemplate = `{"name":"heart","version":1,"description":"heart","types":["health.heart-rate-day"],` +
+const heartTemplate = `{"name":"heart","version":1,"description":"heart","types":["test.registered"],` +
 	`"statuses":["admitted","endorsed"],"max_classification":"Sensitive","from":"","to":"","shape":"log"}`
 
 func readingPayload(at string, level int, note string) string {
@@ -60,14 +60,14 @@ func readingPayload(at string, level int, note string) string {
 	return fmt.Sprintf(`{"measured_at": %q, "level": %d, "note": %q}`, at, level, note)
 }
 
-// registryAt is the catalog's Definitions with test.reading registered at the versions
+// registryAt is the catalog's Definitions with test.registered registered at the versions
 // given, as the daemon would load them.
 func registryAt(t *testing.T, bodies ...string) *def.Registry {
 	t.Helper()
-	bundled := catalogtest.Definitions(t)
+	bundled := catalogtest.Engine.Definitions(t)
 	var stored []def.Stored
 	for i, b := range bodies {
-		stored = append(stored, def.Stored{Type: "test.reading", Version: i + 1, Body: []byte(b)})
+		stored = append(stored, def.Stored{Type: "test.registered", Version: i + 1, Body: []byte(b)})
 	}
 	reg, err := def.WithRegistered(bundled, stored)
 	if err != nil {
@@ -113,7 +113,7 @@ func tombstone(t *testing.T, path string, id string) {
 		t.Fatal(err)
 	}
 	defer func() { _ = l.Close() }()
-	g := gate.New(l, catalogtest.Definitions(t), gate.StaticScopes{}, clock.Real{}, "matt",
+	g := gate.New(l, catalogtest.Engine.Definitions(t), gate.StaticScopes{}, clock.Real{}, "matt",
 		gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	if _, _, err := g.Retract(ctx, id); err != nil {
 		t.Fatal(err)
@@ -135,7 +135,7 @@ func registerInStore(t *testing.T, f ledgerFixture, bodies ...string) {
 	}
 	defer func() { _ = db.Close() }()
 	for i, b := range bodies {
-		row := ops.DefinitionRow{Type: "test.reading", Version: i + 1, Body: b}
+		row := ops.DefinitionRow{Type: "test.registered", Version: i + 1, Body: b}
 		if err := db.RegisterDefinition(ctx, row, fmt.Sprintf("2026-10-2%d%s", i+1, "T00:00:00.000000000Z")); err != nil {
 			t.Fatal(err)
 		}
@@ -143,7 +143,7 @@ func registerInStore(t *testing.T, f ledgerFixture, bodies ...string) {
 	if err := db.RegisterProjection(ctx, ops.ProjectionRow{Name: "heart", Version: 1, Body: heartTemplate}, "2026-10-23T00:00:00.000000000Z"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Put(ctx, ops.KindTemplateBody, []byte(`{"max_classification":"Normal","statuses":["admitted"],"types":["health.heart-rate-day"]}`)); err != nil {
+	if _, err := db.Put(ctx, ops.KindTemplateBody, []byte(`{"max_classification":"Normal","statuses":["admitted"],"types":["test.registered"]}`)); err != nil {
 		t.Fatal(err)
 	}
 	// A source the operator has held: the hold is authored state, so the carry takes
@@ -158,7 +158,7 @@ type migrationFixture struct {
 	ledgerFixture
 	store                     string
 	dead, kept, changed       string // a tombstoned reading, one left alone, one corrected
-	atV1, movedToV2, atV2     string // test.reading facets: left at v1 (moved to v2 on the carry), v1 then v2, v2
+	atV1, movedToV2, atV2     string // test.registered facets: left at v1 (moved to v2 on the carry), v1 then v2, v2
 	edge                      string
 	newLedger, newStore       string
 	oldLedgerSum, oldStoreSum [32]byte
@@ -174,34 +174,34 @@ func newMigrationFixture(t *testing.T) migrationFixture {
 	f.store = filepath.Join(f.dir, "tracking.db")
 	f.newLedger, f.newStore = filepath.Join(f.dir, "new", "ledger.db"), filepath.Join(f.dir, "new", "tracking.db")
 
-	// Two sources of blood pressure; one reading of "records" is corrected, so it has
+	// Two sources of measures; one row of "records" is corrected, so it has
 	// two versions, and one is retracted.
-	f.admit(t, bpReadings)
-	f.admit(t, corrected(bpReadings, "114.0", "115.0")[:1])
-	admitAs(t, f.ledgerPath, "bp-csv", catalogtest.Definitions(t), []record{
-		{"health.blood-pressure", `{"id": "csv:1", "source_time": {"value": "2026-3-1 07:00:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-3-1 07:00:00", "reading": "1", "systolic_blood_pressure": {"value": 120.0, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 80.0, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-03-01T07:00:00+11:00"}, "pulse": "60.0"}`},
+	f.admit(t, measureRows)
+	f.admit(t, corrected(measureRows, "114.0", "115.0")[:1])
+	admitAs(t, f.ledgerPath, "csv-import", catalogtest.Engine.Definitions(t), []record{
+		{"test.measure", `{"at": "2026-03-01 07:00:00", "seq": 1, "count": 120.0, "note": "60.0", "source_time": {"value": "2026-03-01 07:00:00", "zone": "Europe/Berlin", "basis": "configuration"}}`},
 	})
-	f.changed, f.dead, f.kept = idOf("records", "2026-1-24 06:36:00", "1"), idOf("records", "2026-2-10 05:04:00", "1"), idOf("records", "2026-2-11 05:10:00", "1")
+	f.changed, f.dead, f.kept = idOf("records", "2026-01-24 06:36:00", "1"), idOf("records", "2026-02-10 05:04:00", "1"), idOf("records", "2026-02-11 05:10:00", "1")
 	tombstone(t, f.ledgerPath, f.dead)
 
 	// A registered type at two versions: one reading is left at v1, one is admitted at
 	// v1 and corrected under v2, one is admitted at v2.
 	v1, v2 := registryAt(t, readingV1), registryAt(t, readingV1, readingV2)
 	admitAs(t, f.ledgerPath, "records", v1, []record{
-		{"test.reading", readingPayload("2026-04-01T08:00:00Z", 1, "")},
-		{"test.reading", readingPayload("2026-04-02T08:00:00Z", 2, "")},
+		{"test.registered", readingPayload("2026-04-01T08:00:00Z", 1, "")},
+		{"test.registered", readingPayload("2026-04-02T08:00:00Z", 2, "")},
 	})
 	admitAs(t, f.ledgerPath, "records", v2, []record{
-		{"test.reading", readingPayload("2026-04-02T08:00:00Z", 3, "corrected")},
-		{"test.reading", readingPayload("2026-04-03T08:00:00Z", 4, "new")},
+		{"test.registered", readingPayload("2026-04-02T08:00:00Z", 3, "corrected")},
+		{"test.registered", readingPayload("2026-04-03T08:00:00Z", 4, "new")},
 	})
 	f.atV1, f.movedToV2, f.atV2 = idOf("records", "2026-04-01T08:00:00Z"), idOf("records", "2026-04-02T08:00:00Z"), idOf("records", "2026-04-03T08:00:00Z")
 	registerInStore(t, f.ledgerFixture, readingV1, readingV2)
 
 	// An edge naming a reading that is live and one that is retracted.
 	f.edge = idOf("records", "note:t1:1")
-	admitAs(t, f.ledgerPath, "records", catalogtest.Definitions(t), []record{{"record.edge", fmt.Sprintf(
-		`{"id": "note:t1:1", "at": "2026-03-01 10:00", "source_time": {"value": "2026-03-01 10:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kind": "about", "to": [%q, %q], "text": "two readings"}`,
+	admitAs(t, f.ledgerPath, "records", catalogtest.Engine.Definitions(t), []record{{"record.edge", fmt.Sprintf(
+		`{"id": "note:t1:1", "at": "2026-03-01 10:00", "source_time": {"value": "2026-03-01 10:00", "zone": "Europe/Berlin", "offset": "+01:00", "basis": "source"}, "kind": "about", "to": [%q, %q], "text": "two readings"}`,
 		f.kept, f.dead)}})
 
 	f.oldLedgerSum, f.oldStoreSum = sumOf(t, f.ledgerPath), sumOf(t, f.store)
@@ -256,9 +256,9 @@ func TestMigrate_DryRunReportsAndWritesNothing(t *testing.T) {
 		t.Fatalf("dry run: %v\n%s", err, out)
 	}
 	for _, want := range []string{
-		"health.blood-pressure  bp-csv  1  0  1  0", "health.blood-pressure  records  2  0  2  0", "test.reading  records  3  1  2  0",
+		"test.measure  csv-import  1  0  1  0", "test.measure  records  2  0  2  0", "test.registered  records  3  1  2  0",
 		"record.edge  records  1  0  1  0", "total  7  1  6  0", "dry run: nothing written",
-		"moved 1 test.reading from records, moved from v1 to the current v2",
+		"moved 1 test.registered from records, moved from v1 to the current v2",
 		"link to a facet not carried: records:9:note:t1:1", f.dead + ", tombstoned",
 	} {
 		if !strings.Contains(squash(out), squash(want)) {
@@ -290,7 +290,7 @@ func TestMigrate_CarriesLiveCurrentVersionsUnderTheirDefinitionVersion(t *testin
 		t.Fatalf("--yes: %v\n%s", err, out)
 	}
 	for _, want := range []string{"carried 7 facets", "W old", "W new 7", "proof: the new ledger's 7 live facets equal the selection's 7", "idempotent",
-		"proof: moved 1 test.reading from records, moved from v1 to the current v2"} {
+		"proof: moved 1 test.registered from records, moved from v1 to the current v2"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("--yes did not say %q:\n%s", want, out)
 		}
@@ -392,7 +392,7 @@ func TestMigrate_ProgramCarriesOnlyWhatItPicks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dry run: %v\n%s", err, out)
 	}
-	if !strings.Contains(squash(out), "record.edge records 1 0") || strings.Contains(out, "health.blood-pressure") {
+	if !strings.Contains(squash(out), "record.edge records 1 0") || strings.Contains(out, "test.measure") {
 		t.Errorf("the dry run is not the one type:\n%s", out)
 	}
 	if !strings.Contains(out, "link to a facet not carried: records:9:note:t1:1") ||
@@ -445,7 +445,7 @@ func TestMigrate_RefusesAnExistingTarget(t *testing.T) {
 func TestMigrate_RefusesAFacetThatNeitherVersionCarries(t *testing.T) {
 	t.Parallel()
 	f := newLedgerFixture(t)
-	admitAs(t, f.ledgerPath, "records", registryAt(t, readingV1), []record{{"test.reading", readingPayload("2026-04-01T08:00:00Z", 500, "")}})
+	admitAs(t, f.ledgerPath, "records", registryAt(t, readingV1), []record{{"test.registered", readingPayload("2026-04-01T08:00:00Z", 500, "")}})
 	// The store registers v2 only, and v2 caps the level: v1 is not held anywhere, and
 	// the current version does not pass the payload.
 	registerOnly(t, f, 2, readingV3)
@@ -456,7 +456,7 @@ func TestMigrate_RefusesAFacetThatNeitherVersionCarries(t *testing.T) {
 	for _, extra := range [][]string{nil, {"--yes"}} {
 		out, _, err := cli(t, f.cfgPath, append(args, extra...)...)
 		if err == nil || !strings.Contains(err.Error(), "1 facets the gate would refuse") ||
-			!strings.Contains(out, "refused 1 test.reading from records at v1") || !strings.Contains(out, "no Definition of test.reading at v1 is held") ||
+			!strings.Contains(out, "refused 1 test.registered from records at v1") || !strings.Contains(out, "no Definition of test.registered at v1 is held") ||
 			!strings.Contains(out, "v2 is current and") {
 			t.Errorf("migrate %v: %v\n%s", extra, err, out)
 		}
@@ -466,19 +466,19 @@ func TestMigrate_RefusesAFacetThatNeitherVersionCarries(t *testing.T) {
 	}
 }
 
-// readingV3 is v2 of test.reading with a ceiling on the level: a payload above it does
+// readingV3 is v2 of test.registered with a ceiling on the level: a payload above it does
 // not pass. It is written as version 3 or as version 2 by the tests that need it.
 var readingV3 = strings.NewReplacer(`"definition_version": 2`, `"definition_version": 3`,
 	`"level": {"type": "number"}`, `"level": {"type": "number", "maximum": 100}`).Replace(readingV2)
 
 var versionField = regexp.MustCompile(`"definition_version": \d+`)
 
-// bodyAt is a test.reading body re-numbered to version n.
+// bodyAt is a test.registered body re-numbered to version n.
 func bodyAt(body string, n int) string {
 	return versionField.ReplaceAllString(body, fmt.Sprintf(`"definition_version": %d`, n))
 }
 
-// registerOnly writes one test.reading body into the fixture's operational store at
+// registerOnly writes one test.registered body into the fixture's operational store at
 // version n, and nothing else.
 func registerOnly(t *testing.T, f ledgerFixture, n int, body string) {
 	t.Helper()
@@ -492,14 +492,14 @@ func registerOnly(t *testing.T, f ledgerFixture, n int, body string) {
 		t.Fatal(err)
 	}
 	defer func() { _ = db.Close() }()
-	if err := db.RegisterDefinition(ctx, ops.DefinitionRow{Type: "test.reading", Version: n, Body: bodyAt(body, n)}, "2026-10-22T00:00:00.000000000Z"); err != nil {
+	if err := db.RegisterDefinition(ctx, ops.DefinitionRow{Type: "test.registered", Version: n, Body: bodyAt(body, n)}, "2026-10-22T00:00:00.000000000Z"); err != nil {
 		t.Fatal(err)
 	}
 }
 
-// versionFixture is an old ledger of test.reading at three versions, v3 current, with
+// versionFixture is an old ledger of test.registered at three versions, v3 current, with
 // the store registering v1 as the words of the format card 52 retired (validation mode
-// "lenient"), which no longer parse, as health.weight v1 is.
+// "lenient"), which no longer parse.
 type versionFixture struct {
 	ledgerFixture
 	passesV3FromV1, passesV3FromV2, failsV3, atV3 string
@@ -512,11 +512,11 @@ func newVersionFixture(t *testing.T, lenientV1 bool) versionFixture {
 	f.newLedger, f.newStore = filepath.Join(f.dir, "new", "ledger.db"), filepath.Join(f.dir, "new", "tracking.db")
 	v1, v2, v3 := registryAt(t, readingV1), registryAt(t, readingV1, readingV2), registryAt(t, readingV1, readingV2, readingV3)
 	admitAs(t, f.ledgerPath, "records", v1, []record{
-		{"test.reading", readingPayload("2026-04-01T08:00:00Z", 5, "")},
-		{"test.reading", readingPayload("2026-04-02T08:00:00Z", 500, "")},
+		{"test.registered", readingPayload("2026-04-01T08:00:00Z", 5, "")},
+		{"test.registered", readingPayload("2026-04-02T08:00:00Z", 500, "")},
 	})
-	admitAs(t, f.ledgerPath, "records", v2, []record{{"test.reading", readingPayload("2026-04-03T08:00:00Z", 6, "two")}})
-	admitAs(t, f.ledgerPath, "records", v3, []record{{"test.reading", readingPayload("2026-04-04T08:00:00Z", 7, "three")}})
+	admitAs(t, f.ledgerPath, "records", v2, []record{{"test.registered", readingPayload("2026-04-03T08:00:00Z", 6, "two")}})
+	admitAs(t, f.ledgerPath, "records", v3, []record{{"test.registered", readingPayload("2026-04-04T08:00:00Z", 7, "three")}})
 	f.passesV3FromV1, f.failsV3 = idOf("records", "2026-04-01T08:00:00Z"), idOf("records", "2026-04-02T08:00:00Z")
 	f.passesV3FromV2, f.atV3 = idOf("records", "2026-04-03T08:00:00Z"), idOf("records", "2026-04-04T08:00:00Z")
 	v1Body := readingV1
@@ -565,10 +565,10 @@ func TestMigrate_CarriesUnderTheCurrentVersionWhenItComesOutTheSame(t *testing.T
 	// The report counts: four carried, two moved (one from v1, one from v2), one kept
 	// under v1 because it does not pass v3, one admitted under v3 already.
 	for _, want := range []string{
-		"test.reading records 4 2 2 0", "total 4 2 2 0",
-		"moved 1 test.reading from records, moved from v1 to the current v3",
-		"moved 1 test.reading from records, moved from v2 to the current v3",
-		"kept 1 test.reading from records under its own v1: v3 is current and",
+		"test.registered records 4 2 2 0", "total 4 2 2 0",
+		"moved 1 test.registered from records, moved from v1 to the current v3",
+		"moved 1 test.registered from records, moved from v2 to the current v3",
+		"kept 1 test.registered from records under its own v1: v3 is current and",
 	} {
 		if !strings.Contains(squash(out), squash(want)) {
 			t.Errorf("the dry run lacks %q:\n%s", want, out)
@@ -585,8 +585,8 @@ func TestMigrate_CarriesUnderTheCurrentVersionWhenItComesOutTheSame(t *testing.T
 	for _, want := range []string{
 		"proof: the new ledger's 4 live facets equal the selection's 4, facet for facet by id, content hash, fact time and status",
 		"proof: 2 facets carry a definition version other than the one they were admitted under",
-		"proof: moved 1 test.reading from records, moved from v1 to the current v3",
-		"proof: moved 1 test.reading from records, moved from v2 to the current v3",
+		"proof: moved 1 test.registered from records, moved from v1 to the current v3",
+		"proof: moved 1 test.registered from records, moved from v2 to the current v3",
 		"idempotent",
 	} {
 		if !strings.Contains(out, want) {
@@ -618,9 +618,9 @@ func TestMigrate_AFactNoVersionCarriesRefusesTheRunAndWritesNothing(t *testing.T
 			t.Errorf("migrate %v: %v, want one refusal\n%s", extra, err, out)
 		}
 		for _, want := range []string{
-			"test.reading records 3 2 1 1", "refused 1 test.reading from records at v1",
+			"test.registered records 3 2 1 1", "refused 1 test.registered from records at v1",
 			"do not parse as a contract", "v3 is current and",
-			"moved 1 test.reading from records, moved from v1 to the current v3",
+			"moved 1 test.registered from records, moved from v1 to the current v3",
 		} {
 			if !strings.Contains(squash(out), squash(want)) {
 				t.Errorf("migrate %v lacks %q:\n%s", extra, want, out)
@@ -638,10 +638,10 @@ func TestMigrate_AnUnparseableAdmittedVersionMovesWhenTheCurrentOnePasses(t *tes
 	t.Parallel()
 	f := newLedgerFixture(t)
 	// Both readings are admitted under v1 and pass v2; the store holds v1 as words that
-	// do not parse, as health.weight v1 is.
+	// do not parse.
 	admitAs(t, f.ledgerPath, "records", registryAt(t, readingV1), []record{
-		{"test.reading", readingPayload("2026-04-01T08:00:00Z", 1, "")},
-		{"test.reading", readingPayload("2026-04-02T08:00:00Z", 2, "")},
+		{"test.registered", readingPayload("2026-04-01T08:00:00Z", 1, "")},
+		{"test.registered", readingPayload("2026-04-02T08:00:00Z", 2, "")},
 	})
 	registerOnly(t, f, 1, strings.Replace(readingV1, `"strict"`, `"lenient"`, 1))
 	registerOnly(t, f, 2, readingV2)
@@ -652,7 +652,7 @@ func TestMigrate_AnUnparseableAdmittedVersionMovesWhenTheCurrentOnePasses(t *tes
 	if err != nil {
 		t.Fatalf("--yes: %v\n%s", err, out)
 	}
-	for _, want := range []string{"test.reading records 2 2 0 0", "proof: moved 2 test.reading from records, moved from v1 to the current v2", "carried 2 facets"} {
+	for _, want := range []string{"test.registered records 2 2 0 0", "proof: moved 2 test.registered from records, moved from v1 to the current v2", "carried 2 facets"} {
 		if !strings.Contains(squash(out), squash(want)) {
 			t.Errorf("--yes lacks %q:\n%s", want, out)
 		}

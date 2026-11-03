@@ -15,10 +15,10 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
-var threeWeights = []record{
-	{"health.weight", `{"id": "w1", "date": "2026-01-01 07:00", "source_time": {"value": "2026-01-01 07:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kg": 80.1}`},
-	{"health.weight", `{"id": "w2", "date": "2026-01-02 07:00", "source_time": {"value": "2026-01-02 07:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kg": 80.2}`},
-	{"health.weight", `{"id": "w3", "date": "2026-01-03 07:00", "source_time": {"value": "2026-01-03 07:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kg": 80.3}`},
+var threeReadings = []record{
+	{"test.reading", `{"id": "w1", "at": "2026-01-01 07:00", "source_time": {"value": "2026-01-01 07:00", "zone": "Europe/Berlin", "offset": "+01:00", "basis": "source"}, "value": 80.1, "unit": "kg"}`},
+	{"test.reading", `{"id": "w2", "at": "2026-01-02 07:00", "source_time": {"value": "2026-01-02 07:00", "zone": "Europe/Berlin", "offset": "+01:00", "basis": "source"}, "value": 80.2, "unit": "kg"}`},
+	{"test.reading", `{"id": "w3", "at": "2026-01-03 07:00", "source_time": {"value": "2026-01-03 07:00", "zone": "Europe/Berlin", "offset": "+01:00", "basis": "source"}, "value": 80.3, "unit": "kg"}`},
 }
 
 // heldOf is the facet id of each records id the source holds now.
@@ -40,7 +40,7 @@ func TestRetract_PlansOnlyWhatTheSourceDropped(t *testing.T) {
 		t.Fatalf("ledger.Create: %v", err)
 	}
 	defer func() { _ = l.Close() }()
-	if _, err := admitUnder(ctx, l, catalogtest.Definitions(t), threeWeights); err != nil {
+	if _, err := admitUnder(ctx, l, catalogtest.Engine.Definitions(t), threeReadings); err != nil {
 		t.Fatalf("admit: %v", err)
 	}
 
@@ -73,7 +73,7 @@ func TestRetract_PlansOnlyWhatTheSourceDropped(t *testing.T) {
 	}
 
 	// Retracting it is one tombstone through the gate; the plan is then empty.
-	g := gate.New(l, catalogtest.Definitions(t), gate.StaticScopes{}, clock.Real{}, "matt", gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
+	g := gate.New(l, catalogtest.Engine.Definitions(t), gate.StaticScopes{}, clock.Real{}, "matt", gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	out, _, err := g.Retract(ctx, absent[0].FacetID)
 	if err != nil || out.Outcome != gate.OutcomeTombstoned {
 		t.Fatalf("Retract = %v %v", out.Outcome, err)

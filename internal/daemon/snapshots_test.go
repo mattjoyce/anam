@@ -15,7 +15,7 @@ import (
 
 // snapBatch is a batch labelled as one part of snapshot id.
 func snapBatch(id string, part, parts int, envs ...string) string {
-	return fmt.Sprintf(`{"snapshot": {"id": %q, "part": %d, "parts": %d, "types": ["health.weight"]}, "envelopes": [%s]}`,
+	return fmt.Sprintf(`{"snapshot": {"id": %q, "part": %d, "parts": %d, "types": ["test.reading"]}, "envelopes": [%s]}`,
 		id, part, parts, strings.Join(envs, ","))
 }
 
@@ -28,7 +28,7 @@ func TestSnapshotReportsWhatACompleteResendLeftAbsent(t *testing.T) {
 	cfg := importerConfig(t)
 	d, url, stop := serveImporters(t, cfg)
 	defer func() { _ = stop() }()
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	v := weight.Version
 
 	var a api.Admission
@@ -77,16 +77,16 @@ func TestSnapshotPartsAreChecked(t *testing.T) {
 	cfg := importerConfig(t)
 	d, url, stop := serveImporters(t, cfg)
 	defer func() { _ = stop() }()
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	v := weight.Version
 	w0 := head(t, d)
 
 	for name, body := range map[string]string{
 		"part beyond parts": snapBatch("r", 3, 2, weighIn("w-1", 80, v)),
 		"a bad id":          snapBatch("no spaces", 1, 1, weighIn("w-1", 80, v)),
-		"a type the token lacks": `{"snapshot": {"id": "r", "part": 1, "parts": 1, "types": ["health.sleep"]}, "envelopes": [` +
+		"a type the token lacks": `{"snapshot": {"id": "r", "part": 1, "parts": 1, "types": ["test.labelled"]}, "envelopes": [` +
 			weighIn("w-1", 80, v) + `]}`,
-		"an envelope outside the types": `{"snapshot": {"id": "r", "part": 1, "parts": 1, "types": ["test.reading"]}, "envelopes": [` +
+		"an envelope outside the types": `{"snapshot": {"id": "r", "part": 1, "parts": 1, "types": ["test.registered"]}, "envelopes": [` +
 			weighIn("w-1", 80, v) + `]}`,
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -113,18 +113,18 @@ func TestSnapshotReportAccess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := fmt.Fprintf(f, "  - source: other-import\n    token_sha256: %s\n    types: [health.sleep]\n", hex.EncodeToString(sum[:])); err != nil {
+	if _, err := fmt.Fprintf(f, "  - source: other-import\n    token_sha256: %s\n    types: [test.labelled]\n", hex.EncodeToString(sum[:])); err != nil {
 		t.Fatal(err)
 	}
 	_ = f.Close()
 	d, url, stop := serveImporters(t, cfg)
 	defer func() { _ = stop() }()
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	call(t, "POST", url+"/v1/envelopes", importerToken, snapBatch("mine", 1, 1, weighIn("w-1", 80, weight.Version)), http.StatusOK, nil)
 
 	var rep api.SnapshotReport
 	call(t, "GET", url+"/v1/snapshots/mine", testToken, "", http.StatusOK, &rep)
-	if rep.Source != "test-import" || !slices.Equal(rep.Types, []string{"health.weight"}) {
+	if rep.Source != "test-import" || !slices.Equal(rep.Types, []string{"test.reading"}) {
 		t.Errorf("operator's report: %+v", rep)
 	}
 	call(t, "GET", url+"/v1/snapshots/mine", otherToken, "", http.StatusNotFound, nil)
@@ -140,7 +140,7 @@ func TestSnapshotLeavesAloneWhatLandedWhileItRan(t *testing.T) {
 	cfg := importerConfig(t)
 	d, url, stop := serveImporters(t, cfg)
 	defer func() { _ = stop() }()
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	v := weight.Version
 
 	// Before the run: w-1 and w-2 are live; the run will carry only w-1.

@@ -60,7 +60,7 @@ func headOf(t *testing.T, path string) ledger.Watermark {
 func TestRetract_RetiredSourceGoesWhole(t *testing.T) {
 	t.Parallel()
 	f := newLedgerFixture(t)
-	f.admit(t, bpReadings)
+	f.admit(t, measureRows)
 	before := headOf(t, f.ledgerPath)
 	live := liveOf(t, f.ledgerPath, "records", 0)
 	if live != 3 {
@@ -81,14 +81,14 @@ func TestRetract_RetiredSourceGoesWhole(t *testing.T) {
 	// Still an importer: refused.
 	importers := filepath.Join(f.dir, "importers.yaml")
 	writeDoc(t, importers, "importers:\n  - source: records\n    token_sha256: "+strings.Repeat("ab", 32)+
-		"\n    types: [health.blood-pressure]\n")
+		"\n    types: [test.measure]\n")
 	appendFile(t, f.cfgPath, "importers_file: "+importers+"\n")
 	if _, err := retire("--yes", "--max-fraction", "1"); err == nil || !strings.Contains(err.Error(), "still declared as an importer") {
 		t.Fatalf("declared importer: %v", err)
 	}
 	unchanged("declared importer")
 	writeDoc(t, importers, "importers:\n  - source: garmin\n    token_sha256: "+strings.Repeat("ab", 32)+
-		"\n    types: [health.blood-pressure]\n")
+		"\n    types: [test.measure]\n")
 
 	// Undeclared, but the default fraction does not cover the whole source: refused,
 	// after the report.
@@ -96,8 +96,8 @@ func TestRetract_RetiredSourceGoesWhole(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "--max-fraction 1") {
 		t.Fatalf("default fraction: %v", err)
 	}
-	if !strings.Contains(out, "3 live facets") || !strings.Contains(out, "health.blood-pressure\t3") &&
-		!strings.Contains(out, "health.blood-pressure  3") {
+	if !strings.Contains(out, "3 live facets") || !strings.Contains(out, "test.measure\t3") &&
+		!strings.Contains(out, "test.measure  3") {
 		t.Fatalf("report by type missing:\n%s", out)
 	}
 	unchanged("default fraction")

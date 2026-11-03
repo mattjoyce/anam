@@ -16,40 +16,23 @@ import (
 // facet of the type split must match exactly one row; one that matches none, or
 // more than one, stops the dry run and the real run before anything is written.
 
-// sessionOf is an exercise session with the given payload id, a minimal payload
-// activity.exercise-session took and each of its leaves takes. The binary keeps the
-// type only in its history since card 195 split it, so the tests admit sessions
-// under that (admitHeld). Each says how its clock was read, since the Concept2 and
-// Strong leaves require it from their v2 (card 198).
-func sessionOf(id, start string) record {
-	return record{"activity.exercise-session", `{"id": "` + id + `", "activity_name": "rowing.machine", ` +
-		`"effective_time_frame": {"time_interval": {"start_date_time": "` + start + `", "duration": {"value": 1200, "unit": "sec"}}}, ` +
-		`"source_time": {"value": "` + start + `", "zone": "+11:00", "basis": "source"}}`}
+// entries are three course rows under test.entry, which the engine catalog keeps only
+// in its history, so the tests admit them under that (admitHeld). The stop carries no
+// dose, which test.course.started and .changed require and test.course.stopped refuses.
+var entries = []record{
+	{"test.entry", `{"id": "start:a/1", "date": "2026-03-01", "name": "a", "course": 1, "dose": "1 u"}`},
+	{"test.entry", `{"id": "change:a/1", "date": "2026-03-05", "name": "a", "course": 1, "dose": "2 u"}`},
+	{"test.entry", `{"id": "stop:a/1", "date": "2026-03-09", "name": "a", "course": 1, "note": "done"}`},
 }
 
-// sessions are four sessions, one per source's payload id prefix, as the live
-// exercise sessions carry them.
-var sessions = []record{
-	sessionOf("garmin:session:1", "2026-03-01T07:00:00+11:00"),
-	sessionOf("concept2:session:2", "2026-03-02T07:00:00+11:00"),
-	sessionOf("technogym:3", "2026-03-03T07:00:00+11:00"),
-	sessionOf("strong:session:4", "2026-03-04T07:00:00+11:00"),
-}
+var entryLeaves = []facet.Type{"test.course.started", "test.course.changed", "test.course.stopped"}
 
-var leaves = []facet.Type{
-	"activity.exercise-session.garmin",
-	"activity.exercise-session.concept2",
-	"activity.exercise-session.technogym",
-	"activity.exercise-session.strong",
-}
-
-// splitTable splits activity.exercise-session into the four leaves by payload id
-// prefix, the technogym row also by source.
-const splitTable = `{"renames": [
-  {"from": "activity.exercise-session", "to": "activity.exercise-session.garmin", "select": {"pointer": "/id", "prefix": "garmin:session:"}},
-  {"from": "activity.exercise-session", "to": "activity.exercise-session.concept2", "select": {"pointer": "/id", "prefix": "concept2:session:"}},
-  {"from": "activity.exercise-session", "to": "activity.exercise-session.technogym", "select": {"source": "records", "pointer": "/id", "prefix": "technogym:"}},
-  {"from": "activity.exercise-session", "to": "activity.exercise-session.strong", "select": {"pointer": "/id", "prefix": "strong:session:"}}
+// entrySplit splits test.entry into the three course types by payload id prefix, the
+// stop's row also by source.
+const entrySplit = `{"renames": [
+  {"from": "test.entry", "to": "test.course.started", "select": {"pointer": "/id", "prefix": "start:"}},
+  {"from": "test.entry", "to": "test.course.changed", "select": {"pointer": "/id", "prefix": "change:"}},
+  {"from": "test.entry", "to": "test.course.stopped", "select": {"source": "records", "pointer": "/id", "prefix": "stop:"}}
 ]}`
 
 // reportRowTo is the report's row for a rename arriving at to, split into fields.
@@ -68,88 +51,88 @@ func TestRename_SplitsATypeByASelector(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := newLedgerFixture(t)
-	before := f.admitHeld(t, heldDefs(t, "activity.exercise-session"), sessions)
-	table := renameTableFile(t, f.dir, "split.json", splitTable)
+	before := f.admitHeld(t, heldDefs(t, "test.entry"), entries)
+	table := renameTableFile(t, f.dir, "split.json", entrySplit)
 	asOf, _, err := cli(t, f.cfgPath, "timeline", "--json", "--w", strconv.FormatInt(int64(before), 10))
 	if err != nil {
 		t.Fatalf("timeline before: %v", err)
 	}
-	if n := strings.Count(asOf, `"activity.exercise-session"`); n != 4 {
-		t.Fatalf("timeline at W %d names activity.exercise-session %d times, want 4:\n%s", before, n, asOf)
+	if n := strings.Count(asOf, `"test.entry"`); n != 3 {
+		t.Fatalf("timeline at W %d names test.entry %d times, want 3:\n%s", before, n, asOf)
 	}
 
 	out, _, err := cli(t, f.cfgPath, "rename", "--table", table)
 	if err != nil {
 		t.Fatalf("dry run: %v\n%s", err, out)
 	}
-	for _, leaf := range leaves {
+	for _, leaf := range entryLeaves {
 		if row := reportRowTo(t, out, leaf); row[2] != "1" || row[3] != "0" {
 			t.Errorf("dry run row %v, want 1 to carry and 0 refused", row)
 		}
+	}
+	if strings.Contains(out, " places facets by ") {
+		t.Errorf("the course types place facets as test.entry did, but the report says otherwise:\n%s", out)
 	}
 	if w := headOf(t, f.ledgerPath); w != before {
 		t.Fatalf("the dry run wrote: W %d → %d", before, w)
 	}
 
-	if out, _, err = cli(t, f.cfgPath, "rename", "--table", table, "--yes"); err != nil {
+	if out, _, err = cli(t, f.cfgPath, "rename", "--table", table, "--yes"); err != nil || !strings.Contains(out, "carried 3 facets") {
 		t.Fatalf("--yes: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "carried 4 facets") {
-		t.Errorf("--yes said:\n%s", out)
-	}
-
 	l, err := ledger.Open(ctx, f.ledgerPath, "matt")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i, s := range sessions {
+	for i, e := range entries {
 		var p struct{ ID string }
-		if err := json.Unmarshal([]byte(s.payload), &p); err != nil {
+		if err := json.Unmarshal([]byte(e.payload), &p); err != nil {
 			t.Fatal(err)
 		}
 		cur, err := l.CurrentVersion(ctx, facet.NewID(facet.SourceRef("records", p.ID)))
 		if err != nil {
 			t.Fatal(err)
 		}
-		want, err := facet.Canonicalize([]byte(s.payload))
+		want, err := facet.Canonicalize([]byte(e.payload))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if cur.Type != leaves[i] || cur.ArtifactVersion != 2 || string(cur.Payload.Bytes()) != string(want.Bytes()) {
-			t.Errorf("%s is %s v%d, want %s v2 with the payload unchanged", p.ID, cur.Type, cur.ArtifactVersion, leaves[i])
+		if cur.Type != entryLeaves[i] || cur.ArtifactVersion != 2 || string(cur.Payload.Bytes()) != string(want.Bytes()) {
+			t.Errorf("%s is %s v%d, want %s v2 with the payload unchanged", p.ID, cur.Type, cur.ArtifactVersion, entryLeaves[i])
+		}
+		if old, err := l.Version(ctx, cur.ID, 1); err != nil || old.Type != "test.entry" {
+			t.Errorf("%s v1 = %s, %v; want test.entry, kept as admitted", p.ID, old.Type, err)
 		}
 	}
 	if err := l.Close(); err != nil {
 		t.Fatal(err)
 	}
 
-	// A read as-of before the run is unchanged.
 	if again, _, err := cli(t, f.cfgPath, "timeline", "--json", "--w", strconv.FormatInt(int64(before), 10)); err != nil || again != asOf {
 		t.Errorf("timeline at W %d changed across the run (%v):\nbefore %s\nafter  %s", before, err, asOf, again)
 	}
-
 	now, _, err := cli(t, f.cfgPath, "timeline", "--json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, leaf := range leaves {
+	for _, leaf := range entryLeaves {
 		if !strings.Contains(now, `"`+string(leaf)+`"`) {
 			t.Errorf("the timeline now does not show %s:\n%s", leaf, now)
 		}
 	}
 
-	// A second dry run finds nothing left to carry.
-	out, _, err = cli(t, f.cfgPath, "rename", "--table", table)
+	// A rerun finds nothing left to carry.
+	out, _, err = cli(t, f.cfgPath, "rename", "--table", table, "--yes")
 	if err != nil {
-		t.Fatalf("second dry run: %v\n%s", err, out)
+		t.Fatalf("rerun: %v\n%s", err, out)
 	}
-	for _, leaf := range leaves {
+	for _, leaf := range entryLeaves {
 		if row := reportRowTo(t, out, leaf); row[2] != "0" || row[3] != "0" {
-			t.Errorf("second dry run row %v, want nothing to carry", row)
+			t.Errorf("rerun row %v, want nothing to carry", row)
 		}
 	}
-	if w := headOf(t, f.ledgerPath); w != before+4 {
-		t.Errorf("W %d, want %d: one event per facet carried, none by the second dry run", w, before+4)
+	if w := headOf(t, f.ledgerPath); w != before+3 {
+		t.Errorf("W %d, want %d: one event per facet carried, none by the rerun", w, before+3)
 	}
 }
 
@@ -158,24 +141,18 @@ func TestRename_SplitsATypeByASelector(t *testing.T) {
 func TestRename_ASplitRefusesAFacetNoOneRowPlaces(t *testing.T) {
 	t.Parallel()
 	f := newLedgerFixture(t)
-	before := f.admitHeld(t, heldDefs(t, "activity.exercise-session"), append(append([]record{}, sessions...), sessionOf("polar:session:5", "2026-03-05T07:00:00+11:00")))
-
-	cases := []struct {
-		name, table, says string
-	}{
-		{"unmatched", splitTable, "unmatched " + facet.SourceRef("records", "polar:session:5")},
-		{"doubly matched", strings.Replace(splitTable, `"prefix": "strong:session:"`, `"prefix": "garmin:"`, 1),
-			"doubly matched " + facet.SourceRef("records", "garmin:session:1")},
-	}
-	for _, c := range cases {
+	odd := record{"test.entry", `{"id": "other:a/1", "date": "2026-03-10", "name": "a", "course": 1}`}
+	before := f.admitHeld(t, heldDefs(t, "test.entry"), append(append([]record{}, entries...), odd))
+	for _, c := range []struct{ name, table, says string }{
+		{"unmatched", entrySplit, "unmatched " + facet.SourceRef("records", "other:a/1")},
+		{"doubly matched", strings.Replace(entrySplit, `"prefix": "change:"`, `"prefix": "st"`, 1),
+			"doubly matched " + facet.SourceRef("records", "start:a/1")},
+	} {
 		table := renameTableFile(t, f.dir, strings.ReplaceAll(c.name, " ", "-")+".json", c.table)
 		for _, args := range [][]string{{"rename", "--table", table}, {"rename", "--table", table, "--yes"}} {
 			out, _, err := cli(t, f.cfgPath, args...)
-			if err == nil || !strings.Contains(err.Error(), "match no rename or more than one") {
-				t.Errorf("%s %v: %v, want a refusal", c.name, args[2:], err)
-			}
-			if !strings.Contains(out, c.says) {
-				t.Errorf("%s %v: the report does not say %q:\n%s", c.name, args[2:], c.says, out)
+			if err == nil || !strings.Contains(err.Error(), "match no rename or more than one") || !strings.Contains(out, c.says) {
+				t.Errorf("%s %v: %v, want a refusal saying %q:\n%s", c.name, args[2:], err, c.says, out)
 			}
 		}
 	}
@@ -191,7 +168,7 @@ func TestRenameTable_SelectRules(t *testing.T) {
 		name, body string
 		ok         bool
 	}{
-		{"a split", splitTable, true},
+		{"a split", entrySplit, true},
 		{"source alone", `{"renames": [{"from": "a.b", "to": "a.b.c", "select": {"source": "records"}}]}`, true},
 		{"empty select", `{"renames": [{"from": "a.b", "to": "a.b.c", "select": {}}]}`, false},
 		{"pointer without prefix", `{"renames": [{"from": "a.b", "to": "a.b.c", "select": {"pointer": "/id"}}]}`, false},
@@ -214,12 +191,12 @@ func TestRenameTable_SelectRules(t *testing.T) {
 func TestRenameTable_PlacesAFacetByWhatItSays(t *testing.T) {
 	t.Parallel()
 	var tbl renameTable
-	if err := json.Unmarshal([]byte(splitTable), &tbl); err != nil {
+	if err := json.Unmarshal([]byte(entrySplit), &tbl); err != nil {
 		t.Fatal(err)
 	}
-	session := func(source, payload string) facet.Facet {
+	entry := func(source, payload string) facet.Facet {
 		var f facet.Facet
-		f.Type, f.Provenance.Source = "activity.exercise-session", source
+		f.Type, f.Provenance.Source = "test.entry", source
 		p, err := facet.Canonicalize([]byte(payload))
 		if err != nil {
 			t.Fatal(err)
@@ -232,15 +209,15 @@ func TestRenameTable_PlacesAFacetByWhatItSays(t *testing.T) {
 		f    facet.Facet
 		want []int
 	}{
-		{"garmin", session("garmin", `{"id": "garmin:session:9"}`), []int{0}},
-		{"technogym from records", session("records", `{"id": "technogym:9"}`), []int{2}},
-		{"technogym from elsewhere", session("other", `{"id": "technogym:9"}`), nil},
-		{"no id", session("records", `{"name": "x"}`), nil},
-		{"an id that is not a string", session("records", `{"id": 7}`), nil},
-		{"a prefix only part-way", session("records", `{"id": "strong:x"}`), nil},
+		{"a start from anywhere", entry("other", `{"id": "start:a/9"}`), []int{0}},
+		{"a stop from records", entry("records", `{"id": "stop:a/9"}`), []int{2}},
+		{"a stop from elsewhere", entry("other", `{"id": "stop:a/9"}`), nil},
+		{"no id", entry("records", `{"name": "x"}`), nil},
+		{"an id that is not a string", entry("records", `{"id": 7}`), nil},
+		{"a prefix only part-way", entry("records", `{"id": "change"}`), nil},
 		{"another type", func() facet.Facet {
-			f := session("garmin", `{"id": "garmin:session:9"}`)
-			f.Type = "activity.steps"
+			f := entry("other", `{"id": "start:a/9"}`)
+			f.Type = "test.course.started"
 			return f
 		}(), nil},
 	}

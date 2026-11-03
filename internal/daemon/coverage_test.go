@@ -15,12 +15,12 @@ import (
 const scaleToken = "scale-importer-token-0123456789abcdef01234"
 
 // serveCoverage serves importerConfig with a second importer, scale-test, which
-// submits health.weight beside test-import, and rolesConfig's reader.
+// submits test.reading beside test-import, and rolesConfig's reader.
 func serveCoverage(t *testing.T) (*Daemon, string) {
 	t.Helper()
 	cfg := importerConfig(t)
 	scale, reader := sha256.Sum256([]byte(scaleToken)), sha256.Sum256([]byte(readerToken))
-	extra := fmt.Sprintf("  - source: scale-test\n    token_sha256: %s\n    types: [health.weight]\n"+
+	extra := fmt.Sprintf("  - source: scale-test\n    token_sha256: %s\n    types: [test.reading]\n"+
 		"principals:\n  - name: assistant\n    role: reader\n    token_sha256: %s\n",
 		hex.EncodeToString(scale[:]), hex.EncodeToString(reader[:]))
 	f, err := os.OpenFile(cfg.ImportersFile, os.O_APPEND|os.O_WRONLY, 0)
@@ -38,12 +38,12 @@ func serveCoverage(t *testing.T) (*Daemon, string) {
 // weighAt is a weight at date, a Sydney wall clock in daylight time (+11:00) as the
 // callers' dates all are.
 func weighAt(version int, id, date string) string {
-	return fmt.Sprintf(`{"type": "health.weight", "definition_version": %d, "payload": {"id": %q, "date": %q, "source_time": {"value": %q, "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kg": 80}}`,
+	return fmt.Sprintf(`{"type": "test.reading", "definition_version": %d, "payload": {"id": %q, "at": %q, "source_time": {"value": %q, "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "value": 80, "unit": "kg"}}`,
 		version, id, date, date)
 }
 
 func readingAt(id, at string) string {
-	return fmt.Sprintf(`{"type": "test.reading", "definition_version": 1, "payload": {"id": %q, "at": %q, "value": 1}}`, id, at)
+	return fmt.Sprintf(`{"type": "test.registered", "definition_version": 1, "payload": {"id": %q, "at": %q, "value": 1}}`, id, at)
 }
 
 // Card 90: coverage counts each type's live facets, their fact-time range and the
@@ -51,8 +51,8 @@ func readingAt(id, at string) string {
 func TestCoverage(t *testing.T) {
 	t.Parallel()
 	d, url := serveCoverage(t)
-	call(t, "POST", url+"/v1/definitions", importerToken, readingManifest, http.StatusCreated, nil)
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	call(t, "POST", url+"/v1/definitions", importerToken, registeredManifest, http.StatusCreated, nil)
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	v := weight.Version
 
 	submit := func(token, body string) int64 {
@@ -76,13 +76,13 @@ func TestCoverage(t *testing.T) {
 	}
 	// Weight is logged in Sydney time; fact-times are held in UTC.
 	want := []api.TypeCoverage{
-		{Type: "health.weight", Count: 3, Projections: []string{"body"},
+		{Type: "test.reading", Count: 3, Projections: []string{"everything", "normal"},
 			Earliest: "2025-12-31T12:00:00.000000000Z", Latest: "2026-04-01T20:00:00.000000000Z",
 			Sources: []api.SourceCoverage{
 				{Source: "scale-test", Count: 2, Earliest: "2025-12-31T12:00:00.000000000Z", Latest: "2026-04-01T20:00:00.000000000Z"},
 				{Source: "test-import", Count: 1, Earliest: "2026-02-28T20:00:00.000000000Z", Latest: "2026-02-28T20:00:00.000000000Z"},
 			}},
-		{Type: "test.reading", Count: 1, Projections: []string{},
+		{Type: "test.registered", Count: 1, Projections: []string{},
 			Earliest: "2026-05-01T09:00:00.000000000Z", Latest: "2026-05-01T09:00:00.000000000Z",
 			Sources: []api.SourceCoverage{
 				{Source: "test-import", Count: 1, Earliest: "2026-05-01T09:00:00.000000000Z", Latest: "2026-05-01T09:00:00.000000000Z"},
@@ -104,22 +104,23 @@ func TestCoverage(t *testing.T) {
 	}
 
 	// Card 231: each type names the projections that serve it, the newest version of each
-	// name held. The bundled body serves weight; the reading is the gap, an empty list that
-	// reads [] and not null. A projection the operator registers joins the list, sorted.
+	// name held. The bundled everything and normal serve test.reading; the registered type
+	// is the gap, an empty list that reads [] and not null. A projection the operator
+	// registers joins the list, sorted.
 	call(t, "POST", url+"/v1/projections", testToken, weightsV1, http.StatusCreated, nil)
 	registered := coverage("")
-	if got := registered.Types[0].Projections; !reflect.DeepEqual(got, []string{"body", "weights"}) {
-		t.Fatalf("weight is served by %v, want body and weights", got)
+	if got := registered.Types[0].Projections; !reflect.DeepEqual(got, []string{"everything", "normal", "weights"}) {
+		t.Fatalf("test.reading is served by %v, want everything, normal and weights", got)
 	}
 	if got := registered.Types[1].Projections; got == nil || len(got) != 0 {
 		t.Fatalf("a type no projection serves: %#v, want an empty list", got)
 	}
 
-	// A projection counts what it serves: meds serves neither type.
-	meds := coverage("?projection=meds")
-	if meds.Projection == nil || meds.Projection.Name != "meds" || meds.Live != 0 || len(meds.Types) != 0 ||
-		meds.Canonical != now.Canonical {
-		t.Fatalf("coverage through meds: %+v", meds)
+	// A projection counts what it serves: course serves neither type.
+	course := coverage("?projection=course")
+	if course.Projection == nil || course.Projection.Name != "course" || course.Live != 0 || len(course.Types) != 0 ||
+		course.Canonical != now.Canonical {
+		t.Fatalf("coverage through course: %+v", course)
 	}
 
 	// Before the first anam-event Anam knew nothing.

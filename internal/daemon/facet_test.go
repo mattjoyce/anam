@@ -26,14 +26,14 @@ func TestGetReceiptFacet_EntryWithItsLinks(t *testing.T) {
 	cfg.TokenFile = writeToken(t, dir, testToken)
 	sum := sha256.Sum256([]byte(importerToken))
 	cfg.ImportersFile = filepath.Join(dir, "importers.yaml")
-	body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [health.weight, record.edge]\n", hex.EncodeToString(sum[:]))
+	body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [test.reading, record.edge]\n", hex.EncodeToString(sum[:]))
 	if err := os.WriteFile(cfg.ImportersFile, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	d, url, _ := serveImporters(t, cfg)
 	call(t, "POST", url+"/v1/projections", testToken, weightsV1, http.StatusCreated, nil)
 
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	note, _ := d.defs.current.Load().Lookup("record.edge")
 	var a api.Admission
 	call(t, "POST", url+"/v1/envelopes", importerToken, batch(weighIn("w-1", 80.5, weight.Version), weighIn("w-2", 80.1, weight.Version)), http.StatusOK, &a)
@@ -51,7 +51,7 @@ func TestGetReceiptFacet_EntryWithItsLinks(t *testing.T) {
 
 	var shown api.FacetShown
 	call(t, "GET", url+"/v1/receipts/"+pub.ReceiptHash+"/facets/"+w1, testToken, "", http.StatusOK, &shown)
-	if shown.Hash != pub.ReceiptHash || shown.Entry.FacetID != w1 || shown.Entry.Type != "health.weight" || shown.Entry.ContentHash == "" {
+	if shown.Hash != pub.ReceiptHash || shown.Entry.FacetID != w1 || shown.Entry.Type != "test.reading" || shown.Entry.ContentHash == "" {
 		t.Fatalf("shown = %+v", shown)
 	}
 	if shown.Links.W != head(t, d) || len(shown.Links.Edges) != 1 {
@@ -84,12 +84,12 @@ func TestInspector_SaysWhenTheIndexIsWrong(t *testing.T) {
 	cfg.TokenFile = writeToken(t, dir, testToken)
 	sum := sha256.Sum256([]byte(importerToken))
 	cfg.ImportersFile = filepath.Join(dir, "importers.yaml")
-	body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [health.weight]\n", hex.EncodeToString(sum[:]))
+	body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [test.reading]\n", hex.EncodeToString(sum[:]))
 	if err := os.WriteFile(cfg.ImportersFile, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	d, url, _ := serveImporters(t, cfg)
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	var a api.Admission
 	call(t, "POST", url+"/v1/envelopes", importerToken, batch(weighIn("w-1", 80.5, weight.Version)), http.StatusOK, &a)
 	w1 := a.Results[0].FacetID

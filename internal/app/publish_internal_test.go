@@ -21,15 +21,15 @@ func receiptOf(t *testing.T, stderr string) string {
 // and the receipt verifies, locally and over the daemon alike.
 func TestPublish_SameOverTheDaemonAndVerifies(t *testing.T) {
 	t.Parallel()
-	f := newRemoteFixtureIn(t, "Australia/Sydney")
+	f := newRemoteFixtureIn(t, "Europe/Berlin")
 	for _, narrowing := range [][]string{
 		{"--from", "2026-02-10"},
 		{"--at", "2026-02-10"},
-		{"--type", "health.blood-pressure", "--to", "2026-02-10"},
-		{"--type", "health.blood-pressure."},
+		{"--type", "test.measure", "--to", "2026-02-10"},
+		{"--type", "test.measure."},
 		{},
 	} {
-		read := append([]string{"timeline", "--projection", "bp"}, narrowing...)
+		read := append([]string{"timeline", "--projection", "measures"}, narrowing...)
 		shown := f.sameOutput(t, read...)
 		published := f.sameOutput(t, append(read, "--publish")...)
 		if published != shown {
@@ -68,11 +68,11 @@ func TestPublish_RefusalsAreTheSameOverTheDaemon(t *testing.T) {
 	f := newRemoteFixture(t)
 	for _, args := range [][]string{
 		{"timeline", "--publish"},
-		{"timeline", "--publish", "--projection", "bp", "--explain"},
+		{"timeline", "--publish", "--projection", "measures", "--explain"},
 		{"timeline", "--w", "1", "--as-of", "2026-01-01"},
 		{"timeline", "--w", "999"},
 		{"timeline", "--type", "health."},
-		{"timeline", "--projection", "bp", "--publish", "--type", "health.blood-pressure.."},
+		{"timeline", "--projection", "measures", "--publish", "--type", "test.measure.."},
 	} {
 		_, _, localErr := cli(t, f.cfgPath, args...)
 		_, _, remoteErr := cli(t, f.remoteCfg, args...)

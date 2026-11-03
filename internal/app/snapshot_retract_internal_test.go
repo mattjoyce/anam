@@ -33,17 +33,17 @@ func TestRetract_PlansAnImportersSourceFromItsSnapshot(t *testing.T) {
 		PersonID:    "matt",
 		BucketWidth: span.Default, Timeout: testTimeout, Limits: config.DefaultLimits(),
 	}
-	catalogtest.Config(t, &cfg)
+	catalogtest.Engine.Config(t, &cfg)
 	l, err := ledger.Create(ctx, cfg.LedgerPath, cfg.PersonID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = l.Close() }()
-	g := gate.New(l, catalogtest.Definitions(t), gate.StaticScopes{"scale-import": {"health.weight"}}, clock.Real{}, cfg.PersonID, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
+	g := gate.New(l, catalogtest.Engine.Definitions(t), gate.StaticScopes{"scale-import": {"test.reading"}}, clock.Real{}, cfg.PersonID, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	admit := func(id string) string {
 		t.Helper()
-		env := facet.Envelope{Type: "health.weight", Source: "scale-import", Injector: "scale-import",
-			Payload: []byte(fmt.Sprintf(`{"id": %q, "date": "2026-10-09 07:30", "source_time": {"value": "2026-10-09 07:30", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kg": 80.5}`, id))}
+		env := facet.Envelope{Type: "test.reading", Source: "scale-import", Injector: "scale-import",
+			Payload: []byte(fmt.Sprintf(`{"id": %q, "at": "2026-10-09 07:30", "source_time": {"value": "2026-10-09 07:30", "zone": "Europe/Berlin", "offset": "+02:00", "basis": "source"}, "value": 80.5, "unit": "kg"}`, id))}
 		b, err := g.Resolve(env)
 		if err != nil {
 			t.Fatal(err)
@@ -65,20 +65,20 @@ func TestRetract_PlansAnImportersSourceFromItsSnapshot(t *testing.T) {
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 
-	if _, _, _, err := planFromSnapshot(ctx, cmd, cfg, catalogtest.Catalog(t), "scale-import"); err == nil ||
+	if _, _, _, err := planFromSnapshot(ctx, cmd, cfg, catalogtest.Engine.Catalog(t), "scale-import"); err == nil ||
 		!strings.Contains(err.Error(), "no complete snapshot") {
 		t.Fatalf("with no snapshot: %v", err)
 	}
 
 	w, _ := l.Head(ctx)
 	if _, err := db.RecordSnapshotPart(ctx, ops.SnapshotPart{ID: "run", Source: "scale-import",
-		Types: []string{"health.weight"}, Part: 1, Parts: 1, FacetIDs: []string{a, c}}, time.Now(), int64(w), ops.SnapshotRetention{Incomplete: config.DefaultSnapshotTTL, Complete: config.DefaultSnapshotKeep}); err != nil {
+		Types: []string{"test.reading"}, Part: 1, Parts: 1, FacetIDs: []string{a, c}}, time.Now(), int64(w), ops.SnapshotRetention{Incomplete: config.DefaultSnapshotTTL, Complete: config.DefaultSnapshotKeep}); err != nil {
 		t.Fatal(err)
 	}
 	_ = db.Close()
 	d := admit("w-4") // sent after the run completed, by an incremental run
 
-	absent, total, held, err := planFromSnapshot(ctx, cmd, cfg, catalogtest.Catalog(t), "scale-import")
+	absent, total, held, err := planFromSnapshot(ctx, cmd, cfg, catalogtest.Engine.Catalog(t), "scale-import")
 	if err != nil {
 		t.Fatalf("planFromSnapshot: %v", err)
 	}

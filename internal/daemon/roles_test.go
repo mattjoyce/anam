@@ -90,7 +90,7 @@ func TestAReaderWritesNothingButReceipts(t *testing.T) {
 	}
 	call(t, "GET", url+"/v1/status", readerToken, "", http.StatusOK, nil)
 	call(t, "GET", url+"/v1/definitions", readerToken, "", http.StatusOK, nil)
-	call(t, "POST", url+"/v1/receipts?zone=UTC&projection=meds", readerToken, "", http.StatusCreated, nil)
+	call(t, "POST", url+"/v1/receipts?zone=UTC&projection=course", readerToken, "", http.StatusCreated, nil)
 }
 
 // Card 89: a principal in the importers file may not hold the operator's token.

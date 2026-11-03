@@ -24,10 +24,10 @@ import (
 
 const importerToken = "importer-token-0123456789abcdef0123456789"
 
-// readingManifest is a Definition no binary bundles, as an importer's repo carries it.
-const readingManifest = `{
+// registeredManifest is a Definition no catalog holds, as an importer's repo carries it.
+const registeredManifest = `{
   "meta": {
-    "facet_type": "test.reading",
+    "facet_type": "test.registered",
     "definition_version": 1,
     "classification": "Normal",
     "validation_mode": "strict",
@@ -49,7 +49,7 @@ const readingManifest = `{
 }`
 
 // importerConfig is a config with the operator's token and one importer, test-import,
-// which may submit health.weight and test.reading.
+// which may submit test.reading and test.registered.
 func importerConfig(t *testing.T) config.Config {
 	t.Helper()
 	cfg := newConfig(t)
@@ -57,7 +57,7 @@ func importerConfig(t *testing.T) config.Config {
 	cfg.TokenFile = writeToken(t, dir, testToken)
 	sum := sha256.Sum256([]byte(importerToken))
 	cfg.ImportersFile = filepath.Join(dir, "importers.yaml")
-	body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [health.weight, test.reading]\n",
+	body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [test.reading, test.registered]\n",
 		hex.EncodeToString(sum[:]))
 	if err := os.WriteFile(cfg.ImportersFile, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
@@ -102,9 +102,10 @@ func call(t *testing.T, method, url, token, body string, want int, into any) {
 	}
 }
 
+// weighIn is a weigh-in, a test.reading in kg, at a Sydney wall clock with its offset.
 func weighIn(id string, kg float64, version int) string {
-	return fmt.Sprintf(`{"type": "health.weight", "definition_version": %d,
-		"payload": {"id": %q, "date": "2026-10-09 07:30", "source_time": {"value": "2026-10-09 07:30", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kg": %v}}`, version, id, kg)
+	return fmt.Sprintf(`{"type": "test.reading", "definition_version": %d,
+		"payload": {"id": %q, "at": "2026-10-09 07:30", "source_time": {"value": "2026-10-09 07:30", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "value": %v, "unit": "kg"}}`, version, id, kg)
 }
 
 func batch(envs ...string) string { return `{"envelopes": [` + strings.Join(envs, ",") + `]}` }
@@ -124,7 +125,7 @@ func TestOpenRefusesAnImporterWithTheOperatorsToken(t *testing.T) {
 	t.Parallel()
 	cfg := importerConfig(t)
 	sum := sha256.Sum256([]byte(testToken))
-	body := fmt.Sprintf("importers:\n  - source: x\n    token_sha256: %s\n    types: [health.weight]\n", hex.EncodeToString(sum[:]))
+	body := fmt.Sprintf("importers:\n  - source: x\n    token_sha256: %s\n    types: [test.reading]\n", hex.EncodeToString(sum[:]))
 	if err := os.WriteFile(cfg.ImportersFile, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +144,7 @@ func TestImportersShareABundledType(t *testing.T) {
 	first, second := sha256.Sum256([]byte(importerToken)), sha256.Sum256([]byte(secondToken))
 	write := func(types string) {
 		t.Helper()
-		body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [health.weight, test.reading]\n"+
+		body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [test.reading, test.registered]\n"+
 			"  - source: second-import\n    token_sha256: %s\n    types: [%s]\n",
 			hex.EncodeToString(first[:]), hex.EncodeToString(second[:]), types)
 		if err := os.WriteFile(cfg.ImportersFile, []byte(body), 0o600); err != nil {
@@ -151,14 +152,14 @@ func TestImportersShareABundledType(t *testing.T) {
 		}
 	}
 
-	write("health.weight, test.reading")
+	write("test.reading, test.registered")
 	if _, err := Open(context.Background(), cfg, Options{}); !errors.Is(err, config.ErrInvalidImporters) {
 		t.Fatalf("Open with an unbundled type named twice: got %v, want ErrInvalidImporters", err)
 	}
 
-	write("health.weight")
+	write("test.reading")
 	d, url, _ := serveImporters(t, cfg)
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	var a api.Admission
 	for _, token := range []string{importerToken, secondToken} {
 		call(t, "POST", url+"/v1/envelopes", token, batch(weighIn("w-1", 80.5, weight.Version)), http.StatusOK, &a)
@@ -179,7 +180,7 @@ func TestAnyTypeImporterSubmitsEverythingAndDefinesNothing(t *testing.T) {
 	cfg := importerConfig(t)
 	const spokenToken = "spoken-importer-token-0123456789abcdef0123"
 	first, spoken := sha256.Sum256([]byte(importerToken)), sha256.Sum256([]byte(spokenToken))
-	body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [health.weight, test.reading]\n"+
+	body := fmt.Sprintf("importers:\n  - source: test-import\n    token_sha256: %s\n    types: [test.reading, test.registered]\n"+
 		"  - source: conversation\n    token_sha256: %s\n    any_type: true\n",
 		hex.EncodeToString(first[:]), hex.EncodeToString(spoken[:]))
 	if err := os.WriteFile(cfg.ImportersFile, []byte(body), 0o600); err != nil {
@@ -187,17 +188,17 @@ func TestAnyTypeImporterSubmitsEverythingAndDefinesNothing(t *testing.T) {
 	}
 	d, url, _ := serveImporters(t, cfg)
 
-	// test-import owns test.reading and registers it; the conversation may not. Nor
+	// test-import owns test.registered and registers it; the conversation may not. Nor
 	// may it store a document: any_type reaches facets, not the library.
-	call(t, "POST", url+"/v1/definitions", spokenToken, readingManifest, http.StatusForbidden, nil)
-	call(t, "POST", url+"/v1/definitions", importerToken, readingManifest, http.StatusCreated, nil)
+	call(t, "POST", url+"/v1/definitions", spokenToken, registeredManifest, http.StatusForbidden, nil)
+	call(t, "POST", url+"/v1/definitions", importerToken, registeredManifest, http.StatusCreated, nil)
 	call(t, "POST", url+"/v1/documents?ext=pdf", spokenToken, "%PDF-1.4 spoken", http.StatusForbidden, nil)
 
 	// The conversation submits a bundled type and a registered one, each a facet of
 	// its own beside the owner's.
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
-	reading, _ := d.defs.current.Load().Lookup("test.reading")
-	readingEnv := fmt.Sprintf(`{"type": "test.reading", "definition_version": %d,
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
+	reading, _ := d.defs.current.Load().Lookup("test.registered")
+	readingEnv := fmt.Sprintf(`{"type": "test.registered", "definition_version": %d,
 		"payload": {"id": "r-1", "at": "2026-10-09T07:30:00Z", "value": 7}}`, reading.Version)
 	var a api.Admission
 	for _, token := range []string{spokenToken, importerToken} {
@@ -244,7 +245,7 @@ func TestImporterRoutesAuthorize(t *testing.T) {
 func TestPostEnvelopes(t *testing.T) {
 	t.Parallel()
 	d, url, _ := serveImporters(t, importerConfig(t))
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	v := weight.Version
 
 	var a api.Admission
@@ -261,13 +262,13 @@ func TestPostEnvelopes(t *testing.T) {
 	call(t, "POST", url+"/v1/envelopes", importerToken, batch(
 		weighIn("w-3", 81, v),
 		weighIn("w-4", 81, v+1),
-		`{"type": "health.weight", "definition_version": `+fmt.Sprint(v)+`, "payload": {"id": "w-5", "date": "2026-10-09 07:30"}}`,
-		`{"type": "health.sleep", "definition_version": 1, "payload": {}}`,
+		`{"type": "test.reading", "definition_version": `+fmt.Sprint(v)+`, "payload": {"id": "w-5", "at": "2026-10-09 07:30"}}`,
+		`{"type": "test.labelled", "definition_version": 1, "payload": {}}`,
 	), http.StatusUnprocessableEntity, &r)
 	if len(r.Refused) != 3 || r.Refused[0].Index != 1 || r.Refused[1].Index != 2 || r.Refused[2].Index != 3 {
 		t.Fatalf("refusal: %+v", r)
 	}
-	for i, want := range []string{"definition version", "kg", "not authorized"} {
+	for i, want := range []string{"definition version", "value", "not authorized"} {
 		if !strings.Contains(r.Refused[i].Reason, want) {
 			t.Errorf("refused[%d] = %q, want it to mention %q", i, r.Refused[i].Reason, want)
 		}
@@ -277,8 +278,8 @@ func TestPostEnvelopes(t *testing.T) {
 	}
 
 	for name, body := range map[string]string{
-		"a source named":        `{"envelopes": [{"type": "health.weight", "definition_version": 1, "source": "x", "payload": {}}]}`,
-		"no definition version": `{"envelopes": [{"type": "health.weight", "payload": {}}]}`,
+		"a source named":        `{"envelopes": [{"type": "test.reading", "definition_version": 1, "source": "x", "payload": {}}]}`,
+		"no definition version": `{"envelopes": [{"type": "test.reading", "payload": {}}]}`,
 		"no envelopes":          `{"envelopes": []}`,
 		"more than a batch":     batch(strings.Repeat(weighIn("w", 1, v)+",", 49) + weighIn("w", 1, v)),
 		"not JSON":              `envelopes`,
@@ -302,7 +303,7 @@ func TestPostEnvelopes(t *testing.T) {
 func TestPostEnvelopesReadTheWholeBody(t *testing.T) {
 	t.Parallel()
 	d, url, _ := serveImporters(t, importerConfig(t))
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	one := batch(weighIn("w-1", 80.5, weight.Version))
 
 	for name, tc := range map[string]struct {
@@ -348,16 +349,16 @@ func TestPostEnvelopesReadTheWholeBody(t *testing.T) {
 func TestDefinitions_HandlingRoundTrips(t *testing.T) {
 	t.Parallel()
 	_, url, _ := serveImporters(t, importerConfig(t))
-	handled := strings.Replace(readingManifest, `"schema"`,
+	handled := strings.Replace(registeredManifest, `"schema"`,
 		`"handling": {"guidance": "value is the meter's reading, not a mean", "date_basis": ["observed"]}, "schema"`, 1)
 	var reg api.Registered
 	call(t, "POST", url+"/v1/definitions", importerToken, handled, http.StatusCreated, &reg)
 	call(t, "POST", url+"/v1/definitions", importerToken, strings.Replace(handled, "a mean", "a median", 1), http.StatusConflict, nil)
 	call(t, "POST", url+"/v1/definitions", importerToken,
-		strings.Replace(readingManifest, `"schema"`, `"handling": "be kind", "schema"`, 1), http.StatusUnprocessableEntity, nil)
+		strings.Replace(registeredManifest, `"schema"`, `"handling": "be kind", "schema"`, 1), http.StatusUnprocessableEntity, nil)
 
 	var body map[string]any
-	call(t, "GET", url+"/v1/definitions/test.reading", testToken, "", http.StatusOK, &body)
+	call(t, "GET", url+"/v1/definitions/test.registered", testToken, "", http.StatusOK, &body)
 	want := map[string]any{"guidance": "value is the meter's reading, not a mean", "date_basis": []any{"observed"}}
 	if got, _ := body["handling"].(map[string]any); fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Errorf("GET handling = %v, want %v", body["handling"], want)
@@ -379,26 +380,26 @@ func TestPostDefinitions(t *testing.T) {
 		return reg
 	}
 
-	if reg := post(readingManifest, http.StatusCreated); !reg.New || reg.Type != "test.reading" || reg.Version != 1 {
+	if reg := post(registeredManifest, http.StatusCreated); !reg.New || reg.Type != "test.registered" || reg.Version != 1 {
 		t.Fatalf("first registration: %+v", reg)
 	}
-	if reg := post(strings.ReplaceAll(readingManifest, "\n", " "), http.StatusOK); reg.New {
+	if reg := post(strings.ReplaceAll(registeredManifest, "\n", " "), http.StatusOK); reg.New {
 		t.Fatalf("the same body again was new: %+v", reg)
 	}
-	post(strings.Replace(readingManifest, `"minLength": 1}`, `"minLength": 2}`, 1), http.StatusConflict)
-	post(strings.Replace(readingManifest, `"test.reading"`, `"test.other"`, 1), http.StatusForbidden)
+	post(strings.Replace(registeredManifest, `"minLength": 1}`, `"minLength": 2}`, 1), http.StatusConflict)
+	post(strings.Replace(registeredManifest, `"test.registered"`, `"test.other"`, 1), http.StatusForbidden)
 	post(`{"meta": {}}`, http.StatusUnprocessableEntity)
-	weight, _ := d.defs.bundled.Lookup("health.weight")
-	defs, _ := fixture.Mattjoyce()
-	bundledBody, err := fs.ReadFile(defs, "health.weight.json")
+	weight, _ := d.defs.bundled.Lookup("test.reading")
+	defs, _ := fixture.Engine()
+	bundledBody, err := fs.ReadFile(defs, "test.reading.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	post(string(bytes.Replace(bundledBody, []byte(fmt.Sprintf(`"definition_version": %d`, weight.Version)),
 		[]byte(fmt.Sprintf(`"definition_version": %d`, weight.Version+1)), 1)), http.StatusConflict)
-	call(t, "POST", url+"/v1/definitions", testToken, readingManifest, http.StatusForbidden, nil)
+	call(t, "POST", url+"/v1/definitions", testToken, registeredManifest, http.StatusForbidden, nil)
 
-	reading := `{"type": "test.reading", "definition_version": 1, "payload": {"id": "r-1", "at": "2026-10-09T07:30:00Z", "value": 4}}`
+	reading := `{"type": "test.registered", "definition_version": 1, "payload": {"id": "r-1", "at": "2026-10-09T07:30:00Z", "value": 4}}`
 	var a api.Admission
 	call(t, "POST", url+"/v1/envelopes", importerToken, batch(reading), http.StatusOK, &a)
 	if a.Changed != 1 {
@@ -409,17 +410,17 @@ func TestPostDefinitions(t *testing.T) {
 	call(t, "GET", url+"/v1/definitions", importerToken, "", http.StatusOK, &list)
 	found := false
 	for _, s := range list.Definitions {
-		if s.Type == "test.reading" {
+		if s.Type == "test.registered" {
 			found = s.Origin == api.OriginRegistered && s.Current == 1 && len(s.Versions) == 1
 		}
 	}
 	if !found {
-		t.Fatalf("test.reading is not listed as registered v1: %+v", list)
+		t.Fatalf("test.registered is not listed as registered v1: %+v", list)
 	}
 	var body map[string]any
-	call(t, "GET", url+"/v1/definitions/test.reading/1", importerToken, "", http.StatusOK, &body)
-	call(t, "GET", url+"/v1/definitions/test.reading", testToken, "", http.StatusOK, &body)
-	call(t, "GET", url+"/v1/definitions/test.reading/2", testToken, "", http.StatusNotFound, nil)
+	call(t, "GET", url+"/v1/definitions/test.registered/1", importerToken, "", http.StatusOK, &body)
+	call(t, "GET", url+"/v1/definitions/test.registered", testToken, "", http.StatusOK, &body)
+	call(t, "GET", url+"/v1/definitions/test.registered/2", testToken, "", http.StatusNotFound, nil)
 	call(t, "GET", url+"/v1/definitions/test.none", testToken, "", http.StatusNotFound, nil)
 
 	// A restart admits against what was registered before it.
@@ -438,7 +439,7 @@ func TestPostDefinitions(t *testing.T) {
 func TestPostEnvelopesMints(t *testing.T) {
 	t.Parallel()
 	d, url, _ := serveImporters(t, importerConfig(t))
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	call(t, "POST", url+"/v1/envelopes", importerToken, batch(weighIn("w-1", 80.5, weight.Version)), http.StatusOK, nil)
 	waitFor(t, "a mint at W=1", func() bool {
 		w, ok, err := d.readOps.LastMintRun(context.Background(), 1)

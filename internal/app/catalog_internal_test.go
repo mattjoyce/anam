@@ -93,7 +93,7 @@ func TestMigrateRefusesARegisteredDefinitionTheCatalogContradicts(t *testing.T) 
 // catalog's manifest it contradicts.
 func registerAContradiction(t *testing.T, f ledgerFixture) def.Stored {
 	t.Helper()
-	manifests := catalogtest.Catalog(t).Manifests()
+	manifests := catalogtest.Engine.Catalog(t).Manifests()
 	if len(manifests) == 0 {
 		t.Fatal("no catalog manifests")
 	}

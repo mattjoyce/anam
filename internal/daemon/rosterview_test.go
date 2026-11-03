@@ -83,7 +83,7 @@ func TestWorkbenchFrameShowsTheDaemonsVersion(t *testing.T) {
 		t.Fatalf("status version %q, want %q", st.Version, testVersion)
 	}
 	want := fmt.Sprintf(`id="build" title="commit %s, built %s">%s</span>`, testCommit, testBuilt, st.Version)
-	for _, path := range []string{"/", "/facets", "/events", "/definitions", "/projection", "/select", "/location", "/importers", "/entry?type=health.medication.dose"} {
+	for _, path := range []string{"/", "/facets", "/events", "/definitions", "/projection", "/select", "/location", "/importers", "/entry?type=test.dose"} {
 		if body := operatorPage(t, base, path); !strings.Contains(body, want) {
 			t.Errorf("GET %s: the frame does not show the daemon's version; want %s", path, want)
 		}
@@ -104,7 +104,7 @@ func TestImportersPageShowsThePolicyAndRedactsTheToken(t *testing.T) {
 		sum := sha256.Sum256([]byte(tok))
 		sums[name] = hex.EncodeToString(sum[:])
 	}
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	call(t, "POST", base+"/v1/envelopes", importerToken, batch(weighIn("w-1", 80, weight.Version)), http.StatusOK, nil)
 	call(t, "POST", base+"/v1/hold", testToken, `{"sources": ["second-import"]}`, http.StatusOK, nil)
 
@@ -124,7 +124,7 @@ func TestImportersPageShowsThePolicyAndRedactsTheToken(t *testing.T) {
 	}
 	for _, want := range []string{
 		"test-import", "second-import", "assistant", "workbench", "no token",
-		"health.weight", "test.reading", "records every read", "lists receipts naming assistant",
+		"test.reading", "test.registered", "records every read", "lists receipts naming assistant",
 		"opens only receipts naming it", "snapshots of test-import", "never held",
 		"POST /v1/envelopes", "held<", "may be held; not held now", "admitted",
 	} {

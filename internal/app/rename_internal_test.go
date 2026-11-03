@@ -3,19 +3,15 @@ package app
 import (
 	"context"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
-	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
-	"github.com/mattjoyce/anam/internal/fold"
-	"github.com/mattjoyce/anam/internal/read"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
@@ -24,13 +20,13 @@ import (
 // nothing, a refusal anywhere stops the run before anything is written, a rerun is
 // all no-op, and the first version stays, so anam-time is kept.
 
-// illnesses are three self-log illnesses as records. health.illness.started and
-// health.illness.ended share keying, series and schema, which is the shape of a rename:
-// the type moves and nothing else does.
-var illnesses = []record{
-	{"health.illness.started", `{"id": "self-log:ill/flu/1", "date": "2026-03-04", "episode": "flu"}`},
-	{"health.illness.started", `{"id": "self-log:ill/cold/1", "date": "2026-05-10", "episode": "cold", "note": "mild"}`},
-	{"health.illness.started", `{"id": "self-log:ill/flu/2", "date": "2026-08-01", "episode": "flu"}`},
+// stops are three course stops as records, under test.retired, the name the stop had
+// before it became test.course.stopped. The two share keying, series and schema, which
+// is the shape of a rename: the type moves and nothing else does.
+var stops = []record{
+	{"test.retired", `{"id": "stop:flu/1", "date": "2026-03-04", "name": "flu", "course": 1}`},
+	{"test.retired", `{"id": "stop:cold/1", "date": "2026-05-10", "name": "cold", "course": 1, "note": "mild"}`},
+	{"test.retired", `{"id": "stop:flu/2", "date": "2026-08-01", "name": "flu", "course": 2}`},
 }
 
 func renameTableFile(t *testing.T, dir, name, body string) string {
@@ -55,15 +51,15 @@ func reportRow(t *testing.T, out string, from facet.Type) []string {
 func TestRename_CarriesFacetsAndKeepsTheFirstVersion(t *testing.T) {
 	t.Parallel()
 	f := newLedgerFixture(t)
-	before := f.admit(t, illnesses)
-	table := renameTableFile(t, f.dir, "renames.json", `{"renames": [{"from": "health.illness.started", "to": "health.illness.ended"}]}`)
+	before := f.admitHeld(t, heldDefs(t, "test.retired"), stops)
+	table := renameTableFile(t, f.dir, "renames.json", `{"renames": [{"from": "test.retired", "to": "test.course.stopped"}]}`)
 
 	out, _, err := cli(t, f.cfgPath, "rename", "--table", table)
 	if err != nil {
 		t.Fatalf("dry run: %v\n%s", err, out)
 	}
-	if row := reportRow(t, out, "health.illness.started"); row[1] != "health.illness.ended" || row[2] != "3" || row[3] != "0" {
-		t.Errorf("dry run row %v, want health.illness.ended 3 0", row)
+	if row := reportRow(t, out, "test.retired"); row[1] != "test.course.stopped" || row[2] != "3" || row[3] != "0" {
+		t.Errorf("dry run row %v, want test.course.stopped 3 0", row)
 	}
 	if !strings.Contains(out, "dry run: nothing written") {
 		t.Errorf("the dry run did not say so:\n%s", out)
@@ -89,17 +85,17 @@ func TestRename_CarriesFacetsAndKeepsTheFirstVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = l.Close() }()
-	id := facet.NewID(facet.SourceRef("records", "self-log:ill/flu/1"))
+	id := facet.NewID(facet.SourceRef("records", "stop:flu/1"))
 	cur, err := l.CurrentVersion(ctx, id)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cur.Type != "health.illness.ended" || cur.ArtifactVersion != 2 || cur.Provenance.Source != "records" {
-		t.Errorf("current is %s v%d from %s, want health.illness.ended v2 from records, under the same id", cur.Type, cur.ArtifactVersion, cur.Provenance.Source)
+	if cur.Type != "test.course.stopped" || cur.ArtifactVersion != 2 || cur.Provenance.Source != "records" {
+		t.Errorf("current is %s v%d from %s, want test.course.stopped v2 from records, under the same id", cur.Type, cur.ArtifactVersion, cur.Provenance.Source)
 	}
 	old, err := l.Version(ctx, id, 1)
-	if err != nil || old.Type != "health.illness.started" {
-		t.Errorf("v1 = %s, %v; want health.illness.started, kept as admitted", old.Type, err)
+	if err != nil || old.Type != "test.retired" {
+		t.Errorf("v1 = %s, %v; want test.retired, kept as admitted", old.Type, err)
 	}
 
 	// The run again finds nothing left under the old type, and writes nothing.
@@ -107,7 +103,7 @@ func TestRename_CarriesFacetsAndKeepsTheFirstVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("rerun: %v\n%s", err, out)
 	}
-	if row := reportRow(t, out, "health.illness.started"); row[2] != "0" || row[3] != "0" {
+	if row := reportRow(t, out, "test.retired"); row[2] != "0" || row[3] != "0" {
 		t.Errorf("rerun row %v, want nothing to carry", row)
 	}
 	if w := headOf(t, f.ledgerPath); w != before+3 {
@@ -121,25 +117,26 @@ func TestRename_CarriesFacetsAndKeepsTheFirstVersion(t *testing.T) {
 func TestRename_RefusesBeforeWriting(t *testing.T) {
 	t.Parallel()
 	f := newLedgerFixture(t)
-	trip := record{"place.trip.departed", `{"id": "self-log:trip/1/departed", "date": "2026-04-01", "trip": "tokyo", "destination": "Tokyo"}`}
-	before := f.admit(t, append(append([]record{}, illnesses...), trip))
+	start := record{"test.course.started", `{"id": "start:trip/1", "date": "2026-04-01", "name": "trip", "course": 1, "dose": "1 u"}`}
+	before := f.admitHeld(t, heldDefs(t, "test.retired"), stops)
+	before = f.admit(t, []record{start})
 
-	// health.blood-pressure composes its id from date_excel and reading, where an
-	// illness's is its id: another identity key, so the ids would not meet. A different
-	// fact-time rule alone is no refusal (card 195; TestRename_TheTableGivesEachVendorItsLeaf).
-	mis := renameTableFile(t, f.dir, "mis.json", `{"renames": [{"from": "health.illness.started", "to": "health.blood-pressure"}]}`)
+	// test.measure composes its id from /at and /seq, where a stop's is its id: another
+	// identity key, so the ids would not meet. A different fact-time rule alone is no
+	// refusal (card 195; TestRename_ARenameReplacesTheFacetsItMoves).
+	mis := renameTableFile(t, f.dir, "mis.json", `{"renames": [{"from": "test.retired", "to": "test.measure"}]}`)
 	if _, _, err := cli(t, f.cfgPath, "rename", "--table", mis, "--yes"); err == nil || !strings.Contains(err.Error(), "ids would not meet") {
 		t.Errorf("different keying: %v, want a refusal saying the ids would not meet", err)
 	}
 
-	// place.trip.arrived keys as place.trip.departed does but has no destination field, so the
-	// departure's payload fails its schema: reported per facet, nothing written.
-	bad := renameTableFile(t, f.dir, "bad.json", `{"renames": [{"from": "place.trip.departed", "to": "place.trip.arrived"}]}`)
+	// test.course.stopped keys as test.course.started does but has no dose field, so the
+	// start's payload fails its schema: reported per facet, nothing written.
+	bad := renameTableFile(t, f.dir, "bad.json", `{"renames": [{"from": "test.course.started", "to": "test.course.stopped"}]}`)
 	out, _, err := cli(t, f.cfgPath, "rename", "--table", bad, "--yes")
 	if err == nil || !strings.Contains(err.Error(), "would refuse") {
 		t.Errorf("a payload the new schema refuses: %v\n%s", err, out)
 	}
-	if !strings.Contains(out, "refused "+facet.SourceRef("records", "self-log:trip/1/departed")) {
+	if !strings.Contains(out, "refused "+facet.SourceRef("records", "start:trip/1")) {
 		t.Errorf("the refusal does not name the facet:\n%s", out)
 	}
 	if w := headOf(t, f.ledgerPath); w != before {
@@ -161,206 +158,69 @@ func TestRename_RefusesBeforeWriting(t *testing.T) {
 	}
 }
 
-// Card 191: renames/record-edge.json carried the notes a ledger held as record.note,
-// admitted under the Definition the binary now keeps only in its history, into
-// record.edge. It ran on the live ledger then. Since card 198, record.edge v2 requires
-// source_time, which no record.note could carry (its schema was closed), so the table
-// now refuses every note, says why, and writes nothing: a ledger restored from before
-// card 191 takes the rename from a binary before card 198, then this one.
-func TestRename_TheTableCarriesRecordNoteToRecordEdge(t *testing.T) {
+// Card 195: a rename may move a facet in fact time, when the new type reads its clock
+// another way. The dry run says how many move, and an earlier watermark's read is kept.
+
+// samples are two test.sample facets said in London, one in summer at +01:00 and one
+// at +00:00. test.sample read both wall clocks in UTC; test.reading reads them at the
+// offset they name, so the first moves an hour and the second stays.
+var samples = []record{
+	{"test.sample", `{"id": "s:1", "at": "2026-10-19 18:00", "value": 5, "unit": "u",
+		"source_time": {"value": "2026-10-19 18:00", "zone": "Europe/London", "offset": "+01:00", "basis": "source"}}`},
+	{"test.sample", `{"id": "s:2", "at": "2026-11-19 18:00", "value": 6, "unit": "u",
+		"source_time": {"value": "2026-11-19 18:00", "zone": "Europe/London", "offset": "+00:00", "basis": "source"}}`},
+}
+
+func TestRename_ARenameReplacesTheFacetsItMoves(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := newLedgerFixture(t)
-	notes := []record{
-		{"record.note", `{"id": "note:2c6f38a3:1", "at": "2026-10-12 22:14", "about": ["2c6f38a3-3db7-5e65-b933-9c59980e1c6c"], "text": "During a large work meeting."}`},
-		{"record.note", `{"id": "interp:1", "at": "2026-10-13 09:00", "kind": "interpreted_from", "from": ["7d1b2c3e-4f5a-5b6c-8d7e-9f0a1b2c3d4e"], "to": ["2c6f38a3-3db7-5e65-b933-9c59980e1c6c"]}`},
-	}
-	old := heldNote(t)
-	l, err := ledger.Open(ctx, f.ledgerPath, "matt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	before, err := admitUnder(ctx, l, old, notes)
-	if err != nil {
-		t.Fatalf("admit as record.note: %v", err)
-	}
-	ids := []string{facet.NewID(facet.SourceRef("records", "note:2c6f38a3:1")), facet.NewID(facet.SourceRef("records", "interp:1"))}
-	was := map[string]facet.Facet{}
-	for _, id := range ids {
-		if was[id], err = l.CurrentVersion(ctx, id); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := l.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	table := filepath.Join("..", "..", "renames", "record-edge.json")
-	out, _, err := cli(t, f.cfgPath, "rename", "--table", table)
-	if err == nil || !strings.Contains(out, "source_time") {
-		t.Fatalf("dry run: %v, want every note refused for want of source_time:\n%s", err, out)
-	}
-	if row := reportRow(t, out, "record.note"); row[1] != "record.edge" || row[2] != "0" || row[3] != "2" {
-		t.Errorf("dry run row %v, want record.edge 0 2", row)
-	}
-	if _, _, err = cli(t, f.cfgPath, "rename", "--table", table, "--yes"); err == nil {
-		t.Fatalf("--yes wrote a rename the gate refuses")
-	}
-	if w := headOf(t, f.ledgerPath); w != before {
-		t.Errorf("W %d, want %d: nothing written", w, before)
-	}
-	l, err = ledger.Open(ctx, f.ledgerPath, "matt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = l.Close() }()
-	for _, id := range ids {
-		cur, err := l.CurrentVersion(ctx, id)
-		if err != nil || cur.Type != "record.note" || cur.Descriptor.ContentHash != was[id].Descriptor.ContentHash {
-			t.Errorf("%s is %s, %v; want record.note as admitted", id, cur.Type, err)
-		}
-	}
-}
-
-// heldNote is a registry holding record.note as the catalog's history keeps it, the
-// newest version a facet was admitted under before card 191.
-func heldNote(t *testing.T) *def.Registry {
-	t.Helper()
-	for _, s := range catalogtest.Catalog(t).History() {
-		if s.Type == "record.note" && s.Version == 2 {
-			d, err := def.Parse(s.Body)
-			if err != nil {
-				t.Fatal(err)
-			}
-			reg, err := def.NewRegistry(d)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return reg
-		}
-	}
-	t.Fatal("no record.note v2 in the history")
-	return nil
-}
-
-// kindsOld is a ledger as it stood before card 196: a medicine course begun, stopped
-// and begun again, and a flight, each under the hyphenated name or the two-segment
-// name the types had.
-var kindsOld = []record{
-	{"health.medication-started", `{"id": "m/1/started", "date": "2026-03-01", "drug": "examplazole", "course": 1, "dose": "10 mg daily"}`},
-	{"health.medication-stopped", `{"id": "m/1/stopped", "date": "2026-08-01", "drug": "examplazole", "course": 1}`},
-	{"health.medication-started", `{"id": "m/2/started", "date": "2026-10-01", "drug": "examplazole", "course": 2, "dose": "10 mg daily"}`},
-	{"place.flight", `{"id": "travel:2019-03-westmere/flight/2019-03-04/QXA-QXB", "date": "2019-03-04 +08:00", "trip": "2019-03-westmere", "from": "QXA", "to": "QXB"}`},
-}
-
-// kindsNew is kindsOld as the importers write it after the run.
-func kindsNew() []record {
-	renamed := map[facet.Type]facet.Type{
-		"health.medication-started": "health.medication.started",
-		"health.medication-stopped": "health.medication.stopped",
-		"place.flight":              "place.trip.flight",
-	}
-	out := make([]record, len(kindsOld))
-	for i, r := range kindsOld {
-		out[i] = record{renamed[r.typ], r.payload}
-	}
-	return out
-}
-
-// Card 196: renames/kinds-segment.json carries a ledger holding a medication-started,
-// a medication-stopped and a place.flight, each admitted under the Definition the
-// binary now keeps only in its history, to the three-segment names. The regimen it
-// reads through the meds projection at a day is the one a ledger written under the new
-// names gives, entry for entry (the med.regimen series, the content hashes and the
-// ids), and a read as-of before the run is unchanged.
-func TestRename_TheTableCarriesKindsToTheThirdSegment(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	f := newLedgerFixture(t)
-	l, err := ledger.Open(ctx, f.ledgerPath, "matt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	before, err := admitUnder(ctx, l, heldDefs(t, "health.medication-started", "health.medication-stopped", "place.flight"), kindsOld)
-	if err != nil {
-		t.Fatalf("admit under the old names: %v", err)
-	}
-	if err := l.Close(); err != nil {
-		t.Fatal(err)
-	}
-	control := newLedgerFixture(t)
-	control.admit(t, kindsNew())
-
-	days := []string{"2026-04-01", "2026-09-01", "2026-10-15"} // course 1 open, none open, course 2 open
-	read := func(cfgPath string, q api.TimelineQuery) []fold.Entry {
-		t.Helper()
-		cfg, err := config.Load(cfgPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-		src, closeAll, err := readSource(ctx, cfg, catalogtest.Catalog(t))
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer closeAll()
-		q.Zone = "UTC"
-		tl, err := read.Timeline(ctx, src, q)
-		if err != nil {
-			t.Fatalf("%+v: %v", q, err)
-		}
-		return tl.Entries
-	}
-
-	// Until the run, the new binary's meds projection does not see a course the ledger
-	// holds under the old names: the run is what brings it back.
-	if got := read(f.cfgPath, api.TimelineQuery{Projection: "meds", At: days[2]}); len(got) != 0 {
-		t.Fatalf("meds at %s before the run holds %d entries, want none under the old names", days[2], len(got))
-	}
+	before := f.admitHeld(t, heldDefs(t, "test.sample"), samples)
+	table := renameTableFile(t, f.dir, "sample.json", `{"renames": [{"from": "test.sample", "to": "test.reading"}]}`)
 	asOf, _, err := cli(t, f.cfgPath, "timeline", "--json", "--w", strconv.FormatInt(int64(before), 10))
 	if err != nil {
 		t.Fatalf("timeline before: %v", err)
 	}
 
-	table := filepath.Join("..", "..", "renames", "kinds-segment.json")
 	out, _, err := cli(t, f.cfgPath, "rename", "--table", table)
 	if err != nil {
 		t.Fatalf("dry run: %v\n%s", err, out)
 	}
-	for from, want := range map[facet.Type][]string{
-		"health.medication-started": {"health.medication.started", "2", "0"},
-		"health.medication-stopped": {"health.medication.stopped", "1", "0"},
-		"place.flight":              {"place.trip.flight", "1", "0"},
-	} {
-		if row := reportRow(t, out, from); !slices.Equal(row[1:4], want) {
-			t.Errorf("dry run row %v, want %s %v", row, from, want)
-		}
+	if want := "test.sample to test.reading places facets by /at (2006-01-02 15:04, Europe/Berlin), where test.sample " +
+		"read /at (2006-01-02 15:04, UTC): 1 of 2 to carry move in fact time"; !strings.Contains(out, want) {
+		t.Errorf("the dry run does not say %q:\n%s", want, out)
 	}
-	if out, _, err = cli(t, f.cfgPath, "rename", "--table", table, "--yes"); err != nil {
+	if w := headOf(t, f.ledgerPath); w != before {
+		t.Fatalf("the dry run wrote: W %d → %d", before, w)
+	}
+	if out, _, err = cli(t, f.cfgPath, "rename", "--table", table, "--yes"); err != nil || !strings.Contains(out, "carried 2 facets") {
 		t.Fatalf("--yes: %v\n%s", err, out)
 	}
-	if w := headOf(t, f.ledgerPath); w != before+4 {
-		t.Errorf("W %d, want %d: one event per facet carried", w, before+4)
-	}
 
-	for _, day := range days {
-		got := read(f.cfgPath, api.TimelineQuery{Projection: "meds", At: day})
-		want := read(control.cfgPath, api.TimelineQuery{Projection: "meds", At: day})
-		if !reflect.DeepEqual(got, want) {
-			t.Errorf("meds at %s after the run:\n%+v\nwant what the new names give:\n%+v", day, got, want)
+	l, err := ledger.Open(ctx, f.ledgerPath, "matt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[string]time.Time{
+		"s:1": time.Date(2026, 10, 19, 17, 0, 0, 0, time.UTC), // was 18:00Z, read in UTC
+		"s:2": time.Date(2026, 11, 19, 18, 0, 0, 0, time.UTC), // unchanged
+	} {
+		cur, err := l.CurrentVersion(ctx, facet.NewID(facet.SourceRef("records", id)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cur.Type != "test.reading" || cur.ArtifactVersion != 2 || !cur.FactTime.Equal(want) {
+			t.Errorf("%s is %s v%d at %v, want test.reading v2 at %v", id, cur.Type, cur.ArtifactVersion, cur.FactTime, want)
 		}
 	}
-	if got := read(f.cfgPath, api.TimelineQuery{Projection: "meds", At: days[2]}); len(got) != 1 || got[0].SourceRef != "records:11:m/2/started" || !strings.HasPrefix(got[0].Series, "med.regimen:") {
-		t.Errorf("meds at %s = %+v, want course 2 open in the med.regimen series", days[2], got)
+	if err := l.Close(); err != nil {
+		t.Fatal(err)
 	}
-	if got := read(f.cfgPath, api.TimelineQuery{Projection: "meds", At: days[1]}); len(got) != 0 {
-		t.Errorf("meds at %s = %+v, want the stopped course gone", days[1], got)
-	}
-	if got, want := read(f.cfgPath, api.TimelineQuery{Type: "place.trip.flight"}), read(control.cfgPath, api.TimelineQuery{Type: "place.trip.flight"}); len(got) != 1 || !reflect.DeepEqual(got, want) {
-		t.Errorf("flight after the run = %+v, want %+v", got, want)
-	}
-
 	if again, _, err := cli(t, f.cfgPath, "timeline", "--json", "--w", strconv.FormatInt(int64(before), 10)); err != nil || again != asOf {
 		t.Errorf("timeline at W %d changed across the run (%v):\nbefore %s\nafter  %s", before, err, asOf, again)
+	}
+	if w := headOf(t, f.ledgerPath); w != before+2 {
+		t.Errorf("W %d, want %d", w, before+2)
 	}
 }
 
@@ -369,7 +229,7 @@ func TestRename_TheTableCarriesKindsToTheThirdSegment(t *testing.T) {
 func heldDefs(t *testing.T, types ...facet.Type) *def.Registry {
 	t.Helper()
 	newest := map[facet.Type]def.Stored{}
-	for _, s := range catalogtest.Catalog(t).History() {
+	for _, s := range catalogtest.Engine.Catalog(t).History() {
 		if slices.Contains(types, s.Type) && s.Version > newest[s.Type].Version {
 			newest[s.Type] = s
 		}

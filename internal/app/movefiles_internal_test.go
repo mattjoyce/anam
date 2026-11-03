@@ -62,14 +62,14 @@ func exportFolder(t *testing.T, db *ops.DB) (dir string, receipts []string) {
 func TestMoveArtifacts_ARecordsFolderComesInAndItsReceiptsVerify(t *testing.T) {
 	t.Parallel()
 	f := newLedgerFixture(t)
-	f.admit(t, bpReadings)
+	f.admit(t, measureRows)
 	// A bundled projection serves the readings, and each serve files a receipt.
 	// The second serve narrows to before the day after Feb 10 in Sydney, written
 	// with its own offset so the bound is the same whatever zone the machine runs
 	// in (a bare "2026-02-10" is a day in the reader's zone, Local here): it serves
 	// two of the three readings, so its served value is a second, distinct one.
-	for _, narrow := range [][]string{{}, {"--to", "2026-02-11T00:00:00+11:00"}} {
-		if _, _, err := cli(t, f.cfgPath, append([]string{"timeline", "--projection", "bp", "--publish"}, narrow...)...); err != nil {
+	for _, narrow := range [][]string{{}, {"--to", "2026-02-11T00:00:00+01:00"}} {
+		if _, _, err := cli(t, f.cfgPath, append([]string{"timeline", "--projection", "measures", "--publish"}, narrow...)...); err != nil {
 			t.Fatalf("publish: %v", err)
 		}
 	}
@@ -148,8 +148,8 @@ func TestMoveArtifacts_ARecordsFolderComesInAndItsReceiptsVerify(t *testing.T) {
 func TestMoveArtifacts_RefusesAFolderWithAnAlteredFile(t *testing.T) {
 	t.Parallel()
 	f := newLedgerFixture(t)
-	f.admit(t, bpReadings)
-	if _, _, err := cli(t, f.cfgPath, "timeline", "--projection", "bp", "--publish"); err != nil {
+	f.admit(t, measureRows)
+	if _, _, err := cli(t, f.cfgPath, "timeline", "--projection", "measures", "--publish"); err != nil {
 		t.Fatal(err)
 	}
 	folder, receipts := exportFolder(t, storeAt(t, filepath.Join(f.dir, "tracking.db")))

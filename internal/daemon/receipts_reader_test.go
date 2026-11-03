@@ -25,7 +25,7 @@ const (
 	plainToken    = "plain-token-0123456789abcdef0123"
 )
 
-// readerConfig is a daemon with the blood-pressure readings, an operator, a reader
+// readerConfig is a daemon with the test.measure counts, an operator, a reader
 // named assistant whose every read is filed as a receipt, and a plain reader.
 func readerConfig(t *testing.T) config.Config {
 	t.Helper()
@@ -57,7 +57,7 @@ func listReceipts(t *testing.T, base, query string) api.Receipts {
 	return l
 }
 
-const timelineBP = "/v1/timeline?zone=UTC&projection=bp"
+const timelineMeasures = "/v1/timeline?zone=UTC&projection=measures"
 
 // A token set to record leaves one receipt per timeline read, naming its principal,
 // and a token without the setting leaves none.
@@ -70,13 +70,13 @@ func TestRecordingTokenFilesAReceiptPerTimelineRead(t *testing.T) {
 	base := srv.URL
 
 	var plain api.Timeline
-	call(t, "GET", base+timelineBP, plainToken, "", http.StatusOK, &plain)
+	call(t, "GET", base+timelineMeasures, plainToken, "", http.StatusOK, &plain)
 	if n := len(listReceipts(t, base, "").Receipts); n != 0 {
 		t.Fatalf("a plain reader's timeline read left %d receipts", n)
 	}
 
 	var got api.Published
-	call(t, "GET", base+timelineBP, recorderToken, "", http.StatusOK, &got)
+	call(t, "GET", base+timelineMeasures, recorderToken, "", http.StatusOK, &got)
 	if len(got.Entries) != 2 || got.Shown != 2 || got.Page.NextCursor != "" {
 		t.Errorf("a recording reader's timeline carries %d entries, shown %d, page %+v; want the two readings whole",
 			len(got.Entries), got.Shown, got.Page)
@@ -88,8 +88,8 @@ func TestRecordingTokenFilesAReceiptPerTimelineRead(t *testing.T) {
 		t.Errorf("receipt = %+v", got.Receipt)
 	}
 
-	call(t, "GET", base+timelineBP, recorderToken, "", http.StatusOK, &got)
-	call(t, "GET", base+timelineBP, plainToken, "", http.StatusOK, &plain)
+	call(t, "GET", base+timelineMeasures, recorderToken, "", http.StatusOK, &got)
+	call(t, "GET", base+timelineMeasures, plainToken, "", http.StatusOK, &plain)
 	listed := listReceipts(t, base, "")
 	if len(listed.Receipts) != 2 {
 		t.Fatalf("two recorded reads left %d receipts", len(listed.Receipts))
@@ -115,7 +115,7 @@ func TestRecordingTokenRefusesAReadNoReceiptCanDescribe(t *testing.T) {
 	if e.Error == "" {
 		t.Error("the refusal says nothing")
 	}
-	call(t, "GET", srv.URL+timelineBP+"&explain=true", recorderToken, "", http.StatusBadRequest, nil)
+	call(t, "GET", srv.URL+timelineMeasures+"&explain=true", recorderToken, "", http.StatusBadRequest, nil)
 	// The same reads stay open to a token that does not record.
 	call(t, "GET", srv.URL+"/v1/timeline?zone=UTC", plainToken, "", http.StatusOK, nil)
 	if n := len(listReceipts(t, srv.URL, "").Receipts); n != 0 {
@@ -133,14 +133,14 @@ func TestRecordingTokenFilesAReceiptPerQuery(t *testing.T) {
 	defer srv.Close()
 	base := srv.URL
 
-	req := `{"projection": "bp", "relation": "high", "text": "high(T, S) :- entry(E, \"health.blood-pressure\", T, _, _, _, _), attr(E, \"/systolic_blood_pressure/value\", S), S > 110."}`
+	req := `{"projection": "measures", "relation": "high", "text": "high(T, S) :- entry(E, \"test.measure\", T, _, _, _, _), attr(E, \"/count\", S), S > 110."}`
 	var a api.QueryAnswer
 	call(t, "POST", base+"/v1/query", recorderToken, req, http.StatusCreated, &a)
 	if !a.Written || a.Receipt.Principal != "assistant" {
 		t.Errorf("recorded query: written %v, principal %q", a.Written, a.Receipt.Principal)
 	}
 
-	dry := `{"projection": "bp", "relation": "high", "dry_run": true, "text": "high(T, S) :- entry(E, \"health.blood-pressure\", T, _, _, _, _), attr(E, \"/systolic_blood_pressure/value\", S), S > 110."}`
+	dry := `{"projection": "measures", "relation": "high", "dry_run": true, "text": "high(T, S) :- entry(E, \"test.measure\", T, _, _, _, _), attr(E, \"/count\", S), S > 110."}`
 	call(t, "POST", base+"/v1/query", recorderToken, dry, http.StatusOK, &a)
 	if a.Written {
 		t.Error("a dry run was filed")
@@ -167,8 +167,8 @@ func TestReceiptsListByPrincipalAndTime(t *testing.T) {
 	base := srv.URL
 
 	var rec, pub api.Published
-	call(t, "GET", base+timelineBP, recorderToken, "", http.StatusOK, &rec)
-	call(t, "POST", base+"/v1/receipts?zone=UTC&projection=bp", plainToken, "", http.StatusCreated, &pub)
+	call(t, "GET", base+timelineMeasures, recorderToken, "", http.StatusOK, &rec)
+	call(t, "POST", base+"/v1/receipts?zone=UTC&projection=measures", plainToken, "", http.StatusCreated, &pub)
 	if pub.Receipt.Principal != "" {
 		t.Fatalf("an ordinary publish names %q", pub.Receipt.Principal)
 	}
@@ -221,8 +221,8 @@ func TestRecordingTokenOpensOnlyItsOwnReceipts(t *testing.T) {
 	base := srv.URL
 
 	var mine, theirs api.Published
-	call(t, "GET", base+timelineBP, recorderToken, "", http.StatusOK, &mine)
-	call(t, "POST", base+"/v1/receipts?zone=UTC&projection=bp", plainToken, "", http.StatusCreated, &theirs)
+	call(t, "GET", base+timelineMeasures, recorderToken, "", http.StatusOK, &mine)
+	call(t, "POST", base+"/v1/receipts?zone=UTC&projection=measures", plainToken, "", http.StatusCreated, &theirs)
 
 	var shown api.ReceiptShown
 	call(t, "GET", base+"/v1/receipts/"+mine.ReceiptHash, recorderToken, "", http.StatusOK, &shown)
@@ -255,12 +255,12 @@ func TestRecordingTokenReadFailsWhenTheReceiptCannotBeFiled(t *testing.T) {
 		t.Fatal(err)
 	}
 	var e api.Error
-	call(t, "GET", srv.URL+timelineBP, recorderToken, "", http.StatusInternalServerError, &e)
+	call(t, "GET", srv.URL+timelineMeasures, recorderToken, "", http.StatusInternalServerError, &e)
 	if e.Error == "" {
 		t.Error("the failure says nothing")
 	}
 	// A plain read does not write, so it is unaffected.
-	call(t, "GET", srv.URL+timelineBP, plainToken, "", http.StatusOK, nil)
+	call(t, "GET", srv.URL+timelineMeasures, plainToken, "", http.StatusOK, nil)
 }
 
 // A recording token lists only the receipts that name it, and asking for another
@@ -275,8 +275,8 @@ func TestRecordingTokenListsOnlyItsOwnReceipts(t *testing.T) {
 	base := srv.URL
 
 	var mine, theirs api.Published
-	call(t, "GET", base+timelineBP, recorderToken, "", http.StatusOK, &mine)
-	call(t, "POST", base+"/v1/receipts?zone=UTC&projection=bp", plainToken, "", http.StatusCreated, &theirs)
+	call(t, "GET", base+timelineMeasures, recorderToken, "", http.StatusOK, &mine)
+	call(t, "POST", base+"/v1/receipts?zone=UTC&projection=measures", plainToken, "", http.StatusCreated, &theirs)
 
 	for _, query := range []string{"", "?principal=assistant"} {
 		var l api.Receipts
@@ -315,8 +315,8 @@ func TestRecordingTokenVerifiesOnlyItsOwnReceipts(t *testing.T) {
 	base := srv.URL
 
 	var mine, theirs api.Published
-	call(t, "GET", base+timelineBP, recorderToken, "", http.StatusOK, &mine)
-	call(t, "POST", base+"/v1/receipts?zone=UTC&projection=bp", plainToken, "", http.StatusCreated, &theirs)
+	call(t, "GET", base+timelineMeasures, recorderToken, "", http.StatusOK, &mine)
+	call(t, "POST", base+"/v1/receipts?zone=UTC&projection=measures", plainToken, "", http.StatusCreated, &theirs)
 
 	var v api.ReceiptVerified
 	call(t, "GET", base+"/v1/receipts/"+mine.ReceiptHash+"/verify", recorderToken, "", http.StatusOK, &v)
@@ -352,9 +352,9 @@ func TestRecordingTokenReadIsBusyNotAFailureWhenTheStoreIsLocked(t *testing.T) {
 	}
 	defer release()
 
-	query := `{"projection": "bp", "relation": "high", "text": "high(T, S) :- entry(E, \"health.blood-pressure\", T, _, _, _, _), attr(E, \"/systolic_blood_pressure/value\", S), S > 110."}`
+	query := `{"projection": "measures", "relation": "high", "text": "high(T, S) :- entry(E, \"test.measure\", T, _, _, _, _), attr(E, \"/count\", S), S > 110."}`
 	for _, c := range []struct{ method, path, body string }{
-		{http.MethodGet, timelineBP, ""},
+		{http.MethodGet, timelineMeasures, ""},
 		{http.MethodPost, "/v1/query", query},
 	} {
 		req := httptest.NewRequest(c.method, c.path, strings.NewReader(c.body))
@@ -367,7 +367,7 @@ func TestRecordingTokenReadIsBusyNotAFailureWhenTheStoreIsLocked(t *testing.T) {
 		}
 	}
 
-	req := httptest.NewRequest(http.MethodGet, timelineBP, nil)
+	req := httptest.NewRequest(http.MethodGet, timelineMeasures, nil)
 	req.Header.Set("Authorization", "Bearer "+plainToken)
 	rec := httptest.NewRecorder()
 	d.Handler().ServeHTTP(rec, req)
@@ -381,5 +381,5 @@ func TestRecordingTokenReadIsBusyNotAFailureWhenTheStoreIsLocked(t *testing.T) {
 	if n := len(listReceipts(t, srv.URL, "").Receipts); n != 0 {
 		t.Errorf("the refused reads filed %d receipts", n)
 	}
-	call(t, "GET", srv.URL+timelineBP, recorderToken, "", http.StatusOK, nil)
+	call(t, "GET", srv.URL+timelineMeasures, recorderToken, "", http.StatusOK, nil)
 }

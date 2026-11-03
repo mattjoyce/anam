@@ -65,12 +65,11 @@ var embeddedAllowList = []allowed{
 
 	// Slice 4 (#34): daemon and app. R4b slice 3 deleted catalog_drift_test.go with
 	// the drift report, and catalog_dirs_embedded_test.go, since an empty directory no
-	// longer selects the embedded catalog to mint on; builtInCatalog now reads the fixture.
+	// longer selects the embedded catalog to mint on. R4b slice 4c moved the corpus
+	// retirement test, heartrateday_retire_internal_test.go, to the deployment repo.
 	{file: "internal/daemon/catalog_start_test.go",
 		funcs:  []string{"TestOpen_NoCatalogStartsEmpty"},
 		reason: "a daemon on a config with no catalog directories starts on the empty catalog and logs the WARN and structural lines (R4b slice 3); reads nothing embedded"},
-	{file: "internal/app/heartrateday_retire_internal_test.go",
-		reason: "corpus retirement (card 205) over def.Bundled and projection.Bundled; to the deployment repo with the corpus tests"},
 
 	// Slice 5 (#33): inspect.
 	{file: "internal/inspect/marks_test.go",

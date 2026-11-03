@@ -41,7 +41,7 @@ func postAs(t *testing.T, url, body string, headers map[string]string) (int, str
 func TestPostFacetRetract(t *testing.T) {
 	t.Parallel()
 	d, url, _ := serveImporters(t, importerConfig(t))
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	v := weight.Version
 	var adm api.Admission
 	call(t, "POST", url+"/v1/envelopes", importerToken,
@@ -84,7 +84,7 @@ func TestPostFacetRetract(t *testing.T) {
 	// next position, and the answer says so.
 	var got api.Retraction
 	call(t, "POST", route(first), testToken, retractBody("test-import"), http.StatusOK, &got)
-	want := api.Retraction{FacetID: first, Source: "test-import", Type: "health.weight", ArtifactVersion: 1,
+	want := api.Retraction{FacetID: first, Source: "test-import", Type: "test.reading", ArtifactVersion: 1,
 		Outcome: "tombstoned", Seq: at + 1, W: at + 1}
 	if got != want {
 		t.Fatalf("retraction = %+v, want %+v", got, want)
@@ -103,7 +103,7 @@ func TestPostFacetRetract(t *testing.T) {
 
 	// Once the importer completes a snapshot of its source, its next resend reconciles
 	// it, and a hand retraction is refused.
-	snap := `{"snapshot": {"id": "run-1", "part": 1, "parts": 1, "types": ["health.weight"]}, "envelopes": [` +
+	snap := `{"snapshot": {"id": "run-1", "part": 1, "parts": 1, "types": ["test.reading"]}, "envelopes": [` +
 		weighIn("w-2", 80.2, v) + `]}`
 	call(t, "POST", url+"/v1/envelopes", importerToken, snap, http.StatusOK, &adm)
 	at = adm.W

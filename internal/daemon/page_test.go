@@ -27,7 +27,7 @@ func TestReceiptPages_WalkTheWholePublishedRead(t *testing.T) {
 	cfg.MaxReadBytes = 1200
 	d, base, _ := serveImporters(t, cfg)
 	call(t, "POST", base+"/v1/projections", testToken, weightsV1, http.StatusCreated, nil)
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	var envs []string
 	for i := range 8 {
 		envs = append(envs, weighIn(fmt.Sprintf("w-%d", i), 80+float64(i)/10, weight.Version))
@@ -84,7 +84,7 @@ func TestReceiptPages_WalkTheWholePublishedRead(t *testing.T) {
 
 	// A second receipt, of the same read cut to a field: a frame pages by rows.
 	var framed api.Published
-	call(t, "POST", base+"/v1/receipts?zone=UTC&projection=weights&fields=/kg", testToken, "", http.StatusCreated, &framed)
+	call(t, "POST", base+"/v1/receipts?zone=UTC&projection=weights&fields=/value", testToken, "", http.StatusCreated, &framed)
 	if framed.Frame == nil || framed.Page.NextCursor == "" || framed.Page.TotalCount != 9 {
 		t.Fatalf("the framed publish: frame %v, page %+v", framed.Frame != nil, framed.Page)
 	}

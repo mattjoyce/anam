@@ -39,8 +39,8 @@ func weighInOn(t *testing.T, id, day string, version int) string {
 		t.Fatal(err)
 	}
 	local := at.Format("2006-01-02 15:04")
-	return fmt.Sprintf(`{"type": "health.weight", "definition_version": %d,
-		"payload": {"id": %q, "date": %q, "source_time": {"value": %q, "zone": "Australia/Sydney", "offset": %q, "basis": "source"}, "kg": 80}}`,
+	return fmt.Sprintf(`{"type": "test.reading", "definition_version": %d,
+		"payload": {"id": %q, "at": %q, "source_time": {"value": %q, "zone": "Australia/Sydney", "offset": %q, "basis": "source"}, "value": 80, "unit": "kg"}}`,
 		version, id, local, local, at.Format("-07:00"))
 }
 
@@ -52,7 +52,7 @@ func seedUnminted(t *testing.T, cfg config.Config, months int) int64 {
 	t.Helper()
 	cfg.MintQuiet = time.Hour // stopped long before the mint would run
 	d, url, stop := serveImporters(t, cfg)
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	var envs []string
 	for i := range months {
 		day := time.Date(1990, time.January, 15, 0, 0, 0, 0, time.UTC).AddDate(0, i, 0).Format("2006-01-02")

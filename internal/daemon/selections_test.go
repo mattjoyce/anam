@@ -13,7 +13,7 @@ import (
 // program for any role, and the timeline and the link form open its code.
 
 // weightProgram selects every weigh-in, written by hand in a layout of its own.
-const weightProgram = "pick/1.\npick(E) :- entry(E, T, _, _, _, _, _), T = \"health.weight\".\n"
+const weightProgram = "pick/1.\npick(E) :- entry(E, T, _, _, _, _, _), T = \"test.reading\".\n"
 
 func saveSelection(t *testing.T, base, token, program string, want int) api.Selection {
 	t.Helper()
@@ -43,7 +43,7 @@ func TestSelections_APIRoundTrip(t *testing.T) {
 	if again != saved {
 		t.Fatalf("the same program saved twice: %+v and %+v", saved, again)
 	}
-	other := saveSelection(t, base, testToken, `pick(E) :- entry(E, "health.blood-pressure", _, _, _, _, _).`, http.StatusCreated)
+	other := saveSelection(t, base, testToken, `pick(E) :- entry(E, "test.measure", _, _, _, _, _).`, http.StatusCreated)
 	if other.Code == saved.Code {
 		t.Fatalf("two programs share the code %s", saved.Code)
 	}

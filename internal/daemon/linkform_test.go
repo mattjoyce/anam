@@ -27,7 +27,7 @@ import (
 // weighIns admits n weigh-ins as the test importer and returns their facet ids.
 func weighIns(t *testing.T, d *Daemon, base string, n int) []string {
 	t.Helper()
-	weight, _ := d.defs.current.Load().Lookup("health.weight")
+	weight, _ := d.defs.current.Load().Lookup("test.reading")
 	envs := make([]string, n)
 	for i := range envs {
 		envs[i] = weighIn(fmt.Sprintf("w-%02d", i), 80+float64(i)/10, weight.Version)
@@ -126,7 +126,7 @@ func TestLinkFormLinksFourFacetsAndEachPageListsIt(t *testing.T) {
 			t.Errorf("the form lacks %s, kept and linked to its page", id)
 		}
 	}
-	for _, want := range []string{"<td>health.weight</td>", "<td>80 kg</td>", "<td>80.3 kg</td>", "4 in the link", `<option value="about" selected>about</option>`,
+	for _, want := range []string{"<td>test.reading</td>", "<td>80 kg</td>", "<td>80.3 kg</td>", "4 in the link", `<option value="about" selected>about</option>`,
 		`data-fact-time data-now`, `<input type="hidden" id="zone" name="zone" value="">`, "Intl.DateTimeFormat().resolvedOptions().timeZone"} {
 		if !strings.Contains(form, want) {
 			t.Errorf("the form lacks %q", want)
@@ -390,7 +390,7 @@ func TestPinsAreWrittenOnlyWhenTicked(t *testing.T) {
 // offers it; with it, the Definitions page's Enter for record.edge opens the link form.
 func TestTheLinkFormNeedsRecordEdgeOnTheList(t *testing.T) {
 	t.Parallel()
-	d, base := workbenchServing(t, "health.medication.dose")
+	d, base := workbenchServing(t, "test.dose")
 	ids := weighIns(t, d, base, 1)
 	if status, body := page(t, "GET", base+"/link?tick="+ids[0], nil, nil); status != http.StatusForbidden ||
 		!strings.Contains(body, "importers file lists for the workbench principal") {

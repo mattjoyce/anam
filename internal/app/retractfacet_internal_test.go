@@ -43,7 +43,7 @@ func TestRetractFacet_OneFacetByHand(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := newLedgerFixture(t)
-	before := f.admit(t, bpReadings)
+	before := f.admit(t, measureRows)
 	// The store exists once the daemon or init has run; a dry run only reads it.
 	buckets, err := config.Config{BucketWidth: span.Default}.Buckets()
 	if err != nil {
@@ -61,7 +61,7 @@ func TestRetractFacet_OneFacetByHand(t *testing.T) {
 
 	// A dry run shows the facet and what the tombstone would do, and writes nothing.
 	out, err := retract("records")
-	if err != nil || !strings.Contains(out, id) || !strings.Contains(out, "health.blood-pressure") ||
+	if err != nil || !strings.Contains(out, id) || !strings.Contains(out, "test.measure") ||
 		!strings.Contains(out, "v1") || !strings.Contains(out, "status admitted") || !strings.Contains(out, "dry run") {
 		t.Fatalf("dry run: %v\n%s", err, out)
 	}
@@ -81,13 +81,13 @@ func TestRetractFacet_OneFacetByHand(t *testing.T) {
 	// that is declared and has none is not.
 	importers := filepath.Join(f.dir, "importers.yaml")
 	writeDoc(t, importers, "importers:\n  - source: records\n    token_sha256: "+strings.Repeat("ab", 32)+
-		"\n    types: [health.blood-pressure]\n")
+		"\n    types: [test.measure]\n")
 	appendFile(t, f.cfgPath, "importers_file: "+importers+"\n")
 	if out, err = retract("records"); err != nil {
 		t.Fatalf("declared, no snapshot: %v\n%s", err, out)
 	}
 	if _, err := db.RecordSnapshotPart(ctx, ops.SnapshotPart{ID: "run", Source: "records",
-		Types: []string{"health.blood-pressure"}, Part: 1, Parts: 1, FacetIDs: []string{id}}, time.Now(), int64(before),
+		Types: []string{"test.measure"}, Part: 1, Parts: 1, FacetIDs: []string{id}}, time.Now(), int64(before),
 		ops.SnapshotRetention{Incomplete: config.DefaultSnapshotTTL, Complete: config.DefaultSnapshotKeep}); err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestRetractFacet_OneFacetByHand(t *testing.T) {
 	}
 	_ = db.Close()
 	writeDoc(t, importers, "importers:\n  - source: garmin\n    token_sha256: "+strings.Repeat("ab", 32)+
-		"\n    types: [health.blood-pressure]\n")
+		"\n    types: [test.measure]\n")
 
 	// The tombstone: one anam-event, the facet dead now and live as of before.
 	if out, err = retract("records", "--yes"); err != nil || !strings.Contains(out, "tombstoned") {

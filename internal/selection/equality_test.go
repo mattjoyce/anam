@@ -12,6 +12,7 @@ import (
 	"github.com/mattjoyce/anam/internal/consent"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
+	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/query"
 	"github.com/mattjoyce/anam/internal/selection"
 	"github.com/mattjoyce/anam/internal/serve"
@@ -109,11 +110,18 @@ func seed(t *testing.T) fold.Result {
 
 func id(ref string) string { return facet.NewID(ref) }
 
+// bpTemplate is a log of one exact type, the narrowing a served value is checked over
+// beside the canonical one. The seeded types are the test's own strings, chosen for
+// their prefixes, so the template is written here rather than read from a catalog.
+const bpTemplate = `{"name": "bp", "version": 1, "description": "every blood pressure reading, as a log",
+  "types": ["health.blood-pressure"], "statuses": ["admitted", "endorsed"], "max_classification": "Sensitive",
+  "from": "", "to": "", "shape": "log"}`
+
 func TestEquality_ProgramIsThePredicate(t *testing.T) {
 	t.Parallel()
 	res := seed(t)
-	defs := catalogtest.Definitions(t)
-	tmpl, err := catalogtest.Projections(t).Lookup("bp")
+	defs := catalogtest.Engine.Definitions(t)
+	tmpl, err := projection.Parse([]byte(bpTemplate))
 	if err != nil {
 		t.Fatal(err)
 	}

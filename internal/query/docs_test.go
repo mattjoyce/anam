@@ -249,3 +249,62 @@ func TestDocs_SelectionProgramIsWhatTheBuilderWrites(t *testing.T) {
 		t.Errorf("the page shows %d selection programs, the test builds %d", seen, len(filters))
 	}
 }
+
+// sourceTimeV1 and sourceTimeV2 are the two source_time shapes a Definition may copy
+// (internal/def/sourcetime), without their prose: v1 for a value read in a named zone,
+// v2 for a wall clock with the offset it had.
+const sourceTimeV1 = `"source_time": {"type": "object", "required": ["value", "zone", "basis"], "additionalProperties": false,
+      "properties": {"value": {"type": "string", "minLength": 1}, "zone": {"type": "string", "minLength": 1, "pattern": "^([A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$"}, "basis": {"type": "string", "enum": ["source", "configuration", "assumption"]}}}`
+
+const sourceTimeV2 = `"source_time": {"type": "object", "required": ["value", "zone", "offset", "basis"], "additionalProperties": false,
+      "properties": {"value": {"type": "string", "minLength": 1}, "zone": {"type": "string", "minLength": 1, "pattern": "^([A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$"}, "offset": {"type": "string", "pattern": "^[+-]([01][0-9]|2[0-3]):[0-5][0-9]$"}, "basis": {"type": "string", "enum": ["source", "configuration", "assumption"]}}}`
+
+// intakeManifest, sleepManifest and stepsManifest are the three types docs/QUERY.md's
+// alcohol and steps questions are asked of, with the fact-time rule and identity the
+// page's record was admitted under: an intake is at read at the offset source_time
+// names and its id composed from its kind and minute; a sleep episode and a day of steps
+// are placed by the RFC 3339 start of their interval.
+const intakeManifest = `{
+  "meta": {
+    "facet_type": "health.intake", "definition_version": 2, "kind": "event", "classification": "Sensitive",
+    "validation_mode": "strict", "source_schema": "records/health.intake",
+    "time_semantics": {"fact_time": {"pointer": "/at", "layout": "2006-01-02 15:04", "zone": "Australia/Sydney", "zone_pointer": "/source_time/offset"}},
+    "identity_key": ["/id"],
+    "identity_template": "{source}:intake/{/kind}/{/at|2006-01-02T15:04}{/source_time/offset?}"
+  },
+  "schema": {"type": "object", "required": ["id", "kind", "at", "source_time"],
+    "properties": {"id": {"type": "string", "minLength": 1}, "kind": {"type": "string", "enum": ["caffeine", "alcohol", "meal"]},
+      "at": {"type": "string", "minLength": 1}, "drink": {"type": "string", "minLength": 1}, "count": {"type": "integer", "minimum": 1},
+      ` + sourceTimeV2 + `},
+    "additionalProperties": false}
+}`
+
+const intervalSchema = `"effective_time_frame": {"type": "object", "required": ["time_interval"],
+      "properties": {"time_interval": {"type": "object", "required": ["start_date_time", "end_date_time"],
+        "properties": {"start_date_time": {"type": "string", "minLength": 1}, "end_date_time": {"type": "string", "minLength": 1}}, "additionalProperties": false}}, "additionalProperties": false}`
+
+const sleepManifest = `{
+  "meta": {
+    "facet_type": "health.sleep-episode", "definition_version": 2, "kind": "measure", "classification": "Sensitive",
+    "validation_mode": "strict", "source_schema": "garmin/sleep-episode",
+    "time_semantics": {"fact_time": {"pointer": "/effective_time_frame/time_interval/start_date_time", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}},
+    "identity_key": ["/id"]
+  },
+  "schema": {"type": "object", "required": ["id", "effective_time_frame", "source_time"],
+    "properties": {"id": {"type": "string", "minLength": 1}, ` + intervalSchema + `, ` + sourceTimeV1 + `},
+    "additionalProperties": false}
+}`
+
+const stepsManifest = `{
+  "meta": {
+    "facet_type": "activity.steps", "definition_version": 2, "kind": "measure", "classification": "Sensitive",
+    "validation_mode": "strict", "source_schema": "garmin/step-count",
+    "time_semantics": {"fact_time": {"pointer": "/effective_time_frame/time_interval/start_date_time", "layout": "2006-01-02T15:04:05Z07:00", "zone": "Australia/Sydney"}},
+    "identity_key": ["/id"]
+  },
+  "schema": {"type": "object", "required": ["id", "step_count", "effective_time_frame", "source_time"],
+    "properties": {"id": {"type": "string", "minLength": 1},
+      "step_count": {"type": "object", "required": ["value", "unit"], "properties": {"value": {"type": "number"}, "unit": {"type": "string", "enum": ["steps"]}}, "additionalProperties": false},
+      ` + intervalSchema + `, ` + sourceTimeV1 + `},
+    "additionalProperties": false}
+}`

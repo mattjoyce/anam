@@ -20,7 +20,8 @@ import (
 )
 
 // fixture is a real ledger and operational store under the test's own directory, and a
-// gate over them. admit puts one health.weight in as source.
+// gate over them. admit puts one of the engine fixture's test.measure in as source,
+// its seq making it a facet of its own.
 type fixture struct {
 	l  *ledger.Ledger
 	db *ops.DB
@@ -45,17 +46,17 @@ func newFixture(t *testing.T) fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	defs := catalogtest.Definitions(t)
-	scopes := gate.StaticScopes{"workbench": {"health.weight"}, "scale": {"health.weight"}}
+	defs := catalogtest.Engine.Definitions(t)
+	scopes := gate.StaticScopes{"workbench": {"test.measure"}, "scale": {"test.measure"}}
 	g := gate.New(l, defs, scopes, clock.Real{}, "matt",
 		gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	return fixture{l: l, db: db, g: g}
 }
 
-func (f fixture) admit(t *testing.T, source, id string) string {
+func (f fixture) admit(t *testing.T, source string, seq int) string {
 	t.Helper()
-	env := facet.Envelope{Type: "health.weight", Source: source, Injector: source,
-		Payload: []byte(fmt.Sprintf(`{"id": %q, "date": "2026-10-09 07:30", "source_time": {"value": "2026-10-09 07:30", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}, "kg": 80.5}`, id))}
+	env := facet.Envelope{Type: "test.measure", Source: source, Injector: source,
+		Payload: []byte(fmt.Sprintf(`{"at": "2026-10-09 07:30:00", "seq": %d, "count": 80, "source_time": {"value": "2026-10-09 07:30:00", "zone": "Europe/Berlin", "basis": "source"}}`, seq))}
 	b, err := f.g.Resolve(env)
 	if err != nil {
 		t.Fatal(err)
@@ -71,14 +72,14 @@ func TestPlanFacet(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	f := newFixture(t)
-	live := f.admit(t, "workbench", "w-1")
-	dead := f.admit(t, "workbench", "w-2")
+	live := f.admit(t, "workbench", 1)
+	dead := f.admit(t, "workbench", 2)
 	if _, _, err := f.g.Retract(ctx, dead); err != nil {
 		t.Fatal(err)
 	}
-	reconciled := f.admit(t, "scale", "w-3")
+	reconciled := f.admit(t, "scale", 3)
 	w, _ := f.l.Head(ctx)
-	if _, err := f.db.RecordSnapshotPart(ctx, ops.SnapshotPart{ID: "run", Source: "scale", Types: []string{"health.weight"},
+	if _, err := f.db.RecordSnapshotPart(ctx, ops.SnapshotPart{ID: "run", Source: "scale", Types: []string{"test.measure"},
 		Part: 1, Parts: 1, FacetIDs: []string{reconciled}}, time.Now(), int64(w),
 		ops.SnapshotRetention{Incomplete: config.DefaultSnapshotTTL, Complete: config.DefaultSnapshotKeep}); err != nil {
 		t.Fatal(err)

@@ -3,7 +3,6 @@ package projection
 import (
 	"bytes"
 	"crypto/sha256"
-	"embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -16,17 +15,14 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
-// The bundled templates: small, static, versioned with the binary (AGENTS.md,
-// Embedded assets). They are the floor; the operator registers others over the API
-// (Register, WithRegistered), and a consumer still only selects (§9).
+// A catalog's templates are the floor; the operator registers others over the API
+// (Register, WithRegistered), and a consumer still only selects (§9). The binary
+// carries none (card 255); the deployment's projections directory supplies them.
 //
-// manifests/<name>.json is each template's current version, the one a consumer
-// selecting by name is answered with. manifests/history/<name>.v<n>.json is every
-// earlier bundled version a receipt may name (card 147): held beside the current one,
-// so a receipt cut under it still verifies against exactly the template that served it.
-//
-//go:embed manifests/*.json manifests/history/*.json
-var manifestFS embed.FS
+// <name>.json in a catalog root is each template's current version, the one a
+// consumer selecting by name is answered with. history/<name>.v<n>.json is every
+// earlier version a receipt may name (card 147): held beside the current one, so a
+// receipt cut under it still verifies against exactly the template that served it.
 
 // manifest mirrors the JSON layout. The required knobs are pointers so that "absent"
 // and "empty" stay distinguishable — see requireEveryKnob.
@@ -253,16 +249,6 @@ func (r *Registry) add(t Template) error {
 	return nil
 }
 
-// embedded returns the embedded catalog root, laid out as a catalog FS: *.json at
-// the root, history/*.json for earlier versions.
-func embedded() fs.FS {
-	root, err := fs.Sub(manifestFS, "manifests")
-	if err != nil {
-		panic("projection: cannot sub manifests: " + err.Error())
-	}
-	return root
-}
-
 // readJSONFiles lists regular *.json files from an fs.FS root. Any
 // non-regular-file entry (directories, .DS_Store, README.md) is ignored.
 func readJSONFiles(fsys fs.FS, dir string) ([]string, error) {
@@ -284,7 +270,10 @@ func readJSONFiles(fsys fs.FS, dir string) ([]string, error) {
 }
 
 // BundledFS parses every template manifest in a catalog root: *.json at the root,
-// earlier versions under history/. Bundled is BundledFS over the embedded catalog.
+// earlier versions under history/. Like the definition set, it fails on any bad
+// manifest rather than loading the rest: a registry that silently dropped a
+// projection would answer "unknown projection" for a name that is in the catalog,
+// which is the confusing failure, not the safe one.
 func BundledFS(fsys fs.FS) (*Registry, error) {
 	names, err := readJSONFiles(fsys, ".")
 	if err != nil {
@@ -342,21 +331,6 @@ func BundledFS(fsys fs.FS) (*Registry, error) {
 		}
 	}
 	return r, nil
-}
-
-// EmbeddedFS returns the read-only embedded catalog root: *.json at the root,
-// history/*.json for earlier versions. It is the fallback when no external
-// projections directory is configured.
-func EmbeddedFS() fs.FS {
-	return embedded()
-}
-
-// Bundled parses every embedded manifest into a Registry. Like the definition set, it
-// fails on any bad manifest rather than loading the rest: a binary that silently
-// dropped a projection would answer "unknown projection" for a name that is in the
-// source tree, which is the confusing failure, not the safe one.
-func Bundled() (*Registry, error) {
-	return BundledFS(embedded())
 }
 
 // Lookup returns the newest version of the template a consumer selected. An unknown

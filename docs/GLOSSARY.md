@@ -351,7 +351,7 @@ artifact version). It advances the watermark like any mutation. The Facet stays 
 `activity.exercise-session.garmin`, `.concept2`, `.technogym` and `.strong`, `activity.day.garmin`,
 `health.measurement.withings`, `health.cpap-session.dreamstation`. A vendor's shape takes the leaf even
 with one vendor; a standard shape (Open mHealth, IEEE 1752) takes none. A concept split into leaves keeps a
-shared core, the fields every leaf carries with one meaning, which `internal/def/shared-core.json` names and a test
+shared core, the fields every leaf carries with one meaning, which the deployment's `shared-core.json` names and a test
 holds identical. A reader asks across the leaves by the prefix (`activity.exercise-session.`). See
 *Facet type*.
 

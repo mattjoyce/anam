@@ -16,27 +16,17 @@ type allowed struct {
 	reason string
 }
 
-// embeddedAllowList is every test that reads the embedded catalog on purpose. Its
-// subject is the catalog the binary carries, so pointed at the fixture copy it would
-// test the copy and prove nothing about the binary. R4b (card 255) deletes the
-// embedded catalog and empties this list; the rule then stays, with nothing allowed.
+// embeddedAllowList is every test that reads the embedded catalog on purpose, or
+// selects the empty catalog the rule flags in its place. Its subject was the catalog
+// the binary carried, so pointed at the fixture copy it would test the copy and prove
+// nothing about the binary. R4b (card 255) deleted the embedded catalog in slice 5;
+// slice 6 empties this list, and the rule then stays, with nothing allowed.
 // A file holding only allowed tests is listed whole; a file that mixes them with
 // tests that moved to the fixture lists its allowed functions.
 var embeddedAllowList = []allowed{
-	// Slice 1 (#29): the two places the fixture is checked against the binary.
-	{file: "internal/catalog/catalogtest/catalogtest_test.go",
-		funcs:  []string{"TestFixture_SetVersionMatchesEmbedded", "TestFixture_BytesMatchEmbedded"},
-		reason: "the fixture's V and bytes equal the embedded catalog's; deleted with the catalog"},
-
-	// Slice 2 (#31): def and projection. R4b slice 4a moved the tests about the personal
-	// catalog to the deployment overlay and the rest to fixture.Engine; the two
-	// cross-checks below go with the catalog in slice 5.
-	{file: "internal/def/catalog_fs_test.go",
-		funcs:  []string{"TestBundledFS_MatchEmbedded", "TestBundledFS_ManifestsHistoryMatch"},
-		reason: "a disk copy of fixture.Mattjoyce loads as the embedded definitions do; deleted with the catalog"},
-	{file: "internal/projection/catalog_fs_test.go",
-		funcs:  []string{"TestBundledFS_MatchEmbedded"},
-		reason: "the same cross-check for projections; deleted with the catalog"},
+	// Slices 1 and 2 (#29, #31): the cross-checks of fixture.Mattjoyce against the
+	// embedded catalog in catalogtest, def and projection were deleted with that
+	// catalog in R4b slice 5.
 
 	// Slice 3 (#32): catalog. R4b slice 3 rewrote it for the empty catalog.
 	{file: "internal/catalog/empty_test.go",

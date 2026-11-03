@@ -751,7 +751,7 @@ metadata/payload separation (§3) is enforced.
 **Facet Definitions are not in the ledger.** A Definition is not something Anam *knew*; it is how Anam
 *interprets* — governance, not record. It lives in the operational store, every version, so an
 artifact's `definition_version` still resolves. It is provisioned from one of two places, never both
-for one type: the JSON embedded in the binary, for the standard types Anam bundles, or the
+for one type: the deployment's catalog directory (`definitions_dir`), for the types it bundles, or the
 importer that emits it, which registers it from its repo (`POST /v1/definitions`, docs/IMPORTERS.md
 §8). A registered version is immutable, and the store's triggers hold it so. The error kernel is
 smaller for it.

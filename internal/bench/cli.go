@@ -12,6 +12,7 @@ import (
 
 	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/config"
+	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/safepath"
 	"github.com/spf13/cobra"
 )
@@ -59,15 +60,21 @@ func loadCatalog(cmd *cobra.Command, explicit string) (*catalog.Catalog, error) 
 }
 
 func genCmd(cfgPath *string) *cobra.Command {
-	var shape, dir string
+	var shape, dir, typ string
 	budget := 0
 	cmd := &cobra.Command{
 		Use:   "gen",
 		Short: "build a synthetic record of a named shape in an empty directory",
-		Long: `Gen builds a record through the real gate: readings spread over monthly buckets,
-corrections and retractions over the history, a mint of every bucket, then a tail
-of new readings and late corrections after the mint. The same shape always yields
-the same facts.
+		Long: `Gen builds a record through the real gate: readings of --type spread over monthly
+buckets, corrections and retractions over the history, a mint of every bucket, then
+a tail of new readings and late corrections after the mint. The same shape and type
+always yield the same facts.
+
+The type's Definition is read from the catalog the anam config names. Its fact time
+must be a top-level string field that is the whole identity key, read in the
+Definition's own layout and zone, and its schema must require exactly two numeric
+fields beside it and nothing else, with no bound, step, list or pattern on any of the
+three; a type that does not fit is refused.
 
 Shapes: ` + shapeList(),
 		Args: cobra.NoArgs,
@@ -85,20 +92,22 @@ Shapes: ` + shapeList(),
 				return err
 			}
 			start := time.Now()
-			err = Generate(cmd.Context(), cat, dir, sh, func(s string) {
+			err = Generate(cmd.Context(), cat, facet.Type(typ), dir, sh, func(s string) {
 				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "%6.1fs %s\n", time.Since(start).Seconds(), s)
 			})
 			if err != nil {
 				return err
 			}
-			_, err = fmt.Fprintf(cmd.OutOrStdout(), "built shape %s in %s (%.1fs)\n", shape, dir, time.Since(start).Seconds())
+			_, err = fmt.Fprintf(cmd.OutOrStdout(), "built shape %s of %s in %s (%.1fs)\n", shape, typ, dir, time.Since(start).Seconds())
 			return err
 		},
 	}
 	cmd.Flags().StringVar(&shape, "shape", "S", "the shape to build")
 	cmd.Flags().StringVar(&dir, "dir", "", "an empty directory to build it in")
+	cmd.Flags().StringVar(&typ, "type", "", "the facet type to write, a time and two numbers, from the configured catalog")
 	cmd.Flags().IntVar(&budget, "budget", 0, "checkpoint_budget in bytes for the mint; 0 is the fixed monthly width")
 	_ = cmd.MarkFlagRequired("dir")
+	_ = cmd.MarkFlagRequired("type")
 	return cmd
 }
 

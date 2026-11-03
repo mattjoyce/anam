@@ -175,7 +175,8 @@ anam-importers/
   anam_submit/                 the generic plugin that posts envelopes
 ```
 
-A Definition is a JSON manifest in exactly the format of Anam's own (`internal/def/manifests`):
+A Definition is a JSON manifest in exactly the format of a catalog's (a deployment's
+`definitions_dir`; `internal/catalog/fixture/testdata/minimal/definitions` holds examples):
 `meta` carries the type, version, `identity_key`, `time_semantics`, classification and
 `validation_mode`, and may declare `kind` (`measure`, `reading` or `event`) and `family` (a
 lower-case word such as `meds`), which say what the type is so a reader can draw and filter it
@@ -279,8 +280,8 @@ importers:
 | `GET /v1/definitions/{type}/{version}` | That version's manifest. 404 if not held. |
 | `POST /v1/definitions` | Body: one manifest. 201 registered; 200 already registered, same body; 409 a different body at that version, an older version than one held, a changed `identity_key` or `fact_time`, or a type the binary bundles; 422 not a valid manifest; 403 a type outside the token's `types`. |
 
-Every version is held, and a rebuilt operational store holds them again: the versions Anam's own
-bundle ever carried are provisioned from the binary (`internal/def/manifests/history`),
+Every version is held, and a rebuilt operational store holds them again: the versions the catalog
+carries are provisioned from its `definitions_dir` (earlier ones under `history/`),
 and an importer's versions come back because the importer keeps every version it has ever emitted
 of the types it emits now, the current one in `definitions/<type>.json` and each earlier one in
 `definitions/history/<type>.v<n>.json`, and registers them all, each type's oldest first, since a
@@ -342,7 +343,7 @@ Withings' rows `health.measurement.withings`, a DreamStation's sessions
 `health.cpap-session.dreamstation`. A new source of the same concept is a new leaf with
 the shared core and its own fields, never a wider type. A reader asks across the leaves by the
 prefix, `activity.exercise-session.`. The importer that registers a type renames it by a
-rename table (`renames/`), registering the leaf before the run; a leaf's first version may place its
+rename table (`anam rename --table`), registering the leaf before the run; a leaf's first version may place its
 facets by a new fact-time rule, as `activity.day.garmin` reads the start of the day Garmin counted
 where `activity.day` read the date at Sydney midnight.
 
@@ -510,7 +511,8 @@ it no longer does (Matt, 2026-10-10).
 
 ### 8.7 Not yet
 
-- **Receipts.** A receipt pins the bundled Definition set's version (`def.SetVersion`); registered
+- **Receipts.** A receipt pins the catalog's Definition set version (`def.SetVersionFS` over
+  `definitions_dir`); registered
   Definitions are not in it.
 
 ### 8.8 Rebuilding the record from its sources

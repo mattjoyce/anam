@@ -73,49 +73,6 @@ func fixtureDir(t *testing.T) string {
 	return dir
 }
 
-// personalDir is fixtureDir over fixture.Mattjoyce, read only by the test that ties
-// that byte copy to the catalog the binary embeds. It goes with the embedded catalog
-// in R4b slice 5.
-func personalDir(t *testing.T) string {
-	t.Helper()
-	_, projs := fixture.Mattjoyce()
-	_, dir := fixture.Dirs(t, fstest.MapFS{}, projs)
-	return dir
-}
-
-// TestBundledFS_MatchEmbedded proves a disk copy of fixture.Mattjoyce loads exactly
-// as the catalog embedded in the binary does. It reads the embedded catalog on
-// purpose, to tie the fixture to it, and goes when the embedded catalog does (card
-// 255, R4b).
-func TestBundledFS_MatchEmbedded(t *testing.T) {
-	embeddedReg, err := projection.Bundled()
-	if err != nil {
-		t.Fatalf("Bundled: %v", err)
-	}
-
-	srcDir := personalDir(t)
-	copy := copyCatalogToDisk(t, srcDir)
-
-	reg, err := projection.BundledFS(copy)
-	if err != nil {
-		t.Fatalf("BundledFS: %v", err)
-	}
-
-	// Template names, versions and hashes must match.
-	embeddedAll := embeddedReg.Held()
-	all := reg.Held()
-	if len(embeddedAll) != len(all) {
-		t.Fatalf("Bundled has %d templates, copy has %d", len(embeddedAll), len(all))
-	}
-	for i := range embeddedAll {
-		got, want := all[i], embeddedAll[i]
-		if got.Name != want.Name || got.Version != want.Version || got.Hash != want.Hash {
-			t.Errorf("template %d: embedded %s v%d %s, copy %s v%d %s",
-				i, want.Name, want.Version, want.Hash, got.Name, got.Version, got.Hash)
-		}
-	}
-}
-
 // TestBundledFS_IgnoresNonJSONFiles verifies that .DS_Store and notes/ are ignored.
 func TestBundledFS_IgnoresNonJSONFiles(t *testing.T) {
 	srcDir := fixtureDir(t)

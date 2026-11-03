@@ -3,7 +3,6 @@ package catalogtest_test
 import (
 	"bytes"
 	"context"
-	"io/fs"
 	"sort"
 	"testing"
 
@@ -13,7 +12,6 @@ import (
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
-	"github.com/mattjoyce/anam/internal/projection"
 )
 
 // v is the definition set version the binary reports at de2981c, the R0 oracle the
@@ -35,77 +33,6 @@ func TestFixture_SetVersionIsV(t *testing.T) {
 	if got := catalogtest.Catalog(t).SetVersion(); got != v {
 		t.Errorf("catalogtest.Catalog SetVersion = %s, want %s", got, v)
 	}
-}
-
-// TestFixture_SetVersionMatchesEmbedded is the one place the fixture's version is
-// checked against the embedded catalog's. Allow-listed in R4a; R4b deletes it with
-// the catalog.
-func TestFixture_SetVersionMatchesEmbedded(t *testing.T) {
-	t.Parallel()
-	defs, _ := fixture.Mattjoyce()
-	got, err := def.SetVersionFS(defs)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want, err := def.SetVersion()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != want {
-		t.Errorf("SetVersionFS(fixture.Mattjoyce) = %s, def.SetVersion() = %s", got, want)
-	}
-}
-
-// TestFixture_BytesMatchEmbedded proves the mattjoyce fixture is a byte copy of the
-// embedded catalog: the same files under the same names, with the same bytes, in both
-// components. Allow-listed in R4a; R4b deletes it with the catalog.
-func TestFixture_BytesMatchEmbedded(t *testing.T) {
-	t.Parallel()
-	defs, projs := fixture.Mattjoyce()
-	for _, c := range []struct {
-		name            string
-		fixture, binary fs.FS
-	}{
-		{"definitions", defs, def.EmbeddedFS()},
-		{"projections", projs, projection.EmbeddedFS()},
-	} {
-		got, want := files(t, c.fixture), files(t, c.binary)
-		if len(want) == 0 {
-			t.Fatalf("%s: the embedded catalog holds no files", c.name)
-		}
-		for name, body := range want {
-			g, ok := got[name]
-			switch {
-			case !ok:
-				t.Errorf("%s: %s is embedded but not in the fixture", c.name, name)
-			case !bytes.Equal(g, body):
-				t.Errorf("%s: %s differs from the embedded file", c.name, name)
-			}
-		}
-		for name := range got {
-			if _, ok := want[name]; !ok {
-				t.Errorf("%s: %s is in the fixture but not embedded", c.name, name)
-			}
-		}
-	}
-}
-
-// files is every regular file under root, by slash path.
-func files(t *testing.T, root fs.FS) map[string][]byte {
-	t.Helper()
-	out := map[string][]byte{}
-	err := fs.WalkDir(root, ".", func(name string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		body, err := fs.ReadFile(root, name)
-		out[name] = body
-		return err
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return out
 }
 
 // TestHelpers_BuildTheFixture checks each helper is built over fixture.Mattjoyce.

@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 	"testing/fstest"
 
@@ -52,70 +51,6 @@ func copyCatalogToDisk(t *testing.T, src fs.FS, dir string) fs.FS {
 		t.Fatalf("write notes/extra.json: %v", err)
 	}
 	return os.DirFS(dir)
-}
-
-// TestBundledFS_MatchEmbedded proves a disk copy of fixture.Mattjoyce loads exactly
-// as the catalog embedded in the binary does. It reads the embedded catalog on
-// purpose, to tie the fixture to it, and goes when the embedded catalog does (card
-// 255, R4b).
-func TestBundledFS_MatchEmbedded(t *testing.T) {
-	embeddedReg, err := def.Bundled()
-	if err != nil {
-		t.Fatalf("Bundled: %v", err)
-	}
-	embeddedSV, err := def.SetVersion()
-	if err != nil {
-		t.Fatalf("SetVersion: %v", err)
-	}
-	embeddedManifests, err := def.Manifests()
-	if err != nil {
-		t.Fatalf("Manifests: %v", err)
-	}
-
-	dir := t.TempDir()
-	copy := copyCatalogToDisk(t, personalDefs(), dir)
-
-	reg, err := def.BundledFS(copy)
-	if err != nil {
-		t.Fatalf("BundledFS: %v", err)
-	}
-	sv, err := def.SetVersionFS(copy)
-	if err != nil {
-		t.Fatalf("SetVersionFS: %v", err)
-	}
-	manifests, err := def.ManifestsFS(copy)
-	if err != nil {
-		t.Fatalf("ManifestsFS: %v", err)
-	}
-
-	// The registries must be equivalent (same types, versions, keying).
-	embeddedAll := embeddedReg.All()
-	all := reg.All()
-	if len(embeddedAll) != len(all) {
-		t.Fatalf("Bundled has %d types, copy has %d", len(embeddedAll), len(all))
-	}
-	for i := range embeddedAll {
-		got, want := all[i], embeddedAll[i]
-		if got.Type != want.Type || got.Version != want.Version {
-			t.Errorf("type %d: embedded %s v%d, copy %s v%d", i, want.Type, want.Version, got.Type, got.Version)
-		}
-	}
-
-	// SetVersionFS must match.
-	if sv != embeddedSV {
-		t.Errorf("SetVersionFS = %s, want %s", sv, embeddedSV)
-	}
-
-	// ManifestsFS must produce the same type/version/body.
-	if len(manifests) != len(embeddedManifests) {
-		t.Fatalf("ManifestsFS has %d entries, embedded has %d", len(manifests), len(embeddedManifests))
-	}
-	for i := range embeddedManifests {
-		got, want := manifests[i], embeddedManifests[i]
-		if got.Type != want.Type || got.Version != want.Version || string(got.Body) != string(want.Body) {
-			t.Errorf("manifest %d: embedded %s v%d, copy %s v%d, body matches %v", i, want.Type, want.Version, got.Type, got.Version, string(got.Body) == string(want.Body))
-		}
-	}
 }
 
 // TestFS_ChangedManifestMovesSetVersion verifies that changing a manifest's bytes
@@ -252,64 +187,5 @@ func TestFS_IgnoresNonJSONFiles(t *testing.T) {
 	}
 	if sv != fixtureSV {
 		t.Errorf("SetVersionFS with extra files = %s, want %s", sv, fixtureSV)
-	}
-}
-
-// TestBundledFS_ManifestsHistoryMatch verifies that ManifestsFS and HistoryFS over a
-// disk copy of fixture.Mattjoyce return what their embedded counterparts do. Like
-// TestBundledFS_MatchEmbedded it reads the embedded catalog on purpose, and goes with
-// it at R4b.
-func TestBundledFS_ManifestsHistoryMatch(t *testing.T) {
-	dir := t.TempDir()
-	_ = copyCatalogToDisk(t, personalDefs(), dir)
-
-	// ManifestsFS vs Manifests.
-	want, err := def.Manifests()
-	if err != nil {
-		t.Fatalf("Manifests: %v", err)
-	}
-	got, err := def.ManifestsFS(os.DirFS(dir))
-	if err != nil {
-		t.Fatalf("ManifestsFS: %v", err)
-	}
-	if len(got) != len(want) {
-		t.Fatalf("ManifestsFS has %d entries, Manifests has %d", len(got), len(want))
-	}
-	slices.SortFunc(got, func(a, b def.Stored) int {
-		if a.Type != b.Type {
-			if a.Type < b.Type {
-				return -1
-			}
-			return 1
-		}
-		return a.Version - b.Version
-	})
-	slices.SortFunc(want, func(a, b def.Stored) int {
-		if a.Type != b.Type {
-			if a.Type < b.Type {
-				return -1
-			}
-			return 1
-		}
-		return a.Version - b.Version
-	})
-	for i := range want {
-		if got[i].Type != want[i].Type || got[i].Version != want[i].Version || string(got[i].Body) != string(want[i].Body) {
-			t.Errorf("entry %d: ManifestsFS %s v%d, Manifests %s v%d, bodies match %v",
-				i, got[i].Type, got[i].Version, want[i].Type, want[i].Version, string(got[i].Body) == string(want[i].Body))
-		}
-	}
-
-	// HistoryFS vs History.
-	wantHistory, err := def.History()
-	if err != nil {
-		t.Fatalf("History: %v", err)
-	}
-	gotHistory, err := def.HistoryFS(os.DirFS(dir))
-	if err != nil {
-		t.Fatalf("HistoryFS: %v", err)
-	}
-	if len(gotHistory) != len(wantHistory) {
-		t.Fatalf("HistoryFS has %d entries, History has %d", len(gotHistory), len(wantHistory))
 	}
 }

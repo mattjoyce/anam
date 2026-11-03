@@ -22,6 +22,7 @@ import (
 
 //go:embed testdata/mattjoyce/definitions testdata/mattjoyce/projections
 //go:embed testdata/minimal/definitions testdata/minimal/projections
+//go:embed testdata/engine/definitions testdata/engine/projections
 var files embed.FS
 
 // Mattjoyce is the catalog the engine embedded at de2981c, byte for byte: a copy of
@@ -37,6 +38,28 @@ func Mattjoyce() (definitions, projections fs.FS) {
 // over it (measures). It is nobody's record.
 func Minimal() (definitions, projections fs.FS) {
 	return pair("minimal")
+}
+
+// Engine is the catalog the engine's behaviour tests read (card 255, R4b): one type
+// or template per engine feature, each with the history its tests need, under the
+// test. head and record.*. It is nobody's record. What each file is there for is in
+// engine_test.go, which pins the layout and the features; catalogtest's tests pin its
+// definition set version.
+//
+// Definitions: record.edge and record.document, Minimal's UTC copies; test.reading,
+// a reading placed by the offset source_time names (v2) or in Europe/Berlin (v1);
+// test.measure, keyed by two fields, source_time required from v2; test.templated,
+// an identity template that gains an optional offset in v2; test.labelled, a label
+// whose fields may be absent; test.course.started, .changed and .stopped, one series
+// the stop closes; test.retired, only in history, the stop's earlier name, which
+// closes the series too; test.entry, only in history, a course row of any sort that a
+// selector split carries to the three; test.sample, only in history, test.reading's
+// earlier name read in UTC; and test.pair, the bench's two numbers and a time.
+// Projections: measures (a log of one type), course (a
+// snapshot over the series, whose v1 named test.retired), everything (a log of every
+// type, the series by its prefix) and normal (the same types under a Normal ceiling).
+func Engine() (definitions, projections fs.FS) {
+	return pair("engine")
 }
 
 // pair returns a named catalog's two roots.

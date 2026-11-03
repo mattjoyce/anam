@@ -1,0 +1,16 @@
+{
+  "name": "measures",
+  "version": 1,
+  "description": "Every test.measure, at its fact time. It is nobody's record.",
+  "types": [
+    "test.measure"
+  ],
+  "statuses": [
+    "admitted",
+    "endorsed"
+  ],
+  "max_classification": "Normal",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

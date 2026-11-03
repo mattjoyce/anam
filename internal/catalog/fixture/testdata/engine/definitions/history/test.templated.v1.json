@@ -1,0 +1,65 @@
+{
+  "meta": {
+    "facet_type": "test.templated",
+    "definition_version": 1,
+    "kind": "event",
+    "family": "templated",
+    "classification": "Confidential",
+    "validation_mode": "strict",
+    "source_schema": "fixture/test.templated",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/at",
+        "layout": "2006-01-02 15:04",
+        "zone": "Europe/Berlin"
+      }
+    },
+    "identity_key": [
+      "/id"
+    ],
+    "identity_template": "{source}:templated/{/name|slug}/{/at|2006-01-02T15:04}",
+    "min_binding_assurance": "medium"
+  },
+  "handling": {
+    "guidance": "Leave id out and Anam fills it; send it and it must match.",
+    "label": "{/name} {/amount} {/unit}"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One thing taken at a moment, whose id every writer composes from identity_template: the source, the name slugged and the minute. It is nobody's record.",
+    "type": "object",
+    "required": [
+      "id",
+      "at",
+      "name",
+      "amount",
+      "unit"
+    ],
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "at": {
+        "type": "string",
+        "minLength": 1
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1
+      },
+      "amount": {
+        "type": "number"
+      },
+      "unit": {
+        "type": "string",
+        "minLength": 1
+      },
+      "note": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "additionalProperties": false
+  }
+}

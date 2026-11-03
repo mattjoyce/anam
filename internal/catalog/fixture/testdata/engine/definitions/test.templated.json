@@ -1,0 +1,100 @@
+{
+  "meta": {
+    "facet_type": "test.templated",
+    "definition_version": 2,
+    "kind": "event",
+    "family": "templated",
+    "classification": "Confidential",
+    "validation_mode": "strict",
+    "source_schema": "fixture/test.templated",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/at",
+        "layout": "2006-01-02 15:04",
+        "zone": "Europe/Berlin",
+        "zone_pointer": "/source_time/offset"
+      }
+    },
+    "identity_key": [
+      "/id"
+    ],
+    "identity_template": "{source}:templated/{/name|slug}/{/at|2006-01-02T15:04}{/source_time/offset?}",
+    "min_binding_assurance": "medium"
+  },
+  "handling": {
+    "guidance": "Leave id out and Anam fills it; send it and it must match.",
+    "label": "{/name} {/amount} {/unit}"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One thing taken at a moment, whose id every writer composes from identity_template: the source, the name slugged and the minute. Version 2 appends source_time's offset to the id and reads the wall clock at it, so one minute in two zones is two facts and one recorded before keeps its id. It is nobody's record.",
+    "type": "object",
+    "required": [
+      "id",
+      "at",
+      "name",
+      "amount",
+      "unit",
+      "source_time"
+    ],
+    "properties": {
+      "source_time": {
+        "type": "object",
+        "required": [
+          "value",
+          "zone",
+          "offset",
+          "basis"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": "string",
+            "minLength": 1
+          },
+          "zone": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^([A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$"
+          },
+          "offset": {
+            "type": "string",
+            "pattern": "^[+-]([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "source",
+              "configuration",
+              "assumption"
+            ]
+          }
+        }
+      },
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "at": {
+        "type": "string",
+        "minLength": 1
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1
+      },
+      "amount": {
+        "type": "number"
+      },
+      "unit": {
+        "type": "string",
+        "minLength": 1
+      },
+      "note": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "additionalProperties": false
+  }
+}

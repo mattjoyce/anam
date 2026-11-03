@@ -1,0 +1,54 @@
+{
+  "meta": {
+    "facet_type": "test.reading",
+    "definition_version": 1,
+    "kind": "reading",
+    "family": "readings",
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "fixture/test.reading",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/at",
+        "layout": "2006-01-02 15:04",
+        "zone": "Europe/Berlin"
+      }
+    },
+    "identity_key": [
+      "/id"
+    ],
+    "min_binding_assurance": "medium"
+  },
+  "handling": {
+    "label": "{/value} {/unit}"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One instrument value said at a wall clock, read in Europe/Berlin. It is nobody's record.",
+    "type": "object",
+    "required": [
+      "id",
+      "at",
+      "value",
+      "unit"
+    ],
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "at": {
+        "type": "string",
+        "minLength": 1
+      },
+      "value": {
+        "type": "number"
+      },
+      "unit": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "additionalProperties": false
+  }
+}

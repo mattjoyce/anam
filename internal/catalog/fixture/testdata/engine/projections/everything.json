@@ -1,0 +1,23 @@
+{
+  "name": "everything",
+  "version": 1,
+  "description": "Every type the catalog holds, the course series by its prefix, at every classification. It is nobody's record.",
+  "types": [
+    "record.document",
+    "record.edge",
+    "test.course.",
+    "test.labelled",
+    "test.measure",
+    "test.pair",
+    "test.reading",
+    "test.templated"
+  ],
+  "statuses": [
+    "admitted",
+    "endorsed"
+  ],
+  "max_classification": "Sensitive",
+  "from": "",
+  "to": "",
+  "shape": "log"
+}

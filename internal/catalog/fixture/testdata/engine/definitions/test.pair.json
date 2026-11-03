@@ -1,0 +1,49 @@
+{
+  "meta": {
+    "facet_type": "test.pair",
+    "definition_version": 1,
+    "kind": "reading",
+    "family": "readings",
+    "classification": "Normal",
+    "validation_mode": "strict",
+    "source_schema": "fixture/test.pair",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/at",
+        "layout": "2006-01-02 15:04:05",
+        "zone": "Europe/Berlin"
+      }
+    },
+    "identity_key": [
+      "/at"
+    ],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "Two numbers at one moment, keyed by the moment, the shape a synthetic ledger writes: nothing else is required. It is nobody's record.",
+    "type": "object",
+    "required": [
+      "at",
+      "a",
+      "b"
+    ],
+    "properties": {
+      "at": {
+        "type": "string",
+        "minLength": 1
+      },
+      "a": {
+        "type": "number"
+      },
+      "b": {
+        "type": "number"
+      },
+      "note": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "additionalProperties": false
+  }
+}

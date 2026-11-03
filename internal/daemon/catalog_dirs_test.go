@@ -189,7 +189,8 @@ func TestOpenLogsTheCatalogItAdmitted(t *testing.T) {
 
 // A receipt minted on one catalog directory verifies the same on another directory
 // copied from the same files: same result, same notes, no "definition set has moved".
-// Where the files came from never enters a content hash.
+// Where the files came from never enters a content hash. The embedded-to-directory
+// transition is TestReceiptMintedOnTheEmbeddedCatalogVerifiesOnACopy.
 func TestReceiptVerifiesTheSameOnACopiedCatalog(t *testing.T) {
 	t.Parallel()
 	cfg := readerConfig(t)

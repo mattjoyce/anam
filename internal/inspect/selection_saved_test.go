@@ -61,7 +61,7 @@ func save(t *testing.T, srv *httptest.Server, program string) (string, string) {
 func TestSelectSave_ShowsTheCodeAndOpensWithTheChips(t *testing.T) {
 	t.Parallel()
 	srv := savedServer(t, 512<<10)
-	_, page, _ := fetch(t, srv.URL+"/select?type=health.weight&source=withings")
+	_, page, _ := fetch(t, srv.URL+"/select?type=test.reading&source=withings")
 	prog := program(t, page)
 	code, body := save(t, srv, prog)
 	if len(code) != selection.CodeLen {
@@ -72,7 +72,7 @@ func TestSelectSave_ShowsTheCodeAndOpensWithTheChips(t *testing.T) {
 		t.Fatalf("the page at the code drew %d chips, want type and source", len(chips))
 	}
 	if all, _ := boxes(body); len(all) != 3 {
-		t.Errorf("the page at the code lists %d facets, want the three weigh-ins", len(all))
+		t.Errorf("the page at the code lists %d facets, want the three readings", len(all))
 	}
 	for _, want := range []string{`href="/?sel=` + code + `"`, `href="/link?sel=` + code + `"`, `href="/?sel=` + code + `&amp;selmode=highlight"`} {
 		if !strings.Contains(body, want) {
@@ -84,7 +84,7 @@ func TestSelectSave_ShowsTheCodeAndOpensWithTheChips(t *testing.T) {
 		t.Errorf("one program, two codes: %s and %s", code, again)
 	}
 	// A different program is another.
-	if other, _ := save(t, srv, program(t, mustFetch(t, srv.URL+"/select?type=health.blood-pressure"))); other == code {
+	if other, _ := save(t, srv, program(t, mustFetch(t, srv.URL+"/select?type=test.measure"))); other == code {
 		t.Errorf("two programs share the code %s", code)
 	}
 }
@@ -118,8 +118,8 @@ func marks(body string) (drawn, picked map[string]bool) {
 func TestTimelineSelection_OnlyAndHighlight(t *testing.T) {
 	t.Parallel()
 	srv := savedServer(t, 512<<10)
-	code, _ := save(t, srv, program(t, mustFetch(t, srv.URL+"/select?type=health.weight")))
-	weights := ids("w1", "w2", "old")
+	code, _ := save(t, srv, program(t, mustFetch(t, srv.URL+"/select?type=test.reading")))
+	readings := ids("w1", "w2", "old")
 
 	only := mustFetch(t, srv.URL+"/?sel="+code)
 	if m := selHeadRE.FindStringSubmatch(only); m == nil || m[1] != code || m[2] != "3" {
@@ -127,9 +127,9 @@ func TestTimelineSelection_OnlyAndHighlight(t *testing.T) {
 	}
 	drawn, _ := marks(only)
 	if len(drawn) != 3 {
-		t.Errorf("drawn alone, the band holds %d marks, want the 3 weigh-ins: %v", len(drawn), drawn)
+		t.Errorf("drawn alone, the band holds %d marks, want the 3 readings: %v", len(drawn), drawn)
 	}
-	for _, id := range weights {
+	for _, id := range readings {
 		if !drawn[id] {
 			t.Errorf("drawn alone, %s is missing", id)
 		}
@@ -147,7 +147,7 @@ func TestTimelineSelection_OnlyAndHighlight(t *testing.T) {
 	if len(drawn) != len(picks) || len(picked) != 3 {
 		t.Errorf("highlighted, the band draws %d marks with %d picked, want %d with 3", len(drawn), len(picked), len(picks))
 	}
-	for _, id := range weights {
+	for _, id := range readings {
 		if !picked[id] {
 			t.Errorf("highlighted, %s is not picked out", id)
 		}
@@ -159,7 +159,7 @@ func TestTimelineSelection_OnlyAndHighlight(t *testing.T) {
 	// Within a window, the facets the program selects in it.
 	windowed := mustFetch(t, srv.URL+"/?sel="+code+"&from=2026-10-01&to=2026-10-31")
 	if m := selHeadRE.FindStringSubmatch(windowed); m == nil || m[2] != "2" {
-		t.Errorf("in October, header %v, want the 2 readings of the weigh-in", m)
+		t.Errorf("in October, header %v, want the 2 readings of the sitting", m)
 	}
 }
 
@@ -188,7 +188,7 @@ func TestTimelineSelection_UnknownCodeIs404(t *testing.T) {
 func TestTimelineSelection_OverTheBoundAsksForANarrowerWindow(t *testing.T) {
 	t.Parallel()
 	big := savedServer(t, 512<<10)
-	prog := program(t, mustFetch(t, big.URL+"/select?type=health.weight"))
+	prog := program(t, mustFetch(t, big.URL+"/select?type=test.reading"))
 	srv := savedServer(t, 64)
 	code, _ := saveDirect(t, srv, prog)
 	body := mustFetch(t, srv.URL+"/?sel="+code)

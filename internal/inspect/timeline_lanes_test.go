@@ -18,7 +18,9 @@ import (
 )
 
 // lanesServer holds facets in two domains: two weights (health, the body family) and a
-// gym visit (activity, the exercise family), months apart so none join a run.
+// gym visit (activity, the exercise family), months apart so none join a run. The
+// catalog is the engine fixture's, whose Definitions name two heads: record, in the
+// closed set, and test, outside it.
 func lanesServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	ctx := context.Background()
@@ -40,7 +42,7 @@ func lanesServer(t *testing.T) *httptest.Server {
 	admit("scales:1", "health.weight", `{"kg": 80}`, time.Date(2026, 1, 10, 7, 0, 0, 0, time.UTC))
 	admit("scales:2", "health.weight", `{"kg": 79}`, time.Date(2026, 4, 10, 7, 0, 0, 0, time.UTC))
 	admit("gym:1", "activity.gym-visit", `{"at": "x"}`, time.Date(2026, 3, 1, 7, 0, 0, 0, time.UTC))
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Engine.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 	return srv
 }
@@ -73,9 +75,10 @@ func markIDs(band string) []string {
 	return ids
 }
 
-// The band opens with one lane for each domain with a type: the seven in use, and
-// none for the reserved heads. A lane is collapsed, its family rows are not drawn, and
-// one with nothing in the window is greyed.
+// The band opens with one lane for each domain with a type: the two the ledger holds,
+// and record, which only a Definition names. A head outside the closed set that only a
+// Definition names (test) has none, nor has a reserved head. A lane is collapsed, its
+// family rows are not drawn, and one with nothing in the window is greyed.
 func TestTimeline_DomainLanesStartCollapsed(t *testing.T) {
 	t.Parallel()
 	srv := lanesServer(t)
@@ -85,7 +88,7 @@ func TestTimeline_DomainLanesStartCollapsed(t *testing.T) {
 	}
 	band := bandOf(page)
 	got := lanes(band)
-	for _, d := range []string{"health", "activity", "place", "record", "mind", "org", "money"} {
+	for _, d := range []string{"health", "activity", "record"} {
 		flags, ok := got[d]
 		if !ok {
 			t.Errorf("no lane for %s", d)
@@ -103,8 +106,11 @@ func TestTimeline_DomainLanesStartCollapsed(t *testing.T) {
 			t.Errorf("the reserved head %s has a lane before it has a type", d)
 		}
 	}
-	if len(got) != 7 {
-		t.Errorf("%d lanes, want 7: %v", len(got), got)
+	if _, ok := got["test"]; ok {
+		t.Error("test, a head outside the closed set that only a Definition names, has a lane")
+	}
+	if len(got) != 3 {
+		t.Errorf("%d lanes, want 3: %v", len(got), got)
 	}
 	if strings.Contains(band, `class="rowlabel famlabel"`) {
 		t.Error("a family row is drawn under a closed lane")
@@ -188,8 +194,8 @@ func TestTimeline_AnOpenedLaneRoundTripsThroughTheAddress(t *testing.T) {
 	}
 	// Open all and close all are links.
 	all := regexp.MustCompile(`href="([^"]+)" id="lanes-open"`).FindStringSubmatch(closed)
-	if all == nil || strings.Count(all[1], "open=") != 7 {
-		t.Errorf("open all = %v, want seven lanes", all)
+	if all == nil || strings.Count(all[1], "open=") != 3 {
+		t.Errorf("open all = %v, want three lanes", all)
 	}
 }
 

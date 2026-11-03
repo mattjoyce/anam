@@ -62,7 +62,7 @@ func newCheckpointFixture(t *testing.T) *checkpointFixture {
 		t.Fatalf("ops.Open: %v", err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Checkpoints: db}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Engine.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Checkpoints: db}))
 	t.Cleanup(srv.Close)
 	return &checkpointFixture{
 		l: l, srv: srv,
@@ -78,8 +78,8 @@ func TestTimeline_BucketStripFollowsTheMint(t *testing.T) {
 	f := newCheckpointFixture(t)
 	july := time.Date(2026, 7, 5, 6, 30, 0, 0, time.UTC)
 	august := time.Date(2026, 8, 5, 6, 30, 0, 0, time.UTC)
-	f.admit(t, seedAt("bp-csv:2026-07-05", "health.blood-pressure", `{"systolic": 118, "diastolic": 76}`, july))
-	f.admit(t, seedAt("bp-csv:2026-08-05", "health.blood-pressure", `{"systolic": 121, "diastolic": 79}`, august))
+	f.admit(t, seedAt("meter:2026-07-05", "test.measure", `{"count": 118, "seq": 76}`, july))
+	f.admit(t, seedAt("meter:2026-08-05", "test.measure", `{"count": 121, "seq": 79}`, august))
 	f.mint(t)
 
 	code, body := get(t, f.srv.URL+"/?view=whole")
@@ -100,8 +100,8 @@ func TestTimeline_BucketStripFollowsTheMint(t *testing.T) {
 
 	// A new reading in a minted month leaves its bucket behind; one in a month the
 	// mint never saw is never minted. Both are correct floors, neither is wrong.
-	f.admit(t, seedAt("bp-csv:2026-07-06", "health.blood-pressure", `{"systolic": 119, "diastolic": 77}`, july.Add(24*time.Hour)))
-	f.admit(t, seedAt("bp-csv:2026-09-05", "health.blood-pressure", `{"systolic": 117, "diastolic": 75}`, time.Date(2026, 9, 5, 6, 30, 0, 0, time.UTC)))
+	f.admit(t, seedAt("meter:2026-07-06", "test.measure", `{"count": 119, "seq": 77}`, july.Add(24*time.Hour)))
+	f.admit(t, seedAt("meter:2026-09-05", "test.measure", `{"count": 117, "seq": 75}`, time.Date(2026, 9, 5, 6, 30, 0, 0, time.UTC)))
 
 	code, body = get(t, f.srv.URL+"/?view=whole")
 	if code != 200 {
@@ -136,7 +136,7 @@ func TestTimeline_NoLogNoStrip(t *testing.T) {
 func TestTimeline_NeverMintedLedger(t *testing.T) {
 	t.Parallel()
 	f := newCheckpointFixture(t)
-	f.admit(t, seedAt("bp-csv:2026-07-05", "health.blood-pressure", `{"systolic": 118, "diastolic": 76}`, time.Date(2026, 7, 5, 6, 30, 0, 0, time.UTC)))
+	f.admit(t, seedAt("meter:2026-07-05", "test.measure", `{"count": 118, "seq": 76}`, time.Date(2026, 7, 5, 6, 30, 0, 0, time.UTC)))
 	_, body := get(t, f.srv.URL+"/?view=whole")
 	for _, want := range []string{"1 bucket, 0 sealed, ", "1 never minted", "no mint run yet", `class="bucket never"`} {
 		if !strings.Contains(body, want) {

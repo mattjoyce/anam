@@ -18,13 +18,13 @@ func TestReader_NamedOnTheReceiptAndVerifies(t *testing.T) {
 	h.seed(t)
 	ctx := context.Background()
 
-	anon, err := serve.Run(ctx, h.deps, "bp", false)
+	anon, err := serve.Run(ctx, h.deps, "measures", false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	named := h.deps
 	named.Reader = "lifeos"
-	read, err := serve.Run(ctx, named, "bp", false)
+	read, err := serve.Run(ctx, named, "measures", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestList_ByPrincipalAndServedTime(t *testing.T) {
 		d := h.deps
 		d.Reader = reader
 		d.Clock = clock.Fixed{Instant: at}
-		if _, err := serve.Run(ctx, d, "bp", false); err != nil {
+		if _, err := serve.Run(ctx, d, "measures", false); err != nil {
 			t.Fatalf("Run as %q: %v", reader, err)
 		}
 	}

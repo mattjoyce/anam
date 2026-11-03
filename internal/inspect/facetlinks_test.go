@@ -43,8 +43,8 @@ func newLinkedRecord(t *testing.T) linkedRecord {
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	weigh := seedFacet(t, "scales:2026-10-09 07:30", "health.weight", `{"id": "2026-10-09 07:30", "date": "2026-10-09 07:30", "kg": 80.5}`)
-	alone := seedFacet(t, "scales:2026-10-10 07:30", "health.weight", `{"id": "2026-10-10 07:30", "date": "2026-10-10 07:30", "kg": 80.1}`)
+	weigh := seedFacet(t, "scales:2026-10-09 07:30", "test.reading", `{"id": "2026-10-09 07:30", "date": "2026-10-09 07:30", "kg": 80.5}`)
+	alone := seedFacet(t, "scales:2026-10-10 07:30", "test.reading", `{"id": "2026-10-10 07:30", "date": "2026-10-10 07:30", "kg": 80.1}`)
 	note := seedFacet(t, "records:note:1", string(catchup.EdgeType),
 		`{"id": "note:1", "at": "2026-10-09 11:29", "to": ["`+weigh.ID+`"], "text": "Fasted, after the run."}`)
 	var seq int64
@@ -67,7 +67,7 @@ func newLinkedRecord(t *testing.T) linkedRecord {
 func TestFacet_ListsTheEdgesTouchingIt(t *testing.T) {
 	t.Parallel()
 	rec := newLinkedRecord(t)
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: rec.l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Edges: rec.db}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Engine.Catalog(t), Ledger: rec.l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Edges: rec.db}))
 	t.Cleanup(srv.Close)
 
 	code, body := get(t, srv.URL+"/facet?id="+rec.weigh)
@@ -104,7 +104,7 @@ func TestFacet_ListsTheEdgesTouchingIt(t *testing.T) {
 func TestFacet_SaysWhenThereIsNoEdgeIndex(t *testing.T) {
 	t.Parallel()
 	rec := newLinkedRecord(t)
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: rec.l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Engine.Catalog(t), Ledger: rec.l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 	code, body := get(t, srv.URL+"/facet?id="+rec.weigh)
 	if code != http.StatusOK {
@@ -121,7 +121,7 @@ func TestFacet_SaysWhenThereIsNoEdgeIndex(t *testing.T) {
 func TestFacetPage_APayloadIDGetsALinkIcon(t *testing.T) {
 	t.Parallel()
 	rec := newLinkedRecord(t)
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: rec.l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Edges: rec.db}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Engine.Catalog(t), Ledger: rec.l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Edges: rec.db}))
 	t.Cleanup(srv.Close)
 
 	code, body := get(t, srv.URL+"/facet?id="+rec.note)
@@ -175,7 +175,7 @@ func TestFacetPage_AFieldTableIDGetsALinkIcon(t *testing.T) {
 	if err := l.Admit(ctx, 0, note, event(facet.EventAdmitted, note, 1)); err != nil {
 		t.Fatalf("Admit: %v", err)
 	}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Engine.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 
 	code, body := get(t, srv.URL+"/facet?id="+note.ID)

@@ -1,66 +1,13 @@
 package inspect
 
 import (
-	"os"
 	"strings"
 	"testing"
 	"unicode"
 
-	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 )
-
-// Every bundled Definition has a place on the band. A type left out would still
-// draw, as a grey circle in the "other" row, but that is a fallback for a type
-// added in a hurry, not where a shipped type should live. Since card 147 a bundled
-// Definition declares its family (and its kind, unless it has none), so the
-// Definition places it; the table only lends shapes, and only names the three
-// retired health-db types, which are left as written. Every family a Definition
-// declares is a row of the band, so no live type lands in a grey row of its own.
-func TestTypeStyles_CoverEveryBundledType(t *testing.T) {
-	t.Parallel()
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatalf("Bundled: %v", err)
-	}
-	rows := map[string]bool{}
-	for _, f := range families {
-		rows[f.ID] = true
-	}
-	// The catalog's source directory on disk, not the embedded FS: a manifest left out
-	// of the embed then fails here as "not a bundled type". Stays on the personal
-	// catalog until R4b (card 255).
-	entries, err := os.ReadDir("../def/manifests")
-	if err != nil {
-		t.Fatalf("read manifests: %v", err)
-	}
-	st := newStyles(reg)
-	for _, e := range entries {
-		if e.IsDir() {
-			continue // manifests/history holds earlier versions, not types (card 111)
-		}
-		typ := facet.Type(strings.TrimSuffix(e.Name(), ".json"))
-		d, ok := reg.Lookup(typ)
-		if !ok {
-			t.Fatalf("%s is not a bundled type", typ)
-		}
-		_, listed := typeStyles[typ]
-		switch {
-		case d.Family == "" && !listed:
-			t.Errorf("%s declares no family and has no style in typeStyles", typ)
-		case d.Family == "":
-			// retired, placed by the table
-		case !rows[d.Family]:
-			t.Errorf("%s declares family %q, which is not a row of the band", typ, d.Family)
-		case listed && typeStyles[typ].Family != d.Family:
-			t.Errorf("%s: the table says %s, the Definition %s", typ, typeStyles[typ].Family, d.Family)
-		}
-		if st.of(typ).Family == otherFamilyID {
-			t.Errorf("%s draws in the other row", typ)
-		}
-	}
-}
 
 // The legend reads the shapes as a key: a filled circle is a measure, and an event
 // is never a circle. (A reading may be one; it is drawn hollow.) Within a row no
@@ -92,35 +39,6 @@ func TestTypeStyles_ShapesMeanWhatTheLegendSays(t *testing.T) {
 			t.Errorf("%s and %s share the %s shape in the %s row", typ, other, st.Shape, st.Family)
 		}
 		inRow[key] = typ
-	}
-}
-
-// The types the Garmin importer registers when health-db retired (card 55) sit in
-// the rows of the types they replaced, not in "other": the live record is read
-// in the rows, and the retired types still draw there in a read as_of an
-// earlier watermark.
-func TestTypeStyles_GarminTypesTakeTheRowsTheyReplaced(t *testing.T) {
-	t.Parallel()
-	reg := catalogtest.Definitions(t)
-	cases := []struct {
-		typ, replaced facet.Type
-	}{
-		{"health.heart-rate-day", "health.heart-rate"},
-		{"health.sleep-episode", "health.sleep"},
-		{"activity.steps", "health.metric-group"},
-	}
-	for _, c := range cases {
-		// The live type is placed by its Definition, the retired one by the table.
-		got, old := newStyles(reg).of(c.typ), newStyles(nil).of(c.replaced)
-		if got.Family == otherFamilyID {
-			t.Errorf("%s falls into the other row", c.typ)
-		}
-		if got.Family != old.Family {
-			t.Errorf("%s is in the %s row, %s in %s", c.typ, got.Family, c.replaced, old.Family)
-		}
-		if got.Kind != kindMeasure || got.Shape != shapeCircle {
-			t.Errorf("%s: want a measure drawn as a circle, got %s/%d", c.typ, got.Shape, got.Kind)
-		}
 	}
 }
 
@@ -265,25 +183,6 @@ func TestDomains_TenHeadsAndHuesAreDistinct(t *testing.T) {
 			t.Errorf("%s and %s share hue %d", d.ID, other, d.Hue)
 		}
 		seen[d.Hue] = d.ID
-	}
-}
-
-// Every bundled type's head is one of the ten, so no shipped type draws in a lane
-// outside the closed set.
-func TestDomains_EveryBundledTypeHasAHead(t *testing.T) {
-	t.Parallel()
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatalf("Bundled: %v", err)
-	}
-	known := map[string]bool{}
-	for _, d := range domains {
-		known[d.ID] = true
-	}
-	for _, d := range reg.All() {
-		if !known[domainOf(d.Type)] {
-			t.Errorf("%s: head %q is not one of the ten", d.Type, domainOf(d.Type))
-		}
 	}
 }
 

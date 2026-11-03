@@ -92,7 +92,7 @@ func TestProjectionSummary_CountsEqualTheRowsEachLinkOpens(t *testing.T) {
 	t.Parallel()
 	srv := projectionServer(t)
 
-	for _, p := range []string{"canonical", "bp", "sleep"} {
+	for _, p := range []string{"canonical", "measures", "course"} {
 		_, body := get(t, srv.URL+"/projection?p="+p)
 		sum := summaryCounts(t, body)
 		if len(sum) == 0 {
@@ -135,18 +135,18 @@ func TestProjectionSummary_CountsEqualTheRowsEachLinkOpens(t *testing.T) {
 	}
 }
 
-// The fixture's numbers, spelled out: the live bp reading was corrected once, the live
-// sleep period is out of the bp template, and the retracted heart rate is not live.
+// The fixture's numbers, spelled out: the live measure was corrected once, the live
+// course start is out of the measures template, and the retracted reading is not live.
 func TestProjectionSummary_CountsByType(t *testing.T) {
 	t.Parallel()
 	srv := projectionServer(t)
 
-	_, body := get(t, srv.URL+"/projection?p=bp")
+	_, body := get(t, srv.URL+"/projection?p=measures")
 	got := summaryCounts(t, body)
 	for typ, want := range map[string][3]int{
-		"health.blood-pressure": {1, 0, 1},
-		"health.sleep":          {0, 1, 0},
-		notLiveType:             {0, 0, 1},
+		"test.measure":        {1, 0, 1},
+		"test.course.started": {0, 1, 0},
+		notLiveType:           {0, 0, 1},
 	} {
 		g := got[typ]
 		if [3]int{g.served, g.excluded, g.superseded} != want {
@@ -181,7 +181,7 @@ func TestProjectionSummary_ReadsNoVersionsFromTheLedger(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = l.Close() })
 	c := &readCounter{Ledger: l}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: c, Timeout: 30 * time.Second, Buckets: defaultBuckets, CachedReads: 4}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Engine.Catalog(t), Ledger: c, Timeout: 30 * time.Second, Buckets: defaultBuckets, CachedReads: 4}))
 	t.Cleanup(srv.Close)
 
 	// The first read folds the head, which fetches the live versions in one batch.
@@ -191,9 +191,9 @@ func TestProjectionSummary_ReadsNoVersionsFromTheLedger(t *testing.T) {
 	c.versions.Store(0)
 
 	for _, u := range []string{
-		"/projection", "/projection?p=bp", "/projection?p=sleep",
-		"/projection?p=bp&type=health.blood-pressure&show=served",
-		"/projection?p=bp&type=health.sleep&show=excluded",
+		"/projection", "/projection?p=measures", "/projection?p=course",
+		"/projection?p=measures&type=test.measure&show=served",
+		"/projection?p=measures&type=test.course.started&show=excluded",
 	} {
 		if code, _ := get(t, srv.URL+u); code != 200 {
 			t.Fatalf("GET %s = %d", u, code)
@@ -206,19 +206,19 @@ func TestProjectionSummary_ReadsNoVersionsFromTheLedger(t *testing.T) {
 
 	// An as-of summary folds the past once, in a batch, and still reads no older version.
 	c.version.Store(0)
-	get(t, srv.URL+"/projection?p=bp&asof=2026-07-13T00:00:00Z")
+	get(t, srv.URL+"/projection?p=measures&asof=2026-07-13T00:00:00Z")
 	if c.version.Load() != 0 {
 		t.Errorf("an as-of summary read %d older versions, want none", c.version.Load())
 	}
 
 	// Only the superseded rows view reads them.
-	get(t, srv.URL+"/projection?p=bp&type=health.blood-pressure&show=superseded")
+	get(t, srv.URL+"/projection?p=measures&type=test.measure&show=superseded")
 	if c.version.Load() == 0 {
 		t.Error("the superseded rows view read no versions, so it cannot have shown them")
 	}
 }
 
-// seedBig admits n steps facets across days, one fact time each, plus a few of another
+// seedBig admits n test.pair facets across days, one fact time each, plus a few of another
 // type, and corrects every tenth step so the type has superseded versions too.
 func seedBig(t *testing.T, n int) *httptest.Server {
 	t.Helper()
@@ -243,7 +243,7 @@ func seedBig(t *testing.T, n int) *httptest.Server {
 	}
 	base := time.Date(2026, 3, 1, 8, 0, 0, 0, time.UTC)
 	for i := 0; i < n; i++ {
-		f := seedFacetNoT(fmt.Sprintf("steps:%04d", i), "activity.steps", fmt.Sprintf(`{"count": %d}`, i))
+		f := seedFacetNoT(fmt.Sprintf("steps:%04d", i), "test.pair", fmt.Sprintf(`{"count": %d}`, i))
 		f.FactTime = base.AddDate(0, 0, i/50).Add(time.Duration(i%50) * time.Minute)
 		admit(f, facet.EventAdmitted, 0)
 		if i%10 == 0 {
@@ -253,10 +253,10 @@ func seedBig(t *testing.T, n int) *httptest.Server {
 			admit(f, facet.EventSuperseded, 1)
 		}
 	}
-	w := seedFacetNoT("weight:1", "health.weight", `{"kg": 70}`)
+	w := seedFacetNoT("weight:1", "test.reading", `{"value": 70}`)
 	admit(w, facet.EventAdmitted, 0)
 
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 60 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Engine.Catalog(t), Ledger: l, Timeout: 60 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 	return srv
 }
@@ -272,7 +272,7 @@ func TestProjectionRows_OverTheLimitSaysSoAndAsksForANarrowerWindow(t *testing.T
 	if rowsDrawn(sum) != 0 || len(sum) > 20_000 {
 		t.Errorf("the summary of 520 facets draws %d facet rows in %d bytes", rowsDrawn(sum), len(sum))
 	}
-	steps := summaryCounts(t, sum)["activity.steps"]
+	steps := summaryCounts(t, sum)["test.pair"]
 	if steps.served != 520 || steps.superseded != 52 {
 		t.Fatalf("steps = served %d superseded %d, want 520 and 52", steps.served, steps.superseded)
 	}

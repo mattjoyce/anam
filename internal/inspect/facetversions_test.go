@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
-	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
-// supersededServer holds one blood pressure facet admitted at v1 and corrected at v2,
-// both under the bundled Definition, and returns the inspector and the facet's id.
+// supersededServer holds one test.described facet admitted at v1 and corrected at v2,
+// both under the Definition in force, and returns the inspector and the facet's id.
+// test.described is the engine fixture's copy with a type whose fields say what they
+// mean, since the engine fixture's own fields carry no words.
 func supersededServer(t *testing.T) (*httptest.Server, string) {
 	t.Helper()
 	ctx := context.Background()
@@ -26,27 +26,28 @@ func supersededServer(t *testing.T) (*httptest.Server, string) {
 		t.Fatalf("ledger.Create: %v", err)
 	}
 	t.Cleanup(func() { _ = l.Close() })
-	cur, err := def.Parse(bundledBody(t, "health.blood-pressure"))
-	if err != nil {
-		t.Fatal(err)
+	catalog := inspect.ExtraCatalog
+	cur, ok := catalog.Definitions(t).Lookup("test.described")
+	if !ok {
+		t.Fatal("test.described is not in the catalog")
 	}
 
-	const ref = "bp-csv:2026-1-24 06:30:00:1"
-	v1 := seedFacet(t, ref, "health.blood-pressure",
-		`{"source_time": {"value": "2026-1-24 06:30:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-1-24 06:30:00", "reading": "1", "systolic_blood_pressure": {"value": 128, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 79, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-24T06:30:00+11:00"}}`)
+	const ref = "meter:2026-01-24 06:30:1"
+	v1 := seedFacet(t, ref, "test.described",
+		`{"at": "2026-01-24 06:30", "figure": "1", "high": {"value": 128, "unit": "u"}, "low": {"value": 79, "unit": "u"}}`)
 	v1.DefinitionVersion = cur.Version
 	if err := l.Admit(ctx, 0, v1, event(facet.EventAdmitted, v1, 1)); err != nil {
 		t.Fatalf("Admit v1: %v", err)
 	}
-	v2 := seedFacet(t, ref, "health.blood-pressure",
-		`{"source_time": {"value": "2026-1-24 06:30:00", "zone": "Australia/Sydney", "basis": "source"}, "date_excel": "2026-1-24 06:30:00", "reading": "1", "systolic_blood_pressure": {"value": 130, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 79, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-24T06:30:00+11:00"}, "comment": "redone"}`)
+	v2 := seedFacet(t, ref, "test.described",
+		`{"at": "2026-01-24 06:30", "figure": "1", "high": {"value": 130, "unit": "u"}, "low": {"value": 79, "unit": "u"}, "comment": "redone"}`)
 	v2.DefinitionVersion, v2.ArtifactVersion = cur.Version, 2
 	sup := facet.AnamEvent{Kind: facet.EventSuperseded, FacetID: v2.ID, Seq: 2, ArtifactVersion: 2,
 		PriorArtifactVersion: 1, AnamTime: time.Date(2026, 7, 11, 9, 0, 0, 0, time.UTC)}
 	if err := l.Admit(ctx, 1, v2, sup); err != nil {
 		t.Fatalf("Admit v2: %v", err)
 	}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalog.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 	return srv, v1.ID
 }
@@ -62,10 +63,10 @@ func TestFacet_ShowsWhatAVersionChangedAndWhatEachFieldMeans(t *testing.T) {
 	}
 	for _, want := range []string{
 		"changed from v1",
-		`<td class="mono">/systolic_blood_pressure/value</td><td class="mono">128</td><td class="mono">130</td>`,
+		`<td class="mono">/high/value</td><td class="mono">128</td><td class="mono">130</td>`,
 		`<td class="mono">/comment</td><td class="mono"><span class="dim">absent</span></td>`,
 		"read through definition v",
-		"Systolic pressure as an OMH unit-value", // the field's own words
+		"The higher of the two figures.", // the field's own words
 		`<span class="role">fact time</span>`,
 		`href="/facet?id=` + id + `&v=1"`,
 	} {
@@ -73,7 +74,7 @@ func TestFacet_ShowsWhatAVersionChangedAndWhatEachFieldMeans(t *testing.T) {
 			t.Errorf("facet page lacks %q", want)
 		}
 	}
-	if strings.Contains(body, "/diastolic_blood_pressure/value</td>") {
+	if strings.Contains(body, "/low/value</td>") {
 		t.Error("an unchanged field is listed as changed")
 	}
 }

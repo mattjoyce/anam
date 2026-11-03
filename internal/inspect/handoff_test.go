@@ -32,9 +32,9 @@ func TestHandoff_ASydneyDayIsASydneyDayBothWays(t *testing.T) {
 	lo, hi := time.Date(2026, 10, 11, 13, 0, 0, 0, time.UTC), time.Date(2026, 10, 12, 13, 0, 0, 0, time.UTC)
 
 	// Select to timeline.
-	_, sel, _ := fetch(t, srv.URL+"/select?type=health.weight&from=2026-10-12&to=2026-10-12&zone="+sydney)
+	_, sel, _ := fetch(t, srv.URL+"/select?type=test.reading&from=2026-10-12&to=2026-10-12&zone="+sydney)
 	toTimeline := link(sel, "show-on-timeline")
-	if want := "/?from=2026-10-12&to=2026-10-12&type=health.weight&zone=Australia%2FSydney"; toTimeline != want {
+	if want := "/?from=2026-10-12&to=2026-10-12&type=test.reading&zone=Australia%2FSydney"; toTimeline != want {
 		t.Fatalf("show on timeline = %s, want %s", toTimeline, want)
 	}
 	_, tl := get(t, srv.URL+toTimeline)
@@ -44,7 +44,7 @@ func TestHandoff_ASydneyDayIsASydneyDayBothWays(t *testing.T) {
 
 	// Timeline to select, and back to the program the first page showed.
 	back := link(tl, "select-range")
-	if want := "/select?from=2026-10-12&to=2026-10-12&type=health.weight&zone=Australia%2FSydney"; back != want {
+	if want := "/select?from=2026-10-12&to=2026-10-12&type=test.reading&zone=Australia%2FSydney"; back != want {
 		t.Fatalf("select in this range = %s, want %s", back, want)
 	}
 	_, again, _ := fetch(t, srv.URL+back)
@@ -96,14 +96,14 @@ func TestHandoff_AnUnzoomedTimelineOffersNoRange(t *testing.T) {
 func TestHandoff_CarriesTheTypeFilter(t *testing.T) {
 	t.Parallel()
 	srv := zoneServer(t, "")
-	_, sel, _ := fetch(t, srv.URL+"/select?type=health.heart-rate.")
-	want := "/?type=health.heart-rate.alert&type=health.heart-rate.day"
+	_, sel, _ := fetch(t, srv.URL+"/select?type=test.course.")
+	want := "/?type=test.course.changed&type=test.course.started"
 	if got := link(sel, "show-on-timeline"); got != want {
 		t.Errorf("show on timeline = %s, want %s", got, want)
 	}
-	_, tl := get(t, srv.URL+"/?from=2026-10-12&to=2026-10-12&zone="+sydney+"&type=health.blood-pressure&type=health.weight")
+	_, tl := get(t, srv.URL+"/?from=2026-10-12&to=2026-10-12&zone="+sydney+"&type=test.measure&type=test.reading")
 	got := link(tl, "select-range")
-	if want := "/select?from=2026-10-12&to=2026-10-12&type=health.blood-pressure&type=health.weight&zone=Australia%2FSydney"; got != want {
+	if want := "/select?from=2026-10-12&to=2026-10-12&type=test.measure&type=test.reading&zone=Australia%2FSydney"; got != want {
 		t.Errorf("select in this range = %s, want %s", got, want)
 	}
 	// A filter with nothing to say opens the whole person.
@@ -117,9 +117,9 @@ func TestHandoff_CarriesTheTypeFilter(t *testing.T) {
 func TestHandoff_ASavedSelectionIsDrawnAtItsWindow(t *testing.T) {
 	t.Parallel()
 	srv := zoneServer(t, "")
-	_, page, _ := fetch(t, srv.URL+"/select?type=health.weight&from=2026-10-12&to=2026-10-12&zone="+sydney)
+	_, page, _ := fetch(t, srv.URL+"/select?type=test.reading&from=2026-10-12&to=2026-10-12&zone="+sydney)
 	code, saved := save(t, srv, program(t, page))
-	want := "/?from=2026-10-12&sel=" + code + "&to=2026-10-12&zone=Australia%2FSydney&type=health.weight"
+	want := "/?from=2026-10-12&sel=" + code + "&to=2026-10-12&zone=Australia%2FSydney&type=test.reading"
 	got := link(saved, "show-on-timeline")
 	u, err := url.Parse(got)
 	if err != nil {

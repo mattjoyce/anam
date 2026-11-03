@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"testing/fstest"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
@@ -24,8 +23,8 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
-// courseManifest is a medication event Definition shaped like the bundled ones: a
-// course keyed by drug and course, closed by a stop. Old and new type names share it,
+// courseManifest is a course event Definition shaped like the engine fixture's: a
+// course keyed by name and course, closed by a stop. Old and new type names share it,
 // so a rename moves the type and nothing else (card 140).
 func courseManifest(typ string, closes bool) string {
 	return fmt.Sprintf(`{
@@ -35,21 +34,22 @@ func courseManifest(typ string, closes bool) string {
     "classification": "Sensitive",
     "validation_mode": "strict",
     "source_schema": "records/%s",
-    "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "UTC"}},
+    "time_semantics": {"fact_time": {"pointer": "/date", "layout": "2006-01-02", "zone": "Europe/Berlin"}},
     "identity_key": ["/id"],
-    "series": {"name": "med.regimen", "key": ["/drug", "/course"], "closes": %t}
+    "series": {"name": "test.course", "key": ["/name", "/course"], "closes": %t}
   },
-  "schema": {"type": "object", "required": ["id", "date", "drug", "course"],
+  "schema": {"type": "object", "required": ["id", "date", "name", "course"],
     "properties": {"id": {"type": "string", "minLength": 1}, "date": {"type": "string", "minLength": 1},
-      "drug": {"type": "string", "minLength": 1}, "course": {"type": "number"}},
+      "name": {"type": "string", "minLength": 1}, "course": {"type": "number"}},
     "additionalProperties": false}
 }`, typ, typ, closes)
 }
 
-// Card 187: a receipt served under meds v1 names the retired types (med.started,
-// med.stopped). After card 147 the Definitions in force no longer name them, so the
-// replay did not know that med.stopped closes a course, and the stopped course read
-// as open: one more facet than was served. The receipt must still verify.
+// Card 187: a receipt served under course v1 names the retired type test.retired.
+// After the rename the Definitions in force no longer name it, so the replay did not
+// know that test.retired closes a course, and the stopped course read as open: one
+// more facet than was served. The receipt must still verify. The Definitions in force
+// are the engine fixture's, which hold test.retired only in history.
 func TestVerify_ReceiptServedUnderRetiredTypesStillReproduces(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -71,8 +71,8 @@ func TestVerify_ReceiptServedUnderRetiredTypesStillReproduces(t *testing.T) {
 
 	var all []def.Definition
 	for _, m := range []string{
-		courseManifest("med.started", false), courseManifest("med.stopped", true),
-		courseManifest("health.medication.started", false), courseManifest("health.medication.stopped", true),
+		courseManifest("test.course.started", false), courseManifest("test.retired", true),
+		courseManifest("test.course.stopped", true),
 	} {
 		d, err := def.Parse([]byte(m))
 		if err != nil {
@@ -84,7 +84,7 @@ func TestVerify_ReceiptServedUnderRetiredTypesStillReproduces(t *testing.T) {
 	if err != nil {
 		t.Fatalf("def.NewRegistry: %v", err)
 	}
-	scopes := gate.StaticScopes{"records": {"med.started", "med.stopped", "health.medication.started", "health.medication.stopped"}}
+	scopes := gate.StaticScopes{"records": {"test.course.started", "test.retired", "test.course.stopped"}}
 	g := gate.New(l, before, scopes, clock.Real{}, person,
 		gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 
@@ -94,7 +94,7 @@ func TestVerify_ReceiptServedUnderRetiredTypesStillReproduces(t *testing.T) {
 		env := facet.Envelope{
 			Type: typ, Source: "records", Injector: "records",
 			SourceRef: facet.SourceRef("records", id),
-			Payload:   []byte(fmt.Sprintf(`{"id": %q, "date": %q, "drug": %q, "course": 1}`, id, date, drug)),
+			Payload:   []byte(fmt.Sprintf(`{"id": %q, "date": %q, "name": %q, "course": 1}`, id, date, drug)),
 		}
 		b, err := g.Resolve(env)
 		if err != nil {
@@ -106,15 +106,15 @@ func TestVerify_ReceiptServedUnderRetiredTypesStillReproduces(t *testing.T) {
 		}
 		ids = append(ids, res.FacetID)
 	}
-	// felodipine ran and stopped; ramipril is still on.
-	admit("med.started", "records:med/felodipine/1/started", "2025-06-01", "felodipine")
-	admit("med.stopped", "records:med/felodipine/1/stopped", "2025-12-22", "felodipine")
-	admit("med.started", "records:med/ramipril/1/started", "2025-07-01", "ramipril")
+	// gamma ran and stopped; alpha is still on.
+	admit("test.course.started", "records:course/gamma/1/started", "2025-06-01", "gamma")
+	admit("test.retired", "records:course/gamma/1/stopped", "2025-12-22", "gamma")
+	admit("test.course.started", "records:course/alpha/1/started", "2025-07-01", "alpha")
 
-	templates := catalogtest.Projections(t)
-	v1, err := templates.Version("meds", 1)
+	templates := catalogtest.Engine.Projections(t)
+	v1, err := templates.Version("course", 1)
 	if err != nil {
-		t.Fatalf("meds v1: %v", err)
+		t.Fatalf("course v1: %v", err)
 	}
 	served, err := projection.NewRegistry(v1)
 	if err != nil {
@@ -125,46 +125,44 @@ func TestVerify_ReceiptServedUnderRetiredTypesStillReproduces(t *testing.T) {
 		Ledger: l, Templates: served, Published: store, Gate: consent.Open{}, Clock: fixed,
 		DefinitionSetVersion: "sha256:" + strings.Repeat("d", 64), Series: before, Definitions: before,
 	}
-	out, err := serve.Run(ctx, deps, "meds", false)
+	out, err := serve.Run(ctx, deps, "course", false)
 	if err != nil {
-		t.Fatalf("Run meds v1: %v", err)
+		t.Fatalf("Run course v1: %v", err)
 	}
 	if out.Receipt.TemplateVersion != 1 || len(out.Receipt.FacetIDs) != 1 {
-		t.Fatalf("served v%d with %d facets, want v1 with ramipril alone", out.Receipt.TemplateVersion, len(out.Receipt.FacetIDs))
+		t.Fatalf("served v%d with %d facets, want v1 with alpha alone", out.Receipt.TemplateVersion, len(out.Receipt.FacetIDs))
 	}
 
-	// The rename: every live facet becomes the next version of itself under the new
-	// name, after the receipt's watermark.
-	to := map[facet.Type]facet.Type{
-		"med.started": "health.medication.started", "med.stopped": "health.medication.stopped",
-	}
+	// The rename: every live test.retired facet becomes the next version of itself as
+	// test.course.stopped, after the receipt's watermark.
 	var renames []gate.Rename
 	for _, id := range ids {
 		f, err := l.CurrentVersion(ctx, id)
 		if err != nil {
 			t.Fatalf("CurrentVersion %s: %v", id, err)
 		}
+		if f.Type != "test.retired" {
+			continue
+		}
 		renames = append(renames, gate.Rename{
-			Env:     facet.Envelope{Type: to[f.Type], Source: f.Provenance.Source, Injector: "rename", Payload: f.Payload.Bytes()},
+			Env:     facet.Envelope{Type: "test.course.stopped", Source: f.Provenance.Source, Injector: "rename", Payload: f.Payload.Bytes()},
 			Binding: f.Binding,
 			From:    f.Type,
 		})
+	}
+	if len(renames) != 1 {
+		t.Fatalf("%d facets to rename, want the one stop", len(renames))
 	}
 	if _, _, err := g.RenameBatch(ctx, renames); err != nil {
 		t.Fatalf("RenameBatch: %v", err)
 	}
 
-	// Meds v2 is current, v1 is history, and the Definitions in force name only the
-	// new types. The catalog's history keeps the retired ones, as a catalog does after
-	// a rename: the registry answers Closes for them from that history (card 255).
-	now, err := def.BundledFS(fstest.MapFS{
-		"health.medication.started.json": {Data: []byte(courseManifest("health.medication.started", false))},
-		"health.medication.stopped.json": {Data: []byte(courseManifest("health.medication.stopped", true))},
-		"history/med.started.v1.json":    {Data: []byte(courseManifest("med.started", false))},
-		"history/med.stopped.v1.json":    {Data: []byte(courseManifest("med.stopped", true))},
-	})
-	if err != nil {
-		t.Fatalf("def.BundledFS: %v", err)
+	// Course v2 is current, v1 is history, and the engine fixture's Definitions in
+	// force name only the new stop. Its history keeps test.retired, as a catalog does
+	// after a rename: the registry answers Closes for it from that history (card 255).
+	now := catalogtest.Engine.Definitions(t)
+	if _, current := now.Lookup("test.retired"); current {
+		t.Fatal("the engine fixture holds test.retired as current; the replay would not need its history")
 	}
 	deps.Templates, deps.Series, deps.Definitions = templates, now, now
 
@@ -175,7 +173,7 @@ func TestVerify_ReceiptServedUnderRetiredTypesStillReproduces(t *testing.T) {
 	if !res.OK() {
 		t.Fatalf("a receipt served under the retired type names did not verify:\n%s", res.Summary())
 	}
-	if !slices.Contains(res.Notes, "replayed meds v1 from the held history; v4 is current") {
+	if !slices.Contains(res.Notes, "replayed course v1 from the held history; v2 is current") {
 		t.Errorf("the verdict does not say which version was replayed: %q", res.Notes)
 	}
 }

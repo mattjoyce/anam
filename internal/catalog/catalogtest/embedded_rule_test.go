@@ -51,10 +51,8 @@ var embeddedAllowList = []allowed{
 	{file: "internal/app/heartrateday_retire_internal_test.go",
 		reason: "corpus retirement (card 205) over def.Bundled and projection.Bundled; to the deployment repo with the corpus tests"},
 
-	// Slice 5 (#33): inspect.
-	{file: "internal/inspect/marks_test.go",
-		funcs:  []string{"TestTypeStyles_CoverEveryBundledType", "TestDomains_EveryBundledTypeHasAHead"},
-		reason: "marks.go covers every type the binary ships (CoverEveryBundledType lists ../def/manifests on disk); R5 (card 256) rewrites them against inspector.yaml"},
+	// Slice 5 (#33): inspect. R4b slice 4d moved its two marks coverage tests to the
+	// deployment overlay, which lists the deployment's definitions/.
 }
 
 // pathLabels are strings that spell an embedded catalog path but read nothing from

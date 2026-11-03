@@ -29,7 +29,7 @@ func TestShow_ReadsThePublishedArtifactOnly(t *testing.T) {
 	h.seed(t)
 	ctx := context.Background()
 
-	out, err := serve.Run(ctx, h.deps, "bp", false)
+	out, err := serve.Run(ctx, h.deps, "measures", false)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestShow_RefusesATamperedArtifact(t *testing.T) {
 	h.seed(t)
 	ctx := context.Background()
 
-	out, err := serve.Run(ctx, h.deps, "bp", false)
+	out, err := serve.Run(ctx, h.deps, "measures", false)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestShow_RefusesATamperedArtifact(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
-	tampered := strings.Replace(string(original), `"systolic":118`, `"systolic":119`, 1)
+	tampered := strings.Replace(string(original), `"value":118`, `"value":119`, 1)
 	if tampered == string(original) {
 		t.Fatalf("the tamper changed nothing")
 	}
@@ -106,12 +106,12 @@ func TestList_NewestFirst(t *testing.T) {
 	// Two serves at two instants, so the ordering has something to order.
 	early := h.deps
 	early.Clock = clock.Fixed{Instant: time.Date(2026, 7, 20, 9, 0, 0, 0, time.UTC)}
-	if _, err := serve.Run(ctx, early, "bp", false); err != nil {
+	if _, err := serve.Run(ctx, early, "measures", false); err != nil {
 		t.Fatalf("Run(early): %v", err)
 	}
 	late := h.deps
 	late.Clock = clock.Fixed{Instant: time.Date(2026, 7, 25, 9, 0, 0, 0, time.UTC)}
-	if _, err := serve.Run(ctx, late, "sleep", false); err != nil {
+	if _, err := serve.Run(ctx, late, "everything", false); err != nil {
 		t.Fatalf("Run(late): %v", err)
 	}
 
@@ -122,8 +122,8 @@ func TestList_NewestFirst(t *testing.T) {
 	if len(receipts) != 2 || len(hashes) != 2 {
 		t.Fatalf("List returned %d receipts and %d hashes, want 2 and 2", len(receipts), len(hashes))
 	}
-	if receipts[0].Template != "sleep" || receipts[1].Template != "bp" {
-		t.Errorf("List order: %s then %s, want sleep then bp (newest first)",
+	if receipts[0].Template != "everything" || receipts[1].Template != "measures" {
+		t.Errorf("List order: %s then %s, want everything then measures (newest first)",
 			receipts[0].Template, receipts[1].Template)
 	}
 	// The hashes must stay paired with their receipts through the sort.

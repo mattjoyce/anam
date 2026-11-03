@@ -15,9 +15,9 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ops/opstest"
 )
 
-const inlineBP = `{"types":["health.blood-pressure"],"statuses":["admitted","endorsed"],"max_classification":"Sensitive"}`
+const inlineMeasures = `{"types":["test.measure"],"statuses":["admitted","endorsed"],"max_classification":"Sensitive"}`
 
-// answerThrough runs a query over the blood-pressure readings through the inline
+// answerThrough runs a query over the measures through the inline
 // template and files it, as the daemon's query route does.
 func answerThrough(t *testing.T, h *harness, tmpl projection.Template, dryRun bool) serve.Served {
 	t.Helper()
@@ -34,7 +34,7 @@ func answerThrough(t *testing.T, h *harness, tmpl projection.Template, dryRun bo
 	if err != nil {
 		t.Fatal(err)
 	}
-	const text = `high(E, S) :- attr(E, "/systolic", S), S > 120.`
+	const text = `high(E, S) :- attr(E, "/value", S), S > 120.`
 	ans, rules, err := query.Run(ctx, served, query.Versions(res.Live), h.deps.Definitions, text, "high", 0)
 	if err != nil {
 		t.Fatal(err)
@@ -52,11 +52,11 @@ func answerThrough(t *testing.T, h *harness, tmpl projection.Template, dryRun bo
 // replays the answer. A dry run files nothing.
 func TestPublishQuery_InlineTemplateIsFiledAndReplayed(t *testing.T) {
 	t.Parallel()
-	h := medHarness(t)
+	h := courseHarness(t)
 	h.deps.Definitions = h.deps.Series.(query.Definitions)
 	h.seed(t)
 	ctx := context.Background()
-	tmpl, err := projection.ParseInline([]byte(inlineBP))
+	tmpl, err := projection.ParseInline([]byte(inlineMeasures))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,11 +95,11 @@ func TestPublishQuery_InlineTemplateIsFiledAndReplayed(t *testing.T) {
 // gone rather than blaming the ledger. A body altered under its hash is refused by the store.
 func TestVerify_InlineBodyMissingOrAltered(t *testing.T) {
 	t.Parallel()
-	h := medHarness(t)
+	h := courseHarness(t)
 	h.deps.Definitions = h.deps.Series.(query.Definitions)
 	h.seed(t)
 	ctx := context.Background()
-	tmpl, err := projection.ParseInline([]byte(inlineBP))
+	tmpl, err := projection.ParseInline([]byte(inlineMeasures))
 	if err != nil {
 		t.Fatal(err)
 	}

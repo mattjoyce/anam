@@ -25,7 +25,7 @@ func TestRun_ServesAndPublishes(t *testing.T) {
 	h.seed(t)
 	ctx := context.Background()
 
-	out, err := serve.Run(ctx, h.deps, "bp", false)
+	out, err := serve.Run(ctx, h.deps, "measures", false)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestRun_ServesAndPublishes(t *testing.T) {
 		t.Errorf("canonical held %d facets, want 5", out.CanonicalLen)
 	}
 	if got := len(out.Receipt.FacetIDs); got != 3 {
-		t.Errorf("bp served %d facets, want the 3 blood-pressure readings", got)
+		t.Errorf("measures served %d facets, want the 3 measures", got)
 	}
 
 	// The receipt is complete and says what it served.
@@ -44,7 +44,7 @@ func TestRun_ServesAndPublishes(t *testing.T) {
 	if err := r.Validate(); err != nil {
 		t.Errorf("published receipt is incomplete: %v", err)
 	}
-	if r.Template != "bp" || r.TemplateVersion != 1 {
+	if r.Template != "measures" || r.TemplateVersion != 1 {
 		t.Errorf("receipt names %s v%d", r.Template, r.TemplateVersion)
 	}
 	if r.Span != "whole-person" {
@@ -95,7 +95,7 @@ func TestRun_LeavesTheLedgerUntouched(t *testing.T) {
 		t.Fatalf("Replay: %v", err)
 	}
 
-	for _, name := range []string{"bp", "sleep", "bp"} {
+	for _, name := range []string{"measures", "everything", "measures"} {
 		if _, err := serve.Run(ctx, h.deps, name, false); err != nil {
 			t.Fatalf("Run(%s): %v", name, err)
 		}
@@ -124,11 +124,11 @@ func TestRun_StableAcrossRepeatedServes(t *testing.T) {
 	h.seed(t)
 	ctx := context.Background()
 
-	first, err := serve.Run(ctx, h.deps, "bp", false)
+	first, err := serve.Run(ctx, h.deps, "measures", false)
 	if err != nil {
 		t.Fatalf("first Run: %v", err)
 	}
-	second, err := serve.Run(ctx, h.deps, "bp", false)
+	second, err := serve.Run(ctx, h.deps, "measures", false)
 	if err != nil {
 		t.Fatalf("second Run: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestRun_DryRunPublishesNothing(t *testing.T) {
 	h.seed(t)
 	ctx := context.Background()
 
-	dry, err := serve.Run(ctx, h.deps, "bp", true)
+	dry, err := serve.Run(ctx, h.deps, "measures", true)
 	if err != nil {
 		t.Fatalf("Run(dry): %v", err)
 	}
@@ -175,7 +175,7 @@ func TestRun_DryRunPublishesNothing(t *testing.T) {
 		}
 	}
 
-	wet, err := serve.Run(ctx, h.deps, "bp", false)
+	wet, err := serve.Run(ctx, h.deps, "measures", false)
 	if err != nil {
 		t.Fatalf("Run(wet): %v", err)
 	}
@@ -189,7 +189,7 @@ func TestRun_UnknownProjection(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()
 
-	if _, err := serve.Run(ctx, h.deps, "bloodpressure", false); !errors.Is(err, projection.ErrUnknown) {
+	if _, err := serve.Run(ctx, h.deps, "measure", false); !errors.Is(err, projection.ErrUnknown) {
 		t.Errorf("Run(unknown): err = %v, want ErrUnknown", err)
 	}
 }
@@ -204,16 +204,16 @@ func TestVerify_ReproducesAfterTheLedgerAdvances(t *testing.T) {
 	h.seed(t)
 	ctx := context.Background()
 
-	out, err := serve.Run(ctx, h.deps, "bp", false)
+	out, err := serve.Run(ctx, h.deps, "measures", false)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	servedW := out.Receipt.Watermark
 
 	// The world moves: a correction to a served reading, and two new facts.
-	h.admit(t, "bp-csv", "health.blood-pressure", "2026-01-24T06:30:00Z", `"systolic": 116, "diastolic": 74`)
-	h.admit(t, "bp-csv", "health.blood-pressure", "2026-02-01T06:30:00Z", `"systolic": 120, "diastolic": 78`)
-	h.admit(t, "health-db", "health.sleep", "2026-02-01T22:00:00Z", `"deep_minutes": 55`)
+	h.admit(t, "meter", "test.measure", "2026-01-24T06:30:00Z", `"value": 116, "extra": 74`)
+	h.admit(t, "meter", "test.measure", "2026-02-01T06:30:00Z", `"value": 120, "extra": 78`)
+	h.admit(t, "logger", "test.reading", "2026-02-01T22:00:00Z", `"minutes": 55`)
 
 	head, err := h.l.Head(ctx)
 	if err != nil {
@@ -241,7 +241,7 @@ func TestVerify_ReproducesAfterTheLedgerAdvances(t *testing.T) {
 	}
 
 	// Serving now must differ — otherwise the reproduction above proved nothing.
-	fresh, err := serve.Run(ctx, h.deps, "bp", false)
+	fresh, err := serve.Run(ctx, h.deps, "measures", false)
 	if err != nil {
 		t.Fatalf("Run (after ingest): %v", err)
 	}
@@ -249,7 +249,7 @@ func TestVerify_ReproducesAfterTheLedgerAdvances(t *testing.T) {
 		t.Error("the served hash did not move across a correction and a new reading; the reproduction test is vacuous")
 	}
 	if len(fresh.Receipt.FacetIDs) != 4 {
-		t.Errorf("a fresh serve found %d bp facets, want 4", len(fresh.Receipt.FacetIDs))
+		t.Errorf("a fresh serve found %d measures, want 4", len(fresh.Receipt.FacetIDs))
 	}
 
 	// And the older receipt still verifies, now that a second serve exists alongside it.
@@ -266,7 +266,7 @@ func TestVerify_DetectsATamperedArtifact(t *testing.T) {
 	h.seed(t)
 	ctx := context.Background()
 
-	out, err := serve.Run(ctx, h.deps, "bp", false)
+	out, err := serve.Run(ctx, h.deps, "measures", false)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -275,7 +275,7 @@ func TestVerify_DetectsATamperedArtifact(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read the served value: %v", err)
 	}
-	tampered := strings.Replace(string(original), `"systolic":118`, `"systolic":119`, 1)
+	tampered := strings.Replace(string(original), `"value":118`, `"value":119`, 1)
 	if tampered == string(original) {
 		t.Fatalf("the tamper changed nothing; the served bytes are:\n%s", original)
 	}
@@ -314,7 +314,7 @@ func TestVerify_MissingServedValueIsNotTampering(t *testing.T) {
 
 	// A dry run derives the receipt and writes nothing; filing the receipt alone leaves
 	// one whose served value is not there.
-	out, err := serve.Run(ctx, h.deps, "bp", true)
+	out, err := serve.Run(ctx, h.deps, "measures", true)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -356,13 +356,13 @@ func TestVerify_ReplaysTheFiledBodyOnceTheCatalogMovesOn(t *testing.T) {
 	h.seed(t)
 	ctx := context.Background()
 
-	out, err := serve.Run(ctx, h.deps, "bp", false)
+	out, err := serve.Run(ctx, h.deps, "measures", false)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	parse := func(version int, statuses string) projection.Template {
 		t.Helper()
-		tmpl, err := projection.Parse([]byte(fmt.Sprintf(`{"name":"bp","version":%d,"types":["health.blood-pressure"],`+
+		tmpl, err := projection.Parse([]byte(fmt.Sprintf(`{"name":"measures","version":%d,"types":["test.measure"],`+
 			`"statuses":[%s],"max_classification":"Sensitive","from":"","to":""}`, version, statuses)))
 		if err != nil {
 			t.Fatalf("Parse: %v", err)
@@ -420,7 +420,7 @@ func TestVerify_MovedDefinitionSetIsANoteNotAFailure(t *testing.T) {
 	h.seed(t)
 	ctx := context.Background()
 
-	out, err := serve.Run(ctx, h.deps, "bp", false)
+	out, err := serve.Run(ctx, h.deps, "measures", false)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -488,7 +488,7 @@ func TestVerify_RewordedDescriptionKeepsAnOlderReceiptVerifying(t *testing.T) {
 	h.seed(t)
 	ctx := context.Background()
 
-	out, err := serve.Run(ctx, h.deps, "bp", false)
+	out, err := serve.Run(ctx, h.deps, "measures", false)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -498,7 +498,7 @@ func TestVerify_RewordedDescriptionKeepsAnOlderReceiptVerifying(t *testing.T) {
 		return "sha256:" + hex.EncodeToString(sum[:])
 	}
 	older := digest(`{"schema":{"description":"made by a card"}}`)
-	newer := digest(`{"schema":{"description":"a reading of blood pressure"}}`)
+	newer := digest(`{"schema":{"description":"a reading of a measure"}}`)
 	if older == newer {
 		t.Fatal("the reworded manifest hashes the same as the original")
 	}

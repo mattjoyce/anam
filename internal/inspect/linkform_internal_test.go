@@ -5,8 +5,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 )
 
 const (
@@ -40,12 +38,16 @@ func TestEdgeIDIsTheRule(t *testing.T) {
 }
 
 // linkFormAt is record.edge's form as the Definition in force draws it, without a
-// server: its kinds and its at field.
+// server: its kinds and its at field. The Definition is the engine fixture's, read in
+// Europe/Berlin (berlinCatalog), so the form is held to a zone whose clocks skip.
 func linkFormAt(t *testing.T) linkForm {
 	t.Helper()
-	d, ok := catalogtest.Definitions(t).Lookup("record.edge")
+	d, ok := berlinCatalog.Definitions(t).Lookup("record.edge")
 	if !ok {
-		t.Fatal("record.edge is not bundled")
+		t.Fatal("record.edge is not in the catalog")
+	}
+	if d.FactTime.Zone != "Europe/Berlin" || d.FactTime.ZonePointer == "" {
+		t.Fatalf("record.edge's fact time = %+v, want a zoned one read in Europe/Berlin", d.FactTime)
 	}
 	loc, err := time.LoadLocation(d.FactTime.Zone)
 	if err != nil {
@@ -56,7 +58,7 @@ func linkFormAt(t *testing.T) linkForm {
 }
 
 func posting(kind string, to, from, pins []string) url.Values {
-	vals := url.Values{"kind": {kind}, "at": {"2026-10-21T14:30"}, "zone": {"Australia/Sydney"}, "offset": {"+11:00"}}
+	vals := url.Values{"kind": {kind}, "at": {"2026-10-21T14:30"}, "zone": {"Pacific/Noumea"}, "offset": {"+11:00"}}
 	for _, id := range to {
 		vals.Add("item", id)
 		vals.Add("keep", id)
@@ -121,6 +123,18 @@ func TestLinkPayloadRules(t *testing.T) {
 	raw, _ = build(posting("about", []string{noteA, noteB}, nil, nil))
 	if strings.Contains(raw, "pins") || !strings.Contains(raw, `"id":"workbench:edge:2d2f1575f837e477"`) {
 		t.Errorf("no pin ticked: %s", raw)
+	}
+
+	// A wall clock the Definition's zone skips (Berlin moves from 02:00 to 03:00 on
+	// 29 March) keeps its digits as typed, and the offset posted places it.
+	skipped := posting("about", []string{noteA}, nil, nil)
+	skipped.Set("at", "2026-03-29T02:30")
+	skipped.Set("zone", "Europe/London")
+	skipped.Set("offset", "+01:00")
+	raw, why = build(skipped)
+	if why != "" || !strings.Contains(raw, `"at":"2026-03-29 02:30"`) ||
+		!strings.Contains(raw, `"source_time":{"basis":"source","offset":"+01:00","value":"2026-03-29 02:30","zone":"Europe/London"}`) {
+		t.Errorf("a wall clock Berlin skips: %s %q", raw, why)
 	}
 
 	stale := posting("about", []string{noteA}, nil, []string{noteA})

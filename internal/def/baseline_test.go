@@ -19,6 +19,17 @@ import (
 // change.
 var update = flag.Bool("update", false, "rewrite testdata/baseline.golden instead of comparing")
 
+// goldenLabel is the golden file's label for a catalog file: its path under the
+// catalog's old source directory, "manifests/<name>.json" or
+// "manifests/history/<name>.json". It is a label only; the bytes come from the
+// fixture FS.
+func goldenLabel(dir, name string) string {
+	if dir == "." {
+		return "manifests/" + name
+	}
+	return "manifests/" + dir + "/" + name
+}
+
 // baselineLines hashes every file in a catalog root (fsys at "." and "history/") and
 // returns the manifest lines; it also reads the sourcetime files from sourceTimeFS,
 // and appends the set_version SetVersionFS reports for fsys. The returned lines are in the same
@@ -27,9 +38,8 @@ func baselineLines(t *testing.T, fsys fs.FS) []string {
 	t.Helper()
 	var lines []string
 
-	// Manifest and history files from the catalog root. The golden file uses
-	// "manifests/<name>.json" and "manifests/history/<name>.json" paths, so we
-	// prepend "manifests/" to match.
+	// Manifest and history files from the catalog root, labelled as the golden file
+	// labels them (goldenLabel).
 	for _, dir := range []string{".", "history"} {
 		entries, err := fs.ReadDir(fsys, dir)
 		if err != nil {
@@ -46,10 +56,7 @@ func baselineLines(t *testing.T, fsys fs.FS) []string {
 			if !isJSON(e.Name()) {
 				continue
 			}
-			path := "manifests/" + e.Name()
-			if dir != "." {
-				path = "manifests/" + dir + "/" + e.Name()
-			}
+			path := goldenLabel(dir, e.Name())
 			readPath := dir + "/" + e.Name()
 			if dir == "." {
 				readPath = e.Name()

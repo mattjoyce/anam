@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/span"
@@ -54,6 +55,23 @@ func newConfig(t *testing.T) config.Config {
 		t.Fatal(err)
 	}
 	return cfg
+}
+
+// TestNewConfig_ReadsTheFixtureCatalog holds newConfig to a fixture: the catalog its
+// config loads, as Open loads it, comes from directories, not the embedded catalog.
+// TestTests_ReadNoEmbeddedCatalog (catalogtest) sees a directory set to "" but not
+// one left unset, so this is the guard for every daemon this package opens.
+func TestNewConfig_ReadsTheFixtureCatalog(t *testing.T) {
+	t.Parallel()
+	cfg := newConfig(t)
+	cat, err := catalog.Load(context.Background(), cfg.DefinitionsDir, cfg.ProjectionsDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cat.DefinitionsSource() == "embedded" || cat.ProjectionsSource() == "embedded" {
+		t.Errorf("newConfig loads definitions from %s and projections from %s, want a fixture copy for both",
+			cat.DefinitionsSource(), cat.ProjectionsSource())
+	}
 }
 
 func open(t *testing.T, cfg config.Config) *Daemon {

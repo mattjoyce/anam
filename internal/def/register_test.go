@@ -6,20 +6,25 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
-// importedManifest is bpManifest under a type no binary bundles, as an importer's
-// repo would carry it.
-var importedManifest = strings.Replace(bpManifest, `"health.blood-pressure"`, `"test.reading"`, 1)
+// importedManifest is bpManifest under a type the engine fixture does not hold, as an
+// importer's repo would carry it.
+var importedManifest = strings.Replace(bpManifest, `"health.blood-pressure"`, `"test.registered"`, 1)
+
+// measureManifest is bpManifest under test.measure, a type the engine fixture holds.
+// Register reads the bundled registry by type, so the body need not be the fixture's.
+var measureManifest = strings.Replace(bpManifest, `"health.blood-pressure"`, `"test.measure"`, 1)
 
 func versioned(manifest string, v int) string {
 	return strings.Replace(manifest, `"definition_version": 1`, `"definition_version": `+strconv.Itoa(v), 1)
 }
 
 func held(manifest string, v int) def.Stored {
-	return def.Stored{Type: "test.reading", Version: v, Body: []byte(versioned(manifest, v))}
+	return def.Stored{Type: "test.registered", Version: v, Body: []byte(versioned(manifest, v))}
 }
 
 // Card 53: a registered version is immutable, versions only go forward, a new version
@@ -27,10 +32,7 @@ func held(manifest string, v int) def.Stored {
 // never both.
 func TestRegister(t *testing.T) {
 	t.Parallel()
-	bundled, err := def.BundledFS(fixtureDefs())
-	if err != nil {
-		t.Fatal(err)
-	}
+	bundled := catalogtest.Engine.Definitions(t)
 	reformatted := strings.ReplaceAll(importedManifest, "\n", "")
 	rekeyed := strings.Replace(importedManifest, `"identity_key": ["/measured_at"]`, `"identity_key": ["/systolic"]`, 1)
 	widened := strings.Replace(importedManifest, `"comment": {"type": "string", "minLength": 1}`,
@@ -42,13 +44,13 @@ func TestRegister(t *testing.T) {
 	// Card 139: a release that takes a type back from an importer must not break the
 	// importer still sending the body the binary now carries. The store holds the
 	// bundled body, as the daemon writes it at start.
-	bpBundled, ok := bundled.Lookup("health.blood-pressure")
+	measureBundled, ok := bundled.Lookup("test.measure")
 	if !ok {
-		t.Fatal("health.blood-pressure is not bundled")
+		t.Fatal("test.measure is not bundled")
 	}
-	bpAtBundled := versioned(bpManifest, bpBundled.Version)
-	bpStored := def.Stored{Type: "health.blood-pressure", Version: bpBundled.Version, Body: []byte(bpAtBundled)}
-	bpOtherAtBundled := strings.Replace(bpAtBundled, `"comment": {"type": "string", "minLength": 1}`,
+	measureAtBundled := versioned(measureManifest, measureBundled.Version)
+	measureStored := def.Stored{Type: "test.measure", Version: measureBundled.Version, Body: []byte(measureAtBundled)}
+	measureOtherAtBundled := strings.Replace(measureAtBundled, `"comment": {"type": "string", "minLength": 1}`,
 		`"comment": {"type": "string"}`, 1)
 
 	cases := []struct {
@@ -71,10 +73,10 @@ func TestRegister(t *testing.T) {
 		{"the same handling again", handled, nil, []def.Stored{held(handled, 1)}, false, nil},
 		{"another handling at a registered version", rehandled, nil, []def.Stored{held(handled, 1)}, false, def.ErrRegistered},
 		{"a newer version, only its handling changed", versioned(rehandled, 2), nil, []def.Stored{held(handled, 1)}, true, nil},
-		{"a type this binary bundles", bpManifestBundled(t, bundled), nil, nil, false, def.ErrBundled},
-		{"a type this binary bundles, the body it carries", bpAtBundled, []def.Stored{bpStored}, nil, false, nil},
-		{"a type this binary bundles, another body at its version", bpOtherAtBundled, []def.Stored{bpStored}, nil, false, def.ErrBundled},
-		{"a type this binary bundles, its body but the store holds none", bpAtBundled, nil, nil, false, def.ErrBundled},
+		{"a type this binary bundles", measureManifestBundled(t, bundled), nil, nil, false, def.ErrBundled},
+		{"a type this binary bundles, the body it carries", measureAtBundled, []def.Stored{measureStored}, nil, false, nil},
+		{"a type this binary bundles, another body at its version", measureOtherAtBundled, []def.Stored{measureStored}, nil, false, def.ErrBundled},
+		{"a type this binary bundles, its body but the store holds none", measureAtBundled, nil, nil, false, def.ErrBundled},
 		{"not a manifest", `{"meta": {}}`, nil, nil, false, def.ErrBadManifest},
 	}
 	for _, c := range cases {
@@ -91,22 +93,19 @@ func TestRegister(t *testing.T) {
 	}
 }
 
-// bpManifestBundled is a manifest for a type the binary ships, at a version past it.
-func bpManifestBundled(t *testing.T, bundled *def.Registry) string {
+// measureManifestBundled is a manifest for a type the catalog holds, at a version past it.
+func measureManifestBundled(t *testing.T, bundled *def.Registry) string {
 	t.Helper()
-	d, ok := bundled.Lookup("health.blood-pressure")
+	d, ok := bundled.Lookup("test.measure")
 	if !ok {
-		t.Fatal("health.blood-pressure is not bundled")
+		t.Fatal("test.measure is not bundled")
 	}
-	return versioned(bpManifest, d.Version+1)
+	return versioned(measureManifest, d.Version+1)
 }
 
 func TestWithRegistered(t *testing.T) {
 	t.Parallel()
-	bundled, err := def.BundledFS(fixtureDefs())
-	if err != nil {
-		t.Fatal(err)
-	}
+	bundled := catalogtest.Engine.Definitions(t)
 
 	t.Run("the newest registered version is the one admitted against", func(t *testing.T) {
 		t.Parallel()
@@ -114,11 +113,11 @@ func TestWithRegistered(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		d, ok := r.Lookup("test.reading")
+		d, ok := r.Lookup("test.registered")
 		if !ok || d.Version != 2 {
 			t.Fatalf("Lookup = v%d %v, want v2", d.Version, ok)
 		}
-		if _, ok := r.Lookup("health.weight"); !ok {
+		if _, ok := r.Lookup("test.reading"); !ok {
 			t.Error("bundled types are missing")
 		}
 	})
@@ -126,14 +125,14 @@ func TestWithRegistered(t *testing.T) {
 	t.Run("a type the binary took back is admitted against the bundled one", func(t *testing.T) {
 		t.Parallel()
 		r, err := def.WithRegistered(bundled, []def.Stored{{
-			Type: facet.Type("health.blood-pressure"), Version: 9, Body: []byte(versioned(bpManifest, 9)),
+			Type: facet.Type("test.measure"), Version: 9, Body: []byte(versioned(measureManifest, 9)),
 		}})
 		if err != nil {
 			t.Fatal(err)
 		}
-		want, _ := bundled.Lookup("health.blood-pressure")
-		if got, _ := r.Lookup("health.blood-pressure"); got.Version != want.Version {
-			t.Fatalf("health.blood-pressure is v%d, want the bundled v%d", got.Version, want.Version)
+		want, _ := bundled.Lookup("test.measure")
+		if got, _ := r.Lookup("test.measure"); got.Version != want.Version || want.Version != 2 {
+			t.Fatalf("test.measure is v%d, want the bundled v%d (2)", got.Version, want.Version)
 		}
 	})
 }

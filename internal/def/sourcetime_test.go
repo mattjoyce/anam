@@ -3,6 +3,7 @@ package def_test
 import (
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"os"
 	"slices"
 	"strings"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/def"
-	"github.com/mattjoyce/anam/internal/facet"
 )
 
 // clockManifest is a reading timed by a wall clock in zone, laid out as layout,
@@ -140,221 +140,62 @@ func TestSourceTime_ADefinitionCarriesTheShapeOrIsRefused(t *testing.T) {
 	}
 }
 
-// bareDate reports whether a time layout names a day and no time of day. A date stays a
-// local date (card 198): it has no clock and no offset to state, so a type timed by one is
-// exempt from the rule below and needs no source_time.
-func bareDate(layout string) bool {
-	at := time.Date(2001, 2, 3, 16, 5, 6, 0, time.UTC)
-	return at.Format(layout) == at.Add(-12*time.Hour).Format(layout)
-}
-
-// readsALocalClock are the bundled types whose fact time is a wall clock read in the
-// Definition's zone, and which do not yet say how it was read. It is empty (card 198): every
-// type that reads a local clock requires source_time. A type timed by a bare date is exempt by
-// that card's rule. A new type that reads a local clock must require source_time from its first
-// version, so this list does not grow.
-var readsALocalClock = map[string]bool{}
-
-func TestSourceTime_EveryTypeReadingALocalClockSaysHow(t *testing.T) {
+// The engine fixture's types carry the shapes as a catalog writes them, pretty-printed
+// inside a whole manifest: test.measure a copy of v1 and test.reading a copy of v2 (the
+// offset). Each loads as it is, and the same file with one rule of its copy changed is
+// refused when it loads, so no catalog can carry a third shape.
+func TestSourceTime_TheFixturesCopiesAreTheShapes(t *testing.T) {
 	t.Parallel()
-	reg, err := def.BundledFS(fixtureDefs())
-	if err != nil {
-		t.Fatal(err)
-	}
-	stored, err := def.ManifestsFS(fixtureDefs())
-	if err != nil {
-		t.Fatal(err)
-	}
-	required := map[string]bool{}
-	for _, s := range stored {
-		if d, ok := reg.Lookup(s.Type); !ok || d.Version != s.Version {
-			continue
+	for _, tc := range []struct {
+		file, shape string
+		edits       map[string][2]string // name: old, new in the manifest's bytes
+	}{
+		{"test.measure.json", "v1.json", map[string][2]string{
+			"a fourth basis": {`"assumption"`, `"assumption", "hearsay"`},
+			"zone optional":  {"\"required\": [\n          \"value\",\n          \"zone\",", "\"required\": [\n          \"value\","},
+			"an offset more": {"\"basis\": {\n            \"type\"", "\"offset\": {\"type\": \"string\"},\n          \"basis\": {\n            \"type\""},
+		}},
+		{"test.reading.json", "v2.json", map[string][2]string{
+			"a fourth basis":  {`"assumption"`, `"assumption", "hearsay"`},
+			"offset optional": {"\"zone\",\n          \"offset\",\n          \"basis\"", "\"zone\",\n          \"basis\""},
+			"a zone unchecked": {`"minLength": 1,
+            "pattern": "^([A-Za-z]`, `"minLength": 1,
+            "format": "^([A-Za-z]`},
+		}},
+	} {
+		raw, err := fs.ReadFile(fixtureDefs(), tc.file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		mustParse(t, string(raw))
+		shape, err := os.ReadFile("sourcetime/" + tc.shape)
+		if err != nil {
+			t.Fatal(err)
 		}
 		var m struct {
 			Schema struct {
-				Required []string `json:"required"`
+				Required   []string       `json:"required"`
+				Properties map[string]any `json:"properties"`
 			} `json:"schema"`
 		}
-		if err := json.Unmarshal(s.Body, &m); err != nil {
+		if err := json.Unmarshal(raw, &m); err != nil {
 			t.Fatal(err)
 		}
-		required[string(s.Type)] = slices.Contains(m.Schema.Required, def.SourceTimeField)
-	}
-	for _, d := range reg.All() {
-		local := d.FactTime.Zone != "UTC" && !strings.Contains(d.FactTime.Layout, "07") && !strings.Contains(d.FactTime.Layout, "Z") &&
-			!bareDate(d.FactTime.Layout)
-		listed := readsALocalClock[string(d.Type)]
-		switch {
-		case local && !required[string(d.Type)] && !listed:
-			t.Errorf("%s reads %q in %s and does not require %s", d.Type, d.FactTime.Layout, d.FactTime.Zone, def.SourceTimeField)
-		case listed && (required[string(d.Type)] || !local):
-			t.Errorf("%s is listed as not yet saying how its clock was read, and it says how or reads no clock: take it off the list", d.Type)
+		if !slices.Contains(m.Schema.Required, def.SourceTimeField) {
+			t.Errorf("%s does not require %s", tc.file, def.SourceTimeField)
 		}
-	}
-	for typ := range readsALocalClock {
-		if _, ok := reg.Lookup(facet.Type(typ)); !ok {
-			t.Errorf("%s is listed and not bundled: take it off the list", typ)
+		_, offset := m.Schema.Properties[def.SourceTimeField].(map[string]any)["properties"].(map[string]any)["offset"]
+		if want := strings.Contains(string(shape), `"offset"`); offset != want {
+			t.Errorf("%s carries an offset %v, want the %s shape's %v", tc.file, offset, tc.shape, want)
 		}
-	}
-}
-
-// Card 198: the importers' types say how their clocks were read. A type whose every
-// writer sends source_time requires it; one whose source has no export left to extract
-// again declares it without requiring it, so its old payloads still admit.
-func TestSourceTime_TheImportersTypesCarryIt(t *testing.T) {
-	t.Parallel()
-	reg, err := def.BundledFS(fixtureDefs())
-	if err != nil {
-		t.Fatal(err)
-	}
-	stored, err := def.ManifestsFS(fixtureDefs())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for typ, want := range map[facet.Type]struct {
-		version  int
-		required bool
-	}{
-		"activity.exercise-session.concept2":  {2, true},
-		"activity.exercise-session.strong":    {2, true},
-		"record.document":                     {2, true},
-		"activity.exercise-session.technogym": {2, false},
-		"health.blood-pressure":               {8, true},
-		"health.lab-result":                   {3, true},
-		"health.lab-panel":                    {3, true},
-	} {
-		d, ok := reg.Lookup(typ)
-		if !ok || d.Version != want.version {
-			t.Errorf("%s = v%d, %v; want v%d", typ, d.Version, ok, want.version)
-			continue
-		}
-		for _, s := range stored {
-			if s.Type != typ || s.Version != d.Version {
-				continue
+		for name, e := range tc.edits {
+			edited := strings.Replace(string(raw), e[0], e[1], 1)
+			if edited == string(raw) {
+				t.Fatalf("%s, %s: the edit changed nothing", tc.file, name)
 			}
-			var m struct {
-				Schema struct {
-					Required   []string                   `json:"required"`
-					Properties map[string]json.RawMessage `json:"properties"`
-				} `json:"schema"`
+			if _, err := def.Parse([]byte(edited)); !errors.Is(err, def.ErrBadManifest) {
+				t.Errorf("%s, %s: Parse = %v, want ErrBadManifest", tc.file, name, err)
 			}
-			if err := json.Unmarshal(s.Body, &m); err != nil {
-				t.Fatal(err)
-			}
-			if _, ok := m.Schema.Properties[def.SourceTimeField]; !ok {
-				t.Errorf("%s v%d does not declare %s", typ, d.Version, def.SourceTimeField)
-			}
-			if got := slices.Contains(m.Schema.Required, def.SourceTimeField); got != want.required {
-				t.Errorf("%s v%d requires %s = %v, want %v", typ, d.Version, def.SourceTimeField, got, want.required)
-			}
-		}
-	}
-}
-
-// Card 198, slice A: five types no writer sends any more require source_time, so a
-// facet written again says how its clock was read. Four are the health ETL's period
-// summaries, retired with health-db at card 55; activity.gym-visit's only writer was the
-// Strong extract, which now writes activity.exercise-session.strong. Fact-time rule and
-// identity are the earlier version's, which def.Guard holds.
-func TestSourceTime_TheWriterlessTypesRequireIt(t *testing.T) {
-	t.Parallel()
-	reg, err := def.BundledFS(fixtureDefs())
-	if err != nil {
-		t.Fatal(err)
-	}
-	stored, err := def.ManifestsFS(fixtureDefs())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for typ, version := range map[facet.Type]int{
-		"activity.gym-visit":      2,
-		"health.body-composition": 5,
-		"health.heart-rate":       4,
-		"health.metric-group":     4,
-		"health.sleep":            4,
-	} {
-		d, ok := reg.Lookup(typ)
-		if !ok || d.Version != version {
-			t.Errorf("%s = v%d, %v; want v%d", typ, d.Version, ok, version)
-			continue
-		}
-		held := map[int]bool{}
-		for _, s := range stored {
-			if s.Type != typ {
-				continue
-			}
-			held[s.Version] = true
-			if s.Version != version {
-				continue
-			}
-			var m struct {
-				Schema struct {
-					Required   []string                   `json:"required"`
-					Properties map[string]json.RawMessage `json:"properties"`
-				} `json:"schema"`
-			}
-			if err := json.Unmarshal(s.Body, &m); err != nil {
-				t.Fatal(err)
-			}
-			if _, ok := m.Schema.Properties[def.SourceTimeField]; !ok {
-				t.Errorf("%s v%d does not declare %s", typ, version, def.SourceTimeField)
-			}
-			if !slices.Contains(m.Schema.Required, def.SourceTimeField) {
-				t.Errorf("%s v%d does not require %s", typ, version, def.SourceTimeField)
-			}
-		}
-		if !held[version-1] {
-			t.Errorf("%s v%d is not carried in the history", typ, version-1)
-		}
-	}
-}
-
-// Card 198, the records window: the six types read from hand-made records files require
-// source_time, each at the version after the one that declared it. Fact-time rule and
-// identity are the earlier version's, which def.Guard holds. Weight's carries the offset the
-// date had (shape v2), since its fact time is read at it; the others carry shape v1.
-func TestSourceTime_TheRecordsFilesTypesRequireIt(t *testing.T) {
-	t.Parallel()
-	reg, err := def.BundledFS(fixtureDefs())
-	if err != nil {
-		t.Fatal(err)
-	}
-	stored, err := def.ManifestsFS(fixtureDefs())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for typ, version := range map[facet.Type]int{
-		"health.weight": 7, "health.lab-result": 3, "health.lab-panel": 3,
-		"health.blood-pressure": 8, "health.encounter": 2, "health.donation": 2,
-	} {
-		d, ok := reg.Lookup(typ)
-		if !ok || d.Version != version {
-			t.Errorf("%s = v%d, %v; want v%d", typ, d.Version, ok, version)
-			continue
-		}
-		held := map[int]bool{}
-		for _, s := range stored {
-			if s.Type != typ {
-				continue
-			}
-			held[s.Version] = true
-			if s.Version != version {
-				continue
-			}
-			var m struct {
-				Schema struct {
-					Required []string `json:"required"`
-				} `json:"schema"`
-			}
-			if err := json.Unmarshal(s.Body, &m); err != nil {
-				t.Fatal(err)
-			}
-			if !slices.Contains(m.Schema.Required, def.SourceTimeField) {
-				t.Errorf("%s v%d does not require %s", typ, version, def.SourceTimeField)
-			}
-		}
-		if !held[version-1] {
-			t.Errorf("%s v%d is not carried in the history", typ, version-1)
 		}
 	}
 }

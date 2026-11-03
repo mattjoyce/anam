@@ -8,29 +8,37 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
-// Card 198: a fact names the zone its wall clock was said in. These run on the
-// fixture catalog's record.edge, the note the conversation writer saves, and the dose.
+// Card 198: a fact names the zone its wall clock was said in. These run on the engine
+// fixture's test.reading, read at the offset source_time names or else in
+// Europe/Berlin, and test.templated, whose id takes the offset from v2.
 
-func bundledDef(t *testing.T, typ string) def.Definition {
+func engineDef(t *testing.T, typ string) def.Definition {
 	t.Helper()
-	reg, err := def.BundledFS(fixtureDefs())
-	if err != nil {
-		t.Fatal(err)
-	}
-	d, ok := reg.Lookup(facet.Type(typ))
+	d, ok := catalogtest.Engine.Definitions(t).Lookup(facet.Type(typ))
 	if !ok {
-		t.Fatalf("no %s in the fixture catalog", typ)
+		t.Fatalf("no %s in the engine fixture", typ)
 	}
 	return d
 }
 
-// note is a record.edge payload said at the wall clock at, with source_time when zone
-// is set.
-func note(at, zone, offset string) string {
+// historyDef parses a version of a type from the engine fixture's history.
+func historyDef(t *testing.T, name string) def.Definition {
+	t.Helper()
+	raw, err := fs.ReadFile(fixtureDefs(), "history/"+name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return mustParse(t, string(raw))
+}
+
+// zonedReading is a test.reading payload said at the wall clock at, with source_time when
+// zone is set.
+func zonedReading(at, zone, offset string) string {
 	st := ""
 	if zone != "" {
 		st = `, "source_time": {"value": "` + at + `", "zone": "` + zone + `", "basis": "source"`
@@ -39,14 +47,14 @@ func note(at, zone, offset string) string {
 		}
 		st += `}`
 	}
-	return `{"id": "conversation:0123456789abcdef", "at": "` + at + `", "text": "words"` + st + `}`
+	return `{"id": "reading:0123456789abcdef", "at": "` + at + `", "value": 5, "unit": "mg"` + st + `}`
 }
 
 func TestZonePointer_TheFactIsReadAtTheOffsetItNames(t *testing.T) {
 	t.Parallel()
-	d := bundledDef(t, "record.edge")
-	if d.FactTime.ZonePointer != "/source_time/offset" {
-		t.Fatalf("record.edge v%d fact time %+v, want it read at source_time's offset", d.Version, d.FactTime)
+	d := engineDef(t, "test.reading")
+	if d.FactTime.ZonePointer != "/source_time/offset" || d.FactTime.Zone != "Europe/Berlin" {
+		t.Fatalf("test.reading v%d fact time %+v, want it read at source_time's offset, else in Europe/Berlin", d.Version, d.FactTime)
 	}
 	utc := func(s string) time.Time {
 		t.Helper()
@@ -61,21 +69,22 @@ func TestZonePointer_TheFactIsReadAtTheOffsetItNames(t *testing.T) {
 		want          time.Time
 		refused       string
 	}{
-		{"a London note at 18:00", note("2026-10-19 18:00", "Europe/London", "+01:00"), utc("2026-10-19T17:00:00Z"), ""},
-		{"a zone known only as its offset", note("2026-10-19 18:00", "+01:00", "+01:00"), utc("2026-10-19T17:00:00Z"), ""},
-		{"a Sydney note", note("2026-10-19 18:00", "Australia/Sydney", "+11:00"), utc("2026-10-19T07:00:00Z"), ""},
+		{"a London reading at 18:00", zonedReading("2026-10-19 18:00", "Europe/London", "+01:00"), utc("2026-10-19T17:00:00Z"), ""},
+		{"a zone known only as its offset", zonedReading("2026-10-19 18:00", "+01:00", "+01:00"), utc("2026-10-19T17:00:00Z"), ""},
+		{"a Sydney reading", zonedReading("2026-10-19 18:00", "Australia/Sydney", "+11:00"), utc("2026-10-19T07:00:00Z"), ""},
 		// London's clocks go back at 02:00 BST on 25 October 2026: 01:30 happens twice.
-		{"a repeated hour, the first by its offset", note("2026-10-25 01:30", "Europe/London", "+01:00"), utc("2026-10-25T00:30:00Z"), ""},
-		{"a repeated hour, the second by its offset", note("2026-10-25 01:30", "Europe/London", "+00:00"), utc("2026-10-25T01:30:00Z"), ""},
-		{"a repeated hour, the name alone", note("2026-10-25 01:30", "Europe/London", ""), time.Time{}, "offset"},
+		{"a repeated hour, the first by its offset", zonedReading("2026-10-25 01:30", "Europe/London", "+01:00"), utc("2026-10-25T00:30:00Z"), ""},
+		{"a repeated hour, the second by its offset", zonedReading("2026-10-25 01:30", "Europe/London", "+00:00"), utc("2026-10-25T01:30:00Z"), ""},
+		{"a repeated hour, the name alone", zonedReading("2026-10-25 01:30", "Europe/London", ""), time.Time{}, "offset"},
 		// London's clocks go forward at 01:00 GMT on 29 March 2026: 01:30 never happens.
-		{"a skipped hour, an offset cannot conjure it", note("2026-03-29 01:30", "Europe/London", "+00:00"), time.Time{}, "is not a wall clock Europe/London shows at offset +00:00"},
-		{"an offset the zone does not keep", note("2026-10-19 18:00", "Europe/London", "+05:00"), time.Time{}, "is not a wall clock Europe/London shows at offset +05:00"},
-		// Sydney skips 02:30 on 4 October; said in London it is an ordinary time.
-		{"Sydney's skipped hour, said in London", note("2026-10-04 02:30", "Europe/London", "+01:00"), utc("2026-10-04T01:30:00Z"), ""},
-		{"a zone that is none", note("2026-10-19 18:00", "Mars/Olympus_Mons", "+01:00"), time.Time{}, "Mars/Olympus_Mons"},
-		{"the host's zone", note("2026-10-19 18:00", "Local", "+01:00"), time.Time{}, `"Local" names no zone`},
-		{"no source_time: the version requires it", note("2026-10-19 18:00", "", ""), time.Time{}, "source_time"},
+		{"a skipped hour, an offset cannot conjure it", zonedReading("2026-03-29 01:30", "Europe/London", "+00:00"), time.Time{}, "is not a wall clock Europe/London shows at offset +00:00"},
+		{"an offset the zone does not keep", zonedReading("2026-10-19 18:00", "Europe/London", "+05:00"), time.Time{}, "is not a wall clock Europe/London shows at offset +05:00"},
+		// Berlin skips 02:30 on 29 March; said in London, an hour behind, it is an
+		// ordinary time.
+		{"Berlin's skipped hour, said in London", zonedReading("2026-03-29 02:30", "Europe/London", "+01:00"), utc("2026-03-29T01:30:00Z"), ""},
+		{"a zone that is none", zonedReading("2026-10-19 18:00", "Mars/Olympus_Mons", "+01:00"), time.Time{}, "Mars/Olympus_Mons"},
+		{"the host's zone", zonedReading("2026-10-19 18:00", "Local", "+01:00"), time.Time{}, `"Local" names no zone`},
+		{"no source_time: the version requires it", zonedReading("2026-10-19 18:00", "", ""), time.Time{}, "source_time"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -98,37 +107,38 @@ func TestZonePointer_TheFactIsReadAtTheOffsetItNames(t *testing.T) {
 		})
 	}
 
-	// A note admitted before v2 carries no source_time, and v2 reads it where v1 did:
-	// in Sydney, its skipped hour refused as before.
-	if got, err := d.FactTimeOf(mustDecode(t, note("2026-10-19 18:00", "", ""))); err != nil || !got.Equal(utc("2026-10-19T07:00:00Z")) {
-		t.Errorf("an old note reads %v, %v; want 07:00Z, as v1 read it", got, err)
+	// A reading admitted before v2 carries no source_time, and v2 reads it where v1
+	// did: in Berlin, its skipped hour refused as before.
+	v1 := historyDef(t, "test.reading.v1.json")
+	old := mustDecode(t, zonedReading("2026-10-19 18:00", "", ""))
+	if got, err := d.FactTimeOf(old); err != nil || !got.Equal(utc("2026-10-19T16:00:00Z")) {
+		t.Errorf("an old reading reads %v, %v; want 16:00Z", got, err)
 	}
-	if _, err := d.FactTimeOf(mustDecode(t, note("2026-10-04 02:30", "", ""))); err == nil || !strings.Contains(err.Error(), "does not exist in Australia/Sydney") {
-		t.Errorf("an old note in Sydney's skipped hour: %v, want refused", err)
+	if got, err := v1.FactTimeOf(old); err != nil || !got.Equal(utc("2026-10-19T16:00:00Z")) {
+		t.Errorf("v1 reads the old reading at %v, %v; want 16:00Z, as v2 does", got, err)
+	}
+	if _, err := d.FactTimeOf(mustDecode(t, zonedReading("2026-03-29 02:30", "", ""))); err == nil || !strings.Contains(err.Error(), "does not exist in Europe/Berlin") {
+		t.Errorf("an old reading in Berlin's skipped hour: %v, want refused", err)
 	}
 }
 
-// The dose's id takes the offset when the dose names one (Matt, 2026-10-21): a dose
+// The id takes the offset when the payload names one (Matt, 2026-10-21): a fact
 // recorded before keeps its id byte for byte, and one local minute in two zones is two
-// doses.
-func TestZonePointer_TheDoseIDTakesTheOffset(t *testing.T) {
+// facts. test.templated v1 composed no offset; v2 appends it as an optional segment.
+func TestZonePointer_TheTemplatedIDTakesTheOffset(t *testing.T) {
 	t.Parallel()
-	now := bundledDef(t, "health.medication.dose")
-	raw, err := fs.ReadFile(fixtureDefs(), "history/health.medication.dose.v1.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	before := mustParse(t, string(raw))
-	plain := `{"taken_at": "2026-10-17 22:00", "drug": "Melatonin", "amount": 5, "unit": "mg"}`
+	now := engineDef(t, "test.templated")
+	before := historyDef(t, "test.templated.v1.json")
+	plain := `{"at": "2026-10-17 22:00", "name": "Melatonin", "amount": 5, "unit": "mg"}`
 	was, err := def.ComposeID(before, "conversation", []byte(plain))
 	if err != nil {
 		t.Fatal(err)
 	}
 	is, err := def.ComposeID(now, "conversation", []byte(plain))
-	if err != nil || is != was || was != "conversation:med/melatonin/dose/2026-10-17T22:00" {
-		t.Fatalf("a dose without a zone: v%d composes %q (%v), v%d composed %q", now.Version, is, err, before.Version, was)
+	if err != nil || is != was || was != "conversation:templated/melatonin/2026-10-17T22:00" {
+		t.Fatalf("a payload without a zone: v%d composes %q (%v), v%d composed %q", now.Version, is, err, before.Version, was)
 	}
-	london := `{"taken_at": "2026-10-17 22:00", "drug": "Melatonin", "amount": 5, "unit": "mg",
+	london := `{"at": "2026-10-17 22:00", "name": "Melatonin", "amount": 5, "unit": "mg",
 		"source_time": {"value": "2026-10-17 22:00", "zone": "Europe/London", "offset": "+01:00", "basis": "source"}}`
 	sydney := strings.ReplaceAll(strings.ReplaceAll(london, "Europe/London", "Australia/Sydney"), "+01:00", "+11:00")
 	l, err := def.ComposeID(now, "conversation", []byte(london))
@@ -139,7 +149,7 @@ func TestZonePointer_TheDoseIDTakesTheOffset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if l != "conversation:med/melatonin/dose/2026-10-17T22:00+01:00" || s != "conversation:med/melatonin/dose/2026-10-17T22:00+11:00" || l == s {
+	if l != "conversation:templated/melatonin/2026-10-17T22:00+01:00" || s != "conversation:templated/melatonin/2026-10-17T22:00+11:00" || l == s {
 		t.Errorf("one local minute in two zones: %q and %q, want two ids ending in their offsets", l, s)
 	}
 	// The gate fills and holds the id the same way.

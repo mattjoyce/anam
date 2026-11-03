@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 )
@@ -78,8 +77,8 @@ func TestGuard_RefusesAChangedKeyingAndNothingElse(t *testing.T) {
 		t.Errorf("Guard refused a new type: %v", err)
 	}
 	// And a catalog is what it compares against itself: a store holding exactly the
-	// fixture catalog's manifests passes.
-	defs, _ := fixture.Mattjoyce()
+	// engine fixture's manifests, history included, passes.
+	defs := fixtureDefs()
 	manifests, err := def.ManifestsFS(defs)
 	if err != nil {
 		t.Fatalf("ManifestsFS: %v", err)
@@ -102,8 +101,8 @@ func TestGuard_RefusesAChangedKeyingAndNothingElse(t *testing.T) {
 			current++
 		}
 	}
-	if current != len(bundled.All()) {
-		t.Errorf("ManifestsFS lists %d current bodies, BundledFS holds %d", current, len(bundled.All()))
+	if current != len(bundled.All()) || current != 10 || len(manifests) != 16 {
+		t.Errorf("ManifestsFS lists %d current bodies of %d, BundledFS holds %d; want the fixture's 10 of 16", current, len(manifests), len(bundled.All()))
 	}
 }
 

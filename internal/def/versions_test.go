@@ -18,30 +18,30 @@ func TestVersions_HoldsWhatParsesAndSaysWhyNotTheRest(t *testing.T) {
 	}
 	words := strings.Replace(versioned(importedManifest, 1), `"strict"`, `"lenient"`, 1)
 	v := def.NewVersions(reg,
-		[]def.Stored{held(importedManifest, 2), {Type: "test.reading", Version: 1, Body: []byte(words)}},
-		[]def.Stored{held(importedManifest, 2), {Type: "test.reading", Version: 3, Body: []byte(`{}`)}},
+		[]def.Stored{held(importedManifest, 2), {Type: "test.registered", Version: 1, Body: []byte(words)}},
+		[]def.Stored{held(importedManifest, 2), {Type: "test.registered", Version: 3, Body: []byte(`{}`)}},
 	)
 
 	for _, version := range []int{2, 3} {
-		if d, ok := v.At("test.reading", version); !ok || d.Version != version {
-			t.Errorf("At(test.reading, %d) = v%d, %v; want it held", version, d.Version, ok)
+		if d, ok := v.At("test.registered", version); !ok || d.Version != version {
+			t.Errorf("At(test.registered, %d) = v%d, %v; want it held", version, d.Version, ok)
 		}
 	}
-	if d, _ := v.At("test.reading", 3); d.Version != current.Version || d.Type != current.Type {
+	if d, _ := v.At("test.registered", 3); d.Version != current.Version || d.Type != current.Type {
 		t.Error("the Definition in force must win over a body stored at its version")
 	}
-	if _, ok := v.At("test.reading", 1); ok {
+	if _, ok := v.At("test.registered", 1); ok {
 		t.Error("v1 is words that do not parse and must not be held")
 	}
-	if why := v.Why("test.reading", 1); !strings.Contains(why, "do not parse as a contract") || !strings.Contains(why, "lenient") {
+	if why := v.Why("test.registered", 1); !strings.Contains(why, "do not parse as a contract") || !strings.Contains(why, "lenient") {
 		t.Errorf("Why(v1) = %q, want the parse failure", why)
 	}
-	if why := v.Why("test.reading", 7); !strings.Contains(why, "no Definition of test.reading at v7 is held") {
+	if why := v.Why("test.registered", 7); !strings.Contains(why, "no Definition of test.registered at v7 is held") {
 		t.Errorf("Why(v7) = %q", why)
 	}
 	// A body filed under the wrong version is not that version.
-	wrong := def.NewVersions(reg, []def.Stored{{Type: "test.reading", Version: 5, Body: []byte(versioned(importedManifest, 4))}})
-	if _, ok := wrong.At("test.reading", 5); ok {
+	wrong := def.NewVersions(reg, []def.Stored{{Type: "test.registered", Version: 5, Body: []byte(versioned(importedManifest, 4))}})
+	if _, ok := wrong.At("test.registered", 5); ok {
 		t.Error("a v4 body filed as v5 was held as v5")
 	}
 }

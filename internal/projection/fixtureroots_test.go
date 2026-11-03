@@ -6,15 +6,10 @@ import (
 	"github.com/mattjoyce/anam/internal/catalog/fixture"
 )
 
-// fixtureDefs and fixtureProjs are the two roots of fixture.Mattjoyce, the catalog
-// the package's external tests read in place of the one embedded in the binary (card
-// 255, R4a).
-func fixtureDefs() fs.FS {
-	defs, _ := fixture.Mattjoyce()
-	return defs
-}
-
+// fixtureProjs is the projections root of fixture.Engine, the catalog the package's
+// external tests read: one template per engine feature, nobody's record (card 255,
+// R4b). A test that needs the Definitions too reads catalogtest.Engine.
 func fixtureProjs() fs.FS {
-	_, projs := fixture.Mattjoyce()
+	_, projs := fixture.Engine()
 	return projs
 }

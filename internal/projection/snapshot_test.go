@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/consent"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
@@ -136,26 +137,42 @@ func TestParse_ShapeDefaultsToLog(t *testing.T) {
 	}
 }
 
-// The bundled meds template is snapshot-shaped over the three regimen types. It reads
-// the embedded catalog on purpose, being about a personal projection, and leaves the
-// engine with that catalog (card 255, R4b).
-func TestBundled_MedsIsASnapshot(t *testing.T) {
+// The engine fixture's course template is snapshot-shaped over the three course
+// types, and a template that names no shape is a log; a snapshot read through it serves
+// the latest statement per course and drops the course its stop closed.
+func TestBundledFS_CourseIsASnapshot(t *testing.T) {
 	t.Parallel()
-	reg, err := projection.Bundled()
+	reg, err := projection.BundledFS(fixtureProjs())
 	if err != nil {
-		t.Fatalf("Bundled: %v", err)
+		t.Fatalf("BundledFS: %v", err)
 	}
-	meds, err := reg.Lookup("meds")
+	course, err := reg.Lookup("course")
 	if err != nil {
-		t.Fatalf("Lookup(meds): %v", err)
+		t.Fatalf("Lookup(course): %v", err)
 	}
-	if meds.Shape != projection.ShapeSnapshot || len(meds.Types) != 3 {
-		t.Errorf("meds = shape %q over %v", meds.Shape, meds.Types)
+	if course.Shape != projection.ShapeSnapshot || len(course.Types) != 3 {
+		t.Errorf("course = shape %q over %v", course.Shape, course.Types)
 	}
-	for _, name := range []string{"bp", "sleep"} {
+	for _, name := range []string{"measures", "everything", "normal"} {
 		tmpl, err := reg.Lookup(name)
 		if err != nil || tmpl.Shape != projection.ShapeLog {
 			t.Errorf("%s = shape %q, %v; want log", name, tmpl.Shape, err)
 		}
+	}
+	v, err := fold.NewValue([]fold.Entry{
+		seriesEntry("a-start", "test.course.started", "2026-03-01T00:00:00.000000000Z", "test.course:a:1"),
+		seriesEntry("a-change", "test.course.changed", "2026-04-01T00:00:00.000000000Z", "test.course:a:1"),
+		seriesEntry("b-start", "test.course.started", "2026-03-02T00:00:00.000000000Z", "test.course:b:1"),
+		seriesEntry("b-stop", "test.course.stopped", "2026-05-01T00:00:00.000000000Z", "test.course:b:1"),
+	})
+	if err != nil {
+		t.Fatalf("fold.NewValue: %v", err)
+	}
+	served, err := projection.Apply(v, course, consent.Open{}, catalogtest.Engine.Definitions(t))
+	if err != nil {
+		t.Fatalf("Apply: %v", err)
+	}
+	if got := ids(served); len(got) != 1 || got[0] != "a-change" {
+		t.Errorf("course served %v, want only a-change: the latest of course a, course b closed", got)
 	}
 }

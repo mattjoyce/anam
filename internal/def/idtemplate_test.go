@@ -5,42 +5,33 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/def"
 )
 
-// The three melatonin doses on the record (card 188): hand-built ids, written
-// through the conversation source before the rule was declared. Whatever the
-// Definition declares must compose exactly these.
-const (
-	melatoninReason = `"reason": "to help adjust to the timezone, and sleep better"`
-	dosePayloadFmt  = `{"id": %q, "taken_at": %q, "drug": "melatonin", "amount": 5, "unit": "mg", ` + melatoninReason + `}`
-)
-
-func doseDef(t *testing.T) def.Definition {
+// templatedDef is the engine fixture's test.templated, whose identity_template is
+// {source}:templated/{/name|slug}/{/at|2006-01-02T15:04}{/source_time/offset?}.
+func templatedDef(t *testing.T) def.Definition {
 	t.Helper()
-	reg, err := def.BundledFS(fixtureDefs())
-	if err != nil {
-		t.Fatal(err)
-	}
-	d, ok := reg.Lookup("health.medication.dose")
+	d, ok := catalogtest.Engine.Definitions(t).Lookup("test.templated")
 	if !ok {
-		t.Fatal("health.medication.dose is not bundled")
+		t.Fatal("test.templated is not in the engine fixture")
 	}
 	return d
 }
 
-func TestComposeID_TheLiveMelatoninDoses(t *testing.T) {
+// Card 188: the id is composed from the payload alone. An id the payload carries is
+// ignored, and the same payload without it composes the same text.
+func TestComposeID_IgnoresTheIDThePayloadCarries(t *testing.T) {
 	t.Parallel()
-	d := doseDef(t)
-	for _, tc := range []struct{ takenAt, id string }{
-		{"2026-10-17 22:00", "conversation:med/melatonin/dose/2026-10-17T22:00"},
-		{"2026-10-18 22:00", "conversation:med/melatonin/dose/2026-10-18T22:00"},
-		{"2026-10-19 22:00", "conversation:med/melatonin/dose/2026-10-19T22:00"},
+	d := templatedDef(t)
+	for _, tc := range []struct{ at, id string }{
+		{"2026-10-17 22:00", "conversation:templated/melatonin/2026-10-17T22:00"},
+		{"2026-10-18 22:00", "conversation:templated/melatonin/2026-10-18T22:00"},
+		{"2026-10-19 07:05", "conversation:templated/melatonin/2026-10-19T07:05"},
 	} {
-		// The payload as stored carries its id; the composition ignores it, and the
-		// same payload without it composes the same text.
-		with := []byte(`{"id": "x", "taken_at": "` + tc.takenAt + `", "drug": "melatonin", "amount": 5, "unit": "mg", ` + melatoninReason + `}`)
-		without := []byte(`{"taken_at": "` + tc.takenAt + `", "drug": "melatonin", "amount": 5, "unit": "mg"}`)
+		with := []byte(`{"id": "x", "at": "` + tc.at + `", "name": "melatonin", "amount": 5, "unit": "mg", "note": "to sleep better"}`)
+		without := []byte(`{"at": "` + tc.at + `", "name": "melatonin", "amount": 5, "unit": "mg"}`)
 		for _, p := range [][]byte{with, without} {
 			got, err := def.ComposeID(d, "conversation", p)
 			if err != nil || got != tc.id {
@@ -52,19 +43,19 @@ func TestComposeID_TheLiveMelatoninDoses(t *testing.T) {
 
 func TestComposeID_Cases(t *testing.T) {
 	t.Parallel()
-	d := doseDef(t)
+	d := templatedDef(t)
 	cases := []struct {
 		name, source, payload, want, wantErr string
 	}{
-		{"source is the prefix", "workbench", `{"taken_at": "2026-10-17 07:05", "drug": "melatonin"}`,
-			"workbench:med/melatonin/dose/2026-10-17T07:05", ""},
-		{"slug lower-cases and hyphenates", "conversation", `{"taken_at": "2026-10-17 22:00", "drug": "Co-Codamol  500/30"}`,
-			"conversation:med/co-codamol-500-30/dose/2026-10-17T22:00", ""},
-		{"missing drug", "conversation", `{"taken_at": "2026-10-17 22:00"}`, "", "drug"},
-		{"drug that slugs to nothing", "conversation", `{"taken_at": "2026-10-17 22:00", "drug": "!!"}`, "", "empty"},
-		{"time not in the fact-time layout", "conversation", `{"taken_at": "2026-10-17T22:00", "drug": "melatonin"}`, "", "not a time"},
-		{"drug is a container", "conversation", `{"taken_at": "2026-10-17 22:00", "drug": ["a"]}`, "", "container"},
-		{"no source", "", `{"taken_at": "2026-10-17 22:00", "drug": "melatonin"}`, "", "source"},
+		{"source is the prefix", "workbench", `{"at": "2026-10-17 07:05", "name": "melatonin"}`,
+			"workbench:templated/melatonin/2026-10-17T07:05", ""},
+		{"slug lower-cases and hyphenates", "conversation", `{"at": "2026-10-17 22:00", "name": "Co-Codamol  500/30"}`,
+			"conversation:templated/co-codamol-500-30/2026-10-17T22:00", ""},
+		{"missing name", "conversation", `{"at": "2026-10-17 22:00"}`, "", "name"},
+		{"name that slugs to nothing", "conversation", `{"at": "2026-10-17 22:00", "name": "!!"}`, "", "empty"},
+		{"time not in the fact-time layout", "conversation", `{"at": "2026-10-17T22:00", "name": "melatonin"}`, "", "not a time"},
+		{"name is a container", "conversation", `{"at": "2026-10-17 22:00", "name": ["a"]}`, "", "container"},
+		{"no source", "", `{"at": "2026-10-17 22:00", "name": "melatonin"}`, "", "source"},
 	}
 	for _, tc := range cases {
 		got, err := def.ComposeID(d, tc.source, []byte(tc.payload))
@@ -79,11 +70,7 @@ func TestComposeID_Cases(t *testing.T) {
 
 func TestComposeID_NoTemplate(t *testing.T) {
 	t.Parallel()
-	reg, err := def.BundledFS(fixtureDefs())
-	if err != nil {
-		t.Fatal(err)
-	}
-	d, _ := reg.Lookup("health.weight")
+	d, _ := catalogtest.Engine.Definitions(t).Lookup("test.measure")
 	if _, err := def.ComposeID(d, "withings", []byte(`{}`)); !errors.Is(err, def.ErrNoTemplate) {
 		t.Errorf("got %v, want ErrNoTemplate", err)
 	}
@@ -91,9 +78,9 @@ func TestComposeID_NoTemplate(t *testing.T) {
 
 func TestWithID(t *testing.T) {
 	t.Parallel()
-	d := doseDef(t)
-	const id = "conversation:med/melatonin/dose/2026-10-17T22:00"
-	left := `{"taken_at": "2026-10-17 22:00", "drug": "melatonin", "amount": 5, "unit": "mg"}`
+	d := templatedDef(t)
+	const id = "conversation:templated/melatonin/2026-10-17T22:00"
+	left := `{"at": "2026-10-17 22:00", "name": "melatonin", "amount": 5, "unit": "mg"}`
 
 	t.Run("omitted is filled", func(t *testing.T) {
 		out, err := d.WithID("conversation", []byte(left))
@@ -105,15 +92,15 @@ func TestWithID(t *testing.T) {
 		}
 	})
 	t.Run("matching is untouched", func(t *testing.T) {
-		in := `{"id": "` + id + `", "taken_at": "2026-10-17 22:00", "drug": "melatonin"}`
+		in := `{"id": "` + id + `", "at": "2026-10-17 22:00", "name": "melatonin"}`
 		out, err := d.WithID("conversation", []byte(in))
 		if err != nil || string(out) != in {
 			t.Errorf("got %s, %v", out, err)
 		}
 	})
-	for _, bad := range []string{`"conversation:med/melatonin/dose/2026-10-17T22:30"`, `""`, `7`, `null`} {
+	for _, bad := range []string{`"conversation:templated/melatonin/2026-10-17T22:30"`, `""`, `7`, `null`} {
 		t.Run("disagreeing "+bad, func(t *testing.T) {
-			in := `{"id": ` + bad + `, "taken_at": "2026-10-17 22:00", "drug": "melatonin"}`
+			in := `{"id": ` + bad + `, "at": "2026-10-17 22:00", "name": "melatonin"}`
 			_, err := d.WithID("conversation", []byte(in))
 			if !errors.Is(err, def.ErrIdentityField) || !strings.Contains(err.Error(), bad) || !strings.Contains(err.Error(), id) {
 				t.Errorf("got %v, want ErrIdentityField showing %s and %s", err, bad, id)
@@ -126,8 +113,7 @@ func TestWithID(t *testing.T) {
 		}
 	})
 	t.Run("no template leaves the payload", func(t *testing.T) {
-		reg, _ := def.BundledFS(fixtureDefs())
-		w, _ := reg.Lookup("health.weight")
+		w, _ := catalogtest.Engine.Definitions(t).Lookup("test.measure")
 		out, err := w.WithID("withings", []byte(`{"a":1}`))
 		if err != nil || string(out) != `{"a":1}` {
 			t.Errorf("got %s, %v", out, err)
@@ -135,8 +121,8 @@ func TestWithID(t *testing.T) {
 	})
 }
 
-// The parser accepts a Definition without the field (every bundled type but the
-// dose) and refuses a template that cannot work.
+// The parser accepts a Definition without the field (every engine fixture type but
+// test.templated) and refuses a template that cannot work.
 func TestParse_IdentityTemplate(t *testing.T) {
 	t.Parallel()
 	manifest := func(key, tpl string) []byte {
@@ -172,27 +158,5 @@ func TestParse_IdentityTemplate(t *testing.T) {
 		case tc.wantErr != "" && (err == nil || !errors.Is(err, def.ErrBadManifest) || !strings.Contains(err.Error(), tc.wantErr)):
 			t.Errorf("%s: got %v, want ErrBadManifest mentioning %q", tc.name, err, tc.wantErr)
 		}
-	}
-}
-
-// The types that declare an id rule: the dose, the intake and the three attention types,
-// which take the same moment-and-offset shape, the three employment types, whose id is
-// the org, the stint and the kind, and the purchase, whose id is the merchant and the order
-// reference. Any other bundled type lets the writer choose the identity field's text.
-func TestBundled_OnlyTheseTypesDeclareATemplate(t *testing.T) {
-	t.Parallel()
-	reg, err := def.BundledFS(fixtureDefs())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, d := range reg.All() {
-		want := d.Type == "health.medication.dose" || d.Type == "health.intake" || strings.HasPrefix(string(d.Type), "mind.attention") ||
-			strings.HasPrefix(string(d.Type), "org.employment.") || d.Type == "money.purchase"
-		if got := d.IdentityTemplate != ""; got != want {
-			t.Errorf("%s declares a template: %v, want %v", d.Type, got, want)
-		}
-	}
-	if d := doseDef(t); d.Version != 3 {
-		t.Errorf("health.medication.dose is v%d, want 3", d.Version)
 	}
 }

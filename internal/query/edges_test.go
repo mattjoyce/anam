@@ -8,11 +8,13 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
+	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
+	"github.com/mattjoyce/anam/internal/policy"
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/query"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -22,8 +24,10 @@ import (
 // touching it, read from the served payloads with no table; a v2 note names its
 // sides, and the kind is its own attr.
 
-// edgeHarness is newHarness with the fixture's record.edge beside the test types, a
-// records source allowed to write it, and the log projection serving it.
+// edgeHarness is newHarness with the engine fixture's record.edge beside the test types,
+// a records source allowed to write it, and the log projection serving it. The intake,
+// sleep and steps types docs/QUERY.md's questions are asked of are the test's own
+// (docs_test.go), as the regimen and blood pressure types are.
 func edgeHarness(t *testing.T) *harness {
 	t.Helper()
 	l, err := ledger.Create(context.Background(), filepath.Join(t.TempDir(), "ledger.db"), "matt")
@@ -31,26 +35,21 @@ func edgeHarness(t *testing.T) *harness {
 		t.Fatalf("ledger.Create: %v", err)
 	}
 	t.Cleanup(func() { _ = l.Close() })
-	fixed := catalogtest.Definitions(t)
-	note, ok := fixed.Lookup("record.edge")
+	note, ok := catalogtest.Engine.Definitions(t).Lookup("record.edge")
 	if !ok {
-		t.Fatal("no record.edge in the fixture")
+		t.Fatal("no record.edge in the engine fixture")
 	}
-	// The intake and the sleep episode are what docs/QUERY.md's alcohol question is asked of.
-	intake, ok := fixed.Lookup("health.intake")
-	if !ok {
-		t.Fatal("no health.intake in the fixture")
+	// The intake and the sleep episode are what docs/QUERY.md's alcohol question is asked
+	// of, and the steps what its steps-per-month question is.
+	var docTypes []def.Definition
+	for _, m := range []string{intakeManifest, sleepManifest, stepsManifest} {
+		d, err := def.Parse([]byte(m))
+		if err != nil {
+			t.Fatalf("def.Parse: %v", err)
+		}
+		docTypes = append(docTypes, d)
 	}
-	sleep, ok := fixed.Lookup("health.sleep-episode")
-	if !ok {
-		t.Fatal("no health.sleep-episode in the fixture")
-	}
-	// The steps are what docs/QUERY.md's steps-per-month question is asked of.
-	steps, ok := fixed.Lookup("activity.steps")
-	if !ok {
-		t.Fatal("no activity.steps in the fixture")
-	}
-	defs, err := def.NewRegistry(append(registry(t).All(), note, intake, sleep, steps)...)
+	defs, err := def.NewRegistry(append(append(registry(t).All(), note), docTypes...)...)
 	if err != nil {
 		t.Fatalf("def.NewRegistry: %v", err)
 	}
@@ -153,14 +152,18 @@ reach(E, G) :- reach(E, F), linked(X, F), linked(X, G), X != E, G != F.`
 
 // The bundled set names one type by constant, and a rename would empty its rules
 // without a word, so the constant is held to a type the fixture catalog declares
-// (card 104, finding 5).
+// (card 104, finding 5). The engine ships no catalog, so the rules may name only the
+// structural types every catalog supplies and the engine reads by name
+// (catchup.EdgeType, policy.DocumentType); a constant naming any other type the
+// engine fixture holds, such as test.measure, is refused as well.
 func TestBundled_TypeConstantsAreBundledTypes(t *testing.T) {
 	t.Parallel()
 	rs, err := query.Bundled()
 	if err != nil {
 		t.Fatal(err)
 	}
-	fixed := catalogtest.Definitions(t)
+	fixed := catalogtest.Engine.Definitions(t)
+	structural := map[facet.Type]bool{catchup.EdgeType: true, policy.DocumentType: true}
 	n := 0
 	for _, r := range rs.Program.Rules {
 		for _, l := range r.Body {
@@ -171,6 +174,9 @@ func TestBundled_TypeConstantsAreBundledTypes(t *testing.T) {
 			typ := facet.Type(l.Atom.Args[1].Const.Text())
 			if _, ok := fixed.Lookup(typ); !ok {
 				t.Errorf("line %d names type %s, which no fixture Definition declares", l.Atom.Line, typ)
+			}
+			if !structural[typ] {
+				t.Errorf("line %d names type %s, which is not a structural type (%s, %s)", l.Atom.Line, typ, catchup.EdgeType, policy.DocumentType)
 			}
 		}
 	}

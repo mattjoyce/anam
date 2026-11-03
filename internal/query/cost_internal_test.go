@@ -39,12 +39,12 @@ func value2(t *testing.T, entries ...fold.Entry) (fold.Value, map[string]int) {
 func TestCostBoundMatches(t *testing.T) {
 	t.Parallel()
 	v, versions := value2(t,
-		entry2("r1", "health.blood-pressure", day2("2026-01-01"), `{"date_excel": "2026-1-1 06:30:00", "reading": "1", "systolic_blood_pressure": {"value": 118, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 76, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-01T06:30:00+11:00"}, "source_time": {"value": "2026-1-1 06:30:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}}`),
-		entry2("r2", "health.blood-pressure", day2("2026-01-02"), `{"date_excel": "2026-1-2 06:30:00", "reading": "1", "systolic_blood_pressure": {"value": 146, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 90, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-02T06:30:00+11:00"}, "source_time": {"value": "2026-1-2 06:30:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}}`),
-		entry2("r3", "health.blood-pressure", day2("2026-01-03"), `{"date_excel": "2026-1-3 06:30:00", "reading": "1", "systolic_blood_pressure": {"value": 160, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 95, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-03T06:30:00+11:00"}, "source_time": {"value": "2026-1-3 06:30:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}}`),
+		entry2("r1", "test.measure", day2("2026-01-01"), `{"at": "2026-01-01 06:30:00", "seq": 1, "count": 118, "source_time": {"value": "2026-01-01 06:30:00", "zone": "Europe/Berlin", "basis": "source"}}`),
+		entry2("r2", "test.measure", day2("2026-01-02"), `{"at": "2026-01-02 06:30:00", "seq": 1, "count": 146, "source_time": {"value": "2026-01-02 06:30:00", "zone": "Europe/Berlin", "basis": "source"}}`),
+		entry2("r3", "test.measure", day2("2026-01-03"), `{"at": "2026-01-03 06:30:00", "seq": 1, "count": 160, "source_time": {"value": "2026-01-03 06:30:00", "zone": "Europe/Berlin", "basis": "source"}}`),
 	)
-	defs := catalogtest.Definitions(t)
-	text := `high(E) :- attr(E, "/systolic_blood_pressure/value", S), S > 100.`
+	defs := catalogtest.Engine.Definitions(t)
+	text := `high(E) :- attr(E, "/count", S), S > 100.`
 	relation := "high"
 
 	tuples, steps, _, err := Cost(context.Background(), v, versions, defs, text, relation)

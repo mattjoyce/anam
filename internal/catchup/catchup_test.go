@@ -83,7 +83,7 @@ func newHarness(t *testing.T) (*gate.Gate, *ledger.Ledger, *ops.DB) {
 	return gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}), l, db
 }
 
-// noteHarness is newHarness with the fixture's record.edge beside the readings, and a
+// noteHarness is newHarness with the engine fixture's record.edge beside the readings, and a
 // records source allowed to write it, so a test can assert an edge about a reading.
 func noteHarness(t *testing.T) (*gate.Gate, *ledger.Ledger, *ops.DB) {
 	t.Helper()
@@ -102,9 +102,9 @@ func noteHarness(t *testing.T) (*gate.Gate, *ledger.Ledger, *ops.DB) {
 	if err != nil {
 		t.Fatalf("def.Parse: %v", err)
 	}
-	note, ok := catalogtest.Definitions(t).Lookup(catchup.EdgeType)
+	note, ok := catalogtest.Engine.Definitions(t).Lookup(catchup.EdgeType)
 	if !ok {
-		t.Fatalf("no %s in the fixture", catchup.EdgeType)
+		t.Fatalf("no %s in the engine fixture", catchup.EdgeType)
 	}
 	reg, err := def.NewRegistry(bp, note)
 	if err != nil {
@@ -442,13 +442,13 @@ func TestSync_DerivesTheEdgeIndex(t *testing.T) {
 	}
 }
 
-// The edge index reads fields the fixture's Definition of the edge type declares, and
+// The edge index reads fields the engine fixture's Definition of the edge type declares, and
 // nothing else; the Definition is held to declaring them.
 func TestEdgeType_DeclaresItsEnds(t *testing.T) {
 	t.Parallel()
-	d, ok := catalogtest.Definitions(t).Lookup(catchup.EdgeType)
+	d, ok := catalogtest.Engine.Definitions(t).Lookup(catchup.EdgeType)
 	if !ok {
-		t.Fatalf("no %s in the fixture", catchup.EdgeType)
+		t.Fatalf("no %s in the engine fixture", catchup.EdgeType)
 	}
 	for _, p := range []string{"/kind", "/from/0", "/to/0", "/about/0"} {
 		if err := d.HasPointer(p); err != nil {

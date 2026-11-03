@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -20,18 +21,21 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
-// Card 198: the self-report types gained a version whose fact time reads the zone a
-// fact names. The guard lets that version stand because no facet admitted before
-// carries one. This holds it over a real ledger: facets admitted under each type's
-// previous version, then read and sent again under the new one, keep their instant
-// and their id.
+// Card 198: a type may gain a version whose fact time reads the zone a fact names. The
+// guard lets that version stand because no facet admitted before carries one. This
+// holds it over a real ledger: facets admitted under each type's previous version, then
+// read and sent again under the new one, keep their instant and their id. The types
+// are the engine fixture's test.reading and test.templated, whose v2 reads the offset
+// source_time names and requires source_time, and a copy of test.reading whose v2 only
+// declares it, so both answers to a resent payload are held.
 
-// zonedTypes are the fixture's types whose fact time reads a zone from the fact, each
-// with the version before that one, from its history.
+// zonedTypes are the engine fixture's types whose fact time reads a zone from the fact,
+// each with the version before that one, from its history, and test.optional, a copy of
+// test.reading at both versions whose v2 does not require source_time.
 func zonedTypes(t *testing.T) (now, before []def.Definition, bodies [][]byte) {
 	t.Helper()
-	reg := catalogtest.Definitions(t)
-	defs, _ := fixture.Mattjoyce()
+	reg := catalogtest.Engine.Definitions(t)
+	defs, _ := fixture.Engine()
 	history, err := def.HistoryFS(defs)
 	if err != nil {
 		t.Fatal(err)
@@ -65,14 +69,23 @@ func zonedTypes(t *testing.T) (now, before []def.Definition, bodies [][]byte) {
 			}
 		}
 		if born {
-			continue // born reading a zone (the attention types): no facet was admitted before
+			continue // born reading a zone (record.edge): no facet was admitted before
 		}
 		now, before, bodies = append(now, d), append(before, prev), append(bodies, body)
 	}
-	if len(now) < 3 {
-		t.Fatalf("%d zoned types, want the self-report types", len(now))
+	var names []string
+	for _, d := range now {
+		names = append(names, string(d.Type))
 	}
-	return now, before, bodies
+	if got := strings.Join(names, ","); got != "test.reading,test.templated" {
+		t.Fatalf("zoned types = %s, want test.reading,test.templated", got)
+	}
+	current, err := fs.ReadFile(defs, "test.reading.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	optNow, optBefore, optBody := optional(t, current, old["test.reading@1"])
+	return append(now, optNow), append(before, optBefore), append(bodies, optBody)
 }
 
 // samplePayload is a payload of d's schema with its fact time at, built from the
@@ -159,11 +172,11 @@ func TestZonePointer_EveryAdmittedFacetReadsTheSameInstant(t *testing.T) {
 	now, before, bodies := zonedTypes(t)
 	old := zoneGate(t, l, before...)
 
-	sydney, _ := time.LoadLocation("Australia/Sydney")
-	moments := []time.Time{ // summer, winter, either side of both of Sydney's changes, a midnight
-		time.Date(2026, 1, 15, 9, 30, 0, 0, sydney), time.Date(2025, 7, 1, 0, 0, 0, 0, sydney),
-		time.Date(2026, 4, 5, 3, 30, 0, 0, sydney), time.Date(2026, 10, 4, 3, 0, 0, 0, sydney),
-		time.Date(2026, 10, 19, 18, 0, 0, 0, sydney),
+	berlin, _ := time.LoadLocation("Europe/Berlin")
+	moments := []time.Time{ // winter, summer, either side of both of Berlin's changes, a midnight
+		time.Date(2026, 1, 15, 9, 30, 0, 0, berlin), time.Date(2025, 7, 1, 0, 0, 0, 0, berlin),
+		time.Date(2026, 3, 29, 3, 30, 0, 0, berlin), time.Date(2026, 10, 25, 3, 0, 0, 0, berlin),
+		time.Date(2026, 10, 19, 18, 0, 0, 0, berlin),
 	}
 	type admitted struct {
 		typ     facet.Type
@@ -194,6 +207,7 @@ func TestZonePointer_EveryAdmittedFacetReadsTheSameInstant(t *testing.T) {
 	for _, d := range now {
 		byType[d.Type] = d
 	}
+	var refused, taken int
 	for _, h := range held {
 		d := byType[h.typ]
 		doc, err := def.Decode(h.payload)
@@ -209,8 +223,8 @@ func TestZonePointer_EveryAdmittedFacetReadsTheSameInstant(t *testing.T) {
 		}
 		// A type whose new version requires source_time refuses the old payload sent
 		// again, naming the field: a writer that resends must say how its clock was
-		// read. One that only declares it (health.weight, which records sends without)
-		// takes it back as the same facet at the same instant.
+		// read. One that only declares it (test.optional) takes it back as the same
+		// facet at the same instant.
 		env := facet.Envelope{Type: h.typ, Source: "conversation", Injector: "conversation", Payload: h.payload}
 		b, err := newer.Resolve(env)
 		if err != nil {
@@ -221,8 +235,10 @@ func TestZonePointer_EveryAdmittedFacetReadsTheSameInstant(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), "source_time") {
 				t.Errorf("%s v%d took an old payload without source_time: %+v, %v", h.typ, d.Version, res, err)
 			}
+			refused++
 			continue
 		}
+		taken++
 		if err != nil {
 			t.Fatalf("%s sent again under v%d: %v", h.typ, d.Version, err)
 		}
@@ -244,6 +260,10 @@ func TestZonePointer_EveryAdmittedFacetReadsTheSameInstant(t *testing.T) {
 	}
 	sort.Strings(names)
 	t.Logf("%d facets of %s", len(held), strings.Join(names, ", "))
+	// Both answers to a resent payload were given: two types refuse it, one takes it back.
+	if refused != 2*len(moments) || taken != len(moments) {
+		t.Errorf("resent: %d refused and %d taken back, want %d and %d", refused, taken, 2*len(moments), len(moments))
+	}
 }
 
 // requires reports whether d refuses payload for want of source_time.
@@ -255,4 +275,44 @@ func requires(t *testing.T, d def.Definition, payload []byte) bool {
 	}
 	err = d.Check(doc)
 	return err != nil && strings.Contains(err.Error(), "source_time")
+}
+
+// optional is test.reading's v2 (now) and v1 (before) renamed test.optional, with v2
+// declaring source_time and no longer requiring it, and v1's body. A facet admitted under
+// v1 and sent again under v2 is then taken back, not refused.
+func optional(t *testing.T, now, before []byte) (def.Definition, def.Definition, []byte) {
+	t.Helper()
+	rename := func(body []byte, unrequire string) []byte {
+		var m map[string]any
+		if err := json.Unmarshal(body, &m); err != nil {
+			t.Fatal(err)
+		}
+		m["meta"].(map[string]any)["facet_type"] = "test.optional"
+		schema := m["schema"].(map[string]any)
+		var required []any
+		for _, f := range schema["required"].([]any) {
+			if f != unrequire {
+				required = append(required, f)
+			}
+		}
+		schema["required"] = required
+		out, err := json.Marshal(m)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	nowBody, beforeBody := rename(now, "source_time"), rename(before, "")
+	n, err := def.Parse(nowBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := def.Parse(beforeBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n.FactTime.ZonePointer == "" || b.FactTime.ZonePointer != "" || n.Version != b.Version+1 {
+		t.Fatalf("test.optional: v%d zone pointer %q, v%d zone pointer %q; want v2 reading one and v1 none", n.Version, n.FactTime.ZonePointer, b.Version, b.FactTime.ZonePointer)
+	}
+	return n, b, beforeBody
 }

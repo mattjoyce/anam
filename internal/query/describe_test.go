@@ -15,10 +15,10 @@ import (
 // The catalogue says what can be asked: the base relations and the parameter, the
 // instant lexeme, every type's pointers at every held version, and the bundled rules
 // with their docs, from the Definitions and the rules alone. The Definitions are the
-// fixture catalog's.
+// engine fixture's, whose test.measure is at v2 and holds v1 in its history.
 func TestDescribe_FromTheBundledDefinitions(t *testing.T) {
 	t.Parallel()
-	defs := catalogtest.Definitions(t)
+	defs := catalogtest.Engine.Definitions(t)
 	held := heldFixture(t)
 	cat, err := query.Describe(defs, held)
 	if err != nil {
@@ -34,18 +34,23 @@ func TestDescribe_FromTheBundledDefinitions(t *testing.T) {
 	if cat.Instant.Layout != "2006-01-02T15:04:05.000000000Z07:00" || !strings.HasSuffix(cat.Instant.Example, "Z") {
 		t.Errorf("instant = %+v", cat.Instant)
 	}
-	var bp query.TypeAttributes
+	var measure query.TypeAttributes
 	for _, ta := range cat.Types {
-		if ta.Type == "health.blood-pressure" {
-			bp = ta
+		if ta.Type == "test.measure" {
+			measure = ta
 		}
 	}
-	if bp.Current != 8 || len(bp.Versions) != 8 {
-		t.Fatalf("blood-pressure = current v%d, %d versions; want v8 with eight versions", bp.Current, len(bp.Versions))
+	if measure.Current != 2 || len(measure.Versions) != 2 {
+		t.Fatalf("test.measure = current v%d, %d versions; want v2 with two versions", measure.Current, len(measure.Versions))
 	}
-	for _, v := range bp.Versions {
-		if v.Version == 5 && !strings.Contains(strings.Join(v.Pointers, " "), "/systolic_blood_pressure/value") {
-			t.Errorf("v5 pointers lack the systolic value: %v", v.Pointers)
+	// v2 added source_time; v1, held only in the history, has its count and not that.
+	for _, v := range measure.Versions {
+		ptrs := strings.Join(v.Pointers, " ")
+		if !strings.Contains(ptrs, "/count") {
+			t.Errorf("v%d pointers lack the count: %v", v.Version, v.Pointers)
+		}
+		if got := strings.Contains(ptrs, "/source_time/value"); got != (v.Version == 2) {
+			t.Errorf("v%d declares /source_time/value = %t: %v", v.Version, got, v.Pointers)
 		}
 	}
 	rules := map[string]query.Relation{}
@@ -81,8 +86,8 @@ func TestPointerWarnings(t *testing.T) {
 		text string
 		want string
 	}{
-		{`a(E) :- attr(E, "/missed_medication", _).`, "health.blood-pressure declares /missed_medication at"},
-		{`a(N) :- N = count : { attr(E, "/missed_medication", _) }.`, "health.blood-pressure declares /missed_medication at"},
+		{`a(E) :- attr(E, "/source_time/value", _).`, "test.measure declares /source_time/value at"},
+		{`a(N) :- N = count : { attr(E, "/source_time/value", _) }.`, "test.measure declares /source_time/value at"},
 		{`a(E) :- attr(E, "/nothing", _).`, ""},
 		{`a(E, P) :- attr(E, P, _).`, ""},
 	}
@@ -169,10 +174,10 @@ func TestEvaluate_BoundsTheDerivation(t *testing.T) {
 	}
 }
 
-// heldFixture is the fixture catalog's manifests and their history as a Held.
+// heldFixture is the engine fixture's manifests and their history as a Held.
 func heldFixture(t *testing.T) query.Held {
 	t.Helper()
-	defs, _ := fixture.Mattjoyce()
+	defs, _ := fixture.Engine()
 	manifests, err := def.ManifestsFS(defs)
 	if err != nil {
 		t.Fatal(err)

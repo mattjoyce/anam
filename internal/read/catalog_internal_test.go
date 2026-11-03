@@ -14,13 +14,14 @@ import (
 	"github.com/mattjoyce/anam/internal/query"
 )
 
-// changedCatalog is the fixture catalog loaded from a directory copy whose first
+// changedCatalog is the engine fixture loaded from a directory copy whose first
 // current definition carries a trailing space, so its set version is not the
 // fixture's. It returns the catalog and the unchanged fixture's set version. The
-// fixture carries history, so held() is checked to keep earlier versions too.
+// fixture carries history (test.measure v1 among it), so held() is checked to keep
+// earlier versions too.
 func changedCatalog(t *testing.T) (*catalog.Catalog, string) {
 	t.Helper()
-	defs, projs := fixture.Mattjoyce()
+	defs, projs := fixture.Engine()
 	unchanged, err := def.SetVersionFS(defs)
 	if err != nil {
 		t.Fatal(err)
@@ -86,6 +87,9 @@ func TestSourceFallsBackToItsCatalog(t *testing.T) {
 	held, err := src.held()
 	if err != nil || !reflect.DeepEqual(held, query.HeldOf(cat.Manifests())) {
 		t.Errorf("held() = %d types, %v; want the catalog's manifests", len(held), err)
+	}
+	if _, ok := held["test.measure"][1]; !ok {
+		t.Errorf("held() lacks test.measure v1, which the catalog holds only in its history")
 	}
 
 	var none Source

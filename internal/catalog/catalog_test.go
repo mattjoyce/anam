@@ -42,10 +42,10 @@ func copyCatalog(t *testing.T, definitions, projections fs.FS) (defDir, projDir 
 	return defDir, projDir
 }
 
-// copyFixture copies fixture.Mattjoyce to disk, as copyCatalog does.
+// copyFixture copies fixture.Engine to disk, as copyCatalog does.
 func copyFixture(t *testing.T) (defDir, projDir string) {
 	t.Helper()
-	defs, projs := fixture.Mattjoyce()
+	defs, projs := fixture.Engine()
 	return copyCatalog(t, defs, projs)
 }
 
@@ -53,7 +53,7 @@ func copyFixture(t *testing.T) (defDir, projDir string) {
 // TestLoadExternalSetVersion
 // ---------------------------------------------------------------------------
 func TestLoadExternalSetVersion(t *testing.T) {
-	unchanged := catalogtest.Catalog(t)
+	unchanged := catalogtest.Engine.Catalog(t)
 	defDir, projDir := copyFixture(t)
 
 	// Find one definition file and append a space.
@@ -494,7 +494,7 @@ func TestLoadRejectsConflictingDefinitions(t *testing.T) {
 	_, validProjDir := copyFixture(t)
 
 	// Find one definition from the fixture catalog.
-	defs, _ := fixture.Mattjoyce()
+	defs, _ := fixture.Engine()
 	fixtureDefs, err := def.ManifestsFS(defs)
 	if err != nil {
 		t.Fatalf("ManifestsFS: %v", err)
@@ -569,7 +569,7 @@ func TestLoadRejectsProjectionHistoryConflict(t *testing.T) {
 	validDefDir, _ := copyFixture(t)
 
 	// Get one fixture projection template.
-	templates := catalogtest.Projections(t).Held()
+	templates := catalogtest.Engine.Projections(t).Held()
 	if len(templates) == 0 {
 		t.Fatal("no fixture projections")
 	}
@@ -735,7 +735,7 @@ func TestLoadCanceledMidway(t *testing.T) {
 	}
 	total := counter.calls
 	files := 0
-	defs, projs := fixture.Mattjoyce()
+	defs, projs := fixture.Engine()
 	for _, root := range []fs.FS{defs, projs} {
 		_ = fs.WalkDir(root, ".", func(_ string, d fs.DirEntry, err error) error {
 			if err == nil && !d.IsDir() {
@@ -762,7 +762,7 @@ func TestLoadCanceledMidway(t *testing.T) {
 // canonicalized, ignores versions the catalog does not hold, and refuses a different
 // body at a version it holds, naming the type and version.
 func TestCheckRegistered(t *testing.T) {
-	cat := catalogtest.Catalog(t)
+	cat := catalogtest.Engine.Catalog(t)
 	m := cat.Manifests()[0]
 	reformatted := append([]byte("\n  "), m.Body...)
 	other := def.Stored{Type: m.Type, Version: m.Version + 1000, Body: []byte(`{"anything":"else"}`)}
@@ -789,22 +789,24 @@ func TestCheckRegistered(t *testing.T) {
 }
 
 // Card 255 (R4b): a directory catalog's registry closes a retired type from that
-// directory's history. A history the binary does not carry still closes its series,
-// and a history the directory lacks closes nothing.
+// directory's history. A retired type only that directory's history names still closes
+// its series, and a retired type whose history the directory lacks closes nothing. Over
+// a copy of the engine fixture with test.gone added to its history and test.retired,
+// which the fixture's history holds, removed.
 func TestLoad_RetiredTypesCloseFromTheDirectorysHistory(t *testing.T) {
 	t.Parallel()
-	defs, projs := fixture.Mattjoyce()
+	defs, projs := fixture.Engine()
 	defDir, projDir := fixture.Dirs(t, defs, projs)
-	retired := `{"meta": {"facet_type": "test.retired", "definition_version": 1,
-  "series": {"name": "test.course", "key": ["/drug"], "closes": true}}}`
-	if err := os.WriteFile(filepath.Join(defDir, "history", "test.retired.v1.json"), []byte(retired), 0o600); err != nil {
+	gone := `{"meta": {"facet_type": "test.gone", "definition_version": 1,
+  "series": {"name": "test.course", "key": ["/name", "/course"], "closes": true}}}`
+	if err := os.WriteFile(filepath.Join(defDir, "history", "test.gone.v1.json"), []byte(gone), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	stopped, err := filepath.Glob(filepath.Join(defDir, "history", "med.stopped.v*.json"))
-	if err != nil || len(stopped) == 0 {
-		t.Fatalf("the fixture has no med.stopped history to remove (%v)", err)
+	retired, err := filepath.Glob(filepath.Join(defDir, "history", "test.retired.v*.json"))
+	if err != nil || len(retired) == 0 {
+		t.Fatalf("the fixture has no test.retired history to remove (%v)", err)
 	}
-	for _, name := range stopped {
+	for _, name := range retired {
 		if err := os.Remove(name); err != nil {
 			t.Fatal(err)
 		}
@@ -818,11 +820,16 @@ func TestLoad_RetiredTypesCloseFromTheDirectorysHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, r := range map[string]*def.Registry{"Definitions": c.Definitions(), "WithRegistered": reg} {
-		if !r.Closes("test.retired") {
-			t.Errorf("%s: test.retired closes = false, want true from the directory's history", name)
+		if !r.Closes("test.gone") {
+			t.Errorf("%s: test.gone closes = false, want true from the directory's history", name)
 		}
-		if r.Closes("med.stopped") {
-			t.Errorf("%s: med.stopped closes = true, but the directory's history does not name it", name)
+		if r.Closes("test.retired") {
+			t.Errorf("%s: test.retired closes = true, but the directory's history does not name it", name)
 		}
+	}
+	// The unchanged fixture closes test.retired from its own history, so its absence
+	// above is the removal's doing.
+	if !catalogtest.Engine.Catalog(t).Definitions().Closes("test.retired") {
+		t.Error("the engine fixture does not close test.retired")
 	}
 }

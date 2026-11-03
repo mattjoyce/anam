@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
@@ -45,7 +46,7 @@ func supersededServer(t *testing.T) (*httptest.Server, string) {
 	if err := l.Admit(ctx, 1, v2, sup); err != nil {
 		t.Fatalf("Admit v2: %v", err)
 	}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 	return srv, v1.ID
 }

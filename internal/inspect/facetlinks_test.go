@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/catchup"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
@@ -66,7 +67,7 @@ func newLinkedRecord(t *testing.T) linkedRecord {
 func TestFacet_ListsTheEdgesTouchingIt(t *testing.T) {
 	t.Parallel()
 	rec := newLinkedRecord(t)
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: rec.l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Edges: rec.db}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: rec.l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Edges: rec.db}))
 	t.Cleanup(srv.Close)
 
 	code, body := get(t, srv.URL+"/facet?id="+rec.weigh)
@@ -103,7 +104,7 @@ func TestFacet_ListsTheEdgesTouchingIt(t *testing.T) {
 func TestFacet_SaysWhenThereIsNoEdgeIndex(t *testing.T) {
 	t.Parallel()
 	rec := newLinkedRecord(t)
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: rec.l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: rec.l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 	code, body := get(t, srv.URL+"/facet?id="+rec.weigh)
 	if code != http.StatusOK {
@@ -120,7 +121,7 @@ func TestFacet_SaysWhenThereIsNoEdgeIndex(t *testing.T) {
 func TestFacetPage_APayloadIDGetsALinkIcon(t *testing.T) {
 	t.Parallel()
 	rec := newLinkedRecord(t)
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: rec.l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Edges: rec.db}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: rec.l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Edges: rec.db}))
 	t.Cleanup(srv.Close)
 
 	code, body := get(t, srv.URL+"/facet?id="+rec.note)
@@ -174,7 +175,7 @@ func TestFacetPage_AFieldTableIDGetsALinkIcon(t *testing.T) {
 	if err := l.Admit(ctx, 0, note, event(facet.EventAdmitted, note, 1)); err != nil {
 		t.Fatalf("Admit: %v", err)
 	}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 
 	code, body := get(t, srv.URL+"/facet?id="+note.ID)

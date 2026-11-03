@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
@@ -16,7 +17,7 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
-// Card 222: the attention types, over the bundled Definitions, a real gate and a real
+// Card 222: the attention types, over the fixture's Definitions, a real gate and a real
 // ledger. A person says what is absorbing them; the gate holds the reading's topic to
 // one spelling and its intensity to 1 to 5, and the started and ended pair is a series.
 
@@ -27,10 +28,7 @@ func newAttentionGate(t *testing.T) (*gate.Gate, *ledger.Ledger, *def.Registry) 
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = l.Close() })
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
+	reg := catalogtest.Definitions(t)
 	scopes := gate.StaticScopes{"conversation": {"mind.attention", "mind.attention.started", "mind.attention.ended"}}
 	g := gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	return g, l, reg

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/mattjoyce/anam/internal/def"
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/tarski"
@@ -43,10 +43,7 @@ func TestCostBoundMatches(t *testing.T) {
 		entry2("r2", "health.blood-pressure", day2("2026-01-02"), `{"date_excel": "2026-1-2 06:30:00", "reading": "1", "systolic_blood_pressure": {"value": 146, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 90, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-02T06:30:00+11:00"}, "source_time": {"value": "2026-1-2 06:30:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}}`),
 		entry2("r3", "health.blood-pressure", day2("2026-01-03"), `{"date_excel": "2026-1-3 06:30:00", "reading": "1", "systolic_blood_pressure": {"value": 160, "unit": "mmHg"}, "diastolic_blood_pressure": {"value": 95, "unit": "mmHg"}, "effective_time_frame": {"date_time": "2026-01-03T06:30:00+11:00"}, "source_time": {"value": "2026-1-3 06:30:00", "zone": "Australia/Sydney", "offset": "+11:00", "basis": "source"}}`),
 	)
-	defs, err := def.Bundled()
-	if err != nil {
-		t.Fatalf("Bundled: %v", err)
-	}
+	defs := catalogtest.Definitions(t)
 	text := `high(E) :- attr(E, "/systolic_blood_pressure/value", S), S > 100.`
 	relation := "high"
 

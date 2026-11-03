@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/consent"
@@ -109,10 +110,7 @@ func TestVerify_ReceiptServedUnderRetiredTypesStillReproduces(t *testing.T) {
 	admit("med.stopped", "records:med/felodipine/1/stopped", "2025-12-22", "felodipine")
 	admit("med.started", "records:med/ramipril/1/started", "2025-07-01", "ramipril")
 
-	templates, err := projection.Bundled()
-	if err != nil {
-		t.Fatalf("projection.Bundled: %v", err)
-	}
+	templates := catalogtest.Projections(t)
 	v1, err := templates.Version("meds", 1)
 	if err != nil {
 		t.Fatalf("meds v1: %v", err)

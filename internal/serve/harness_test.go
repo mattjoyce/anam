@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/consent"
@@ -15,7 +16,6 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
 	"github.com/mattjoyce/anam/internal/mint"
-	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/serve"
 	"github.com/mattjoyce/anam/internal/span"
 	"github.com/mattjoyce/anam/internal/store/ledger"
@@ -103,10 +103,7 @@ func newHarness(t *testing.T) *harness {
 		"health-db": {"health.sleep"},
 	}
 
-	templates, err := projection.Bundled()
-	if err != nil {
-		t.Fatalf("projection.Bundled: %v", err)
-	}
+	templates := catalogtest.Projections(t)
 	buckets, err := span.New(span.Monthly)
 	if err != nil {
 		t.Fatalf("span.New: %v", err)

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
@@ -21,7 +22,7 @@ import (
 // touching it, read from the served payloads with no table; a v2 note names its
 // sides, and the kind is its own attr.
 
-// edgeHarness is newHarness with the bundled record.edge beside the test types, a
+// edgeHarness is newHarness with the fixture's record.edge beside the test types, a
 // records source allowed to write it, and the log projection serving it.
 func edgeHarness(t *testing.T) *harness {
 	t.Helper()
@@ -30,27 +31,24 @@ func edgeHarness(t *testing.T) *harness {
 		t.Fatalf("ledger.Create: %v", err)
 	}
 	t.Cleanup(func() { _ = l.Close() })
-	bundled, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
-	note, ok := bundled.Lookup("record.edge")
+	fixed := catalogtest.Definitions(t)
+	note, ok := fixed.Lookup("record.edge")
 	if !ok {
-		t.Fatal("no bundled record.edge")
+		t.Fatal("no record.edge in the fixture")
 	}
 	// The intake and the sleep episode are what docs/QUERY.md's alcohol question is asked of.
-	intake, ok := bundled.Lookup("health.intake")
+	intake, ok := fixed.Lookup("health.intake")
 	if !ok {
-		t.Fatal("no bundled health.intake")
+		t.Fatal("no health.intake in the fixture")
 	}
-	sleep, ok := bundled.Lookup("health.sleep-episode")
+	sleep, ok := fixed.Lookup("health.sleep-episode")
 	if !ok {
-		t.Fatal("no bundled health.sleep-episode")
+		t.Fatal("no health.sleep-episode in the fixture")
 	}
 	// The steps are what docs/QUERY.md's steps-per-month question is asked of.
-	steps, ok := bundled.Lookup("activity.steps")
+	steps, ok := fixed.Lookup("activity.steps")
 	if !ok {
-		t.Fatal("no bundled activity.steps")
+		t.Fatal("no activity.steps in the fixture")
 	}
 	defs, err := def.NewRegistry(append(registry(t).All(), note, intake, sleep, steps)...)
 	if err != nil {
@@ -154,18 +152,15 @@ reach(E, G) :- reach(E, F), linked(X, F), linked(X, G), X != E, G != F.`
 }
 
 // The bundled set names one type by constant, and a rename would empty its rules
-// without a word, so the constant is held to a type the binary bundles (card 104,
-// finding 5).
+// without a word, so the constant is held to a type the fixture catalog declares
+// (card 104, finding 5).
 func TestBundled_TypeConstantsAreBundledTypes(t *testing.T) {
 	t.Parallel()
 	rs, err := query.Bundled()
 	if err != nil {
 		t.Fatal(err)
 	}
-	bundled, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
+	fixed := catalogtest.Definitions(t)
 	n := 0
 	for _, r := range rs.Program.Rules {
 		for _, l := range r.Body {
@@ -174,8 +169,8 @@ func TestBundled_TypeConstantsAreBundledTypes(t *testing.T) {
 			}
 			n++
 			typ := facet.Type(l.Atom.Args[1].Const.Text())
-			if _, ok := bundled.Lookup(typ); !ok {
-				t.Errorf("line %d names type %s, which no bundled Definition declares", l.Atom.Line, typ)
+			if _, ok := fixed.Lookup(typ); !ok {
+				t.Errorf("line %d names type %s, which no fixture Definition declares", l.Atom.Line, typ)
 			}
 		}
 	}

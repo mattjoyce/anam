@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
+	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
@@ -148,7 +150,7 @@ func TestDefinition_AnOlderVersionIsShownAsHeld(t *testing.T) {
 			}, map[facet.Type]string{"health.blood-pressure": "bundled"},
 			nil
 	}
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: testCatalog(), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Held: held}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Held: held}))
 	t.Cleanup(srv.Close)
 
 	code, body := get(t, srv.URL+"/definition?type=health.blood-pressure&v=1")
@@ -183,12 +185,13 @@ func TestFacet_LinksToItsAdmittedDefinition(t *testing.T) {
 	}
 }
 
-// bundledBody is the bundled manifest of t, as the binary carries it.
+// bundledBody is the current manifest of t in the fixture catalog the pages serve.
 func bundledBody(t *testing.T, typ facet.Type) []byte {
 	t.Helper()
-	ms, err := def.Manifests()
+	defs, _ := fixture.Mattjoyce()
+	ms, err := def.ManifestsFS(defs)
 	if err != nil {
-		t.Fatalf("def.Manifests: %v", err)
+		t.Fatalf("def.ManifestsFS: %v", err)
 	}
 	for _, m := range ms {
 		if m.Type == typ {

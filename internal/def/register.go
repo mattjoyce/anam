@@ -165,7 +165,8 @@ func sameBody(canon facet.Canonical, held []byte) (bool, error) {
 // A type both bundled and registered is a release that took a type back from an
 // importer. The bundled Definition wins: Register refuses any other body of the type
 // from then on, answers the one it carries as unchanged, and its registered rows stay
-// held, immutable, for the facets admitted under them.
+// held, immutable, for the facets admitted under them. The registry keeps the bundled
+// one's retired types: a registered Definition does not change the catalog's history.
 func WithRegistered(bundled *Registry, registered []Stored) (*Registry, error) {
 	newest := map[facet.Type]Stored{}
 	for _, s := range registered {
@@ -184,5 +185,5 @@ func WithRegistered(bundled *Registry, registered []Stored) (*Registry, error) {
 		}
 		defs = append(defs, d)
 	}
-	return NewRegistry(defs...)
+	return newRegistry(bundled.retired, defs...)
 }

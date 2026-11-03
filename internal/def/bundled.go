@@ -16,7 +16,8 @@ import (
 // facet in the ledger may have been admitted under (card 111): provisioned into the
 // operational store at start so an old facet still reads against its own words after
 // a rebuild, and so an importer registering an older version finds it held. History
-// is words, not a contract: it is not parsed as one, and Bundled never loads it.
+// is words, not a contract: it is never parsed as a current Definition. Bundled reads
+// it for one thing only, which retired types close their series (Closes).
 //
 //go:embed manifests/*.json manifests/history/*.json
 var manifestFS embed.FS
@@ -57,7 +58,9 @@ func isJSON(name string) bool {
 }
 
 // BundledFS parses every current manifest in a catalog root: *.json at the root,
-// earlier versions under history/. Bundled is BundledFS over the embedded catalog.
+// earlier versions under history/. The registry's retired types, which Closes answers
+// for a type no current manifest names, come from that root's history/ and no other.
+// Bundled is BundledFS over the embedded catalog.
 func BundledFS(fsys fs.FS) (*Registry, error) {
 	names, err := readJSONFiles(fsys, ".")
 	if err != nil {
@@ -80,7 +83,15 @@ func BundledFS(fsys fs.FS) (*Registry, error) {
 		}
 		defs = append(defs, d)
 	}
-	return NewRegistry(defs...)
+	history, err := HistoryFS(fsys)
+	if err != nil {
+		return nil, err
+	}
+	retired, err := retiredCloses(history)
+	if err != nil {
+		return nil, err
+	}
+	return newRegistry(retired, defs...)
 }
 
 // EmbeddedFS returns the read-only embedded catalog root: *.json at the root,

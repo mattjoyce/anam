@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
@@ -154,10 +155,16 @@ func TestVerify_ReceiptServedUnderRetiredTypesStillReproduces(t *testing.T) {
 	}
 
 	// Meds v2 is current, v1 is history, and the Definitions in force name only the
-	// new types.
-	now, err := def.NewRegistry(all[2], all[3])
+	// new types. The catalog's history keeps the retired ones, as a catalog does after
+	// a rename: the registry answers Closes for them from that history (card 255).
+	now, err := def.BundledFS(fstest.MapFS{
+		"health.medication.started.json": {Data: []byte(courseManifest("health.medication.started", false))},
+		"health.medication.stopped.json": {Data: []byte(courseManifest("health.medication.stopped", true))},
+		"history/med.started.v1.json":    {Data: []byte(courseManifest("med.started", false))},
+		"history/med.stopped.v1.json":    {Data: []byte(courseManifest("med.stopped", true))},
+	})
 	if err != nil {
-		t.Fatalf("def.NewRegistry: %v", err)
+		t.Fatalf("def.BundledFS: %v", err)
 	}
 	deps.Templates, deps.Series, deps.Definitions = templates, now, now
 

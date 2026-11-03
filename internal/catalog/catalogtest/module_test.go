@@ -90,7 +90,9 @@ func testFiles(root string) ([]string, error) {
 type scan struct {
 	reaches []reach
 	refs    []ref
+	checks  []check
 	files   []string
+	funcs   map[[2]string]bool // file and top-level function, for each function declared
 }
 
 // findReaches parses every test file in the module at root.
@@ -103,14 +105,18 @@ func findReaches(root string) (scan, error) {
 	if err != nil {
 		return scan{}, err
 	}
-	s := scan{files: files}
+	s := scan{files: files, funcs: map[[2]string]bool{}}
 	for _, rel := range files {
-		rs, refs, err := fileReaches(root, mod, rel)
+		rs, refs, checks, funcs, err := fileReaches(root, mod, rel)
 		if err != nil {
 			return scan{}, err
 		}
 		s.reaches = append(s.reaches, rs...)
 		s.refs = append(s.refs, refs...)
+		s.checks = append(s.checks, checks...)
+		for _, f := range funcs {
+			s.funcs[[2]string{rel, f}] = true
+		}
 	}
 	return s, nil
 }

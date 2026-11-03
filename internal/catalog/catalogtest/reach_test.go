@@ -31,9 +31,15 @@ var loaders = map[string]bool{"Load": true, "load": true}
 // that sets one to "" opens a daemon on the empty catalog for that component.
 var configDirs = map[string]bool{"DefinitionsDir": true, "ProjectionsDir": true}
 
-// noneLabel is the source the empty catalog reports. A function that names it checks
-// that it selected the empty catalog, so its selection is on purpose and not a reach.
-const noneLabel = "none"
+// catalogtestPkg holds the Require helpers a listed test checks its selection with.
+const catalogtestPkg = "internal/catalog/catalogtest"
+
+// requireHelpers are catalogtest's helpers that fail a test unless the catalog it was
+// given is what an empty directory selects (RequireRefused: unless the load was
+// refused). A test on emptyOnPurpose passes each catalog it selects to one of them.
+var requireHelpers = map[string]bool{
+	"RequireEmpty": true, "RequireNoDefinitions": true, "RequireNoProjections": true, "RequireRefused": true,
+}
 
 // kind is the way a reach selects the empty catalog.
 type kind int
@@ -44,7 +50,7 @@ const (
 	kindHelper             // a call to a test helper that reaches
 )
 
-// reach is one place a test selects the empty catalog without checking it did.
+// reach is one place a test selects the empty catalog.
 type reach struct {
 	Pkg  string // the directory and package name, which scope a helper's name
 	File string // module-relative, slash-separated
@@ -52,6 +58,15 @@ type reach struct {
 	Line int
 	Kind kind
 	What string
+	Bind token.Pos // for a load assigned to a variable, where that variable is declared; 0 otherwise
+}
+
+// check is a call to a Require helper written directly in a top-level function's
+// body, outside any function literal, so it runs whenever the function does.
+type check struct {
+	File, Func string
+	Line       int
+	Args       []token.Pos // where each identifier argument is declared; 0 for any other argument
 }
 
 func (r reach) String() string {
@@ -71,14 +86,14 @@ type ref struct {
 }
 
 // fileReaches parses one test file and walks it.
-func fileReaches(root, mod, rel string) ([]reach, []ref, error) {
+func fileReaches(root, mod, rel string) ([]reach, []ref, []check, []string, error) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, filepath.Join(root, filepath.FromSlash(rel)), nil, 0) // object resolution on: it tells a local from a package name
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse %s: %w", rel, err)
+		return nil, nil, nil, nil, fmt.Errorf("parse %s: %w", rel, err)
 	}
 	w := &walker{fset: fset, file: f, rel: rel, dir: path.Dir(rel), imports: map[string]string{},
-		aliases: map[token.Pos]bool{}, reassigned: map[token.Pos]bool{}, checksNone: map[string]bool{}}
+		aliases: map[token.Pos]bool{}, reassigned: map[token.Pos]bool{}, binds: map[token.Pos]token.Pos{}}
 	w.pkg = w.dir + " " + f.Name.Name
 	// A file in package catalog (not catalog_test) names load unqualified; one that
 	// dot-imports catalog names Load so.
@@ -88,7 +103,7 @@ func fileReaches(root, mod, rel string) ([]reach, []ref, error) {
 	for _, spec := range f.Imports {
 		p, err := strconv.Unquote(spec.Path.Value)
 		if err != nil {
-			return nil, nil, fmt.Errorf("%s: import %s: %w", rel, spec.Path.Value, err)
+			return nil, nil, nil, nil, fmt.Errorf("%s: import %s: %w", rel, spec.Path.Value, err)
 		}
 		local, ok := strings.CutPrefix(p, mod+"/")
 		if !ok {
@@ -111,15 +126,7 @@ func fileReaches(root, mod, rel string) ([]reach, []ref, error) {
 	for _, d := range f.Decls {
 		w.decl(d)
 	}
-	// A function that names the none label checks the empty catalog it selects.
-	var out []reach
-	for _, r := range w.found {
-		if r.Func != "" && w.checksNone[r.Func] {
-			continue
-		}
-		out = append(out, r)
-	}
-	return out, w.refs, nil
+	return w.found, w.refs, w.checks, w.funcs, nil
 }
 
 // walker visits one file's syntax. It resolves a name to its package from the file's
@@ -129,21 +136,25 @@ type walker struct {
 	fset       *token.FileSet
 	file       *ast.File
 	rel        string
-	dir        string             // module-relative directory of the file
-	pkg        string             // dir and package name
-	self       string             // the package a bare name belongs to, or "" in an _test package
-	dot        []string           // dot-imported packages
-	imports    map[string]string  // local name to module-relative (or full) import path
-	aliases    map[token.Pos]bool // variables bound to a loader, by where they are declared
-	reassigned map[token.Pos]bool // variables set again after their declaration
-	checksNone map[string]bool    // top-level functions that name the none label
+	dir        string                  // module-relative directory of the file
+	pkg        string                  // dir and package name
+	self       string                  // the package a bare name belongs to, or "" in an _test package
+	dot        []string                // dot-imported packages
+	imports    map[string]string       // local name to module-relative (or full) import path
+	aliases    map[token.Pos]bool      // variables bound to a loader, by where they are declared
+	reassigned map[token.Pos]bool      // variables set again after their declaration
+	binds      map[token.Pos]token.Pos // a call's position to the variable its result is assigned to
+	lit        int                     // depth of function literals around the node being walked
+	checks     []check
+	funcs      []string // the top-level functions declared
 	fn         string
 	found      []reach
 	refs       []ref
 }
 
 func (w *walker) add(pos token.Pos, k kind, what string) {
-	w.found = append(w.found, reach{Pkg: w.pkg, File: w.rel, Func: w.fn, Line: w.fset.Position(pos).Line, Kind: k, What: what})
+	w.found = append(w.found, reach{Pkg: w.pkg, File: w.rel, Func: w.fn, Line: w.fset.Position(pos).Line, Kind: k, What: what,
+		Bind: w.binds[pos]})
 }
 
 // walk visits a child; the caller passes no typed nil.
@@ -156,6 +167,7 @@ func (w *walker) decl(d ast.Decl) {
 	switch d := d.(type) {
 	case *ast.FuncDecl:
 		w.fn = funcKey(d)
+		w.funcs = append(w.funcs, w.fn)
 		if d.Recv != nil {
 			w.walk(d.Recv)
 		}
@@ -220,6 +232,13 @@ func (w *walker) visit(n ast.Node) bool {
 	switch n := n.(type) {
 	case *ast.ImportSpec:
 		return false
+	case *ast.FuncLit:
+		// A check inside a literal runs only if the literal is called, so it is not one.
+		w.lit++
+		w.walk(n.Type)
+		w.walk(n.Body)
+		w.lit--
+		return false
 	case *ast.Field:
 		// Field and parameter names declare; only the type is a use.
 		w.walk(n.Type)
@@ -253,10 +272,6 @@ func (w *walker) visit(n ast.Node) bool {
 		}
 	case *ast.CallExpr:
 		w.call(n)
-	case *ast.BasicLit:
-		if s, ok := stringValue(n); ok && s == noneLabel && w.fn != "" {
-			w.checksNone[w.fn] = true
-		}
 	}
 	return true
 }
@@ -309,6 +324,19 @@ func (w *walker) loader(x ast.Expr) (name string, alias, ok bool) {
 // call records a catalog loader given an empty directory or called through a
 // variable.
 func (w *walker) call(c *ast.CallExpr) {
+	if sel, ok := ast.Unparen(c.Fun).(*ast.SelectorExpr); ok && requireHelpers[sel.Sel.Name] && w.lit == 0 && w.fn != "" {
+		if p, ok := w.pkgOf(sel.X); ok && p == catalogtestPkg {
+			k := check{File: w.rel, Func: w.fn, Line: w.fset.Position(c.Pos()).Line}
+			for _, a := range c.Args {
+				var at token.Pos
+				if id, ok := ast.Unparen(a).(*ast.Ident); ok && id.Obj != nil {
+					at = id.Obj.Pos()
+				}
+				k.Args = append(k.Args, at)
+			}
+			w.checks = append(w.checks, k)
+		}
+	}
 	if name, alias, ok := w.loader(c.Fun); ok {
 		if alias {
 			w.add(c.Pos(), kindLoad, fmt.Sprintf("a call through %s, a variable bound to catalog.Load", name))
@@ -326,6 +354,13 @@ func (w *walker) call(c *ast.CallExpr) {
 // assign records a config catalog directory set to "", and a variable bound to a
 // loader.
 func (w *walker) assign(a *ast.AssignStmt) {
+	if len(a.Rhs) == 1 && len(a.Lhs) > 0 {
+		if c, ok := ast.Unparen(a.Rhs[0]).(*ast.CallExpr); ok {
+			if id, ok := a.Lhs[0].(*ast.Ident); ok && id.Obj != nil {
+				w.binds[c.Pos()] = id.Obj.Pos()
+			}
+		}
+	}
 	if len(a.Lhs) != len(a.Rhs) {
 		return
 	}
@@ -343,6 +378,11 @@ func (w *walker) assign(a *ast.AssignStmt) {
 
 // valueSpec records a var bound to a loader.
 func (w *walker) valueSpec(vs *ast.ValueSpec) {
+	if len(vs.Values) == 1 && len(vs.Names) > 0 && vs.Names[0].Obj != nil {
+		if c, ok := ast.Unparen(vs.Values[0]).(*ast.CallExpr); ok {
+			w.binds[c.Pos()] = vs.Names[0].Obj.Pos()
+		}
+	}
 	for i, n := range vs.Names {
 		if i < len(vs.Values) && n.Obj != nil {
 			if _, _, ok := w.loader(vs.Values[i]); ok {

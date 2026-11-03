@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/catalog"
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
@@ -114,3 +115,66 @@ func equal(a, b []string) bool {
 	}
 	return true
 }
+
+// recorder is a testing.TB that records a Fatalf instead of stopping, so a test can
+// see a Require helper fail. The helpers return after Fatalf, so nothing runs on.
+type recorder struct {
+	testing.TB
+	failed bool
+}
+
+func (r *recorder) Helper()               {}
+func (r *recorder) Fatalf(string, ...any) { r.failed = true }
+
+// TestRequire_PassesOnlyTheEmptyCatalog checks the helpers a test on emptyOnPurpose
+// checks its selection with: each passes the empty component it names and fails a
+// catalog with that component from a directory, a fixture, or no catalog at all.
+func TestRequire_PassesOnlyTheEmptyCatalog(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	empty, err := catalog.Load(ctx, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalogtest.RequireEmpty(t, empty)
+
+	defs, projs := fixture.Minimal()
+	defsDir, _ := fixture.Dirs(t, defs, projs)
+	noProjs, err := catalog.Load(ctx, defsDir, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalogtest.RequireNoProjections(t, noProjs)
+	emptyDirs, err := catalog.Load(ctx, t.TempDir(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	refused, err := catalog.Load(&canceled{ctx}, "", "")
+	catalogtest.RequireRefused(t, refused, err)
+
+	for _, c := range []struct {
+		name    string
+		require func(testing.TB)
+	}{
+		{"Empty, the engine fixture", func(tb testing.TB) { catalogtest.RequireEmpty(tb, catalogtest.Engine.Catalog(t)) }},
+		{"Empty, definitions from a directory", func(tb testing.TB) { catalogtest.RequireEmpty(tb, noProjs) }},
+		{"Empty, empty directories", func(tb testing.TB) { catalogtest.RequireEmpty(tb, emptyDirs) }},
+		{"Empty, no catalog", func(tb testing.TB) { catalogtest.RequireEmpty(tb, nil) }},
+		{"NoDefinitions, definitions from a directory", func(tb testing.TB) { catalogtest.RequireNoDefinitions(tb, noProjs) }},
+		{"NoProjections, the engine fixture", func(tb testing.TB) { catalogtest.RequireNoProjections(tb, catalogtest.Engine.Catalog(t)) }},
+		{"NoProjections, no catalog", func(tb testing.TB) { catalogtest.RequireNoProjections(tb, nil) }},
+		{"Refused, a catalog", func(tb testing.TB) { catalogtest.RequireRefused(tb, empty, nil) }},
+		{"Refused, another error", func(tb testing.TB) { catalogtest.RequireRefused(tb, nil, context.Canceled) }},
+	} {
+		r := &recorder{TB: t}
+		c.require(r)
+		if !r.failed {
+			t.Errorf("Require%s passed", c.name)
+		}
+	}
+}
+
+// canceled is a context that is already canceled.
+type canceled struct{ context.Context }
+
+func (canceled) Err() error { return context.Canceled }

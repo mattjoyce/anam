@@ -2,6 +2,7 @@ package catalogtest_test
 
 import (
 	"fmt"
+	"go/token"
 	"os"
 	"path/filepath"
 	"slices"
@@ -9,40 +10,47 @@ import (
 	"testing"
 )
 
-// allowed names test code that may select the empty catalog without checking it did,
-// and why.
-type allowed struct {
-	file   string   // module-relative
-	funcs  []string // the top-level functions allowed; nil allows the whole file
+// exempt names one test that selects the empty catalog on purpose, and why.
+type exempt struct {
+	file   string // module-relative
+	fn     string // the top-level function
 	reason string
 }
 
-// embeddedAllowList is every test excused from the rule. It is nil. Through R4a and
-// R4b (card 255) it named the tests that read the catalog the binary carried, whose
-// subject was that catalog: the fixture cross-checks, the drift report, the corpus
-// and marks coverage tests. Each was deleted with the embedded catalog in R4b slice 5
-// or moved to the deployment's overlay (anam_mattjoyce/engine-tests). Slice 6 removed
-// the last two, catalog/empty_test.go and daemon's TestOpen_NoCatalogStartsEmpty:
-// they select the empty catalog on purpose and check its none label, which the rule
-// now reads as the sign of a deliberate selection. An entry added here is a reviewed
-// exception and needs its reason.
-var embeddedAllowList []allowed
+// emptyOnPurpose names the only tests that may select the empty catalog: catalog.Load
+// with an empty directory, or a config catalog directory set to "". Each is listed
+// by its function, and is excused only while it passes every catalog it loads, and
+// at least as many catalogs as it has selections, to a catalogtest Require helper
+// written in its own body (not inside a function literal). Through R4a and R4b (card
+// 255) this list named the tests that read the catalog the binary carried; those were
+// deleted with it in R4b slice 5 or moved to the deployment's overlay
+// (anam_mattjoyce/engine-tests).
+var emptyOnPurpose = []exempt{
+	{file: "internal/catalog/empty_test.go", fn: "TestLoadNoDirectoriesIsEmpty",
+		reason: "both directories empty is the empty catalog: none, no bodies, the empty V"},
+	{file: "internal/catalog/empty_test.go", fn: "TestLoadOneDirectoryEmpty",
+		reason: "one directory empty is that component empty beside the other's directory"},
+	{file: "internal/catalog/empty_test.go", fn: "TestLoadEmptyIsBuiltOnce",
+		reason: "the empty catalog is built once and shared, and a canceled context still refuses it"},
+	{file: "internal/catalog/catalogtest/catalogtest_test.go", fn: "TestRequire_PassesOnlyTheEmptyCatalog",
+		reason: "the Require helpers' own test needs the empty catalog, and a half-empty one, to pass"},
+	{file: "internal/daemon/catalog_start_test.go", fn: "TestOpen_NoCatalogStartsEmpty",
+		reason: "a daemon on a config with no catalog directories starts on the empty catalog and logs the WARN and structural lines"},
+}
 
 // TestTests_ReadNoEmbeddedCatalog parses every _test.go in the module and fails on
-// any test that selects the empty catalog without checking it did, outside
-// embeddedAllowList: catalog.Load with an empty directory or called through a
-// variable, a config catalog directory set to "", or a call to a test helper in the
-// same package that does either. A top-level function that names the label "none",
-// the source the empty catalog reports, checks what it selected and is not a reach.
-// It also fails on an entry that no longer reaches or names a file that has gone, so
-// the list cannot outlive what it allows.
+// any selection of the empty catalog outside emptyOnPurpose: catalog.Load (or load
+// inside the package) with an empty directory or called through a variable, a config
+// catalog directory set to "", or a call to a test helper in the same package that
+// does either. It also fails on a listed function that has gone, that no longer
+// selects, or that does not check what it selects with a Require helper.
 //
 // Before R4b slice 5 an empty directory fell back on the catalog the binary carried,
 // Matt's, and a test that read it proved things about one person's record; the rule
-// then also matched the embedded def, projection and catalog symbols and their
-// source directories. The binary carries no catalog now, so those cannot compile, and
-// what an empty directory selects is the empty catalog. A test that selects it by
-// mistake, meaning a fixture, can pass vacuously over no types; the rule stops that.
+// then also matched the embedded def, projection and catalog symbols and their source
+// directories. The binary carries no catalog now, so those cannot compile, and what an
+// empty directory selects is the empty catalog. A test that selects it by mistake,
+// meaning a fixture, can pass vacuously over no types; the rule stops that.
 //
 // A deliberate way round it would show in review. What it cannot see: a config that
 // leaves its catalog directories unset rather than setting them to "" (a YAML config
@@ -52,7 +60,9 @@ var embeddedAllowList []allowed
 // resolve in the file (a package-level const in another file, a field, a function's
 // result); and a wrapper that reaches from outside the test files, in a non-test .go
 // file or through an exported helper of another test package. It matches a method
-// call by the method's name, as the parser does not know a receiver's type.
+// call by the method's name, as the parser does not know a receiver's type. For a
+// config selection it counts Require calls rather than following the config into the
+// daemon, since the daemon's catalog is a field the parser cannot trace.
 func TestTests_ReadNoEmbeddedCatalog(t *testing.T) {
 	t.Parallel()
 	root := moduleRoot(t)
@@ -63,101 +73,112 @@ func TestTests_ReadNoEmbeddedCatalog(t *testing.T) {
 	if len(s.files) < 100 {
 		t.Fatalf("read %d test files under %s, want the module's", len(s.files), root)
 	}
-	if embeddedAllowList != nil {
-		t.Errorf("embeddedAllowList holds %d entries; R4b slice 6 left it nil", len(embeddedAllowList))
-	}
-	for _, p := range checkReaches(s, embeddedAllowList) {
+	for _, p := range checkReaches(s, emptyOnPurpose) {
 		t.Error(p)
 	}
 }
 
-// TestAllowList_EntriesAreWellFormed keeps each entry giving a reason and naming a
-// file that exists.
-func TestAllowList_EntriesAreWellFormed(t *testing.T) {
+// TestEmptyOnPurpose_EntriesAreWellFormed keeps each entry giving a reason and naming
+// a file that exists.
+func TestEmptyOnPurpose_EntriesAreWellFormed(t *testing.T) {
 	t.Parallel()
 	root := moduleRoot(t)
-	for _, a := range embeddedAllowList {
-		if a.reason == "" {
-			t.Errorf("%s has no reason", a.file)
+	for _, e := range emptyOnPurpose {
+		if e.reason == "" {
+			t.Errorf("%s %s has no reason", e.file, e.fn)
 		}
-		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(a.file))); err != nil {
-			t.Errorf("%s: %v", a.file, err)
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(e.file))); err != nil {
+			t.Errorf("%s: %v", e.file, err)
 		}
 	}
 }
 
-// listShape returns what is wrong with the list's shape: a file listed twice, an
-// empty function set, and a function listed twice.
-func listShape(allow []allowed) []string {
+// listShape returns what is wrong with the list's shape: a function listed twice or
+// an entry naming no function.
+func listShape(list []exempt) []string {
 	var problems []string
-	for i, a := range allow {
-		for _, b := range allow[:i] {
-			if b.file == a.file {
-				problems = append(problems, fmt.Sprintf("%s is listed twice", a.file))
-			}
+	for i, e := range list {
+		if e.fn == "" {
+			problems = append(problems, fmt.Sprintf("%s: an entry names no function", e.file))
 		}
-		if a.funcs != nil && len(a.funcs) == 0 {
-			problems = append(problems, fmt.Sprintf("%s lists an empty set of functions; use nil for the whole file", a.file))
-		}
-		for j, f := range a.funcs {
-			if slices.Contains(a.funcs[:j], f) {
-				problems = append(problems, fmt.Sprintf("%s lists %s twice", a.file, f))
+		for _, b := range list[:i] {
+			if b.file == e.file && b.fn == e.fn {
+				problems = append(problems, fmt.Sprintf("%s %s is listed twice", e.file, e.fn))
 			}
 		}
 	}
 	return problems
 }
 
-// checkReaches returns what is wrong: the list's shape, each reach that no entry
-// allows, and each entry (or listed function) that allows nothing or names a file the
-// walk did not read. A reach spreads to every test function of the same package that
-// names the function it sits in, transitively, so a test calling an allowed helper is
-// held to the list as well.
-func checkReaches(s scan, allow []allowed) []string {
-	problems := listShape(allow)
+// checkReaches returns what is wrong: the list's shape; each listed function that has
+// gone, selects nothing, or does not check what it selects; and each selection outside
+// a listed function. A selection spreads to every test function of the same package
+// that names the function it sits in, transitively, so calling a listed test or a
+// helper that selects is held to the list as well.
+func checkReaches(s scan, list []exempt) []string {
+	problems := listShape(list)
 	type key struct{ file, fn string }
-	used := map[key]bool{}
-	match := func(r reach) bool {
-		for _, a := range allow {
-			if a.file != r.File {
-				continue
-			}
-			if a.funcs == nil {
-				used[key{a.file, ""}] = true
-				return true
-			}
-			if slices.Contains(a.funcs, r.Func) {
-				used[key{a.file, r.Func}] = true
-				return true
+	listed := map[key]bool{}
+	for _, e := range list {
+		k := key{e.file, e.fn}
+		listed[k] = true
+		switch {
+		case !slices.Contains(s.files, e.file):
+			problems = append(problems, fmt.Sprintf("listed %s is not a test file in the module; drop its entry", e.file))
+			continue
+		case !s.funcs[[2]string{e.file, e.fn}]:
+			problems = append(problems, fmt.Sprintf("listed %s %s is not a function in that file; drop its entry", e.file, e.fn))
+			continue
+		}
+		var mine []reach
+		lines := map[int]bool{}
+		for _, r := range s.reaches {
+			if r.File == e.file && r.Func == e.fn {
+				mine = append(mine, r)
+				lines[r.Line] = true
 			}
 		}
+		var checks []check
+		for _, c := range s.checks {
+			if c.File == e.file && c.Func == e.fn {
+				checks = append(checks, c)
+			}
+		}
+		if len(mine) == 0 {
+			problems = append(problems, fmt.Sprintf("listed %s %s no longer selects the empty catalog; drop its entry", e.file, e.fn))
+			continue
+		}
+		if len(checks) < len(lines) {
+			problems = append(problems, fmt.Sprintf("listed %s %s selects the empty catalog on %d lines and calls a catalogtest Require helper %d times in its body; check each selection",
+				e.file, e.fn, len(lines), len(checks)))
+		}
+		for _, r := range mine {
+			if r.Kind == kindLoad && !passed(r.Bind, checks) {
+				problems = append(problems, fmt.Sprintf("%s: listed, but the catalog this load returns is not passed to a catalogtest Require helper in the function's body", r))
+			}
+		}
+	}
+	for _, r := range append(slices.Clone(s.reaches), throughHelpers(s.reaches, s.refs)...) {
+		if r.Kind != kindHelper && listed[key{r.File, r.Func}] {
+			continue
+		}
+		problems = append(problems, fmt.Sprintf("%s selects the empty catalog outside emptyOnPurpose; "+
+			"read a fixture (catalogtest.Engine, fixture.Minimal), or list the test and check what it selects", r))
+	}
+	return problems
+}
+
+// passed reports whether the variable declared at bind is an argument of one of checks.
+func passed(bind token.Pos, checks []check) bool {
+	if bind == token.NoPos {
 		return false
 	}
-	reaches := append(slices.Clone(s.reaches), throughHelpers(s.reaches, s.refs)...)
-	for _, r := range reaches {
-		if !match(r) {
-			problems = append(problems, fmt.Sprintf("%s selects the empty catalog without checking its %s label; "+
-				"read a fixture (catalogtest.Engine, fixture.Minimal), or check the label if the empty catalog is the subject", r, noneLabel))
+	for _, c := range checks {
+		if slices.Contains(c.Args, bind) {
+			return true
 		}
 	}
-	for _, a := range allow {
-		if !slices.Contains(s.files, a.file) {
-			problems = append(problems, fmt.Sprintf("listed %s is not a test file in the module; drop its entry", a.file))
-			continue
-		}
-		if a.funcs == nil {
-			if !used[key{a.file, ""}] {
-				problems = append(problems, fmt.Sprintf("listed %s no longer reaches; drop its entry", a.file))
-			}
-			continue
-		}
-		for _, f := range a.funcs {
-			if !used[key{a.file, f}] {
-				problems = append(problems, fmt.Sprintf("listed %s %s no longer reaches; drop it", a.file, f))
-			}
-		}
-	}
-	return problems
+	return false
 }
 
 // throughHelpers returns a reach for each function that names, in the same package,

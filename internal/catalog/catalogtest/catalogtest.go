@@ -9,6 +9,7 @@ package catalogtest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -103,4 +104,53 @@ func (f *Fixture) Config(t testing.TB, c *config.Config) {
 	t.Helper()
 	defs, projs := f.roots()
 	c.DefinitionsDir, c.ProjectionsDir = fixture.Dirs(t, defs, projs)
+}
+
+// emptyV is the definition set version of no files: SHA-256 over nothing.
+const emptyV = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+// RequireEmpty fails the test unless c is the empty catalog: both components selected
+// by no directory (labelled none) and holding nothing. A test that selects the empty
+// catalog on purpose passes what it selected here; catalogtest's
+// TestTests_ReadNoEmbeddedCatalog holds it to that.
+func RequireEmpty(t testing.TB, c *catalog.Catalog) {
+	t.Helper()
+	RequireNoDefinitions(t, c)
+	RequireNoProjections(t, c)
+}
+
+// RequireNoDefinitions fails the test unless c's definitions component is the empty
+// one: labelled none, no Definitions, no current or historical bodies, the empty V.
+func RequireNoDefinitions(t testing.TB, c *catalog.Catalog) {
+	t.Helper()
+	if c == nil {
+		t.Fatalf("catalogtest: no catalog, want one with no definitions")
+		return
+	}
+	if src, n := c.DefinitionsSource(), len(c.Definitions().All())+len(c.Manifests())+len(c.History()); src != "none" || n != 0 || c.SetVersion() != emptyV {
+		t.Fatalf("catalogtest: definitions from %q with %d entries and V %s; want none, 0 and %s", src, n, c.SetVersion(), emptyV)
+	}
+}
+
+// RequireNoProjections fails the test unless c's projections component is the empty
+// one: labelled none, no templates held, no bodies.
+func RequireNoProjections(t testing.TB, c *catalog.Catalog) {
+	t.Helper()
+	if c == nil {
+		t.Fatalf("catalogtest: no catalog, want one with no projections")
+		return
+	}
+	if src, n := c.ProjectionsSource(), len(c.Projections().Held())+len(c.ProjectionManifests()); src != "none" || n != 0 {
+		t.Fatalf("catalogtest: projections from %q with %d entries; want none and 0", src, n)
+	}
+}
+
+// RequireRefused fails the test unless a selection of the empty catalog was refused:
+// no catalog and an error wrapping catalog.ErrInvalid. It is the check for a test
+// whose subject is Load refusing the empty catalog (a canceled context).
+func RequireRefused(t testing.TB, c *catalog.Catalog, err error) {
+	t.Helper()
+	if c != nil || !errors.Is(err, catalog.ErrInvalid) {
+		t.Fatalf("catalogtest: catalog %v, error %v; want no catalog and %v", c, err, catalog.ErrInvalid)
+	}
 }

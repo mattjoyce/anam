@@ -13,11 +13,13 @@ import (
 type Registry struct {
 	byType map[facet.Type]Definition
 
-	// retired holds the types the binary's history names that no Definition in force
-	// does, mapped to whether their newest history version closes a series. Only
-	// Closes reads it: the gate admits nothing under a retired type, but a replay of
-	// a read served before the type was renamed (card 147) must still know that a
-	// stop closed its course (card 187).
+	// retired holds the types the catalog's history names, mapped to whether their
+	// newest history version closes a series; a type a Definition in force names is
+	// answered from the Definition. Only Closes reads it: the gate admits nothing under
+	// a retired type, but a replay of a read served before the type was renamed (card
+	// 147) must still know that a stop closed its course (card 187). It comes from the
+	// history of the catalog the registry was built over (BundledFS), never from one the
+	// binary carries (card 255), and WithRegistered keeps the bundled registry's.
 	retired map[facet.Type]bool
 }
 
@@ -25,13 +27,15 @@ type Registry struct {
 // type is a configuration error, not a precedence question. It also refuses a series
 // family declared with two different keys: the types of one family must stamp the
 // same series for the same thing, or a stop could never close what a start opened.
+// A registry built here has no history, so no retired type closes; BundledFS gives
+// one the history of its catalog.
 func NewRegistry(defs ...Definition) (*Registry, error) {
-	r := &Registry{byType: make(map[facet.Type]Definition, len(defs))}
-	retired, err := retiredCloses()
-	if err != nil {
-		return nil, err
-	}
-	r.retired = retired
+	return newRegistry(nil, defs...)
+}
+
+// newRegistry is NewRegistry over a retired-type map taken from a catalog's history.
+func newRegistry(retired map[facet.Type]bool, defs ...Definition) (*Registry, error) {
+	r := &Registry{byType: make(map[facet.Type]Definition, len(defs)), retired: retired}
 	families := map[string]Definition{}
 	for _, d := range defs {
 		if _, dup := r.byType[d.Type]; dup {
@@ -62,15 +66,11 @@ func (r *Registry) Closes(t facet.Type) bool {
 	return r.retired[t]
 }
 
-// retiredCloses reads, for every type the history carries, whether its newest history
-// version closes a series. A history body is words, not a contract, so only the one
-// field is read. Types a registry holds a Definition for are ignored at lookup, not
-// here, so the answer does not depend on which Definitions the registry was given.
-func retiredCloses() (map[facet.Type]bool, error) {
-	history, err := History()
-	if err != nil {
-		return nil, err
-	}
+// retiredCloses reads, for every type a catalog's history carries, whether its newest
+// history version closes a series. A history body is words, not a contract, so only
+// the one field is read. Types a registry holds a Definition for are ignored at lookup,
+// not here, so the answer does not depend on which Definitions the registry was given.
+func retiredCloses(history []Stored) (map[facet.Type]bool, error) {
 	newest := map[facet.Type]int{}
 	out := map[facet.Type]bool{}
 	for _, h := range history {

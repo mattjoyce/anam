@@ -9,10 +9,6 @@ account of one instance and carries its data.
 
 ## Unreleased
 
-- A registry answers whether a retired type closes its series from the history of the catalog it
-  was built over, not the history embedded in the binary (card 255, R4b, slice 1). A
-  `definitions_dir` whose `history/` differs from the embedded one now closes what its own history
-  closes; the live catalog, a byte copy of the embedded one, answers as before.
 - Tests get their catalogs from fixtures (card 255, R4a, first slice). `internal/catalog/fixture`
   holds `mattjoyce`, a byte copy of the embedded catalog, and `minimal`, a small catalog with
   `record.edge` and `record.document` in UTC, one measure type and one projection;

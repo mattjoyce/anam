@@ -16,7 +16,8 @@ import (
 // facet in the ledger may have been admitted under (card 111): provisioned into the
 // operational store at start so an old facet still reads against its own words after
 // a rebuild, and so an importer registering an older version finds it held. History
-// is words, not a contract: it is not parsed as one, and Bundled never loads it.
+// is words, not a contract: it is never parsed as a current Definition. Bundled reads
+// it for one thing only, which retired types close their series (Closes).
 //
 //go:embed manifests/*.json manifests/history/*.json
 var manifestFS embed.FS

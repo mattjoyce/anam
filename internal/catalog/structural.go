@@ -30,37 +30,36 @@ func (c *Catalog) AbsentStructural() []facet.Type {
 }
 
 // structuralSchema is the part of a Definition's JSON Schema the structural check
-// reads, decoded the way inspect's kindsOf reads record.edge's kinds.
+// reads. Each property is kept as decoded JSON, not coerced into Go types, so a null
+// enum member or a list of types is seen as written.
 type structuralSchema struct {
 	Schema struct {
-		Required   []string                   `json:"required"`
-		Properties map[string]json.RawMessage `json:"properties"`
+		Required   []string                  `json:"required"`
+		Properties map[string]map[string]any `json:"properties"`
 	} `json:"schema"`
 }
 
-// structuralProperty is one declared property: its type, its items' type, its enum.
-type structuralProperty struct {
-	Type  any `json:"type"`
-	Items *struct {
-		Type any `json:"type"`
-	} `json:"items"`
-	Enum *[]string `json:"enum"`
-}
+// sha256Pattern is the pattern record.document's sha256 must declare: lower-case hex
+// of 64 digits, the only form library.IsSHA256 and the library's file names accept.
+const sha256Pattern = "^[0-9a-f]{64}$"
 
 // checkStructural refuses a current record.edge or record.document whose declared
 // shape a consumer cannot read, with def.ErrBadManifest naming the type, version and
-// pointer. A pointer left undeclared passes: a consumer answers its absence itself.
-// History is not checked; the consumers read the Definition in force.
+// pointer. A pointer left undeclared passes where a consumer answers its absence
+// itself. History is not checked; the consumers read the Definition in force. A
+// type is read with def.TypesOf, so "string" and ["string"] are the same declaration,
+// and ["string", "null"] is not.
 //
-//   - record.edge /from, /to, /about: lists of facet ids (catchup.EdgeEnds), so an
-//     array whose items are strings.
-//   - record.edge /kind: a closed list the link form offers (inspect's kindsOf), so a
-//     non-empty enum.
+//   - record.edge /from, /to, /about: lists of facet ids (catchup.EdgeEnds), so of
+//     type array only, with items of type string only.
+//   - record.edge /kind: one of a closed list the link form offers (inspect's
+//     kindsOf), so of type string only, with an enum of non-empty strings.
 //   - record.document /sha256: the library hash every reference is checked against
-//     (daemon's checkReferences), so required.
+//     (daemon's checkReferences), so required, of type string only, with the pattern
+//     of lower-case hex.
 func checkStructural(current []def.Stored) error {
 	for _, s := range current {
-		var check func(structuralSchema) (string, string, error)
+		var check func(structuralSchema) (string, string)
 		switch s.Type {
 		case catchup.EdgeType:
 			check = checkEdge
@@ -73,60 +72,59 @@ func checkStructural(current []def.Stored) error {
 		if err := json.Unmarshal(s.Body, &schema); err != nil {
 			return fmt.Errorf("%w: %s v%d: %w", def.ErrBadManifest, s.Type, s.Version, err)
 		}
-		pointer, problem, err := check(schema)
-		if err != nil {
-			return fmt.Errorf("%w: %s v%d %s: %w", def.ErrBadManifest, s.Type, s.Version, pointer, err)
-		}
-		if problem != "" {
+		if pointer, problem := check(schema); problem != "" {
 			return fmt.Errorf("%w: %s v%d %s: %s", def.ErrBadManifest, s.Type, s.Version, pointer, problem)
 		}
 	}
 	return nil
 }
 
+// only reports whether a subschema declares exactly one type, want.
+func only(sub map[string]any, want string) bool {
+	return slices.Equal(def.TypesOf(sub), []string{want})
+}
+
 // checkEdge returns the first record.edge pointer declared in a shape its consumers
 // cannot read, and why.
-func checkEdge(s structuralSchema) (pointer, problem string, err error) {
+func checkEdge(s structuralSchema) (pointer, problem string) {
 	for _, name := range []string{"from", "to", "about"} {
-		p, ok, err := property(s, name)
-		if err != nil {
-			return "/" + name, "", err
-		}
+		p, ok := s.Schema.Properties[name]
 		if !ok {
 			continue
 		}
-		if p.Type != "array" || p.Items == nil || p.Items.Type != "string" {
-			return "/" + name, "declared other than as a list of facet ids (an array of strings)", nil
+		items, _ := p["items"].(map[string]any)
+		if !only(p, "array") || items == nil || !only(items, "string") {
+			return "/" + name, "declared other than as a list of facet ids (of type array only, with items of type string only)"
 		}
 	}
-	p, ok, err := property(s, "kind")
-	if err != nil {
-		return "/kind", "", err
+	p, ok := s.Schema.Properties["kind"]
+	if !ok {
+		return "", ""
 	}
-	if ok && (p.Enum == nil || len(*p.Enum) == 0) {
-		return "/kind", "declared without a non-empty enum of kinds", nil
+	if !only(p, "string") {
+		return "/kind", "declared other than of type string only"
 	}
-	return "", "", nil
+	enum, _ := p["enum"].([]any)
+	if len(enum) == 0 {
+		return "/kind", "declared without a non-empty enum of kinds"
+	}
+	for _, v := range enum {
+		if k, ok := v.(string); !ok || k == "" {
+			return "/kind", fmt.Sprintf("enum member %v is not a non-empty string", v)
+		}
+	}
+	return "", ""
 }
 
 // checkDocument returns the record.document pointer its consumers cannot rely on, and
 // why.
-func checkDocument(s structuralSchema) (pointer, problem string, err error) {
+func checkDocument(s structuralSchema) (pointer, problem string) {
 	if !slices.Contains(s.Schema.Required, "sha256") {
-		return "/sha256", "not in the schema's required list, so a reference may name no bytes", nil
+		return "/sha256", "not in the schema's required list, so a reference may name no bytes"
 	}
-	return "", "", nil
-}
-
-// property decodes one declared property; ok is false when it is not declared.
-func property(s structuralSchema, name string) (structuralProperty, bool, error) {
-	raw, ok := s.Schema.Properties[name]
-	if !ok {
-		return structuralProperty{}, false, nil
+	p := s.Schema.Properties["sha256"]
+	if p == nil || !only(p, "string") || p["pattern"] != sha256Pattern {
+		return "/sha256", "declared other than as a library hash (of type string only, with pattern " + sha256Pattern + ")"
 	}
-	var p structuralProperty
-	if err := json.Unmarshal(raw, &p); err != nil {
-		return structuralProperty{}, false, err
-	}
-	return p, true, nil
+	return "", ""
 }

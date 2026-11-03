@@ -82,6 +82,33 @@ func TestLoad_RefusesAMalformedStructuralType(t *testing.T) {
 			delete(s, "not")
 			s["anyOf"] = []any{map[string]any{"required": []any{"text"}}}
 		}, ""},
+		{"kind nullable with a null member", edge, func(m map[string]any) {
+			p := property(m, "kind")
+			p["type"] = []any{"string", "null"}
+			p["enum"] = []any{"about", nil}
+		}, "record.edge v1 /kind"},
+		{"kind with a null member", edge, func(m map[string]any) { property(m, "kind")["enum"] = []any{"about", nil} }, "record.edge v1 /kind"},
+		{"kind with an empty member", edge, func(m map[string]any) { property(m, "kind")["enum"] = []any{"about", ""} }, "record.edge v1 /kind"},
+		{"kind a number", edge, func(m map[string]any) { property(m, "kind")["type"] = "number" }, "record.edge v1 /kind"},
+		{"kind typed as a one-member list", edge, func(m map[string]any) { property(m, "kind")["type"] = []any{"string"} }, ""},
+		{"from typed as one-member lists", edge, func(m map[string]any) {
+			p := property(m, "from")
+			p["type"] = []any{"array"}
+			p["items"].(map[string]any)["type"] = []any{"string"}
+		}, ""},
+		{"from nullable", edge, func(m map[string]any) { property(m, "from")["type"] = []any{"array", "null"} }, "record.edge v1 /from"},
+		{"sha256 a number", doc, func(m map[string]any) {
+			p := property(m, "sha256")
+			p["type"] = "number"
+			delete(p, "pattern")
+			delete(p, "minLength")
+		}, "record.document v1 /sha256"},
+		// def's own schema check refuses these two first, naming sha256.
+		{"sha256 nullable", doc, func(m map[string]any) { property(m, "sha256")["type"] = []any{"string", "null"} }, `required "sha256": admits null`},
+		{"sha256 without its pattern", doc, func(m map[string]any) { delete(property(m, "sha256"), "pattern") }, "record.document v1 /sha256"},
+		{"sha256 with another pattern", doc, func(m map[string]any) { property(m, "sha256")["pattern"] = "^[0-9A-Fa-f]+$" }, "record.document v1 /sha256"},
+		{"sha256 not declared", doc, func(m map[string]any) { dropProperty(m, "sha256") }, `required "sha256" is not a declared property`},
+		{"sha256 typed as a one-member list", doc, func(m map[string]any) { property(m, "sha256")["type"] = []any{"string"} }, ""},
 		{"sha256 not required", doc, func(m map[string]any) {
 			s := m["schema"].(map[string]any)
 			s["required"] = slices.DeleteFunc(s["required"].([]any), func(v any) bool { return v == "sha256" })

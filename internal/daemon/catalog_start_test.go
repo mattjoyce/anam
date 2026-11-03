@@ -25,6 +25,7 @@ const (
 	msgAdmitted   = "daemon: catalog admitted"
 	msgNoCatalog  = "daemon: no catalog configured; set definitions_dir and projections_dir, or register definitions over the API"
 	msgStructural = "daemon: structural type not in the catalog"
+	msgComponent  = "daemon: catalog component not configured; it is empty"
 )
 
 // startLog opens a daemon on cfg with the process logger captured, and returns the
@@ -128,20 +129,49 @@ func TestOpen_NoCatalogStartsEmpty(t *testing.T) {
 		t.Errorf("the store holds %d definitions, %v; want none", len(rows), err)
 	}
 
-	// One directory left unset is the same WARN: that component is empty.
-	half := minimalConfig(t, func(string) {})
-	half.ProjectionsDir = ""
-	_, lines, err = startLog(t, half)
-	if err != nil {
-		t.Fatalf("Open with no projections_dir: %v", err)
+	// One directory left unset is a WARN naming it: that component is empty, and the
+	// other keeps its files and, for definitions, its V.
+	full := minimalConfig(t, func(string) {})
+	fullV := func() string {
+		cat, err := catalog.Load(context.Background(), full.DefinitionsDir, full.ProjectionsDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cat.SetVersion()
+	}()
+	label := func(dir string) string {
+		if dir == "" {
+			return "none"
+		}
+		return dir
 	}
-	lines = afterAdmitted(t, lines)
-	if len(lines) != 2 {
-		t.Fatalf("logged %d lines from admission, want 2: %v", len(lines), lines)
+	for _, tt := range []struct {
+		unset string
+		keep  func(c config.Config) (defs, projs string)
+		v     string
+	}{
+		{"projections_dir", func(c config.Config) (string, string) { return c.DefinitionsDir, "" }, fullV},
+		{"definitions_dir", func(c config.Config) (string, string) { return "", c.ProjectionsDir }, emptyV},
+	} {
+		// A store of its own each time; Minimal's V does not depend on where it is.
+		half := minimalConfig(t, func(string) {})
+		half.DefinitionsDir, half.ProjectionsDir = tt.keep(half)
+		_, lines, err := startLog(t, half)
+		if err != nil {
+			t.Fatalf("Open with no %s: %v", tt.unset, err)
+		}
+		lines = afterAdmitted(t, lines)
+		want := 2
+		if tt.unset == "definitions_dir" {
+			want = 4 // and both structural types are absent
+		}
+		if len(lines) != want {
+			t.Fatalf("no %s: logged %d lines from admission, want %d: %v", tt.unset, len(lines), want, lines)
+		}
+		wantLine(t, lines[0], "INFO", msgAdmitted, map[string]any{
+			"definitions_source": label(half.DefinitionsDir), "projections_source": label(half.ProjectionsDir), "definition_set_version": tt.v})
+		wantLine(t, lines[1], "WARN", msgComponent, map[string]any{"unset": tt.unset})
 	}
-	wantLine(t, lines[0], "INFO", msgAdmitted, map[string]any{
-		"definitions_source": half.DefinitionsDir, "projections_source": "none"})
-	wantLine(t, lines[1], "WARN", msgNoCatalog, nil)
 }
 
 // A catalog without record.edge is admitted, and the daemon says which feature
@@ -190,57 +220,85 @@ func TestOpen_ACompleteCatalogLogsOnlyItsAdmission(t *testing.T) {
 	}
 }
 
-// A record.edge whose kind has no closed list is refused at start, naming the type,
-// its version and the pointer, before either store is opened: the ledger and the
-// operational store are byte for byte as the last good start left them.
+// A structural type in a shape the engine cannot read is refused at start, naming
+// the type, its version and the pointer, before either store is opened: the ledger
+// and the operational store are byte for byte as the last good start left them, and
+// nothing is persisted. Sol's review of #37 found a record.document whose sha256 was
+// a number persisted and a reference admitted with no bytes behind it.
 // Serial because it replaces the process default logger.
-func TestOpen_RefusesAMalformedEdgeWithTheStoreUntouched(t *testing.T) {
-	cfg := minimalConfig(t, func(string) {})
-	d, _, err := startLog(t, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := d.closeStores(); err != nil {
-		t.Fatal(err)
-	}
-	before := storeFiles(t, cfg)
-
-	path := filepath.Join(cfg.DefinitionsDir, "record.edge.json")
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	broken := bytes.Replace(raw, []byte(`"enum": [
+func TestOpen_RefusesAMalformedStructuralTypeWithTheStoreUntouched(t *testing.T) {
+	for _, tt := range []struct {
+		name, file, from, to, want string
+	}{
+		{"edge kind without its enum", "record.edge.json", `"enum": [
           "about",
           "interpreted_from"
-        ]`), []byte(`"minLength": 1`), 1)
-	if bytes.Equal(broken, raw) {
-		t.Fatal("the fixture's record.edge kind enum was not found")
-	}
-	if err := os.WriteFile(path, broken, 0o600); err != nil {
-		t.Fatal(err)
-	}
+        ]`, `"minLength": 1`, "record.edge v1 /kind"},
+		{"edge kind nullable", "record.edge.json", `"kind": {
+        "type": "string",
+        "enum": [
+          "about",
+          "interpreted_from"
+        ]`, `"kind": {
+        "type": ["string", "null"],
+        "enum": [
+          "about",
+          null
+        ]`, "record.edge v1 /kind"},
+		{"document sha256 a number", "record.document.json", `"sha256": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[0-9a-f]{64}$"
+      }`, `"sha256": {
+        "type": "number"
+      }`, "record.document v1 /sha256"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := minimalConfig(t, func(string) {})
+			d, _, err := startLog(t, cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := d.closeStores(); err != nil {
+				t.Fatal(err)
+			}
+			before := storeFiles(t, cfg)
 
-	d, lines, err := startLog(t, cfg)
-	if d != nil || !errors.Is(err, catalog.ErrInvalid) {
-		t.Fatalf("Open returned a daemon: %v, err %v; want a refusal wrapping catalog.ErrInvalid", d != nil, err)
-	}
-	if !strings.Contains(err.Error(), "record.edge v1 /kind") {
-		t.Errorf("refusal %q does not name record.edge v1 /kind", err)
-	}
-	for _, l := range lines {
-		if l["msg"] == msgAdmitted {
-			t.Errorf("a refused catalog was admitted: %v", l)
-		}
-	}
-	after := storeFiles(t, cfg)
-	if len(after) != len(before) {
-		t.Fatalf("store files changed from %v to %v", before, after)
-	}
-	for name, sum := range before {
-		if after[name] != sum {
-			t.Errorf("%s changed under a refused start", name)
-		}
+			path := filepath.Join(cfg.DefinitionsDir, tt.file)
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			broken := bytes.Replace(raw, []byte(tt.from), []byte(tt.to), 1)
+			if bytes.Equal(broken, raw) {
+				t.Fatalf("the fixture's %s does not hold the text to change", tt.file)
+			}
+			if err := os.WriteFile(path, broken, 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			d, lines, err := startLog(t, cfg)
+			if d != nil || !errors.Is(err, catalog.ErrInvalid) {
+				t.Fatalf("Open returned a daemon: %v, err %v; want a refusal wrapping catalog.ErrInvalid", d != nil, err)
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("refusal %q does not name %s", err, tt.want)
+			}
+			for _, l := range lines {
+				if l["msg"] == msgAdmitted {
+					t.Errorf("a refused catalog was admitted: %v", l)
+				}
+			}
+			after := storeFiles(t, cfg)
+			if len(after) != len(before) {
+				t.Fatalf("store files changed from %v to %v", before, after)
+			}
+			for name, sum := range before {
+				if after[name] != sum {
+					t.Errorf("%s changed under a refused start", name)
+				}
+			}
+		})
 	}
 }
 

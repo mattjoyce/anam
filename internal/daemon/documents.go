@@ -113,7 +113,8 @@ func documentMediaType(ext string) string {
 }
 
 // checkReferences refuses, before anything is admitted, every record.document in a
-// batch whose sha256 the library holds no bytes for (cards 102, 150). The reference
+// batch whose sha256 the library holds no bytes for, or whose sha256 cannot be read
+// as a string (cards 102, 150, 255). The reference
 // is a pointer, and a pointer to nothing is not a fact worth admitting. Its path is
 // the document's name and identity, and plays no part in finding the bytes.
 func checkReferences(dir string, envs []facet.Envelope) error {
@@ -127,15 +128,21 @@ func checkReferences(dir string, envs []facet.Envelope) error {
 		var ref struct {
 			SHA256 string `json:"sha256"`
 		}
+		var problem string
 		if err := json.Unmarshal(env.Payload, &ref); err != nil {
-			continue // the gate refuses a malformed payload with its own reason
-		}
-		if held == nil && why == "" {
-			held, why = heldDocuments(dir)
-		}
-		problem := why
-		if _, ok := held[ref.SHA256]; problem == "" && !ok {
-			problem = "the library holds no bytes with sha256 " + ref.SHA256
+			// A reference whose sha256 cannot be read names no bytes. It is refused
+			// here, not left to the gate, since a Definition that types sha256 as
+			// something other than a string would admit it (catalog.Load refuses
+			// such a Definition too).
+			problem = "its sha256 cannot be read as a string: " + err.Error()
+		} else {
+			if held == nil && why == "" {
+				held, why = heldDocuments(dir)
+			}
+			problem = why
+			if _, ok := held[ref.SHA256]; problem == "" && !ok {
+				problem = "the library holds no bytes with sha256 " + ref.SHA256
+			}
 		}
 		if problem != "" {
 			refused.Envelopes = append(refused.Envelopes, gate.RefusedEnvelope{

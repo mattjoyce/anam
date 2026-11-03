@@ -20,12 +20,12 @@ import (
 
 // engineV is fixture.Engine's definition set version. A byte changed in a current
 // definition moves it; history and projections do not count toward it.
-const engineV = "sha256:a1bdbe0e58ccc45ea51db2ce786f3fcb75b0f45c2a9ba94e228c0e834242ffd9"
+const engineV = "sha256:e48a8f30adae725880b2cb8859f014e7538150eec08cbe5d279a8496420552f7"
 
 // engineTypes and engineTemplates are what fixture.Engine holds in force.
 var (
 	engineTypes = []string{"record.document", "record.edge", "test.course.changed", "test.course.started",
-		"test.course.stopped", "test.labelled", "test.measure", "test.reading", "test.templated"}
+		"test.course.stopped", "test.labelled", "test.measure", "test.pair", "test.reading", "test.templated"}
 	engineTemplates = []string{"course", "everything", "measures", "normal"}
 )
 
@@ -66,8 +66,8 @@ func TestEngine_LoadsFromADirectoryCopy(t *testing.T) {
 	if got := c.Projections().Names(); !slices.Equal(got, engineTemplates) {
 		t.Errorf("projections = %v, want %v", got, engineTemplates)
 	}
-	if got := len(c.History()); got != 4 {
-		t.Errorf("definition history: %d versions, want 4", got)
+	if got := len(c.History()); got != 6 {
+		t.Errorf("definition history: %d versions, want 6", got)
 	}
 	if c.DefinitionsSource() == "embedded" || c.ProjectionsSource() == "embedded" {
 		t.Errorf("sources = %q, %q; want directories", c.DefinitionsSource(), c.ProjectionsSource())
@@ -351,6 +351,69 @@ func TestEngine_HoldsAFeatureEach(t *testing.T) {
 			if s := lookup(typ).Series; s == nil || s.Name != "test.course" || !slices.Equal(s.Key, []string{"/name", "/course"}) {
 				t.Errorf("%s series %+v", typ, s)
 			}
+		}
+	})
+
+	t.Run("test.pair is the bench's shape: two numbers and a time, keyed by the time", func(t *testing.T) {
+		t.Parallel()
+		d := lookup("test.pair")
+		if !slices.Equal(d.IdentityKey, []string{"/at"}) || d.FactTime.Pointer != "/at" || d.IdentityTemplate != "" ||
+			d.FactTime.ZonePointer != "" {
+			t.Errorf("test.pair key %v, fact time %+v, template %q", d.IdentityKey, d.FactTime, d.IdentityTemplate)
+		}
+		if err := d.Check(decode(t, `{"at": "2026-10-19 08:00:00", "a": 120, "b": 80}`)); err != nil {
+			t.Errorf("two numbers and a time are refused: %v", err)
+		}
+		if err := d.Check(decode(t, `{"at": "2026-10-19 08:00:00", "a": 120}`)); err == nil {
+			t.Error("one number is admitted; want both required")
+		}
+	})
+
+	t.Run("test.entry fits each course type by what it says", func(t *testing.T) {
+		t.Parallel()
+		entry := history["test.entry"]
+		if entry.Version != 1 || reg.Has("test.entry") || entry.Series != nil {
+			t.Fatalf("test.entry v%d, in force %t, series %+v; want v1 only in history, in no series",
+				entry.Version, reg.Has("test.entry"), entry.Series)
+		}
+		withDose := `{"id": "start:1", "date": "2026-03-01", "name": "a", "course": 1, "dose": "1 u"}`
+		without := `{"id": "stop:1", "date": "2026-03-09", "name": "a", "course": 1}`
+		for _, c := range []struct {
+			typ, payload string
+			fits         bool
+		}{
+			{"test.course.started", withDose, true}, {"test.course.changed", withDose, true},
+			{"test.course.stopped", without, true}, {"test.course.stopped", withDose, false},
+			{"test.course.started", without, false},
+		} {
+			to := lookup(c.typ)
+			if !slices.Equal(to.IdentityKey, entry.IdentityKey) || to.FactTime != entry.FactTime {
+				t.Errorf("%s does not key and place as test.entry does", c.typ)
+			}
+			if err := entry.Check(decode(t, c.payload)); err != nil {
+				t.Errorf("test.entry refuses %s: %v", c.payload, err)
+			}
+			if err := to.Check(decode(t, c.payload)); (err == nil) != c.fits {
+				t.Errorf("%s takes %s: %v, want fits %t", c.typ, c.payload, err, c.fits)
+			}
+		}
+	})
+
+	t.Run("test.sample keys as test.reading and places by another rule", func(t *testing.T) {
+		t.Parallel()
+		sample, reading := history["test.sample"], lookup("test.reading")
+		if reg.Has("test.sample") || !slices.Equal(sample.IdentityKey, reading.IdentityKey) || sample.FactTime == reading.FactTime {
+			t.Fatalf("test.sample key %v fact time %+v; test.reading key %v fact time %+v",
+				sample.IdentityKey, sample.FactTime, reading.IdentityKey, reading.FactTime)
+		}
+		london := `{"id": "s1", "at": "2026-10-19 18:00", "value": 5, "unit": "u",
+			"source_time": {"value": "2026-10-19 18:00", "zone": "Europe/London", "offset": "+01:00", "basis": "source"}}`
+		utc := strings.NewReplacer("+01:00", "+00:00", "2026-10-19", "2026-11-19").Replace(london)
+		if factTime(t, sample, london).Equal(factTime(t, reading, london)) {
+			t.Error("a London sample is placed alike by both; want test.reading to move it")
+		}
+		if !factTime(t, sample, utc).Equal(factTime(t, reading, utc)) {
+			t.Error("a sample at +00:00 is placed apart; want it where it was")
 		}
 	})
 

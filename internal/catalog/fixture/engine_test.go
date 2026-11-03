@@ -17,9 +17,11 @@ import (
 // the definition set version catalogtest pins, so either is a decision, not drift.
 var engineFiles = map[string][]string{
 	"definitions": {
+		"history/test.entry.v1.json",     // app renamesplit: a generic source a selector split carries to the three course types
 		"history/test.measure.v1.json",   // def versions and history: an earlier version that loads, named by its file
 		"history/test.reading.v1.json",   // def guard: v2 widens the fact time with a zone pointer
 		"history/test.retired.v1.json",   // def retired, serve retired_type: a retired type that closes its series (card 187)
+		"history/test.sample.v1.json",    // app rename (card 195): test.reading's old name, read in UTC; the rename re-places some facets
 		"history/test.templated.v1.json", // def factzone, idtemplate: v2 appends an optional offset; an old id holds
 		"record.document.json",           // daemon documents, inspect document: the structural type, in UTC
 		"record.edge.json",               // catchup, query edges, inspect links, migrate: the structural type, in UTC
@@ -28,6 +30,7 @@ var engineFiles = map[string][]string{
 		"test.course.stopped.json",       // registry Closes, snapshot: closes the series; a rename target for test.retired
 		"test.labelled.json",             // def and inspect label: fields that may be absent
 		"test.measure.json",              // gate, read, serve, query: a two-field identity key, source_time v1, Normal
+		"test.pair.json",                 // bench: two numbers and a time, keyed by the time, nothing else required
 		"test.reading.json",              // def factzone, sourcetime, inspect zone: a wall clock read at its offset
 		"test.templated.json",            // def idtemplate and identityfields, gate identity_template, inspect entry form
 	},

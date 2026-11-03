@@ -1,0 +1,85 @@
+{
+  "meta": {
+    "facet_type": "test.sample",
+    "definition_version": 1,
+    "kind": "reading",
+    "family": "readings",
+    "classification": "Sensitive",
+    "validation_mode": "strict",
+    "source_schema": "fixture/test.sample",
+    "time_semantics": {
+      "fact_time": {
+        "pointer": "/at",
+        "layout": "2006-01-02 15:04",
+        "zone": "UTC"
+      }
+    },
+    "identity_key": [
+      "/id"
+    ],
+    "min_binding_assurance": "medium"
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "description": "One instrument value said at a wall clock, read in UTC whatever source_time says, under the name the type had before it became test.reading. Only history names it. It is nobody's record.",
+    "type": "object",
+    "required": [
+      "id",
+      "at",
+      "value",
+      "unit",
+      "source_time"
+    ],
+    "properties": {
+      "source_time": {
+        "type": "object",
+        "required": [
+          "value",
+          "zone",
+          "offset",
+          "basis"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": "string",
+            "minLength": 1
+          },
+          "zone": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^([A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$"
+          },
+          "offset": {
+            "type": "string",
+            "pattern": "^[+-]([01][0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "source",
+              "configuration",
+              "assumption"
+            ]
+          }
+        }
+      },
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "at": {
+        "type": "string",
+        "minLength": 1
+      },
+      "value": {
+        "type": "number"
+      },
+      "unit": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "additionalProperties": false
+  }
+}

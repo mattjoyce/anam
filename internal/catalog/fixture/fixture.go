@@ -51,8 +51,11 @@ func Minimal() (definitions, projections fs.FS) {
 // test.measure, keyed by two fields, source_time required from v2; test.templated,
 // an identity template that gains an optional offset in v2; test.labelled, a label
 // whose fields may be absent; test.course.started, .changed and .stopped, one series
-// the stop closes; and test.retired, only in history, the stop's earlier name, which
-// closes the series too. Projections: measures (a log of one type), course (a
+// the stop closes; test.retired, only in history, the stop's earlier name, which
+// closes the series too; test.entry, only in history, a course row of any sort that a
+// selector split carries to the three; test.sample, only in history, test.reading's
+// earlier name read in UTC; and test.pair, the bench's two numbers and a time.
+// Projections: measures (a log of one type), course (a
 // snapshot over the series, whose v1 named test.retired), everything (a log of every
 // type, the series by its prefix) and normal (the same types under a Normal ceiling).
 func Engine() (definitions, projections fs.FS) {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
@@ -66,11 +67,12 @@ func sayCourse(t *testing.T, g *gate.Gate, typ, name string, course int, date st
 }
 
 // A stop closes the series of its course's latest start, a later start opens it again,
-// and another name's series is its own.
+// and another name's series is its own. Each start is a day apart, so the open rows
+// have one timeline order.
 func TestCourse_AStopClosesItsStartAndALaterStartReopensIt(t *testing.T) {
 	t.Parallel()
 	g, l, reg := newCourseGate(t)
-	started1 := sayCourse(t, g, courseStarted, "deskcam", 1, "2026-10-20")
+	started1 := sayCourse(t, g, courseStarted, "deskcam", 1, "2026-10-19")
 	garden := sayCourse(t, g, courseStarted, "garden", 1, "2026-10-20")
 	sayCourse(t, g, courseStopped, "deskcam", 1, "2026-10-21")
 	started2 := sayCourse(t, g, courseStarted, "deskcam", 1, "2026-10-23")
@@ -84,8 +86,9 @@ func TestCourse_AStopClosesItsStartAndALaterStartReopensIt(t *testing.T) {
 		name, at string
 		want     []string
 	}{
-		{"before anything", "2026-10-19T00:00:00.000000000Z", nil},
-		{"both open", "2026-10-19T22:00:00.000000000Z", []string{started1, garden}},
+		{"before anything", "2026-10-18T00:00:00.000000000Z", nil},
+		{"deskcam open", "2026-10-19T00:00:00.000000000Z", []string{started1}},
+		{"deskcam and garden open", "2026-10-20T00:00:00.000000000Z", []string{started1, garden}},
 		{"deskcam closed, garden still open", "2026-10-21T08:00:00.000000000Z", []string{garden}},
 		{"deskcam reopened", "2026-10-23T00:00:00.000000000Z", []string{garden, started2}},
 	} {
@@ -97,8 +100,9 @@ func TestCourse_AStopClosesItsStartAndALaterStartReopensIt(t *testing.T) {
 		for _, e := range s.Entries() {
 			got = append(got, e.FacetID)
 		}
-		if !sameIDs(got, tc.want) {
-			t.Errorf("%s: open = %v, want %v", tc.name, got, tc.want)
+		// The snapshot is a value, so its entries are in timeline order: by fact time.
+		if strings.Join(got, ",") != strings.Join(tc.want, ",") {
+			t.Errorf("%s: open = %v, want %v in timeline order", tc.name, got, tc.want)
 		}
 	}
 }

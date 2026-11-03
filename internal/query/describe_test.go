@@ -184,3 +184,46 @@ func heldFixture(t *testing.T) query.Held {
 	}
 	return query.HeldOf(manifests)
 }
+
+// A historical version is described from its schema alone, nested pointers included,
+// even when the body is no longer a contract Parse accepts. The engine fixture's history
+// is flat, so this held set swaps test.measure's v1 for a body with a nested number
+// and a validation mode no current contract may declare; the fixture's files and V are
+// untouched.
+func TestDescribe_AHistoricalVersionIsReadFromItsSchema(t *testing.T) {
+	t.Parallel()
+	const v1 = `{
+  "meta": {
+    "facet_type": "test.measure", "definition_version": 1, "classification": "Normal",
+    "validation_mode": "lenient", "source_schema": "fixture/test.measure",
+    "time_semantics": {"fact_time": {"pointer": "/at", "layout": "2006-01-02 15:04:05", "zone": "Europe/Berlin"}},
+    "identity_key": ["/at", "/seq"]
+  },
+  "schema": {"type": "object", "required": ["at", "seq", "reading"],
+    "properties": {"at": {"type": "string"}, "seq": {"type": "number"},
+      "reading": {"type": "object", "properties": {"value": {"type": "number"}, "unit": {"type": "string"}}}}}
+}`
+	if _, err := def.Parse([]byte(v1)); err == nil {
+		t.Fatal("the historical body parses as a contract; the case needs one that is schema only")
+	}
+	held := heldFixture(t)
+	held["test.measure"] = map[int][]byte{1: []byte(v1), 2: held["test.measure"][2]}
+	cat, err := query.Describe(catalogtest.Engine.Definitions(t), held)
+	if err != nil {
+		t.Fatalf("Describe: %v", err)
+	}
+	var got []string
+	for _, ta := range cat.Types {
+		if ta.Type != "test.measure" {
+			continue
+		}
+		for _, v := range ta.Versions {
+			if v.Version == 1 {
+				got = v.Pointers
+			}
+		}
+	}
+	if want := "/at /reading /reading/unit /reading/value /seq"; strings.Join(got, " ") != want {
+		t.Errorf("test.measure v1 pointers = %v, want %s", got, want)
+	}
+}

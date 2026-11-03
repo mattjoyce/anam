@@ -33,7 +33,7 @@ func newTemplatedGate(t *testing.T) (*gate.Gate, *ledger.Ledger) {
 	}
 	t.Cleanup(func() { _ = l.Close() })
 	reg := catalogtest.Engine.Definitions(t)
-	scopes := gate.StaticScopes{"conversation": {"test.templated", "test.measure"}}
+	scopes := gate.StaticScopes{"conversation": {"test.templated", "test.reading"}}
 	return gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}), l
 }
 
@@ -99,18 +99,30 @@ func TestTemplate_CarriedIdentityMustMatch(t *testing.T) {
 	}
 }
 
+// A type with no template takes the id the writer supplies, unchanged: test.reading's
+// identity is its /id, and the facet is the one that id names.
 func TestTemplate_ATypeWithoutOneIsUntouched(t *testing.T) {
 	t.Parallel()
-	g, _ := newTemplatedGate(t)
-	m := facet.Envelope{Type: "test.measure", Source: "conversation", Injector: "conversation",
-		Payload: []byte(`{"at": "2026-10-17 07:00:00", "seq": 1, "count": 3, "source_time": {"value": "2026-10-17 07:00:00", "zone": "Europe/Berlin", "basis": "source"}}`)}
-	b, err := g.Resolve(m)
+	g, l := newTemplatedGate(t)
+	r := facet.Envelope{Type: "test.reading", Source: "conversation", Injector: "conversation",
+		Payload: []byte(`{"id": "r-1", "at": "2026-10-17 07:00", "value": 80.5, "unit": "kg", ` + templatedClock("2026-10-17 07:00", "Europe/Berlin", "+02:00") + `}`)}
+	b, err := g.Resolve(r)
 	if err != nil {
 		t.Fatal(err)
 	}
-	res, _, err := g.Commit(context.Background(), m, b)
+	res, _, err := g.Commit(context.Background(), r, b)
 	if err != nil || res.Outcome != gate.OutcomeAdmitted {
-		t.Errorf("a type with no template: %+v, %v; want admitted as before", res, err)
+		t.Fatalf("a type with no template: %+v, %v; want admitted as before", res, err)
+	}
+	if want := facet.NewID(facet.SourceRef("conversation", "r-1")); res.FacetID != want {
+		t.Errorf("facet id %s, want the one the supplied id names (%s)", res.FacetID, want)
+	}
+	f, err := l.CurrentVersion(context.Background(), res.FacetID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(f.Payload.Bytes()), `"id":"r-1"`) {
+		t.Errorf("payload %s does not keep the supplied id", f.Payload.Bytes())
 	}
 }
 

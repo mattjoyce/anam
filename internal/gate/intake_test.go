@@ -7,16 +7,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
-	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
 	"github.com/mattjoyce/anam/internal/gate"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
-// Card 232: health.intake over the bundled Definition, a real gate and a real ledger.
+// Card 232: health.intake over the fixture's Definition, a real gate and a real ledger.
 // A person says what they took in (a coffee, two glasses of wine, a rich meal out); the
 // gate holds the drink to one spelling, the count to a whole number, and each kind to
 // its own fields through the schema's if and then.
@@ -28,10 +28,7 @@ func newIntakeGate(t *testing.T) (*gate.Gate, *ledger.Ledger) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = l.Close() })
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
+	reg := catalogtest.Definitions(t)
 	scopes := gate.StaticScopes{"conversation": {"health.intake"}}
 	g := gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	return g, l

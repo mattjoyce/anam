@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/catalog"
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 )
 
 func TestDriftFrom(t *testing.T) {
@@ -17,10 +18,8 @@ func TestDriftFrom(t *testing.T) {
 	for _, tt := range driftCases() {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			embedded := loadEmbedded(t)
-			defs, projs := t.TempDir(), t.TempDir()
-			copyEmbeddedDefs(t, defs)
-			copyEmbeddedProjections(t, projs)
+			fixed := catalogtest.Catalog(t)
+			defs, projs := copyFixture(t)
 			if tt.change != nil {
 				tt.change(t, defs, projs)
 			}
@@ -28,14 +27,14 @@ func TestDriftFrom(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got := cat.DriftFrom(embedded)
+			got := cat.DriftFrom(fixed)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("DriftFrom = %+v, want %+v", got, tt.want)
 			}
 			if got.None() != (tt.change == nil) {
 				t.Errorf("None = %v", got.None())
 			}
-			reverse := embedded.DriftFrom(cat)
+			reverse := fixed.DriftFrom(cat)
 			wantReverse := catalog.Drift{
 				DefinitionsOnlyHere: tt.want.DefinitionsOnlyThere, DefinitionsOnlyThere: tt.want.DefinitionsOnlyHere, DefinitionsDiffer: tt.want.DefinitionsDiffer,
 				ProjectionsOnlyHere: tt.want.ProjectionsOnlyThere, ProjectionsOnlyThere: tt.want.ProjectionsOnlyHere, ProjectionsDiffer: tt.want.ProjectionsDiffer,
@@ -51,7 +50,7 @@ func TestDriftFrom(t *testing.T) {
 			if err := os.RemoveAll(projs); err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(cat.DriftFrom(embedded), got) {
+			if !reflect.DeepEqual(cat.DriftFrom(fixed), got) {
 				t.Fatal("drift changed after source removal")
 			}
 		})

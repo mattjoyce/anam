@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
@@ -17,7 +18,7 @@ import (
 
 // Card 188 S1: a Definition that declares an identity_template has its identity field
 // filled when an envelope leaves it out and held to it when it carries it. Over the
-// bundled health.medication.dose and a real ledger.
+// fixture's health.medication.dose and a real ledger.
 
 func newDoseGate(t *testing.T) *gate.Gate {
 	t.Helper()
@@ -26,10 +27,7 @@ func newDoseGate(t *testing.T) *gate.Gate {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = l.Close() })
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
+	reg := catalogtest.Definitions(t)
 	scopes := gate.StaticScopes{"conversation": {"health.medication.dose", "health.weight"}}
 	return gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 }

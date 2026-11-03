@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
-	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/gate"
 	"github.com/mattjoyce/anam/internal/retract"
@@ -45,10 +45,7 @@ func newFixture(t *testing.T) fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	defs, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
+	defs := catalogtest.Definitions(t)
 	scopes := gate.StaticScopes{"workbench": {"health.weight"}, "scale": {"health.weight"}}
 	g := gate.New(l, defs, scopes, clock.Real{}, "matt",
 		gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})

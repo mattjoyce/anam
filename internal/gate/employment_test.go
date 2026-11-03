@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/clock"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/consent"
@@ -19,7 +20,7 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
-// Card 239: the employment types over the bundled Definitions, a real gate and a real
+// Card 239: the employment types over the fixture's Definitions, a real gate and a real
 // ledger. The employers here are made up. A start opens a stint, a change of role
 // displaces the row before it, an end closes the stint, and a return to the same
 // employer is a second stint, so the series is keyed by org and stint.
@@ -37,10 +38,7 @@ func newEmploymentGate(t *testing.T) (*gate.Gate, *ledger.Ledger, *def.Registry)
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = l.Close() })
-	reg, err := def.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
+	reg := catalogtest.Definitions(t)
 	scopes := gate.StaticScopes{"records": {startedType, roleType, endedType}}
 	g := gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	return g, l, reg
@@ -191,11 +189,8 @@ func TestEmployment_AnEndClosesItsStintAndACareerLogKeepsEverything(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	bundled, err := projection.Bundled()
-	if err != nil {
-		t.Fatal(err)
-	}
-	employment, err := bundled.Lookup("employment")
+	projs := catalogtest.Projections(t)
+	employment, err := projs.Lookup("employment")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +223,7 @@ func TestEmployment_AnEndClosesItsStintAndACareerLogKeepsEverything(t *testing.T
 		}
 	}
 
-	career, err := bundled.Lookup("career")
+	career, err := projs.Lookup("career")
 	if err != nil {
 		t.Fatal(err)
 	}

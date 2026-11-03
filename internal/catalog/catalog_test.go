@@ -13,6 +13,8 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/catalog"
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
+	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/projection"
 )
@@ -21,213 +23,38 @@ import (
 // Helpers
 // ---------------------------------------------------------------------------
 
-// copyEmbeddedDefs copies the embedded definition catalog to dir, adding
-// .DS_Store and notes/extra.json (which must be ignored). Returns an os.DirFS.
-func copyEmbeddedDefs(t *testing.T, dir string) {
+// copyCatalog copies a catalog's two roots to directories of their own, adding
+// .DS_Store and notes/extra.json to each, which Load must ignore.
+func copyCatalog(t *testing.T, definitions, projections fs.FS) (defDir, projDir string) {
 	t.Helper()
-	root := def.EmbeddedFS()
-
-	if err := fs.WalkDir(root, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	defDir, projDir = fixture.Dirs(t, definitions, projections)
+	for _, dir := range []string{defDir, projDir} {
+		if err := os.WriteFile(filepath.Join(dir, ".DS_Store"), []byte("mock"), 0o600); err != nil {
+			t.Fatal(err)
 		}
-		if d.IsDir() {
-			return nil
+		if err := os.MkdirAll(filepath.Join(dir, "notes"), 0o750); err != nil {
+			t.Fatal(err)
 		}
-		raw, err := fs.ReadFile(root, path)
-		if err != nil {
-			return err
+		if err := os.WriteFile(filepath.Join(dir, "notes", "extra.json"), []byte(`{}`), 0o600); err != nil {
+			t.Fatal(err)
 		}
-		dst := filepath.Join(dir, path)
-		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-			return err
-		}
-		return os.WriteFile(dst, raw, 0o644)
-	}); err != nil {
-		t.Fatalf("walk embedded definitions: %v", err)
 	}
-	// Add ignored entries.
-	_ = os.WriteFile(filepath.Join(dir, ".DS_Store"), []byte("mock"), 0o644)
-	notesDir := filepath.Join(dir, "notes")
-	_ = os.MkdirAll(notesDir, 0o755)
-	_ = os.WriteFile(filepath.Join(notesDir, "extra.json"), []byte(`{}`), 0o644)
+	return defDir, projDir
 }
 
-// copyEmbeddedProjections copies the embedded projection catalog to dir, adding
-// .DS_Store and notes/extra.json.
-func copyEmbeddedProjections(t *testing.T, dir string) {
+// copyFixture copies fixture.Mattjoyce to disk, as copyCatalog does.
+func copyFixture(t *testing.T) (defDir, projDir string) {
 	t.Helper()
-	root := projection.EmbeddedFS()
-
-	if err := fs.WalkDir(root, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-		raw, err := fs.ReadFile(root, path)
-		if err != nil {
-			return err
-		}
-		dst := filepath.Join(dir, path)
-		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-			return err
-		}
-		return os.WriteFile(dst, raw, 0o644)
-	}); err != nil {
-		t.Fatalf("walk embedded projections: %v", err)
-	}
-	_ = os.WriteFile(filepath.Join(dir, ".DS_Store"), []byte("mock"), 0o644)
-	notesDir := filepath.Join(dir, "notes")
-	_ = os.MkdirAll(notesDir, 0o755)
-	_ = os.WriteFile(filepath.Join(notesDir, "extra.json"), []byte(`{}`), 0o644)
-}
-
-// loadEmbedded is a convenience for Load("", "").
-func loadEmbedded(t *testing.T) *catalog.Catalog {
-	t.Helper()
-	cat, err := catalog.Load(context.Background(), "", "")
-	if err != nil {
-		t.Fatalf("Load(embedded, embedded): %v", err)
-	}
-	return cat
-}
-
-// ---------------------------------------------------------------------------
-// TestLoadEmbeddedAndDiskCopy
-// ---------------------------------------------------------------------------
-func TestLoadEmbeddedAndDiskCopy(t *testing.T) {
-	embedded := loadEmbedded(t)
-
-	defDir := t.TempDir()
-	projDir := t.TempDir()
-	copyEmbeddedDefs(t, defDir)
-	copyEmbeddedProjections(t, projDir)
-
-	mixed, err := catalog.Load(context.Background(), defDir, projDir)
-	if err != nil {
-		t.Fatalf("Load(disk+disk): %v", err)
-	}
-
-	// Compare definition registry contents.
-	embeddedAll := embedded.Definitions().All()
-	mixedAll := mixed.Definitions().All()
-	if len(embeddedAll) != len(mixedAll) {
-		t.Fatalf("embedded has %d definitions, disk copy has %d", len(embeddedAll), len(mixedAll))
-	}
-	for i := range embeddedAll {
-		got, want := mixedAll[i], embeddedAll[i]
-		if got.Type != want.Type || got.Version != want.Version {
-			t.Errorf("definition %d: embedded %s v%d, copy %s v%d",
-				i, want.Type, want.Version, got.Type, got.Version)
-		}
-	}
-
-	// Compare projection registry contents.
-	embeddedProj := embedded.Projections().Held()
-	mixedProj := mixed.Projections().Held()
-	if len(embeddedProj) != len(mixedProj) {
-		t.Fatalf("embedded has %d projections, disk copy has %d", len(embeddedProj), len(mixedProj))
-	}
-	for i := range embeddedProj {
-		got, want := mixedProj[i], embeddedProj[i]
-		if got.Name != want.Name || got.Version != want.Version || got.Hash != want.Hash {
-			t.Errorf("projection %d: embedded %s v%d %s, copy %s v%d %s",
-				i, want.Name, want.Version, want.Hash, got.Name, got.Version, got.Hash)
-		}
-	}
-
-	// Compare set versions.
-	if embedded.SetVersion() != mixed.SetVersion() {
-		t.Errorf("set version: embedded %s, disk copy %s", embedded.SetVersion(), mixed.SetVersion())
-	}
-
-	// Compare manifests (bodies included).
-	embeddedMan := embedded.Manifests()
-	mixedMan := mixed.Manifests()
-	if len(embeddedMan) != len(mixedMan) {
-		t.Fatalf("embedded has %d manifests, disk copy has %d", len(embeddedMan), len(mixedMan))
-	}
-	for i := range embeddedMan {
-		got, want := mixedMan[i], embeddedMan[i]
-		if got.Type != want.Type || got.Version != want.Version || string(got.Body) != string(want.Body) {
-			t.Errorf("manifest %d: embedded %s v%d, copy %s v%d, body matches %v",
-				i, want.Type, want.Version, got.Type, got.Version, string(got.Body) == string(want.Body))
-		}
-	}
-
-	// Compare history.
-	embeddedHist := embedded.History()
-	mixedHist := mixed.History()
-	if len(embeddedHist) != len(mixedHist) {
-		t.Fatalf("embedded has %d history entries, disk copy has %d", len(embeddedHist), len(mixedHist))
-	}
-	for i := range embeddedHist {
-		got, want := mixedHist[i], embeddedHist[i]
-		if got.Type != want.Type || got.Version != want.Version || string(got.Body) != string(want.Body) {
-			t.Errorf("history %d: embedded %s v%d, copy %s v%d",
-				i, want.Type, want.Version, got.Type, got.Version)
-		}
-	}
-
-	// Compare projection bodies, current then history.
-	embeddedPM := embedded.ProjectionManifests()
-	mixedPM := mixed.ProjectionManifests()
-	if len(embeddedPM) != len(mixedPM) {
-		t.Fatalf("embedded has %d projection bodies, disk copy has %d", len(embeddedPM), len(mixedPM))
-	}
-	for i := range embeddedPM {
-		got, want := mixedPM[i], embeddedPM[i]
-		if got.Name != want.Name || got.Version != want.Version || string(got.Body) != string(want.Body) {
-			t.Errorf("projection body %d: embedded %s v%d, copy %s v%d", i, want.Name, want.Version, got.Name, got.Version)
-		}
-	}
-
-	// Source labels: embedded vs disk.
-	if embedded.DefinitionsSource() != "embedded" || embedded.ProjectionsSource() != "embedded" {
-		t.Errorf("embedded sources: def=%q proj=%q", embedded.DefinitionsSource(), embedded.ProjectionsSource())
-	}
-	if mixed.DefinitionsSource() != defDir || mixed.ProjectionsSource() != projDir {
-		t.Errorf("disk sources: def=%q (want %q) proj=%q (want %q)",
-			mixed.DefinitionsSource(), defDir, mixed.ProjectionsSource(), projDir)
-	}
-
-	// Mixed: embedded defs, disk projs.
-	mixed2, err := catalog.Load(context.Background(), "", projDir)
-	if err != nil {
-		t.Fatalf("Load(embedded, disk): %v", err)
-	}
-	if mixed2.DefinitionsSource() != "embedded" || mixed2.ProjectionsSource() != projDir {
-		t.Errorf("mixed sources: def=%q proj=%q", mixed2.DefinitionsSource(), mixed2.ProjectionsSource())
-	}
-	if mixed2.SetVersion() != embedded.SetVersion() {
-		t.Errorf("mixed set version %s != embedded %s", mixed2.SetVersion(), embedded.SetVersion())
-	}
-
-	// Mixed: disk defs, embedded projs.
-	mixed3, err := catalog.Load(context.Background(), defDir, "")
-	if err != nil {
-		t.Fatalf("Load(disk, embedded): %v", err)
-	}
-	if mixed3.DefinitionsSource() != defDir || mixed3.ProjectionsSource() != "embedded" {
-		t.Errorf("mixed sources: def=%q proj=%q", mixed3.DefinitionsSource(), mixed3.ProjectionsSource())
-	}
-	if mixed3.SetVersion() != embedded.SetVersion() {
-		t.Errorf("mixed set version %s != embedded %s", mixed3.SetVersion(), embedded.SetVersion())
-	}
+	defs, projs := fixture.Mattjoyce()
+	return copyCatalog(t, defs, projs)
 }
 
 // ---------------------------------------------------------------------------
 // TestLoadExternalSetVersion
 // ---------------------------------------------------------------------------
 func TestLoadExternalSetVersion(t *testing.T) {
-	embedded := loadEmbedded(t)
-
-	defDir := t.TempDir()
-	projDir := t.TempDir()
-	copyEmbeddedDefs(t, defDir)
-	copyEmbeddedProjections(t, projDir)
+	unchanged := catalogtest.Catalog(t)
+	defDir, projDir := copyFixture(t)
 
 	// Find one definition file and append a space.
 	var firstDef string
@@ -268,9 +95,9 @@ func TestLoadExternalSetVersion(t *testing.T) {
 		t.Errorf("SetVersion = %s, want %s (SetVersionFS)", cat.SetVersion(), wantSV)
 	}
 
-	// Must differ from the embedded set version.
-	if cat.SetVersion() == embedded.SetVersion() {
-		t.Error("SetVersion equals embedded after whitespace change")
+	// Must differ from the unchanged fixture's set version.
+	if cat.SetVersion() == unchanged.SetVersion() {
+		t.Error("SetVersion equals the unchanged fixture's after whitespace change")
 	}
 
 	// Manifest accessor must preserve the changed bytes.
@@ -301,7 +128,7 @@ func TestLoadExternalSetVersion(t *testing.T) {
 		}
 	}
 	if histName == "" {
-		t.Fatal("embedded catalog has no definition history to edit")
+		t.Fatal("fixture catalog has no definition history to edit")
 	}
 	histRaw, err := os.ReadFile(filepath.Join(histDir, histName))
 	if err != nil {
@@ -332,10 +159,7 @@ func bodiesOf(ms []def.Stored) string {
 // TestLoadFreezesInputs
 // ---------------------------------------------------------------------------
 func TestLoadFreezesInputs(t *testing.T) {
-	defDir := t.TempDir()
-	projDir := t.TempDir()
-	copyEmbeddedDefs(t, defDir)
-	copyEmbeddedProjections(t, projDir)
+	defDir, projDir := copyFixture(t)
 
 	first, err := catalog.Load(context.Background(), defDir, projDir)
 	if err != nil {
@@ -400,7 +224,13 @@ func TestLoadFreezesInputs(t *testing.T) {
 // TestLoadCopiesBodies
 // ---------------------------------------------------------------------------
 func TestLoadCopiesBodies(t *testing.T) {
-	cat := loadEmbedded(t)
+	// A catalog of its own, not catalogtest's shared one: the test overwrites what
+	// the accessors return.
+	defDir, projDir := copyFixture(t)
+	cat, err := catalog.Load(context.Background(), defDir, projDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	sv := cat.SetVersion()
 	wantManifests := bodiesOf(cat.Manifests())
@@ -410,7 +240,7 @@ func TestLoadCopiesBodies(t *testing.T) {
 	// Overwrite every returned byte in place, then drop entries from the slices.
 	for _, ms := range [][]def.Stored{cat.Manifests(), cat.History()} {
 		if len(ms) == 0 {
-			t.Fatal("embedded catalog has no definition bodies to mutate")
+			t.Fatal("fixture catalog has no definition bodies to mutate")
 		}
 		for i := range ms {
 			for j := range ms[i].Body {
@@ -420,7 +250,7 @@ func TestLoadCopiesBodies(t *testing.T) {
 	}
 	pms := cat.ProjectionManifests()
 	if len(pms) == 0 {
-		t.Fatal("embedded catalog has no projection bodies to mutate")
+		t.Fatal("fixture catalog has no projection bodies to mutate")
 	}
 	for i := range pms {
 		for j := range pms[i].Body {
@@ -429,13 +259,13 @@ func TestLoadCopiesBodies(t *testing.T) {
 	}
 
 	if got := bodiesOf(cat.Manifests()); got != wantManifests {
-		t.Error("Manifests() bodies changed after a caller overwrote returned bytes")
+		t.Error("cat.Manifests() bodies changed after a caller overwrote returned bytes")
 	}
 	if got := bodiesOf(cat.History()); got != wantHistory {
-		t.Error("History() bodies changed after a caller overwrote returned bytes")
+		t.Error("cat.History() bodies changed after a caller overwrote returned bytes")
 	}
 	if got := projBodiesOf(cat.ProjectionManifests()); got != wantProj {
-		t.Error("ProjectionManifests() bodies changed after a caller overwrote returned bytes")
+		t.Error("cat.ProjectionManifests() bodies changed after a caller overwrote returned bytes")
 	}
 	if cat.SetVersion() != sv {
 		t.Errorf("SetVersion changed after mutation: %s -> %s", sv, cat.SetVersion())
@@ -457,10 +287,7 @@ func projBodiesOf(ps []projection.Stored) string {
 func TestLoadRejectsInvalidCatalog(t *testing.T) {
 	ctx := context.Background()
 
-	validDefDir := t.TempDir()
-	validProjDir := t.TempDir()
-	copyEmbeddedDefs(t, validDefDir)
-	copyEmbeddedProjections(t, validProjDir)
+	validDefDir, validProjDir := copyFixture(t)
 
 	missing := filepath.Join(t.TempDir(), "absent")
 	fileRoot := filepath.Join(t.TempDir(), "a-file")
@@ -664,18 +491,18 @@ func renameOneJSON(t *testing.T, dir, newName string) {
 func TestLoadRejectsConflictingDefinitions(t *testing.T) {
 	ctx := context.Background()
 
-	validProjDir := t.TempDir()
-	copyEmbeddedProjections(t, validProjDir)
+	_, validProjDir := copyFixture(t)
 
-	// Find one definition from the embedded catalog.
-	embeddedDefs, err := def.Manifests()
+	// Find one definition from the fixture catalog.
+	defs, _ := fixture.Mattjoyce()
+	fixtureDefs, err := def.ManifestsFS(defs)
 	if err != nil {
-		t.Fatalf("Manifests: %v", err)
+		t.Fatalf("ManifestsFS: %v", err)
 	}
-	if len(embeddedDefs) == 0 {
-		t.Fatal("no embedded definitions")
+	if len(fixtureDefs) == 0 {
+		t.Fatal("no fixture definitions")
 	}
-	first := embeddedDefs[0]
+	first := fixtureDefs[0]
 
 	// Create a dir with only first's type, then add a conflicting history entry
 	// at the same type and version with a different body.
@@ -739,17 +566,12 @@ func TestLoadRejectsConflictingDefinitions(t *testing.T) {
 // ---------------------------------------------------------------------------
 func TestLoadRejectsProjectionHistoryConflict(t *testing.T) {
 	ctx := context.Background()
-	validDefDir := t.TempDir()
-	copyEmbeddedDefs(t, validDefDir)
+	validDefDir, _ := copyFixture(t)
 
-	// Get one embedded projection template.
-	embeddedProj, err := projection.Bundled()
-	if err != nil {
-		t.Fatalf("projection.Bundled: %v", err)
-	}
-	templates := embeddedProj.Held()
+	// Get one fixture projection template.
+	templates := catalogtest.Projections(t).Held()
 	if len(templates) == 0 {
-		t.Fatal("no embedded projections")
+		t.Fatal("no fixture projections")
 	}
 	first := templates[0]
 
@@ -763,7 +585,7 @@ func TestLoadRejectsProjectionHistoryConflict(t *testing.T) {
 		[]byte(`{"name":"`+first.Name+`","version":`+strconv.Itoa(first.Version)+`,"types":[],"statuses":[],"max_classification":"Normal","from":"2024-01-01T00:00:00.000000000Z","to":"2024-12-31T00:00:00.000000000Z"}`),
 		0o644)
 
-	_, err = catalog.Load(ctx, validDefDir, projDir)
+	_, err := catalog.Load(ctx, validDefDir, projDir)
 	if err == nil {
 		t.Fatal("Load with conflicting projection version succeeded, expected error")
 	}
@@ -784,10 +606,7 @@ func TestLoadRejectsProjectionHistoryConflict(t *testing.T) {
 // ---------------------------------------------------------------------------
 func TestLoadReturnsNoPartialCatalog(t *testing.T) {
 	ctx := context.Background()
-	validDefDir := t.TempDir()
-	validProjDir := t.TempDir()
-	copyEmbeddedDefs(t, validDefDir)
-	copyEmbeddedProjections(t, validProjDir)
+	validDefDir, validProjDir := copyFixture(t)
 
 	// Valid defs + invalid projs.
 	badProjDir := makeBadProjDir(t, validProjDir)
@@ -845,13 +664,13 @@ func TestLoadEmptyDirectories(t *testing.T) {
 
 	// Empty manifest accessors.
 	if len(cat.Manifests()) != 0 {
-		t.Errorf("empty dirs: Manifests() has entries")
+		t.Errorf("empty dirs: cat.Manifests() has entries")
 	}
 	if len(cat.History()) != 0 {
-		t.Errorf("empty dirs: History() has entries")
+		t.Errorf("empty dirs: cat.History() has entries")
 	}
 	if len(cat.ProjectionManifests()) != 0 {
-		t.Errorf("empty dirs: ProjectionManifests() has entries")
+		t.Errorf("empty dirs: cat.ProjectionManifests() has entries")
 	}
 
 	// Set version must match SetVersionFS over an empty root.
@@ -876,7 +695,8 @@ func TestLoadCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	cat, err := catalog.Load(ctx, "", "")
+	defDir, projDir := copyFixture(t)
+	cat, err := catalog.Load(ctx, defDir, projDir)
 	if err == nil {
 		t.Fatal("Load with canceled context succeeded")
 	}
@@ -906,19 +726,17 @@ func (c *cancelAt) Err() error {
 // TestLoadCanceledMidway cancels at each check Load makes, from the first to the one
 // before it returns: every point fails with both sentinels and no catalog. Load
 // checks before every file it reads, so it makes more checks than there are files.
-// It loads a disk copy: the embedded catalog is built once per process, so a load of
-// it reads no files after the first.
+// It loads a disk copy of the fixture catalog.
 func TestLoadCanceledMidway(t *testing.T) {
-	defDir, projDir := t.TempDir(), t.TempDir()
-	copyEmbeddedDefs(t, defDir)
-	copyEmbeddedProjections(t, projDir)
+	defDir, projDir := copyFixture(t)
 	counter := &cancelAt{Context: context.Background()}
 	if _, err := catalog.Load(counter, defDir, projDir); err != nil {
 		t.Fatalf("Load with a context that never cancels: %v", err)
 	}
 	total := counter.calls
 	files := 0
-	for _, root := range []fs.FS{def.EmbeddedFS(), projection.EmbeddedFS()} {
+	defs, projs := fixture.Mattjoyce()
+	for _, root := range []fs.FS{defs, projs} {
 		_ = fs.WalkDir(root, ".", func(_ string, d fs.DirEntry, err error) error {
 			if err == nil && !d.IsDir() {
 				files++
@@ -940,36 +758,11 @@ func TestLoadCanceledMidway(t *testing.T) {
 	}
 }
 
-// TestLoadEmbeddedIsBuiltOnce: the embedded catalog is shared, and a canceled
-// context still refuses it, even once it is built.
-func TestLoadEmbeddedIsBuiltOnce(t *testing.T) {
-	a, err := catalog.Load(context.Background(), "", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, err := catalog.Load(context.Background(), "", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if a != b {
-		t.Error("two loads of the embedded catalog built two catalogs, want one shared")
-	}
-	for n := 1; n <= 2; n++ {
-		cat, err := catalog.Load(&cancelAt{Context: context.Background(), n: n}, "", "")
-		if cat != nil || !errors.Is(err, catalog.ErrInvalid) || !errors.Is(err, context.Canceled) {
-			t.Errorf("cancel at check %d: cat %v, err %v, want nil and both sentinels", n, cat, err)
-		}
-	}
-}
-
 // CheckRegistered agrees with a registered body equal to the catalog's once
 // canonicalized, ignores versions the catalog does not hold, and refuses a different
 // body at a version it holds, naming the type and version.
 func TestCheckRegistered(t *testing.T) {
-	cat, err := catalog.Load(context.Background(), "", "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	cat := catalogtest.Catalog(t)
 	m := cat.Manifests()[0]
 	reformatted := append([]byte("\n  "), m.Body...)
 	other := def.Stored{Type: m.Type, Version: m.Version + 1000, Body: []byte(`{"anything":"else"}`)}

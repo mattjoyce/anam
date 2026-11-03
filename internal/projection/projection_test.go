@@ -128,53 +128,34 @@ func TestParse_RejectsBadValuesAtLoad(t *testing.T) {
 	}
 }
 
-// TestBundled_ParsesBpAndSleep reads the embedded catalog on purpose: its subject is
-// the personal projections and their history, so it leaves the engine with that
-// catalog (card 255, R4b) instead of moving to a fixture copy.
-func TestBundled_ParsesBpAndSleep(t *testing.T) {
+// BundledFS reads a catalog's templates and their history: the current version of
+// each by name, every earlier version held from history/ so a receipt that names it
+// still verifies against it. Over the engine fixture's four templates, course v1 is
+// the history's and names the stop under its first name.
+func TestBundledFS_ParsesTheFixtureAndItsHistory(t *testing.T) {
 	t.Parallel()
 
-	r, err := projection.Bundled()
+	r, err := projection.BundledFS(fixtureProjs())
 	if err != nil {
-		t.Fatalf("Bundled: %v", err)
+		t.Fatalf("BundledFS: %v", err)
 	}
-	if got, want := r.Names(), []string{"activity", "attention", "body", "bp", "career", "clinical", "doses", "employment", "intake", "meds", "purchases", "sleep"}; !reflect.DeepEqual(got, want) {
+	if got, want := r.Names(), []string{"course", "everything", "measures", "normal"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("bundled names = %v, want %v", got, want)
 	}
-	// Card 147: meds v2 names the types under the health domain, and card 196 gave them
-	// their third segment in v3. Every earlier version is held from manifests/history so a
-	// receipt that names it still verifies against it.
-	if cur, err := r.Lookup("meds"); err != nil || cur.Version != 4 || cur.Types[0] != "health.medication.started" {
-		t.Errorf("meds = v%d %v, %v; want v4 current, naming health.medication.started", cur.Version, cur.Types, err)
+	if got := len(r.Held()); got != 5 {
+		t.Errorf("held %d template versions, want the fixture's 5 (4 current, 1 history)", got)
 	}
-	// v4 only rewords v3's description: the same types, statuses and shape, so a
-	// receipt cut through v3 replays through the same filter.
-	cur, _ := r.Lookup("meds")
-	if old, err := r.Version("meds", 3); err != nil || !reflect.DeepEqual(old.Types, cur.Types) || old.Shape != cur.Shape ||
-		old.MaxClassification != cur.MaxClassification || old.Description == cur.Description {
-		t.Errorf("meds v3 = %+v, %v; want the same filter as v4 under its own description", old, err)
+	cur, err := r.Lookup("course")
+	if err != nil || cur.Version != 2 || !reflect.DeepEqual(cur.Types, []facet.Type{"test.course.started", "test.course.changed", "test.course.stopped"}) {
+		t.Errorf("course = v%d %v, %v; want v2 current, naming test.course.stopped", cur.Version, cur.Types, err)
 	}
-	if old, err := r.Version("meds", 2); err != nil || old.Types[0] != "health.medication-started" {
-		t.Errorf("meds v2 = %+v, %v; want the history's template", old.Types, err)
+	// v1 names the stop by its earlier name, under the same filter otherwise.
+	if old, err := r.Version("course", 1); err != nil || !reflect.DeepEqual(old.Types, []facet.Type{"test.course.started", "test.course.changed", "test.retired"}) ||
+		old.Shape != cur.Shape || old.MaxClassification != cur.MaxClassification || old.Description == cur.Description {
+		t.Errorf("course v1 = %+v, %v; want the history's template", old.Types, err)
 	}
-	if old, err := r.Version("meds", 1); err != nil || old.Types[0] != "med.started" {
-		t.Errorf("meds v1 = %+v, %v; want the history's template", old.Types, err)
-	}
-	if cur, err := r.Lookup("doses"); err != nil || cur.Version != 4 || cur.Types[0] != "health.medication.dose" {
-		t.Errorf("doses = v%d %v, %v; want v4 current, naming health.medication.dose first", cur.Version, cur.Types, err)
-	}
-	// v4 adds the missed doses and the compliance reports to the dose; v3 stays held, as
-	// it was, for a receipt that names it.
-	curDoses, _ := r.Lookup("doses")
-	if old, err := r.Version("doses", 3); err != nil || !reflect.DeepEqual(old.Types, []facet.Type{"health.medication.dose"}) ||
-		!reflect.DeepEqual(curDoses.Types, []facet.Type{"health.medication.dose", "health.medication.dose-missed", "health.medication.compliance"}) {
-		t.Errorf("doses v3 = %+v, %v; v4 = %v; want v4 to add the missed doses and compliance to v3's dose", old.Types, err, curDoses.Types)
-	}
-	if old, err := r.Version("doses", 2); err != nil || !reflect.DeepEqual(old.Types, []facet.Type{"health.medication.dose"}) {
-		t.Errorf("doses v2 = %+v, %v; want the history's template", old.Types, err)
-	}
-	if old, err := r.Version("doses", 1); err != nil || old.Types[0] != "health.medication-dose" {
-		t.Errorf("doses v1 = %+v, %v; want the history's template", old.Types, err)
+	if _, err := r.Version("course", 3); !errors.Is(err, projection.ErrUnknown) {
+		t.Errorf("Version(course, 3) = %v, want ErrUnknown", err)
 	}
 	for _, tmpl := range r.All() {
 		if tmpl.Version < 1 {
@@ -198,11 +179,11 @@ func TestLookup_UnknownNamesTheAlternatives(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BundledFS: %v", err)
 	}
-	_, err = r.Lookup("bloodpressure")
+	_, err = r.Lookup("measure")
 	if !errors.Is(err, projection.ErrUnknown) {
 		t.Fatalf("Lookup: err = %v, want ErrUnknown", err)
 	}
-	for _, want := range []string{"bloodpressure", "bp", "sleep"} {
+	for _, want := range []string{"measure", "measures", "course", "everything", "normal"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q does not mention %q", err, want)
 		}
@@ -533,120 +514,5 @@ func TestPatterns_KeepsPrefixesAsWritten(t *testing.T) {
 	tmpl := mustParse(t, template("x", []string{"activity.exercise-session.", "health.sleep"}, []string{"admitted"}, "Normal", "", ""))
 	if got, want := tmpl.Patterns(), []string{"health.sleep", "activity.exercise-session."}; !reflect.DeepEqual(got, want) {
 		t.Errorf("Patterns = %v, want %v", got, want)
-	}
-}
-
-// Card 222: the bundled attention projection is a log of the three attention types, at
-// the time they were said, up to Confidential. Nothing else is served, and a declared
-// end stays beside its start: a log infers no episode.
-func TestBundled_AttentionServesTheThreeTypes(t *testing.T) {
-	t.Parallel()
-	r, err := projection.BundledFS(fixtureProjs())
-	if err != nil {
-		t.Fatalf("BundledFS: %v", err)
-	}
-	tmpl, err := r.Lookup("attention")
-	if err != nil {
-		t.Fatalf("Lookup: %v", err)
-	}
-	if tmpl.Shape != "log" || tmpl.MaxClassification != "Confidential" {
-		t.Errorf("attention = %s up to %s, want a log up to Confidential", tmpl.Shape, tmpl.MaxClassification)
-	}
-	v, err := fold.NewValue([]fold.Entry{
-		entry("a-started", "mind.attention.started", "2026-10-20T00:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationConfidential),
-		entry("a-reading-1", "mind.attention", "2026-10-21T10:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationConfidential),
-		entry("a-reading-2", "mind.attention", "2026-10-22T10:00:00.000000000Z", facet.StatusEndorsed, facet.ClassificationConfidential),
-		entry("a-ended", "mind.attention.ended", "2026-10-23T00:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationConfidential),
-		entry("a-retracted", "mind.attention", "2026-10-22T11:00:00.000000000Z", facet.StatusTombstoned, facet.ClassificationConfidential),
-		entry("f-bp-1", "health.blood-pressure", "2026-10-21T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
-		entry("f-note", "record.edge", "2026-10-21T07:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
-	})
-	if err != nil {
-		t.Fatalf("fold.NewValue: %v", err)
-	}
-	served, err := projection.Apply(v, tmpl, consent.Open{}, nil)
-	if err != nil {
-		t.Fatalf("Apply: %v", err)
-	}
-	want := []string{"a-started", "a-reading-1", "a-reading-2", "a-ended"}
-	if got := ids(served); !reflect.DeepEqual(got, want) {
-		t.Errorf("served %v, want %v", got, want)
-	}
-}
-
-// Card 232: the bundled intake projection is a log of health.intake up to Sensitive, at
-// the time it was said, and serves nothing else.
-func TestBundled_IntakeServesTheIntakeLog(t *testing.T) {
-	t.Parallel()
-	r, err := projection.BundledFS(fixtureProjs())
-	if err != nil {
-		t.Fatalf("BundledFS: %v", err)
-	}
-	tmpl, err := r.Lookup("intake")
-	if err != nil {
-		t.Fatalf("Lookup: %v", err)
-	}
-	if tmpl.Shape != "log" || tmpl.MaxClassification != "Sensitive" {
-		t.Errorf("intake = %s up to %s, want a log up to Sensitive", tmpl.Shape, tmpl.MaxClassification)
-	}
-	v, err := fold.NewValue([]fold.Entry{
-		entry("i-coffee", "health.intake", "2026-10-22T08:15:00.000000000Z", facet.StatusAdmitted, facet.ClassificationSensitive),
-		entry("i-wine", "health.intake", "2026-10-22T19:30:00.000000000Z", facet.StatusEndorsed, facet.ClassificationSensitive),
-		entry("i-retracted", "health.intake", "2026-10-22T20:00:00.000000000Z", facet.StatusTombstoned, facet.ClassificationSensitive),
-		entry("f-bp-1", "health.blood-pressure", "2026-10-21T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
-	})
-	if err != nil {
-		t.Fatalf("fold.NewValue: %v", err)
-	}
-	served, err := projection.Apply(v, tmpl, consent.Open{}, nil)
-	if err != nil {
-		t.Fatalf("Apply: %v", err)
-	}
-	if got, want := ids(served), []string{"i-coffee", "i-wine"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("served %v, want %v", got, want)
-	}
-}
-
-// Card 239: the bundled career projection is a log over the org.employment. prefix, so
-// every start, change of role and end stays, each at its date, and the employment
-// projection is a snapshot of the three types. The gate's employment test shows that
-// snapshot dropping a stint whose end has come. Neither serves anything outside the family.
-func TestBundled_CareerLogsAndEmploymentSnapshotsTheEmploymentTypes(t *testing.T) {
-	t.Parallel()
-	r, err := projection.BundledFS(fixtureProjs())
-	if err != nil {
-		t.Fatalf("BundledFS: %v", err)
-	}
-	career, err := r.Lookup("career")
-	if err != nil {
-		t.Fatalf("Lookup career: %v", err)
-	}
-	if career.Shape != "log" || career.MaxClassification != "Confidential" || !reflect.DeepEqual(career.Prefixes, []string{"org.employment."}) {
-		t.Errorf("career = %s up to %s over %v, want a log up to Confidential over org.employment.", career.Shape, career.MaxClassification, career.Prefixes)
-	}
-	employment, err := r.Lookup("employment")
-	if err != nil {
-		t.Fatalf("Lookup employment: %v", err)
-	}
-	wantTypes := []facet.Type{"org.employment.started", "org.employment.role-changed", "org.employment.ended"}
-	if employment.Shape != "snapshot" || employment.MaxClassification != "Confidential" || !reflect.DeepEqual(employment.Types, wantTypes) {
-		t.Errorf("employment = %s up to %s over %v, want a snapshot up to Confidential over %v", employment.Shape, employment.MaxClassification, employment.Types, wantTypes)
-	}
-	v, err := fold.NewValue([]fold.Entry{
-		entry("e-started", "org.employment.started", "2019-09-29T14:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationConfidential),
-		entry("e-role", "org.employment.role-changed", "2022-03-31T13:00:00.000000000Z", facet.StatusEndorsed, facet.ClassificationConfidential),
-		entry("e-ended", "org.employment.ended", "2025-06-29T14:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationConfidential),
-		entry("e-retracted", "org.employment.role-changed", "2023-01-01T00:00:00.000000000Z", facet.StatusTombstoned, facet.ClassificationConfidential),
-		entry("f-bp-1", "health.blood-pressure", "2026-10-21T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
-	})
-	if err != nil {
-		t.Fatalf("fold.NewValue: %v", err)
-	}
-	served, err := projection.Apply(v, career, consent.Open{}, nil)
-	if err != nil {
-		t.Fatalf("Apply career: %v", err)
-	}
-	if got, want := ids(served), []string{"e-started", "e-role", "e-ended"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("career served %v, want %v", got, want)
 	}
 }

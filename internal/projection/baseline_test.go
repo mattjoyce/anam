@@ -19,15 +19,15 @@ import (
 // change.
 var update = flag.Bool("update", false, "rewrite testdata/baseline.golden instead of comparing")
 
-// goldenLabel is the golden file's label for a catalog file: its path under the
-// catalog's old source directory, "manifests/<name>.json" or
-// "manifests/history/<name>.json". It is a label only; the bytes come from the
+// goldenLabel is the golden file's label for a catalog file: its path under a
+// catalog's projections directory, "projections/<name>.json" or
+// "projections/history/<name>.json". It is a label only; the bytes come from the
 // fixture FS.
 func goldenLabel(dir, name string) string {
 	if dir == "." {
-		return "manifests/" + name
+		return "projections/" + name
 	}
-	return "manifests/" + dir + "/" + name
+	return "projections/" + dir + "/" + name
 }
 
 // baselineLines hashes every file in a catalog root (fsys at "." and "history/") and
@@ -79,12 +79,11 @@ func baselineLines(t *testing.T, fsys fs.FS) []string {
 	return lines
 }
 
-// The fixture catalog's bytes are pinned so moving the catalog out of the binary
-// cannot change a body, a hash, or the set version unnoticed. fixture.Mattjoyce is a
-// byte copy of the catalog the binary embedded, so the golden file is unchanged.
-// Regenerate with -update only when a manifest change is intended.
+// The engine fixture's template bytes and hashes are pinned, so a test that reads them
+// cannot have its catalog change under it unnoticed. Regenerate with -update only when
+// a fixture change is intended.
 func TestBaseline(t *testing.T) {
-	_, projs := fixture.Mattjoyce()
+	_, projs := fixture.Engine()
 	lines := baselineLines(t, projs)
 	compareAgainstGolden(t, lines)
 }
@@ -103,7 +102,7 @@ func TestBaseline_DiskCopy(t *testing.T) {
 // notes/extra.json to prove they are ignored. Returns an fs.FS over dir.
 func writeCatalogCopy(t *testing.T, dir string) fs.FS {
 	t.Helper()
-	_, root := fixture.Mattjoyce()
+	_, root := fixture.Engine()
 	if err := fs.WalkDir(root, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -168,7 +167,7 @@ func readGolden(t *testing.T, path string) []string {
 	return strings.Split(text, "\n")
 }
 
-// diffLines reports how the embedded catalog and the golden differ, one message per
+// diffLines reports how the fixture catalog and the golden differ, one message per
 // differing line, naming the path or template and both values.
 func diffLines(got, want []string) []string {
 	var diffs []string
@@ -185,11 +184,11 @@ func diffLines(got, want []string) []string {
 		}
 		switch {
 		case i >= len(want):
-			diffs = append(diffs, fmt.Sprintf("%s is embedded but not in baseline.golden (an added file?)", g))
+			diffs = append(diffs, fmt.Sprintf("%s is in the fixture but not in baseline.golden (an added file?)", g))
 		case i >= len(got):
-			diffs = append(diffs, fmt.Sprintf("%s is in baseline.golden but not embedded (a removed file?)", w))
+			diffs = append(diffs, fmt.Sprintf("%s is in baseline.golden but not in the fixture (a removed file?)", w))
 		default:
-			diffs = append(diffs, fmt.Sprintf("line %d differs:\n  embedded: %s\n  golden:   %s", i+1, g, w))
+			diffs = append(diffs, fmt.Sprintf("line %d differs:\n  fixture: %s\n  golden:  %s", i+1, g, w))
 		}
 	}
 	return diffs

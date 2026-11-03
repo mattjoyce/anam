@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 )
@@ -87,29 +88,30 @@ func TestLabel_ParseRefusals(t *testing.T) {
 	}
 }
 
-// The bundled Definitions that declare a label render these examples as shown on the
-// picker: synthetic payloads, one per shape.
-func TestLabel_BundledOnesRenderTheirOwnExamples(t *testing.T) {
+// The engine fixture's Definitions that declare a label render these examples as the
+// picker shows them: synthetic payloads, one per shape.
+func TestLabel_TheFixturesRenderTheirOwnExamples(t *testing.T) {
 	t.Parallel()
-	reg, err := def.BundledFS(fixtureDefs())
-	if err != nil {
-		t.Fatal(err)
-	}
+	reg := catalogtest.Engine.Definitions(t)
 	cases := []struct{ typ, payload, want string }{
-		{"health.weight", `{"id": "w1", "date": "2026-10-02", "kg": 80.4}`, "80.4 kg"},
-		{"health.medication.dose", `{"taken_at": "2026-10-17 22:00", "drug": "melatonin", "amount": 5, "unit": "mg"}`, "melatonin 5 mg"},
-		{"mind.attention", `{"at": "2026-10-17 22:00", "topic": "deskcam", "intensity": 3}`, "deskcam"},
-		{"health.intake", `{"kind": "caffeine", "at": "2026-10-17 08:00", "drink": "flat-white", "count": 1}`, "caffeine flat-white"},
-		{"health.intake", `{"kind": "meal", "at": "2026-10-17 19:00", "text": "pasta, out with friends"}`, "meal pasta, out with friends"},
+		{"test.reading", `{"id": "r1", "at": "2026-10-02 08:00", "value": 80.4, "unit": "kg"}`, "80.4 kg"},
+		{"test.templated", `{"at": "2026-10-17 22:00", "name": "melatonin", "amount": 5, "unit": "mg"}`, "melatonin 5 mg"},
+		{"test.labelled", `{"id": "l1", "at": "2026-10-17 08:00", "kind": "drink", "what": "flat-white"}`, "drink flat-white"},
+		{"test.labelled", `{"id": "l2", "at": "2026-10-17 19:00", "kind": "other", "text": "pasta, out with friends"}`, "other pasta, out with friends"},
+		{"test.labelled", `{"id": "l3", "at": "2026-10-17 19:00", "kind": "other"}`, "other"},
 		{"record.edge", `{"at": "2026-10-21 14:30", "text": "During a large work meeting.\nPresenting."}`, "During a large work meeting."},
 	}
 	for _, c := range cases {
 		d, ok := reg.Lookup(facet.Type(c.typ))
 		if !ok {
-			t.Fatalf("%s is not bundled", c.typ)
+			t.Fatalf("%s is not in the engine fixture", c.typ)
 		}
 		if got := d.Label([]byte(c.payload)); got != c.want {
 			t.Errorf("%s label of %s = %q, want %q", c.typ, c.payload, got, c.want)
 		}
+	}
+	// A type that declares no label has none.
+	if d, _ := reg.Lookup("test.measure"); d.LabelTemplate != "" {
+		t.Errorf("test.measure declares the label %q, want none", d.LabelTemplate)
 	}
 }

@@ -50,17 +50,24 @@ func TestRegistry_RetiredTypesCloseFromTheirOwnCatalog(t *testing.T) {
 	t.Run("a retired type only this catalog's history names still closes", func(t *testing.T) {
 		t.Parallel()
 		root := copyOf(t, fixtureDefs())
-		root["history/test.retired.v1.json"] = &fstest.MapFile{Data: retiredHistory("test.retired", true)}
-		root["history/test.retired-open.v1.json"] = &fstest.MapFile{Data: retiredHistory("test.retired-open", false)}
+		root["history/test.gone.v1.json"] = &fstest.MapFile{Data: retiredHistory("test.gone", true)}
+		root["history/test.gone-open.v1.json"] = &fstest.MapFile{Data: retiredHistory("test.gone-open", false)}
 		reg, err := def.BundledFS(root)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !reg.Closes("test.retired") {
-			t.Error("test.retired closes = false, want true: its newest history version closes the series")
+		if !reg.Closes("test.gone") {
+			t.Error("test.gone closes = false, want true: its newest history version closes the series")
 		}
-		if reg.Closes("test.retired-open") {
-			t.Error("test.retired-open closes = true, want false")
+		if reg.Closes("test.gone-open") {
+			t.Error("test.gone-open closes = true, want false")
+		}
+		full, err := def.BundledFS(fixtureDefs())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if full.Closes("test.gone") {
+			t.Error("test.gone closes = true over the fixture, whose history does not name it")
 		}
 	})
 
@@ -69,27 +76,27 @@ func TestRegistry_RetiredTypesCloseFromTheirOwnCatalog(t *testing.T) {
 		root := copyOf(t, fixtureDefs())
 		var removed int
 		for name := range root {
-			if strings.HasPrefix(name, "history/med.stopped.v") {
+			if strings.HasPrefix(name, "history/test.retired.v") {
 				delete(root, name)
 				removed++
 			}
 		}
 		if removed == 0 {
-			t.Fatal("the fixture has no med.stopped history to remove")
+			t.Fatal("the fixture has no test.retired history to remove")
 		}
 		reg, err := def.BundledFS(root)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if reg.Closes("med.stopped") {
-			t.Error("med.stopped closes = true over a catalog whose history does not name it")
+		if reg.Closes("test.retired") {
+			t.Error("test.retired closes = true over a catalog whose history does not name it")
 		}
 		full, err := def.BundledFS(fixtureDefs())
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !full.Closes("med.stopped") {
-			t.Error("med.stopped closes = false over the fixture, whose history closes it")
+		if !full.Closes("test.retired") {
+			t.Error("test.retired closes = false over the fixture, whose history closes it")
 		}
 	})
 
@@ -99,15 +106,15 @@ func TestRegistry_RetiredTypesCloseFromTheirOwnCatalog(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if reg.Closes("med.stopped") {
-			t.Error("med.stopped closes = true over no history")
+		if reg.Closes("test.retired") {
+			t.Error("test.retired closes = true over no history")
 		}
 	})
 
 	t.Run("a registry with registered Definitions keeps its catalog's retired types", func(t *testing.T) {
 		t.Parallel()
 		root := copyOf(t, fixtureDefs())
-		root["history/test.retired.v1.json"] = &fstest.MapFile{Data: retiredHistory("test.retired", true)}
+		root["history/test.gone.v1.json"] = &fstest.MapFile{Data: retiredHistory("test.gone", true)}
 		bundled, err := def.BundledFS(root)
 		if err != nil {
 			t.Fatal(err)
@@ -116,7 +123,7 @@ func TestRegistry_RetiredTypesCloseFromTheirOwnCatalog(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !reg.Closes("test.retired") || !reg.Closes("med.stopped") {
+		if !reg.Closes("test.gone") || !reg.Closes("test.retired") {
 			t.Error("WithRegistered dropped the catalog's retired types")
 		}
 	})

@@ -343,20 +343,3 @@ func HistoryFS(fsys fs.FS) ([]Stored, error) {
 	}
 	return out, nil
 }
-
-// Manifests returns every bundled manifest's type, version and raw bytes, the current
-// ones and the history (card 111), which is what the operational store keeps: Guard
-// compares the newest stored against the current, and the inspector and the API read
-// an old facet against the version it was admitted under.
-func Manifests() ([]Stored, error) {
-	return ManifestsFS(embedded())
-}
-
-// History returns every earlier Definition version the binary carries under
-// manifests/history, as manifests/history/<type>.v<n>.json. A history body is the
-// words a facet was admitted under, kept verbatim: it is checked to be JSON whose
-// meta names the type and version its file name says, and not parsed as a contract,
-// since the lint of today need not have held then.
-func History() ([]Stored, error) {
-	return HistoryFS(embedded())
-}

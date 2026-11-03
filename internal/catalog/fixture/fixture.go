@@ -1,6 +1,5 @@
 // Package fixture holds the catalogs the engine's tests read (card 255, R4a). A test
-// that needs a catalog names one here instead of falling back on the catalog
-// embedded in the binary.
+// that needs a catalog names one here; the binary carries none (R4b).
 //
 // Each catalog is two roots laid out as the daemon reads them: definitions (*.json,
 // history/*.json) and projections (*.json, history/*.json). The package imports
@@ -25,10 +24,10 @@ import (
 //go:embed testdata/engine/definitions testdata/engine/projections
 var files embed.FS
 
-// Mattjoyce is the catalog the engine embedded at de2981c, byte for byte: a copy of
-// internal/def/manifests and internal/projection/manifests. It is the personal
-// catalog, kept while tests move off it, and its definition set version is the one
-// the binary reports. Do not reformat, sort or prune it.
+// Mattjoyce is the catalog the engine embedded at de2981c, byte for byte, until R4b
+// slice 5 deleted the embedded copy. It is the personal catalog, kept while tests
+// move off it, and its definition set version is the one the live daemon reports.
+// Slice 6 deletes it. Do not reformat, sort or prune it.
 func Mattjoyce() (definitions, projections fs.FS) {
 	return pair("mattjoyce")
 }

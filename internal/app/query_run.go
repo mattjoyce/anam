@@ -37,9 +37,12 @@ the projection, the rule set and the program, so anam receipt verify re-runs it;
 be asked.
 
   anam query run --projection everything -e '
-    instant(At) :- entry(_, "health.blood-pressure", At, _, _, _, _).
-    regimen(At, Drug) :- entry(_, "health.blood-pressure", At, _, _, _, _), current(E, At),
-                         entry(E, "health.medication.started", _, _, _, _, _), attr(E, "/drug", Drug).'
+    instant(At) :- entry(_, "test.measure", At, _, _, _, _).
+    course(At, Name) :- entry(_, "test.measure", At, _, _, _, _), current(E, At),
+                        entry(E, "test.course.started", _, _, _, _, _), attr(E, "/name", Name).'
+
+The types and the projection are the engine test catalog's
+(internal/catalog/fixture/testdata/engine); name your catalog's own.
 
 The program is -e, -f, or stdin.`,
 		Args: cobra.NoArgs,

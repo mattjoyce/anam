@@ -12,11 +12,3 @@ func fixtureDefs() fs.FS {
 	defs, _ := fixture.Engine()
 	return defs
 }
-
-// personalDefs is the definitions root of fixture.Mattjoyce, read only by the two
-// tests that tie that byte copy to the catalog the binary embeds. They go with the
-// embedded catalog in R4b slice 5, and this with them.
-func personalDefs() fs.FS {
-	defs, _ := fixture.Mattjoyce()
-	return defs
-}

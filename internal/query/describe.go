@@ -89,7 +89,7 @@ so divide the sum by the count. month_of/2 and day_of/2 give a fact-time's UTC m
 Every evaluation is bounded at 5,000,000 steps.`
 
 // Held is every Definition body Anam holds, by type and version: what the daemon
-// serves at /v1/definitions and def.Manifests carries.
+// serves at /v1/definitions and a catalog's ManifestsFS carries.
 type Held map[facet.Type]map[int][]byte
 
 // HeldOf is a catalog's manifests and their history as a Held.

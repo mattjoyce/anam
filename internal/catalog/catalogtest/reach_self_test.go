@@ -1,6 +1,7 @@
 package catalogtest_test
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -27,6 +28,24 @@ func src(pkg string, imports []string, body string) string {
 	}
 	b.WriteString(")\n\nfunc T(t *testing.T) {\n" + body + "\n}\n")
 	return b.String()
+}
+
+// writeModule writes files, and a go.mod, to a new directory and returns it.
+func writeModule(t *testing.T, files map[string]string) string {
+	t.Helper()
+	root := t.TempDir()
+	all := map[string]string{"go.mod": "module " + mod + "\n\ngo 1.25\n"}
+	maps.Copy(all, files)
+	for name, body := range all {
+		p := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return root
 }
 
 // TestReach_SeesEveryWayIn runs the walk over small modules, one per way a test can
@@ -57,7 +76,9 @@ func TestReach_SeesEveryWayIn(t *testing.T) {
 		{"renamed import", ext(`d.Bundled()`, "d internal/def"), []string{x + "def.Bundled"}},
 		{"dot import", ext(`Bundled()`, ". internal/projection"), []string{x + "projection.Bundled"}},
 		{"in a helper", map[string]string{"internal/x/x_test.go": "package x\n\nimport \"" + mod + "/internal/def\"\n\nvar reg, _ = def.Bundled()\n\nfunc helper() { _ = def.EmbeddedFS() }\n"},
-			[]string{"internal/x/x_test.go (file scope): def.Bundled", "internal/x/x_test.go helper: def.EmbeddedFS"}},
+			[]string{"internal/x/x_test.go reg: def.Bundled", "internal/x/x_test.go helper: def.EmbeddedFS"}},
+		{"in a method", map[string]string{"internal/x/x_test.go": "package x\n\nimport \"" + mod + "/internal/def\"\n\nfunc (f *fx) cat() { def.Bundled() }\n"},
+			[]string{"internal/x/x_test.go fx.cat: def.Bundled"}},
 
 		// Inside the packages, the bare names, unexported ones included.
 		{"in package def", in("internal/def", "def", "Bundled(); embedded(); _ = manifestFS; History()"),
@@ -75,6 +96,20 @@ func TestReach_SeesEveryWayIn(t *testing.T) {
 			[]string{x + "catalog.Load with an empty projections directory"}},
 		{"Load(ctx, \"\", dir) multi-line", ext("catalog.Load(\n\t\tctx,\n\t\t``,\n\t\tdir,\n\t)", "internal/catalog"),
 			[]string{x + "catalog.Load with an empty definitions directory"}},
+		{"dot-imported Load", ext(`Load(ctx, "", "")`, ". internal/catalog"),
+			[]string{x + "catalog.Load with an empty definitions directory"}},
+		{"Load in parentheses", ext(`(catalog.Load)(ctx, defs, "")`, "internal/catalog"),
+			[]string{x + "catalog.Load with an empty projections directory"}},
+		{"Load through a variable", ext("f := catalog.Load\n\tf(ctx, defs, projs)\n\tvar g = (catalog.Load)\n\tg(ctx, a, b)", "internal/catalog"),
+			[]string{x + "a call through f, a variable bound to catalog.Load", x + "a call through g, a variable bound to catalog.Load"}},
+		{"an empty variable", ext("dir := \"\"\n\tcatalog.Load(ctx, dir, dir)", "internal/catalog"),
+			[]string{x + "catalog.Load with an empty definitions directory"}},
+		{"a zero string var", ext("var dir string\n\tcatalog.Load(ctx, defs, dir)", "internal/catalog"),
+			[]string{x + "catalog.Load with an empty projections directory"}},
+		{"an empty const at file scope", map[string]string{"internal/x/x_test.go": "package x_test\n\nimport \"" + mod + "/internal/catalog\"\n\nconst none = \"\"\n\nconst alsoNone = none\n\nfunc T() { catalog.Load(ctx, alsoNone, d) }\n"},
+			[]string{x + "catalog.Load with an empty definitions directory"}},
+		{"an empty config var", ext("dir := \"\"\n\tcfg.ProjectionsDir = dir"),
+			[]string{x + `ProjectionsDir = "" selects the embedded catalog`}},
 
 		// A config whose catalog directories are "", so a daemon opens on the embedded one.
 		{"config dir assigned \"\"", ext(`cfg.DefinitionsDir, cfg.ProjectionsDir = "", ""`),
@@ -110,27 +145,20 @@ func TestReach_SeesEveryWayIn(t *testing.T) {
 		{"decoy: a manifests dir elsewhere", in("internal/serve", "serve", `os.MkdirAll(filepath.Join(t.TempDir(), "manifests"), 0o750)`, "os", "path/filepath"), nil},
 		{"decoy: registered projections", ext(`os.ReadFile(filepath.Join("..", "..", "projections", "heart.v3.json"))`, "os", "path/filepath"), nil},
 		{"decoy: a config dir set to a path", ext(`cfg.DefinitionsDir = dir; _ = config.Config{ProjectionsDir: dir}`, "internal/config"), nil},
+		{"decoy: a variable set again", ext("dir := \"\"\n\tdir = t.TempDir()\n\tcatalog.Load(ctx, dir, dir)", "internal/catalog"), nil},
+		{"decoy: a variable whose address is taken", ext("var dir string\n\tflagVar(&dir)\n\tcatalog.Load(ctx, dir, dir)", "internal/catalog"), nil},
+		{"decoy: catalog.Load passed, not bound", ext(`use(catalog.Load)`, "internal/catalog"), nil},
+		{"decoy: a package's own Load", in("internal/x", "x", `Load(ctx, "", "")`), nil},
 		{"decoy: under testdata", map[string]string{"internal/x/testdata/x_test.go": src("x", []string{"internal/def"}, "def.Bundled()")}, nil},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			root := t.TempDir()
-			c.files["go.mod"] = "module " + mod + "\n\ngo 1.25\n"
-			for name, body := range c.files {
-				p := filepath.Join(root, filepath.FromSlash(name))
-				if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
-					t.Fatal(err)
-				}
-			}
-			reaches, _, err := findReaches(root)
+			s, err := findReaches(writeModule(t, c.files))
 			if err != nil {
 				t.Fatal(err)
 			}
 			var got []string
-			for _, r := range reaches {
+			for _, r := range s.reaches {
 				fn := r.Func
 				if fn == "" {
 					fn = "(file scope)"
@@ -181,10 +209,97 @@ func TestCheck_HoldsTheListToWhatReaches(t *testing.T) {
 		{name: "a label does not excuse a symbol", reaches: []reach{sym("a_test.go", "golden")},
 			labels: []allowed{{file: "a_test.go", funcs: []string{"golden"}, reason: "r"}},
 			want:   []string{"a_test.go:0 golden: def.Bundled reaches", "listed a_test.go golden no longer names a catalog path"}},
+		{name: "a method is not the function of its name", reaches: []reach{sym("a_test.go", "fx.TestA")},
+			allow: []allowed{{file: "a_test.go", funcs: []string{"TestA"}, reason: "r"}},
+			want:  []string{"a_test.go:0 fx.TestA: def.Bundled reaches", "listed a_test.go TestA no longer reaches"}},
+		{name: "a file listed twice", reaches: []reach{sym("a_test.go", "TestA")},
+			allow: []allowed{{file: "a_test.go", reason: "r"}, {file: "a_test.go", funcs: []string{"TestA"}, reason: "r"}},
+			want:  []string{"a_test.go is listed twice in one list", "listed a_test.go TestA no longer reaches"}},
+		{name: "lists overlap", reaches: []reach{lit("a_test.go", "golden")},
+			allow:  []allowed{{file: "a_test.go", reason: "r"}},
+			labels: []allowed{{file: "a_test.go", funcs: []string{"golden"}, reason: "r"}},
+			want:   []string{"a_test.go is in both the allow-list and pathLabels", "listed a_test.go no longer reaches"}},
+		{name: "usage is per list", reaches: []reach{lit("a_test.go", "golden")},
+			allow:  []allowed{{file: "a_test.go", funcs: []string{"golden"}, reason: "r"}},
+			labels: []allowed{{file: "a_test.go", funcs: []string{"golden"}, reason: "r"}},
+			want:   []string{"a_test.go is in both the allow-list and pathLabels", "listed a_test.go golden no longer reaches"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			got := checkReaches(c.reaches, files, c.allow, c.labels)
+			got := checkReaches(scan{reaches: c.reaches, files: files}, c.allow, c.labels)
+			if len(got) != len(c.want) {
+				t.Fatalf("problems = %q, want %d like %q", got, len(c.want), c.want)
+			}
+			for i := range got {
+				if !strings.Contains(got[i], c.want[i]) {
+					t.Errorf("problem %d = %q, want it to contain %q", i, got[i], c.want[i])
+				}
+			}
+		})
+	}
+}
+
+// TestCheck_FollowsHelpers runs the walk and the list check over small modules, so a
+// new test that calls an allowed helper fails, and a label excuses only the function
+// it names.
+func TestCheck_FollowsHelpers(t *testing.T) {
+	t.Parallel()
+	head := "package x\n\nimport (\n\t\"os\"\n\t\"" + mod + "/internal/def\"\n)\n\n"
+	allowA := []allowed{{file: "internal/x/a_test.go", reason: "r"}}
+	for _, c := range []struct {
+		name   string
+		files  map[string]string
+		allow  []allowed
+		labels []allowed
+		want   []string // a substring of each problem, in order
+	}{
+		{name: "an allowed helper called only from its file",
+			files: map[string]string{"internal/x/a_test.go": head + "func helper() { def.Bundled() }\n\nfunc TestA() { helper() }\n"},
+			allow: allowA},
+		{name: "a new test calls an allowed helper",
+			files: map[string]string{
+				"internal/x/a_test.go": head + "func helper() { def.Bundled() }\n\nfunc TestA() { helper() }\n",
+				"internal/x/b_test.go": head + "func TestNew() { helper() }\n",
+			},
+			allow: allowA, want: []string{"internal/x/b_test.go:8 TestNew: calls helper, which reaches"}},
+		{name: "through another helper",
+			files: map[string]string{
+				"internal/x/a_test.go": head + "func helper() { def.Bundled() }\n",
+				"internal/x/b_test.go": head + "func mid() { helper() }\n\nfunc TestNew() { mid() }\n",
+			},
+			allow: allowA, want: []string{"b_test.go:8 mid: calls helper", "b_test.go:10 TestNew: calls mid"}},
+		{name: "a method helper",
+			files: map[string]string{
+				"internal/x/a_test.go": head + "type fx struct{}\n\nfunc (fx) cat() { def.Bundled() }\n",
+				"internal/x/b_test.go": head + "func TestNew(f fx) { f.cat() }\n",
+			},
+			allow: allowA, want: []string{"b_test.go:8 TestNew: calls fx.cat"}},
+		{name: "a package-level var",
+			files: map[string]string{
+				"internal/x/a_test.go": head + "var reg, _ = def.Bundled()\n",
+				"internal/x/b_test.go": head + "func TestNew() { _ = reg }\n",
+			},
+			allow: allowA, want: []string{"b_test.go:8 TestNew: calls reg"}},
+		{name: "decoy: the same name in another package",
+			files: map[string]string{
+				"internal/x/a_test.go": head + "func helper() { def.Bundled() }\n",
+				"internal/y/b_test.go": "package y\n\nfunc TestNew() { helper() }\n",
+			},
+			allow: allowA},
+		{name: "a label excuses only its formatter",
+			files: map[string]string{"internal/def/b_test.go": "package def\n\nimport \"os\"\n\n" +
+				"func label(n string) string { return \"manifests/\" + n }\n\n" +
+				"func lines() { _ = label(\"x\"); os.ReadFile(\"manifests/x.json\") }\n"},
+			labels: []allowed{{file: "internal/def/b_test.go", funcs: []string{"label"}, reason: "r"}},
+			want:   []string{`internal/def/b_test.go:7 lines: the path "manifests/x.json"`}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			s, err := findReaches(writeModule(t, c.files))
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := checkReaches(s, c.allow, c.labels)
 			if len(got) != len(c.want) {
 				t.Fatalf("problems = %q, want %d like %q", got, len(c.want), c.want)
 			}

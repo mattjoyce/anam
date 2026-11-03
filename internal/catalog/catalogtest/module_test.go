@@ -85,24 +85,32 @@ func testFiles(root string) ([]string, error) {
 	return files, err
 }
 
-// findReaches parses every test file in the module at root and returns each place
-// one reads the embedded catalog, and the files it read.
-func findReaches(root string) ([]reach, []string, error) {
+// scan is what the walk read: each direct reach, each reference a test function
+// makes to a package-level name, and the test files it parsed.
+type scan struct {
+	reaches []reach
+	refs    []ref
+	files   []string
+}
+
+// findReaches parses every test file in the module at root.
+func findReaches(root string) (scan, error) {
 	mod, err := modulePath(root)
 	if err != nil {
-		return nil, nil, err
+		return scan{}, err
 	}
 	files, err := testFiles(root)
 	if err != nil {
-		return nil, nil, err
+		return scan{}, err
 	}
-	var all []reach
+	s := scan{files: files}
 	for _, rel := range files {
-		rs, err := fileReaches(root, mod, rel)
+		rs, refs, err := fileReaches(root, mod, rel)
 		if err != nil {
-			return nil, nil, err
+			return scan{}, err
 		}
-		all = append(all, rs...)
+		s.reaches = append(s.reaches, rs...)
+		s.refs = append(s.refs, refs...)
 	}
-	return all, files, nil
+	return s, nil
 }

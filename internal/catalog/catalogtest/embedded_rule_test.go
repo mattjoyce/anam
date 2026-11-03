@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -77,62 +78,59 @@ var embeddedAllowList = []allowed{
 }
 
 // pathLabels are strings that spell an embedded catalog path but read nothing from
-// disk. The parser cannot tell a label from a path, so they are named here. They are
-// not reaches, and R4b need not empty this list.
+// disk. The parser cannot tell a label from a path, so they are named here. Each
+// entry names one small formatter that builds the label and does nothing else, so a
+// read beside it is not excused. They are not reaches, and R4b need not empty this
+// list.
 var pathLabels = []allowed{
-	{file: "internal/def/baseline_test.go", funcs: []string{"baselineLines"},
-		reason: `"manifests/" prefixes the golden file's line labels for files read from the fixture FS`},
-	{file: "internal/projection/baseline_test.go", funcs: []string{"baselineLines"},
-		reason: `"manifests/" prefixes the golden file's line labels for files read from the fixture FS`},
+	{file: "internal/def/baseline_test.go", funcs: []string{"goldenLabel"},
+		reason: `"manifests/" prefixes the golden file's line labels; the bytes are read from the fixture FS`},
+	{file: "internal/projection/baseline_test.go", funcs: []string{"goldenLabel"},
+		reason: `"manifests/" prefixes the golden file's line labels; the bytes are read from the fixture FS`},
 }
 
 // TestTests_ReadNoEmbeddedCatalog parses every _test.go in the module and fails on
 // any read of the embedded catalog outside embeddedAllowList: a use of an embedded
-// def or projection symbol, catalog.Load with an empty directory, a config catalog
-// directory set to "", or a string naming an embedded catalog directory on disk. It
-// also fails on an entry that no longer reaches the catalog or names a file that has
-// gone, so the list cannot outlive what it allows.
+// def or projection symbol, catalog.Load with an empty directory or called through a
+// variable, a config catalog directory set to "", a string naming an embedded catalog
+// directory on disk, or a call to a test helper in the same package that does any of
+// these. It also fails on an entry that no longer reaches the catalog or names a file
+// that has gone, so the list cannot outlive what it allows.
 //
-// It cannot see a config that leaves its directories unset rather than setting them
-// to "", or a YAML config that names none; catalogtest.Config is how a test's daemon
-// gets a fixture.
+// The rule stops a test relying on the embedded catalog by accident; a deliberate way
+// round it would show in review. What it cannot see: a config that leaves its
+// catalog directories unset rather than setting them to "" (a YAML config with no
+// definitions_dir is the same case), which the fixture helpers' own tests guard
+// (daemon's TestNewConfig_ReadsTheFixtureCatalog, app's TestFixtures_ReadTheFixtureCatalog);
+// an empty directory held in a value it cannot resolve in the file (a package-level
+// const in another file, a field, a function's result); and a wrapper that reaches
+// from outside the test files, in a non-test .go file or through an exported helper
+// of another test package. It matches a method call by the method's name, as the
+// parser does not know a receiver's type.
 func TestTests_ReadNoEmbeddedCatalog(t *testing.T) {
 	t.Parallel()
 	root := moduleRoot(t)
-	reaches, files, err := findReaches(root)
+	s, err := findReaches(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) < 100 {
-		t.Fatalf("read %d test files under %s, want the module's", len(files), root)
+	if len(s.files) < 100 {
+		t.Fatalf("read %d test files under %s, want the module's", len(s.files), root)
 	}
-	for _, p := range checkReaches(reaches, files, embeddedAllowList, pathLabels) {
+	for _, p := range checkReaches(s, embeddedAllowList, pathLabels) {
 		t.Error(p)
 	}
 }
 
-// TestAllowList_EntriesAreWellFormed keeps each entry giving a reason, naming a file
-// once, and each listed function once.
+// TestAllowList_EntriesAreWellFormed keeps each entry giving a reason and naming a
+// file that exists.
 func TestAllowList_EntriesAreWellFormed(t *testing.T) {
 	t.Parallel()
 	root := moduleRoot(t)
 	for _, list := range [][]allowed{embeddedAllowList, pathLabels} {
-		seen := map[string]bool{}
 		for _, a := range list {
 			if a.reason == "" {
 				t.Errorf("%s has no reason", a.file)
-			}
-			if seen[a.file] {
-				t.Errorf("%s is listed twice", a.file)
-			}
-			seen[a.file] = true
-			if a.funcs != nil && len(a.funcs) == 0 {
-				t.Errorf("%s lists an empty set of functions; use nil for the whole file", a.file)
-			}
-			for i, f := range a.funcs {
-				if slices.Contains(a.funcs[:i], f) {
-					t.Errorf("%s lists %s twice", a.file, f)
-				}
 			}
 			if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(a.file))); err != nil {
 				t.Errorf("%s: %v", a.file, err)
@@ -141,12 +139,56 @@ func TestAllowList_EntriesAreWellFormed(t *testing.T) {
 	}
 }
 
-// checkReaches returns what is wrong: each reach that no entry allows, and each entry
-// (or listed function) that allows nothing or names a file the walk did not read.
-func checkReaches(reaches []reach, files []string, allow, labels []allowed) []string {
+// listShape returns what is wrong with the two lists' shape: a file listed twice in
+// one list, an empty function set, a function listed twice, and an entry of one list
+// that covers a function the other list also covers.
+func listShape(allow, labels []allowed) []string {
+	var problems []string
+	covers := func(a allowed, fn string) bool { return a.funcs == nil || slices.Contains(a.funcs, fn) }
+	for _, list := range [][]allowed{allow, labels} {
+		for i, a := range list {
+			for _, b := range list[:i] {
+				if b.file == a.file {
+					problems = append(problems, fmt.Sprintf("%s is listed twice in one list", a.file))
+				}
+			}
+			if a.funcs != nil && len(a.funcs) == 0 {
+				problems = append(problems, fmt.Sprintf("%s lists an empty set of functions; use nil for the whole file", a.file))
+			}
+			for j, f := range a.funcs {
+				if slices.Contains(a.funcs[:j], f) {
+					problems = append(problems, fmt.Sprintf("%s lists %s twice", a.file, f))
+				}
+			}
+		}
+	}
+	for _, a := range allow {
+		for _, b := range labels {
+			if a.file != b.file {
+				continue
+			}
+			overlap := a.funcs == nil || b.funcs == nil
+			for _, f := range a.funcs {
+				overlap = overlap || covers(b, f)
+			}
+			if overlap {
+				problems = append(problems, fmt.Sprintf("%s is in both the allow-list and pathLabels for the same function", a.file))
+			}
+		}
+	}
+	return problems
+}
+
+// checkReaches returns what is wrong: the lists' shape, each reach that no entry
+// allows, and each entry (or listed function) that allows nothing or names a file the
+// walk did not read. A label excuses only a path. A reach then spreads to every test
+// function of the same package that names the function it sits in, transitively, so
+// a test calling an allowed helper is held to the list as well.
+func checkReaches(s scan, allow, labels []allowed) []string {
+	problems := listShape(allow, labels)
 	type key struct{ file, fn string }
-	used := map[key]bool{}
-	match := func(list []allowed, r reach) bool {
+	usedAllow, usedLabels := map[key]bool{}, map[key]bool{}
+	match := func(list []allowed, used map[key]bool, r reach) bool {
 		for _, a := range list {
 			if a.file != r.File {
 				continue
@@ -162,36 +204,92 @@ func checkReaches(reaches []reach, files []string, allow, labels []allowed) []st
 		}
 		return false
 	}
-	var problems []string
-	for _, r := range reaches {
-		if r.Kind == kindPath && match(labels, r) {
+	var reaches []reach
+	for _, r := range s.reaches {
+		if r.Kind == kindPath && match(labels, usedLabels, r) {
 			continue
 		}
-		if !match(allow, r) {
+		reaches = append(reaches, r)
+	}
+	reaches = append(reaches, throughHelpers(reaches, s.refs)...)
+	for _, r := range reaches {
+		if !match(allow, usedAllow, r) {
 			problems = append(problems, fmt.Sprintf("%s reaches the embedded catalog outside the allow-list; read a fixture (catalogtest, fixture.Mattjoyce) instead", r))
 		}
 	}
 	for _, l := range []struct {
 		list []allowed
+		used map[key]bool
 		name string
-	}{{allow, "reaches the embedded catalog"}, {labels, "names a catalog path"}} {
+	}{{allow, usedAllow, "reaches the embedded catalog"}, {labels, usedLabels, "names a catalog path"}} {
 		for _, a := range l.list {
-			if !slices.Contains(files, a.file) {
+			if !slices.Contains(s.files, a.file) {
 				problems = append(problems, fmt.Sprintf("listed %s is not a test file in the module; drop its entry", a.file))
 				continue
 			}
 			if a.funcs == nil {
-				if !used[key{a.file, ""}] {
+				if !l.used[key{a.file, ""}] {
 					problems = append(problems, fmt.Sprintf("listed %s no longer %s; drop its entry", a.file, l.name))
 				}
 				continue
 			}
 			for _, f := range a.funcs {
-				if !used[key{a.file, f}] {
+				if !l.used[key{a.file, f}] {
 					problems = append(problems, fmt.Sprintf("listed %s %s no longer %s; drop it", a.file, f, l.name))
 				}
 			}
 		}
 	}
 	return problems
+}
+
+// throughHelpers returns a reach for each function that names, in the same package,
+// a function that reaches, until no more do. A method is named by "*.m" for any
+// receiver.
+func throughHelpers(direct []reach, refs []ref) []reach {
+	type fn struct{ pkg, name string }
+	reaching := map[fn]bool{}
+	for _, r := range direct {
+		if r.Func != "" {
+			reaching[fn{r.Pkg, r.Func}] = true
+		}
+	}
+	names := func(r ref) []string {
+		m, ok := strings.CutPrefix(r.To, "*.")
+		if !ok {
+			if reaching[fn{r.Pkg, r.To}] {
+				return []string{r.To}
+			}
+			return nil
+		}
+		var out []string
+		for f := range reaching {
+			if f.pkg == r.Pkg && strings.HasSuffix(f.name, "."+m) {
+				out = append(out, f.name)
+			}
+		}
+		slices.Sort(out)
+		return out
+	}
+	var found []reach
+	seen := map[[3]string]bool{}
+	for changed := true; changed; {
+		changed = false
+		for _, r := range refs {
+			for _, h := range names(r) {
+				k := [3]string{r.Pkg, r.From, h}
+				if h == r.From || seen[k] {
+					continue
+				}
+				seen[k] = true
+				found = append(found, reach{Pkg: r.Pkg, File: r.File, Func: r.From, Line: r.Line, Kind: kindHelper,
+					What: "calls " + h + ", which reaches the embedded catalog"})
+				if !reaching[fn{r.Pkg, r.From}] {
+					reaching[fn{r.Pkg, r.From}] = true
+					changed = true
+				}
+			}
+		}
+	}
+	return found
 }

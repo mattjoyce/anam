@@ -119,6 +119,41 @@ func newLedgerFixture(t *testing.T) ledgerFixture {
 	return f
 }
 
+// TestFixtures_ReadTheFixtureCatalog holds the package's fixtures to a fixture
+// catalog: the config newLedgerFixture writes, and the config newRemoteFixture's
+// daemon opens on, load their catalog from directories, not the embedded catalog.
+// TestTests_ReadNoEmbeddedCatalog (catalogtest) sees a directory set to "" but not a
+// YAML config that leaves the keys out, so this is the guard for every local command
+// and daemon these fixtures run.
+func TestFixtures_ReadTheFixtureCatalog(t *testing.T) {
+	t.Parallel()
+	check := func(t *testing.T, cfg config.Config) {
+		t.Helper()
+		cat, err := loadCatalog(context.Background(), cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cat.DefinitionsSource() == "embedded" || cat.ProjectionsSource() == "embedded" {
+			t.Errorf("the config loads definitions from %s and projections from %s, want a fixture copy for both",
+				cat.DefinitionsSource(), cat.ProjectionsSource())
+		}
+	}
+	t.Run("newLedgerFixture", func(t *testing.T) {
+		t.Parallel()
+		cfg, err := config.Load(newLedgerFixture(t).cfgPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		check(t, cfg)
+	})
+	t.Run("newRemoteFixture", func(t *testing.T) {
+		t.Parallel()
+		var opened config.Config
+		newRemoteFixtureWith(t, "UTC", func(_ *testing.T, _ remoteFixture, cfg *config.Config) { opened = *cfg })
+		check(t, opened)
+	})
+}
+
 // admit commits recs to the fixture's ledger and returns the head after.
 func (f ledgerFixture) admit(t *testing.T, recs []record) ledger.Watermark {
 	t.Helper()

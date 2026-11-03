@@ -57,7 +57,7 @@ var carryLimits = gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, Ma
 func admittedAtV1(t *testing.T) facet.Facet {
 	t.Helper()
 	l := newLedgerAt(t)
-	g := gate.New(l, registryOf(t, bpManifest), gate.StaticScopes{"bp-csv": {"health.blood-pressure"}}, clock.Real{}, person, carryLimits)
+	g := gate.New(l, registryOf(t, bpManifest), gate.StaticScopes{"bp-csv": {"test.blood-pressure"}}, clock.Real{}, person, carryLimits)
 	env := bpEnvelope(bpPayload)
 	b, err := g.Resolve(env)
 	if err != nil {
@@ -89,11 +89,11 @@ func TestCarry_AdmitsTheFacetUnderTheVersionItWasAdmittedUnder(t *testing.T) {
 
 	current := registryOf(t, bpManifestV2)
 	held := def.NewVersions(current, []def.Stored{
-		{Type: "health.blood-pressure", Version: 1, Body: []byte(bpManifest)},
-		{Type: "health.blood-pressure", Version: 2, Body: []byte(bpManifestV2)},
+		{Type: "test.blood-pressure", Version: 1, Body: []byte(bpManifest)},
+		{Type: "test.blood-pressure", Version: 2, Body: []byte(bpManifestV2)},
 	})
 	l := newLedgerAt(t)
-	g := gate.New(l, current, gate.StaticScopes{"bp-csv": {"health.blood-pressure"}}, clock.Real{}, person, carryLimits).Holding(held)
+	g := gate.New(l, current, gate.StaticScopes{"bp-csv": {"test.blood-pressure"}}, clock.Real{}, person, carryLimits).Holding(held)
 
 	// The dry run's question writes nothing and answers the facet that would be built.
 	vet, err := g.VetCarry(carryOfStored(old))
@@ -136,8 +136,8 @@ func TestCarry_StillRunsEveryPillar(t *testing.T) {
 	ctx := context.Background()
 	old := admittedAtV1(t)
 	current := registryOf(t, bpManifestV2)
-	held := def.NewVersions(current, []def.Stored{{Type: "health.blood-pressure", Version: 1, Body: []byte(bpManifest)}})
-	scopes := gate.StaticScopes{"bp-csv": {"health.blood-pressure"}}
+	held := def.NewVersions(current, []def.Stored{{Type: "test.blood-pressure", Version: 1, Body: []byte(bpManifest)}})
+	scopes := gate.StaticScopes{"bp-csv": {"test.blood-pressure"}}
 
 	cases := []struct {
 		name  string

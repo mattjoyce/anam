@@ -39,7 +39,7 @@ func program(t *testing.T, f selection.Filter) string {
 func TestSave_SameProgramOneCode(t *testing.T) {
 	ctx := t.Context()
 	s, a := savedStore(t)
-	text := program(t, selection.Filter{Types: []string{"health.weight", "health.blood-pressure"}, Sources: []string{"withings"}})
+	text := program(t, selection.Filter{Types: []string{"test.weight", "test.blood-pressure"}, Sources: []string{"withings"}})
 	first, err := s.Save(ctx, text)
 	if err != nil {
 		t.Fatalf("Save: %v", err)
@@ -87,11 +87,11 @@ func selectionReordered(text string) string {
 func TestSave_DifferentProgramsDifferentCodes(t *testing.T) {
 	ctx := t.Context()
 	s, _ := savedStore(t)
-	a, err := s.Save(ctx, program(t, selection.Filter{Types: []string{"health.weight"}}))
+	a, err := s.Save(ctx, program(t, selection.Filter{Types: []string{"test.weight"}}))
 	if err != nil {
 		t.Fatalf("Save: %v", err)
 	}
-	b, err := s.Save(ctx, program(t, selection.Filter{Types: []string{"health.blood-pressure"}}))
+	b, err := s.Save(ctx, program(t, selection.Filter{Types: []string{"test.blood-pressure"}}))
 	if err != nil {
 		t.Fatalf("Save: %v", err)
 	}

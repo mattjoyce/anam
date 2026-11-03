@@ -23,7 +23,7 @@ func TestRetract_AmongOtherFacetsIsTheFullFoldsAnswer(t *testing.T) {
 		t.Helper()
 		at := fmt.Sprintf("2026-01-%02dT06:30:00Z", i)
 		env := facet.Envelope{
-			Type: "health.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
+			Type: "test.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
 			SourceRef: facet.SourceRef("bp-csv", at),
 			Payload:   []byte(fmt.Sprintf(`{"measured_at": %q, "systolic": %d, "diastolic": 76}`, at, systolic)),
 		}

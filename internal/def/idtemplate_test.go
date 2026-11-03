@@ -126,7 +126,7 @@ func TestWithID(t *testing.T) {
 func TestParse_IdentityTemplate(t *testing.T) {
 	t.Parallel()
 	manifest := func(key, tpl string) []byte {
-		return []byte(`{"meta": {"facet_type": "health.dose-test", "definition_version": 1, "classification": "Normal",
+		return []byte(`{"meta": {"facet_type": "test.dose-test", "definition_version": 1, "classification": "Normal",
 		  "validation_mode": "strict", "source_schema": "t/x",
 		  "time_semantics": {"fact_time": {"pointer": "/at", "layout": "2006-01-02 15:04", "zone": "UTC"}},
 		  "identity_key": ` + key + `, "identity_template": "` + tpl + `"},

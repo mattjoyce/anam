@@ -17,13 +17,13 @@ depends_on:
 | `BundledFS` | the registry of a catalog root's current manifests (the deployment's `definitions_dir`, read by `catalog.Load`); the binary carries none since card 255 |
 | `Parse` | one [Definition manifest](/data-structures/definition-manifest.md) from bytes, refusing an open schema |
 | `Guard` | at daemon start (`guardCatalog`), refuses a stored version whose `identity_key`, `identity_template` or `fact_time` differs from the bundled one, but for two widenings proved from the stored versions (card 198): a `zone_pointer` added to the fact time, and optional placeholders appended to the template |
-| `Register` | decides an importer's registration: bundled type is `ErrBundled` unless it is the body the binary carries (unchanged, card 139), same body is adopted, different body at a held version is `ErrRegistered`, older version is `ErrVersionBehind`, re-keyed is `ErrKeyed` |
-| `WithRegistered` | the live registry: bundled first, registered rows for types the binary does not carry |
+| `Register` | decides an importer's registration: a catalog type is `ErrBundled` unless it is the body the catalog holds (unchanged, card 139), same body is adopted, different body at a held version is `ErrRegistered`, older version is `ErrVersionBehind`, re-keyed is `ErrKeyed` |
+| `WithRegistered` | the live registry: bundled first, registered rows for types the catalog does not hold |
 | `KeyingOf`, `Definition.SameIdentity` | the keying (`identity_key`, `fact_time`) read from a stored body as Guard reads it, and whether a Definition composes ids from the same identity key; what a rename compares across two types, since a different key would give different ids (card 140). A rename may change the fact-time rule (card 195) |
 | `SetVersionFS` | a hash over a catalog root's current manifests, pinned into receipts |
 | `Registry.Closes` | whether a type closes its series, for the snapshot read |
 
-A type lives in one place: while the binary bundles it no importer may register it, and a registered row for a bundled type is shadowed with a log line.
+A type lives in one place: while the deployment's catalog holds it no importer may register it, and a registered row for a catalog type is shadowed with a log line.
 
 Since 2026-10-13 (card 111) a catalog's `history/<type>.v<n>.json` carries every earlier version a facet may have been admitted under; `ManifestsFS` returns them with the current bodies so the start-up upsert provisions the whole history into the operational store, while `BundledFS` and `SetVersionFS` skip them (`BundledFS` reads history only for the retired types whose series close). Card 157 found that `note.annotation` v2 had been bumped without copying v1 there (the type's lineage: `note.annotation` (v1 to v3), then `record.note` (v1, v2), now `record.edge`), so a rebuilt operational store would have lost the words the first notes were admitted under; v1 and v2 now both ship in history. A history body is words, not a contract: checked to be JSON naming its type and version, never parsed as one.
 

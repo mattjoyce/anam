@@ -16,7 +16,7 @@ import (
 // declares it as an object.
 const cuffNoteManifest = `{
   "meta": {
-    "facet_type": "health.cuff-note", "definition_version": 1, "classification": "Normal",
+    "facet_type": "test.cuff-note", "definition_version": 1, "classification": "Normal",
     "validation_mode": "strict", "source_schema": "note/cuff",
     "time_semantics": {"fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}},
     "identity_key": ["/measured_at"]
@@ -30,7 +30,7 @@ const cuffNoteManifest = `{
 // type does not have.
 const cuffObjectManifest = `{
   "meta": {
-    "facet_type": "health.cuff-object", "definition_version": 1, "classification": "Normal",
+    "facet_type": "test.cuff-object", "definition_version": 1, "classification": "Normal",
     "validation_mode": "strict", "source_schema": "note/cuff",
     "time_semantics": {"fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}},
     "identity_key": ["/measured_at"]
@@ -65,7 +65,7 @@ func TestPointer_AContainerPointerIsRefusedWithItsLeaves(t *testing.T) {
 	t.Parallel()
 	v, versions := value(t)
 	_, err := tryRun(v, versions, registryOf(t, bpManifest),
-		`cuff(E, A) :- entry(E, "health.blood-pressure", _, _, _, _, _), attr(E, "/cuff", A).`, "cuff")
+		`cuff(E, A) :- entry(E, "test.blood-pressure", _, _, _, _, _), attr(E, "/cuff", A).`, "cuff")
 	if err == nil {
 		t.Fatal("the engine accepted a pointer that names a container")
 	}
@@ -80,7 +80,7 @@ func TestPointer_TheRefusalNamesTheLeavesOfEveryType(t *testing.T) {
 	t.Parallel()
 	v, versions := value(t)
 	_, err := tryRun(v, versions, registryOf(t, bpManifest, cuffObjectManifest),
-		`cuff(E, A) :- entry(E, "health.blood-pressure", _, _, _, _, _), attr(E, "/cuff", A).`, "cuff")
+		`cuff(E, A) :- entry(E, "test.blood-pressure", _, _, _, _, _), attr(E, "/cuff", A).`, "cuff")
 	if err == nil {
 		t.Fatal("the engine accepted a pointer that names a container")
 	}
@@ -96,10 +96,10 @@ func TestPointer_TheRefusalNamesTheLeavesOfEveryType(t *testing.T) {
 // that type alone.
 func TestPointer_AFieldInOneTypeAndAContainerInAnotherIsNotRefused(t *testing.T) {
 	t.Parallel()
-	v, versions := value(t, entry("f1", "health.cuff-note", "2026-06-15T00:00:00.000000000Z", "",
+	v, versions := value(t, entry("f1", "test.cuff-note", "2026-06-15T00:00:00.000000000Z", "",
 		`{"measured_at": "2026-06-15T07:00:00Z", "cuff": "left"}`))
 	ans, err := tryRun(v, versions, registryOf(t, bpManifest, cuffNoteManifest),
-		`cuff(E, C) :- entry(E, "health.cuff-note", _, _, _, _, _), attr(E, "/cuff", C).`, "cuff")
+		`cuff(E, C) :- entry(E, "test.cuff-note", _, _, _, _, _), attr(E, "/cuff", C).`, "cuff")
 	if err != nil {
 		t.Fatalf("a pointer that is a field in one type must not be refused: %v", err)
 	}

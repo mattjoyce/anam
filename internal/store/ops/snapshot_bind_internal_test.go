@@ -28,7 +28,7 @@ func TestOpen_BindsSnapshotPartsOfAnOlderStore(t *testing.T) {
 			started_at TEXT NOT NULL, started_w INTEGER NOT NULL, completed_at TEXT, completed_w INTEGER)`,
 		`CREATE TABLE snapshot_part (id TEXT NOT NULL, part INTEGER NOT NULL, PRIMARY KEY (id, part))`,
 		`CREATE TABLE snapshot_facet (id TEXT NOT NULL, facet_id TEXT NOT NULL, PRIMARY KEY (id, facet_id))`,
-		`INSERT INTO snapshot VALUES ('old', 'withings', 'health.measurement', 1, '2026-10-10T09:00:00Z', 1, '2026-10-10T09:00:00Z', 1)`,
+		`INSERT INTO snapshot VALUES ('old', 'withings', 'test.measurement', 1, '2026-10-10T09:00:00Z', 1, '2026-10-10T09:00:00Z', 1)`,
 		`INSERT INTO snapshot_part VALUES ('old', 1)`,
 		`INSERT INTO snapshot_facet VALUES ('old', 'f1')`,
 	} {
@@ -56,7 +56,7 @@ func TestOpen_BindsSnapshotPartsOfAnOlderStore(t *testing.T) {
 		t.Errorf("the old snapshot's facets survived: %v, %v", c, err)
 	}
 	// The column is there to use, and a second open leaves what it holds.
-	if _, err := db.RecordSnapshotPart(ctx, SnapshotPart{ID: "new", Source: "withings", Types: []string{"health.measurement"},
+	if _, err := db.RecordSnapshotPart(ctx, SnapshotPart{ID: "new", Source: "withings", Types: []string{"test.measurement"},
 		Part: 1, Parts: 1, Digest: "d", FacetIDs: []string{"f2"}}, time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC), 2, SnapshotRetention{Incomplete: config.DefaultSnapshotTTL, Complete: config.DefaultSnapshotKeep}); err != nil {
 		t.Fatal(err)
 	}

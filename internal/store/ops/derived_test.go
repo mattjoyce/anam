@@ -16,7 +16,7 @@ func eventRow(seq int64, rt string, kind facet.AnamEventKind, id string, v int) 
 
 func facetRow(id string, v int, status facet.Status) ops.FacetRow {
 	return ops.FacetRow{
-		FacetID: id, Type: "health.blood-pressure",
+		FacetID: id, Type: "test.blood-pressure",
 		FactTime: "2026-07-05T06:30:00.000000000Z", BucketID: "bucket:2026-W27",
 		Version: v, Status: status, ContentHash: "sha256:aaa",
 	}

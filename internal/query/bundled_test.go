@@ -75,7 +75,7 @@ func TestHeldRuleSet_AHashNoTextHasIsNotHeld(t *testing.T) {
 // under it replays: the same program over each runs and answers current.
 func TestHeldRuleSet_EveryTextRuns(t *testing.T) {
 	t.Parallel()
-	v, versions := value(t, entry("w", "health.weight", noon, "", `{}`))
+	v, versions := value(t, entry("w", "test.weight", noon, "", `{}`))
 	for _, hash := range []string{
 		"sha256:bd62040288c0e5b4e6de576c13618b065714736ed6c628106b73b0769c32727d",
 		"sha256:e29634877441262c765923739d4d2cb49ae7e15d93b537dd972ebc68bb7c026d",

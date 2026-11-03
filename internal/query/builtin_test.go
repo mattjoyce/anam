@@ -116,10 +116,10 @@ func TestWithin_Negated(t *testing.T) {
 func TestWithin_InARecursiveRule(t *testing.T) {
 	t.Parallel()
 	v, versions := value(t,
-		entry("a", "health.weight", "2026-06-01T00:00:00.000000000Z", "", `{}`),
-		entry("b", "health.weight", "2026-06-03T00:00:00.000000000Z", "", `{}`),
-		entry("c", "health.weight", "2026-06-05T00:00:00.000000000Z", "", `{}`),
-		entry("d", "health.weight", "2026-06-20T00:00:00.000000000Z", "", `{}`),
+		entry("a", "test.weight", "2026-06-01T00:00:00.000000000Z", "", `{}`),
+		entry("b", "test.weight", "2026-06-03T00:00:00.000000000Z", "", `{}`),
+		entry("c", "test.weight", "2026-06-05T00:00:00.000000000Z", "", `{}`),
+		entry("d", "test.weight", "2026-06-20T00:00:00.000000000Z", "", `{}`),
 	)
 	// A chain of readings each within two days of the next: a, b, c; d stands alone.
 	ans, err := tryRun(v, versions, registry(t), `
@@ -159,7 +159,7 @@ func TestWithin_RefusedAtPlanTime(t *testing.T) {
 		{"a rule that defines it", `within(A, B, D) :- entry(A, _, B, _, _, _, _), entry(D, _, _, _, _, _, _).`, []string{"within is a built-in", "head of a rule"}},
 		{"a declaration of it", "within/3.\nr(1).", []string{"within is a built-in", "cannot be declared"}},
 	}
-	v, versions := value(t, entry("w", "health.weight", noon, "", `{}`))
+	v, versions := value(t, entry("w", "test.weight", noon, "", `{}`))
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -180,8 +180,8 @@ func TestWithin_RefusedAtPlanTime(t *testing.T) {
 func TestWithin_ConstantsAreAcceptedWhenRight(t *testing.T) {
 	t.Parallel()
 	v, versions := value(t,
-		entry("a", "health.weight", "2026-06-15T10:00:00.000000000Z", "", `{}`),
-		entry("b", "health.weight", "2026-07-15T10:00:00.000000000Z", "", `{}`),
+		entry("a", "test.weight", "2026-06-15T10:00:00.000000000Z", "", `{}`),
+		entry("b", "test.weight", "2026-07-15T10:00:00.000000000Z", "", `{}`),
 	)
 	ans, err := tryRun(v, versions, registry(t), fmt.Sprintf(`
 		near(E) :- entry(E, _, T, _, _, _, _), within(T, %q, 0.5).
@@ -201,9 +201,9 @@ func TestWithin_AgainstBruteForce_RealLedger(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	h.seedRegimen(t)
-	h.admit(t, "health-db", "health.weight", "2026-06-15T06:00:00Z", `{"measured_at": "2026-06-15T06:00:00Z", "kg": 81}`)
-	h.admit(t, "health-db", "health.weight", "2026-06-15T12:00:00Z", `{"measured_at": "2026-06-15T12:00:00Z", "kg": 80}`)
-	h.admit(t, "health-db", "health.weight", "2026-06-15T12:00:00.5Z", `{"measured_at": "2026-06-15T12:00:00.5Z", "kg": 80}`)
+	h.admit(t, "health-db", "test.weight", "2026-06-15T06:00:00Z", `{"measured_at": "2026-06-15T06:00:00Z", "kg": 81}`)
+	h.admit(t, "health-db", "test.weight", "2026-06-15T12:00:00Z", `{"measured_at": "2026-06-15T12:00:00Z", "kg": 80}`)
+	h.admit(t, "health-db", "test.weight", "2026-06-15T12:00:00.5Z", `{"measured_at": "2026-06-15T12:00:00.5Z", "kg": 80}`)
 	v, versions, _ := h.served(t)
 
 	var instants []time.Time

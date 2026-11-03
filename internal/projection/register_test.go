@@ -9,7 +9,7 @@ import (
 	"github.com/mattjoyce/anam/internal/projection"
 )
 
-const heartV1 = `{"name":"heart","version":1,"description":"heart","types":["health.heart-rate-day","health.heart-rate-alert"],` +
+const heartV1 = `{"name":"heart","version":1,"description":"heart","types":["test.heart-rate-day","test.heart-rate-alert"],` +
 	`"statuses":["admitted","endorsed"],"max_classification":"Sensitive","from":"","to":"","shape":"log"}`
 
 func allDefined(facet.Type) bool { return true }
@@ -111,9 +111,9 @@ func TestRegister_ABundledTemplateIsTheFloor(t *testing.T) {
 func TestRegister_RefusesATypeWithNoDefinition(t *testing.T) {
 	t.Parallel()
 	held, _ := projection.BundledFS(fixtureProjs())
-	defined := func(typ facet.Type) bool { return typ == "health.heart-rate-day" }
+	defined := func(typ facet.Type) bool { return typ == "test.heart-rate-day" }
 	if _, err := projection.Register([]byte(heartV1), held, defined); !errors.Is(err, projection.ErrUndefinedType) ||
-		!strings.Contains(err.Error(), "health.heart-rate-alert") {
+		!strings.Contains(err.Error(), "test.heart-rate-alert") {
 		t.Errorf("a template naming an undefined type: %v", err)
 	}
 }

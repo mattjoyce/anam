@@ -13,7 +13,7 @@ import (
 
 const bpManifest = `{
   "meta": {
-    "facet_type": "health.blood-pressure",
+    "facet_type": "test.blood-pressure",
     "definition_version": 1,
     "classification": "Normal",
     "validation_mode": "strict",
@@ -114,7 +114,7 @@ func TestParse_RejectsBadManifests(t *testing.T) {
 	t.Parallel()
 	breakages := map[string]func(string) string{
 		"unknown key":      func(m string) string { return strings.Replace(m, `"meta"`, `"metta"`, 1) },
-		"snake type":       func(m string) string { return strings.Replace(m, "health.blood-pressure", "blood_pressure", 1) },
+		"snake type":       func(m string) string { return strings.Replace(m, "test.blood-pressure", "blood_pressure", 1) },
 		"no identity":      func(m string) string { return strings.Replace(m, `["/measured_at"]`, `[]`, 1) },
 		"bad mode":         func(m string) string { return strings.Replace(m, `"strict"`, `"relaxed"`, 1) },
 		"lenient is gone":  func(m string) string { return strings.Replace(m, `"strict"`, `"lenient"`, 1) },

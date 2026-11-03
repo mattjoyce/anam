@@ -16,12 +16,12 @@ const beyondFloat64 = "9007199254740993"
 func TestBug_AttrReportsTheNumberTheRecordHolds(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
-	h.admit(t, "bp-csv", "health.blood-pressure", "2026-06-15T07:00:00Z",
+	h.admit(t, "bp-csv", "test.blood-pressure", "2026-06-15T07:00:00Z",
 		`{"measured_at": "2026-06-15T07:00:00Z", "systolic": 9007199254740993, "diastolic": 80}`)
 	v, versions, _ := h.served(t)
 
 	ans, err := tryRun(v, versions, h.defs,
-		`sys(E, S) :- entry(E, "health.blood-pressure", _, _, _, _, _), attr(E, "/systolic", S).`, "sys")
+		`sys(E, S) :- entry(E, "test.blood-pressure", _, _, _, _, _), attr(E, "/systolic", S).`, "sys")
 	if err != nil {
 		t.Fatalf("attr: %v", err)
 	}
@@ -38,12 +38,12 @@ func TestBug_ComparingANumberBeyondFloat64DoesNotMatchTheWrongFact(t *testing.T)
 	h := newHarness(t)
 	// 2^53: the largest integer a float64 holds exactly, and the neighbour of the
 	// number the query asks for.
-	h.admit(t, "bp-csv", "health.blood-pressure", "2026-06-15T07:00:00Z",
+	h.admit(t, "bp-csv", "test.blood-pressure", "2026-06-15T07:00:00Z",
 		`{"measured_at": "2026-06-15T07:00:00Z", "systolic": 9007199254740992, "diastolic": 80}`)
 	v, versions, _ := h.served(t)
 
 	ans, err := tryRun(v, versions, h.defs,
-		`sys(E) :- entry(E, "health.blood-pressure", _, _, _, _, _), attr(E, "/systolic", S), S = `+beyondFloat64+`.`, "sys")
+		`sys(E) :- entry(E, "test.blood-pressure", _, _, _, _, _), attr(E, "/systolic", S), S = `+beyondFloat64+`.`, "sys")
 	if err != nil {
 		t.Fatalf("query: %v", err)
 	}

@@ -202,8 +202,8 @@ func TestOpen_AbsentEdgeDegrades(t *testing.T) {
 // catalog. Serial because it replaces the process default logger.
 func TestOpen_ACompleteCatalogLogsOnlyItsAdmission(t *testing.T) {
 	for name, cfg := range map[string]config.Config{
-		"minimal":   minimalConfig(t, func(string) {}),
-		"engine":    newConfig(t),
+		"minimal": minimalConfig(t, func(string) {}),
+		"engine":  newConfig(t),
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, lines, err := startLog(t, cfg)

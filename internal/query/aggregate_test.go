@@ -13,14 +13,14 @@ import (
 func TestAggregate_CountAndSum(t *testing.T) {
 	t.Parallel()
 	entries := []fold.Entry{
-		entry("r1", "health.blood-pressure", "2026-06-01T07:00:00.000000000Z", "", `{"measured_at":"2026-06-01T07:00:00Z","systolic":118}`),
-		entry("r2", "health.blood-pressure", "2026-07-20T07:00:00.000000000Z", "", `{"measured_at":"2026-07-20T07:00:00Z","systolic":146.5}`),
-		entry("r3", "health.blood-pressure", "2026-08-20T07:00:00.000000000Z", "", `{"measured_at":"2026-08-20T07:00:00Z","systolic":9.25}`),
+		entry("r1", "test.blood-pressure", "2026-06-01T07:00:00.000000000Z", "", `{"measured_at":"2026-06-01T07:00:00Z","systolic":118}`),
+		entry("r2", "test.blood-pressure", "2026-07-20T07:00:00.000000000Z", "", `{"measured_at":"2026-07-20T07:00:00Z","systolic":146.5}`),
+		entry("r3", "test.blood-pressure", "2026-08-20T07:00:00.000000000Z", "", `{"measured_at":"2026-08-20T07:00:00Z","systolic":9.25}`),
 	}
 	v, versions := value(t, entries...)
 
 	ans, _, err := query.Run(context.Background(), v, versions, registry(t),
-		`n(N) :- N = count : { entry(_, "health.blood-pressure", _, _, _, _, _) }.`, "n", 0)
+		`n(N) :- N = count : { entry(_, "test.blood-pressure", _, _, _, _, _) }.`, "n", 0)
 	if err != nil {
 		t.Fatalf("count: %v", err)
 	}
@@ -29,7 +29,7 @@ func TestAggregate_CountAndSum(t *testing.T) {
 	}
 
 	ans2, _, err := query.Run(context.Background(), v, versions, registry(t),
-		`s(S) :- S = sum V : { entry(E, "health.blood-pressure", _, _, _, _, _), attr(E, "/systolic", V) }.`, "s", 0)
+		`s(S) :- S = sum V : { entry(E, "test.blood-pressure", _, _, _, _, _), attr(E, "/systolic", V) }.`, "s", 0)
 	if err != nil {
 		t.Fatalf("sum: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestAggregate_CountAndSum(t *testing.T) {
 func TestAggregate_ReadsItsOwnResult(t *testing.T) {
 	t.Parallel()
 	entries := []fold.Entry{
-		entry("r1", "health.blood-pressure", "2026-06-01T07:00:00.000000000Z", "", `{"measured_at":"2026-06-01T07:00:00Z","systolic":118}`),
+		entry("r1", "test.blood-pressure", "2026-06-01T07:00:00.000000000Z", "", `{"measured_at":"2026-06-01T07:00:00Z","systolic":118}`),
 	}
 	v, versions := value(t, entries...)
 	_, _, err := query.Run(context.Background(), v, versions, registry(t),
@@ -54,7 +54,7 @@ func TestAggregate_ReadsItsOwnResult(t *testing.T) {
 func TestAggregate_RefusesPrefixInsideBraces(t *testing.T) {
 	t.Parallel()
 	entries := []fold.Entry{
-		entry("r1", "health.blood-pressure", "2026-06-01T07:00:00.000000000Z", "", `{"measured_at":"2026-06-01T07:00:00Z","systolic":118}`),
+		entry("r1", "test.blood-pressure", "2026-06-01T07:00:00.000000000Z", "", `{"measured_at":"2026-06-01T07:00:00Z","systolic":118}`),
 	}
 	v, versions := value(t, entries...)
 	_, _, err := query.Run(context.Background(), v, versions, registry(t),
@@ -67,7 +67,7 @@ func TestAggregate_RefusesPrefixInsideBraces(t *testing.T) {
 func TestAggregate_RefusesBareDateInstantInsideBraces(t *testing.T) {
 	t.Parallel()
 	entries := []fold.Entry{
-		entry("r1", "health.blood-pressure", "2026-06-01T07:00:00.000000000Z", "", `{"measured_at":"2026-06-01T07:00:00Z","systolic":118}`),
+		entry("r1", "test.blood-pressure", "2026-06-01T07:00:00.000000000Z", "", `{"measured_at":"2026-06-01T07:00:00Z","systolic":118}`),
 	}
 	v, versions := value(t, entries...)
 	_, _, err := query.Run(context.Background(), v, versions, registry(t),

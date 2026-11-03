@@ -31,7 +31,7 @@ func medManifest(typ string, closes bool) string {
 
 const bpManifest = `{
   "meta": {
-    "facet_type": "health.blood-pressure", "definition_version": 1, "classification": "Normal",
+    "facet_type": "test.blood-pressure", "definition_version": 1, "classification": "Normal",
     "validation_mode": "strict", "source_schema": "bp-csv/reading",
     "time_semantics": {"fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}},
     "identity_key": ["/measured_at"]
@@ -44,7 +44,7 @@ const bpManifest = `{
 
 const weightManifest = `{
   "meta": {
-    "facet_type": "health.weight", "definition_version": 1, "classification": "Normal",
+    "facet_type": "test.weight", "definition_version": 1, "classification": "Normal",
     "validation_mode": "verbatim", "source_schema": "health-db/weight",
     "time_semantics": {"fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}},
     "identity_key": ["/measured_at"]
@@ -54,7 +54,7 @@ const weightManifest = `{
 func registry(t *testing.T) *def.Registry {
 	t.Helper()
 	var defs []def.Definition
-	for _, m := range []string{medManifest("health.medication.started", false), medManifest("health.medication.dose-changed", false), medManifest("health.medication.stopped", true), bpManifest, weightManifest} {
+	for _, m := range []string{medManifest("test.medication.started", false), medManifest("test.medication.dose-changed", false), medManifest("test.medication.stopped", true), bpManifest, weightManifest} {
 		d, err := def.Parse([]byte(m))
 		if err != nil {
 			t.Fatalf("def.Parse: %v", err)
@@ -160,9 +160,9 @@ func same(a, b []string) bool {
 func TestEvaluate_ComparisonsAndAttributes(t *testing.T) {
 	t.Parallel()
 	v, versions := value(t,
-		entry("r1", "health.blood-pressure", day("2026-01-01"), "", `{"measured_at": "x", "systolic": 118, "tags": ["am", "sitting"], "cuff": {"arm": "left"}}`),
-		entry("r2", "health.blood-pressure", day("2026-01-02"), "", `{"measured_at": "x", "systolic": 146.0, "diastolic": null}`),
-		entry("r3", "health.blood-pressure", day("2026-01-03"), "", `{"measured_at": "x", "systolic": 9}`),
+		entry("r1", "test.blood-pressure", day("2026-01-01"), "", `{"measured_at": "x", "systolic": 118, "tags": ["am", "sitting"], "cuff": {"arm": "left"}}`),
+		entry("r2", "test.blood-pressure", day("2026-01-02"), "", `{"measured_at": "x", "systolic": 146.0, "diastolic": null}`),
+		entry("r3", "test.blood-pressure", day("2026-01-03"), "", `{"measured_at": "x", "systolic": 9}`),
 	)
 	cases := []struct {
 		name, text, relation string

@@ -10,8 +10,8 @@ import (
 func TestCostMatchesRun(t *testing.T) {
 	t.Parallel()
 	v, versions := value(t,
-		entry("r1", "health.blood-pressure", day("2026-01-01"), "", `{"measured_at": "x", "systolic": 118}`),
-		entry("r2", "health.blood-pressure", day("2026-01-02"), "", `{"measured_at": "x", "systolic": 146}`),
+		entry("r1", "test.blood-pressure", day("2026-01-01"), "", `{"measured_at": "x", "systolic": 118}`),
+		entry("r2", "test.blood-pressure", day("2026-01-02"), "", `{"measured_at": "x", "systolic": 146}`),
 	)
 	defs := registry(t)
 	text := `high(E) :- attr(E, "/systolic", S), S > 140.`

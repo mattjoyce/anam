@@ -14,9 +14,9 @@ func TestPageFacets(t *testing.T) {
 	t.Parallel()
 	var rows []facetRow
 	for i := 0; i < 700; i++ {
-		typ, src := facet.Type("health.weight"), "records"
+		typ, src := facet.Type("test.weight"), "records"
 		if i%2 == 1 {
-			typ, src = "health.sleep", "health-db"
+			typ, src = "test.sleep", "health-db"
 		}
 		rows = append(rows, facetRow{ID: fmt.Sprintf("f%04d", i), Type: typ, Source: src,
 			FactTime: fmt.Sprintf("2026-01-01T00:%02d:%02dZ", i/60, i%60), Status: facet.StatusAdmitted})
@@ -25,9 +25,9 @@ func TestPageFacets(t *testing.T) {
 	if all.Matched != 700 || len(all.Rows) != listPage || all.Rows[0].ID != "f0699" || all.Older == "" || all.Newer != "" {
 		t.Fatalf("first page: matched %d, %d rows, first %s, older %q newer %q", all.Matched, len(all.Rows), all.Rows[0].ID, all.Older, all.Newer)
 	}
-	sleep := pageFacets(rows, facetFilter{Type: "health.sleep"}, 300)
+	sleep := pageFacets(rows, facetFilter{Type: "test.sleep"}, 300)
 	if sleep.Matched != 350 || len(sleep.Rows) != 50 || sleep.From != 301 || sleep.Older != "" ||
-		sleep.Newer != "/facets?type=health.sleep" {
+		sleep.Newer != "/facets?type=test.sleep" {
 		t.Fatalf("sleep page 2: %+v", sleep)
 	}
 	if got := pageFacets(rows, facetFilter{Source: "records", Status: "tombstoned"}, 0); got.Matched != 0 {

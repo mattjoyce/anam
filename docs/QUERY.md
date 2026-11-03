@@ -39,13 +39,13 @@ takes an object with the fields of a manifest, without its name, version or desc
 ```json
 {
   "projection": {
-    "types": ["health.weight", "health.blood-pressure."],
+    "types": ["test.weight", "test.blood-pressure."],
     "statuses": ["admitted", "endorsed"],
     "max_classification": "Sensitive",
     "from": "2026-01-01T00:00:00.000000000Z",
     "shape": "log"
   },
-  "text": "heavy(E, Kg) :- entry(E, \"health.weight\", _, _, _, _, _), attr(E, \"/kg\", Kg), Kg > 80.",
+  "text": "heavy(E, Kg) :- entry(E, \"test.weight\", _, _, _, _, _), attr(E, \"/kg\", Kg), Kg > 80.",
   "relation": "heavy"
 }
 ```
@@ -156,9 +156,9 @@ The catalogue lists each type's pointers by Definition version, so write a progr
 
 ### Types by prefix
 
-A type pattern is an exact type or a prefix ending in `.`, such as `health.medication.`. The query
+A type pattern is an exact type or a prefix ending in `.`, such as `test.medication.`. The query
 language has no prefix operator. A prefix is a pair of lexical bounds. One is above the prefix, and one below it
-with the closing `.` raised to `/`, the next byte. `T > "health.medication.", T < "health.medication/"`
+with the closing `.` raised to `/`, the next byte. `T > "test.medication.", T < "test.medication/"`
 holds for every type that starts with the prefix and is longer, and for nothing else. The selection
 builder writes it this way, and so do the bundled edge rules for a pointer.
 
@@ -239,14 +239,14 @@ n(T, N) :- entry(_, T, _, _, _, _, _), N = count : { entry(_, T, _, _, _, _, _) 
 ```
 
 ```answer question=types-count
-activity.steps 5
-health.blood-pressure 5
-health.intake 4
-health.medication.dose-changed 1
-health.medication.started 3
-health.medication.stopped 1
-health.sleep-episode 2
 record.edge 1
+test.blood-pressure 5
+test.intake 4
+test.medication.dose-changed 1
+test.medication.started 3
+test.medication.stopped 1
+test.sleep-episode 2
+test.steps 5
 ```
 
 ## What the language does not do
@@ -267,20 +267,21 @@ record.edge 1
 
 ## Worked questions
 
-The record these run against is a small one. Ramipril started on 1 March 2026 and had a dose change
+The record these run against is a small one, under the test's own types (the `test.` head; the
+binary carries no catalog, so the types are whatever the deployment's catalog names). Ramipril started on 1 March 2026 and had a dose change
 on 15 May. Vitamin D3 + K2 started on 1 May, stopped on 15 July, and began a second course on 10
 August. Blood-pressure readings were taken on 15 February, 10 April, 1 June, 20 July and 20 August,
 and the April one is the high one at 146. A note, "Before the dentist.", is about the April reading.
-For the alcohol question, the record also holds three `health.intake` alcohol facts (two red wines on the
+For the alcohol question, the record also holds three `test.intake` alcohol facts (two red wines on the
 evening of 21 October, a beer on the evening of 22 and another on the evening of 23), a flat white on the
 morning of the 22nd, and two nights' sleep, which began at 12:30 UTC on the 21st and at 12:00 UTC on the 22nd.
-The medication types are `health.medication.started`, `.dose-changed` and `.stopped`, and each course
+The medication types are `test.medication.started`, `.dose-changed` and `.stopped`, and each course
 of a drug is one series.
 
 ### A reading above a bound
 
 ```datalog question=high-readings relation=high
-high(At, Systolic) :- entry(R, "health.blood-pressure", At, _, _, _, _),
+high(At, Systolic) :- entry(R, "test.blood-pressure", At, _, _, _, _),
                       attr(R, "/systolic", Systolic), Systolic > 140.
 ```
 
@@ -295,7 +296,7 @@ Name the date as an instant, then ask `current/2`. In this record the medication
 
 ```datalog question=on-a-date relation=taking
 instant("2026-07-20T00:00:00.000000000Z").
-regimen_type("health.medication.started"). regimen_type("health.medication.dose-changed").
+regimen_type("test.medication.started"). regimen_type("test.medication.dose-changed").
 taking(Drug) :- instant(At), current(E, At), entry(E, T, _, _, _, _, _),
                 regimen_type(T), attr(E, "/drug", Drug).
 ```
@@ -312,9 +313,9 @@ begun.
 One question over many instants. `instant/1` can be a rule over `entry/7`.
 
 ```datalog question=regimen-at-each-reading relation=regimen
-instant(At) :- entry(_, "health.blood-pressure", At, _, _, _, _).
-regimen_type("health.medication.started"). regimen_type("health.medication.dose-changed").
-regimen(At, Drug) :- entry(_, "health.blood-pressure", At, _, _, _, _), current(E, At),
+instant(At) :- entry(_, "test.blood-pressure", At, _, _, _, _).
+regimen_type("test.medication.started"). regimen_type("test.medication.dose-changed").
+regimen(At, Drug) :- entry(_, "test.blood-pressure", At, _, _, _, _), current(E, At),
                      entry(E, T, _, _, _, _, _), regimen_type(T), attr(E, "/drug", Drug).
 ```
 
@@ -334,9 +335,9 @@ current when the reading R happened, so there is no `At` to carry. `instant/1` s
 readings' fact-times, since that is what bounds the work.
 
 ```datalog question=regimen-in-force relation=regimen
-instant(At) :- entry(_, "health.blood-pressure", At, _, _, _, _).
-regimen_type("health.medication.started"). regimen_type("health.medication.dose-changed").
-regimen(At, Drug) :- entry(R, "health.blood-pressure", At, _, _, _, _), in_force(E, R),
+instant(At) :- entry(_, "test.blood-pressure", At, _, _, _, _).
+regimen_type("test.medication.started"). regimen_type("test.medication.dose-changed").
+regimen(At, Drug) :- entry(R, "test.blood-pressure", At, _, _, _, _), in_force(E, R),
                      entry(E, T, _, _, _, _, _), regimen_type(T), attr(E, "/drug", Drug).
 ```
 
@@ -358,8 +359,8 @@ hand. Each row is a reading and the dose change it is near. Ramipril's dose chan
 35 days after the April reading and 17 before the June one, and 66 before the July one, so July is out.
 
 ```datalog question=near-a-dose relation=near_dose
-near_dose(At, ChangedAt) :- entry(_, "health.blood-pressure", At, _, _, _, _),
-                            entry(_, "health.medication.dose-changed", ChangedAt, _, _, _, _),
+near_dose(At, ChangedAt) :- entry(_, "test.blood-pressure", At, _, _, _, _),
+                            entry(_, "test.medication.dose-changed", ChangedAt, _, _, _, _),
                             within(At, ChangedAt, 56).
 ```
 
@@ -379,9 +380,9 @@ last(Series, Type) :- instant(At), latest(E, At), entry(E, Type, _, Series, _, _
 ```
 
 ```answer question=latest-per-series
-med.regimen:15:vitamin d3 + k2:1:1 health.medication.stopped
-med.regimen:15:vitamin d3 + k2:1:2 health.medication.started
-med.regimen:8:ramipril:1:1 health.medication.dose-changed
+med.regimen:15:vitamin d3 + k2:1:1 test.medication.stopped
+med.regimen:15:vitamin d3 + k2:1:2 test.medication.started
+med.regimen:8:ramipril:1:1 test.medication.dose-changed
 ```
 
 The series names are composed by the Definition (the drug's length, the drug, the course), so match
@@ -392,7 +393,7 @@ them through `entry/7` by type or by a rule, and treat the text as opaque.
 These are the readings from June to August, counted: three of them.
 
 ```datalog question=summer-readings relation=summer
-summer(N) :- N = count : { entry(_, "health.blood-pressure", At, _, _, _, _), At >= "2026-06-01T00:00:00.000000000Z", At < "2026-09-01T00:00:00.000000000Z" }.
+summer(N) :- N = count : { entry(_, "test.blood-pressure", At, _, _, _, _), At >= "2026-06-01T00:00:00.000000000Z", At < "2026-09-01T00:00:00.000000000Z" }.
 ```
 
 ```answer question=summer-readings
@@ -407,9 +408,9 @@ The steps of each month, summed, with the number of days they came from. The ave
 over the count, which the caller divides: 5,000 steps a day in September and 7,000 in October.
 
 ```datalog question=steps-per-month relation=steps
-steps(M, S, N) :- entry(_, "activity.steps", At0, _, _, _, _), month_of(At0, M),
-                  S = sum V : { entry(E, "activity.steps", At, _, _, _, _), month_of(At, M), attr(E, "/step_count/value", V) },
-                  N = count : { entry(E, "activity.steps", At, _, _, _, _), month_of(At, M) }.
+steps(M, S, N) :- entry(_, "test.steps", At0, _, _, _, _), month_of(At0, M),
+                  S = sum V : { entry(E, "test.steps", At, _, _, _, _), month_of(At, M), attr(E, "/step_count/value", V) },
+                  N = count : { entry(E, "test.steps", At, _, _, _, _), month_of(At, M) }.
 ```
 
 ```answer question=steps-per-month
@@ -427,11 +428,11 @@ The readings in summer at whose moment no regimen statement names vitamin D3 + K
 negation over a relation you define, since negation can only test what is bound.
 
 ```datalog question=without-d3k2 relation=without
-instant(At) :- entry(_, "health.blood-pressure", At, _, _, _, _).
-regimen_type("health.medication.started"). regimen_type("health.medication.dose-changed").
+instant(At) :- entry(_, "test.blood-pressure", At, _, _, _, _).
+regimen_type("test.medication.started"). regimen_type("test.medication.dose-changed").
 on_d3k2(At) :- current(E, At), entry(E, T, _, _, _, _, _), regimen_type(T),
                attr(E, "/drug", "vitamin d3 + k2").
-without(At) :- entry(_, "health.blood-pressure", At, _, _, _, _),
+without(At) :- entry(_, "test.blood-pressure", At, _, _, _, _),
                At >= "2026-06-01T00:00:00.000000000Z", At < "2026-09-01T00:00:00.000000000Z",
                not on_d3k2(At).
 ```
@@ -445,7 +446,7 @@ without(At) :- entry(_, "health.blood-pressure", At, _, _, _, _),
 Notes are `record.edge` facets, so `linked/2` finds them. The words are in the edge's payload.
 
 ```datalog question=notes-on-readings relation=noted
-noted(At, Text) :- entry(R, "health.blood-pressure", At, _, _, _, _), linked(Edge, R),
+noted(At, Text) :- entry(R, "test.blood-pressure", At, _, _, _, _), linked(Edge, R),
                    attr(Edge, "/text", Text).
 ```
 
@@ -455,7 +456,7 @@ noted(At, Text) :- entry(R, "health.blood-pressure", At, _, _, _, _), linked(Edg
 
 ### Alcohol before a sleep episode
 
-Each alcohol intake with the next sleep episode that began after it. `health.intake` keeps what kind of
+Each alcohol intake with the next sleep episode that began after it. `test.intake` keeps what kind of
 intake it was at `/kind` and which drink at `/drink`, so the flat white is left out by asking for
 `alcohol`. The next sleep is the earliest later start, found by negation over a relation you define:
 a start is skipped for an intake when another start falls between them. The beer on the 23rd is
@@ -463,9 +464,9 @@ followed by no sleep in the record, so it has no row. Answers are the intake's i
 the sleep's start.
 
 ```datalog question=alcohol-before-sleep relation=before_sleep
-alcohol(At, Drink) :- entry(A, "health.intake", At, _, _, _, _),
+alcohol(At, Drink) :- entry(A, "test.intake", At, _, _, _, _),
                       attr(A, "/kind", "alcohol"), attr(A, "/drink", Drink).
-sleep_start(At) :- entry(_, "health.sleep-episode", At, _, _, _, _).
+sleep_start(At) :- entry(_, "test.sleep-episode", At, _, _, _, _).
 skipped(At, Next) :- alcohol(At, _), sleep_start(Next), sleep_start(Other),
                      At < Next, At < Other, Other < Next.
 before_sleep(At, Drink, Next) :- alcohol(At, Drink), sleep_start(Next),
@@ -487,9 +488,9 @@ sleep that began within six hours after the drink, and a night with two such sta
 rows.
 
 ```datalog question=alcohol-within-six-hours relation=within_six_hours
-alcohol(At, Drink) :- entry(A, "health.intake", At, _, _, _, _),
+alcohol(At, Drink) :- entry(A, "test.intake", At, _, _, _, _),
                       attr(A, "/kind", "alcohol"), attr(A, "/drink", Drink).
-sleep_start(At) :- entry(_, "health.sleep-episode", At, _, _, _, _).
+sleep_start(At) :- entry(_, "test.sleep-episode", At, _, _, _, _).
 within_six_hours(At, Drink, Next) :- alcohol(At, Drink), sleep_start(Next),
                                      At < Next, within(At, Next, 0.25).
 ```
@@ -505,13 +506,13 @@ The type prefix as lexical bounds, in a window.
 
 ```datalog question=medication-events relation=events
 events(At, Type) :- entry(_, Type, At, _, _, _, _),
-                    Type > "health.medication.", Type < "health.medication/",
+                    Type > "test.medication.", Type < "test.medication/",
                     At >= "2026-07-01T00:00:00.000000000Z", At < "2026-09-01T00:00:00.000000000Z".
 ```
 
 ```answer question=medication-events
-2026-07-15T00:00:00.000000000Z health.medication.stopped
-2026-08-10T00:00:00.000000000Z health.medication.started
+2026-07-15T00:00:00.000000000Z test.medication.stopped
+2026-08-10T00:00:00.000000000Z test.medication.started
 ```
 
 ### Which types close a series
@@ -521,7 +522,7 @@ closing(Type) :- closes(Type).
 ```
 
 ```answer question=closing-types
-health.medication.stopped
+test.medication.stopped
 ```
 
 ### Programs that are refused
@@ -552,7 +553,7 @@ instant 2026-07-20 is not a fact-time
 A builtin with an argument nothing binds.
 
 ```datalog refused=unbound-within relation=near
-near(At) :- entry(_, "health.blood-pressure", At, _, _, _, _), within(At, Other, 56).
+near(At) :- entry(_, "test.blood-pressure", At, _, _, _, _), within(At, Other, 56).
 ```
 
 ```error refused=unbound-within
@@ -600,7 +601,7 @@ nothing of it.
 % dates read in Australia/Sydney
 pick/1.
 pick(E) :- entry(E, T, At, _, _, S, _),
-    T > "health.medication.", T < "health.medication/",
+    T > "test.medication.", T < "test.medication/",
     S = "self-log",
     At >= "2026-05-31T14:00:00.000000000Z", At < "2026-08-31T14:00:00.000000000Z",
     not unpick(E).

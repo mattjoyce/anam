@@ -17,7 +17,7 @@ import (
 func TestGuard_RefusesAChangedKeyingAndNothingElse(t *testing.T) {
 	t.Parallel()
 
-	stored := []def.Stored{{Type: "health.blood-pressure", Version: 1, Body: []byte(bpManifest)}}
+	stored := []def.Stored{{Type: "test.blood-pressure", Version: 1, Body: []byte(bpManifest)}}
 	bundle := func(t *testing.T, manifest string) *def.Registry {
 		t.Helper()
 		d, err := def.Parse([]byte(manifest))
@@ -63,7 +63,7 @@ func TestGuard_RefusesAChangedKeyingAndNothingElse(t *testing.T) {
 			if !errors.Is(err, def.ErrKeyed) {
 				t.Fatalf("Guard = %v, want ErrKeyed", err)
 			}
-			for _, want := range []string{"health.blood-pressure", "new ledger"} {
+			for _, want := range []string{"test.blood-pressure", "new ledger"} {
 				if !strings.Contains(err.Error(), want) {
 					t.Errorf("refusal %q does not say %q", err, want)
 				}
@@ -72,7 +72,7 @@ func TestGuard_RefusesAChangedKeyingAndNothingElse(t *testing.T) {
 	}
 
 	// A type the store has never seen is new, and passes whatever it declares.
-	fresh := strings.Replace(bpManifest, `"facet_type": "health.blood-pressure"`, `"facet_type": "health.pulse"`, 1)
+	fresh := strings.Replace(bpManifest, `"facet_type": "test.blood-pressure"`, `"facet_type": "test.pulse"`, 1)
 	if err := def.Guard(stored, bundle(t, fresh)); err != nil {
 		t.Errorf("Guard refused a new type: %v", err)
 	}
@@ -113,14 +113,14 @@ func TestGuard_ComparesAStoredBodyOfAnEarlierFormat(t *testing.T) {
 	t.Parallel()
 	before := `{
   "meta": {
-    "facet_type": "health.blood-pressure", "definition_version": 1, "classification": "Normal",
+    "facet_type": "test.blood-pressure", "definition_version": 1, "classification": "Normal",
     "validation_mode": "lenient", "source_schema": "bp-csv/reading",
     "time_semantics": {"fact_time": {"pointer": "/measured_at", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}},
     "identity_key": ["/measured_at"]
   },
   "schema": {"required": ["/systolic", "/diastolic"], "properties": {"/position": {"enum": ["sitting"]}}}
 }`
-	stored := []def.Stored{{Type: "health.blood-pressure", Version: 1, Body: []byte(before)}}
+	stored := []def.Stored{{Type: "test.blood-pressure", Version: 1, Body: []byte(before)}}
 
 	same, err := def.NewRegistry(mustParse(t, strings.Replace(bpManifest, `"definition_version": 1`, `"definition_version": 2`, 1)))
 	if err != nil {
@@ -163,14 +163,14 @@ func TestGuard_AcceptsTheTwoWideningsAndNothingElse(t *testing.T) {
 		if mode == "verbatim" {
 			schema = ""
 		}
-		return `{"meta": {"facet_type": "health.reading", "definition_version": ` + strconv.Itoa(version) + `, "classification": "Normal",
+		return `{"meta": {"facet_type": "test.raw-reading", "definition_version": ` + strconv.Itoa(version) + `, "classification": "Normal",
 		  "validation_mode": "` + mode + `", "source_schema": "test/reading",
 		  "time_semantics": {"fact_time": ` + fact + `}, "identity_key": ["/id"]` + template + `}` + schema + `}`
 	}
 	stored := func(bodies ...string) []def.Stored {
 		var out []def.Stored
 		for i, b := range bodies {
-			out = append(out, def.Stored{Type: "health.reading", Version: i + 1, Body: []byte(b)})
+			out = append(out, def.Stored{Type: "test.raw-reading", Version: i + 1, Body: []byte(b)})
 		}
 		return out
 	}
@@ -231,9 +231,9 @@ func TestGuard_AcceptsTheTwoWideningsAndNothingElse(t *testing.T) {
 	}
 }
 
-// lenientReading is health.reading in the format before card 52, which did not close
+// lenientReading is test.raw-reading in the format before card 52, which did not close
 // its fields.
-const lenientReading = `{"meta": {"facet_type": "health.reading", "definition_version": 1, "classification": "Normal",
+const lenientReading = `{"meta": {"facet_type": "test.raw-reading", "definition_version": 1, "classification": "Normal",
   "validation_mode": "lenient", "source_schema": "test/reading",
   "time_semantics": {"fact_time": {"pointer": "/at", "layout": "2006-01-02 15:04", "zone": "Australia/Sydney"}},
   "identity_key": ["/id"], "identity_template": "{source}:r/{/at|2006-01-02T15:04}"},

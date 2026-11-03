@@ -1,7 +1,7 @@
 ---
 type: gap
-title: Receipts pin the bundled Definition set only
-description: definition_set_version hashes the embedded manifests; a registered Definition that decides a snapshot's closing types is not in it, so a meds-style serve against a registered series rule that later changes verifies with no note.
+title: Receipts pin the catalog's Definition set only
+description: definition_set_version hashes the catalog's current manifests; a registered Definition that decides a snapshot's closing types is not in it, so a meds-style serve against a registered series rule that later changes verifies with no note.
 timestamp: 2026-10-11T00:00:00Z
 looked_at:
   - internal/def/setversion.go

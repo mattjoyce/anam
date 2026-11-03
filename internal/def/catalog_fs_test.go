@@ -126,8 +126,8 @@ func TestFS_BadManifestNameFails(t *testing.T) {
 func TestFS_HistoryCanBeEmpty(t *testing.T) {
 	// Build a minimal catalog with just one manifest, no history.
 	fsys := fstest.MapFS{
-		"health.fake.json": &fstest.MapFile{
-			Data: []byte(`{"meta":{"facet_type":"health.fake","definition_version":1,"classification":"Normal","validation_mode":"strict","source_schema":"fake/reading","time_semantics":{"fact_time":{"pointer":"/at","layout":"2006-01-02","zone":"UTC"}},"identity_key":["/at"]},"schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["at"],"properties":{"at":{"type":"string","minLength":1}},"additionalProperties":false}}`),
+		"test.fake.json": &fstest.MapFile{
+			Data: []byte(`{"meta":{"facet_type":"test.fake","definition_version":1,"classification":"Normal","validation_mode":"strict","source_schema":"fake/reading","time_semantics":{"fact_time":{"pointer":"/at","layout":"2006-01-02","zone":"UTC"}},"identity_key":["/at"]},"schema":{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["at"],"properties":{"at":{"type":"string","minLength":1}},"additionalProperties":false}}`),
 		},
 	}
 

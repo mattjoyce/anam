@@ -121,7 +121,7 @@ func TestSchema10_AFreshStoreFilesTemplateBodiesInTemplateBody(t *testing.T) {
 			t.Errorf("a fresh store has %s", o)
 		}
 	}
-	digest, err := d.Put(ctx, ops.KindTemplateBody, []byte(`{"types":["health.weight"]}`))
+	digest, err := d.Put(ctx, ops.KindTemplateBody, []byte(`{"types":["test.weight"]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +200,7 @@ func TestSchema9Build_RefusesASchema10FileAndAddsOnlyAnEmptyTable(t *testing.T) 
 	t.Parallel()
 	ctx := context.Background()
 	d, path := open(t)
-	body, err := d.Put(ctx, ops.KindTemplateBody, []byte(`{"types":["health.weight"]}`))
+	body, err := d.Put(ctx, ops.KindTemplateBody, []byte(`{"types":["test.weight"]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +227,7 @@ func TestSchema9Build_RefusesASchema10FileAndAddsOnlyAnEmptyTable(t *testing.T) 
 	if err := d.SetHold(ctx, ops.HoldAll, "2026-11-02T00:00:00.000000000Z"); err != nil {
 		t.Fatal(err)
 	}
-	if err := d.PutDefinitions(ctx, []ops.DefinitionRow{{Type: "health.weight", Version: 7, Body: `{}`}}); err != nil {
+	if err := d.PutDefinitions(ctx, []ops.DefinitionRow{{Type: "test.weight", Version: 7, Body: `{}`}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := d.PinLedger(ctx, "ledger-a"); err != nil {
@@ -492,7 +492,7 @@ func TestCarrySchema_IsAllOrNothingAndOnlyIntoAFreshStore(t *testing.T) {
 	}
 
 	provisioned, _ := open(t)
-	if err := provisioned.PutDefinitions(ctx, []ops.DefinitionRow{{Type: "health.weight", Version: 7, Body: `{}`}}); err != nil {
+	if err := provisioned.PutDefinitions(ctx, []ops.DefinitionRow{{Type: "test.weight", Version: 7, Body: `{}`}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := provisioned.CarrySchema(ctx, src.Registered); !errors.Is(err, ops.ErrCarryTarget) || !strings.Contains(err.Error(), "1 definition") {

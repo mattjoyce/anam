@@ -22,7 +22,7 @@ const person = "matt"
 
 const bpManifest = `{
   "meta": {
-    "facet_type": "health.blood-pressure",
+    "facet_type": "test.blood-pressure",
     "definition_version": 1,
     "classification": "Normal",
     "validation_mode": "strict",
@@ -56,13 +56,13 @@ func newGate(t *testing.T) (*gate.Gate, *ledger.Ledger) {
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
 	}
-	scopes := gate.StaticScopes{"bp-csv": {"health.blood-pressure"}}
+	scopes := gate.StaticScopes{"bp-csv": {"test.blood-pressure"}}
 	return gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}), l
 }
 
 func bpEnvelope(payload string) facet.Envelope {
 	return facet.Envelope{
-		Type: "health.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
+		Type: "test.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
 		SourceRef: facet.SourceRef("bp-csv", "2026-01-24T06:30:00Z"),
 		Payload:   []byte(payload),
 	}
@@ -262,9 +262,9 @@ func TestCommit_TypedRejections(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		g2 := gate.New(nil, reg, gate.StaticScopes{"bp-csv": {"health.sleep"}}, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
+		g2 := gate.New(nil, reg, gate.StaticScopes{"bp-csv": {"test.sleep"}}, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 		env := bpEnvelope(bpPayload)
-		env.Type = "health.sleep"
+		env.Type = "test.sleep"
 		if _, _, err := g2.Commit(ctx, env, binding); !errors.Is(err, gate.ErrNoDefinition) {
 			t.Errorf("got %v, want ErrNoDefinition", err)
 		}

@@ -17,13 +17,13 @@ import (
 func TestBug_AttrPointerToAContainerIsRefused(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
-	h.admit(t, "bp-csv", "health.blood-pressure", "2026-06-15T07:00:00Z",
+	h.admit(t, "bp-csv", "test.blood-pressure", "2026-06-15T07:00:00Z",
 		`{"measured_at": "2026-06-15T07:00:00Z", "systolic": 120, "diastolic": 80, "cuff": {"arm": "left"}}`)
 	v, versions, _ := h.served(t)
 
 	// The container's leaf binds.
 	ans, err := tryRun(v, versions, h.defs,
-		`arm(E, A) :- entry(E, "health.blood-pressure", _, _, _, _, _), attr(E, "/cuff/arm", A).`, "arm")
+		`arm(E, A) :- entry(E, "test.blood-pressure", _, _, _, _, _), attr(E, "/cuff/arm", A).`, "arm")
 	if err != nil {
 		t.Fatalf("the leaf of a container must bind: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestBug_AttrPointerToAContainerIsRefused(t *testing.T) {
 
 	// The container's own pointer cannot: the engine must say so, not answer empty.
 	_, err = tryRun(v, versions, h.defs,
-		`cuff(E, A) :- entry(E, "health.blood-pressure", _, _, _, _, _), attr(E, "/cuff", A).`, "cuff")
+		`cuff(E, A) :- entry(E, "test.blood-pressure", _, _, _, _, _), attr(E, "/cuff", A).`, "cuff")
 	if err == nil {
 		t.Fatal("the engine accepted attr(E, \"/cuff\", A): /cuff names a container and attr holds only " +
 			"scalar leaves, so the program can never bind and answers empty. That is the shape checkDefined refuses: " +

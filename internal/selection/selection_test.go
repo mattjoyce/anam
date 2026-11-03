@@ -24,20 +24,20 @@ var filters = map[string]selection.Filter{
 	"from":                {From: oct1},
 	"to":                  {To: oct8},
 	"window":              {From: oct1, To: oct8},
-	"exact type":          {Types: []string{"health.blood-pressure"}},
-	"prefix":              {Types: []string{"activity.exercise-session."}},
-	"prefix and exact":    {Types: []string{"health.heart-rate.", "health.blood-pressure"}},
+	"exact type":          {Types: []string{"test.blood-pressure"}},
+	"prefix":              {Types: []string{"test.exercise-session."}},
+	"prefix and exact":    {Types: []string{"test.heart-rate.", "test.blood-pressure"}},
 	"source":              {Sources: []string{"withings"}},
-	"two by two":          {Types: []string{"health.weight", "health.heart-rate."}, Sources: []string{"withings", "garmin"}},
+	"two by two":          {Types: []string{"test.weight", "test.heart-rate."}, Sources: []string{"withings", "garmin"}},
 	"superseded":          {Standing: selection.Superseded},
 	"superseded windowed": {Standing: selection.Superseded, From: oct1},
-	"live named":          {Standing: selection.Live, Types: []string{"health.weight"}},
+	"live named":          {Standing: selection.Live, Types: []string{"test.weight"}},
 	"everything": {
-		From: oct1, To: oct8, Types: []string{"activity.exercise-session.", "health.heart-rate.alert"},
+		From: oct1, To: oct8, Types: []string{"test.exercise-session.", "test.heart-rate.alert"},
 		Sources: []string{"garmin"}, Ticks: []string{"t2", "t1"}, Exclusions: []string{"x1", "x2"},
 	},
-	"repeats":             {Types: []string{"health.weight", "health.weight"}, Ticks: []string{"a", "a"}},
-	"ticked and excluded": {Types: []string{"health.weight"}, Ticks: []string{"a"}, Exclusions: []string{"a", "b"}},
+	"repeats":             {Types: []string{"test.weight", "test.weight"}, Ticks: []string{"a", "a"}},
+	"ticked and excluded": {Types: []string{"test.weight"}, Ticks: []string{"a"}, Exclusions: []string{"a", "b"}},
 	"quoting":             {Sources: []string{`odd "source" \ name`}, Ticks: []string{"id with spaces"}},
 }
 
@@ -69,11 +69,11 @@ func TestRoundTrip(t *testing.T) {
 // The program is the value whatever order the criteria were added in.
 func TestOrderDoesNotMatter(t *testing.T) {
 	t.Parallel()
-	a, err := selection.Filter{From: oct1, Types: []string{"health.weight", "activity.steps"}}.Program()
+	a, err := selection.Filter{From: oct1, Types: []string{"test.weight", "test.steps"}}.Program()
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := selection.Filter{Types: []string{"activity.steps", "health.weight"}, From: oct1}.Program()
+	b, err := selection.Filter{Types: []string{"test.steps", "test.weight"}, From: oct1}.Program()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestOrderDoesNotMatter(t *testing.T) {
 func TestProgram_Sample(t *testing.T) {
 	t.Parallel()
 	text, err := selection.Filter{
-		From: oct1, To: oct8, Types: []string{"activity.exercise-session."},
+		From: oct1, To: oct8, Types: []string{"test.exercise-session."},
 		Ticks: []string{"5d1c0a4e-0000-0000-0000-000000000001", "5d1c0a4e-0000-0000-0000-000000000002"},
 	}.Program()
 	if err != nil {
@@ -95,7 +95,7 @@ func TestProgram_Sample(t *testing.T) {
 	want := `% An Anam selection (card 199): pick/1 holds the facets it selects.
 pick/1.
 pick(E) :- entry(E, T, At, _, _, _, _),
-    T > "activity.exercise-session.", T < "activity.exercise-session/",
+    T > "test.exercise-session.", T < "test.exercise-session/",
     At >= "2026-10-01T00:00:00.000000000Z", At < "2026-10-08T00:00:00.000000000Z".
 pick("5d1c0a4e-0000-0000-0000-000000000001").
 pick("5d1c0a4e-0000-0000-0000-000000000002").
@@ -113,13 +113,13 @@ func TestParse_Grammar(t *testing.T) {
 	t.Parallel()
 	inside := `pick("b").
 % a comment
-pick(E) :- entry(E, T, _, _, _, _, _), T = "health.weight".
+pick(E) :- entry(E, T, _, _, _, _, _), T = "test.weight".
 pick("a").`
 	f, err := selection.Parse(inside)
 	if err != nil {
 		t.Fatalf("a reordered program in the grammar: %v", err)
 	}
-	if want := (selection.Filter{Types: []string{"health.weight"}, Ticks: []string{"a", "b"}}).Canonical(); !reflect.DeepEqual(f, want) {
+	if want := (selection.Filter{Types: []string{"test.weight"}, Ticks: []string{"a", "b"}}).Canonical(); !reflect.DeepEqual(f, want) {
 		t.Errorf("Parse = %+v, want %+v", f, want)
 	}
 
@@ -132,14 +132,14 @@ pick("a").`
 		"a declaration": "instant/1.\npick(\"a\").",
 		"a bad type":    `pick(E) :- entry(E, T, _, _, _, _, _), T = "weight".`,
 		"a bare date":   `pick(E) :- entry(E, _, At, _, _, _, _), At >= "2026-10-01".`,
-		"a lost bound":  `pick(E) :- entry(E, T, _, _, _, _, _), T > "activity.exercise-session.".`,
-		"an exclusion the rule does not read": `pick(E) :- entry(E, T, _, _, _, _, _), T = "health.weight".
+		"a lost bound":  `pick(E) :- entry(E, T, _, _, _, _, _), T > "test.exercise-session.".`,
+		"an exclusion the rule does not read": `pick(E) :- entry(E, T, _, _, _, _, _), T = "test.weight".
 unpick("a").`,
-		"two windows": `pick(E) :- entry(E, T, At, _, _, _, _), T = "health.weight", At >= "2026-10-01T00:00:00.000000000Z".
-pick(E) :- entry(E, T, At, _, _, _, _), T = "activity.steps", At >= "2026-10-02T00:00:00.000000000Z".`,
-		"a missing pair": `pick(E) :- entry(E, T, _, _, _, S, _), T = "health.weight", S = "garmin".
-pick(E) :- entry(E, T, _, _, _, S, _), T = "health.weight", S = "withings".
-pick(E) :- entry(E, T, _, _, _, S, _), T = "activity.steps", S = "garmin".`,
+		"two windows": `pick(E) :- entry(E, T, At, _, _, _, _), T = "test.weight", At >= "2026-10-01T00:00:00.000000000Z".
+pick(E) :- entry(E, T, At, _, _, _, _), T = "test.steps", At >= "2026-10-02T00:00:00.000000000Z".`,
+		"a missing pair": `pick(E) :- entry(E, T, _, _, _, S, _), T = "test.weight", S = "garmin".
+pick(E) :- entry(E, T, _, _, _, S, _), T = "test.weight", S = "withings".
+pick(E) :- entry(E, T, _, _, _, S, _), T = "test.steps", S = "garmin".`,
 	}
 	for name, text := range outside {
 		if _, err := selection.Parse(text); !errors.Is(err, selection.ErrNotChips) {
@@ -151,7 +151,7 @@ pick(E) :- entry(E, T, _, _, _, S, _), T = "activity.steps", S = "garmin".`,
 func TestValidate_Refusals(t *testing.T) {
 	t.Parallel()
 	for name, f := range map[string]selection.Filter{
-		"bare domain":   {Types: []string{"health."}},
+		"bare domain":   {Types: []string{"test."}},
 		"date not time": {From: "2026-10-01"},
 		"short lexeme":  {To: "2026-10-01T00:00:00Z"},
 		"empty source":  {Sources: []string{""}},
@@ -197,7 +197,7 @@ func TestDays_ReadsTheReadersZone(t *testing.T) {
 // ZoneOf reads it back; a filter with no bound read no date and names none.
 func TestProgramIn_NamesTheZone(t *testing.T) {
 	t.Parallel()
-	f := selection.Filter{From: "2026-10-11T13:00:00.000000000Z", Types: []string{"health.weight"}}
+	f := selection.Filter{From: "2026-10-11T13:00:00.000000000Z", Types: []string{"test.weight"}}
 	text, err := f.ProgramIn("Australia/Sydney")
 	if err != nil {
 		t.Fatal(err)
@@ -216,7 +216,7 @@ func TestProgramIn_NamesTheZone(t *testing.T) {
 		t.Errorf("saving changes the text, so the zone is lost:\n%s", canon)
 	}
 
-	plain, err := selection.Filter{Types: []string{"health.weight"}}.ProgramIn("Australia/Sydney")
+	plain, err := selection.Filter{Types: []string{"test.weight"}}.ProgramIn("Australia/Sydney")
 	if err != nil || strings.Contains(plain, "dates read in") {
 		t.Errorf("a filter with no bound names a zone: %v\n%s", err, plain)
 	}

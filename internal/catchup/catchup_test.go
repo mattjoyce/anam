@@ -40,7 +40,7 @@ const person = "matt"
 
 const bpManifest = `{
   "meta": {
-    "facet_type": "health.blood-pressure",
+    "facet_type": "test.blood-pressure",
     "definition_version": 1,
     "classification": "Normal",
     "validation_mode": "strict",
@@ -79,7 +79,7 @@ func newHarness(t *testing.T) (*gate.Gate, *ledger.Ledger, *ops.DB) {
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
 	}
-	scopes := gate.StaticScopes{"bp-csv": {"health.blood-pressure"}}
+	scopes := gate.StaticScopes{"bp-csv": {"test.blood-pressure"}}
 	return gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}), l, db
 }
 
@@ -110,7 +110,7 @@ func noteHarness(t *testing.T) (*gate.Gate, *ledger.Ledger, *ops.DB) {
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
 	}
-	scopes := gate.StaticScopes{"bp-csv": {"health.blood-pressure"}, "records": {catchup.EdgeType}}
+	scopes := gate.StaticScopes{"bp-csv": {"test.blood-pressure"}, "records": {catchup.EdgeType}}
 	return gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}), l, db
 }
 
@@ -136,7 +136,7 @@ func commitNote(t *testing.T, g *gate.Gate, id, payload string) gate.Result {
 func commit(t *testing.T, g *gate.Gate, measuredAt, reading string) gate.Result {
 	t.Helper()
 	env := facet.Envelope{
-		Type: "health.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
+		Type: "test.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
 		SourceRef: facet.SourceRef("bp-csv", measuredAt),
 		Payload:   []byte(`{"measured_at": "` + measuredAt + `", ` + reading + `}`),
 	}
@@ -313,7 +313,7 @@ func TestChangesSince_ReturnsABatchsSharedInstantWhole(t *testing.T) {
 	for i := range envs {
 		at := time.Date(2026, 5, 1, 6, i, 0, 0, time.UTC).Format(time.RFC3339)
 		envs[i] = facet.Envelope{
-			Type: "health.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
+			Type: "test.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
 			SourceRef: facet.SourceRef("bp-csv", at),
 			Payload:   []byte(`{"measured_at": "` + at + `", "systolic": 118, "diastolic": 76}`),
 		}

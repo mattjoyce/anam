@@ -99,7 +99,7 @@ func docsLedger(t *testing.T) (*harness, fold.Value, map[string]int) {
 	v, _, _ := h.served(t)
 	reading := ""
 	for _, e := range v.Entries() {
-		if e.Type == "health.blood-pressure" && strings.HasPrefix(e.FactTime, "2026-04-10") {
+		if e.Type == "test.blood-pressure" && strings.HasPrefix(e.FactTime, "2026-04-10") {
 			reading = e.FacetID
 		}
 	}
@@ -120,13 +120,13 @@ func docsLedger(t *testing.T) (*harness, fold.Value, map[string]int) {
 		{"alcohol", "2026-10-23 21:00", `"kind": "alcohol", "drink": "beer", "count": 1`},
 	} {
 		wall := strings.Replace(in.at, " ", "T", 1)
-		h.admit(t, "conversation", "health.intake", "conversation:intake/"+in.kind+"/"+wall+"+11:00", `{`+syd(in.at)+`, `+in.body+`}`)
+		h.admit(t, "conversation", "test.intake", "conversation:intake/"+in.kind+"/"+wall+"+11:00", `{`+syd(in.at)+`, `+in.body+`}`)
 	}
 	for _, s := range []struct{ id, start, end string }{
 		{"sleep:2026-10-22", "2026-10-21T12:30:00Z", "2026-10-21T20:00:00Z"},
 		{"sleep:2026-10-23", "2026-10-22T12:00:00Z", "2026-10-22T19:30:00Z"},
 	} {
-		h.admit(t, "garmin", "health.sleep-episode", s.id, `{"id": "`+s.id+`", "effective_time_frame": {"time_interval": {"start_date_time": "`+s.start+`", "end_date_time": "`+s.end+`"}}, "source_time": {"value": "`+s.start+`", "zone": "UTC", "basis": "source"}}`)
+		h.admit(t, "garmin", "test.sleep-episode", s.id, `{"id": "`+s.id+`", "effective_time_frame": {"time_interval": {"start_date_time": "`+s.start+`", "end_date_time": "`+s.end+`"}}, "source_time": {"value": "`+s.start+`", "zone": "UTC", "basis": "source"}}`)
 	}
 	// Five days of steps, two in September and three in October, away from a month's first day:
 	// a day starts at local midnight, which is the evening before in UTC.
@@ -142,7 +142,7 @@ func docsLedger(t *testing.T) (*harness, fold.Value, map[string]int) {
 	} {
 		start := s.day + "T00:00:00" + s.offset
 		end := s.day + "T23:59:59" + s.offset
-		h.admit(t, "garmin", "activity.steps", "steps:"+s.day, fmt.Sprintf(`{"id": "steps:%s", "step_count": {"value": %d, "unit": "steps"}, `+
+		h.admit(t, "garmin", "test.steps", "steps:"+s.day, fmt.Sprintf(`{"id": "steps:%s", "step_count": {"value": %d, "unit": "steps"}, `+
 			`"effective_time_frame": {"time_interval": {"start_date_time": "%s", "end_date_time": "%s"}}, `+
 			`"source_time": {"value": "%s", "zone": "Australia/Sydney", "basis": "source"}}`, s.day, s.steps, start, end, start))
 	}
@@ -221,7 +221,7 @@ func TestDocs_SelectionProgramIsWhatTheBuilderWrites(t *testing.T) {
 	t.Parallel()
 	filters := map[string]selection.Filter{
 		"summer-medication": {
-			Types: []string{"health.medication."}, Sources: []string{"self-log"},
+			Types: []string{"test.medication."}, Sources: []string{"self-log"},
 			// 1 June to 31 August in Sydney, where June is UTC+10.
 			From: "2026-05-31T14:00:00.000000000Z", To: "2026-08-31T14:00:00.000000000Z", Exclusions: []string{"m4"}, Ticks: []string{"w1"},
 		},
@@ -266,8 +266,8 @@ const sourceTimeV2 = `"source_time": {"type": "object", "required": ["value", "z
 // are placed by the RFC 3339 start of their interval.
 const intakeManifest = `{
   "meta": {
-    "facet_type": "health.intake", "definition_version": 2, "kind": "event", "classification": "Sensitive",
-    "validation_mode": "strict", "source_schema": "records/health.intake",
+    "facet_type": "test.intake", "definition_version": 2, "kind": "event", "classification": "Sensitive",
+    "validation_mode": "strict", "source_schema": "records/test.intake",
     "time_semantics": {"fact_time": {"pointer": "/at", "layout": "2006-01-02 15:04", "zone": "Australia/Sydney", "zone_pointer": "/source_time/offset"}},
     "identity_key": ["/id"],
     "identity_template": "{source}:intake/{/kind}/{/at|2006-01-02T15:04}{/source_time/offset?}"
@@ -285,7 +285,7 @@ const intervalSchema = `"effective_time_frame": {"type": "object", "required": [
 
 const sleepManifest = `{
   "meta": {
-    "facet_type": "health.sleep-episode", "definition_version": 2, "kind": "measure", "classification": "Sensitive",
+    "facet_type": "test.sleep-episode", "definition_version": 2, "kind": "measure", "classification": "Sensitive",
     "validation_mode": "strict", "source_schema": "garmin/sleep-episode",
     "time_semantics": {"fact_time": {"pointer": "/effective_time_frame/time_interval/start_date_time", "layout": "2006-01-02T15:04:05Z07:00", "zone": "UTC"}},
     "identity_key": ["/id"]
@@ -297,7 +297,7 @@ const sleepManifest = `{
 
 const stepsManifest = `{
   "meta": {
-    "facet_type": "activity.steps", "definition_version": 2, "kind": "measure", "classification": "Sensitive",
+    "facet_type": "test.steps", "definition_version": 2, "kind": "measure", "classification": "Sensitive",
     "validation_mode": "strict", "source_schema": "garmin/step-count",
     "time_semantics": {"fact_time": {"pointer": "/effective_time_frame/time_interval/start_date_time", "layout": "2006-01-02T15:04:05Z07:00", "zone": "Australia/Sydney"}},
     "identity_key": ["/id"]

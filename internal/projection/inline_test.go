@@ -9,7 +9,7 @@ import (
 	"github.com/mattjoyce/anam/internal/projection"
 )
 
-const inlineWeights = `{"types":["health.weight","health.blood-pressure."],"statuses":["admitted","endorsed"],` +
+const inlineWeights = `{"types":["test.weight","test.blood-pressure."],"statuses":["admitted","endorsed"],` +
 	`"max_classification":"Sensitive","from":"2026-01-01T00:00:00.000000000Z","to":"","shape":"log"}`
 
 // Card 211: an inline template is the knobs of a manifest without a name or a version,
@@ -25,7 +25,7 @@ func TestParseInline_IsKnownByItsContentHash(t *testing.T) {
 	}
 	// The same body in another key order and layout is the same template.
 	b, err := projection.ParseInline([]byte(`{ "shape":"log", "to":"", "from":"2026-01-01T00:00:00.000000000Z", "max_classification":"Sensitive",
-	  "statuses":["admitted","endorsed"], "types":["health.weight","health.blood-pressure."] }`))
+	  "statuses":["admitted","endorsed"], "types":["test.weight","test.blood-pressure."] }`))
 	if err != nil || b.Hash != a.Hash {
 		t.Fatalf("the same body laid out another way: %v, %s want %s", err, b.Hash, a.Hash)
 	}
@@ -34,7 +34,7 @@ func TestParseInline_IsKnownByItsContentHash(t *testing.T) {
 		t.Errorf("the canonical body parses to %s (%v), want %s", again.Hash, err, a.Hash)
 	}
 	// Prefixes and window work as they do in a manifest.
-	if len(a.Prefixes) != 1 || a.Prefixes[0] != "health.blood-pressure." || len(a.Types) != 1 || a.From == "" {
+	if len(a.Prefixes) != 1 || a.Prefixes[0] != "test.blood-pressure." || len(a.Types) != 1 || a.From == "" {
 		t.Errorf("filters = types %v prefixes %v from %q", a.Types, a.Prefixes, a.From)
 	}
 	// A registered template of the same name is not mistaken for it: the registry only
@@ -65,8 +65,8 @@ func TestParseInline_NamesTheFieldItGotWrong(t *testing.T) {
 		"a version":              {`{"version":1,"types":[],"statuses":[],"max_classification":"Normal"}`, "version"},
 		"a description":          {`{"description":"d","types":[],"statuses":[],"max_classification":"Normal"}`, "description"},
 		"an unknown key":         {`{"types":[],"statuses":[],"max_classification":"Normal","tombstones":true}`, "tombstones"},
-		"types is a string":      {`{"types":"health.weight","statuses":[],"max_classification":"Normal"}`, "types"},
-		"not an object":          {`["health.weight"]`, ""},
+		"types is a string":      {`{"types":"test.weight","statuses":[],"max_classification":"Normal"}`, "types"},
+		"not an object":          {`["test.weight"]`, ""},
 	} {
 		_, err := projection.ParseInline([]byte(tc.body))
 		if !errors.Is(err, projection.ErrBadTemplate) {
@@ -93,8 +93,8 @@ func TestInline_CheckDefined(t *testing.T) {
 	if err := tmpl.CheckDefined(func(facet.Type) bool { return true }); err != nil {
 		t.Errorf("every type defined: %v", err)
 	}
-	err = tmpl.CheckDefined(func(ft facet.Type) bool { return ft != "health.weight" })
-	if !errors.Is(err, projection.ErrUndefinedType) || !strings.Contains(err.Error(), "health.weight") {
+	err = tmpl.CheckDefined(func(ft facet.Type) bool { return ft != "test.weight" })
+	if !errors.Is(err, projection.ErrUndefinedType) || !strings.Contains(err.Error(), "test.weight") {
 		t.Errorf("a type without a Definition: %v", err)
 	}
 }

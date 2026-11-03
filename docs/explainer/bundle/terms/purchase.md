@@ -7,7 +7,7 @@ timestamp: 2026-10-25T00:00:00Z
 
 `money` was one of the four reserved domain heads, and Matt opened it on 2026-10-25 (card 241): "We need a new top level domain, money." That leaves ten heads, seven in use and `social`, `media` and `work` still reserved; see [where a distinction is encoded](/decisions/where-a-distinction-is-encoded.md). Purchases are its first concept, and a payment or a transaction would come later as a concept of its own.
 
-`money.purchase` is a [Definition](/terms/facet-definition.md) bundled with the binary, written by hand into a records file, entered in the Workbench or saved by an agent. It is an event, Confidential and strict, in the family `purchases`.
+`money.purchase` is a [Definition](/terms/facet-definition.md) in the deployment's catalog, written by hand into a records file, entered in the Workbench or saved by an agent. It is an event, Confidential and strict, in the family `purchases`.
 
 One order or receipt is one [facet](/terms/facet.md), never one per line: the lines are `items` inside it, each with a `name` and, where the document gives them, a `sku`, `quantity`, `unit_price` and `line_total`. `subtotal`, `shipping`, `tax` with its `tax_label`, and `total` are numbers as the document prints them, in `currency`, the document's own ISO 4217 code. Nothing is converted: what the bank charged in another currency is a later fact, and so is a refund, each joined to the purchase by an edge.
 

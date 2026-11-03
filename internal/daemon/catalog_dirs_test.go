@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -22,30 +21,6 @@ import (
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
-
-// copyCatalogRoot writes the files of a catalog root into a new directory, history
-// included, the way an operator would provision one.
-func copyCatalogRoot(t *testing.T, root fs.FS) string {
-	t.Helper()
-	dir := t.TempDir()
-	err := fs.WalkDir(root, ".", func(p string, e fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if e.IsDir() {
-			return os.MkdirAll(filepath.Join(dir, p), 0o750)
-		}
-		b, err := fs.ReadFile(root, p)
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(filepath.Join(dir, p), b, 0o600)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return dir
-}
 
 func openStore(t *testing.T, ctx context.Context, cfg config.Config) *ops.DB {
 	t.Helper()

@@ -50,8 +50,8 @@ func TestLoadCatalog_FollowsTheConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadCatalog: %v", err)
 	}
-	if cat.DefinitionsSource() != defs || cat.ProjectionsSource() != "embedded" {
-		t.Errorf("sources = %s, %s; want %s, embedded", cat.DefinitionsSource(), cat.ProjectionsSource(), defs)
+	if cat.DefinitionsSource() != defs || cat.ProjectionsSource() != "none" {
+		t.Errorf("sources = %s, %s; want %s, none", cat.DefinitionsSource(), cat.ProjectionsSource(), defs)
 	}
 	if !strings.Contains(stderr, "definitions "+defs) {
 		t.Errorf("the bench does not say which catalog it read:\n%s", stderr)

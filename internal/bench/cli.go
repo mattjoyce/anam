@@ -34,7 +34,7 @@ func Main(ctx context.Context, build string) error {
 // loadCatalog loads the catalog one bench invocation reads, once: from the
 // definitions_dir and projections_dir of the anam config found as anam finds it
 // (--config, ANAM_CONFIG, the user config directory) and the environment, the
-// built-in catalog for either left empty. The bench takes nothing else from the
+// empty catalog for either left empty. The bench takes nothing else from the
 // config, so a setting it does not read (a daemon's timeout, a person) neither
 // needs to be there nor to be valid.
 func loadCatalog(cmd *cobra.Command, explicit string) (*catalog.Catalog, error) {

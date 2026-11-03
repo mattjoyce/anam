@@ -96,8 +96,9 @@ to save a page of code.
   however many cores there are: `internal/daemon`'s 111 tests at about a second each took 168 s
   serial and 18 s parallel (card 262). `scripts/slow-tests.sh [packages]` ranks packages and tests
   by time; a package whose test sum is near its wall time is running serially.
-- **The embedded catalog is built once per process** and shared (`catalog.Load` with both
-  directories empty). Never modify a Definition, template or slice a catalog or registry returns.
+- **A test's catalog is built once per process** and shared (`catalogtest`, over a fixture; the
+  empty catalog, `catalog.Load` with both directories empty, likewise). Never modify a Definition,
+  template or slice a catalog or registry returns.
 
 **Embedded assets**
 - `//go:embed` (`embed.FS`) for small, static, versioned assets only (projection templates, bundled

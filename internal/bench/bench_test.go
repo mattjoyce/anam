@@ -96,19 +96,37 @@ func TestPairOf_RefusesWhatItCannotWrite(t *testing.T) {
 		}
 	}
 
-	// test.pair with its schema changed, in a copy of Engine.
+	// test.pair with its schema changed, in a copy of Engine. A constraint on a field the
+	// generator writes is refused by name: Sol's case was a maximum of 139 on a, which a
+	// correction broke halfway through a build.
 	for _, tc := range []struct {
 		name     string
 		required []string
+		field    string
+		keyword  string
+		value    any
 		want     string
 	}{
-		{"three numbers", []string{"at", "a", "b", "c"}, "requires 3 numeric fields"},
-		{"one number", []string{"at", "a"}, "requires 1 numeric fields"},
-		{"a string", []string{"at", "a", "b", "note"}, "requires /note, which is not a number"},
+		{"three numbers", []string{"at", "a", "b", "c"}, "", "", nil, "requires 3 numeric fields"},
+		{"one number", []string{"at", "a"}, "", "", nil, "requires 1 numeric fields"},
+		{"a string", []string{"at", "a", "b", "note"}, "", "", nil, "requires /note, which is not a number"},
+		{"a maximum", nil, "a", "maximum", 139, "its /a declares maximum"},
+		{"a minimum", nil, "b", "minimum", 0, "its /b declares minimum"},
+		{"an exclusive maximum", nil, "a", "exclusiveMaximum", 1000, "its /a declares exclusiveMaximum"},
+		{"an exclusive minimum", nil, "b", "exclusiveMinimum", 0, "its /b declares exclusiveMinimum"},
+		{"a step", nil, "a", "multipleOf", 2, "its /a declares multipleOf"},
+		{"an enum", nil, "b", "enum", []int{60, 61}, "its /b declares enum"},
+		{"a const", nil, "a", "const", 120, "its /a declares const"},
+		{"a time pattern", nil, "at", "pattern", "^2", "its fact time /at declares pattern"},
+		{"a time length", nil, "at", "minLength", 20, "its fact time /at declares minLength"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			cat := pairVariant(t, tc.required)
+			required := tc.required
+			if required == nil {
+				required = []string{"at", "a", "b"}
+			}
+			cat := pairVariant(t, required, tc.field, tc.keyword, tc.value)
 			_, err := bench.PairOf(cat, "test.pair")
 			if !errors.Is(err, bench.ErrType) || !strings.Contains(err.Error(), tc.want) {
 				t.Errorf("PairOf = %v, want ErrType saying %q", err, tc.want)
@@ -121,8 +139,9 @@ func TestPairOf_RefusesWhatItCannotWrite(t *testing.T) {
 }
 
 // pairVariant is a copy of Engine whose test.pair schema requires required, with a
-// numeric c declared beside a and b.
-func pairVariant(t *testing.T, required []string) *catalog.Catalog {
+// numeric c declared beside a and b and, when field is not "", keyword set to value
+// on that field.
+func pairVariant(t *testing.T, required []string, field, keyword string, value any) *catalog.Catalog {
 	t.Helper()
 	defs, projs := fixture.Engine()
 	raw, err := fs.ReadFile(defs, "test.pair.json")
@@ -135,7 +154,11 @@ func pairVariant(t *testing.T, required []string) *catalog.Catalog {
 	}
 	schema := m["schema"].(map[string]any)
 	schema["required"] = required
-	schema["properties"].(map[string]any)["c"] = map[string]any{"type": "number"}
+	props := schema["properties"].(map[string]any)
+	props["c"] = map[string]any{"type": "number"}
+	if field != "" {
+		props[field].(map[string]any)[keyword] = value
+	}
 	body, err := json.Marshal(m)
 	if err != nil {
 		t.Fatal(err)

@@ -73,7 +73,8 @@ always yield the same facts.
 The type's Definition is read from the catalog the anam config names. Its fact time
 must be a top-level string field that is the whole identity key, read in the
 Definition's own layout and zone, and its schema must require exactly two numeric
-fields beside it and nothing else; a type that does not fit is refused.
+fields beside it and nothing else, with no bound, step, list or pattern on any of the
+three; a type that does not fit is refused.
 
 Shapes: ` + shapeList(),
 		Args: cobra.NoArgs,

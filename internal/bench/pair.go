@@ -20,7 +20,8 @@ var ErrType = errors.New("bench: cannot generate this type")
 // Pair is a type the generator writes, read from its Definition: a fact time at a
 // top-level field, which is also the whole identity key, and exactly two required
 // numeric fields beside it. A payload is those three fields and nothing more, so
-// the type's schema must require nothing else. The layout and zone are the
+// the type's schema must require nothing else and constrain none of the three
+// beyond its type. The layout and zone are the
 // Definition's own (meta.time_semantics.fact_time).
 type Pair struct {
 	def  def.Definition
@@ -63,6 +64,9 @@ func PairOf(cat *catalog.Catalog, typ facet.Type) (Pair, error) {
 	if t := def.TypesOf(schema.Properties[at]); len(t) > 0 && !slices.Contains(t, "string") {
 		return refuse("its fact time %s is not a string", d.FactTime.Pointer)
 	}
+	if k := constraint(schema.Properties[at], true); k != "" {
+		return refuse("its fact time %s declares %s, which the generator does not honour", d.FactTime.Pointer, k)
+	}
 	var numbers []string
 	for _, name := range schema.Required {
 		if name == at {
@@ -72,12 +76,47 @@ func PairOf(cat *catalog.Catalog, typ facet.Type) (Pair, error) {
 		if !slices.Contains(t, "number") && !slices.Contains(t, "integer") {
 			return refuse("it requires /%s, which is not a number", name)
 		}
+		if k := constraint(schema.Properties[name], false); k != "" {
+			return refuse("its /%s declares %s, which the generator does not honour", name, k)
+		}
 		numbers = append(numbers, name)
 	}
 	if len(numbers) != 2 {
 		return refuse("it requires %d numeric fields beside the time, not two", len(numbers))
 	}
 	return Pair{def: d, loc: loc, at: at, a: numbers[0], b: numbers[1]}, nil
+}
+
+// annotations are the keywords of a field's schema that constrain no value.
+var annotations = map[string]bool{
+	"type": true, "title": true, "description": true, "examples": true, "$comment": true,
+	"default": true, "deprecated": true, "readOnly": true, "writeOnly": true,
+}
+
+// constraint is the first keyword, in name order, of a field's schema that could
+// refuse a value the generator writes, or "". The generator writes numbers from 100
+// up and wall clocks in the Definition's layout, and honours no bound, step, list or
+// pattern, so any keyword but an annotation refuses the type: a correction that
+// broke a maximum would fail halfway through a build and leave a ledger a rerun
+// refuses. The time field may say minLength of 1, which every clock meets.
+func constraint(field map[string]any, isTime bool) string {
+	keys := make([]string, 0, len(field))
+	for k := range field {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	for _, k := range keys {
+		if annotations[k] {
+			continue
+		}
+		if isTime && k == "minLength" {
+			if n, ok := field[k].(float64); ok && n <= 1 {
+				continue
+			}
+		}
+		return k
+	}
+	return ""
 }
 
 // zoneOf is the location a Definition's fact-time zone names: an IANA zone, or a

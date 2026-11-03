@@ -95,7 +95,7 @@ func fileReaches(root, mod, rel string) ([]reach, []ref, error) {
 		return nil, nil, fmt.Errorf("parse %s: %w", rel, err)
 	}
 	w := &walker{fset: fset, file: f, rel: rel, dir: path.Dir(rel), imports: map[string]string{},
-		aliases: map[*ast.Object]bool{}, reassigned: map[*ast.Object]bool{}}
+		aliases: map[token.Pos]bool{}, reassigned: map[token.Pos]bool{}}
 	w.pkg = w.dir + " " + f.Name.Name
 	// A file in package def (not def_test) names def's symbols unqualified; so does
 	// one that dot-imports it.
@@ -150,13 +150,13 @@ type walker struct {
 	fset       *token.FileSet
 	file       *ast.File
 	rel        string
-	dir        string            // module-relative directory of the file
-	pkg        string            // dir and package name
-	self       string            // the package a bare name belongs to, or "" in an _test package
-	dot        []string          // dot-imported packages
-	imports    map[string]string // local name to module-relative (or full) import path
-	aliases    map[*ast.Object]bool
-	reassigned map[*ast.Object]bool
+	dir        string             // module-relative directory of the file
+	pkg        string             // dir and package name
+	self       string             // the package a bare name belongs to, or "" in an _test package
+	dot        []string           // dot-imported packages
+	imports    map[string]string  // local name to module-relative (or full) import path
+	aliases    map[token.Pos]bool // variables bound to a loader, by where they are declared
+	reassigned map[token.Pos]bool // variables set again after their declaration
 	fn         string
 	found      []reach
 	refs       []ref
@@ -331,7 +331,7 @@ func (w *walker) loader(x ast.Expr) (name string, alias, ok bool) {
 			return "Load", false, true
 		}
 	case *ast.Ident:
-		if x.Obj != nil && w.aliases[x.Obj] {
+		if x.Obj != nil && w.aliases[x.Obj.Pos()] {
 			return x.Name, true, true
 		}
 		if !w.packageLevel(x) || !loaders[x.Name] {
@@ -370,36 +370,6 @@ func (w *walker) call(c *ast.CallExpr) {
 	}
 }
 
-// join checks the literal parts of a filepath.Join: all of them as a path relative to
-// the file, and the literal tail after the last computed part as a path that ends
-// in the catalog wherever it starts.
-func (w *walker) join(c *ast.CallExpr) {
-	var tail []string
-	all := true
-	for _, a := range c.Args {
-		s, ok := stringValue(a)
-		if !ok {
-			all, tail = false, nil
-			continue
-		}
-		tail = append(tail, s)
-	}
-	if len(tail) < 2 && all {
-		return // one literal is checked on its own
-	}
-	joined := path.Join(tail...)
-	if all {
-		w.path(c.Pos(), joined)
-		return
-	}
-	for _, d := range catalogDirs {
-		if hasPathSuffixIn(joined, d) {
-			w.add(c.Pos(), kindPath, fmt.Sprintf("a path ending in %s", d))
-			return
-		}
-	}
-}
-
 // assign records a config catalog directory set to "", and a variable bound to a
 // loader.
 func (w *walker) assign(a *ast.AssignStmt) {
@@ -412,7 +382,7 @@ func (w *walker) assign(a *ast.AssignStmt) {
 		}
 		if id, ok := l.(*ast.Ident); ok && id.Obj != nil {
 			if _, _, ok := w.loader(a.Rhs[i]); ok {
-				w.aliases[id.Obj] = true
+				w.aliases[id.Obj.Pos()] = true
 			}
 		}
 	}
@@ -423,113 +393,8 @@ func (w *walker) valueSpec(vs *ast.ValueSpec) {
 	for i, n := range vs.Names {
 		if i < len(vs.Values) && n.Obj != nil {
 			if _, _, ok := w.loader(vs.Values[i]); ok {
-				w.aliases[n.Obj] = true
+				w.aliases[n.Obj.Pos()] = true
 			}
 		}
 	}
-}
-
-// findReassigned marks each variable the file assigns after declaring it, or takes
-// the address of, so empty does not trust its first value.
-func (w *walker) findReassigned() {
-	mark := func(x ast.Expr, decl ast.Node) {
-		if id, ok := ast.Unparen(x).(*ast.Ident); ok && id.Obj != nil && id.Obj.Decl != decl {
-			w.reassigned[id.Obj] = true
-		}
-	}
-	ast.Inspect(w.file, func(n ast.Node) bool {
-		switch n := n.(type) {
-		case *ast.AssignStmt:
-			for _, l := range n.Lhs {
-				mark(l, n)
-			}
-		case *ast.RangeStmt:
-			if n.Tok == token.ASSIGN {
-				mark(n.Key, n)
-				if n.Value != nil {
-					mark(n.Value, n)
-				}
-			}
-		case *ast.UnaryExpr:
-			if n.Op == token.AND {
-				mark(n.X, nil)
-			}
-		}
-		return true
-	})
-}
-
-// empty reports whether x is the empty string: a literal, or a const or variable
-// declared in this file with an empty value (or a string var with none) that the file
-// never assigns again.
-func (w *walker) empty(x ast.Expr, depth int) bool {
-	x = ast.Unparen(x)
-	if s, ok := stringValue(x); ok {
-		return s == ""
-	}
-	id, ok := x.(*ast.Ident)
-	if !ok || id.Obj == nil || w.reassigned[id.Obj] || depth > 8 {
-		return false
-	}
-	switch d := id.Obj.Decl.(type) {
-	case *ast.ValueSpec:
-		for i, n := range d.Names {
-			if n.Name != id.Name {
-				continue
-			}
-			if len(d.Values) == 0 {
-				t, ok := d.Type.(*ast.Ident)
-				return id.Obj.Kind == ast.Var && ok && t.Name == "string"
-			}
-			return i < len(d.Values) && w.empty(d.Values[i], depth+1)
-		}
-	case *ast.AssignStmt:
-		if len(d.Lhs) != len(d.Rhs) {
-			return false
-		}
-		for i, l := range d.Lhs {
-			if li, ok := l.(*ast.Ident); ok && li.Obj == id.Obj {
-				return w.empty(d.Rhs[i], depth+1)
-			}
-		}
-	}
-	return false
-}
-
-// path records a string that names an embedded catalog directory on disk, either
-// from the module root or relative to the test's own directory (go test runs a test
-// in its package directory). A string with spaces or quotes is not a path.
-func (w *walker) path(pos token.Pos, s string) {
-	if s == "" || strings.ContainsAny(s, " \t\n\"`") {
-		return
-	}
-	p := path.Clean(filepath.ToSlash(s))
-	rel := path.Join(w.dir, p)
-	for _, d := range catalogDirs {
-		if under(p, d) || under(rel, d) || strings.Contains(p, "/"+d+"/") || strings.HasSuffix(p, "/"+d) {
-			w.add(pos, kindPath, fmt.Sprintf("the path %q reads %s from disk", s, d))
-			return
-		}
-	}
-}
-
-func under(p, dir string) bool { return p == dir || strings.HasPrefix(p, dir+"/") }
-
-// hasPathSuffixIn reports whether p ends with dir, or ends inside it.
-func hasPathSuffixIn(p, dir string) bool {
-	for _, d := range []string{dir, path.Base(path.Dir(dir)) + "/" + path.Base(dir)} {
-		if p == d || strings.HasPrefix(p, d+"/") || strings.HasSuffix(p, "/"+d) || strings.Contains(p, "/"+d+"/") {
-			return true
-		}
-	}
-	return false
-}
-
-func stringValue(x ast.Expr) (string, bool) {
-	lit, ok := x.(*ast.BasicLit)
-	if !ok || lit.Kind != token.STRING {
-		return "", false
-	}
-	s, err := strconv.Unquote(lit.Value)
-	return s, err == nil
 }

@@ -248,47 +248,39 @@ func checkReaches(s scan, allow, labels []allowed) []string {
 // receiver.
 func throughHelpers(direct []reach, refs []ref) []reach {
 	type fn struct{ pkg, name string }
+	byName := map[fn][]ref{}
+	for _, r := range refs {
+		byName[fn{r.Pkg, r.To}] = append(byName[fn{r.Pkg, r.To}], r)
+	}
 	reaching := map[fn]bool{}
-	for _, r := range direct {
-		if r.Func != "" {
-			reaching[fn{r.Pkg, r.Func}] = true
+	var queue []fn
+	mark := func(f fn) {
+		if f.name != "" && !reaching[f] {
+			reaching[f] = true
+			queue = append(queue, f)
 		}
 	}
-	names := func(r ref) []string {
-		m, ok := strings.CutPrefix(r.To, "*.")
-		if !ok {
-			if reaching[fn{r.Pkg, r.To}] {
-				return []string{r.To}
-			}
-			return nil
-		}
-		var out []string
-		for f := range reaching {
-			if f.pkg == r.Pkg && strings.HasSuffix(f.name, "."+m) {
-				out = append(out, f.name)
-			}
-		}
-		slices.Sort(out)
-		return out
+	for _, r := range direct {
+		mark(fn{r.Pkg, r.Func})
 	}
 	var found []reach
 	seen := map[[3]string]bool{}
-	for changed := true; changed; {
-		changed = false
-		for _, r := range refs {
-			for _, h := range names(r) {
-				k := [3]string{r.Pkg, r.From, h}
-				if h == r.From || seen[k] {
-					continue
-				}
-				seen[k] = true
-				found = append(found, reach{Pkg: r.Pkg, File: r.File, Func: r.From, Line: r.Line, Kind: kindHelper,
-					What: "calls " + h + ", which reaches the embedded catalog"})
-				if !reaching[fn{r.Pkg, r.From}] {
-					reaching[fn{r.Pkg, r.From}] = true
-					changed = true
-				}
+	for len(queue) > 0 {
+		h := queue[0]
+		queue = queue[1:]
+		users := byName[h]
+		if _, m, ok := strings.Cut(h.name, "."); ok {
+			users = append(slices.Clone(users), byName[fn{h.pkg, "*." + m}]...)
+		}
+		for _, r := range users {
+			k := [3]string{r.Pkg, r.From, h.name}
+			if r.From == h.name || seen[k] {
+				continue
 			}
+			seen[k] = true
+			found = append(found, reach{Pkg: r.Pkg, File: r.File, Func: r.From, Line: r.Line, Kind: kindHelper,
+				What: "via helper " + h.name})
+			mark(fn{r.Pkg, r.From})
 		}
 	}
 	return found

@@ -19,18 +19,9 @@ import (
 	"testing"
 )
 
-//go:embed testdata/mattjoyce/definitions testdata/mattjoyce/projections
 //go:embed testdata/minimal/definitions testdata/minimal/projections
 //go:embed testdata/engine/definitions testdata/engine/projections
 var files embed.FS
-
-// Mattjoyce is the catalog the engine embedded at de2981c, byte for byte, until R4b
-// slice 5 deleted the embedded copy. It is the personal catalog, kept while tests
-// move off it, and its definition set version is the one the live daemon reports.
-// Slice 6 deletes it. Do not reformat, sort or prune it.
-func Mattjoyce() (definitions, projections fs.FS) {
-	return pair("mattjoyce")
-}
 
 // Minimal is the smallest catalog the engine's own consumers need: record.edge and
 // record.document read in UTC, one measure type (test.measure) and one projection

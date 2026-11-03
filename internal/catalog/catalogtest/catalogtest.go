@@ -1,12 +1,8 @@
 // Package catalogtest builds the engine's catalog types over the fixture catalogs, for
 // tests that need a registry, a catalog or a config naming one (card 255). Each
-// fixture is a Fixture value, Engine or Personal, and each thing a Fixture builds is
-// built once per process and shared: never modify a Definition, template or slice
-// one returns.
-//
-// The package-level Definitions, Projections, Catalog and Config are Personal's,
-// kept while tests move to Engine (R4b slices 4a to 4d), so no slice touches a file
-// it is not converting. Slice 6 deletes them with Personal.
+// fixture is a Fixture value: Engine, or Over a fixture's roots for another. Each
+// thing a Fixture builds is built once per process and shared: never modify a
+// Definition, template or slice one returns.
 //
 // Nothing outside a test imports it; see package fixture.
 package catalogtest
@@ -36,9 +32,6 @@ type Fixture struct {
 
 // Engine is the fixture over fixture.Engine, the catalog the engine's own tests read.
 var Engine = Over(fixture.Engine)
-
-// Personal is the fixture over fixture.Mattjoyce, until R4b slice 6 deletes it.
-var Personal = Over(fixture.Mattjoyce)
 
 // Over is a Fixture over the catalog roots returns. Nothing is built until a test
 // asks for it.
@@ -110,28 +103,4 @@ func (f *Fixture) Config(t testing.TB, c *config.Config) {
 	t.Helper()
 	defs, projs := f.roots()
 	c.DefinitionsDir, c.ProjectionsDir = fixture.Dirs(t, defs, projs)
-}
-
-// Definitions is Personal.Definitions.
-func Definitions(t testing.TB) *def.Registry {
-	t.Helper()
-	return Personal.Definitions(t)
-}
-
-// Projections is Personal.Projections.
-func Projections(t testing.TB) *projection.Registry {
-	t.Helper()
-	return Personal.Projections(t)
-}
-
-// Catalog is Personal.Catalog.
-func Catalog(t testing.TB) *catalog.Catalog {
-	t.Helper()
-	return Personal.Catalog(t)
-}
-
-// Config is Personal.Config.
-func Config(t testing.TB, c *config.Config) {
-	t.Helper()
-	Personal.Config(t, c)
 }

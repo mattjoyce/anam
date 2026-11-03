@@ -10,32 +10,6 @@ import (
 	"github.com/mattjoyce/anam/internal/catalog/fixture"
 )
 
-// countJSON is how many *.json files a root holds at its top and under history/.
-func countJSON(t *testing.T, root fs.FS) (current, history int) {
-	t.Helper()
-	for dir, n := range map[string]*int{".": &current, "history": &history} {
-		names, err := fs.Glob(root, filepath.ToSlash(filepath.Join(dir, "*.json")))
-		if err != nil {
-			t.Fatal(err)
-		}
-		*n = len(names)
-	}
-	return current, history
-}
-
-// TestMattjoyce_Layout pins the copy's shape: 44 current and 90 earlier
-// Definitions, 12 current and 6 earlier templates, as embedded at de2981c.
-func TestMattjoyce_Layout(t *testing.T) {
-	t.Parallel()
-	defs, projs := fixture.Mattjoyce()
-	if c, h := countJSON(t, defs); c != 44 || h != 90 {
-		t.Errorf("definitions: %d current, %d history; want 44, 90", c, h)
-	}
-	if c, h := countJSON(t, projs); c != 12 || h != 6 {
-		t.Errorf("projections: %d current, %d history; want 12, 6", c, h)
-	}
-}
-
 // TestMinimal_Layout pins what the minimal catalog holds.
 func TestMinimal_Layout(t *testing.T) {
 	t.Parallel()
@@ -61,10 +35,11 @@ func TestMinimal_Layout(t *testing.T) {
 	}
 }
 
-// TestDirs_WritesTheSameBytes checks Dirs writes every file of both roots unchanged.
+// TestDirs_WritesTheSameBytes checks Dirs writes every file of both roots unchanged,
+// history/ included.
 func TestDirs_WritesTheSameBytes(t *testing.T) {
 	t.Parallel()
-	defs, projs := fixture.Mattjoyce()
+	defs, projs := fixture.Engine()
 	defsDir, projsDir := fixture.Dirs(t, defs, projs)
 	for dir, root := range map[string]fs.FS{defsDir: defs, projsDir: projs} {
 		n := 0

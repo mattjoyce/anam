@@ -2,9 +2,9 @@ package catalog_test
 
 // The tests in this file call catalog.Load with an empty directory, because the empty
 // catalog is what they check (card 255, R4b): no directory selects no files, labelled
-// "none", and never the catalog the binary carries. They are on card 255's allow-list
-// because the rule flags every empty directory, which selects the empty catalog on
-// purpose or by mistake.
+// "none". Each checks that label, which is how catalogtest's TestTests_ReadNoEmbeddedCatalog
+// tells a test that selects the empty catalog on purpose from one that does so by
+// mistake.
 
 import (
 	"context"
@@ -126,6 +126,9 @@ func TestLoadEmptyIsBuiltOnce(t *testing.T) {
 	}
 	if a != b {
 		t.Error("two loads of the empty catalog built two catalogs, want one shared")
+	}
+	if a.DefinitionsSource() != "none" || a.ProjectionsSource() != "none" {
+		t.Errorf("sources = %q, %q; want none, none", a.DefinitionsSource(), a.ProjectionsSource())
 	}
 	for n := 1; n <= 2; n++ {
 		cat, err := catalog.Load(&cancelAt{Context: context.Background(), n: n}, "", "")

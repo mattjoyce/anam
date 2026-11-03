@@ -12,56 +12,39 @@ import (
 	"strings"
 )
 
-// The packages that hold the embedded catalog, module-relative.
-const (
-	defPkg     = "internal/def"
-	projPkg    = "internal/projection"
-	catalogPkg = "internal/catalog"
-)
+// catalogPkg is the package whose loader selects a catalog, module-relative.
+const catalogPkg = "internal/catalog"
 
-// exported names, by package, that return or read the embedded catalog: the functions
-// R4b deletes. A test that names one, called or passed as a value, reads the catalog
-// the binary carries rather than one it chose.
-var exported = map[string][]string{
-	defPkg:  {"Bundled", "EmbeddedFS", "History", "Manifests", "SetVersion"},
-	projPkg: {"Bundled", "EmbeddedFS"},
-}
+// R4b (card 255) deleted the embedded catalog in slice 5, and with it the symbols
+// and source directories this rule once matched: def.Bundled, EmbeddedFS, History,
+// Manifests and SetVersion, projection.Bundled and EmbeddedFS, the unexported roots,
+// and internal/def/manifests and internal/projection/manifests. None of them can
+// appear in a test that compiles. What is left is the call that once fell back on
+// that catalog and now selects the empty one.
 
-// unexported names that hold the embedded catalog, which only a test inside the
-// package can name.
-var unexported = map[string][]string{
-	defPkg:     {"embedded", "manifestFS"},
-	projPkg:    {"embedded", "manifestFS"},
-	catalogPkg: {"embedded"},
-}
-
-// loaders are the functions that fall back on the embedded catalog for a component
-// whose directory is empty: catalog.Load, and load inside the package. A variable
-// bound to one is a loader too, and any call through it counts, whatever its
-// arguments.
+// loaders are the functions that select the empty catalog for a component whose
+// directory is empty: catalog.Load, and load inside the package. A variable bound to
+// one is a loader too, and any call through it counts, whatever its arguments.
 var loaders = map[string]bool{"Load": true, "load": true}
 
 // configDirs are the config.Config fields that select a catalog directory. A test
-// that sets one to "" opens a daemon on the embedded catalog for that component.
+// that sets one to "" opens a daemon on the empty catalog for that component.
 var configDirs = map[string]bool{"DefinitionsDir": true, "ProjectionsDir": true}
 
-// catalogDirs are the embedded catalog's source directories, which a test can read
-// from disk without naming any symbol. Built with path.Join so this file names no
-// such path as a literal itself.
-var catalogDirs = []string{path.Join(defPkg, "manifests"), path.Join(projPkg, "manifests")}
+// noneLabel is the source the empty catalog reports. A function that names it checks
+// that it selected the empty catalog, so its selection is on purpose and not a reach.
+const noneLabel = "none"
 
-// kind is the way a reach gets to the embedded catalog.
+// kind is the way a reach selects the empty catalog.
 type kind int
 
 const (
-	kindSymbol kind = iota // names an embedded def, projection or catalog symbol
-	kindLoad               // catalog.Load with an empty directory
+	kindLoad   kind = iota // catalog.Load with an empty directory
 	kindConfig             // a config catalog directory set to ""
-	kindPath               // a string naming an embedded catalog directory on disk
 	kindHelper             // a call to a test helper that reaches
 )
 
-// reach is one place a test reads the embedded catalog.
+// reach is one place a test selects the empty catalog without checking it did.
 type reach struct {
 	Pkg  string // the directory and package name, which scope a helper's name
 	File string // module-relative, slash-separated
@@ -95,10 +78,10 @@ func fileReaches(root, mod, rel string) ([]reach, []ref, error) {
 		return nil, nil, fmt.Errorf("parse %s: %w", rel, err)
 	}
 	w := &walker{fset: fset, file: f, rel: rel, dir: path.Dir(rel), imports: map[string]string{},
-		aliases: map[token.Pos]bool{}, reassigned: map[token.Pos]bool{}}
+		aliases: map[token.Pos]bool{}, reassigned: map[token.Pos]bool{}, checksNone: map[string]bool{}}
 	w.pkg = w.dir + " " + f.Name.Name
-	// A file in package def (not def_test) names def's symbols unqualified; so does
-	// one that dot-imports it.
+	// A file in package catalog (not catalog_test) names load unqualified; one that
+	// dot-imports catalog names Load so.
 	if !strings.HasSuffix(f.Name.Name, "_test") {
 		w.self = w.dir
 	}
@@ -109,7 +92,7 @@ func fileReaches(root, mod, rel string) ([]reach, []ref, error) {
 		}
 		local, ok := strings.CutPrefix(p, mod+"/")
 		if !ok {
-			// Outside the module: only the path helpers matter, for literal joins.
+			// Outside the module: kept, so a local name is not taken for a package.
 			local = p
 		}
 		name := path.Base(p)
@@ -128,15 +111,11 @@ func fileReaches(root, mod, rel string) ([]reach, []ref, error) {
 	for _, d := range f.Decls {
 		w.decl(d)
 	}
-	// A literal inside a literal join names one path, so a line's paths count once.
-	paths := map[int]bool{}
+	// A function that names the none label checks the empty catalog it selects.
 	var out []reach
 	for _, r := range w.found {
-		if r.Kind == kindPath {
-			if paths[r.Line] {
-				continue
-			}
-			paths[r.Line] = true
+		if r.Func != "" && w.checksNone[r.Func] {
+			continue
 		}
 		out = append(out, r)
 	}
@@ -157,6 +136,7 @@ type walker struct {
 	imports    map[string]string  // local name to module-relative (or full) import path
 	aliases    map[token.Pos]bool // variables bound to a loader, by where they are declared
 	reassigned map[token.Pos]bool // variables set again after their declaration
+	checksNone map[string]bool    // top-level functions that name the none label
 	fn         string
 	found      []reach
 	refs       []ref
@@ -247,7 +227,7 @@ func (w *walker) visit(n ast.Node) bool {
 	case *ast.KeyValueExpr:
 		if id, ok := n.Key.(*ast.Ident); ok {
 			if configDirs[id.Name] && w.empty(n.Value, 0) {
-				w.add(n.Pos(), kindConfig, id.Name+": \"\" selects the embedded catalog")
+				w.add(n.Pos(), kindConfig, id.Name+": \"\" selects the empty catalog")
 			}
 			w.walk(n.Value)
 			return false
@@ -257,8 +237,7 @@ func (w *walker) visit(n ast.Node) bool {
 	case *ast.AssignStmt:
 		w.assign(n)
 	case *ast.SelectorExpr:
-		if pkg, ok := w.pkgOf(n.X); ok {
-			w.symbol(n.Sel.Pos(), pkg, n.Sel.Name, false)
+		if _, ok := w.pkgOf(n.X); ok {
 			return false
 		}
 		if w.fn != "" {
@@ -268,12 +247,6 @@ func (w *walker) visit(n ast.Node) bool {
 		return false
 	case *ast.Ident:
 		if w.packageLevel(n) {
-			if w.self != "" {
-				w.symbol(n.Pos(), w.self, n.Name, true)
-			}
-			for _, pkg := range w.dot {
-				w.symbol(n.Pos(), pkg, n.Name, false)
-			}
 			if w.fn != "" && n.Name != w.fn && n.Name != "_" {
 				w.refs = append(w.refs, ref{Pkg: w.pkg, File: w.rel, From: w.fn, To: n.Name, Line: w.fset.Position(n.Pos()).Line})
 			}
@@ -281,8 +254,8 @@ func (w *walker) visit(n ast.Node) bool {
 	case *ast.CallExpr:
 		w.call(n)
 	case *ast.BasicLit:
-		if s, ok := stringValue(n); ok {
-			w.path(n.Pos(), s)
+		if s, ok := stringValue(n); ok && s == noneLabel && w.fn != "" {
+			w.checksNone[w.fn] = true
 		}
 	}
 	return true
@@ -304,20 +277,6 @@ func (w *walker) pkgOf(x ast.Expr) (string, bool) {
 // declared at this file's top level. A local variable has its own object.
 func (w *walker) packageLevel(id *ast.Ident) bool {
 	return id.Obj == nil || id.Obj == w.file.Scope.Lookup(id.Name)
-}
-
-// symbol records a use of name in pkg when it is one of the embedded catalog's.
-func (w *walker) symbol(pos token.Pos, pkg, name string, inside bool) {
-	names := exported[pkg]
-	if inside {
-		names = append(append([]string(nil), names...), unexported[pkg]...)
-	}
-	for _, s := range names {
-		if s == name {
-			w.add(pos, kindSymbol, path.Base(pkg)+"."+name)
-			return
-		}
-	}
 }
 
 // loader reports the loader an expression names: catalog.Load (through an import,
@@ -348,7 +307,7 @@ func (w *walker) loader(x ast.Expr) (name string, alias, ok bool) {
 }
 
 // call records a catalog loader given an empty directory or called through a
-// variable, and checks a join of literal path parts as the one path it builds.
+// variable.
 func (w *walker) call(c *ast.CallExpr) {
 	if name, alias, ok := w.loader(c.Fun); ok {
 		if alias {
@@ -361,12 +320,6 @@ func (w *walker) call(c *ast.CallExpr) {
 				return
 			}
 		}
-		return
-	}
-	if sel, ok := ast.Unparen(c.Fun).(*ast.SelectorExpr); ok && sel.Sel.Name == "Join" {
-		if p, ok := w.pkgOf(sel.X); ok && (p == "path/filepath" || p == "path") {
-			w.join(c)
-		}
 	}
 }
 
@@ -378,7 +331,7 @@ func (w *walker) assign(a *ast.AssignStmt) {
 	}
 	for i, l := range a.Lhs {
 		if sel, ok := l.(*ast.SelectorExpr); ok && configDirs[sel.Sel.Name] && w.empty(a.Rhs[i], 0) {
-			w.add(a.Pos(), kindConfig, sel.Sel.Name+" = \"\" selects the embedded catalog")
+			w.add(a.Pos(), kindConfig, sel.Sel.Name+" = \"\" selects the empty catalog")
 		}
 		if id, ok := l.(*ast.Ident); ok && id.Obj != nil {
 			if _, _, ok := w.loader(a.Rhs[i]); ok {

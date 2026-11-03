@@ -7,67 +7,15 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/catalog"
-	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/catalog/fixture"
-	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
-// v is the definition set version the binary reports at de2981c, the R0 oracle the
-// mattjoyce fixture must reproduce.
+// v is the definition set version the deployment's catalog reports, the live V since
+// R0. No engine fixture may reproduce it: the overlay in anam_mattjoyce pins it over
+// that catalog, and the engine holds no copy (card 255, R4b).
 const v = "sha256:b8cc55e0a2f6d14de76a15a892eaa5cd53577ae857cefff09730bbbcb6d9e969"
-
-// TestFixture_SetVersionIsV pins the fixture's definition set version to the literal
-// V, over the files and over the catalog Load builds from a directory copy.
-func TestFixture_SetVersionIsV(t *testing.T) {
-	t.Parallel()
-	defs, _ := fixture.Mattjoyce()
-	got, err := def.SetVersionFS(defs)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != v {
-		t.Errorf("SetVersionFS(fixture.Mattjoyce) = %s, want %s", got, v)
-	}
-	if got := catalogtest.Catalog(t).SetVersion(); got != v {
-		t.Errorf("catalogtest.Catalog SetVersion = %s, want %s", got, v)
-	}
-}
-
-// TestHelpers_BuildTheFixture checks each helper is built over fixture.Mattjoyce.
-func TestHelpers_BuildTheFixture(t *testing.T) {
-	t.Parallel()
-	if got := len(catalogtest.Definitions(t).All()); got != 44 {
-		t.Errorf("Definitions: %d types, want 44", got)
-	}
-	if got := len(catalogtest.Projections(t).Names()); got != 12 {
-		t.Errorf("Projections: %d templates, want 12", got)
-	}
-	c := catalogtest.Catalog(t)
-	if got := len(c.Definitions().All()); got != 44 {
-		t.Errorf("Catalog: %d types, want 44", got)
-	}
-	if c.DefinitionsSource() == "embedded" || c.ProjectionsSource() == "embedded" {
-		t.Errorf("Catalog sources = %q, %q; want directories", c.DefinitionsSource(), c.ProjectionsSource())
-	}
-	if catalogtest.Catalog(t) != c {
-		t.Error("Catalog built twice; want once per process")
-	}
-
-	var cfg config.Config
-	catalogtest.Config(t, &cfg)
-	if cfg.DefinitionsDir == "" || cfg.ProjectionsDir == "" {
-		t.Fatalf("Config left dirs %q, %q", cfg.DefinitionsDir, cfg.ProjectionsDir)
-	}
-	loaded, err := catalog.Load(context.Background(), cfg.DefinitionsDir, cfg.ProjectionsDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := loaded.SetVersion(); got != v {
-		t.Errorf("catalog over Config's dirs: SetVersion = %s, want %s", got, v)
-	}
-}
 
 // TestMinimal_Loads checks the minimal catalog is a valid catalog on its own: Load
 // accepts it from directories, its version is computable and is not V, and its

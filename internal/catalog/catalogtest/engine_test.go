@@ -98,24 +98,21 @@ func TestEngine_LoadsFromADirectoryCopy(t *testing.T) {
 	}
 }
 
-// TestFixtures_AreDistinctAndThePackageHelpersArePersonal checks Over builds one
-// Fixture per catalog and the package-level helpers stay Personal's until slice 6.
-func TestFixtures_AreDistinctAndThePackageHelpersArePersonal(t *testing.T) {
+// TestFixtures_AreDistinct checks Over builds one Fixture per catalog: Engine and a
+// Fixture over fixture.Minimal share nothing, and each holds its own types and V.
+func TestFixtures_AreDistinct(t *testing.T) {
 	t.Parallel()
-	if catalogtest.Catalog(t) != catalogtest.Personal.Catalog(t) ||
-		catalogtest.Definitions(t) != catalogtest.Personal.Definitions(t) ||
-		catalogtest.Projections(t) != catalogtest.Personal.Projections(t) {
-		t.Error("a package-level helper is not Personal's")
-	}
-	if catalogtest.Engine.Catalog(t) == catalogtest.Personal.Catalog(t) {
-		t.Error("Engine and Personal share a catalog")
-	}
-	if got := catalogtest.Personal.Catalog(t).SetVersion(); got != v {
-		t.Errorf("Personal SetVersion = %s, want %s", got, v)
-	}
 	over := catalogtest.Over(fixture.Minimal)
+	if catalogtest.Engine.Catalog(t) == over.Catalog(t) ||
+		catalogtest.Engine.Definitions(t) == over.Definitions(t) ||
+		catalogtest.Engine.Projections(t) == over.Projections(t) {
+		t.Error("Engine and Over(fixture.Minimal) share a helper's value")
+	}
 	if got := typesOf(over.Definitions(t)); !slices.Equal(got, []string{"record.document", "record.edge", "test.measure"}) {
 		t.Errorf("Over(fixture.Minimal) types = %v", got)
+	}
+	if got := over.Catalog(t).SetVersion(); got == engineV || got == v {
+		t.Errorf("Over(fixture.Minimal) SetVersion = %s, want Minimal's own", got)
 	}
 }
 

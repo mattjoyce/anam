@@ -203,7 +203,7 @@ func TestOpen_AbsentEdgeDegrades(t *testing.T) {
 func TestOpen_ACompleteCatalogLogsOnlyItsAdmission(t *testing.T) {
 	for name, cfg := range map[string]config.Config{
 		"minimal":   minimalConfig(t, func(string) {}),
-		"mattjoyce": newConfig(t),
+		"engine":    newConfig(t),
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, lines, err := startLog(t, cfg)

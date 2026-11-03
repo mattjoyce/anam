@@ -34,13 +34,13 @@ func supersededServer(t *testing.T) (*httptest.Server, string) {
 
 	const ref = "meter:2026-01-24 06:30:1"
 	v1 := seedFacet(t, ref, "test.described",
-		`{"at": "2026-01-24 06:30", "figure": "1", "high": {"value": 128, "unit": "u"}, "low": {"value": 79, "unit": "u"}}`)
+		`{"at": "2026-01-24 06:30", "span": {"start": "2026-01-24 06:30"}, "figure": "1", "high": {"value": 128, "unit": "u"}, "low": {"value": 79, "unit": "u"}}`)
 	v1.DefinitionVersion = cur.Version
 	if err := l.Admit(ctx, 0, v1, event(facet.EventAdmitted, v1, 1)); err != nil {
 		t.Fatalf("Admit v1: %v", err)
 	}
 	v2 := seedFacet(t, ref, "test.described",
-		`{"at": "2026-01-24 06:30", "figure": "1", "high": {"value": 130, "unit": "u"}, "low": {"value": 79, "unit": "u"}, "comment": "redone"}`)
+		`{"at": "2026-01-24 06:30", "span": {"start": "2026-01-24 06:30"}, "figure": "1", "high": {"value": 130, "unit": "u"}, "low": {"value": 79, "unit": "u"}, "comment": "redone"}`)
 	v2.DefinitionVersion, v2.ArtifactVersion = cur.Version, 2
 	sup := facet.AnamEvent{Kind: facet.EventSuperseded, FacetID: v2.ID, Seq: 2, ArtifactVersion: 2,
 		PriorArtifactVersion: 1, AnamTime: time.Date(2026, 7, 11, 9, 0, 0, 0, time.UTC)}
@@ -66,7 +66,8 @@ func TestFacet_ShowsWhatAVersionChangedAndWhatEachFieldMeans(t *testing.T) {
 		`<td class="mono">/high/value</td><td class="mono">128</td><td class="mono">130</td>`,
 		`<td class="mono">/comment</td><td class="mono"><span class="dim">absent</span></td>`,
 		"read through definition v",
-		"The higher of the two figures.", // the field's own words
+		"The upper figure, a value and its unit.", // an object field's own words
+		"The higher of the two figures.",          // a leaf's
 		`<span class="role">fact time</span>`,
 		`href="/facet?id=` + id + `&v=1"`,
 	} {

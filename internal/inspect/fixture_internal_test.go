@@ -14,10 +14,11 @@ import (
 // feature added, built once per process like Engine itself.
 
 // describedManifest is a type whose fields say what they mean, as the engine
-// fixture's do not: two of them carry a description, one figure is written as text
-// (the schema's numeric pattern on a string, which the Definition page names "number
-// as text"), and two figures are nested objects of a value and a unit, so a facet page
-// lists a changed leaf by its pointer.
+// fixture's do not: three of them carry a description, an object among them, one
+// figure is written as text (the schema's numeric pattern on a string, which the
+// Definition page names "number as text"), two figures are nested objects of a value
+// and a unit, so a facet page lists a changed leaf by its pointer, and the fact time is
+// a nested field, so its role sits on a row below the top.
 const describedManifest = `{
   "meta": {
     "facet_type": "test.described",
@@ -27,16 +28,18 @@ const describedManifest = `{
     "classification": "Normal",
     "validation_mode": "strict",
     "source_schema": "fixture/test.described",
-    "time_semantics": {"fact_time": {"pointer": "/at", "layout": "2006-01-02 15:04", "zone": "UTC"}},
+    "time_semantics": {"fact_time": {"pointer": "/span/start", "layout": "2006-01-02 15:04", "zone": "UTC"}},
     "identity_key": ["/at"]
   },
   "schema": {
     "type": "object",
-    "required": ["at", "figure", "high", "low"],
+    "required": ["at", "span", "figure", "high", "low"],
     "properties": {
       "at": {"type": "string", "minLength": 1},
+      "span": {"type": "object", "required": ["start"], "additionalProperties": false, "properties": {
+        "start": {"type": "string", "minLength": 1}}},
       "figure": {"type": "string", "minLength": 1, "pattern": "` + numericTextJSON + `", "description": "The figure as the source wrote it."},
-      "high": {"type": "object", "required": ["value", "unit"], "additionalProperties": false, "properties": {
+      "high": {"type": "object", "description": "The upper figure, a value and its unit.", "required": ["value", "unit"], "additionalProperties": false, "properties": {
         "value": {"type": "number", "description": "The higher of the two figures."},
         "unit": {"type": "string", "minLength": 1}}},
       "low": {"type": "object", "required": ["value", "unit"], "additionalProperties": false, "properties": {

@@ -72,8 +72,13 @@ func TestDefinition_PageMarksRolesOnTheirRows(t *testing.T) {
 	if !strings.Contains(described, "number as text") || strings.Contains(described, numericPattern) {
 		t.Error("test.described's numeric string is not named as number as text, or its regex is shown")
 	}
-	if !strings.Contains(described, "2 of 9 described") {
-		t.Error("test.described's two described fields are not counted")
+	if !strings.Contains(described, "3 of 11 described") {
+		t.Error("test.described's three described fields are not counted")
+	}
+	// Its fact time is a nested field: the role sits on that row, below the top.
+	row, _, _ := strings.Cut(described[strings.Index(described, `<tr id="f/span/start">`)+1:], "</tr>")
+	if !strings.Contains(row, `<span class="role">fact time</span>`) {
+		t.Errorf("the nested fact-time row lacks its role: %s", row)
 	}
 }
 

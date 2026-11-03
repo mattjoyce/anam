@@ -57,7 +57,9 @@ func isJSON(name string) bool {
 }
 
 // BundledFS parses every current manifest in a catalog root: *.json at the root,
-// earlier versions under history/. Bundled is BundledFS over the embedded catalog.
+// earlier versions under history/. The registry's retired types, which Closes answers
+// for a type no current manifest names, come from that root's history/ and no other.
+// Bundled is BundledFS over the embedded catalog.
 func BundledFS(fsys fs.FS) (*Registry, error) {
 	names, err := readJSONFiles(fsys, ".")
 	if err != nil {
@@ -80,7 +82,15 @@ func BundledFS(fsys fs.FS) (*Registry, error) {
 		}
 		defs = append(defs, d)
 	}
-	return NewRegistry(defs...)
+	history, err := HistoryFS(fsys)
+	if err != nil {
+		return nil, err
+	}
+	retired, err := retiredCloses(history)
+	if err != nil {
+		return nil, err
+	}
+	return newRegistry(retired, defs...)
 }
 
 // EmbeddedFS returns the read-only embedded catalog root: *.json at the root,

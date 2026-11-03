@@ -787,3 +787,42 @@ func TestCheckRegistered(t *testing.T) {
 		t.Errorf("error %q does not name %s", err, want)
 	}
 }
+
+// Card 255 (R4b): a directory catalog's registry closes a retired type from that
+// directory's history. A history the binary does not carry still closes its series,
+// and a history the directory lacks closes nothing.
+func TestLoad_RetiredTypesCloseFromTheDirectorysHistory(t *testing.T) {
+	t.Parallel()
+	defs, projs := fixture.Mattjoyce()
+	defDir, projDir := fixture.Dirs(t, defs, projs)
+	retired := `{"meta": {"facet_type": "test.retired", "definition_version": 1,
+  "series": {"name": "test.course", "key": ["/drug"], "closes": true}}}`
+	if err := os.WriteFile(filepath.Join(defDir, "history", "test.retired.v1.json"), []byte(retired), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stopped, err := filepath.Glob(filepath.Join(defDir, "history", "med.stopped.v*.json"))
+	if err != nil || len(stopped) == 0 {
+		t.Fatalf("the fixture has no med.stopped history to remove (%v)", err)
+	}
+	for _, name := range stopped {
+		if err := os.Remove(name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c, err := catalog.Load(context.Background(), defDir, projDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reg, err := c.WithRegistered(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, r := range map[string]*def.Registry{"Definitions": c.Definitions(), "WithRegistered": reg} {
+		if !r.Closes("test.retired") {
+			t.Errorf("%s: test.retired closes = false, want true from the directory's history", name)
+		}
+		if r.Closes("med.stopped") {
+			t.Errorf("%s: med.stopped closes = true, but the directory's history does not name it", name)
+		}
+	}
+}

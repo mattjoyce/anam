@@ -15,15 +15,16 @@ import (
 func TestTimeline_FieldsAnswerWithAFrame(t *testing.T) {
 	t.Parallel()
 	f := newRemoteFixtureIn(t, "Europe/Berlin")
-	read := []string{"timeline", "--type", "test.measure", "--field", "/count", "--field", "/note"}
+	// A nested pointer and a top-level one: the frame cuts source_time to its basis.
+	read := []string{"timeline", "--type", "test.measure", "--field", "/source_time/basis", "--field", "/note"}
 
 	out := f.sameOutput(t, read...)
-	for _, want := range []string{"shown=3", "/COUNT", "/NOTE", "FACET_ID", "114", "70.0"} {
+	for _, want := range []string{"shown=3", "/SOURCE_TIME/BASIS", "/NOTE", "FACET_ID", "configuration", "70.0"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the frame does not show %q:\n%s", want, out)
 		}
 	}
-	if strings.Contains(out, "/SEQ") || strings.Contains(out, "configuration") || strings.Contains(out, "Europe/Berlin") {
+	if strings.Contains(out, "/SEQ") || strings.Contains(out, "/COUNT") || strings.Contains(out, "Europe/Berlin") {
 		t.Errorf("a field not named reached the answer:\n%s", out)
 	}
 
@@ -74,7 +75,7 @@ func TestTimeline_FieldsAreCheckedAgainstTheSchema(t *testing.T) {
 func TestPublish_FieldsFileAFrameThatVerifiesAndShows(t *testing.T) {
 	t.Parallel()
 	f := newRemoteFixture(t)
-	read := []string{"timeline", "--projection", "measures", "--field", "/count"}
+	read := []string{"timeline", "--projection", "measures", "--field", "/source_time/basis"}
 
 	shown := f.sameOutput(t, read...)
 	published := f.sameOutput(t, append(read, "--publish")...)
@@ -91,7 +92,7 @@ func TestPublish_FieldsFileAFrameThatVerifiesAndShows(t *testing.T) {
 		t.Errorf("the fields receipt did not reproduce:\n%s", out)
 	}
 	show := f.sameOutput(t, "receipt", "show", hash)
-	for _, want := range []string{"fields /count", "/COUNT", "114"} {
+	for _, want := range []string{"fields /source_time/basis", "/SOURCE_TIME/BASIS", "configuration"} {
 		if !strings.Contains(show, want) {
 			t.Errorf("receipt show lacks %q:\n%s", want, show)
 		}
@@ -103,7 +104,7 @@ func TestPublish_FieldsFileAFrameThatVerifiesAndShows(t *testing.T) {
 	var cols struct {
 		Columns []string `json:"columns"`
 	}
-	if json.Unmarshal([]byte(asJSON), &cols) != nil || cols.Columns[len(cols.Columns)-1] != "/count" {
+	if json.Unmarshal([]byte(asJSON), &cols) != nil || cols.Columns[len(cols.Columns)-1] != "/source_time/basis" {
 		t.Errorf("the shown frame's columns: %v", cols.Columns)
 	}
 }

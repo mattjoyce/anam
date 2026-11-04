@@ -2,9 +2,8 @@ package catalog_test
 
 // The tests in this file call catalog.Load with an empty directory, because the empty
 // catalog is what they check (card 255, R4b): no directory selects no files, labelled
-// "none", and never the catalog the binary carries. They are on card 255's allow-list
-// because the rule flags every empty directory, which selects the empty catalog on
-// purpose or by mistake.
+// "none". Each is listed in catalogtest's emptyOnPurpose, and passes every catalog it
+// selects to a catalogtest Require helper, which TestTests_ReadNoEmbeddedCatalog checks.
 
 import (
 	"context"
@@ -13,6 +12,7 @@ import (
 	"testing/fstest"
 
 	"github.com/mattjoyce/anam/internal/catalog"
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/def"
 )
@@ -28,6 +28,7 @@ func TestLoadNoDirectoriesIsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load(none, none): %v", err)
 	}
+	catalogtest.RequireEmpty(t, cat)
 	if cat.DefinitionsSource() != "none" || cat.ProjectionsSource() != "none" {
 		t.Errorf("sources = %q, %q; want none, none", cat.DefinitionsSource(), cat.ProjectionsSource())
 	}
@@ -63,6 +64,7 @@ func TestLoadOneDirectoryEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load(dir, none): %v", err)
 	}
+	catalogtest.RequireNoProjections(t, noProjs)
 	if noProjs.DefinitionsSource() != defs || noProjs.ProjectionsSource() != "none" {
 		t.Errorf("sources = %q, %q; want %s, none", noProjs.DefinitionsSource(), noProjs.ProjectionsSource(), defs)
 	}
@@ -77,6 +79,7 @@ func TestLoadOneDirectoryEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load(none, dir): %v", err)
 	}
+	catalogtest.RequireNoDefinitions(t, noDefs)
 	if noDefs.DefinitionsSource() != "none" || noDefs.ProjectionsSource() != projs {
 		t.Errorf("sources = %q, %q; want none, %s", noDefs.DefinitionsSource(), noDefs.ProjectionsSource(), projs)
 	}
@@ -124,11 +127,14 @@ func TestLoadEmptyIsBuiltOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	catalogtest.RequireEmpty(t, a)
+	catalogtest.RequireEmpty(t, b)
 	if a != b {
 		t.Error("two loads of the empty catalog built two catalogs, want one shared")
 	}
 	for n := 1; n <= 2; n++ {
 		cat, err := catalog.Load(&cancelAt{Context: context.Background(), n: n}, "", "")
+		catalogtest.RequireRefused(t, cat, err)
 		if cat != nil || !errors.Is(err, catalog.ErrInvalid) || !errors.Is(err, context.Canceled) {
 			t.Errorf("cancel at check %d: cat %v, err %v, want nil and both sentinels", n, cat, err)
 		}

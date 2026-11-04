@@ -32,21 +32,21 @@ type seeded struct {
 }
 
 var record = []seeded{
-	{"bp-1", "health.blood-pressure", "bp-csv", day(2026, 9, 30, 23)},
-	{"bp-2", "health.blood-pressure", "bp-csv", day(2026, 10, 1, 0)},
-	{"bp-3", "health.blood-pressure", "withings", day(2026, 10, 7, 23)},
-	{"bp-4", "health.blood-pressure", "withings", day(2026, 10, 8, 0)},
-	{"hr-1", "health.heart-rate.alert", "garmin", day(2026, 10, 3, 9)},
-	{"hr-2", "health.heart-rate.alert", "garmin", day(2026, 10, 3, 10)},
-	{"hrd-1", "health.heart-rate.day", "garmin", day(2026, 10, 3, 0)},
-	{"hrv-1", "health.heart-rate-variability", "garmin", day(2026, 10, 3, 0)},
-	{"hrx-1", "health.heart-rate", "garmin", day(2026, 10, 3, 0)},
-	{"run-1", "activity.exercise-session.run", "garmin", day(2026, 10, 4, 7)},
-	{"row-1", "activity.exercise-session.row", "concept2", day(2026, 10, 5, 7)},
-	{"ses-1", "activity.exercise-sessions", "garmin", day(2026, 10, 5, 7)},
-	{"wt-1", "health.weight", "withings", day(2026, 10, 2, 7)},
-	{"wt-2", "health.weight", "withings", day(2026, 10, 2, 7)},
-	{"gone", "health.weight", "withings", day(2026, 10, 2, 8)},
+	{"bp-1", "test.blood-pressure", "bp-csv", day(2026, 9, 30, 23)},
+	{"bp-2", "test.blood-pressure", "bp-csv", day(2026, 10, 1, 0)},
+	{"bp-3", "test.blood-pressure", "withings", day(2026, 10, 7, 23)},
+	{"bp-4", "test.blood-pressure", "withings", day(2026, 10, 8, 0)},
+	{"hr-1", "test.heart-rate.alert", "garmin", day(2026, 10, 3, 9)},
+	{"hr-2", "test.heart-rate.alert", "garmin", day(2026, 10, 3, 10)},
+	{"hrd-1", "test.heart-rate.day", "garmin", day(2026, 10, 3, 0)},
+	{"hrv-1", "test.heart-rate-variability", "garmin", day(2026, 10, 3, 0)},
+	{"hrx-1", "test.heart-rate", "garmin", day(2026, 10, 3, 0)},
+	{"run-1", "test.exercise-session.run", "garmin", day(2026, 10, 4, 7)},
+	{"row-1", "test.exercise-session.row", "concept2", day(2026, 10, 5, 7)},
+	{"ses-1", "test.exercise-sessions", "garmin", day(2026, 10, 5, 7)},
+	{"wt-1", "test.weight", "withings", day(2026, 10, 2, 7)},
+	{"wt-2", "test.weight", "withings", day(2026, 10, 2, 7)},
+	{"gone", "test.weight", "withings", day(2026, 10, 2, 8)},
 }
 
 func day(y int, m time.Month, d, h int) time.Time { return time.Date(y, m, d, h, 0, 0, 0, time.UTC) }
@@ -114,7 +114,7 @@ func id(ref string) string { return facet.NewID(ref) }
 // beside the canonical one. The seeded types are the test's own strings, chosen for
 // their prefixes, so the template is written here rather than read from a catalog.
 const bpTemplate = `{"name": "bp", "version": 1, "description": "every blood pressure reading, as a log",
-  "types": ["health.blood-pressure"], "statuses": ["admitted", "endorsed"], "max_classification": "Sensitive",
+  "types": ["test.blood-pressure"], "statuses": ["admitted", "endorsed"], "max_classification": "Sensitive",
   "from": "", "to": "", "shape": "log"}`
 
 func TestEquality_ProgramIsThePredicate(t *testing.T) {
@@ -135,12 +135,12 @@ func TestEquality_ProgramIsThePredicate(t *testing.T) {
 		"ticks of facets served and not":  {Ticks: []string{id("hr-1"), id("gone"), "not-a-facet"}},
 		"exclusions without criteria":     {Exclusions: []string{id("hr-1")}},
 		"a window on its edges":           {From: "2026-10-01T00:00:00.000000000Z", To: "2026-10-08T00:00:00.000000000Z"},
-		"a prefix at its boundary":        {Types: []string{"health.heart-rate."}},
-		"an exact type is not its prefix": {Types: []string{"health.heart-rate"}},
-		"a prefix is not a longer word":   {Types: []string{"activity.exercise-session."}},
-		"two types, two sources":          {Types: []string{"health.blood-pressure", "health.weight"}, Sources: []string{"withings", "bp-csv"}},
+		"a prefix at its boundary":        {Types: []string{"test.heart-rate."}},
+		"an exact type is not its prefix": {Types: []string{"test.heart-rate"}},
+		"a prefix is not a longer word":   {Types: []string{"test.exercise-session."}},
+		"two types, two sources":          {Types: []string{"test.blood-pressure", "test.weight"}, Sources: []string{"withings", "bp-csv"}},
 		"criteria, ticks and exclusions": {
-			Types: []string{"health.heart-rate.", "activity.exercise-session."}, From: "2026-10-03T00:00:00.000000000Z",
+			Types: []string{"test.heart-rate.", "test.exercise-session."}, From: "2026-10-03T00:00:00.000000000Z",
 			Ticks: []string{id("bp-1")}, Exclusions: []string{id("hr-2"), id("bp-1")},
 		},
 		"superseded over a served value": {Standing: selection.Superseded},
@@ -191,10 +191,10 @@ func TestPredicate_PicksWhatTheCriteriaSay(t *testing.T) {
 		f    selection.Filter
 		want []string
 	}{
-		"prefix":  {selection.Filter{Types: []string{"health.heart-rate."}}, ids("hr-1", "hr-2", "hrd-1")},
-		"window":  {selection.Filter{Types: []string{"health.blood-pressure"}, From: "2026-10-01T00:00:00.000000000Z", To: "2026-10-08T00:00:00.000000000Z"}, ids("bp-2", "bp-3")},
-		"exact":   {selection.Filter{Types: []string{"health.heart-rate"}}, ids("hrx-1")},
-		"retired": {selection.Filter{Types: []string{"health.weight"}}, ids("wt-1", "wt-2")},
+		"prefix":  {selection.Filter{Types: []string{"test.heart-rate."}}, ids("hr-1", "hr-2", "hrd-1")},
+		"window":  {selection.Filter{Types: []string{"test.blood-pressure"}, From: "2026-10-01T00:00:00.000000000Z", To: "2026-10-08T00:00:00.000000000Z"}, ids("bp-2", "bp-3")},
+		"exact":   {selection.Filter{Types: []string{"test.heart-rate"}}, ids("hrx-1")},
+		"retired": {selection.Filter{Types: []string{"test.weight"}}, ids("wt-1", "wt-2")},
 		"untick":  {selection.Filter{Sources: []string{"concept2", "withings"}, Exclusions: []string{id("bp-3"), id("bp-4")}}, ids("row-1", "wt-1", "wt-2")},
 	} {
 		if got := c.f.Picks(rows); !reflect.DeepEqual(got, c.want) {

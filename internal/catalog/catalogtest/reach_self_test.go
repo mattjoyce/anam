@@ -49,8 +49,9 @@ func writeModule(t *testing.T, files map[string]string) string {
 }
 
 // TestReach_SeesEveryWayIn runs the walk over small modules, one per way a test can
-// reach the embedded catalog and one per decoy that must not count, so a clean pass
-// over the real module is not a walk that saw nothing. Each want is "file func: what".
+// select the empty catalog and one per decoy that must not count, so a
+// clean pass over the real module is not a walk that saw nothing. Each want is
+// "file func: what".
 func TestReach_SeesEveryWayIn(t *testing.T) {
 	t.Parallel()
 	ext := func(body string, imports ...string) map[string]string {
@@ -65,36 +66,14 @@ func TestReach_SeesEveryWayIn(t *testing.T) {
 		files map[string]string
 		want  []string
 	}{
-		// Each embedded symbol, called or passed as a value.
-		{"def.Bundled", ext(`def.Bundled()`, "internal/def"), []string{x + "def.Bundled"}},
-		{"def.Manifests", ext(`def.Manifests()`, "internal/def"), []string{x + "def.Manifests"}},
-		{"def.History", ext(`def.History()`, "internal/def"), []string{x + "def.History"}},
-		{"def.SetVersion", ext(`def.SetVersion()`, "internal/def"), []string{x + "def.SetVersion"}},
-		{"def.EmbeddedFS as a value", ext(`use(def.EmbeddedFS)`, "internal/def"), []string{x + "def.EmbeddedFS"}},
-		{"projection.Bundled", ext(`projection.Bundled()`, "internal/projection"), []string{x + "projection.Bundled"}},
-		{"projection.EmbeddedFS", ext(`projection.EmbeddedFS()`, "internal/projection"), []string{x + "projection.EmbeddedFS"}},
-		{"renamed import", ext(`d.Bundled()`, "d internal/def"), []string{x + "def.Bundled"}},
-		{"dot import", ext(`Bundled()`, ". internal/projection"), []string{x + "projection.Bundled"}},
-		{"in a helper", map[string]string{"internal/x/x_test.go": "package x\n\nimport \"" + mod + "/internal/def\"\n\nvar reg, _ = def.Bundled()\n\nfunc helper() { _ = def.EmbeddedFS() }\n"},
-			[]string{"internal/x/x_test.go reg: def.Bundled", "internal/x/x_test.go helper: def.EmbeddedFS"}},
-		{"in a method", map[string]string{"internal/x/x_test.go": "package x\n\nimport \"" + mod + "/internal/def\"\n\nfunc (f *fx) cat() { def.Bundled() }\n"},
-			[]string{"internal/x/x_test.go fx.cat: def.Bundled"}},
-
-		// Inside the packages, the bare names, unexported ones included.
-		{"in package def", in("internal/def", "def", "Bundled(); embedded(); _ = manifestFS; History()"),
-			[]string{"internal/def/in_test.go T: def.Bundled", "internal/def/in_test.go T: def.embedded",
-				"internal/def/in_test.go T: def.manifestFS", "internal/def/in_test.go T: def.History"}},
-		{"in package projection", in("internal/projection", "projection", "embedded()"),
-			[]string{"internal/projection/in_test.go T: projection.embedded"}},
-		{"in package catalog", in("internal/catalog", "catalog", `embedded(); load(ctx, "", dir)`),
-			[]string{"internal/catalog/in_test.go T: catalog.embedded", "internal/catalog/in_test.go T: catalog.load with an empty definitions directory"}},
-
-		// The loader with an empty directory: the brief's grep missed the first two.
+		// The loader with an empty directory.
 		{"Load(context.Background(), \"\", \"\")", ext(`catalog.Load(context.Background(), "", "")`, "context", "internal/catalog"),
 			[]string{x + "catalog.Load with an empty definitions directory"}},
 		{"Load(ctx, dir, \"\")", ext(`catalog.Load(ctx, dir, "")`, "internal/catalog"),
 			[]string{x + "catalog.Load with an empty projections directory"}},
 		{"Load(ctx, \"\", dir) multi-line", ext("catalog.Load(\n\t\tctx,\n\t\t``,\n\t\tdir,\n\t)", "internal/catalog"),
+			[]string{x + "catalog.Load with an empty definitions directory"}},
+		{"renamed import", ext(`c.Load(ctx, "", dir)`, "c internal/catalog"),
 			[]string{x + "catalog.Load with an empty definitions directory"}},
 		{"dot-imported Load", ext(`Load(ctx, "", "")`, ". internal/catalog"),
 			[]string{x + "catalog.Load with an empty definitions directory"}},
@@ -108,48 +87,35 @@ func TestReach_SeesEveryWayIn(t *testing.T) {
 			[]string{x + "catalog.Load with an empty projections directory"}},
 		{"an empty const at file scope", map[string]string{"internal/x/x_test.go": "package x_test\n\nimport \"" + mod + "/internal/catalog\"\n\nconst none = \"\"\n\nconst alsoNone = none\n\nfunc T() { catalog.Load(ctx, alsoNone, d) }\n"},
 			[]string{x + "catalog.Load with an empty definitions directory"}},
-		{"an empty config var", ext("dir := \"\"\n\tcfg.ProjectionsDir = dir"),
-			[]string{x + `ProjectionsDir = "" selects the embedded catalog`}},
+		{"in package catalog", in("internal/catalog", "catalog", `load(ctx, "", dir); Load(ctx, dir, "")`),
+			[]string{"internal/catalog/in_test.go T: catalog.load with an empty definitions directory",
+				"internal/catalog/in_test.go T: catalog.Load with an empty projections directory"}},
+		{"in a helper", map[string]string{"internal/x/x_test.go": "package x\n\nimport \"" + mod + "/internal/catalog\"\n\nvar cat, _ = catalog.Load(ctx, \"\", d)\n\nfunc (f *fx) cat() { catalog.Load(ctx, d, \"\") }\n"},
+			[]string{"internal/x/x_test.go cat: catalog.Load with an empty definitions directory",
+				"internal/x/x_test.go fx.cat: catalog.Load with an empty projections directory"}},
 
-		// A config whose catalog directories are "", so a daemon opens on the embedded one.
+		// A config whose catalog directories are "", so a daemon opens on the empty one.
 		{"config dir assigned \"\"", ext(`cfg.DefinitionsDir, cfg.ProjectionsDir = "", ""`),
-			[]string{x + `DefinitionsDir = "" selects the embedded catalog`, x + `ProjectionsDir = "" selects the embedded catalog`}},
+			[]string{x + `DefinitionsDir = "" selects the empty catalog`, x + `ProjectionsDir = "" selects the empty catalog`}},
 		{"config literal with \"\"", ext(`_ = config.Config{ProjectionsDir: ""}`, "internal/config"),
-			[]string{x + `ProjectionsDir: "" selects the embedded catalog`}},
+			[]string{x + `ProjectionsDir: "" selects the empty catalog`}},
+		{"an empty config var", ext("dir := \"\"\n\tcfg.ProjectionsDir = dir"),
+			[]string{x + `ProjectionsDir = "" selects the empty catalog`}},
 
-		// The catalog's directories read from disk.
-		{"relative path", map[string]string{"internal/inspect/x_test.go": src("inspect", []string{"os"}, `os.ReadDir("../def/manifests")`)},
-			[]string{`internal/inspect/x_test.go T: the path "../def/manifests" reads internal/def/manifests from disk`}},
-		{"bare dir in its package", in("internal/def", "def_test", `filepath.Glob(filepath.Join("manifests", "*.json"))`, "path/filepath"),
-			[]string{`internal/def/in_test.go T: the path "manifests/*.json" reads internal/def/manifests from disk`}},
-		{"bare dir in a slice", in("internal/projection", "projection", `for _, d := range []string{"manifests"} { _ = d }`),
-			[]string{`internal/projection/in_test.go T: the path "manifests" reads internal/projection/manifests from disk`}},
-		{"literal join", ext(`filepath.Join("..", "projection", "manifests", "bp.json")`, "path/filepath"),
-			[]string{x + `the path "../projection/manifests/bp.json" reads internal/projection/manifests from disk`}},
-		{"join under a computed root", ext(`os.DirFS(filepath.Join(root, "internal", "def", "manifests"))`, "os", "path/filepath"),
-			[]string{x + "a path ending in internal/def/manifests"}},
-		{"module-relative literal", ext(`os.ReadFile(root + "/internal/projection/manifests/history/bp.v1.json")`, "os"),
-			[]string{x + `the path "/internal/projection/manifests/history/bp.v1.json" reads internal/projection/manifests from disk`}},
-
-		// Decoys: none of these reads the embedded catalog.
-		{"decoy: query's own Bundled", in("internal/query", "query", "rules, err := Bundled(); _, _ = rules, err"), nil},
+		// Decoys: none of these selects the empty catalog.
 		{"decoy: the FS functions over a fixture", ext(`def.BundledFS(f); def.ManifestsFS(f); def.HistoryFS(f); def.SetVersionFS(f); projection.BundledFS(f)`,
 			"internal/def", "internal/projection"), nil},
 		{"decoy: catalog methods", ext(`cat.Manifests(); cat.History(); cat.SetVersion(); reg.Bundled`), nil},
 		{"decoy: Load from directories", ext(`catalog.Load(ctx, defs, projs)`, "internal/catalog"), nil},
-		{"decoy: a local shadows the package", ext(`def := fake{}; def.Bundled()`, "internal/def"), nil},
-		{"decoy: a local shadows in package", in("internal/catalog", "catalog", `embedded, err := Load(ctx, a, b); _, _ = embedded, err`), nil},
-		{"decoy: a field key", in("internal/def", "def", `_ = Registry{History: nil}`), nil},
-		{"decoy: a method named History", map[string]string{"internal/def/m_test.go": "package def\n\ntype h struct{}\n\nfunc (h) History() {}\n"}, nil},
-		{"decoy: source text and a comment", ext("_ = `def.Bundled() and \"../def/manifests\"`\n// def.Bundled() catalog.Load(ctx, \"\", \"\")", "internal/def"), nil},
-		{"decoy: a manifests dir elsewhere", in("internal/serve", "serve", `os.MkdirAll(filepath.Join(t.TempDir(), "manifests"), 0o750)`, "os", "path/filepath"), nil},
-		{"decoy: registered projections", ext(`os.ReadFile(filepath.Join("..", "..", "projections", "heart.v3.json"))`, "os", "path/filepath"), nil},
+		{"decoy: a local shadows the package", ext(`catalog := fake{}; catalog.Load(ctx, "", "")`, "internal/catalog"), nil},
+		{"decoy: a local shadows in package", in("internal/catalog", "catalog", `load := fake; load(ctx, "", "")`), nil},
+		{"decoy: source text and a comment", ext("_ = `catalog.Load(ctx, \"\", \"\")`\n// catalog.Load(ctx, \"\", \"\")", "internal/catalog"), nil},
 		{"decoy: a config dir set to a path", ext(`cfg.DefinitionsDir = dir; _ = config.Config{ProjectionsDir: dir}`, "internal/config"), nil},
 		{"decoy: a variable set again", ext("dir := \"\"\n\tdir = t.TempDir()\n\tcatalog.Load(ctx, dir, dir)", "internal/catalog"), nil},
 		{"decoy: a variable whose address is taken", ext("var dir string\n\tflagVar(&dir)\n\tcatalog.Load(ctx, dir, dir)", "internal/catalog"), nil},
 		{"decoy: catalog.Load passed, not bound", ext(`use(catalog.Load)`, "internal/catalog"), nil},
 		{"decoy: a package's own Load", in("internal/x", "x", `Load(ctx, "", "")`), nil},
-		{"decoy: under testdata", map[string]string{"internal/x/testdata/x_test.go": src("x", []string{"internal/def"}, "def.Bundled()")}, nil},
+		{"decoy: under testdata", map[string]string{"internal/x/testdata/x_test.go": src("x", []string{"internal/catalog"}, `catalog.Load(ctx, "", "")`)}, nil},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
@@ -175,58 +141,84 @@ func TestReach_SeesEveryWayIn(t *testing.T) {
 	}
 }
 
-// TestCheck_HoldsTheListToWhatReaches runs the list check over given reaches, so an
-// entry that allows nothing, a gone file, and a reach in an unlisted function of a
-// listed file all fail.
+// TestCheck_HoldsTheListToWhatReaches runs the walk and the list check over small
+// modules with T listed, so a listed test passes only while it checks every catalog
+// it selects with a Require helper in its own body, and nothing else is excused.
 func TestCheck_HoldsTheListToWhatReaches(t *testing.T) {
 	t.Parallel()
-	files := []string{"a_test.go", "b_test.go"}
-	sym := func(file, fn string) reach { return reach{File: file, Func: fn, Kind: kindSymbol, What: "def.Bundled"} }
-	lit := func(file, fn string) reach { return reach{File: file, Func: fn, Kind: kindPath, What: "a path"} }
+	const file = "internal/x/x_test.go"
+	listT := []exempt{{file: file, fn: "T", reason: "r"}}
+	mod1 := func(body string) map[string]string {
+		return map[string]string{file: src("x_test", []string{"testing", "internal/catalog", "internal/catalog/catalogtest"}, body)}
+	}
 	for _, c := range []struct {
-		name    string
-		reaches []reach
-		allow   []allowed
-		labels  []allowed
-		want    []string // a substring of each problem, in order
+		name  string
+		files map[string]string
+		list  []exempt
+		want  []string // a substring of each problem, in order
 	}{
-		{name: "clean", reaches: []reach{sym("a_test.go", "TestA")},
-			allow: []allowed{{file: "a_test.go", reason: "r"}}},
-		{name: "unlisted file", reaches: []reach{sym("b_test.go", "TestB")},
-			want: []string{"b_test.go:0 TestB: def.Bundled reaches the embedded catalog outside the allow-list"}},
-		{name: "unlisted function in a listed file", reaches: []reach{sym("a_test.go", "TestA"), sym("a_test.go", "TestNew")},
-			allow: []allowed{{file: "a_test.go", funcs: []string{"TestA"}, reason: "r"}},
-			want:  []string{"a_test.go:0 TestNew: def.Bundled reaches"}},
-		{name: "stale file entry", allow: []allowed{{file: "a_test.go", reason: "r"}},
-			want: []string{"listed a_test.go no longer reaches the embedded catalog"}},
-		{name: "stale function", reaches: []reach{sym("a_test.go", "TestA")},
-			allow: []allowed{{file: "a_test.go", funcs: []string{"TestA", "TestGone"}, reason: "r"}},
-			want:  []string{"listed a_test.go TestGone no longer reaches the embedded catalog"}},
-		{name: "gone file", allow: []allowed{{file: "gone_test.go", reason: "r"}},
-			want: []string{"listed gone_test.go is not a test file in the module"}},
-		{name: "a label excuses a path", reaches: []reach{lit("a_test.go", "golden")},
-			labels: []allowed{{file: "a_test.go", funcs: []string{"golden"}, reason: "r"}}},
-		{name: "a label does not excuse a symbol", reaches: []reach{sym("a_test.go", "golden")},
-			labels: []allowed{{file: "a_test.go", funcs: []string{"golden"}, reason: "r"}},
-			want:   []string{"a_test.go:0 golden: def.Bundled reaches", "listed a_test.go golden no longer names a catalog path"}},
-		{name: "a method is not the function of its name", reaches: []reach{sym("a_test.go", "fx.TestA")},
-			allow: []allowed{{file: "a_test.go", funcs: []string{"TestA"}, reason: "r"}},
-			want:  []string{"a_test.go:0 fx.TestA: def.Bundled reaches", "listed a_test.go TestA no longer reaches"}},
-		{name: "a file listed twice", reaches: []reach{sym("a_test.go", "TestA")},
-			allow: []allowed{{file: "a_test.go", reason: "r"}, {file: "a_test.go", funcs: []string{"TestA"}, reason: "r"}},
-			want:  []string{"a_test.go is listed twice in one list", "listed a_test.go TestA no longer reaches"}},
-		{name: "lists overlap", reaches: []reach{lit("a_test.go", "golden")},
-			allow:  []allowed{{file: "a_test.go", reason: "r"}},
-			labels: []allowed{{file: "a_test.go", funcs: []string{"golden"}, reason: "r"}},
-			want:   []string{"a_test.go is in both the allow-list and pathLabels", "listed a_test.go no longer reaches"}},
-		{name: "usage is per list", reaches: []reach{lit("a_test.go", "golden")},
-			allow:  []allowed{{file: "a_test.go", funcs: []string{"golden"}, reason: "r"}},
-			labels: []allowed{{file: "a_test.go", funcs: []string{"golden"}, reason: "r"}},
-			want:   []string{"a_test.go is in both the allow-list and pathLabels", "listed a_test.go golden no longer reaches"}},
+		{name: "a listed load, checked", list: listT,
+			files: mod1("cat, err := catalog.Load(ctx, \"\", \"\")\n\tcatalogtest.RequireEmpty(t, cat)\n\t_ = err")},
+		{name: "a listed load assigned with =, checked", list: listT,
+			files: mod1("var cat *catalog.Catalog\n\tcat, _ = catalog.Load(ctx, d, \"\")\n\tcatalogtest.RequireNoProjections(t, cat)")},
+		{name: "a listed refusal, checked", list: listT,
+			files: mod1("cat, err := catalog.Load(canceled, \"\", \"\")\n\tcatalogtest.RequireRefused(t, cat, err)")},
+		{name: "a listed config, checked", list: listT,
+			files: mod1("cfg.DefinitionsDir, cfg.ProjectionsDir = \"\", \"\"\n\td := start(cfg)\n\tcatalogtest.RequireEmpty(t, d.catalog)")},
+
+		{name: "unlisted, with an unrelated none", files: mod1("_ = \"none\"\n\tcat, _ := catalog.Load(ctx, \"\", \"\")\n\tcatalogtest.RequireEmpty(t, cat)"),
+			want: []string{file + ":11 T: catalog.Load with an empty definitions directory selects the empty catalog outside emptyOnPurpose"}},
+		{name: "listed, an ignored comparison", list: listT,
+			files: mod1("cat, _ := catalog.Load(ctx, \"\", \"\")\n\t_ = cat.DefinitionsSource() == \"none\""),
+			want:  []string{"selects the empty catalog on 1 lines and calls a catalogtest Require helper 0 times", "the catalog this load returns is not passed"}},
+		{name: "listed, the check in an uncalled closure", list: listT,
+			files: mod1("cat, _ := catalog.Load(ctx, \"\", \"\")\n\tf := func() { catalogtest.RequireEmpty(t, cat) }\n\t_ = f"),
+			want:  []string{"on 1 lines and calls a catalogtest Require helper 0 times", "is not passed"}},
+		{name: "listed, the load and check in a subtest", list: listT,
+			files: mod1("t.Run(\"none\", func(t *testing.T) {\n\t\tcat, _ := catalog.Load(ctx, \"\", \"\")\n\t\tcatalogtest.RequireEmpty(t, cat)\n\t})"),
+			want:  []string{"on 1 lines and calls a catalogtest Require helper 0 times", "is not passed"}},
+		{name: "a sibling of a listed test", list: listT,
+			files: map[string]string{file: "package x_test\n\nimport (\n\t\"" + mod + "/internal/catalog\"\n\t\"" + mod + "/internal/catalog/catalogtest\"\n)\n\n" +
+				"func T(t *testing.T) { cat, _ := catalog.Load(ctx, \"\", \"\"); catalogtest.RequireEmpty(t, cat) }\n\n" +
+				"func U(t *testing.T) { cat, _ := catalog.Load(ctx, \"\", \"\"); _ = cat }\n"},
+			want: []string{file + ":10 U: catalog.Load with an empty definitions directory selects the empty catalog outside emptyOnPurpose"}},
+		{name: "listed, a second load unchecked", list: listT,
+			files: mod1("a, _ := catalog.Load(ctx, \"\", \"\")\n\tcatalogtest.RequireEmpty(t, a)\n\tb, _ := catalog.Load(ctx, \"\", d)\n\t_ = b"),
+			want:  []string{"on 2 lines and calls a catalogtest Require helper 1 times", file + ":12 T: catalog.Load with an empty definitions directory: listed, but the catalog this load returns is not passed"}},
+		{name: "listed, the first load checked twice", list: listT,
+			files: mod1("a, _ := catalog.Load(ctx, \"\", \"\")\n\tb, _ := catalog.Load(ctx, \"\", d)\n\tcatalogtest.RequireEmpty(t, a)\n\tcatalogtest.RequireEmpty(t, a)\n\t_ = b"),
+			want:  []string{file + ":11 T: catalog.Load with an empty definitions directory: listed, but the catalog this load returns is not passed"}},
+		{name: "listed, a load whose result is dropped", list: listT,
+			files: mod1("catalog.Load(ctx, \"\", \"\")\n\tcatalogtest.RequireEmpty(t, other)"),
+			want:  []string{"the catalog this load returns is not passed"}},
+		{name: "listed, a Require of another package", list: listT,
+			files: map[string]string{file: src("x_test", []string{"testing", "internal/catalog", "catalogtest internal/y"},
+				"cat, _ := catalog.Load(ctx, \"\", \"\")\n\tcatalogtest.RequireEmpty(t, cat)")},
+			want: []string{"calls a catalogtest Require helper 0 times", "is not passed"}},
+		{name: "a test that calls a listed one", list: listT,
+			files: map[string]string{
+				file:                   src("x", []string{"testing", "internal/catalog", "internal/catalog/catalogtest"}, "cat, _ := catalog.Load(ctx, \"\", \"\")\n\tcatalogtest.RequireEmpty(t, cat)"),
+				"internal/x/b_test.go": "package x\n\nfunc TestNew(t *testing.T) { T(t) }\n",
+			},
+			want: []string{"internal/x/b_test.go:3 TestNew: via helper T"}},
+
+		{name: "a listed function that selects nothing", list: listT, files: mod1("_ = 1"),
+			want: []string{"listed " + file + " T no longer selects the empty catalog"}},
+		{name: "a listed function that has gone", list: []exempt{{file: file, fn: "Gone", reason: "r"}}, files: mod1("_ = 1"),
+			want: []string{"listed " + file + " Gone is not a function in that file"}},
+		{name: "a listed file that has gone", list: []exempt{{file: "internal/x/gone_test.go", fn: "T", reason: "r"}}, files: mod1("_ = 1"),
+			want: []string{"listed internal/x/gone_test.go is not a test file"}},
+		{name: "a function listed twice", list: append(slices.Clone(listT), listT...),
+			files: mod1("cat, _ := catalog.Load(ctx, \"\", \"\")\n\tcatalogtest.RequireEmpty(t, cat)"),
+			want:  []string{file + " T is listed twice"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			got := checkReaches(scan{reaches: c.reaches, files: files}, c.allow, c.labels)
+			s, err := findReaches(writeModule(t, c.files))
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := checkReaches(s, c.list)
 			if len(got) != len(c.want) {
 				t.Fatalf("problems = %q, want %d like %q", got, len(c.want), c.want)
 			}
@@ -240,58 +232,43 @@ func TestCheck_HoldsTheListToWhatReaches(t *testing.T) {
 }
 
 // TestCheck_FollowsHelpers runs the walk and the list check over small modules, so a
-// new test that calls an allowed helper fails, and a label excuses only the function
-// it names.
+// test that calls a helper that selects the empty catalog fails, however far away.
 func TestCheck_FollowsHelpers(t *testing.T) {
 	t.Parallel()
-	head := "package x\n\nimport (\n\t\"os\"\n\t\"" + mod + "/internal/def\"\n)\n\n"
-	allowA := []allowed{{file: "internal/x/a_test.go", reason: "r"}}
+	head := "package x\n\nimport \"" + mod + "/internal/catalog\"\n\n"
+	const sel = `catalog.Load(ctx, "", d)`
 	for _, c := range []struct {
-		name   string
-		files  map[string]string
-		allow  []allowed
-		labels []allowed
-		want   []string // a substring of each problem, in order
+		name  string
+		files map[string]string
+		want  []string // a substring of each problem, in order
 	}{
-		{name: "an allowed helper called only from its file",
-			files: map[string]string{"internal/x/a_test.go": head + "func helper() { def.Bundled() }\n\nfunc TestA() { helper() }\n"},
-			allow: allowA},
-		{name: "a new test calls an allowed helper",
+		{name: "a helper and its caller",
+			files: map[string]string{"internal/x/a_test.go": head + "func helper() { " + sel + " }\n\nfunc TestA() { helper() }\n"},
+			want:  []string{"a_test.go:5 helper: catalog.Load", "a_test.go:7 TestA: via helper helper"}},
+		{name: "through another helper in another file",
 			files: map[string]string{
-				"internal/x/a_test.go": head + "func helper() { def.Bundled() }\n\nfunc TestA() { helper() }\n",
-				"internal/x/b_test.go": head + "func TestNew() { helper() }\n",
-			},
-			allow: allowA, want: []string{"internal/x/b_test.go:8 TestNew: via helper helper"}},
-		{name: "through another helper",
-			files: map[string]string{
-				"internal/x/a_test.go": head + "func helper() { def.Bundled() }\n",
+				"internal/x/a_test.go": head + "func helper() { " + sel + " }\n",
 				"internal/x/b_test.go": head + "func mid() { helper() }\n\nfunc TestNew() { mid() }\n",
 			},
-			allow: allowA, want: []string{"b_test.go:8 mid: via helper helper", "b_test.go:10 TestNew: via helper mid"}},
+			want: []string{"a_test.go:5 helper: catalog.Load", "b_test.go:5 mid: via helper helper", "b_test.go:7 TestNew: via helper mid"}},
 		{name: "a method helper",
 			files: map[string]string{
-				"internal/x/a_test.go": head + "type fx struct{}\n\nfunc (fx) cat() { def.Bundled() }\n",
+				"internal/x/a_test.go": head + "type fx struct{}\n\nfunc (fx) cat() { " + sel + " }\n",
 				"internal/x/b_test.go": head + "func TestNew(f fx) { f.cat() }\n",
 			},
-			allow: allowA, want: []string{"b_test.go:8 TestNew: via helper fx.cat"}},
+			want: []string{"a_test.go:7 fx.cat: catalog.Load", "b_test.go:5 TestNew: via helper fx.cat"}},
 		{name: "a package-level var",
 			files: map[string]string{
-				"internal/x/a_test.go": head + "var reg, _ = def.Bundled()\n",
-				"internal/x/b_test.go": head + "func TestNew() { _ = reg }\n",
+				"internal/x/a_test.go": head + "var cat, _ = " + sel + "\n",
+				"internal/x/b_test.go": head + "func TestNew() { _ = cat }\n",
 			},
-			allow: allowA, want: []string{"b_test.go:8 TestNew: via helper reg"}},
+			want: []string{"a_test.go:5 cat: catalog.Load", "b_test.go:5 TestNew: via helper cat"}},
 		{name: "decoy: the same name in another package",
 			files: map[string]string{
-				"internal/x/a_test.go": head + "func helper() { def.Bundled() }\n",
+				"internal/x/a_test.go": head + "func helper() { " + sel + " }\n",
 				"internal/y/b_test.go": "package y\n\nfunc TestNew() { helper() }\n",
 			},
-			allow: allowA},
-		{name: "a label excuses only its formatter",
-			files: map[string]string{"internal/def/b_test.go": "package def\n\nimport \"os\"\n\n" +
-				"func label(n string) string { return \"manifests/\" + n }\n\n" +
-				"func lines() { _ = label(\"x\"); os.ReadFile(\"manifests/x.json\") }\n"},
-			labels: []allowed{{file: "internal/def/b_test.go", funcs: []string{"label"}, reason: "r"}},
-			want:   []string{`internal/def/b_test.go:7 lines: the path "manifests/x.json"`}},
+			want: []string{"a_test.go:5 helper: catalog.Load"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
@@ -299,7 +276,7 @@ func TestCheck_FollowsHelpers(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got := checkReaches(s, c.allow, c.labels)
+			got := checkReaches(s, nil)
 			if len(got) != len(c.want) {
 				t.Fatalf("problems = %q, want %d like %q", got, len(c.want), c.want)
 			}

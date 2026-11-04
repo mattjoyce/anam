@@ -172,7 +172,7 @@ func TestZonePointer_ParseHoldsItsPlace(t *testing.T) {
 		if mode == "verbatim" {
 			schema = ""
 		}
-		return `{"meta": {"facet_type": "health.reading", "definition_version": 1, "classification": "Normal",
+		return `{"meta": {"facet_type": "test.raw-reading", "definition_version": 1, "classification": "Normal",
 		  "validation_mode": "` + mode + `", "source_schema": "test/reading",
 		  "time_semantics": {"fact_time": ` + fact + `}, "identity_key": ["/at"]}` + schema + `}`
 	}

@@ -45,7 +45,7 @@ steps:
   - actor: /components/def.md
     caller: /components/daemon.md
     label: Register checks bundled and held
-    action: A type the binary bundles is `ErrBundled` (409), unless the body is the one the binary carries at that version, which is unchanged (200) so a release taking a type back does not break the importer still sending it (card 139). The same canonical body at a held version is adopted or unchanged; a different body at a held version is `ErrRegistered` (409).
+    action: A type the deployment's catalog holds is `ErrBundled` (409), unless the body is the one the catalog holds at that version, which is unchanged (200) so a catalog taking a type back does not break the importer still sending it (card 139). The same canonical body at a held version is adopted or unchanged; a different body at a held version is `ErrRegistered` (409).
     reads: [/data-structures/definition-manifest.md]
     resource: internal/def/register.go#Register
     anchor: "if b, ok := bundled.Lookup(d.Type); ok {"
@@ -74,6 +74,6 @@ steps:
     anchor: "status = http.StatusCreated"
 ---
 
-This is the importer contract's "a type lives in one place" made mechanical. While the binary bundles a type, no importer may register it and any number may submit it; when a release drops the type, the one importer naming it takes it over by registering the same body, and two importers naming an unbundled type refuse the daemon's start.
+This is the importer contract's "a type lives in one place" made mechanical. While the deployment's catalog holds a type, no importer may register it and any number may submit it; when the catalog drops the type, the one importer naming it takes it over by registering the same body, and two importers naming an unbundled type refuse the daemon's start.
 
 Related: [a type lives in one place](/invariants/a-type-lives-in-one-place.md), [Definitions live in the operational store](/decisions/definitions-live-in-the-operational-store.md), [Definitions are registered on a 404, not at start](/gaps/definitions-registered-on-404-not-at-start.md).

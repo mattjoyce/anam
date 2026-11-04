@@ -21,7 +21,7 @@ import (
 
 const pulseManifest = `{
   "meta": {
-    "facet_type": "health.pulse",
+    "facet_type": "test.pulse",
     "definition_version": 1,
     "classification": "Normal",
     "validation_mode": "strict",
@@ -56,7 +56,7 @@ func TestCommit_RefusesAFacetChangingType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := gate.New(l, reg, gate.StaticScopes{"bp-csv": {"health.blood-pressure", "health.pulse"}}, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
+	g := gate.New(l, reg, gate.StaticScopes{"bp-csv": {"test.blood-pressure", "test.pulse"}}, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 
 	first := bpEnvelope(bpPayload)
 	b, _ := g.Resolve(first)
@@ -67,7 +67,7 @@ func TestCommit_RefusesAFacetChangingType(t *testing.T) {
 
 	// The same source and the same identity value, another type: the same facet id.
 	second := facet.Envelope{
-		Type: "health.pulse", Source: "bp-csv", Injector: "bp-csv",
+		Type: "test.pulse", Source: "bp-csv", Injector: "bp-csv",
 		Payload: []byte(`{"measured_at": "2026-01-24T06:30:00Z", "bpm": 61}`),
 	}
 	b, _ = g.Resolve(second)
@@ -76,7 +76,7 @@ func TestCommit_RefusesAFacetChangingType(t *testing.T) {
 	if !errors.As(err, &refused) || !errors.Is(err, gate.ErrTypeChanged) {
 		t.Fatalf("a facet changing type: %v, want a refusal with ErrTypeChanged", err)
 	}
-	for _, want := range []string{"health.blood-pressure", "health.pulse", facet.SourceRef("bp-csv", "2026-01-24T06:30:00Z")} {
+	for _, want := range []string{"test.blood-pressure", "test.pulse", facet.SourceRef("bp-csv", "2026-01-24T06:30:00Z")} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("the refusal does not name %q: %v", want, err)
 		}
@@ -85,7 +85,7 @@ func TestCommit_RefusesAFacetChangingType(t *testing.T) {
 		t.Errorf("the refusal wrote: W %d → %d", head, after)
 	}
 	cur, err := l.CurrentVersion(ctx, facet.NewID(first.SourceRef))
-	if err == nil && cur.Type != "health.blood-pressure" {
+	if err == nil && cur.Type != "test.blood-pressure" {
 		t.Errorf("the reading is now a %s", cur.Type)
 	}
 

@@ -21,11 +21,11 @@ func canonical(t *testing.T) fold.Value {
 	t.Helper()
 
 	entries := []fold.Entry{
-		entry("f-bp-1", "health.blood-pressure", "2026-01-24T06:36:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
-		entry("f-bp-2", "health.blood-pressure", "2026-02-01T06:30:00.000000000Z", facet.StatusEndorsed, facet.ClassificationConfidential),
-		entry("f-sleep-1", "health.sleep", "2026-01-25T22:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
-		entry("f-hr-1", "health.heart-rate", "2026-01-26T08:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationSensitive),
-		entry("f-bp-3", "health.blood-pressure", "2026-03-15T06:20:00.000000000Z", facet.StatusTombstoned, facet.ClassificationNormal),
+		entry("f-bp-1", "test.blood-pressure", "2026-01-24T06:36:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
+		entry("f-bp-2", "test.blood-pressure", "2026-02-01T06:30:00.000000000Z", facet.StatusEndorsed, facet.ClassificationConfidential),
+		entry("f-sleep-1", "test.sleep", "2026-01-25T22:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
+		entry("f-hr-1", "test.heart-rate", "2026-01-26T08:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationSensitive),
+		entry("f-bp-3", "test.blood-pressure", "2026-03-15T06:20:00.000000000Z", facet.StatusTombstoned, facet.ClassificationNormal),
 	}
 	v, err := fold.NewValue(entries)
 	if err != nil {
@@ -110,13 +110,13 @@ func TestParse_RejectsBadValuesAtLoad(t *testing.T) {
 
 	cases := map[string]string{
 		"unknown key":         `{"name":"x","version":1,"types":[],"statuses":[],"max_classification":"Normal","tombstones":true}`,
-		"bare domain prefix":  template("x", []string{"health."}, []string{"admitted"}, "Normal", "", ""),
-		"double dot prefix":   template("x", []string{"health.sleep.."}, []string{"admitted"}, "Normal", "", ""),
+		"bare domain prefix":  template("x", []string{"test."}, []string{"admitted"}, "Normal", "", ""),
+		"double dot prefix":   template("x", []string{"test.sleep.."}, []string{"admitted"}, "Normal", "", ""),
 		"unnamespaced type":   template("x", []string{"bloodpressure"}, []string{"admitted"}, "Normal", "", ""),
-		"unknown status":      template("x", []string{"health.sleep"}, []string{"published"}, "Normal", "", ""),
-		"unknown class":       template("x", []string{"health.sleep"}, []string{"admitted"}, "Secret", "", ""),
-		"unparseable from":    template("x", []string{"health.sleep"}, []string{"admitted"}, "Normal", "2026-01-01", ""),
-		"from at or after to": template("x", []string{"health.sleep"}, []string{"admitted"}, "Normal", "2026-02-01T00:00:00.000000000Z", "2026-01-01T00:00:00.000000000Z"),
+		"unknown status":      template("x", []string{"test.sleep"}, []string{"published"}, "Normal", "", ""),
+		"unknown class":       template("x", []string{"test.sleep"}, []string{"admitted"}, "Secret", "", ""),
+		"unparseable from":    template("x", []string{"test.sleep"}, []string{"admitted"}, "Normal", "2026-01-01", ""),
+		"from at or after to": template("x", []string{"test.sleep"}, []string{"admitted"}, "Normal", "2026-02-01T00:00:00.000000000Z", "2026-01-01T00:00:00.000000000Z"),
 	}
 	for name, raw := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -200,7 +200,7 @@ func TestSpan_RendersTheWindow(t *testing.T) {
 		{"2026-01-01T00:00:00.000000000Z", "2026-02-01T00:00:00.000000000Z", "fact-time[2026-01-01T00:00:00.000000000Z,2026-02-01T00:00:00.000000000Z)"},
 	}
 	for _, c := range cases {
-		tmpl := mustParse(t, template("x", []string{"health.sleep"}, []string{"admitted"}, "Normal", c.from, c.to))
+		tmpl := mustParse(t, template("x", []string{"test.sleep"}, []string{"admitted"}, "Normal", c.from, c.to))
 		if got := tmpl.Span(); got != c.want {
 			t.Errorf("Span(%q,%q) = %q, want %q", c.from, c.to, got, c.want)
 		}
@@ -232,7 +232,7 @@ func TestApply_StatusAllowListDeniesByDefault(t *testing.T) {
 	t.Parallel()
 
 	v := canonical(t)
-	tmpl := mustParse(t, template("nostatus", []string{"health.blood-pressure"}, nil, "Sensitive", "", ""))
+	tmpl := mustParse(t, template("nostatus", []string{"test.blood-pressure"}, nil, "Sensitive", "", ""))
 	served, err := projection.Apply(v, tmpl, consent.Open{}, nil)
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
@@ -245,7 +245,7 @@ func TestApply_StatusAllowListDeniesByDefault(t *testing.T) {
 func TestApply_Knobs(t *testing.T) {
 	t.Parallel()
 
-	all := []string{"health.blood-pressure", "health.sleep", "health.heart-rate"}
+	all := []string{"test.blood-pressure", "test.sleep", "test.heart-rate"}
 	everyStatus := []string{"admitted", "endorsed", "tombstoned"}
 
 	cases := []struct {
@@ -255,7 +255,7 @@ func TestApply_Knobs(t *testing.T) {
 	}{
 		{
 			"type allow-list narrows to one type",
-			template("t", []string{"health.blood-pressure"}, everyStatus, "Sensitive", "", ""),
+			template("t", []string{"test.blood-pressure"}, everyStatus, "Sensitive", "", ""),
 			[]string{"f-bp-1", "f-bp-2", "f-bp-3"},
 		},
 		{
@@ -290,7 +290,7 @@ func TestApply_Knobs(t *testing.T) {
 		},
 		{
 			"knobs compose: bp, admitted only, Normal only",
-			template("t", []string{"health.blood-pressure"}, []string{"admitted"}, "Normal", "", ""),
+			template("t", []string{"test.blood-pressure"}, []string{"admitted"}, "Normal", "", ""),
 			[]string{"f-bp-1"},
 		},
 	}
@@ -329,9 +329,9 @@ func TestApply_PropertyPruneOnly(t *testing.T) {
 
 	types := [][]string{
 		nil,
-		{"health.blood-pressure"},
-		{"health.sleep"},
-		{"health.blood-pressure", "health.sleep", "health.heart-rate"},
+		{"test.blood-pressure"},
+		{"test.sleep"},
+		{"test.blood-pressure", "test.sleep", "test.heart-rate"},
 	}
 	statuses := [][]string{nil, {"admitted"}, {"endorsed"}, {"admitted", "endorsed", "tombstoned"}}
 	classes := []string{"Normal", "Confidential", "Sensitive"}
@@ -386,7 +386,7 @@ func TestApply_WideOpenReproducesTheCanonicalHash(t *testing.T) {
 
 	v := canonical(t)
 	tmpl := mustParse(t, template("everything",
-		[]string{"health.blood-pressure", "health.sleep", "health.heart-rate"},
+		[]string{"test.blood-pressure", "test.sleep", "test.heart-rate"},
 		[]string{"admitted", "endorsed", "tombstoned", "rejected", "superseded"},
 		"Sensitive", "", ""))
 
@@ -420,7 +420,7 @@ func TestApply_ConsentGateCanExclude(t *testing.T) {
 
 	v := canonical(t)
 	tmpl := mustParse(t, template("t",
-		[]string{"health.blood-pressure", "health.sleep"},
+		[]string{"test.blood-pressure", "test.sleep"},
 		[]string{"admitted", "endorsed", "tombstoned"}, "Sensitive", "", ""))
 
 	open, err := projection.Apply(v, tmpl, consent.Open{}, nil)
@@ -431,7 +431,7 @@ func TestApply_ConsentGateCanExclude(t *testing.T) {
 		t.Fatal("the open gate served nothing; the denial below would pass vacuously")
 	}
 
-	denied, err := projection.Apply(v, tmpl, denyType{typ: "health.blood-pressure"}, nil)
+	denied, err := projection.Apply(v, tmpl, denyType{typ: "test.blood-pressure"}, nil)
 	if err != nil {
 		t.Fatalf("Apply(deny): %v", err)
 	}
@@ -444,7 +444,7 @@ func TestApply_ConsentGateCanExclude(t *testing.T) {
 func TestApply_RequiresAGate(t *testing.T) {
 	t.Parallel()
 
-	tmpl := mustParse(t, template("t", []string{"health.sleep"}, []string{"admitted"}, "Normal", "", ""))
+	tmpl := mustParse(t, template("t", []string{"test.sleep"}, []string{"admitted"}, "Normal", "", ""))
 	if _, err := projection.Apply(canonical(t), tmpl, nil, nil); err == nil {
 		t.Error("Apply with no consent gate was accepted")
 	}
@@ -456,15 +456,15 @@ func TestApply_TypePrefixServesLeavesAndStopsAtTheBoundary(t *testing.T) {
 	t.Parallel()
 
 	v, err := fold.NewValue([]fold.Entry{
-		entry("f-garmin", "activity.exercise-session.garmin", "2026-01-24T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
-		entry("f-concept2", "activity.exercise-session.concept2", "2026-01-25T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
-		entry("f-sibling", "activity.exercise-session-note", "2026-01-26T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
-		entry("f-concept", "activity.exercise-session", "2026-01-27T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
+		entry("f-garmin", "test.exercise-session.garmin", "2026-01-24T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
+		entry("f-concept2", "test.exercise-session.concept2", "2026-01-25T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
+		entry("f-sibling", "test.exercise-session-note", "2026-01-26T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
+		entry("f-concept", "test.exercise-session", "2026-01-27T06:00:00.000000000Z", facet.StatusAdmitted, facet.ClassificationNormal),
 	})
 	if err != nil {
 		t.Fatalf("fold.NewValue: %v", err)
 	}
-	tmpl := mustParse(t, template("exercise", []string{"activity.exercise-session."}, []string{"admitted"}, "Normal", "", ""))
+	tmpl := mustParse(t, template("exercise", []string{"test.exercise-session."}, []string{"admitted"}, "Normal", "", ""))
 	served, err := projection.Apply(v, tmpl, consent.Open{}, nil)
 	if err != nil {
 		t.Fatalf("Apply: %v", err)
@@ -480,21 +480,21 @@ func TestCovers_ResolvesPrefixesAgainstDefinitions(t *testing.T) {
 	t.Parallel()
 
 	defs := []def.Definition{
-		{Type: "activity.exercise-session.garmin"},
-		{Type: "activity.exercise-session.concept2"},
-		{Type: "activity.exercise-session-note"},
-		{Type: "health.sleep"},
+		{Type: "test.exercise-session.garmin"},
+		{Type: "test.exercise-session.concept2"},
+		{Type: "test.exercise-session-note"},
+		{Type: "test.sleep"},
 	}
 	tests := []struct {
 		name  string
 		types []string
 		want  []facet.Type
 	}{
-		{"prefix", []string{"activity.exercise-session."},
-			[]facet.Type{"activity.exercise-session.concept2", "activity.exercise-session.garmin"}},
-		{"exact and prefix, no duplicate", []string{"activity.exercise-session.garmin", "activity.exercise-session.", "health.sleep"},
-			[]facet.Type{"activity.exercise-session.concept2", "activity.exercise-session.garmin", "health.sleep"}},
-		{"exact entry with no definition is kept", []string{"health.weight"}, []facet.Type{"health.weight"}},
+		{"prefix", []string{"test.exercise-session."},
+			[]facet.Type{"test.exercise-session.concept2", "test.exercise-session.garmin"}},
+		{"exact and prefix, no duplicate", []string{"test.exercise-session.garmin", "test.exercise-session.", "test.sleep"},
+			[]facet.Type{"test.exercise-session.concept2", "test.exercise-session.garmin", "test.sleep"}},
+		{"exact entry with no definition is kept", []string{"test.weight"}, []facet.Type{"test.weight"}},
 		{"prefix over nothing", []string{"money.spend."}, []facet.Type{}},
 	}
 	for _, tc := range tests {
@@ -511,8 +511,8 @@ func TestCovers_ResolvesPrefixesAgainstDefinitions(t *testing.T) {
 func TestPatterns_KeepsPrefixesAsWritten(t *testing.T) {
 	t.Parallel()
 
-	tmpl := mustParse(t, template("x", []string{"activity.exercise-session.", "health.sleep"}, []string{"admitted"}, "Normal", "", ""))
-	if got, want := tmpl.Patterns(), []string{"health.sleep", "activity.exercise-session."}; !reflect.DeepEqual(got, want) {
+	tmpl := mustParse(t, template("x", []string{"test.exercise-session.", "test.sleep"}, []string{"admitted"}, "Normal", "", ""))
+	if got, want := tmpl.Patterns(), []string{"test.sleep", "test.exercise-session."}; !reflect.DeepEqual(got, want) {
 		t.Errorf("Patterns = %v, want %v", got, want)
 	}
 }

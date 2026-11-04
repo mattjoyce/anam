@@ -24,7 +24,7 @@ import (
 
 // pressureManifest is bpManifest under another name with the same keying and schema:
 // the shape of a rename, where the type moves and nothing else does.
-var pressureManifest = strings.Replace(bpManifest, `"health.blood-pressure"`, `"health.pressure"`, 1)
+var pressureManifest = strings.Replace(bpManifest, `"test.blood-pressure"`, `"test.pressure"`, 1)
 
 func newRenameGate(t *testing.T) (*gate.Gate, *ledger.Ledger) {
 	t.Helper()
@@ -46,7 +46,7 @@ func newRenameGate(t *testing.T) (*gate.Gate, *ledger.Ledger) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scopes := gate.StaticScopes{"bp-csv": {"health.blood-pressure", "health.pressure", "health.pulse"}}
+	scopes := gate.StaticScopes{"bp-csv": {"test.blood-pressure", "test.pressure", "test.pulse"}}
 	return gate.New(l, reg, scopes, clock.Real{}, person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries}), l
 }
 
@@ -88,7 +88,7 @@ func TestRename_IsTheNextVersionUnderTheNewType(t *testing.T) {
 	before, _ := l.Head(ctx)
 
 	// Rehearse answers what the run would do, and writes nothing.
-	r, err := g.Rehearse(ctx, renameOf(f, "health.pressure"))
+	r, err := g.Rehearse(ctx, renameOf(f, "test.pressure"))
 	if err != nil || r.Outcome != gate.OutcomeSuperseded || r.ArtifactVersion != 2 || r.FacetID != f.ID {
 		t.Fatalf("Rehearse = %+v, %v; want superseded v2 of %s", r, err, f.ID)
 	}
@@ -96,7 +96,7 @@ func TestRename_IsTheNextVersionUnderTheNewType(t *testing.T) {
 		t.Errorf("Rehearse wrote: W %d → %d", before, w)
 	}
 
-	results, w, err := g.RenameBatch(ctx, []gate.Rename{renameOf(f, "health.pressure")})
+	results, w, err := g.RenameBatch(ctx, []gate.Rename{renameOf(f, "test.pressure")})
 	if err != nil {
 		t.Fatalf("RenameBatch: %v", err)
 	}
@@ -107,22 +107,22 @@ func TestRename_IsTheNextVersionUnderTheNewType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cur.Type != "health.pressure" || cur.ArtifactVersion != 2 {
-		t.Errorf("current is %s v%d, want health.pressure v2", cur.Type, cur.ArtifactVersion)
+	if cur.Type != "test.pressure" || cur.ArtifactVersion != 2 {
+		t.Errorf("current is %s v%d, want test.pressure v2", cur.Type, cur.ArtifactVersion)
 	}
 	if cur.Provenance.SourceRef != f.Provenance.SourceRef || cur.Descriptor.ContentHash != f.Descriptor.ContentHash {
 		t.Errorf("the rename changed the source ref or the payload hash")
 	}
 	// Anam-time is kept: the first version is still there, as it was admitted.
 	old, err := l.Version(ctx, f.ID, 1)
-	if err != nil || old.Type != "health.blood-pressure" {
+	if err != nil || old.Type != "test.blood-pressure" {
 		t.Errorf("v1 = %s, %v; want the blood pressure as admitted", old.Type, err)
 	}
 
 	// The run again, as the command would send it (leaving the table's old type), is
 	// a no-op and moves nothing.
-	again := renameOf(cur, "health.pressure")
-	again.From = "health.blood-pressure"
+	again := renameOf(cur, "test.pressure")
+	again.From = "test.blood-pressure"
 	results, w2, err := g.RenameBatch(ctx, []gate.Rename{again})
 	if err != nil || results[0].Outcome != gate.OutcomeNoOp || w2 != w {
 		t.Errorf("rerun = %+v at W %d, %v; want no-op at W %d", results, w2, err, w)
@@ -140,8 +140,8 @@ func TestRename_RefusesWhatIsNotTheTypeLeft(t *testing.T) {
 	f := admitReading(t, g, l)
 	before, _ := l.Head(ctx)
 
-	wrong := renameOf(f, "health.pressure")
-	wrong.From = "health.pulse"
+	wrong := renameOf(f, "test.pressure")
+	wrong.From = "test.pulse"
 	var refused *gate.Refused
 	if _, _, err := g.RenameBatch(ctx, []gate.Rename{wrong}); !errors.As(err, &refused) || !errors.Is(err, gate.ErrTypeChanged) {
 		t.Errorf("the wrong type left: %v, want a refusal with ErrTypeChanged", err)
@@ -154,7 +154,7 @@ func TestRename_RefusesWhatIsNotTheTypeLeft(t *testing.T) {
 	if _, _, err := g.Commit(ctx, plain, b); !errors.Is(err, gate.ErrTypeChanged) {
 		t.Errorf("Commit under the new type: %v, want ErrTypeChanged (card 105)", err)
 	}
-	if _, err := g.Rehearse(ctx, renameOf(f, "health.pulse")); err == nil || errors.Is(err, gate.ErrTypeChanged) {
+	if _, err := g.Rehearse(ctx, renameOf(f, "test.pulse")); err == nil || errors.Is(err, gate.ErrTypeChanged) {
 		t.Errorf("rename into a type the payload does not fit: %v, want a compliance refusal", err)
 	}
 	if w, _ := l.Head(ctx); w != before {
@@ -179,7 +179,7 @@ func TestRename_RefusesAFacetThatIsNotLive(t *testing.T) {
 	// Live and dead offered together: the block is refused whole, so the live one is
 	// not carried either.
 	live := facet.Envelope{
-		Type: "health.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
+		Type: "test.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
 		SourceRef: facet.SourceRef("bp-csv", "2026-01-26T06:30:00Z"),
 		Payload:   []byte(`{"measured_at": "2026-01-26T06:30:00Z", "systolic": 118, "diastolic": 78}`),
 	}
@@ -199,16 +199,16 @@ func TestRename_RefusesAFacetThatIsNotLive(t *testing.T) {
 
 	for name, call := range map[string]func() error{
 		"Rehearse": func() error {
-			_, err := g.Rehearse(ctx, renameOf(dead, "health.pressure"))
+			_, err := g.Rehearse(ctx, renameOf(dead, "test.pressure"))
 			return err
 		},
 		"RenameBatch": func() error {
-			_, _, err := g.RenameBatch(ctx, []gate.Rename{renameOf(dead, "health.pressure")})
+			_, _, err := g.RenameBatch(ctx, []gate.Rename{renameOf(dead, "test.pressure")})
 			return err
 		},
 		"RenameBatch with a live facet beside it": func() error {
 			_, _, err := g.RenameBatch(ctx, []gate.Rename{
-				renameOf(liveFacet, "health.pressure"), renameOf(dead, "health.pressure"),
+				renameOf(liveFacet, "test.pressure"), renameOf(dead, "test.pressure"),
 			})
 			return err
 		},
@@ -218,7 +218,7 @@ func TestRename_RefusesAFacetThatIsNotLive(t *testing.T) {
 			t.Errorf("%s: %v, want ErrFacetNotLive", name, err)
 			continue
 		}
-		for _, want := range []string{dead.ID, "health.blood-pressure", "tombstoned"} {
+		for _, want := range []string{dead.ID, "test.blood-pressure", "tombstoned"} {
 			if !strings.Contains(err.Error(), want) {
 				t.Errorf("%s: %q does not name %q", name, err, want)
 			}
@@ -228,11 +228,11 @@ func TestRename_RefusesAFacetThatIsNotLive(t *testing.T) {
 		t.Errorf("the refusals wrote: W %d → %d", before, w)
 	}
 	cur, err := l.CurrentVersion(ctx, dead.ID)
-	if err != nil || cur.Type != "health.blood-pressure" || cur.ArtifactVersion != 1 {
-		t.Errorf("the dead facet is %s v%d, %v; want health.blood-pressure v1 as it died", cur.Type, cur.ArtifactVersion, err)
+	if err != nil || cur.Type != "test.blood-pressure" || cur.ArtifactVersion != 1 {
+		t.Errorf("the dead facet is %s v%d, %v; want test.blood-pressure v1 as it died", cur.Type, cur.ArtifactVersion, err)
 	}
 	// The live facet beside it was not carried by the refused block, and still can be.
-	if r, _, err := g.RenameBatch(ctx, []gate.Rename{renameOf(liveFacet, "health.pressure")}); err != nil || r[0].Outcome != gate.OutcomeSuperseded {
+	if r, _, err := g.RenameBatch(ctx, []gate.Rename{renameOf(liveFacet, "test.pressure")}); err != nil || r[0].Outcome != gate.OutcomeSuperseded {
 		t.Errorf("a live facet alone = %+v, %v; want superseded", r, err)
 	}
 }
@@ -244,14 +244,14 @@ func TestRename_RefusesACarriedFacetThatWasRetracted(t *testing.T) {
 	ctx := context.Background()
 	g, l := newRenameGate(t)
 	f := admitReading(t, g, l)
-	if _, _, err := g.RenameBatch(ctx, []gate.Rename{renameOf(f, "health.pressure")}); err != nil {
+	if _, _, err := g.RenameBatch(ctx, []gate.Rename{renameOf(f, "test.pressure")}); err != nil {
 		t.Fatalf("RenameBatch: %v", err)
 	}
 	if _, _, err := g.Retract(ctx, f.ID); err != nil {
 		t.Fatalf("Retract: %v", err)
 	}
 	before, _ := l.Head(ctx)
-	if _, _, err := g.RenameBatch(ctx, []gate.Rename{renameOf(f, "health.pressure")}); !errors.Is(err, gate.ErrFacetNotLive) {
+	if _, _, err := g.RenameBatch(ctx, []gate.Rename{renameOf(f, "test.pressure")}); !errors.Is(err, gate.ErrFacetNotLive) {
 		t.Errorf("rerun over a retracted facet: %v, want ErrFacetNotLive", err)
 	}
 	if w, _ := l.Head(ctx); w != before {

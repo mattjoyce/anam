@@ -26,7 +26,7 @@ func clockManifest(t *testing.T, layout, zone, shape string) string {
 	}
 	return `{
   "meta": {
-    "facet_type": "health.reading", "definition_version": 1, "classification": "Normal",
+    "facet_type": "test.raw-reading", "definition_version": 1, "classification": "Normal",
     "validation_mode": "strict", "source_schema": "test/reading",
     "time_semantics": {"fact_time": {"pointer": "/at", "layout": "` + layout + `", "zone": "` + zone + `"}},
     "identity_key": ["/at"]

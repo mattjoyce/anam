@@ -7,7 +7,7 @@ timestamp: 2026-10-24T00:00:00Z
 
 `org` is the tenth domain head. It holds the person's relationships with organisations, and employment is the first concept. Membership comes later, as `org.membership`. A head is added only by a logged decision, and this one was decided on 2026-10-24 (card 239); see [where a distinction is encoded](/decisions/where-a-distinction-is-encoded.md). The cost is accepted: `org` sorts by counterparty where the other heads sort by subject, so a shareholding stays with `money`.
 
-Three types are built, each a [Definition](/terms/facet-definition.md) bundled with the binary, written by hand into a records file or saved by an agent.
+Three types are built, each a [Definition](/terms/facet-definition.md) in the deployment's catalog, written by hand into a records file or saved by an agent.
 
 - `org.employment.started` opens a period of employment and carries the role the person started in: a `title`, and where known the `employer`'s display name, the `legal_entity`, the `location`, who the role reported to, the `grade` and the `terms`.
 - `org.employment.role-changed` is a new role inside the same period. It restates the whole role, because a snapshot keeps only the latest row of a [series](/terms/series.md). An acting role or a secondment is a row, and the return from it is another.

@@ -7,7 +7,7 @@ timestamp: 2026-10-23T00:00:00Z
 
 `mind` is the ninth domain head. It holds what a person says about their own inner state, so mood or energy can join later as concepts without another head. A head is added only by a logged decision, and this one was decided on 2026-10-22 (card 222); see [where a distinction is encoded](/decisions/where-a-distinction-is-encoded.md). Anam records what the person said and does not judge it. A model's guess at where attention went is a different source and sits beside these facts without editing them.
 
-Attention is the first concept. Three types are built, each a [Definition](/terms/facet-definition.md) bundled with the binary.
+Attention is the first concept. Three types are built, each a [Definition](/terms/facet-definition.md) in the deployment's catalog.
 
 - `mind.attention` is one reading. The person says, at a moment, what is holding them (`topic`), how strongly (`intensity`, a whole number from 1 to 5) and, if they like, a `note`. It is a reading in the way a blood pressure is, but the instrument is the person.
 - `mind.attention.started` and `mind.attention.ended` are a pair the person declares, for how long something held them. Their [series](/terms/series.md) key is the topic, so an ended closes the latest started of that topic and a later started opens a new one. Readings never open or close an episode. Nothing here works episodes out from readings, so a gap between readings means nothing until the person says it.

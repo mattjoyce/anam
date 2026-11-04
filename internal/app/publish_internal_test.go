@@ -71,7 +71,7 @@ func TestPublish_RefusalsAreTheSameOverTheDaemon(t *testing.T) {
 		{"timeline", "--publish", "--projection", "measures", "--explain"},
 		{"timeline", "--w", "1", "--as-of", "2026-01-01"},
 		{"timeline", "--w", "999"},
-		{"timeline", "--type", "health."},
+		{"timeline", "--type", "test."},
 		{"timeline", "--projection", "measures", "--publish", "--type", "test.measure.."},
 	} {
 		_, _, localErr := cli(t, f.cfgPath, args...)

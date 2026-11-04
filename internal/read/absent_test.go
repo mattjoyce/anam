@@ -24,7 +24,7 @@ func TestAbsent_StopsAtTheJudgeBound(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = l.Close() })
 	for i, ref := range []string{"a", "b", "c"} {
-		f := absentFixture("scale", "health.weight", ref, time.Date(2026, 7, 1+i, 6, 0, 0, 0, time.UTC))
+		f := absentFixture("scale", "test.weight", ref, time.Date(2026, 7, 1+i, 6, 0, 0, 0, time.UTC))
 		ev := facet.AnamEvent{Kind: facet.EventAdmitted, FacetID: f.ID, AnamTime: time.Date(2026, 7, 10, 9, 0, 0, i, time.UTC),
 			Seq: int64(i + 1), ArtifactVersion: 1}
 		if err := l.Admit(ctx, ledger.Watermark(i), f, ev); err != nil {
@@ -32,7 +32,7 @@ func TestAbsent_StopsAtTheJudgeBound(t *testing.T) {
 		}
 	}
 	src := read.Source{Ledger: l}
-	scope := read.SnapshotScope{Source: "scale", Types: []string{"health.weight"}, Carried: map[string]bool{}, StartedW: 10}
+	scope := read.SnapshotScope{Source: "scale", Types: []string{"test.weight"}, Carried: map[string]bool{}, StartedW: 10}
 
 	absent, live, err := read.Absent(ctx, src, l, scope)
 	if err != nil || len(absent) != 3 || live != 3 {

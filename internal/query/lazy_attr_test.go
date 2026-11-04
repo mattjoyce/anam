@@ -69,7 +69,7 @@ func TestReadsAttr_LazyAnswersEqualEagerOnes(t *testing.T) {
 		name, text, relation string
 		readsAttr            bool
 	}{
-		{"entry only", `bp(E, At) :- entry(E, "health.blood-pressure", At, _, _, _, _).`, "bp", false},
+		{"entry only", `bp(E, At) :- entry(E, "test.blood-pressure", At, _, _, _, _).`, "bp", false},
 		{"closes", `c(T) :- closes(T).`, "c", false},
 		{"bundled current, no attr", `instant(At) :- entry(_, _, At, _, _, _, _). now(E) :- current(E, At).`, "now", false},
 		{"attr directly", `high(E, V) :- attr(E, "/systolic", V), V > 130.`, "high", true},
@@ -77,7 +77,7 @@ func TestReadsAttr_LazyAnswersEqualEagerOnes(t *testing.T) {
 		{"attr through linked", `touched(E) :- linked(E, _).`, "touched", true},
 		{"attr through edge_to", `into(E, F) :- edge_to(E, F).`, "into", true},
 		{"attr through a rule chain", `a(E) :- linked(E, _). b(E) :- a(E). c(E) :- entry(E, _, _, _, _, _, _), not b(E).`, "c", true},
-		{"a program with attr that the root does not reach", `unused(E) :- attr(E, "/systolic", _). bp(E) :- entry(E, "health.blood-pressure", _, _, _, _, _).`, "bp", false},
+		{"a program with attr that the root does not reach", `unused(E) :- attr(E, "/systolic", _). bp(E) :- entry(E, "test.blood-pressure", _, _, _, _, _).`, "bp", false},
 		{"linked asked for itself", ``, "linked", true},
 		{"attr asked for itself", ``, "attr", true},
 	}

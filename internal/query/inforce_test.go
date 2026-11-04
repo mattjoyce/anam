@@ -15,10 +15,10 @@ func TestInForce_IsCurrentAtTheReadingsInstants(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
 	h.seedRegimen(t)
-	h.admit(t, "health-db", "health.weight", "2026-06-15T06:00:00Z", `{"measured_at": "2026-06-15T06:00:00Z", "kg": 81}`)
+	h.admit(t, "health-db", "test.weight", "2026-06-15T06:00:00Z", `{"measured_at": "2026-06-15T06:00:00Z", "kg": 81}`)
 	v, versions, _ := h.served(t)
 
-	const instants = `instant(At) :- entry(_, "health.blood-pressure", At, _, _, _, _).`
+	const instants = `instant(At) :- entry(_, "test.blood-pressure", At, _, _, _, _).`
 	inForce, err := tryRun(v, versions, h.defs, instants, "in_force")
 	if err != nil {
 		t.Fatalf("in_force: %v", err)
@@ -38,7 +38,7 @@ func TestInForce_IsCurrentAtTheReadingsInstants(t *testing.T) {
 		if e.FactTime == "2026-08-20T07:00:00.000000000Z" {
 			august = e.FacetID
 		}
-		if e.Type != "health.blood-pressure" {
+		if e.Type != "test.blood-pressure" {
 			if _, ok := byReading[e.FacetID]; ok {
 				t.Errorf("in_force holds for %s, a %s whose instant the query did not name", e.FacetID, e.Type)
 			}

@@ -9,65 +9,14 @@ import (
 	"github.com/mattjoyce/anam/internal/catalog"
 	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/catalog/fixture"
-	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
-// v is the definition set version the binary reports at de2981c, the R0 oracle the
-// mattjoyce fixture must reproduce.
+// v is the definition set version the deployment's catalog reports, the live V since
+// R0. No engine fixture may reproduce it: the overlay in anam_mattjoyce pins it over
+// that catalog, and the engine holds no copy (card 255, R4b).
 const v = "sha256:b8cc55e0a2f6d14de76a15a892eaa5cd53577ae857cefff09730bbbcb6d9e969"
-
-// TestFixture_SetVersionIsV pins the fixture's definition set version to the literal
-// V, over the files and over the catalog Load builds from a directory copy.
-func TestFixture_SetVersionIsV(t *testing.T) {
-	t.Parallel()
-	defs, _ := fixture.Mattjoyce()
-	got, err := def.SetVersionFS(defs)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != v {
-		t.Errorf("SetVersionFS(fixture.Mattjoyce) = %s, want %s", got, v)
-	}
-	if got := catalogtest.Catalog(t).SetVersion(); got != v {
-		t.Errorf("catalogtest.Catalog SetVersion = %s, want %s", got, v)
-	}
-}
-
-// TestHelpers_BuildTheFixture checks each helper is built over fixture.Mattjoyce.
-func TestHelpers_BuildTheFixture(t *testing.T) {
-	t.Parallel()
-	if got := len(catalogtest.Definitions(t).All()); got != 44 {
-		t.Errorf("Definitions: %d types, want 44", got)
-	}
-	if got := len(catalogtest.Projections(t).Names()); got != 12 {
-		t.Errorf("Projections: %d templates, want 12", got)
-	}
-	c := catalogtest.Catalog(t)
-	if got := len(c.Definitions().All()); got != 44 {
-		t.Errorf("Catalog: %d types, want 44", got)
-	}
-	if c.DefinitionsSource() == "embedded" || c.ProjectionsSource() == "embedded" {
-		t.Errorf("Catalog sources = %q, %q; want directories", c.DefinitionsSource(), c.ProjectionsSource())
-	}
-	if catalogtest.Catalog(t) != c {
-		t.Error("Catalog built twice; want once per process")
-	}
-
-	var cfg config.Config
-	catalogtest.Config(t, &cfg)
-	if cfg.DefinitionsDir == "" || cfg.ProjectionsDir == "" {
-		t.Fatalf("Config left dirs %q, %q", cfg.DefinitionsDir, cfg.ProjectionsDir)
-	}
-	loaded, err := catalog.Load(context.Background(), cfg.DefinitionsDir, cfg.ProjectionsDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := loaded.SetVersion(); got != v {
-		t.Errorf("catalog over Config's dirs: SetVersion = %s, want %s", got, v)
-	}
-}
 
 // TestMinimal_Loads checks the minimal catalog is a valid catalog on its own: Load
 // accepts it from directories, its version is computable and is not V, and its
@@ -166,3 +115,66 @@ func equal(a, b []string) bool {
 	}
 	return true
 }
+
+// recorder is a testing.TB that records a Fatalf instead of stopping, so a test can
+// see a Require helper fail. The helpers return after Fatalf, so nothing runs on.
+type recorder struct {
+	testing.TB
+	failed bool
+}
+
+func (r *recorder) Helper()               {}
+func (r *recorder) Fatalf(string, ...any) { r.failed = true }
+
+// TestRequire_PassesOnlyTheEmptyCatalog checks the helpers a test on emptyOnPurpose
+// checks its selection with: each passes the empty component it names and fails a
+// catalog with that component from a directory, a fixture, or no catalog at all.
+func TestRequire_PassesOnlyTheEmptyCatalog(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	empty, err := catalog.Load(ctx, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalogtest.RequireEmpty(t, empty)
+
+	defs, projs := fixture.Minimal()
+	defsDir, _ := fixture.Dirs(t, defs, projs)
+	noProjs, err := catalog.Load(ctx, defsDir, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalogtest.RequireNoProjections(t, noProjs)
+	emptyDirs, err := catalog.Load(ctx, t.TempDir(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	refused, err := catalog.Load(&canceled{ctx}, "", "")
+	catalogtest.RequireRefused(t, refused, err)
+
+	for _, c := range []struct {
+		name    string
+		require func(testing.TB)
+	}{
+		{"Empty, the engine fixture", func(tb testing.TB) { catalogtest.RequireEmpty(tb, catalogtest.Engine.Catalog(t)) }},
+		{"Empty, definitions from a directory", func(tb testing.TB) { catalogtest.RequireEmpty(tb, noProjs) }},
+		{"Empty, empty directories", func(tb testing.TB) { catalogtest.RequireEmpty(tb, emptyDirs) }},
+		{"Empty, no catalog", func(tb testing.TB) { catalogtest.RequireEmpty(tb, nil) }},
+		{"NoDefinitions, definitions from a directory", func(tb testing.TB) { catalogtest.RequireNoDefinitions(tb, noProjs) }},
+		{"NoProjections, the engine fixture", func(tb testing.TB) { catalogtest.RequireNoProjections(tb, catalogtest.Engine.Catalog(t)) }},
+		{"NoProjections, no catalog", func(tb testing.TB) { catalogtest.RequireNoProjections(tb, nil) }},
+		{"Refused, a catalog", func(tb testing.TB) { catalogtest.RequireRefused(tb, empty, nil) }},
+		{"Refused, another error", func(tb testing.TB) { catalogtest.RequireRefused(tb, nil, context.Canceled) }},
+	} {
+		r := &recorder{TB: t}
+		c.require(r)
+		if !r.failed {
+			t.Errorf("Require%s passed", c.name)
+		}
+	}
+}
+
+// canceled is a context that is already canceled.
+type canceled struct{ context.Context }
+
+func (canceled) Err() error { return context.Canceled }

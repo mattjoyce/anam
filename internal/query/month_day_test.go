@@ -27,7 +27,7 @@ func TestMonthOfDay_GroupsFactTimes(t *testing.T) {
 		c := c
 		t.Run(c.ft, func(t *testing.T) {
 			t.Parallel()
-			v, versions := value(t, entry("e1", "health.weight", c.ft, "", `{"measured_at": "x", "kg": 1}`))
+			v, versions := value(t, entry("e1", "test.weight", c.ft, "", `{"measured_at": "x", "kg": 1}`))
 			defs := registry(t)
 			mAns, _, err := query.Run(context.Background(), v, versions, defs, `m(M) :- month_of(_, M).`, "m", 0)
 			if err != nil {
@@ -52,8 +52,8 @@ func TestMonthOfDay_OneTuplePerDistinctFactTime(t *testing.T) {
 	t.Parallel()
 	ft := "2026-01-15T00:00:00.000000000Z"
 	v, versions := value(t,
-		entry("e1", "health.weight", ft, "", `{"measured_at": "x", "kg": 1}`),
-		entry("e2", "health.weight", ft, "", `{"measured_at": "x", "kg": 2}`),
+		entry("e1", "test.weight", ft, "", `{"measured_at": "x", "kg": 1}`),
+		entry("e2", "test.weight", ft, "", `{"measured_at": "x", "kg": 2}`),
 	)
 	defs := registry(t)
 	mAns, _, err := query.Run(context.Background(), v, versions, defs, `m(At, M) :- month_of(At, M).`, "m", 0)
@@ -76,9 +76,9 @@ func TestMonthOfDay_OneTuplePerDistinctFactTime(t *testing.T) {
 func TestMonthOfDay_CountByMonth(t *testing.T) {
 	t.Parallel()
 	v, versions := value(t,
-		entry("a", "health.weight", "2026-01-15T00:00:00.000000000Z", "", `{"measured_at": "x", "kg": 1}`),
-		entry("b", "health.weight", "2026-01-20T00:00:00.000000000Z", "", `{"measured_at": "x", "kg": 2}`),
-		entry("c", "health.weight", "2026-02-01T00:00:00.000000000Z", "", `{"measured_at": "x", "kg": 3}`),
+		entry("a", "test.weight", "2026-01-15T00:00:00.000000000Z", "", `{"measured_at": "x", "kg": 1}`),
+		entry("b", "test.weight", "2026-01-20T00:00:00.000000000Z", "", `{"measured_at": "x", "kg": 2}`),
+		entry("c", "test.weight", "2026-02-01T00:00:00.000000000Z", "", `{"measured_at": "x", "kg": 3}`),
 	)
 	defs := registry(t)
 	text := `n(M, N) :- month_of(_, M), N = count : { entry(_, _, At, _, _, _, _), month_of(At, M) }.`

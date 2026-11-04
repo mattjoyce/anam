@@ -12,56 +12,45 @@ import (
 	"strings"
 )
 
-// The packages that hold the embedded catalog, module-relative.
-const (
-	defPkg     = "internal/def"
-	projPkg    = "internal/projection"
-	catalogPkg = "internal/catalog"
-)
+// catalogPkg is the package whose loader selects a catalog, module-relative.
+const catalogPkg = "internal/catalog"
 
-// exported names, by package, that return or read the embedded catalog: the functions
-// R4b deletes. A test that names one, called or passed as a value, reads the catalog
-// the binary carries rather than one it chose.
-var exported = map[string][]string{
-	defPkg:  {"Bundled", "EmbeddedFS", "History", "Manifests", "SetVersion"},
-	projPkg: {"Bundled", "EmbeddedFS"},
-}
+// R4b (card 255) deleted the embedded catalog in slice 5, and with it the symbols
+// and source directories this rule once matched: def.Bundled, EmbeddedFS, History,
+// Manifests and SetVersion, projection.Bundled and EmbeddedFS, the unexported roots,
+// and internal/def/manifests and internal/projection/manifests. None of them can
+// appear in a test that compiles. What is left is the call that once fell back on
+// that catalog and now selects the empty one.
 
-// unexported names that hold the embedded catalog, which only a test inside the
-// package can name.
-var unexported = map[string][]string{
-	defPkg:     {"embedded", "manifestFS"},
-	projPkg:    {"embedded", "manifestFS"},
-	catalogPkg: {"embedded"},
-}
-
-// loaders are the functions that fall back on the embedded catalog for a component
-// whose directory is empty: catalog.Load, and load inside the package. A variable
-// bound to one is a loader too, and any call through it counts, whatever its
-// arguments.
+// loaders are the functions that select the empty catalog for a component whose
+// directory is empty: catalog.Load, and load inside the package. A variable bound to
+// one is a loader too, and any call through it counts, whatever its arguments.
 var loaders = map[string]bool{"Load": true, "load": true}
 
 // configDirs are the config.Config fields that select a catalog directory. A test
-// that sets one to "" opens a daemon on the embedded catalog for that component.
+// that sets one to "" opens a daemon on the empty catalog for that component.
 var configDirs = map[string]bool{"DefinitionsDir": true, "ProjectionsDir": true}
 
-// catalogDirs are the embedded catalog's source directories, which a test can read
-// from disk without naming any symbol. Built with path.Join so this file names no
-// such path as a literal itself.
-var catalogDirs = []string{path.Join(defPkg, "manifests"), path.Join(projPkg, "manifests")}
+// catalogtestPkg holds the Require helpers a listed test checks its selection with.
+const catalogtestPkg = "internal/catalog/catalogtest"
 
-// kind is the way a reach gets to the embedded catalog.
+// requireHelpers are catalogtest's helpers that fail a test unless the catalog it was
+// given is what an empty directory selects (RequireRefused: unless the load was
+// refused). A test on emptyOnPurpose passes each catalog it selects to one of them.
+var requireHelpers = map[string]bool{
+	"RequireEmpty": true, "RequireNoDefinitions": true, "RequireNoProjections": true, "RequireRefused": true,
+}
+
+// kind is the way a reach selects the empty catalog.
 type kind int
 
 const (
-	kindSymbol kind = iota // names an embedded def, projection or catalog symbol
-	kindLoad               // catalog.Load with an empty directory
+	kindLoad   kind = iota // catalog.Load with an empty directory
 	kindConfig             // a config catalog directory set to ""
-	kindPath               // a string naming an embedded catalog directory on disk
 	kindHelper             // a call to a test helper that reaches
 )
 
-// reach is one place a test reads the embedded catalog.
+// reach is one place a test selects the empty catalog.
 type reach struct {
 	Pkg  string // the directory and package name, which scope a helper's name
 	File string // module-relative, slash-separated
@@ -69,6 +58,15 @@ type reach struct {
 	Line int
 	Kind kind
 	What string
+	Bind token.Pos // for a load assigned to a variable, where that variable is declared; 0 otherwise
+}
+
+// check is a call to a Require helper written directly in a top-level function's
+// body, outside any function literal, so it runs whenever the function does.
+type check struct {
+	File, Func string
+	Line       int
+	Args       []token.Pos // where each identifier argument is declared; 0 for any other argument
 }
 
 func (r reach) String() string {
@@ -88,28 +86,28 @@ type ref struct {
 }
 
 // fileReaches parses one test file and walks it.
-func fileReaches(root, mod, rel string) ([]reach, []ref, error) {
+func fileReaches(root, mod, rel string) ([]reach, []ref, []check, []string, error) {
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, filepath.Join(root, filepath.FromSlash(rel)), nil, 0) // object resolution on: it tells a local from a package name
 	if err != nil {
-		return nil, nil, fmt.Errorf("parse %s: %w", rel, err)
+		return nil, nil, nil, nil, fmt.Errorf("parse %s: %w", rel, err)
 	}
 	w := &walker{fset: fset, file: f, rel: rel, dir: path.Dir(rel), imports: map[string]string{},
-		aliases: map[token.Pos]bool{}, reassigned: map[token.Pos]bool{}}
+		aliases: map[token.Pos]bool{}, reassigned: map[token.Pos]bool{}, binds: map[token.Pos]token.Pos{}}
 	w.pkg = w.dir + " " + f.Name.Name
-	// A file in package def (not def_test) names def's symbols unqualified; so does
-	// one that dot-imports it.
+	// A file in package catalog (not catalog_test) names load unqualified; one that
+	// dot-imports catalog names Load so.
 	if !strings.HasSuffix(f.Name.Name, "_test") {
 		w.self = w.dir
 	}
 	for _, spec := range f.Imports {
 		p, err := strconv.Unquote(spec.Path.Value)
 		if err != nil {
-			return nil, nil, fmt.Errorf("%s: import %s: %w", rel, spec.Path.Value, err)
+			return nil, nil, nil, nil, fmt.Errorf("%s: import %s: %w", rel, spec.Path.Value, err)
 		}
 		local, ok := strings.CutPrefix(p, mod+"/")
 		if !ok {
-			// Outside the module: only the path helpers matter, for literal joins.
+			// Outside the module: kept, so a local name is not taken for a package.
 			local = p
 		}
 		name := path.Base(p)
@@ -128,19 +126,7 @@ func fileReaches(root, mod, rel string) ([]reach, []ref, error) {
 	for _, d := range f.Decls {
 		w.decl(d)
 	}
-	// A literal inside a literal join names one path, so a line's paths count once.
-	paths := map[int]bool{}
-	var out []reach
-	for _, r := range w.found {
-		if r.Kind == kindPath {
-			if paths[r.Line] {
-				continue
-			}
-			paths[r.Line] = true
-		}
-		out = append(out, r)
-	}
-	return out, w.refs, nil
+	return w.found, w.refs, w.checks, w.funcs, nil
 }
 
 // walker visits one file's syntax. It resolves a name to its package from the file's
@@ -150,20 +136,25 @@ type walker struct {
 	fset       *token.FileSet
 	file       *ast.File
 	rel        string
-	dir        string             // module-relative directory of the file
-	pkg        string             // dir and package name
-	self       string             // the package a bare name belongs to, or "" in an _test package
-	dot        []string           // dot-imported packages
-	imports    map[string]string  // local name to module-relative (or full) import path
-	aliases    map[token.Pos]bool // variables bound to a loader, by where they are declared
-	reassigned map[token.Pos]bool // variables set again after their declaration
+	dir        string                  // module-relative directory of the file
+	pkg        string                  // dir and package name
+	self       string                  // the package a bare name belongs to, or "" in an _test package
+	dot        []string                // dot-imported packages
+	imports    map[string]string       // local name to module-relative (or full) import path
+	aliases    map[token.Pos]bool      // variables bound to a loader, by where they are declared
+	reassigned map[token.Pos]bool      // variables set again after their declaration
+	binds      map[token.Pos]token.Pos // a call's position to the variable its result is assigned to
+	lit        int                     // depth of function literals around the node being walked
+	checks     []check
+	funcs      []string // the top-level functions declared
 	fn         string
 	found      []reach
 	refs       []ref
 }
 
 func (w *walker) add(pos token.Pos, k kind, what string) {
-	w.found = append(w.found, reach{Pkg: w.pkg, File: w.rel, Func: w.fn, Line: w.fset.Position(pos).Line, Kind: k, What: what})
+	w.found = append(w.found, reach{Pkg: w.pkg, File: w.rel, Func: w.fn, Line: w.fset.Position(pos).Line, Kind: k, What: what,
+		Bind: w.binds[pos]})
 }
 
 // walk visits a child; the caller passes no typed nil.
@@ -176,6 +167,7 @@ func (w *walker) decl(d ast.Decl) {
 	switch d := d.(type) {
 	case *ast.FuncDecl:
 		w.fn = funcKey(d)
+		w.funcs = append(w.funcs, w.fn)
 		if d.Recv != nil {
 			w.walk(d.Recv)
 		}
@@ -240,6 +232,13 @@ func (w *walker) visit(n ast.Node) bool {
 	switch n := n.(type) {
 	case *ast.ImportSpec:
 		return false
+	case *ast.FuncLit:
+		// A check inside a literal runs only if the literal is called, so it is not one.
+		w.lit++
+		w.walk(n.Type)
+		w.walk(n.Body)
+		w.lit--
+		return false
 	case *ast.Field:
 		// Field and parameter names declare; only the type is a use.
 		w.walk(n.Type)
@@ -247,7 +246,7 @@ func (w *walker) visit(n ast.Node) bool {
 	case *ast.KeyValueExpr:
 		if id, ok := n.Key.(*ast.Ident); ok {
 			if configDirs[id.Name] && w.empty(n.Value, 0) {
-				w.add(n.Pos(), kindConfig, id.Name+": \"\" selects the embedded catalog")
+				w.add(n.Pos(), kindConfig, id.Name+": \"\" selects the empty catalog")
 			}
 			w.walk(n.Value)
 			return false
@@ -257,8 +256,7 @@ func (w *walker) visit(n ast.Node) bool {
 	case *ast.AssignStmt:
 		w.assign(n)
 	case *ast.SelectorExpr:
-		if pkg, ok := w.pkgOf(n.X); ok {
-			w.symbol(n.Sel.Pos(), pkg, n.Sel.Name, false)
+		if _, ok := w.pkgOf(n.X); ok {
 			return false
 		}
 		if w.fn != "" {
@@ -268,22 +266,12 @@ func (w *walker) visit(n ast.Node) bool {
 		return false
 	case *ast.Ident:
 		if w.packageLevel(n) {
-			if w.self != "" {
-				w.symbol(n.Pos(), w.self, n.Name, true)
-			}
-			for _, pkg := range w.dot {
-				w.symbol(n.Pos(), pkg, n.Name, false)
-			}
 			if w.fn != "" && n.Name != w.fn && n.Name != "_" {
 				w.refs = append(w.refs, ref{Pkg: w.pkg, File: w.rel, From: w.fn, To: n.Name, Line: w.fset.Position(n.Pos()).Line})
 			}
 		}
 	case *ast.CallExpr:
 		w.call(n)
-	case *ast.BasicLit:
-		if s, ok := stringValue(n); ok {
-			w.path(n.Pos(), s)
-		}
 	}
 	return true
 }
@@ -304,20 +292,6 @@ func (w *walker) pkgOf(x ast.Expr) (string, bool) {
 // declared at this file's top level. A local variable has its own object.
 func (w *walker) packageLevel(id *ast.Ident) bool {
 	return id.Obj == nil || id.Obj == w.file.Scope.Lookup(id.Name)
-}
-
-// symbol records a use of name in pkg when it is one of the embedded catalog's.
-func (w *walker) symbol(pos token.Pos, pkg, name string, inside bool) {
-	names := exported[pkg]
-	if inside {
-		names = append(append([]string(nil), names...), unexported[pkg]...)
-	}
-	for _, s := range names {
-		if s == name {
-			w.add(pos, kindSymbol, path.Base(pkg)+"."+name)
-			return
-		}
-	}
 }
 
 // loader reports the loader an expression names: catalog.Load (through an import,
@@ -348,8 +322,21 @@ func (w *walker) loader(x ast.Expr) (name string, alias, ok bool) {
 }
 
 // call records a catalog loader given an empty directory or called through a
-// variable, and checks a join of literal path parts as the one path it builds.
+// variable.
 func (w *walker) call(c *ast.CallExpr) {
+	if sel, ok := ast.Unparen(c.Fun).(*ast.SelectorExpr); ok && requireHelpers[sel.Sel.Name] && w.lit == 0 && w.fn != "" {
+		if p, ok := w.pkgOf(sel.X); ok && p == catalogtestPkg {
+			k := check{File: w.rel, Func: w.fn, Line: w.fset.Position(c.Pos()).Line}
+			for _, a := range c.Args {
+				var at token.Pos
+				if id, ok := ast.Unparen(a).(*ast.Ident); ok && id.Obj != nil {
+					at = id.Obj.Pos()
+				}
+				k.Args = append(k.Args, at)
+			}
+			w.checks = append(w.checks, k)
+		}
+	}
 	if name, alias, ok := w.loader(c.Fun); ok {
 		if alias {
 			w.add(c.Pos(), kindLoad, fmt.Sprintf("a call through %s, a variable bound to catalog.Load", name))
@@ -361,24 +348,25 @@ func (w *walker) call(c *ast.CallExpr) {
 				return
 			}
 		}
-		return
-	}
-	if sel, ok := ast.Unparen(c.Fun).(*ast.SelectorExpr); ok && sel.Sel.Name == "Join" {
-		if p, ok := w.pkgOf(sel.X); ok && (p == "path/filepath" || p == "path") {
-			w.join(c)
-		}
 	}
 }
 
 // assign records a config catalog directory set to "", and a variable bound to a
 // loader.
 func (w *walker) assign(a *ast.AssignStmt) {
+	if len(a.Rhs) == 1 && len(a.Lhs) > 0 {
+		if c, ok := ast.Unparen(a.Rhs[0]).(*ast.CallExpr); ok {
+			if id, ok := a.Lhs[0].(*ast.Ident); ok && id.Obj != nil {
+				w.binds[c.Pos()] = id.Obj.Pos()
+			}
+		}
+	}
 	if len(a.Lhs) != len(a.Rhs) {
 		return
 	}
 	for i, l := range a.Lhs {
 		if sel, ok := l.(*ast.SelectorExpr); ok && configDirs[sel.Sel.Name] && w.empty(a.Rhs[i], 0) {
-			w.add(a.Pos(), kindConfig, sel.Sel.Name+" = \"\" selects the embedded catalog")
+			w.add(a.Pos(), kindConfig, sel.Sel.Name+" = \"\" selects the empty catalog")
 		}
 		if id, ok := l.(*ast.Ident); ok && id.Obj != nil {
 			if _, _, ok := w.loader(a.Rhs[i]); ok {
@@ -390,6 +378,11 @@ func (w *walker) assign(a *ast.AssignStmt) {
 
 // valueSpec records a var bound to a loader.
 func (w *walker) valueSpec(vs *ast.ValueSpec) {
+	if len(vs.Values) == 1 && len(vs.Names) > 0 && vs.Names[0].Obj != nil {
+		if c, ok := ast.Unparen(vs.Values[0]).(*ast.CallExpr); ok {
+			w.binds[c.Pos()] = vs.Names[0].Obj.Pos()
+		}
+	}
 	for i, n := range vs.Names {
 		if i < len(vs.Values) && n.Obj != nil {
 			if _, _, ok := w.loader(vs.Values[i]); ok {

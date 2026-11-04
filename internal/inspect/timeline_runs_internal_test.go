@@ -15,7 +15,7 @@ func TestMakeRun_OneInstantListsAndASpreadZooms(t *testing.T) {
 	t.Parallel()
 	at := time.Date(2026, 10, 19, 23, 0, 0, 0, time.UTC)
 	mark := func(d time.Duration) laneMark {
-		return laneMark{point: tlPoint{X: 100}, at: at.Add(d), typ: facet.Type("health.heart-rate-day")}
+		return laneMark{point: tlPoint{X: 100}, at: at.Add(d), typ: facet.Type("test.heart-rate-day")}
 	}
 	cases := []struct {
 		name   string
@@ -40,7 +40,7 @@ func TestMakeRun_OneInstantListsAndASpreadZooms(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if q.Get("type") != "health.heart-rate-day" || q.Get("from") != "2026-10-19T23:00:00.000000000Z" ||
+			if q.Get("type") != "test.heart-rate-day" || q.Get("from") != "2026-10-19T23:00:00.000000000Z" ||
 				q.Get("to") != "2026-10-19T23:00:00.000000001Z" {
 				t.Errorf("query %v", q)
 			}

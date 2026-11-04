@@ -13,11 +13,11 @@ import (
 
 // importedManifest is bpManifest under a type the engine fixture does not hold, as an
 // importer's repo would carry it.
-var importedManifest = strings.Replace(bpManifest, `"health.blood-pressure"`, `"test.registered"`, 1)
+var importedManifest = strings.Replace(bpManifest, `"test.blood-pressure"`, `"test.registered"`, 1)
 
 // measureManifest is bpManifest under test.measure, a type the engine fixture holds.
 // Register reads the bundled registry by type, so the body need not be the fixture's.
-var measureManifest = strings.Replace(bpManifest, `"health.blood-pressure"`, `"test.measure"`, 1)
+var measureManifest = strings.Replace(bpManifest, `"test.blood-pressure"`, `"test.measure"`, 1)
 
 func versioned(manifest string, v int) string {
 	return strings.Replace(manifest, `"definition_version": 1`, `"definition_version": `+strconv.Itoa(v), 1)

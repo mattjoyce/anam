@@ -13,7 +13,7 @@ import (
 var t0 = time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC)
 
 func part(id string, n, of int, facets ...string) ops.SnapshotPart {
-	return ops.SnapshotPart{ID: id, Source: "withings", Types: []string{"health.measurement"}, Part: n, Parts: of, FacetIDs: facets}
+	return ops.SnapshotPart{ID: id, Source: "withings", Types: []string{"test.measurement"}, Part: n, Parts: of, FacetIDs: facets}
 }
 
 // Parts arrive in any order and may repeat; the snapshot is complete when the last

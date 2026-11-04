@@ -1,18 +1,15 @@
 // Package catalogtest builds the engine's catalog types over the fixture catalogs, for
 // tests that need a registry, a catalog or a config naming one (card 255). Each
-// fixture is a Fixture value, Engine or Personal, and each thing a Fixture builds is
-// built once per process and shared: never modify a Definition, template or slice
-// one returns.
-//
-// The package-level Definitions, Projections, Catalog and Config are Personal's,
-// kept while tests move to Engine (R4b slices 4a to 4d), so no slice touches a file
-// it is not converting. Slice 6 deletes them with Personal.
+// fixture is a Fixture value: Engine, or Over a fixture's roots for another. Each
+// thing a Fixture builds is built once per process and shared: never modify a
+// Definition, template or slice one returns.
 //
 // Nothing outside a test imports it; see package fixture.
 package catalogtest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -36,9 +33,6 @@ type Fixture struct {
 
 // Engine is the fixture over fixture.Engine, the catalog the engine's own tests read.
 var Engine = Over(fixture.Engine)
-
-// Personal is the fixture over fixture.Mattjoyce, until R4b slice 6 deletes it.
-var Personal = Over(fixture.Mattjoyce)
 
 // Over is a Fixture over the catalog roots returns. Nothing is built until a test
 // asks for it.
@@ -112,26 +106,51 @@ func (f *Fixture) Config(t testing.TB, c *config.Config) {
 	c.DefinitionsDir, c.ProjectionsDir = fixture.Dirs(t, defs, projs)
 }
 
-// Definitions is Personal.Definitions.
-func Definitions(t testing.TB) *def.Registry {
+// emptyV is the definition set version of no files: SHA-256 over nothing.
+const emptyV = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+// RequireEmpty fails the test unless c is the empty catalog: both components selected
+// by no directory (labelled none) and holding nothing. A test that selects the empty
+// catalog on purpose passes what it selected here; catalogtest's
+// TestTests_ReadNoEmbeddedCatalog holds it to that.
+func RequireEmpty(t testing.TB, c *catalog.Catalog) {
 	t.Helper()
-	return Personal.Definitions(t)
+	RequireNoDefinitions(t, c)
+	RequireNoProjections(t, c)
 }
 
-// Projections is Personal.Projections.
-func Projections(t testing.TB) *projection.Registry {
+// RequireNoDefinitions fails the test unless c's definitions component is the empty
+// one: labelled none, no Definitions, no current or historical bodies, the empty V.
+func RequireNoDefinitions(t testing.TB, c *catalog.Catalog) {
 	t.Helper()
-	return Personal.Projections(t)
+	if c == nil {
+		t.Fatalf("catalogtest: no catalog, want one with no definitions")
+		return
+	}
+	if src, n := c.DefinitionsSource(), len(c.Definitions().All())+len(c.Manifests())+len(c.History()); src != "none" || n != 0 || c.SetVersion() != emptyV {
+		t.Fatalf("catalogtest: definitions from %q with %d entries and V %s; want none, 0 and %s", src, n, c.SetVersion(), emptyV)
+	}
 }
 
-// Catalog is Personal.Catalog.
-func Catalog(t testing.TB) *catalog.Catalog {
+// RequireNoProjections fails the test unless c's projections component is the empty
+// one: labelled none, no templates held, no bodies.
+func RequireNoProjections(t testing.TB, c *catalog.Catalog) {
 	t.Helper()
-	return Personal.Catalog(t)
+	if c == nil {
+		t.Fatalf("catalogtest: no catalog, want one with no projections")
+		return
+	}
+	if src, n := c.ProjectionsSource(), len(c.Projections().Held())+len(c.ProjectionManifests()); src != "none" || n != 0 {
+		t.Fatalf("catalogtest: projections from %q with %d entries; want none and 0", src, n)
+	}
 }
 
-// Config is Personal.Config.
-func Config(t testing.TB, c *config.Config) {
+// RequireRefused fails the test unless a selection of the empty catalog was refused:
+// no catalog and an error wrapping catalog.ErrInvalid. It is the check for a test
+// whose subject is Load refusing the empty catalog (a canceled context).
+func RequireRefused(t testing.TB, c *catalog.Catalog, err error) {
 	t.Helper()
-	Personal.Config(t, c)
+	if c != nil || !errors.Is(err, catalog.ErrInvalid) {
+		t.Fatalf("catalogtest: catalog %v, error %v; want no catalog and %v", c, err, catalog.ErrInvalid)
+	}
 }

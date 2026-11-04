@@ -19,10 +19,10 @@ func TestAddress(t *testing.T) {
 	}{
 		{"nothing at all", "", nil, ""},
 		{"a path with no query", "/select", nil, "/select?"},
-		{"one pair", "/select", url.Values{"type": {"health.blood-pressure"}}, "/select?type=health.blood-pressure"},
+		{"one pair", "/select", url.Values{"type": {"test.blood-pressure"}}, "/select?type=test.blood-pressure"},
 		{"keys in order", "/", url.Values{"to": {"2026-02-01"}, "from": {"2026-01-01"}}, "/?from=2026-01-01&to=2026-02-01"},
-		{"every value of a key", "/", url.Values{"type": {"health.weight", "health.sleep"}}, "/?type=health.weight&type=health.sleep"},
-		{"a query alone", "", url.Values{"type": {"health.weight"}}, "type=health.weight"},
+		{"every value of a key", "/", url.Values{"type": {"test.weight", "test.sleep"}}, "/?type=test.weight&type=test.sleep"},
+		{"a query alone", "", url.Values{"type": {"test.weight"}}, "type=test.weight"},
 		{
 			"a reader cannot smuggle a url",
 			"/select",

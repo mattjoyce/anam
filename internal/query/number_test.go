@@ -33,13 +33,13 @@ func TestNumber_TheValueTheRecordHoldsIsTheValueThatAnswers(t *testing.T) {
 	h := newHarness(t)
 	for i, c := range cases {
 		at := fmt.Sprintf("2026-06-%02dT07:00:00Z", i+1)
-		h.admit(t, "bp-csv", "health.blood-pressure", at,
+		h.admit(t, "bp-csv", "test.blood-pressure", at,
 			fmt.Sprintf(`{"measured_at": %q, "systolic": %s}`, at, c.lexeme))
 	}
 	v, versions, _ := h.served(t)
 
 	ans, err := tryRun(v, versions, h.defs,
-		`sys(E, S) :- entry(E, "health.blood-pressure", _, _, _, _, _), attr(E, "/systolic", S).`, "sys")
+		`sys(E, S) :- entry(E, "test.blood-pressure", _, _, _, _, _), attr(E, "/systolic", S).`, "sys")
 	if err != nil {
 		t.Fatalf("attr: %v", err)
 	}
@@ -63,12 +63,12 @@ func TestNumber_TheValueTheRecordHoldsIsTheValueThatAnswers(t *testing.T) {
 func TestNumber_TwoNumbersAFloat64CannotTellApartAreNotOne(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
-	h.admit(t, "bp-csv", "health.blood-pressure", "2026-06-15T07:00:00Z",
+	h.admit(t, "bp-csv", "test.blood-pressure", "2026-06-15T07:00:00Z",
 		`{"measured_at": "2026-06-15T07:00:00Z", "systolic": 1.0000000000000000001}`)
 	v, versions, _ := h.served(t)
 
 	ans, err := tryRun(v, versions, h.defs,
-		`sys(E) :- entry(E, "health.blood-pressure", _, _, _, _, _), attr(E, "/systolic", S), S = 1.`, "sys")
+		`sys(E) :- entry(E, "test.blood-pressure", _, _, _, _, _), attr(E, "/systolic", S), S = 1.`, "sys")
 	if err != nil {
 		t.Fatalf("query: %v", err)
 	}
@@ -82,12 +82,12 @@ func TestNumber_TwoNumbersAFloat64CannotTellApartAreNotOne(t *testing.T) {
 func TestNumber_TheNumberTheRecordHoldsIsTheNumberAComparisonMatches(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
-	h.admit(t, "bp-csv", "health.blood-pressure", "2026-06-15T07:00:00Z",
+	h.admit(t, "bp-csv", "test.blood-pressure", "2026-06-15T07:00:00Z",
 		`{"measured_at": "2026-06-15T07:00:00Z", "systolic": 9007199254740993}`)
 	v, versions, _ := h.served(t)
 
 	ans, err := tryRun(v, versions, h.defs,
-		`sys(E) :- entry(E, "health.blood-pressure", _, _, _, _, _), attr(E, "/systolic", S), S = 9007199254740993.`, "sys")
+		`sys(E) :- entry(E, "test.blood-pressure", _, _, _, _, _), attr(E, "/systolic", S), S = 9007199254740993.`, "sys")
 	if err != nil {
 		t.Fatalf("query: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestNumber_TheNumberTheRecordHoldsIsTheNumberAComparisonMatches(t *testing.
 func TestNumber_AnExponentBeyondTheBoundIsRefusedNotAPanic(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t)
-	h.admit(t, "bp-csv", "health.blood-pressure", "2026-06-15T07:00:00Z",
+	h.admit(t, "bp-csv", "test.blood-pressure", "2026-06-15T07:00:00Z",
 		`{"measured_at": "2026-06-15T07:00:00Z", "systolic": 120}`)
 	v, versions, _ := h.served(t)
 
@@ -124,7 +124,7 @@ func TestNumber_AnExponentBeyondTheBoundIsRefusedNotAPanic(t *testing.T) {
 		t.Run(c.constant, func(t *testing.T) {
 			t.Parallel()
 			ans, err := tryRun(v, versions, h.defs,
-				`big(E) :- entry(E, "health.blood-pressure", _, _, _, _, _), attr(E, "/systolic", S), S < `+c.constant+`.`, "big")
+				`big(E) :- entry(E, "test.blood-pressure", _, _, _, _, _), attr(E, "/systolic", S), S < `+c.constant+`.`, "big")
 			switch {
 			case c.refused && (err == nil || !strings.Contains(err.Error(), "exponent out of range")):
 				t.Errorf("err = %v, want exponent out of range", err)

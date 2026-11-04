@@ -189,14 +189,14 @@ fills the identity field from it when an envelope leaves it out, and refuses an 
 disagrees, showing both. A writer that wants the id before it sends builds it with `def.ComposeID`;
 one that is not Go leaves the field out. A change of template is a new version. `schema` is closed JSON Schema 2020-12
 (§3, prerequisite 3). A type lives in one
-place. While Anam's binary bundles a type, no importer may register a version of it; an importer
-takes a type over when a release drops it from the binary, registering the same body at the same
-version. The other direction works too: a release that bundles a type an importer registered admits
-it against the bundled Definition from then on, keeps the registered rows for the facets admitted
-under them, and says so in its log. An importer that still sends the body the binary now carries,
-at its version, is answered unchanged (200), not refused, so the release and the importer's
-redeploy need no order between them; any other body of a bundled type is a 409. No two importers may name the same type unless the binary bundles it: a bundled
-type's Definitions come from Anam, so no importer can register a version that refuses another's
+place. While the deployment's catalog (`definitions_dir`) holds a type, no importer may register a
+version of it; an importer takes a type over when the catalog drops it, registering the same body at
+the same version. The other direction works too: a catalog that gains a type an importer registered
+admits it against the catalog's Definition from then on, keeps the registered rows for the facets
+admitted under them, and says so in its log. An importer that still sends the body the catalog now
+holds, at its version, is answered unchanged (200), not refused, so the catalog change and the
+importer's redeploy need no order between them; any other body of a catalog type is a 409. No two importers may name the same type unless the catalog holds it: a catalog
+type's Definitions come from the deployment, so no importer can register a version that refuses another's
 envelopes, and any number may submit it, each under its own source (Garmin and Concept2 both sent
 `activity.exercise-session` until each had its own leaf). A release that drops a type two importers share refuses to start until one of them
 gives it up.
@@ -243,7 +243,7 @@ importers:
   ```
 
   The `workbench` source is reserved. It owns none of its types, so another importer may own one
-  (`types` for a type no binary bundles is that importer's alone), and the workbench registers no
+  (`types` for a type the catalog does not hold is that importer's alone), and the workbench registers no
   Definition. Leave the entry out and `POST /v1/entry` answers 404, saying the file declares no
   workbench principal. `anam retract workbench --facet <id> --yes` undoes one entry. The attention
   types (`mind.attention`, `mind.attention.started`, `mind.attention.ended`), `health.intake` and

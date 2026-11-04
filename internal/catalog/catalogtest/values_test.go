@@ -1,47 +1,12 @@
 package catalogtest_test
 
 import (
-	"fmt"
 	"go/ast"
 	"go/token"
-	"path"
-	"path/filepath"
 	"strconv"
-	"strings"
 )
 
-// The walker's readings of values: the paths a string or a join names, and whether
-// an expression is the empty string.
-
-// join checks the literal parts of a filepath.Join: all of them as a path relative to
-// the file, and the literal tail after the last computed part as a path that ends
-// in the catalog wherever it starts.
-func (w *walker) join(c *ast.CallExpr) {
-	var tail []string
-	all := true
-	for _, a := range c.Args {
-		s, ok := stringValue(a)
-		if !ok {
-			all, tail = false, nil
-			continue
-		}
-		tail = append(tail, s)
-	}
-	if len(tail) < 2 && all {
-		return // one literal is checked on its own
-	}
-	joined := path.Join(tail...)
-	if all {
-		w.path(c.Pos(), joined)
-		return
-	}
-	for _, d := range catalogDirs {
-		if hasPathSuffixIn(joined, d) {
-			w.add(c.Pos(), kindPath, fmt.Sprintf("a path ending in %s", d))
-			return
-		}
-	}
-}
+// The walker's readings of values: whether an expression is the empty string.
 
 // findReassigned marks each variable the file assigns after declaring it, or takes
 // the address of, so empty does not trust its first value.
@@ -105,35 +70,6 @@ func (w *walker) empty(x ast.Expr, depth int) bool {
 			if li, ok := l.(*ast.Ident); ok && li.Obj == id.Obj {
 				return w.empty(d.Rhs[i], depth+1)
 			}
-		}
-	}
-	return false
-}
-
-// path records a string that names an embedded catalog directory on disk, either
-// from the module root or relative to the test's own directory (go test runs a test
-// in its package directory). A string with spaces or quotes is not a path.
-func (w *walker) path(pos token.Pos, s string) {
-	if s == "" || strings.ContainsAny(s, " \t\n\"`") {
-		return
-	}
-	p := path.Clean(filepath.ToSlash(s))
-	rel := path.Join(w.dir, p)
-	for _, d := range catalogDirs {
-		if under(p, d) || under(rel, d) || strings.Contains(p, "/"+d+"/") || strings.HasSuffix(p, "/"+d) {
-			w.add(pos, kindPath, fmt.Sprintf("the path %q reads %s from disk", s, d))
-			return
-		}
-	}
-}
-
-func under(p, dir string) bool { return p == dir || strings.HasPrefix(p, dir+"/") }
-
-// hasPathSuffixIn reports whether p ends with dir, or ends inside it.
-func hasPathSuffixIn(p, dir string) bool {
-	for _, d := range []string{dir, path.Base(path.Dir(dir)) + "/" + path.Base(dir)} {
-		if p == d || strings.HasPrefix(p, d+"/") || strings.HasSuffix(p, "/"+d) || strings.Contains(p, "/"+d+"/") {
-			return true
 		}
 	}
 	return false

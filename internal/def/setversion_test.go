@@ -39,31 +39,31 @@ func TestSetVersion_MovesOnEveryChange(t *testing.T) {
 	t.Parallel()
 
 	base := map[string][]byte{
-		"health.sleep.json":          []byte(`{"meta":{"definition_version":1}}`),
-		"health.blood-pressure.json": []byte(`{"meta":{"definition_version":1}}`),
+		"test.sleep.json":          []byte(`{"meta":{"definition_version":1}}`),
+		"test.blood-pressure.json": []byte(`{"meta":{"definition_version":1}}`),
 	}
 	baseline := def.SetVersionOf(base)
 
 	cases := map[string]map[string][]byte{
 		"a byte changes": {
-			"health.sleep.json":          []byte(`{"meta":{"definition_version":2}}`),
-			"health.blood-pressure.json": []byte(`{"meta":{"definition_version":1}}`),
+			"test.sleep.json":          []byte(`{"meta":{"definition_version":2}}`),
+			"test.blood-pressure.json": []byte(`{"meta":{"definition_version":1}}`),
 		},
 		"a manifest is renamed": {
-			"health.slumber.json":        []byte(`{"meta":{"definition_version":1}}`),
-			"health.blood-pressure.json": []byte(`{"meta":{"definition_version":1}}`),
+			"test.slumber.json":        []byte(`{"meta":{"definition_version":1}}`),
+			"test.blood-pressure.json": []byte(`{"meta":{"definition_version":1}}`),
 		},
 		"a manifest is added": {
-			"health.sleep.json":          []byte(`{"meta":{"definition_version":1}}`),
-			"health.blood-pressure.json": []byte(`{"meta":{"definition_version":1}}`),
-			"health.heart-rate.json":     []byte(`{"meta":{"definition_version":1}}`),
+			"test.sleep.json":          []byte(`{"meta":{"definition_version":1}}`),
+			"test.blood-pressure.json": []byte(`{"meta":{"definition_version":1}}`),
+			"test.heart-rate.json":     []byte(`{"meta":{"definition_version":1}}`),
 		},
 		"a manifest is removed": {
-			"health.sleep.json": []byte(`{"meta":{"definition_version":1}}`),
+			"test.sleep.json": []byte(`{"meta":{"definition_version":1}}`),
 		},
 		"bytes move between manifests": {
-			"health.sleep.json":          []byte(`{"meta":{"definition_version":1}}{"meta":`),
-			"health.blood-pressure.json": []byte(`{"definition_version":1}}`),
+			"test.sleep.json":          []byte(`{"meta":{"definition_version":1}}{"meta":`),
+			"test.blood-pressure.json": []byte(`{"definition_version":1}}`),
 		},
 	}
 	for name, set := range cases {

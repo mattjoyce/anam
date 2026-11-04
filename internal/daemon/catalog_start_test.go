@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/mattjoyce/anam/internal/catalog"
+	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/catalog/fixture"
 	"github.com/mattjoyce/anam/internal/config"
 )
@@ -97,7 +98,8 @@ func minimalConfig(t *testing.T, change func(defs string)) config.Config {
 // The daemon on a config that names no catalog starts on the empty one (card 255,
 // R4b): admitted as none with the empty V, a WARN that nothing is configured, then
 // one line for each structural type it lacks. The store holds no Definitions.
-// Allow-listed in catalogtest: it clears the directories on purpose.
+// Listed in catalogtest's emptyOnPurpose: it clears the directories on purpose, and
+// checks the catalog the daemon admitted with catalogtest.RequireEmpty.
 // Serial because it replaces the process default logger.
 func TestOpen_NoCatalogStartsEmpty(t *testing.T) {
 	cfg := newConfig(t)
@@ -106,6 +108,7 @@ func TestOpen_NoCatalogStartsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open with no catalog: %v", err)
 	}
+	catalogtest.RequireEmpty(t, d.catalog)
 	if d.catalog.SetVersion() != emptyV {
 		t.Errorf("set version = %s, want %s", d.catalog.SetVersion(), emptyV)
 	}
@@ -202,8 +205,8 @@ func TestOpen_AbsentEdgeDegrades(t *testing.T) {
 // catalog. Serial because it replaces the process default logger.
 func TestOpen_ACompleteCatalogLogsOnlyItsAdmission(t *testing.T) {
 	for name, cfg := range map[string]config.Config{
-		"minimal":   minimalConfig(t, func(string) {}),
-		"mattjoyce": newConfig(t),
+		"minimal": minimalConfig(t, func(string) {}),
+		"engine":  newConfig(t),
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, lines, err := startLog(t, cfg)

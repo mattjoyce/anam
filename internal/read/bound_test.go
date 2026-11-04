@@ -15,7 +15,7 @@ func entries(n int) []fold.Entry {
 	out := make([]fold.Entry, n)
 	for i := range out {
 		out[i] = fold.Entry{
-			FacetID: "f", Type: "health.blood-pressure", FactTime: "2026-02-10T00:00:00.000000000Z",
+			FacetID: "f", Type: "test.blood-pressure", FactTime: "2026-02-10T00:00:00.000000000Z",
 			Source: "records", SourceRef: "records:1", Payload: json.RawMessage(`{"systolic":120,"html":"<b>&</b>"}`),
 		}
 	}
@@ -103,7 +103,7 @@ func TestNarrowings(t *testing.T) {
 		want string
 	}{
 		{"nothing narrowed", api.TimelineQuery{}, "type from to at projection fields"},
-		{"a type", api.TimelineQuery{Type: "health.blood-pressure"}, "from to at projection fields"},
+		{"a type", api.TimelineQuery{Type: "test.blood-pressure"}, "from to at projection fields"},
 		{"a window", api.TimelineQuery{From: "2026-06-01", To: "2026-06-30"}, "type projection fields"},
 		{"a snapshot", api.TimelineQuery{At: "2026-06-15"}, "type from projection fields"},
 		{"a projection and a window", api.TimelineQuery{Projection: "bp", From: "2026-06-01", To: "2026-06-30"}, "type fields"},
@@ -127,7 +127,7 @@ func TestNarrowings(t *testing.T) {
 func TestFitTimeline(t *testing.T) {
 	t.Parallel()
 	tl := api.Timeline{Entries: entries(2), Verdicts: []api.VerdictRow{{FacetID: "f", Standing: "served"}}}
-	q := api.TimelineQuery{Type: "health.blood-pressure"}
+	q := api.TimelineQuery{Type: "test.blood-pressure"}
 	if err := read.FitTimeline(tl, q, wireSize(t, tl.Entries)-1); err == nil {
 		t.Fatal("two entries over the bound should be refused")
 	} else {

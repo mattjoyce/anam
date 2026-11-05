@@ -22,4 +22,4 @@ Three tables, three access paths, no secondary indexes.
 
 The primitive is two calls, not one with an optional artifact: `Append` writes an artifact with its admitted or superseded event, `Mark` writes a status event alone. Both run in one transaction that checks, in order, that the head is the watermark the caller read (else `ErrStaleWatermark`), that this version is not already written (same bytes is `ErrAlreadyWritten`, different bytes is `ErrDivergentArtifact`), and that the insert is accepted (else `ErrCorrupt`). There is no watermark row: W is `MAX(seq)`, and a trigger lets an event take only the next seq.
 
-`Create` is the one place the schema moves. `Open` refuses a file pinned to another person or at another schema version. `OpenReadOnly` opens with `mode=ro`, so SQLite refuses every write on that handle; every command that only reads uses it. The file runs in WAL mode.
+`Create` is the one place the schema moves. `Open` refuses a file pinned to another subject or at another schema version. `OpenReadOnly` opens with `mode=ro`, so SQLite refuses every write on that handle; every command that only reads uses it. The file runs in WAL mode.

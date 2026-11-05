@@ -33,7 +33,7 @@ func selectRangeLink(from, to time.Time, types []facet.Type, z readZone) string 
 // and to when it has them, its types, the zone when a date is written, and the saved
 // selection drawn as it is today when there is one (code). held is every type the
 // record holds, so a type prefix names the types it covers: the timeline filters by
-// exact type. A filter with nothing to say opens the whole person, named outright
+// exact type. A filter with nothing to say opens the whole record, named outright
 // since a bare "/" may open the default view.
 func (st selectState) timelineLink(held []string, code string) string {
 	q := url.Values{}

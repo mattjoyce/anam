@@ -6,7 +6,7 @@
 * [Attention (the mind domain)](attention.md) - What the person says is absorbing them, kept as a reading with a topic and a strength from 1 to 5, and as a declared start and end; the first concept in the mind domain.
 * [Canonical](canonical.md) - The live-only value of the fold at a watermark; superseded and tombstoned facets are excluded from it.
 * [Checkpoint](checkpoint.md) - An immutable, content-addressed value of the live-only fold over one bucket at a watermark, there only to bound replay.
-* [Derived span](derived-span.md) - A lens the person names over the timeline, composed on demand from bucket values and never minted.
+* [Derived span](derived-span.md) - A lens a reader names over the timeline, composed on demand from bucket values and never minted.
 * [Employment (the org domain)](employment.md) - Where the person worked and in what role, kept as a start, changes of role and an end, one series per period with an employer; the first concept in the org domain.
 * [Envelope](envelope.md) - The one message an importer hands the gate; the only way anything enters the ledger.
 * [Error kernel](error-kernel.md) - The small trusted core that must not corrupt: the append-only ledger plus the gate's admission invariants.
@@ -33,6 +33,6 @@
 * [Source ref](source-ref.md) - The deterministic natural key saying which source row a facet is, composed from identity fields and never from values.
 * [Status](status.md) - A facet's current state, derived by the fold from anam-events and never stored; distinct from its immutable birth status.
 * [Supersession](supersession.md) - What happens when a source row changes: a new artifact version and a superseded event against the prior, nothing mutated.
-* [The whole-person read](inversion.md) - The person is the substrate and the whole-life read is the default.
+* [The whole-record read](inversion.md) - The subject is the substrate and the whole-record read is the default.
 * [Tombstone](tombstone.md) - A tombstoned anam-event marking a facet retracted without deleting it; never a new artifact.
 * [Watermark](watermark.md) - W, the seq of the newest anam-event; the position every checkpoint and receipt is pinned to.

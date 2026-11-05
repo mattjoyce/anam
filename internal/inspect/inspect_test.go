@@ -197,7 +197,7 @@ func TestTimeline_DrawsLedgerBandAndCanonicalStrip(t *testing.T) {
 }
 
 // Narrowing is a lens over the same read: a span that excludes the measure facet
-// composes an empty strip while the header still names the whole-person value.
+// composes an empty strip while the header still names the whole-record value.
 func TestTimeline_SpanNarrowsTheStrip(t *testing.T) {
 	t.Parallel()
 	srv, bpID, _ := seededServer(t)

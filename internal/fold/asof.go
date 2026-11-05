@@ -16,7 +16,7 @@ import (
 // every read below this line is in watermarks, because that is the clock the ledger
 // orders by. Nothing else in Anam should be converting between them ad hoc.
 //
-// A t before the first anam-event yields 0 — the empty person, which ReadAt answers
+// A t before the first anam-event yields 0 — the empty record, which ReadAt answers
 // honestly rather than treating as an error. A t after the last yields the head.
 //
 // It replays to find the boundary rather than asking the operational store, so an

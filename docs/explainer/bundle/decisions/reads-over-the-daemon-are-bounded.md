@@ -12,7 +12,7 @@ tested_by:
   - internal/app/bound_internal_test.go#TestPublish_OneFacetOverTheBoundFilesNothing
 alternatives:
   - A row limit with a cursor (refused for changes_since, where a non-unique anam_time would step over a batch's instant; a byte bound names the cost the daemon actually pays)
-  - No bound (how it was; a whole-person read over HTTP could take the daemon's memory and the client's)
+  - No bound (how it was; a whole-record read over HTTP could take the daemon's memory and the client's)
 affects:
   - /components/read.md
   - /components/daemon.md

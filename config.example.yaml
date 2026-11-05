@@ -215,7 +215,7 @@ max_absent_ids: 1000
 max_absent_judged: 5000
 
 # The CLI as a client of a daemon. It reads at most max_response_bytes of one
-# answer (the whole-person timeline is about 5 MB) and waits network_margin longer
+# answer (the whole-record timeline is about 5 MB) and waits network_margin longer
 # than it asks the daemon to take.
 max_response_bytes: 67108864
 network_margin: 10s

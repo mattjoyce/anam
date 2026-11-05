@@ -164,8 +164,8 @@ func TestBundledFS_ParsesTheFixtureAndItsHistory(t *testing.T) {
 		if len(tmpl.Types) == 0 && len(tmpl.Prefixes) == 0 {
 			t.Errorf("%s: serves no types — a bundled template that serves nothing is a mistake, not a policy", tmpl.Name)
 		}
-		if tmpl.Span() != "whole-person" {
-			t.Errorf("%s: span %q, want whole-person", tmpl.Name, tmpl.Span())
+		if tmpl.Span() != "whole-record" {
+			t.Errorf("%s: span %q, want whole-record", tmpl.Name, tmpl.Span())
 		}
 	}
 }
@@ -194,7 +194,7 @@ func TestSpan_RendersTheWindow(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct{ from, to, want string }{
-		{"", "", "whole-person"},
+		{"", "", "whole-record"},
 		{"2026-01-01T00:00:00.000000000Z", "", "fact-time[2026-01-01T00:00:00.000000000Z,+inf)"},
 		{"", "2026-02-01T00:00:00.000000000Z", "fact-time[-inf,2026-02-01T00:00:00.000000000Z)"},
 		{"2026-01-01T00:00:00.000000000Z", "2026-02-01T00:00:00.000000000Z", "fact-time[2026-01-01T00:00:00.000000000Z,2026-02-01T00:00:00.000000000Z)"},

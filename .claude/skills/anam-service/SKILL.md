@@ -91,7 +91,7 @@ it with `ANAM_SERVER`, `ANAM_TOKEN_FILE`, `ANAM_ZONE`, `ANAM_MCP_TIMEOUT` and
 
 Set `ANAM_SERVER` (or `--server`) and `ANAM_TOKEN_FILE`, and `status`, `version`, `timeline`,
 `changes`, `receipt`, `query` and `checkpoint` ask the daemon, printing what they print against
-local files. `inspect` prints the inspector's URL. No person or ledger path is needed.
+local files. `inspect` prints the inspector's URL. No subject id or ledger path is needed.
 
 ```bash
 export ANAM_SERVER=http://192.168.20.4:8787 ANAM_TOKEN_FILE=~/.config/anam/token ANAM_ZONE=Australia/Sydney

@@ -9,6 +9,15 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- The default read is the whole-record read (card 270a, slice 3). A receipt for a template with
+  no window records span `whole-record`. Receipts filed before this change say `whole-person`,
+  the old name of the same span, and keep it, since a receipt's hash covers its bytes. Verify
+  reads the span of neither, so a receipt of either kind verifies on this build and on the one
+  before it, and no receipt hash moves. A reader that matched on `whole-person` should accept
+  both. The inspector's link to the unwindowed timeline reads "whole record", and the help for
+  `anam timeline` and `anam serve`, the `openapi.yaml` summaries and the docs say whole-record
+  and subject where they meant what the record is about.
+
 - The wire names the subject (card 270a, slice 2). `GET /v1/status` answers `subject`, the
   configured `subject_id`, and still answers `person` with the same value; `person` is
   deprecated in `openapi.yaml` and a later release removes it, so a reader should move to

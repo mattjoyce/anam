@@ -9,7 +9,7 @@ import (
 // CoverageQuery asks what the record holds, type by type (card 90). W stands the
 // answer on that watermark, or AsOf on the one an anam-time names, read in Zone;
 // neither is the head. Projection, when named, counts what that projection serves
-// instead of the whole person.
+// instead of the whole record.
 type CoverageQuery struct {
 	W          int64  `json:"w,omitempty"`
 	AsOf       string `json:"as_of,omitempty"`
@@ -48,13 +48,13 @@ func CoverageQueryOf(v url.Values) (CoverageQuery, error) {
 // what is recorded, never that a source is complete: a quiet source may be current,
 // and a gap in fact-time may be a gap in the world.
 //
-// The same W gives the same answer: Canonical is the whole-person value's hash at W,
+// The same W gives the same answer: Canonical is the whole-record value's hash at W,
 // which the coverage is counted from (or the projection's served hash, when one was
 // named).
 type Coverage struct {
 	W        int64  `json:"w"`
 	LedgerID string `json:"ledger_id"`
-	// Live is how many facets the counts cover: the whole person's live facets, or
+	// Live is how many facets the counts cover: the whole record's live facets, or
 	// what the projection served.
 	Live       int             `json:"live"`
 	Canonical  string          `json:"canonical"`

@@ -1,7 +1,7 @@
 ---
 type: decision
 title: A read may select by payload; the store never does
-description: Payload opacity is a storage rule, not a ceiling on what a person may ask of their own record; a query selects and joins by any schema field, read from the served copy through a projection, and the store still never decomposes or indexes a payload.
+description: Payload opacity is a storage rule, not a ceiling on what a reader may ask of the record; a query selects and joins by any schema field, read from the served copy through a projection, and the store still never decomposes or indexes a payload.
 timestamp: 2026-10-19T00:00:00Z
 resource: docs/ARCHITECTURE.md
 anchor: "The **store** never selects by payload; a **read**"

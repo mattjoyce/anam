@@ -189,8 +189,8 @@ its own report, or a draw whose report is lost) is emitted from that later repor
   header date that differs from the dates on its own panels). Record the date the rest of the
   document supports, and keep the printed text in the record's `source_note`. Reading is fallible,
   and the record says where.
-- **Admit only the person's own facts.** A document that also carries someone else's results (a
-  child's, in a family scan) contributes only the person's own rows.
+- **Admit only the subject's own facts.** A document that also carries someone else's results (a
+  child's, in a family scan) contributes only the subject's own rows.
 - **Check the ledger before judging a range.** A new source can reach back before an existing
   export begins, so it adds readings and does not duplicate them. Look at what the ledger holds
   for those dates (`anam timeline --from … --to …`) first.

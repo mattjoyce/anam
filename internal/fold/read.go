@@ -19,7 +19,7 @@ type Ledger interface {
 	Versions(ctx context.Context, refs []ledger.VersionRef) ([]facet.Facet, error)
 }
 
-// Result is one consistent read of the whole person at a watermark.
+// Result is one consistent read of the whole record at a watermark.
 type Result struct {
 	// W is the watermark the read is true at.
 	W ledger.Watermark
@@ -29,7 +29,7 @@ type Result struct {
 	States map[string]State
 
 	// Live holds the live facets at the artifact versions in force at W, in
-	// (fact-time, id) order — the whole-person timeline, un-narrowed.
+	// (fact-time, id) order — the whole-record timeline, un-narrowed.
 	Live []facet.Facet
 
 	// Value is the canonical built from Live: the live-only value at W.
@@ -38,7 +38,7 @@ type Result struct {
 
 // Read produces the canonical at the head watermark.
 //
-// The whole-person read is the default; narrowing is the caller's lens over Live,
+// The whole-record read is the default; narrowing is the caller's lens over Live,
 // never a different read (§4).
 func Read(ctx context.Context, l Ledger) (Result, error) {
 	head, err := l.Head(ctx)
@@ -92,7 +92,7 @@ func ReadAt(ctx context.Context, l Ledger, w ledger.Watermark) (Result, error) {
 }
 
 // fetchLive reads each live facet at the exact version the fold derived, in batches
-// rather than one query per facet: a read of the whole person fetches every live
+// rather than one query per facet: a read of the whole record fetches every live
 // artifact, and a query each priced 14,000 facets at most of a second in SQL parsing
 // alone.
 func fetchLive(ctx context.Context, l Ledger, states map[string]State) ([]facet.Facet, error) {

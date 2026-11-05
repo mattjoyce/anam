@@ -1,7 +1,7 @@
 ---
 type: decision
 title: "The substrate is accidental: only internal/store names SQLite"
-description: The problem is a personal record, not a store; scripts/check.sh fails the build if database/sql or sqlite is named outside internal/store, with no exception.
+description: The problem is a longitudinal record of one subject, not a store; scripts/check.sh fails the build if database/sql or sqlite is named outside internal/store, with no exception.
 timestamp: 2026-10-14T00:00:00Z
 resource: scripts/check.sh#boundary
 anchor: "grep -vE '^github.com/mattjoyce/anam/internal/store'"

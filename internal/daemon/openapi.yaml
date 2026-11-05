@@ -6,7 +6,7 @@ openapi: 3.1.0
 info:
   title: Anam
   version: v1
-  summary: One person's longitudinal record, read whole and written through a gate.
+  summary: One subject's longitudinal record, read whole and written through a gate.
   description: >-
     Every route but /healthz and this document takes a token: a bearer token, or the
     same token as a basic-auth password so a browser can open the inspector. A token
@@ -99,7 +99,7 @@ paths:
       tags: [record]
       x-anam-roles: [reader, importer, operator]
       x-anam-type: Timeline
-      summary: The whole-person read, narrowed as asked.
+      summary: The whole-record read, narrowed as asked.
       description: >-
         Live facets in fact-time order. from and to narrow by fact time, at takes the
         snapshot (the latest of each series at or before it), as_of or w winds Anam's
@@ -293,7 +293,7 @@ paths:
                       template_version: 1
                       definition_set_version: sha256:ec002e673b06e5688a000c8b8a345759cb68b93b01edbea62ca04d65adbc1705
                       served_at: "2026-10-21T09:00:00.000000000Z"
-                      span: all
+                      span: whole-record
                       principal: assistant
         "400": { $ref: "#/components/responses/BadQuery" }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -367,7 +367,7 @@ paths:
                   template_hash: sha256:7a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9
                   definition_set_version: sha256:ec002e673b06e5688a000c8b8a345759cb68b93b01edbea62ca04d65adbc1705
                   served_at: "2026-10-21T09:00:00.000000000Z"
-                  span: all
+                  span: whole-record
                   ledger_id: 4b1f7c2e-8d3a-4f6b-9c1e-2a7d5e8f0b3c
                 page: { offset: 0, returned_count: 1, total_count: 2, next_cursor: eyJ2IjoxLCJyZWNlaXB0Ijoic2hhMjU2OjVkMGMzYTdlOWIxZjQyZDhhNmMzZTBiN2YxOWQyYTRjOGU2YjBmM2E1ZDdjOWUxYjJhNGY2ZDhjMGUyYjRhNmMiLCJvZmZzZXQiOjEsImZhY2V0X2lkIjoiYjgxZTNmMmEtNmM0ZC01ZTdmLThhOWItMGMxZDJlM2Y0YTViIn0 }
         "400": { $ref: "#/components/responses/BadQuery" }
@@ -720,7 +720,7 @@ paths:
                   template_hash: sha256:1976fb0a4cfc1313ce243c81ae29b34671610d8c3898da3dab3a40a67d737d02
                   definition_set_version: sha256:ec002e673b06e5688a000c8b8a345759cb68b93b01edbea62ca04d65adbc1705
                   served_at: "2026-10-19T12:00:00.000000000Z"
-                  span: all
+                  span: whole-record
                   ledger_id: 4b1f7c2e-8d3a-4f6b-9c1e-2a7d5e8f0b3c
                   program:
                     rule_set: anam
@@ -1659,7 +1659,7 @@ components:
         as_of: { $ref: "#/components/schemas/AnamTime" }
         at: { $ref: "#/components/schemas/AnamTime" }
         at_hash: { type: string }
-        canonical: { type: string, description: the whole-person value's hash at W, whatever the narrowing }
+        canonical: { type: string, description: the whole-record value's hash at W, whatever the narrowing }
         projection: { $ref: "#/components/schemas/ProjectionRead" }
         entries: { type: array, items: { $ref: "#/components/schemas/Entry" } }
         versions: { type: object, additionalProperties: { type: integer }, description: each shown entry's artifact version, by facet id }
@@ -1673,8 +1673,8 @@ components:
       properties:
         w: { type: integer, format: int64 }
         ledger_id: { type: string, format: uuid }
-        live: { type: integer, description: facets counted, the whole person's or what the projection served }
-        canonical: { type: string, description: the whole-person value's hash at w }
+        live: { type: integer, description: facets counted, the whole record's or what the projection served }
+        canonical: { type: string, description: the whole-record value's hash at w }
         projection: { $ref: "#/components/schemas/ProjectionRead" }
         types: { type: array, items: { $ref: "#/components/schemas/TypeCoverage" } }
     TypeCoverage:
@@ -1730,7 +1730,13 @@ components:
         template_version: { type: integer }
         definition_set_version: { type: string }
         served_at: { $ref: "#/components/schemas/AnamTime" }
-        span: { type: string }
+        span:
+          type: string
+          description: >-
+            The fact-time window the template served, as a label: whole-record for a
+            template with no window, fact-time[from,to) otherwise. Receipts filed before
+            card 270a (2026-11-05) say whole-person, the old name of whole-record. They
+            keep it, since the receipt's hash covers its bytes, and verify reads neither.
         ledger_id: { type: string }
         query: { $ref: "#/components/schemas/ReceiptQuery" }
         template_hash: { type: string }

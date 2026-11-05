@@ -1,7 +1,7 @@
 ---
 type: component
 title: Admission gate
-description: "The only ingress: resolve binds an envelope to the person, commit validates it against its Definition, composes identity, and appends through the ledger idempotently."
+description: "The only ingress: resolve binds an envelope to the subject, commit validates it against its Definition, composes identity, and appends through the ledger idempotently."
 timestamp: 2026-10-17T00:00:00Z
 resource: internal/gate/gate.go#New
 anchor: "func New(l Ledger, defs Definitions, scopes TokenScopes, clock Clock, subjectID string, limits Limits) *Gate {"
@@ -21,7 +21,7 @@ Two calls, as the doctrine says: `Resolve` enforces association (binding and its
 |---|---|
 | Facet-compliant | the Definition's closed JSON Schema, `validation_mode`, fact-time pointer and zone (or the zone the fact names at its `zone_pointer`, card 198), series pointers |
 | Authenticated | the token scopes: a source may inject only the types it is scoped for |
-| Associated | binding to the one person, with assurance high / medium / review |
+| Associated | binding to the one subject, with assurance high / medium / review |
 
 What commit computes, per envelope: the [source ref](/terms/source-ref.md) from the Definition's `identity_key` (refusing one the envelope carried that disagrees), the `facet_id` as uuidv5 of it, the fact-time promoted out of the payload, the series stamp, the content hash of the canonical payload. Then the outcome: no prior version is `admitted`; a prior version with the same hash is `no-op`; a different hash is `superseded` with a new artifact version. A batch of up to `MaxBatch` (49) envelopes is one transaction, so a refused envelope writes nothing for the whole batch. `MaxBatch` is a constant, not a config key: every importer cuts its batches to it, so a gate set lower would refuse their full batches, and it decides which events share an anam-time (card 151). The payload bound and the retry count are the two `gate.Limits` the daemon passes in from the config (`max_payload_bytes`, 300 KiB; `commit_retries`, 5); see [config limits](/data-structures/limits.md).
 

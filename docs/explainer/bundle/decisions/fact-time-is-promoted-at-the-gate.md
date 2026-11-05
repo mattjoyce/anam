@@ -9,7 +9,7 @@ basis: docs
 tier: supporting
 alternatives:
   - Leave fact-time inside the blob and parse every payload on every read (refused; it would make the metadata/payload separation a fiction)
-  - Require sources to send UTC (refused; a zoneless source clock is the wall clock where the person stood, so the zone is the Definition's to declare)
+  - Require sources to send UTC (refused; a zoneless source clock is the wall clock where the reading was taken, so the zone is the Definition's to declare)
 affects:
   - /components/gate.md
   - /components/def.md

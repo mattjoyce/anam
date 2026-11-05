@@ -1,7 +1,7 @@
 // Package consent is the gate a projection's every candidate facet passes through
 // before it is served (ARCHITECTURE.md §10).
 //
-// Today it allows everything. Anam serves one person, so there is no second party to
+// Today it allows everything. Anam serves one subject, so there is no second party to
 // withhold anything from, and the policy that would decide is deferred.
 // The seam exists anyway, invoked on the real path rather than reserved in a comment,
 // because a gate added later has to be threaded through every caller that already

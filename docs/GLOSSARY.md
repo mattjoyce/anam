@@ -9,8 +9,8 @@
 *facet-compliant*, *authenticated*, *associated*. Exposed as two calls, `resolve` then `commit`. The
 **only ingress**. See *Binding*, *Envelope*.
 
-**Anam** — This system: a personal, longitudinal episodic-context store over one person's own sources.
-*anam* is Irish for *soul*. Its default read is the whole person (see *Whole-person read*); the workbench opens at the last 30 days.
+**Anam** — This system: a longitudinal episodic-context store about one *Subject*, over the sources that record it.
+*anam* is Irish for *soul*. Its default read is the whole record (see *Whole-record read*); the workbench opens at the last 30 days.
 
 **Artifact** — A specific version of a Facet's captured body. Re-versioned on a whole re-capture or a
 maturity change. Immutable once written. See *Facet*, *Supersession*.
@@ -21,11 +21,11 @@ Anam's clock, never the world's. (This matches Datomic's `as-of` and SQL:2011's 
 Narrowing by **fact-time** is not an as-of: it is a *derived span*, and the two compose. See
 *Bitemporal*, *Anam-time*, *Span*, *Watermark*.
 
-**Binding** — The resolution of a Facet to the person via its Definition's linking elements. In Anam,
-with one person, binding is near-trivial but still attested; it **never requires a Span**. See *Binding
+**Binding** — The resolution of a Facet to the subject via its Definition's linking elements. In Anam,
+with one subject, binding is near-trivial but still attested; it **never requires a Span**. See *Binding
 assurance*.
 
-**Binding assurance** — A derived attestation of how confidently a Facet bound to the person: *high*
+**Binding assurance** — A derived attestation of how confidently a Facet bound to the subject: *high*
 (source explicitly scoped), *medium* (defaulted), *review* (a carried identity element contradicts).
 
 **Birth status** — The **immutable** state a Facet was born in (`admitted` or `proposed`), stored on the
@@ -71,7 +71,7 @@ the same type and hash a hard checkpoint would have, with no row and no file. Sh
 never kept between requests, or it becomes a stale place. Soft equals hard by hash means the bucket is
 *sealed*; soft differs means the bucket is *behind* (still a correct floor, costing replay); no hard
 means *never minted*. A soft checkpoint bounds no replay and is not what the doctrine means by
-"checkpoint". Distinct from a *Derived span*, which composes either kind over a range the person
+"checkpoint". Distinct from a *Derived span*, which composes either kind over a range a reader
 names. The inspector's strip under the timeline band draws every leaf bucket of the mint's layout in
 one of the three states, computed for the page and dropped (2026-10-13); its header line
 counts them and names the last mint run. "Sealed" is also said of the *mint log* as a whole: every
@@ -93,7 +93,7 @@ captured from a source. Re-enters through the ordinary gate as `proposed`. See *
 
 **Domain** — The first segment of a *Facet type*, and a closed set of ten: `health`, `activity`, `place`, `record`,
 `mind` (self-reported inner states, where attention is the first concept), `org` (relationships with
-organisations, where employment is the first concept) and `money` (what the person paid, where
+organisations, where employment is the first concept) and `money` (what was paid, where
 purchases are the first concept) are in use; `social`, `media` and
 `work` are reserved for the next dense sources (`social.message`, `media.play`). A new kind of
 fact joins one of the ten. A head is added only by a logged decision, as `mind`, `org` and `money` were, so growth is
@@ -112,7 +112,7 @@ ledger except through it. See *Admission gate*.
 **Episode** — *Not a first-class Anam concept.* Anam has **no required read span** and inherits no
 boundary from any System of Record. A trip, an illness or a training block is an optional derived *Span*
 bookmark. Anam still mints per span, a *Bucket span*, to bound replay. See *Span*, *Bucket span*,
-*Whole-person read*.
+*Whole-record read*.
 
 **Error kernel** — Armstrong's term, adopted: Anam's small trusted core that must not corrupt — the
 **append-only ledger plus the admission-gate invariants** (three pillars, idempotency, immutability).
@@ -120,7 +120,7 @@ bookmark. Anam still mints per span, a *Bucket span*, to bound replay. See *Span
 transaction across substrates. Everything above it — fold, projections, importers, CLI — is
 disposable and rebuildable. See *Operational store*.
 
-**Event** — A meaningful occurrence on the person's timeline, placed at its Facet *fact-time* and
+**Event** — A meaningful occurrence on the subject's timeline, placed at its Facet *fact-time* and
 carried by one or more Facets.
 
 **Fact-time** — When a fact happened (a Facet clock) — determines *where* it sits on the timeline, and
@@ -128,7 +128,7 @@ the axis the timeline is ordered by.
 
 It is **extracted from the payload at the gate**, by the Definition's `time_semantics.fact_time` JSON
 Pointer, read in the Definition's declared **zone** (a zoneless source clock is the wall clock where the
-person stood: `Australia/Sydney` for every local export, `UTC` for Withings, which writes UTC), and then
+reading was taken: `Australia/Sydney` for every local export, `UTC` for Withings, which writes UTC), and then
 promoted to a first-class governed field on the Facet and on every canonical entry. It
 does not stay buried in the payload, and that promotion is load-bearing: it is why the timeline can be
 ordered and a span filtered without anything ever parsing a payload. Narrowed with `--from`/`--to`, which
@@ -168,8 +168,8 @@ distinction goes is [where a distinction is encoded](explainer/bundle/decisions/
 
 **Fold** — The computation that reads a span's anam-events up to a watermark and derives each Facet's
 **current status**, keeping the live ones — producing the *Canonical*. The serve path is *nearest
-checkpoint + replay-since*, so a read is **as fresh as ingest**. The whole-person view **composes** bucket
-checkpoints; it never re-folds the person. See *Canonical*, *Checkpoint*.
+checkpoint + replay-since*, so a read is **as fresh as ingest**. The whole-record view **composes** bucket
+checkpoints; it never re-folds the record. See *Canonical*, *Checkpoint*.
 
 **Handling** — The optional third block of a Facet Definition, beside `meta` and `schema`: what every
 writer and reader of the type must agree on for its facts to mean the same thing, and the schema cannot
@@ -186,9 +186,9 @@ write. What makes ingest **crash-clean**. See *Content hash*, *Supersession*.
 **Insight** — An Anam-authored *derived facet*: a finding computed over the *Canonical* (e.g. a trend),
 admitted `proposed`, isolated from world-facts. See *Derived facet*, *Endorsement*.
 
-**Whole-person read** — Anam's default and normal mode: the whole-person timeline, read without a span.
-A person is unbounded and "longitudinal is system-of-record gravity"; **Anam makes the Person the
-substrate** and accepts that gravity, at the scale of one life where the cost is affordable. Note what
+**Whole-record read** — Anam's default and normal mode: the subject's whole timeline, read without a span.
+A subject's history is unbounded and "longitudinal is system-of-record gravity"; **Anam makes the Subject the
+substrate** and accepts that gravity, at the scale of one subject (for a person, one life) where the cost is affordable. Note what
 it does *not* license: the **read default** is unbounded, the **mint unit** is not. See *Span*.
 
 **Ledger** — Anam's **system of record**: the append-only log of everything it admitted, every Facet
@@ -222,9 +222,6 @@ real store, not a cache — authoritative for what Anam authors. Each table reco
 from**: the *derived* tier from replaying the *Ledger*, the *provisioned* tier from embedded assets and
 config, the *authored* tier from a backup and nowhere else. Only the derived tier is disposable, and it
 must stay provably derived (`ARCHITECTURE.md` §8). See *Ledger*, *Sync cursor*.
-
-**Person** — The storage **substrate**: all facets partitioned onto one **timeline**, in a ledger
-file pinned to that person's id. In Anam there is exactly one person and **no identity graph, no merge**. See *Timeline*.
 
 **Fields** — A temporary subset of a type's schema that a read names (decided 2026-10-12): JSON
 pointers into the payload, so only those come back. Fields only **take away**: they are applied after the
@@ -322,7 +319,7 @@ the original rather than supersede it. **Identity says which fact; `content_hash
 changed.** See *Content hash*, *Idempotency*, *Supersession*.
 
 **Span** — Two tiers, and conflating them is the mistake Anam already made once:
-a **Bucket span** (minted, invisible, the checkpoint unit) and a **Derived span** (a lens the person
+a **Bucket span** (minted, invisible, the checkpoint unit) and a **Derived span** (a lens a reader
 names: `[from, to]`, a saved bookmark, or "everything"). A derived span is **composed on demand, never
 stored as a unit, never minted, never pulsed**; it materialises only when a receipt is served. Removing
 the span as a *required read filter* never required removing it as a *mint unit*. See *Bucket span*,
@@ -332,13 +329,17 @@ the span as a *required read filter* never required removing it as a *mint unit*
 `rejected` — **derived by the fold** from anam-events, **never stored** on the artifact. Contrast
 *Birth status*.
 
+**Subject** — What the record is about, which might be a person. The storage **substrate**: all facets
+partitioned onto one **timeline**, in a ledger file pinned to the subject's id (`subject_id`). In Anam
+there is exactly one subject and **no identity graph, no merge**. See *Timeline*, *Whole-record read*.
+
 **Supersession** — When a source row changes: a **new artifact version** is written and a `superseded`
 anam-event appended against the prior. Append-only; the old artifact remains. See *Idempotency*.
 
 **Sync cursor** — A per-source resumption marker (`sync#<source>`). A **cache, not truth** — safe to
 lose, because ingest is idempotent; a lost cursor is a re-scan, not data loss.
 
-**Timeline** — A person's facts in chronological (fact-time) order — the storage substrate. A Span
+**Timeline** — The subject's facts in chronological (fact-time) order — the storage substrate. A Span
 selects an interval of it. See *Span*, *Event*.
 
 **Tombstone** — A `tombstoned` **anam-event** marking a Facet retracted **without** deleting it. No new

@@ -48,7 +48,7 @@ const (
 
 // TimeField names where a clock lives in the payload, how to parse it, and the zone
 // a zoneless value is read in. Zone is an IANA name ("Australia/Sydney", "UTC") and
-// is required: a source's export writes the clock on the wall where the person stood,
+// is required: a source's export writes the clock on the wall where the reading was taken,
 // and reading it as UTC puts every fact hours from where it happened. A layout that
 // carries its own offset is unaffected by the zone.
 //

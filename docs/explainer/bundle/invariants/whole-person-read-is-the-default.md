@@ -1,7 +1,7 @@
 ---
 type: invariant
-title: The whole-person read is the default; a span is an optional lens
-description: Storage is partitioned by the person onto one timeline; no span is required to read, and a derived span only narrows a read.
+title: The whole-record read is the default; a span is an optional lens
+description: Storage is partitioned by the subject onto one timeline; no span is required to read, and a derived span only narrows a read.
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/read/timeline.go#Timeline
 anchor: "case narrow(src, q, b):"
@@ -16,4 +16,4 @@ applies_to:
   - /terms/inversion.md
 ---
 
-ARCHITECTURE §12, third bullet, first half. `anam timeline` with no flags reads the whole canonical; `--from` and `--to` are optional and parsed into an inclusive-exclusive window applied after the value is composed. There is no fail-closed on a whole-person read. The enforcement is the absence of a required parameter in `TimelineQuery` and the bounds parser treating an empty bound as open.
+ARCHITECTURE §12, third bullet, first half. `anam timeline` with no flags reads the whole canonical; `--from` and `--to` are optional and parsed into an inclusive-exclusive window applied after the value is composed. There is no fail-closed on a whole-record read. The enforcement is the absence of a required parameter in `TimelineQuery` and the bounds parser treating an empty bound as open.

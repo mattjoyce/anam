@@ -25,12 +25,12 @@ func timelineCmd(cfgPath *string) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "timeline",
-		Short: "the whole-person read: live facets in fact-time order (the inversion)",
-		Long: `Timeline is Anam's default read: one person's live facts, whole, in fact-time
+		Short: "the whole-record read: live facets in fact-time order (the inversion)",
+		Long: `Timeline is Anam's default read: the subject's live facts, whole, in fact-time
 order. No span is required — narrowing with --from/--to or --type is a lens over
 the same read, never a different one.
 
-The canonical hash printed in the header identifies the whole-person value at the
+The canonical hash printed in the header identifies the whole-record value at the
 watermark W, regardless of any narrowing: stable when nothing changed, moved by
 any ingest that changed the live set, identical after a rebuild from source.
 

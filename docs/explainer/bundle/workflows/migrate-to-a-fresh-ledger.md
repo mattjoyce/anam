@@ -12,7 +12,7 @@ steps:
   - actor: /components/cli.md
     caller: outside
     label: migrateCmd reads its flags
-    action: "`--from` and `--from-store` name the old pair, `--to` and `--to-store` the new one, `--program` a file defining `pick/1`, and `--yes`. Without `--yes` the command only reports. It reads the person and the time bounds from the config but touches no daemon."
+    action: "`--from` and `--from-store` name the old pair, `--to` and `--to-store` the new one, `--program` a file defining `pick/1`, and `--yes`. Without `--yes` the command only reports. It reads the subject and the time bounds from the config but touches no daemon."
     resource: internal/app/migrate.go#migrateCmd
     anchor: 'f.StringVar(&o.fromStore, "from-store", "", "the old operational store file, opened read-only")'
   - actor: /components/cli.md

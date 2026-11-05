@@ -194,6 +194,12 @@ a mint ends by removing the ones the newest run does not read, so `GET /v1/check
 checkpoints the log still holds, and a read at a watermark before the newest run, or one that finds a
 checkpoint gone, folds the ledger in full and answers the same value.
 
+**The span label (2026-11-05, card 270a).** A receipt's `span` labels the fact-time window its
+template served: `whole-record` for a template with no window, `fact-time[from,to)` otherwise.
+Receipts filed before card 270a say `whole-person`, the old name of `whole-record`. They keep it,
+because the receipt's hash covers its bytes, and verify reads the span of neither, so both verify on
+either side of the change.
+
 This document proposes the application API that every client shares: the CLI, the inspector,
 importers, and conversational clients (§8). The two conversational features are **chat with my
 record** and **log this**. The API supplies record operations and evidence; the conversational
@@ -283,7 +289,7 @@ open the stores itself. It changes deployment ownership, not Anam's immutable re
 - **Conversational client:** interpretation of the user's words, clarification, analysis, and citation.
   It does not manufacture anam-time, endorsement, source identity, or consent.
 
-The server is configured for one person. Caller requests cannot choose a different person, a ledger
+The server is configured for one subject. Caller requests cannot choose a different subject, a ledger
 path, a source directory, or an arbitrary executable. Operation context carries the authenticated
 actor, allowed capabilities, configured zone, deadline, and request ID; those are not model claims.
 
@@ -620,7 +626,7 @@ fields are not permission to invent a medication schema or discard uncertain mea
 
 ### Idempotency, concurrency, and recovery
 
-Scope submission IDs to the configured person/source and authenticated caller. Store a digest of the
+Scope submission IDs to the configured subject/source and authenticated caller. Store a digest of the
 resolved write intent. Same ID and same intent returns the existing outcome; same ID and different
 intent is `idempotency_conflict`. Rephrasing the same event under a fresh ID is not mechanically
 identifiable as a duplicate: return candidate matches for the client to resolve, never merge by a
@@ -767,7 +773,7 @@ reports the rest as unsupported.
 
 Decisions still needing agreement before their dependent implementation:
 
-- Which projections provide useful default personal context, and which query parameters each allows.
+- Which projections provide useful default context, and which query parameters each allows.
 - How date-only precision is carried in core metadata and how legacy zoneless sources are handled.
 - The series tie rule and whether all change events carry enough state for latest-facet snapshots.
   A dose-change facet must carry the state the snapshot promises, or the core needs an explicit

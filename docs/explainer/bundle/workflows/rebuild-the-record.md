@@ -18,7 +18,7 @@ steps:
   - actor: /components/cli.md
     caller: outside
     label: stop, move the files aside, init
-    action: "The operator stops the daemon and moves `ledger.db` and `tracking.db` aside, never deleting them: they are the record of what Anam knew until now, and receipts published from it verify only against that file. `anam init` at the same paths creates a ledger pinned to the same person and an empty operational store."
+    action: "The operator stops the daemon and moves `ledger.db` and `tracking.db` aside, never deleting them: they are the record of what Anam knew until now, and receipts published from it verify only against that file. `anam init` at the same paths creates a ledger pinned to the same subject and an empty operational store."
     resource: internal/app/init.go#initCmd
     anchor: 'Short: "idempotently create the ledger file and the operational store",'
   - actor: /components/daemon.md

@@ -1,7 +1,7 @@
 ---
 type: purpose
-title: Anam, a personal longitudinal record
-description: One person's whole-life timeline of facts, assembled verbatim from the systems that already hold their data, owning none of it, with a receipt for everything it shows.
+title: Anam, a longitudinal record of one subject
+description: One subject's whole timeline of facts, assembled verbatim from the systems that already hold its data, owning none of it, with a receipt for everything it shows.
 timestamp: 2026-10-17T00:00:00Z
 commit: c08bfb5
 primary_workflow: /workflows/admit-a-batch.md
@@ -10,9 +10,9 @@ basis: docs
 
 ## The problem
 
-Data about one person is scattered: a watch measures sleep and heart rate, a scale measures the body, a cuff measures blood pressure, a lab prints a report, and each lives in its own silo. No single place shows the person to themselves over time with the evidence attached, and nothing they would trust to say what it knew, and when.
+Data about any one subject is scattered across the systems that observe it. For a person, a watch measures sleep and heart rate, a scale measures the body, a cuff measures blood pressure, a lab prints a report, and each lives in its own silo. No single place shows the subject's history over time with the evidence attached, and nothing its keeper would trust to say what it knew, and when.
 
-Anam (Irish for *soul*) is that place for exactly one person. It reads their sources, holds each fragment verbatim as a [Facet](/terms/facet.md) with where it came from and when it was true, and lays them on one timeline. The whole-life read is the default; a span is a lens the reader may add. Every fact accretes and nothing is overwritten, so the past stays as recorded, and every view it serves comes with a [receipt](/terms/receipt.md) proving exactly what was shown at what moment of knowledge.
+Anam (Irish for *soul*) is that place for exactly one subject, which might be a person. It reads the subject's sources, holds each fragment verbatim as a [Facet](/terms/facet.md) with where it came from and when it was true, and lays them on one timeline. The whole-record read is the default; a span is a lens the reader may add. Every fact accretes and nothing is overwritten, so the past stays as recorded, and every view it serves comes with a [receipt](/terms/receipt.md) proving exactly what was shown at what moment of knowledge.
 
 The repo is the Go service and CLI that own the record. Its sources now arrive through a second repo, `anam-importers`: Python ductile plugins that each know one vendor and submit [envelopes](/terms/envelope.md) over HTTP. This explainer covers both, because the contract between them is where most of the design shows.
 
@@ -20,7 +20,7 @@ The whole of it is drawn in [one diagram](https://github.com/mattjoyce/anam/blob
 
 ## Who it is for
 
-Matt, as the one person recorded, as the operator who runs the daemon on unraid, and as the author of each importer. Agents acting for him are the second consumer: they read projections, with a `reader` token since card 89, and may one day propose findings back through the same gate. There is no second person, so there is no identity graph and no merge.
+Matt, as the subject of his own deployment, as the operator who runs the daemon on unraid, and as the author of each importer. Agents acting for him are the second consumer: they read projections, with a `reader` token since card 89, and may one day propose findings back through the same gate. A ledger has no second subject, so there is no identity graph and no merge.
 
 ## What it does not do
 
@@ -30,4 +30,4 @@ Matt, as the one person recorded, as the operator who runs the daemon on unraid,
 - It does not schedule, poll, or know a vendor's tables. Ductile decides when; an [importer](/terms/importer.md) knows the vendor; Anam knows Definitions, the gate and the record.
 - It does not retract on its own. An importer reports what its source still holds; the operator retracts, with guards.
 - It does not gate on classification or consent yet. The attribute and the pass-through gate exist; the policy is deferred.
-- It does not serve multiple people, and it is not a dashboard: it answers "what did I know about this on that date, and from where" rather than "what is the number now".
+- It does not serve multiple subjects from one ledger, and it is not a dashboard: it answers "what did I know about this on that date, and from where" rather than "what is the number now".

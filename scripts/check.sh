@@ -123,6 +123,11 @@ run scripts/check-links.sh
 # itself, so anam's config rule for the two names holds through it (card 270a).
 run scripts/check-souffle-diff.sh
 
+# The engine calls what its record is about the subject. An old identifier shape of
+# person outside the script's allowlist fails the gate, and so does an allowlist entry
+# that matches nothing (card 270a).
+run scripts/check-subject.sh
+
 # The explainer bundle cites tracked files in this repo and in anam-importers, beside this
 # checkout or at EXPLAINER_IMPORTERS_DIR. Without that checkout the citations cannot be read.
 if [ -d "${EXPLAINER_IMPORTERS_DIR:-../anam-importers}" ]; then

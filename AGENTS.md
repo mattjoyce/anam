@@ -122,6 +122,7 @@ gofmt -l .
 goimports -l .
 scripts/check-links.sh
 scripts/check-souffle-diff.sh     # the wrapper leaves the subject rule to anam
+scripts/check-subject.sh          # no old person identifier outside its allowlist
 python3 docs/explainer/check.py   # needs anam-importers beside this checkout, or EXPLAINER_IMPORTERS_DIR
 go vet ./...
 golangci-lint run ./...

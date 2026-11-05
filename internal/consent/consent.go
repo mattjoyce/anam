@@ -1,8 +1,11 @@
 // Package consent is the gate a projection's every candidate facet passes through
 // before it is served (ARCHITECTURE.md §10).
 //
-// Today it allows everything. Anam serves one subject, so there is no second party to
-// withhold anything from, and the policy that would decide is deferred.
+// Today it allows everything. Each deployment so far has one operator reading their own
+// record, so there is no second party to withhold anything from, and the policy that
+// would decide is deferred. One subject does not mean one reader: a machine's record
+// could be read by its owner and by a repair contractor, and that is when a policy is
+// needed.
 // The seam exists anyway, invoked on the real path rather than reserved in a comment,
 // because a gate added later has to be threaded through every caller that already
 // serves, and a gate that was always there does not.

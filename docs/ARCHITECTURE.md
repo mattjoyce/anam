@@ -950,10 +950,11 @@ something Anam learned about the fact.
 
 ---
 
-## 10. Consent and classification (kept in shape, trivial for one subject)
+## 10. Consent and classification (kept in shape, trivial for one reader)
 
-Anam is single-user, so consent is **default-allow** — but the *shape* is preserved so the seam exists
-for a future where Anam serves facets to third-party agents:
+Each deployment today has one operator reading their own record, so consent is **default-allow** — but
+the *shape* is preserved so the seam exists for a future where Anam serves facets to third-party
+agents, or a record is read by more than one party (a machine's owner and its repair contractor):
 
 - Every facet carries a **`classification`** (`Normal` / `Confidential` / `Sensitive`).
 - A projection passes through a `consent.Evaluate()` gate that today returns *allow*; the hook is real

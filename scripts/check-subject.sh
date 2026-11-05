@@ -23,13 +23,21 @@ if [ "$(git rev-parse --is-inside-work-tree 2>/dev/null)" != "true" ]; then
   exit 1
 fi
 
-# The identifier shapes, as one ERE, matched without regard to case: the id in any
-# spelling (person_id, personId, PERSON_ID, Person_ID), the asserted field, a quoted key
-# or json tag ("person", "person,omitempty"), a YAML key at any indent, quoted or not and
-# as a list item, the flag, an assignment with or without spaces, the old CLI output
-# "(person <id>)", the old error name, and the old span label. (^|[^[:alnum:]_]) stands
-# for \b, which not every regex library reads.
-PATTERN='person_?id|asserted_?person|"person[",]|^[[:space:]]*(-[[:space:]]+)?['\''"]?person['\''"]?[[:space:]]*:|--person|(^|[^[:alnum:]_])person[[:space:]]*=|\(person[[:space:]]|errpersonmismatch|whole[-_ ]?person'
+# The identifier shapes, as EREs matched without regard to case, each over the files
+# where it names an identifier rather than prose. (^|[^[:alpha:]]) stands for \b, which
+# not every regex library reads.
+#
+# Everywhere: the id in any spelling (person_id, personId, PERSON_ID, Person_ID), the
+# asserted field, a quoted key or json tag ("person", "person,omitempty"), the flag, the
+# old CLI output "(person <id>)", the old error name, and the old span label.
+PAT_ALL='person_?id|asserted_?person|"person[",]|--person|\(person[[:space:]]|errpersonmismatch|whole[-_ ]?person'
+# A YAML or JSON key at any indent, quoted or not and as a list item. Only in YAML and
+# JSON files, since prose may start a line "Person: someone who uses Anam."
+PAT_KEY='^[[:space:]]*(-[[:space:]]+)?['\''"]?person['\''"]?[[:space:]]*:'
+KEY_FILES=('*.yaml' '*.yml' '*.json')
+# An assignment, person=x or person =x. Not in markdown, where "the person = x" is prose.
+PAT_SET='(^|[^[:alpha:]])person ?=[^[:space:]]'
+SET_FILES=('.' ':!*.md')
 
 # Out of scope, by path. Tests follow the Go rename mechanically, and the alias tests
 # must say person_id; old receipts and fixtures say whole-person because that is what
@@ -87,19 +95,27 @@ allow scripts/check-subject.sh     '.' 'this check names the patterns'
 used=()
 for i in "${!paths[@]}"; do used[i]=0; done
 
-# The scan. git grep answers 0 with hits, 1 with none, and more than 1 on an error; any
-# other status, or anything on stderr (an unreadable file, say), means the scan did not
-# cover the tree, and an incomplete scan must not pass.
+# The scan, one git grep per shape. git grep answers 0 with hits, 1 with none, and more
+# than 1 on an error; any other status, or anything on stderr (an unreadable file, say),
+# means a pass did not cover its files, and an incomplete scan must not pass.
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
-status=0
-git -c color.grep=never grep --no-color -n -I -i --untracked -E "$PATTERN" -- . \
-  >"$T/hits" 2>"$T/err" || status=$?
-if [ "$status" -gt 1 ] || [ -s "$T/err" ]; then
-  echo "  FAILED: git grep did not finish the scan (status $status):" >&2
-  sed 's/^/    /' "$T/err" >&2
-  exit 1
-fi
+scan() { # scan <name> <pattern> <pathspec>...
+  local name=$1 pattern=$2 status=0
+  shift 2
+  git -c color.grep=never grep --no-color -n -I -i --untracked -E "$pattern" -- "$@" \
+    >"$T/$name" 2>"$T/$name.err" || status=$?
+  if [ "$status" -gt 1 ] || [ -s "$T/$name.err" ]; then
+    echo "  FAILED: git grep did not finish the $name scan (status $status):" >&2
+    sed 's/^/    /' "$T/$name.err" >&2
+    exit 1
+  fi
+}
+scan all "$PAT_ALL" .
+scan key "$PAT_KEY" "${KEY_FILES[@]}"
+scan set "$PAT_SET" "${SET_FILES[@]}"
+# A line two shapes match is one hit.
+sort -u "$T/all" "$T/key" "$T/set" >"$T/hits"
 
 fail=0
 hits=0

@@ -163,7 +163,7 @@ func planRename(ctx context.Context, cfg config.Config, tbl renameTable) (rename
 	defer func() { _ = l.Close() }()
 
 	plan := renamePlan{table: tbl, defs: defs, replaced: replaced, items: placeAll(tbl, facets)}
-	g := gate.New(l, defs, renameScopes(tbl, plan.items), clock.Real{}, cfg.PersonID, renameLimits(cfg))
+	g := gate.New(l, defs, renameScopes(tbl, plan.items), clock.Real{}, cfg.SubjectID, renameLimits(cfg))
 	for i, it := range plan.items {
 		if it.fate == renameUnplaced {
 			continue

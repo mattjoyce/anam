@@ -193,11 +193,11 @@ func TestResolvePrecedence(t *testing.T) {
 // TestResolveThenLoad exercises the two halves together, the way a command will.
 func TestResolveThenLoad(t *testing.T) {
 	_, candidate := isolate(t)
-	t.Setenv("ANAM_PERSON_ID", "")
+	t.Setenv("ANAM_SUBJECT_ID", "")
 
 	path := candidate
 	touch(t, path)
-	if err := os.WriteFile(path, []byte("person_id: matt\nledger_path: /srv/xdg/ledger.db\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte("subject_id: matt\nledger_path: /srv/xdg/ledger.db\n"), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 
@@ -213,7 +213,7 @@ func TestResolveThenLoad(t *testing.T) {
 	if origin != config.OriginUserDir {
 		t.Errorf("origin = %q, want %q", origin, config.OriginUserDir)
 	}
-	if cfg.PersonID != "matt" || cfg.LedgerPath != "/srv/xdg/ledger.db" {
-		t.Errorf("Load() = %+v, want person_id=matt ledger_path=/srv/xdg/ledger.db", cfg)
+	if cfg.SubjectID != "matt" || cfg.LedgerPath != "/srv/xdg/ledger.db" {
+		t.Errorf("Load() = %+v, want subject_id=matt ledger_path=/srv/xdg/ledger.db", cfg)
 	}
 }

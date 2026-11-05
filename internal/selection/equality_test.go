@@ -60,7 +60,7 @@ func facetOf(s seeded, version int, payload string) facet.Facet {
 		ID: facet.NewID(s.ref), Type: facet.Type(s.typ), Confidence: 1,
 		Classification: facet.ClassificationNormal, ArtifactVersion: version, DefinitionVersion: 1,
 		FactTime:   s.at,
-		Binding:    facet.Binding{PersonID: person, Assurance: facet.AssuranceHigh},
+		Binding:    facet.Binding{SubjectID: person, Assurance: facet.AssuranceHigh},
 		Provenance: facet.Provenance{Source: s.source, Injector: s.source, SourceRef: s.ref},
 		Descriptor: facet.Descriptor{
 			SourceSchema: "test", SchemaVersion: 1, ContentHash: facet.ContentHash(canonical),

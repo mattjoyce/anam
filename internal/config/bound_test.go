@@ -10,7 +10,7 @@ import (
 // max_read_bytes defaults to 512 KiB, the environment sets it, and a negative one
 // dies at load rather than on the read path.
 func TestMaxReadBytes(t *testing.T) {
-	t.Setenv("ANAM_PERSON_ID", "matt")
+	t.Setenv("ANAM_SUBJECT_ID", "matt")
 
 	got, err := config.Load("")
 	if err != nil {
@@ -35,7 +35,7 @@ func TestMaxReadBytes(t *testing.T) {
 // any name: only the daemon can see the registered projections, so it is the daemon
 // that refuses a name that is nothing (card 180). Load refuses only stray space.
 func TestDefaultProjection(t *testing.T) {
-	t.Setenv("ANAM_PERSON_ID", "matt")
+	t.Setenv("ANAM_SUBJECT_ID", "matt")
 
 	got, err := config.Load("")
 	if err != nil || got.DefaultProjection != "" {

@@ -119,8 +119,8 @@ func inspectCmd(cfgPath *string) *cobra.Command {
 			}
 			zone, _ := cfg.ZoneName() // a Local zone with no name reads dates in UTC
 
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "inspecting ledger %s (person %s), read-only\nhttp://%s/\n",
-				cfg.LedgerPath, cfg.PersonID, listen)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "inspecting ledger %s (subject %s), read-only\nhttp://%s/\n",
+				cfg.LedgerPath, cfg.SubjectID, listen)
 			return inspect.Serve(cmd.Context(), listen, inspect.Deps{
 				Ledger: l, Timeout: cfg.Timeout, Buckets: buckets, Library: cfg.LibraryDir, Catalog: cat,
 				CachedReads: cfg.InspectCachedReads, MaxReadBytes: cfg.MaxReadBytes, Zone: zone,
@@ -138,7 +138,7 @@ func inspectCmd(cfgPath *string) *cobra.Command {
 func openLedgerReadOnly(ctx context.Context, cfg config.Config) (*ledger.Ledger, error) {
 	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()
-	return ledger.OpenReadOnly(ctx, cfg.LedgerPath, cfg.PersonID)
+	return ledger.OpenReadOnly(ctx, cfg.LedgerPath, cfg.SubjectID)
 }
 
 // loadConfig loads configuration for a command that opens local files. With a server

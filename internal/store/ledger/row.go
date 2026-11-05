@@ -19,7 +19,9 @@ import (
 // metadata/payload separation of §3 is physically enforced.
 
 // facetColumns is the one column list the insert and every select share, so the
-// writer and the scanner cannot disagree about order.
+// writer and the scanner cannot disagree about order. binding_person_id is the stored
+// name of the column Binding.SubjectID is written to and read from; it keeps the old
+// word until card 270b renames it behind a schema version and a carry.
 const facetColumns = `facet_id, artifact_version, type, confidence, classification,
 	definition_version, fact_time, series,
 	binding_person_id, binding_assurance, binding_span_hint,
@@ -64,7 +66,7 @@ func insertFacet(ctx context.Context, x execer, f facet.Facet) error {
 	_, err := x.ExecContext(ctx, insertFacetSQL,
 		f.ID, f.ArtifactVersion, string(f.Type), f.Confidence, string(f.Classification),
 		f.DefinitionVersion, clock.Format(f.FactTime), f.Series,
-		f.Binding.PersonID, string(f.Binding.Assurance), f.Binding.SpanHint,
+		f.Binding.SubjectID, string(f.Binding.Assurance), f.Binding.SpanHint,
 		f.Provenance.Source, f.Provenance.Injector, f.Provenance.SourceRef, method, model, watermark,
 		f.Descriptor.SourceSchema, f.Descriptor.SchemaVersion, f.Descriptor.ContentHash,
 		string(f.Descriptor.PayloadKind), f.Descriptor.MediaType, payload,
@@ -96,7 +98,7 @@ func scanFacet(s scanner) (facet.Facet, error) {
 	err := s.Scan(
 		&f.ID, &f.ArtifactVersion, &typ, &f.Confidence, &class,
 		&f.DefinitionVersion, &factTime, &f.Series,
-		&f.Binding.PersonID, &assurance, &f.Binding.SpanHint,
+		&f.Binding.SubjectID, &assurance, &f.Binding.SpanHint,
 		&f.Provenance.Source, &f.Provenance.Injector, &f.Provenance.SourceRef, &method, &model, &watermark,
 		&f.Descriptor.SourceSchema, &f.Descriptor.SchemaVersion, &f.Descriptor.ContentHash,
 		&payloadKind, &f.Descriptor.MediaType, &payload,

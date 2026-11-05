@@ -21,8 +21,9 @@ import (
 // Provenance is where each top-level key came from, keyed by its snake_case config key.
 //
 // Provenance holds a key only when the key is live and was resolved. An unknown key
-// is absent, a key with no default and no value (person_id) is absent, and the retired
-// ingest_timeout is absent: its origin is reported under long_write_timeout instead.
+// is absent, a key with no default and no value (subject_id) is absent, and the old
+// names ingest_timeout and person_id are absent: their origins are reported under
+// long_write_timeout and subject_id instead.
 type Resolved struct {
 	value      Config
 	provenance map[string]ashlar.Provenance
@@ -32,7 +33,8 @@ type Resolved struct {
 func (r Resolved) Value() Config { return r.value }
 
 // Provenance returns the provenance for key, or false when the key is unknown,
-// absent, optional without a value, or the retired ingest_timeout field.
+// absent, optional without a value, or one of the old names ingest_timeout and
+// person_id.
 func (r Resolved) Provenance(key string) (ashlar.Provenance, bool) {
 	v, ok := r.provenance[key]
 	return v, ok
@@ -99,6 +101,9 @@ func resolve(path string, set map[string]string) (Resolved, error) {
 		return Resolved{}, fmt.Errorf("decode config: %w: %w", ErrInvalid, err)
 	}
 	if err := c.adoptLongWriteTimeout(hasKey(root, "long_write_timeout"), hasKey(root, "ingest_timeout")); err != nil {
+		return Resolved{}, err
+	}
+	if err := c.adoptSubjectID(hasKey(root, "subject_id"), hasKey(root, "person_id")); err != nil {
 		return Resolved{}, err
 	}
 
@@ -210,10 +215,11 @@ func numberDefault(key string, n int) defaultSetting {
 	return defaultSetting{key: key, value: value}
 }
 
-// defaultSettings are Anam's shipped defaults. person_id has none on purpose: it is
-// pinned into the ledger, so a default would name a person nobody chose. The two names
-// of the long-write timeout also have none, so their presence says whether they were
-// given; adoptLongWriteTimeout settles the value after both are decoded.
+// defaultSettings are Anam's shipped defaults. subject_id has none on purpose: it is
+// pinned into the ledger, so a default would name a subject nobody chose. Neither has
+// its old name person_id, so its presence says whether it was given. The two names of
+// the long-write timeout also have none, for the same reason; adoptSubjectID and
+// adoptLongWriteTimeout settle the values after both names are decoded.
 func defaultSettings() []defaultSetting {
 	settings := []defaultSetting{
 		textDefault("ledger_path", DefaultLedgerPath()),
@@ -287,11 +293,11 @@ func explicitOverrides(set map[string]string) []yamlconfig.Override {
 // by a layer above them.
 func configKeys() []string {
 	settings := defaultSettings()
-	keys := make([]string, 0, len(settings)+3)
+	keys := make([]string, 0, len(settings)+4)
 	for _, setting := range settings {
 		keys = append(keys, setting.key)
 	}
-	return append(keys, "person_id", "long_write_timeout", "ingest_timeout")
+	return append(keys, "subject_id", "person_id", "long_write_timeout", "ingest_timeout")
 }
 
 // integerKeys are the config keys decoded as an int. A YAML value for one must be a
@@ -359,16 +365,22 @@ func hasKey(root ashlar.Value, key string) bool {
 	return ok
 }
 
-// configProvenance reports where each live top-level key came from. The retired name is
-// never a key of its own: when it supplied the long-write timeout, its origin is the
-// timeout's origin.
+// configProvenance reports where each live top-level key came from. An old name is
+// never a key of its own: when ingest_timeout supplied the long-write timeout, its
+// origin is the timeout's origin, and when person_id supplied the subject, its origin
+// is subject_id's.
 func configProvenance(root ashlar.Value) map[string]ashlar.Provenance {
 	provenance := make(map[string]ashlar.Provenance, root.Len())
 	for _, member := range root.Members() {
-		if member.Key == "ingest_timeout" {
+		if member.Key == "ingest_timeout" || member.Key == "person_id" {
 			continue
 		}
 		provenance[member.Key] = member.Value.Provenance()
+	}
+	if !hasKey(root, "subject_id") {
+		if value, ok := root.Lookup("person_id"); ok {
+			provenance["subject_id"] = value.Provenance()
+		}
 	}
 	switch {
 	case hasKey(root, "long_write_timeout"):

@@ -119,6 +119,10 @@ fi
 # the gate, so the index a stranger follows is true (card 73).
 run scripts/check-links.sh
 
+# souffle-diff.py hands its --subject to anam without deciding against ANAM_PERSON_ID
+# itself, so anam's config rule for the two names holds through it (card 270a).
+run scripts/check-souffle-diff.sh
+
 # The explainer bundle cites tracked files in this repo and in anam-importers, beside this
 # checkout or at EXPLAINER_IMPORTERS_DIR. Without that checkout the citations cannot be read.
 if [ -d "${EXPLAINER_IMPORTERS_DIR:-../anam-importers}" ]; then

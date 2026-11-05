@@ -34,7 +34,7 @@ func newConfig(t *testing.T) config.Config {
 	t.Helper()
 	dir := t.TempDir()
 	cfg := config.Config{
-		PersonID:           "matt",
+		SubjectID:          "matt",
 		LedgerPath:         filepath.Join(dir, "ledger.db"),
 		DBPath:             filepath.Join(dir, "tracking.db"),
 		LibraryDir:         filepath.Join(dir, "documents"),
@@ -47,7 +47,7 @@ func newConfig(t *testing.T) config.Config {
 		Limits:             config.DefaultLimits(),
 	}
 	catalogtest.Engine.Config(t, &cfg)
-	l, err := ledger.Create(context.Background(), cfg.LedgerPath, cfg.PersonID)
+	l, err := ledger.Create(context.Background(), cfg.LedgerPath, cfg.SubjectID)
 	if err != nil {
 		t.Fatalf("create ledger: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestOpenRefuses(t *testing.T) {
 		want   error
 	}{
 		{"no ledger file", func(c *config.Config) { c.LedgerPath += ".missing" }, ledger.ErrNotInitialised},
-		{"another person's ledger", func(c *config.Config) { c.PersonID = "someone-else" }, ledger.ErrPersonMismatch},
+		{"another subject's ledger", func(c *config.Config) { c.SubjectID = "someone-else" }, ledger.ErrSubjectMismatch},
 		{"every interface", func(c *config.Config) { c.Listen = ":8787" }, ErrNotLoopback},
 		{"all-zeros address", func(c *config.Config) { c.Listen = "0.0.0.0:8787" }, ErrNotLoopback},
 		{"a LAN address", func(c *config.Config) { c.Listen = "192.168.86.45:8787" }, ErrNotLoopback},

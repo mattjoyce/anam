@@ -20,7 +20,7 @@ func validParams(t *testing.T) facet.NewParams {
 			Type: "health.blood-pressure", Source: "bp-csv", Injector: "bp-csv",
 			SourceRef: "bp-csv:2026-01-24T06:30:00", Payload: []byte(`{"systolic": 118}`),
 		},
-		Binding:         facet.Binding{PersonID: "matt", Assurance: facet.AssuranceHigh},
+		Binding:         facet.Binding{SubjectID: "matt", Assurance: facet.AssuranceHigh},
 		Payload:         c,
 		ArtifactVersion: 1, DefinitionVersion: 1,
 		Classification: facet.ClassificationNormal,
@@ -76,7 +76,7 @@ func TestNew_RejectsIllegalParams(t *testing.T) {
 	mutations := map[string]func(*facet.NewParams){
 		"invalid envelope type":   func(p *facet.NewParams) { p.Envelope.Type = "notdotted" },
 		"no source_ref":           func(p *facet.NewParams) { p.Envelope.SourceRef = "" },
-		"empty binding person":    func(p *facet.NewParams) { p.Binding.PersonID = "" },
+		"empty binding subject":   func(p *facet.NewParams) { p.Binding.SubjectID = "" },
 		"bad assurance":           func(p *facet.NewParams) { p.Binding.Assurance = "low" },
 		"empty payload":           func(p *facet.NewParams) { p.Payload = facet.Canonical{} },
 		"artifact version zero":   func(p *facet.NewParams) { p.ArtifactVersion = 0 },

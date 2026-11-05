@@ -181,7 +181,7 @@ func renameAll(cmd *cobra.Command, cfg config.Config, plan renamePlan) error {
 		return err
 	}
 	defer func() { _ = l.Close() }()
-	g := gate.New(l, plan.defs, renameScopes(plan.table, carry), clock.Real{}, cfg.PersonID, renameLimits(cfg))
+	g := gate.New(l, plan.defs, renameScopes(plan.table, carry), clock.Real{}, cfg.SubjectID, renameLimits(cfg))
 
 	done := 0
 	for start := 0; start < len(carry); start += gate.MaxBatch {

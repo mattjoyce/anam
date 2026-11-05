@@ -20,9 +20,15 @@ var ErrInvalid = errors.New("invalid config")
 
 // Config is Anam's resolved runtime configuration.
 type Config struct {
-	// PersonID names whose timeline this is. It is pinned inside the ledger file when
-	// the ledger is initialised, and a ledger pinned to another person is refused.
-	// Anam serves exactly one person (§4).
+	// SubjectID names what the record is about, which might be a person. It is pinned
+	// inside the ledger file when the ledger is initialised, and a ledger pinned to
+	// another subject is refused. Anam serves exactly one subject (§4).
+	SubjectID string `yaml:"subject_id"`
+
+	// PersonID is the old name of SubjectID (card 270a). It is decoded so a config or
+	// environment that still sets person_id is honoured, with a warning, rather than
+	// refused as an unknown key. Load moves its value across and leaves this zero;
+	// nothing reads it after that.
 	PersonID string `yaml:"person_id"`
 
 	// LedgerPath is the SQLite file holding the ledger: facet artifacts and
@@ -185,12 +191,36 @@ func (c *Config) adoptLongWriteTimeout(newSet, oldSet bool) error {
 	return nil
 }
 
+// adoptSubjectID settles subject_id from the two keys that may name it (card 270a):
+// the new key when given; its old name person_id when only that is given, with a
+// warning so the deployment moves. The two given with the same value is a deployment
+// in the middle of moving, so it is an INFO line rather than a WARN, which the deploy
+// check would refuse. The two given with different values is a config that contradicts
+// itself, so it is refused rather than one of them being picked. The old field is left
+// zero either way.
+func (c *Config) adoptSubjectID(newSet, oldSet bool) error {
+	switch {
+	case newSet && oldSet && c.SubjectID != c.PersonID:
+		return fmt.Errorf("%w: subject_id (%q) and its old name person_id (%q) differ; set subject_id only",
+			ErrInvalid, c.SubjectID, c.PersonID)
+	case newSet && oldSet:
+		slog.Info("config: subject_id and its old name person_id are both set and equal; drop person_id",
+			"subject", c.SubjectID)
+	case oldSet:
+		slog.Warn("config: person_id is the old name of subject_id; set subject_id (ANAM_SUBJECT_ID) instead",
+			"subject", c.PersonID)
+		c.SubjectID = c.PersonID
+	}
+	c.PersonID = ""
+	return nil
+}
+
 // Validate reports whether c is usable.
 func (c Config) Validate() error {
 	switch {
-	case c.PersonID == "" && c.Server == "":
-		// A client of a daemon names no person: the daemon serves exactly one.
-		return fmt.Errorf("%w: person_id is required", ErrInvalid)
+	case c.SubjectID == "" && c.Server == "":
+		// A client of a daemon names no subject: the daemon serves exactly one.
+		return fmt.Errorf("%w: subject_id is required (ANAM_SUBJECT_ID)", ErrInvalid)
 	case c.LedgerPath == "":
 		return fmt.Errorf("%w: ledger_path is required", ErrInvalid)
 	case c.DBPath == "":

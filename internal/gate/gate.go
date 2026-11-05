@@ -125,11 +125,11 @@ type Clock interface {
 
 // Gate enforces admission for one person.
 type Gate struct {
-	ledger   Ledger
-	defs     Definitions
-	scopes   TokenScopes
-	clock    Clock
-	personID string
+	ledger    Ledger
+	defs      Definitions
+	scopes    TokenScopes
+	clock     Clock
+	subjectID string
 
 	limits Limits
 
@@ -163,8 +163,8 @@ type Limits struct {
 const MaxBatch = 49
 
 // New builds a Gate under limits.
-func New(l Ledger, defs Definitions, scopes TokenScopes, clock Clock, personID string, limits Limits) *Gate {
-	return &Gate{ledger: l, defs: defs, scopes: scopes, clock: clock, personID: personID, limits: limits}
+func New(l Ledger, defs Definitions, scopes TokenScopes, clock Clock, subjectID string, limits Limits) *Gate {
+	return &Gate{ledger: l, defs: defs, scopes: scopes, clock: clock, subjectID: subjectID, limits: limits}
 }
 
 // Outcome says what a commit or retract actually did.
@@ -200,9 +200,9 @@ func (g *Gate) Resolve(env facet.Envelope) (facet.Binding, error) {
 	if err := env.Validate(); err != nil {
 		return facet.Binding{}, err
 	}
-	b := facet.Binding{PersonID: g.personID, SpanHint: env.SpanHint}
+	b := facet.Binding{SubjectID: g.subjectID, SpanHint: env.SpanHint}
 	switch env.AssertedPerson {
-	case g.personID:
+	case g.subjectID:
 		b.Assurance = facet.AssuranceHigh
 	case "":
 		b.Assurance = facet.AssuranceMedium

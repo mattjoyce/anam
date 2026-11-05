@@ -46,7 +46,7 @@ func TestInitRefusesAMissingCatalogDirectoryBeforeCreatingFiles(t *testing.T) {
 	ledgerPath := filepath.Join(dir, "ledger.db")
 	dbPath := filepath.Join(dir, "tracking.db")
 	cfgPath := filepath.Join(dir, "config.yaml")
-	cfg := fmt.Sprintf("person_id: matt\nledger_path: %s\ndb_path: %s\ntimeout: %s\ndefinitions_dir: %s\n",
+	cfg := fmt.Sprintf("subject_id: matt\nledger_path: %s\ndb_path: %s\ntimeout: %s\ndefinitions_dir: %s\n",
 		ledgerPath, dbPath, testTimeout, missing)
 	if err := os.WriteFile(cfgPath, []byte(cfg), 0o600); err != nil {
 		t.Fatal(err)

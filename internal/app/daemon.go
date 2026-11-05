@@ -77,8 +77,8 @@ or reaches its deadline, and the stores are closed.`,
 			if err != nil {
 				return err
 			}
-			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "daemon: ledger %s (person %s)\nhttp://%s/\n",
-				cfg.LedgerPath, cfg.PersonID, cfg.Listen)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "daemon: ledger %s (subject %s)\nhttp://%s/\n",
+				cfg.LedgerPath, cfg.SubjectID, cfg.Listen)
 			return d.Run(cmd.Context())
 		},
 	}

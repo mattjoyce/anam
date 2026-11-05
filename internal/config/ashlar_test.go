@@ -15,7 +15,7 @@ import (
 // TestResolvedPrecedence confirms each layer wins in turn with matching
 // provenance kind/name.
 func TestResolvedPrecedence(t *testing.T) {
-	t.Setenv("ANAM_PERSON_ID", "matt")
+	t.Setenv("ANAM_SUBJECT_ID", "matt")
 
 	// Default only — no file, no env override for timeout.
 	t.Run("default provenance", func(t *testing.T) {
@@ -38,7 +38,7 @@ func TestResolvedPrecedence(t *testing.T) {
 	// File provenance.
 	t.Run("file provenance", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "anam.yaml")
-		if err := os.WriteFile(path, []byte("person_id: matt\ntimeout: 30s\n"), 0o600); err != nil {
+		if err := os.WriteFile(path, []byte("subject_id: matt\ntimeout: 30s\n"), 0o600); err != nil {
 			t.Fatalf("write: %v", err)
 		}
 		r, err := config.LoadResolved(path)
@@ -64,7 +64,7 @@ func TestResolvedPrecedence(t *testing.T) {
 	t.Run("env provenance", func(t *testing.T) {
 		t.Setenv("ANAM_TIMEOUT", "45s")
 		path := filepath.Join(t.TempDir(), "anam.yaml")
-		if err := os.WriteFile(path, []byte("person_id: matt\ntimeout: 30s\n"), 0o600); err != nil {
+		if err := os.WriteFile(path, []byte("subject_id: matt\ntimeout: 30s\n"), 0o600); err != nil {
 			t.Fatalf("write: %v", err)
 		}
 		r, err := config.LoadResolved(path)
@@ -91,7 +91,7 @@ func TestResolvedPrecedence(t *testing.T) {
 	t.Run("explicit provenance", func(t *testing.T) {
 		t.Setenv("ANAM_TIMEOUT", "45s")
 		path := filepath.Join(t.TempDir(), "anam.yaml")
-		if err := os.WriteFile(path, []byte("person_id: matt\ntimeout: 30s\n"), 0o600); err != nil {
+		if err := os.WriteFile(path, []byte("subject_id: matt\ntimeout: 30s\n"), 0o600); err != nil {
 			t.Fatalf("write: %v", err)
 		}
 		r, err := config.LoadResolvedOverriding(path, map[string]string{"timeout": "60s"})
@@ -111,7 +111,7 @@ func TestResolvedPrecedence(t *testing.T) {
 // TestResolvedEmptyEnvIgnored confirms that an empty ANAM_ variable contributes
 // no override.
 func TestResolvedEmptyEnvIgnored(t *testing.T) {
-	t.Setenv("ANAM_PERSON_ID", "matt")
+	t.Setenv("ANAM_SUBJECT_ID", "matt")
 	t.Setenv("ANAM_TIMEOUT", "")
 
 	r, err := config.LoadResolved("")
@@ -129,26 +129,26 @@ func TestResolvedEmptyEnvIgnored(t *testing.T) {
 
 // TestResolvedExplicitEmpty trivially confirms an explicit empty value is
 // present (the card says "explicit empty values remain present" which is
-// enforced by rejecting empty person_id etc.)
+// enforced by rejecting empty subject_id etc.)
 func TestResolvedExplicitEmptyRemains(t *testing.T) {
-	t.Setenv("ANAM_PERSON_ID", "")
-	r, err := config.LoadResolvedOverriding("", map[string]string{"person_id": ""})
+	t.Setenv("ANAM_SUBJECT_ID", "")
+	r, err := config.LoadResolvedOverriding("", map[string]string{"subject_id": ""})
 	if err != nil {
-		// An empty person_id fails validation — that is correct: the
+		// An empty subject_id fails validation — that is correct: the
 		// explicit empty was applied, and Validate rejected it.
-		if !strings.Contains(err.Error(), "person_id") {
-			t.Errorf("error = %v, want it to name person_id", err)
+		if !strings.Contains(err.Error(), "subject_id") {
+			t.Errorf("error = %v, want it to name subject_id", err)
 		}
 		return
 	}
-	t.Error("LoadResolvedOverriding with empty person_id should have failed validation")
+	t.Error("LoadResolvedOverriding with empty subject_id should have failed validation")
 	_ = r // unused when the function is expected to fail
 }
 
 // TestResolvedIntegerOverride confirms a valid explicit integer wins over an
 // invalid environment integer without early conversion failure.
 func TestResolvedIntegerOverride(t *testing.T) {
-	t.Setenv("ANAM_PERSON_ID", "matt")
+	t.Setenv("ANAM_SUBJECT_ID", "matt")
 	t.Setenv("ANAM_LIBRARY_FOLDER_LIMIT", "not-a-number")
 	// An explicit valid integer should override the bad env.
 	r, err := config.LoadResolvedOverriding("", map[string]string{"library_folder_limit": "500"})
@@ -172,7 +172,7 @@ func TestResolvedIntegerOverride(t *testing.T) {
 func TestResolvedAliasContradictionAcrossLayers(t *testing.T) {
 	// long_write_timeout in the file and ingest_timeout via env with
 	// different values should fail.
-	path := writeCfg(t, "person_id: matt\nlong_write_timeout: 20m\n")
+	path := writeCfg(t, "subject_id: matt\nlong_write_timeout: 20m\n")
 	t.Setenv("ANAM_INGEST_TIMEOUT", "10m")
 
 	_, err := config.LoadResolved(path)
@@ -187,11 +187,11 @@ func TestResolvedAliasContradictionAcrossLayers(t *testing.T) {
 // TestResolvedEquivalentDurations confirms equivalent spellings agree and the
 // canonical name gets the selected origin.
 func TestResolvedEquivalentDurations(t *testing.T) {
-	t.Setenv("ANAM_PERSON_ID", "matt")
+	t.Setenv("ANAM_SUBJECT_ID", "matt")
 
 	// Both spellings given and equivalent: 60s == 1m. Canonical origin wins.
 	t.Run("equivalent spellings agree", func(t *testing.T) {
-		path := writeCfg(t, "person_id: matt\nlong_write_timeout: 60s\ningest_timeout: 1m\n")
+		path := writeCfg(t, "subject_id: matt\nlong_write_timeout: 60s\ningest_timeout: 1m\n")
 		r, err := config.LoadResolved(path)
 		if err != nil {
 			t.Fatalf("LoadResolved() = %v", err)
@@ -207,7 +207,7 @@ func TestResolvedEquivalentDurations(t *testing.T) {
 
 	// Only ingest_timeout: provenance uses ingest_timeout's origin.
 	t.Run("old name only, adopted", func(t *testing.T) {
-		path := writeCfg(t, "person_id: matt\ningest_timeout: 25m\n")
+		path := writeCfg(t, "subject_id: matt\ningest_timeout: 25m\n")
 		r, err := config.LoadResolved(path)
 		if err != nil {
 			t.Fatalf("LoadResolved() = %v", err)
@@ -237,10 +237,57 @@ func TestResolvedEquivalentDurations(t *testing.T) {
 	})
 }
 
+// TestResolvedSubjectProvenance is card 270a: subject_id's origin is reported under
+// subject_id whichever of its two names supplied it, and the old name person_id is
+// never a key of its own.
+func TestResolvedSubjectProvenance(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		env  map[string]string
+		kind ashlar.OriginKind
+	}{
+		{"new key in the file", "subject_id: matt\n", nil, ashlar.OriginFile},
+		{"old key in the file", "person_id: matt\n", nil, ashlar.OriginFile},
+		{"old variable", "", map[string]string{"ANAM_PERSON_ID": "matt"}, ashlar.OriginEnv},
+		{"old in the file, new in the environment", "person_id: matt\n",
+			map[string]string{"ANAM_SUBJECT_ID": "matt"}, ashlar.OriginEnv},
+		{"new in the file, old in the environment", "subject_id: matt\n",
+			map[string]string{"ANAM_PERSON_ID": "matt"}, ashlar.OriginFile},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("ANAM_SUBJECT_ID", "")
+			t.Setenv("ANAM_PERSON_ID", "")
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+			var path string
+			if tt.body != "" {
+				path = writeCfg(t, tt.body)
+			}
+			r, err := config.LoadResolved(path)
+			if err != nil {
+				t.Fatalf("LoadResolved() = %v", err)
+			}
+			p, ok := r.Provenance("subject_id")
+			if !ok {
+				t.Fatal("no provenance for subject_id")
+			}
+			if p.Effective.Kind != tt.kind {
+				t.Errorf("subject_id origin kind = %q, want %q", p.Effective.Kind, tt.kind)
+			}
+			if _, ok := r.Provenance("person_id"); ok {
+				t.Error("person_id has provenance of its own, want it reported under subject_id")
+			}
+		})
+	}
+}
+
 // TestResolvedDerivedLibraryDir confirms a derived library_dir has the
 // declared default origin.
 func TestResolvedDerivedLibraryDir(t *testing.T) {
-	t.Setenv("ANAM_PERSON_ID", "matt")
+	t.Setenv("ANAM_SUBJECT_ID", "matt")
 	t.Setenv("XDG_DATA_HOME", "/data")
 
 	r, err := config.LoadResolved("")
@@ -264,7 +311,7 @@ func TestResolvedDerivedLibraryDir(t *testing.T) {
 // independent metadata and a caller cannot change provenance seen by a later
 // Provenance call.
 func TestResolvedIndependentLoads(t *testing.T) {
-	t.Setenv("ANAM_PERSON_ID", "matt")
+	t.Setenv("ANAM_SUBJECT_ID", "matt")
 
 	r, err := config.LoadResolved("")
 	if err != nil {
@@ -291,8 +338,8 @@ func TestResolvedIndependentLoads(t *testing.T) {
 // TestResolvedIncludeUnknown confirms that 'include' is rejected as an
 // unknown config key.
 func TestResolvedIncludeUnknown(t *testing.T) {
-	t.Setenv("ANAM_PERSON_ID", "matt")
-	path := writeCfg(t, "person_id: matt\ninclude: other.yaml\n")
+	t.Setenv("ANAM_SUBJECT_ID", "matt")
+	path := writeCfg(t, "subject_id: matt\ninclude: other.yaml\n")
 	_, err := config.LoadResolved(path)
 	if err == nil {
 		t.Fatal("LoadResolved() with include key, want an error")

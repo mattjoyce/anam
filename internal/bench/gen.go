@@ -24,8 +24,8 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
-// Person is whose record a synthetic ledger is.
-const Person = "bench"
+// Subject is what a synthetic ledger is about: the subject it is pinned to.
+const Subject = "bench"
 
 // source is the source a synthetic record is admitted from.
 const source = "bench"
@@ -100,13 +100,13 @@ func Generate(ctx context.Context, cat *catalog.Catalog, typ facet.Type, dir str
 		return err
 	}
 	p := PathsIn(dir)
-	l, err := ledger.Create(ctx, p.Ledger, Person)
+	l, err := ledger.Create(ctx, p.Ledger, Subject)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = l.Close() }()
 	clk := &stepClock{}
-	g := gate.New(l, cat.Definitions(), gate.StaticScopes{source: {typ}}, clk, Person, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
+	g := gate.New(l, cat.Definitions(), gate.StaticScopes{source: {typ}}, clk, Subject, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 
 	ids, err := admit(ctx, g, clk, pr, base, dayAfterLast, progress, "base")
 	if err != nil {
@@ -270,8 +270,8 @@ func checkpoint(ctx context.Context, l *ledger.Ledger, p Paths, budget int, prog
 
 // MintRecord mints the record at p, as `anam checkpoint` does, and returns how many
 // buckets it minted and the run's watermark.
-func MintRecord(ctx context.Context, p Paths, person string, budget int) (int, int64, error) {
-	l, err := ledger.OpenReadOnly(ctx, p.Ledger, person)
+func MintRecord(ctx context.Context, p Paths, subject string, budget int) (int, int64, error) {
+	l, err := ledger.OpenReadOnly(ctx, p.Ledger, subject)
 	if err != nil {
 		return 0, 0, err
 	}

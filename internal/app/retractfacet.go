@@ -56,7 +56,7 @@ func runFacetRetraction(cmd *cobra.Command, cfg config.Config, cat *catalog.Cata
 		return err
 	}
 	// A tombstone admits nothing, so the gate needs no scopes for it.
-	g := gate.New(l, cat.Definitions(), gate.StaticScopes{}, clock.Real{}, cfg.PersonID,
+	g := gate.New(l, cat.Definitions(), gate.StaticScopes{}, clock.Real{}, cfg.SubjectID,
 		gate.Limits{MaxPayloadBytes: cfg.MaxPayloadBytes, MaxRetries: cfg.CommitRetries})
 	res, w, err := g.Retract(ctx, f.ID)
 	if err != nil {

@@ -33,7 +33,7 @@ func TestGenerateThenRun(t *testing.T) {
 		t.Fatalf("Generate: %v", err)
 	}
 	rep, err := bench.Run(context.Background(), bench.Options{
-		Name: "tiny", Person: bench.Person, Paths: bench.PathsIn(dir), Reps: 3, Timeout: time.Minute, Catalog: cat,
+		Name: "tiny", Subject: bench.Subject, Paths: bench.PathsIn(dir), Reps: 3, Timeout: time.Minute, Catalog: cat,
 	}, nil)
 	if err != nil {
 		t.Fatalf("Run: %v", err)

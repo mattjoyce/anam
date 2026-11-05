@@ -61,7 +61,7 @@ func localStatus(ctx context.Context, cfg config.Config, info BuildInfo) (api.St
 	if err != nil {
 		return api.Status{}, err
 	}
-	return api.Status{Version: info.Version, Person: cfg.PersonID, LedgerID: id, W: int64(w)}, nil
+	return api.Status{Version: info.Version, Person: cfg.SubjectID, LedgerID: id, W: int64(w)}, nil
 }
 
 func writeStatus(cmd *cobra.Command, s api.Status, server string) error {
@@ -70,7 +70,7 @@ func writeStatus(cmd *cobra.Command, s api.Status, server string) error {
 	if server != "" {
 		where = "daemon at " + server
 	}
-	_, _ = fmt.Fprintf(out, "ledger  %s (person %s)\n", s.LedgerID, s.Person)
+	_, _ = fmt.Fprintf(out, "ledger  %s (subject %s)\n", s.LedgerID, s.Person)
 	_, _ = fmt.Fprintf(out, "W       %d\n", s.W)
 	_, _ = fmt.Fprintf(out, "build   %s, %s\n", s.Version, where)
 	if len(s.Held) > 0 {

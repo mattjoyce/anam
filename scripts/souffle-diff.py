@@ -26,7 +26,7 @@ differently; tabs and newlines inside payload strings are spaced on both sides, 
 a .facts file cannot carry them.
 
     scripts/souffle-diff.py --projection everything --every 10
-    scripts/souffle-diff.py --ledger copy/ledger.db --person matt --projection bp
+    scripts/souffle-diff.py --ledger copy/ledger.db --subject matt --projection bp
 
 Needs `anam` (or --anam) and `souffle` (or --souffle) on the PATH. Exit 1 on any
 disagreement. Python, stdlib only, as AGENTS.md allows for a one-off script.
@@ -147,7 +147,9 @@ def main():
     ap.add_argument("--anam", default="anam", help="the anam binary")
     ap.add_argument("--souffle", default="souffle", help="the souffle binary")
     ap.add_argument("--ledger", help="a ledger file to run over (default: the configured one)")
-    ap.add_argument("--person", help="the person the ledger is pinned to (default: the configured one)")
+    # --person is the old name of --subject (card 270a), kept until the alias-removal release.
+    ap.add_argument("--subject", "--person", dest="subject",
+                    help="the subject the ledger is pinned to (default: the configured one)")
     ap.add_argument("--projection", required=True, help="the log-shaped projection both engines run through")
     ap.add_argument("--every", type=int, default=1, help="ask about every Nth distinct fact-time")
     ap.add_argument("--workdir", help="where to write the facts and programs (default: a temp dir, removed unless --keep)")
@@ -160,8 +162,11 @@ def main():
     env = dict(os.environ)
     if args.ledger:
         env["ANAM_LEDGER_PATH"] = os.path.abspath(args.ledger)
-    if args.person:
-        env["ANAM_PERSON_ID"] = args.person
+    if args.subject:
+        # The flag sets the new variable only. An ANAM_PERSON_ID in the environment is
+        # left for anam to settle against it: refused when they differ, an INFO when
+        # they agree (card 270a).
+        env["ANAM_SUBJECT_ID"] = args.subject
     env.pop("ANAM_SERVER", None)  # the script runs over files; a daemon would own them
     # A whole-record current/2 over many instants outruns the CLI's default read
     # timeout; this is a one-off run, so the bound is raised unless the caller set it.

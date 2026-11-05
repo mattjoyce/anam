@@ -45,9 +45,9 @@ everything runs on loopback against two SQLite files.
 ```sh
 make build
 
-# person_id has no default on purpose: it is pinned into the ledger at init, so a
-# defaulted one would name a person nobody chose for the life of the file.
-export ANAM_PERSON_ID=me
+# subject_id has no default on purpose: it is pinned into the ledger at init, so a
+# defaulted one would name a subject nobody chose for the life of the file.
+export ANAM_SUBJECT_ID=me
 
 # The ledger and the operational store are two SQLite files. Both default to
 # ~/.local/share/anam/ (ledger.db and tracking.db); override with

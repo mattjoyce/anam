@@ -16,7 +16,7 @@ import (
 // sideBySide is the test-only shape both loaders decode into. It mirrors only the
 // Config fields the rows touch.
 type sideBySide struct {
-	PersonID           string        `yaml:"person_id"`
+	SubjectID          string        `yaml:"subject_id"`
 	LongWriteTimeout   time.Duration `yaml:"long_write_timeout"`
 	LibraryFolderLimit int           `yaml:"library_folder_limit"`
 }
@@ -24,7 +24,7 @@ type sideBySide struct {
 // sideBySideWant names the fields a row is about. A nil pointer is a field the row
 // does not assert, so a loader's defaults elsewhere cannot manufacture a gap.
 type sideBySideWant struct {
-	personID           *string
+	subjectID          *string
 	longWriteTimeout   *time.Duration
 	libraryFolderLimit *int
 }
@@ -35,8 +35,8 @@ func intp(n int) *int                     { return &n }
 
 func (w sideBySideWant) check(t *testing.T, loader string, got sideBySide) {
 	t.Helper()
-	if w.personID != nil && got.PersonID != *w.personID {
-		t.Errorf("%s person_id = %q, want %q", loader, got.PersonID, *w.personID)
+	if w.subjectID != nil && got.SubjectID != *w.subjectID {
+		t.Errorf("%s subject_id = %q, want %q", loader, got.SubjectID, *w.subjectID)
 	}
 	if w.longWriteTimeout != nil && got.LongWriteTimeout != *w.longWriteTimeout {
 		t.Errorf("%s long_write_timeout = %s, want %s", loader, got.LongWriteTimeout, *w.longWriteTimeout)
@@ -48,7 +48,7 @@ func (w sideBySideWant) check(t *testing.T, loader string, got sideBySide) {
 
 // equal compares the fields w names, so a gap is judged only on what the row is about.
 func (w sideBySideWant) equal(a, b sideBySide) bool {
-	if w.personID != nil && a.PersonID != b.PersonID {
+	if w.subjectID != nil && a.SubjectID != b.SubjectID {
 		return false
 	}
 	if w.longWriteTimeout != nil && a.LongWriteTimeout != b.LongWriteTimeout {
@@ -67,7 +67,7 @@ func TestViperAshlarSideBySide(t *testing.T) {
 	tests := []struct {
 		name       string
 		yaml       string
-		envPerson  bool
+		envSubject bool
 		viperOK    bool
 		viperWant  sideBySideWant
 		viperErr   string
@@ -76,12 +76,12 @@ func TestViperAshlarSideBySide(t *testing.T) {
 		gap        bool
 	}{
 		{
-			name:      "empty file",
-			yaml:      "",
-			envPerson: true,
-			viperOK:   true,
+			name:       "empty file",
+			yaml:       "",
+			envSubject: true,
+			viperOK:    true,
 			viperWant: sideBySideWant{
-				personID:           strp("matt"),
+				subjectID:          strp("matt"),
 				longWriteTimeout:   durp(config.DefaultLongWriteTimeout),
 				libraryFolderLimit: intp(config.DefaultLibraryFolderLimit),
 			},
@@ -89,12 +89,12 @@ func TestViperAshlarSideBySide(t *testing.T) {
 			gap:      true,
 		},
 		{
-			name:      "comment-only file",
-			yaml:      "# only a comment\n",
-			envPerson: true,
-			viperOK:   true,
+			name:       "comment-only file",
+			yaml:       "# only a comment\n",
+			envSubject: true,
+			viperOK:    true,
 			viperWant: sideBySideWant{
-				personID:           strp("matt"),
+				subjectID:          strp("matt"),
 				longWriteTimeout:   durp(config.DefaultLongWriteTimeout),
 				libraryFolderLimit: intp(config.DefaultLibraryFolderLimit),
 			},
@@ -187,12 +187,12 @@ func TestViperAshlarSideBySide(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("ANAM_PERSON_ID", "")
+			t.Setenv("ANAM_SUBJECT_ID", "")
 			body := tt.yaml
-			if tt.envPerson {
-				t.Setenv("ANAM_PERSON_ID", "matt")
+			if tt.envSubject {
+				t.Setenv("ANAM_SUBJECT_ID", "matt")
 			} else {
-				body = "person_id: matt\n" + body
+				body = "subject_id: matt\n" + body
 			}
 			path := filepath.Join(t.TempDir(), "anam.yaml")
 			if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
@@ -204,7 +204,7 @@ func TestViperAshlarSideBySide(t *testing.T) {
 			viperGot := sideBySide{}
 			if viperOK {
 				viperGot = sideBySide{
-					PersonID:           c.PersonID,
+					SubjectID:          c.SubjectID,
 					LongWriteTimeout:   c.LongWriteTimeout,
 					LibraryFolderLimit: c.LibraryFolderLimit,
 				}

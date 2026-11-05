@@ -86,7 +86,7 @@ func seedFacetNoT(sourceRef, ftype, payload string) facet.Facet {
 		ID: facet.NewID(sourceRef), Type: facet.Type(ftype), Confidence: 1,
 		Classification: facet.ClassificationNormal, ArtifactVersion: 1, DefinitionVersion: 1,
 		FactTime:   et,
-		Binding:    facet.Binding{PersonID: person, Assurance: facet.AssuranceHigh},
+		Binding:    facet.Binding{SubjectID: person, Assurance: facet.AssuranceHigh},
 		Provenance: facet.Provenance{Source: "test", Injector: "test", SourceRef: sourceRef},
 		Descriptor: facet.Descriptor{
 			SourceSchema: "test", SchemaVersion: 1, ContentHash: facet.ContentHash(canonical),

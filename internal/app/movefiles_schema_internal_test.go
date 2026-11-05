@@ -37,7 +37,7 @@ func newSchema9Move(t *testing.T) schema9Move {
 		t.Fatal(err)
 	}
 	m.cfg = filepath.Join(dir, "anam.yaml")
-	writeDoc(t, m.cfg, fmt.Sprintf("person_id: matt\nledger_path: %s\ndb_path: %s\ntimeout: %s\ndefinitions_dir: %s\nprojections_dir: %s\n",
+	writeDoc(t, m.cfg, fmt.Sprintf("subject_id: matt\nledger_path: %s\ndb_path: %s\ntimeout: %s\ndefinitions_dir: %s\nprojections_dir: %s\n",
 		p.Ledger, m.store, testTimeout, p.Definitions, p.Projections))
 	return m
 }
@@ -143,7 +143,7 @@ func TestMoveArtifacts_RefusesASourceItCannotCarry(t *testing.T) {
 	t.Parallel()
 	m := newSchema9Move(t)
 	same := filepath.Join(filepath.Dir(m.cfg), "same.yaml")
-	writeDoc(t, same, fmt.Sprintf("person_id: matt\nledger_path: %s\ndb_path: %s\ntimeout: %s\ndefinitions_dir: %s\nprojections_dir: %s\n",
+	writeDoc(t, same, fmt.Sprintf("subject_id: matt\nledger_path: %s\ndb_path: %s\ntimeout: %s\ndefinitions_dir: %s\nprojections_dir: %s\n",
 		m.Ledger, m.Store, testTimeout, m.Definitions, m.Projections))
 	if _, _, err := cli(t, same, "move-artifacts", "--from", m.folder, "--registered-from", m.Store, "--yes"); err == nil ||
 		!strings.Contains(err.Error(), "is the store this command writes into") {

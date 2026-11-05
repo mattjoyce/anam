@@ -68,10 +68,10 @@ type Scenario struct {
 
 // Options say what to run against.
 type Options struct {
-	Name, Label, Build, Person string
-	Paths                      Paths
-	Reps                       int
-	Timeout                    time.Duration
+	Name, Label, Build, Subject string
+	Paths                       Paths
+	Reps                        int
+	Timeout                     time.Duration
 	// Only, when set, names the scenarios to run by a substring of their names.
 	Only []string
 	// Budget is the checkpoint_budget the dry-run mint scenario mints with.
@@ -86,7 +86,7 @@ func Run(ctx context.Context, o Options, progress func(string)) (Report, error) 
 	if o.Catalog == nil {
 		return Report{}, errors.New("bench: Run needs a catalog")
 	}
-	l, err := ledger.OpenReadOnly(ctx, o.Paths.Ledger, o.Person)
+	l, err := ledger.OpenReadOnly(ctx, o.Paths.Ledger, o.Subject)
 	if err != nil {
 		return Report{}, err
 	}

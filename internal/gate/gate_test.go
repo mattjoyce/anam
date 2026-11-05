@@ -89,7 +89,7 @@ func TestResolve_TheThreeAssuranceArms(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Resolve(%q): %v", tc.asserted, err)
 		}
-		if b.Assurance != tc.want || b.PersonID != person {
+		if b.Assurance != tc.want || b.SubjectID != person {
 			t.Errorf("Resolve(%q) = %+v, want assurance %s for %s", tc.asserted, b, tc.want, person)
 		}
 	}
@@ -244,7 +244,7 @@ func TestCommit_TypedRejections(t *testing.T) {
 	t.Parallel()
 	g, _ := newGate(t)
 	ctx := context.Background()
-	binding := facet.Binding{PersonID: person, Assurance: facet.AssuranceHigh}
+	binding := facet.Binding{SubjectID: person, Assurance: facet.AssuranceHigh}
 
 	t.Run("unscoped source", func(t *testing.T) {
 		t.Parallel()
@@ -293,7 +293,7 @@ func TestCommit_TypedRejections(t *testing.T) {
 	})
 	t.Run("assurance below floor", func(t *testing.T) {
 		t.Parallel()
-		low := facet.Binding{PersonID: person, Assurance: facet.AssuranceReview}
+		low := facet.Binding{SubjectID: person, Assurance: facet.AssuranceReview}
 		if _, _, err := g.Commit(ctx, bpEnvelope(bpPayload), low); !errors.Is(err, gate.ErrAssuranceBelowFloor) {
 			t.Errorf("got %v, want ErrAssuranceBelowFloor (review < medium default)", err)
 		}

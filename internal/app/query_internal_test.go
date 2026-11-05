@@ -41,9 +41,12 @@ func TestQueryCheck_OverARealLedger(t *testing.T) {
 	if out, _, err := cli(t, f.cfgPath, "query", "check", "--ledger", f.ledgerPath, "--person", "matt"); err != nil {
 		t.Errorf("query check --person matt: %v\n%s", err, out)
 	}
-	if _, _, err := cli(t, f.cfgPath, "query", "check", "--subject", "matt", "--person", "other"); err == nil ||
-		!strings.Contains(err.Error(), "--subject") || !strings.Contains(err.Error(), "--person") {
-		t.Errorf("--subject and --person differing = %v, want a refusal naming both", err)
+	// Given means on the command line: an explicit empty value differs from a set one.
+	for _, pair := range [][2]string{{"matt", "other"}, {"matt", ""}, {"", "matt"}} {
+		_, _, err := cli(t, f.cfgPath, "query", "check", "--subject", pair[0], "--person", pair[1])
+		if err == nil || !strings.Contains(err.Error(), "--subject") || !strings.Contains(err.Error(), "--person") {
+			t.Errorf("--subject %q --person %q = %v, want a refusal naming both", pair[0], pair[1], err)
+		}
 	}
 
 	if _, _, err := cli(t, f.cfgPath, "query", "check", "--projection", "course"); err == nil || !strings.Contains(err.Error(), "snapshot-shaped") {

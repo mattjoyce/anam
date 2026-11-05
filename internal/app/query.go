@@ -50,7 +50,7 @@ took.
 one; the bundled Definitions and projections are used either way.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			id, err := subjectFlag(subject, person)
+			id, err := subjectFlag(cmd, subject, person)
 			if err != nil {
 				return err
 			}
@@ -73,12 +73,14 @@ one; the bundled Definitions and projections are used either way.`,
 }
 
 // subjectFlag settles --subject and its old name --person: whichever is given, and
-// a refusal when both are given with different values, as the config keys are.
-func subjectFlag(subject, person string) (string, error) {
+// a refusal when both are given with different values, as the config keys are. Given
+// means on the command line, so an explicit empty value counts.
+func subjectFlag(cmd *cobra.Command, subject, person string) (string, error) {
+	newSet, oldSet := cmd.Flags().Changed("subject"), cmd.Flags().Changed("person")
 	switch {
-	case subject != "" && person != "" && subject != person:
+	case newSet && oldSet && subject != person:
 		return "", fmt.Errorf("--subject (%q) and its old name --person (%q) differ; pass --subject only", subject, person)
-	case subject == "":
+	case oldSet && !newSet:
 		return person, nil
 	}
 	return subject, nil

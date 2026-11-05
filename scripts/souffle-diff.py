@@ -163,8 +163,10 @@ def main():
     if args.ledger:
         env["ANAM_LEDGER_PATH"] = os.path.abspath(args.ledger)
     if args.subject:
+        # The flag sets the new variable only. An ANAM_PERSON_ID in the environment is
+        # left for anam to settle against it: refused when they differ, an INFO when
+        # they agree (card 270a).
         env["ANAM_SUBJECT_ID"] = args.subject
-        env.pop("ANAM_PERSON_ID", None)  # the old name, which would contradict the flag
     env.pop("ANAM_SERVER", None)  # the script runs over files; a daemon would own them
     # A whole-record current/2 over many instants outruns the CLI's default read
     # timeout; this is a one-off run, so the bound is raised unless the caller set it.

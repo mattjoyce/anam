@@ -121,6 +121,7 @@ to save a page of code.
 gofmt -l .
 goimports -l .
 scripts/check-links.sh
+scripts/check-souffle-diff.sh     # the wrapper leaves the subject rule to anam
 python3 docs/explainer/check.py   # needs anam-importers beside this checkout, or EXPLAINER_IMPORTERS_DIR
 go vet ./...
 golangci-lint run ./...

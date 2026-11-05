@@ -36,8 +36,8 @@ else
   echo "goimports not installed — skipping (install: golang.org/x/tools/cmd/goimports)"
 fi
 
-# Substrate boundary. The stores are accidental complexity — the problem is a personal
-# longitudinal record, not a database — so the choice must stay reversible. Only
+# Substrate boundary. The stores are accidental complexity — the problem is a
+# longitudinal record of one subject, not a database — so the choice must stay reversible. Only
 # internal/store may name SQLite or database/sql; the domain must not know what it is
 # stored in.
 #

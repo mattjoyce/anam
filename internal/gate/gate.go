@@ -123,7 +123,7 @@ type Clock interface {
 	Now() time.Time
 }
 
-// Gate enforces admission for one person.
+// Gate enforces admission for one subject.
 type Gate struct {
 	ledger    Ledger
 	defs      Definitions
@@ -193,8 +193,8 @@ type Result struct {
 }
 
 // Resolve is the gate's first call: the associated pillar (§6). Binding never
-// requires a span; with one person the resolution is near-trivial but the shape
-// holds — high when the source explicitly scopes to the person, medium when
+// requires a span; with one subject the resolution is near-trivial but the shape
+// holds — high when the source explicitly scopes to the subject, medium when
 // defaulted, review when a carried identity element contradicts.
 func (g *Gate) Resolve(env facet.Envelope) (facet.Binding, error) {
 	if err := env.Validate(); err != nil {

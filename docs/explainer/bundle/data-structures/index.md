@@ -18,4 +18,4 @@
 * [Projection template](projection-template.md) - An embedded JSON manifest naming a versioned prune: types, statuses, a classification ceiling, a fact-time window and a shape.
 * [Receipt](receipt.md) - Proof of what a projection served: the served hash, the facet ids, the watermark and ledger id, the template and definition-set versions, served_at, the span, and the query a read narrowed by.
 * [Snapshot tables](snapshot-part.md) - The operational store's record of an importer's resend-everything run: the run with its started and completed watermarks, each part's digest, and the facet ids the parts carried.
-* [Timeline response](timeline-response.md) - What GET /v1/timeline answers: the watermark, counts, the whole-person hash, the shown entries with their versions, and verdicts when a projection or explain was asked for.
+* [Timeline response](timeline-response.md) - What GET /v1/timeline answers: the watermark, counts, the whole-record hash, the shown entries with their versions, and verdicts when a projection or explain was asked for.

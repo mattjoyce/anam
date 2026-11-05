@@ -35,7 +35,7 @@ type Displacement struct {
 // corrected rather than merely that something was.
 //
 // The reads are one round-trip per displaced version. That is proportional to how much
-// the record has been corrected, not to how large it is — a person with no corrections
+// the record has been corrected, not to how large it is — a record with no corrections
 // pays nothing here.
 func Displaced(ctx context.Context, l Ledger, res Result) ([]Displacement, error) {
 	return DisplacedWhere(ctx, l, res, func(string) bool { return true })

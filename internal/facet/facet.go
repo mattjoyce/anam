@@ -133,10 +133,10 @@ func (p PayloadKind) Valid() bool {
 	return false
 }
 
-// BindingAssurance attests how confidently a Facet bound to the person.
+// BindingAssurance attests how confidently a Facet bound to the subject.
 type BindingAssurance string
 
-// The assurance levels: high when the source explicitly scopes to the person, medium
+// The assurance levels: high when the source explicitly scopes to the subject, medium
 // when the binding was defaulted, review when a carried identity element contradicts.
 const (
 	AssuranceHigh   BindingAssurance = "high"

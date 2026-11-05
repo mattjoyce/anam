@@ -59,7 +59,7 @@ func (s statusFilter) wantsDead() bool { return s != statusLive }
 // No facet type can collide with it: types are dotted and namespaced.
 const typeNone = "none"
 
-// viewWhole is the query that names the whole person outright, for when a bare "/"
+// viewWhole is the query that names the whole record outright, for when a bare "/"
 // opens the default view or the last month instead (card 263).
 const viewWhole = "whole"
 
@@ -160,7 +160,7 @@ func typeFilter(typeQ []string, types []facet.Type) (show map[facet.Type]bool, s
 	return show, selected, false
 }
 
-// windowLink is the current window under a different view. The whole person with
+// windowLink is the current window under a different view. The whole record with
 // nothing else to say is named outright, since a bare "/" opens the default view or
 // the last month instead.
 func windowLink(from, to time.Time, zoomed bool, view tlView) string {

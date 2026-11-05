@@ -251,7 +251,7 @@ func coveredBy(pattern string, defs []def.Definition) []facet.Type {
 	return out
 }
 
-// view is one read of the person, optionally wound back, optionally pruned, and
+// view is one read of the record, optionally wound back, optionally pruned, and
 // optionally taken as a snapshot.
 type view struct {
 	res fold.Result
@@ -412,7 +412,7 @@ func readWindow(ctx context.Context, src Source, know knowledge, b bounds) (view
 	return v, nil
 }
 
-// Canonical is the whole-person value at the ledger's head: composed from the last
+// Canonical is the whole-record value at the ledger's head: composed from the last
 // mint run and the tail after it when src has the checkpoint log, folded from the
 // beginning when it does not. The result's States are empty when it was composed; a
 // caller that needs a facet's history folds the ledger itself.

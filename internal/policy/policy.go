@@ -8,7 +8,7 @@
 // stays a mechanism and never becomes a reading of content (Anam is a neutral layer).
 // TestPolicyReadsNoPayload holds the line on the package's imports.
 //
-// The rules are static Go for one person, few and visible in one file. The stated flip
+// The rules are static Go for one subject's record, few and visible in one file. The stated flip
 // is the bundled Datalog engine over a policy base (principal/2, flag/2, request/3, a
 // versioned policy.dl), never attr/3, once the rules pass about a dozen, a second class
 // of principal arrives, or a rule must read beyond the request and the file. The

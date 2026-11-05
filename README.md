@@ -2,9 +2,10 @@
 
 > *anam*: Irish for *soul*.
 
-A personal, longitudinal record of one person's life, kept as immutable facts. Health readings,
-workouts, medicines, lab results, trips, documents and notes land on one timeline, each with where
-it came from and when it was true. The current state is derived from the facts, every cache of it
+A longitudinal record of one subject, kept as immutable facts. The subject is what the record is
+about. In the author's deployment it is the author, and health readings, workouts, medicines, lab
+results, trips, documents and notes land on one timeline, each with where it came from and when it
+was true. The current state is derived from the facts, every cache of it
 is rebuilt by replay, and nothing is ever overwritten.
 
 This is a personal project, published so others can read it and borrow from it. The sources, units
@@ -17,7 +18,7 @@ fact time; the green strip is the checkpoints.*
 
 ## Ideas
 
-- **The whole-person timeline is the default read.** A trip, an illness or a training block is an
+- **The whole-record timeline is the default read.** A trip, an illness or a training block is an
   optional lens over it, never a requirement.
 - **Facts accrete.** A correction is a new version beside the old one. `--as-of` shows what Anam
   knew at any earlier moment.
@@ -68,7 +69,7 @@ Open `http://127.0.0.1:8787/` for the inspector. With `ANAM_SERVER` set, every c
 the daemon; `init` and `daemon` refuse to run, because a configured server is treated as the owner
 of the files. Unset it for those two commands.
 
-**Read.** The whole-person timeline is the default, and everything else is a lens over it.
+**Read.** The whole-record timeline is the default, and everything else is a lens over it.
 
 ```sh
 ./anam timeline                                    # the canonical, whole
@@ -125,7 +126,7 @@ The **ledger** is the record. It is a SQLite file whose triggers refuse any upda
 second SQLite file holds what Anam itself authors: its derived tables are rebuilt by replaying the
 ledger, and what the operator registered comes back from the backup. Facts reach the ledger only
 through the gate, which checks each one is compliant with its Definition, authenticated, and
-associated with the person.
+associated with the subject.
 
 What must not break is small: the ledger and the gate's checks. A commit is idempotent, so an
 importer that crashed mid-batch runs again and nothing doubles. The second file is caught up by
@@ -146,7 +147,7 @@ file, not code.
 
 With neither directory set the daemon starts on an empty catalog and logs a WARN saying so. A
 catalog supplies `record.edge` and `record.document`, the two types the engine reads by name for
-links and documents, in the zone the person lives in; the
+links and documents, in the deployment's own zone; the
 [minimal fixture](internal/catalog/fixture/testdata/minimal/definitions/) holds UTC copies to start
 from.
 

@@ -27,8 +27,8 @@ shown, at exactly what moment of knowledge.
 If Anam vanished tomorrow, you'd lose nothing: it owns no facts and rebuilds itself from your sources.
 It is a **lens on your data, not a second copy pretending to be the original.**
 
-Anam is the soul-record (*anam* is Irish for *soul*) — built for one person, extensible to every facet
-of their life.
+Anam is the soul-record (*anam* is Irish for *soul*). It is built for one subject, the thing the record
+is about. Here that subject is you, and the record extends to every facet of your life.
 
 ---
 
@@ -41,7 +41,7 @@ about my blood pressure on this date, and where did each reading come from." Hea
 kind of facet; calendar, mail, and notes are the same shape.
 
 **Is it a record of episodes, like an admission or a trip?**
-No. The **whole-person timeline is the default read**, and an episode is an optional lens over it. The
+No. The **whole-record timeline is the default read**, and an episode is an optional lens over it. The
 pieces are the Facet, the append-only ledger, the admission gate, the two clocks, minting, projections
 and receipts.
 

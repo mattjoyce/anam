@@ -93,8 +93,8 @@ steps:
     anchor: "case <-busy.C:"
   - actor: /components/gate.md
     caller: /components/daemon.md
-    label: resolve binds the envelope to the person
-    action: "A fresh gate is built for the batch with scopes `{bp-csv: [health.blood-pressure]}` and the registry snapshot read inside the write. `Resolve` validates the envelope and binds it to the configured person with assurance medium (no asserted person) or high (asserted and equal)."
+    label: resolve binds to the subject
+    action: "A fresh gate is built for the batch with scopes `{bp-csv: [health.blood-pressure]}` and the registry snapshot read inside the write. `Resolve` validates the envelope and binds it to the configured subject with assurance medium (no asserted subject) or high (asserted and equal)."
     reads: [/data-structures/envelope.md]
     resource: internal/gate/gate.go#Resolve
     anchor: "case g.subjectID:"
@@ -106,7 +106,7 @@ steps:
     anchor: "if len(envs) > MaxBatch {"
   - actor: /components/gate.md
     label: the three pillars without a ledger read
-    action: "In order: envelope valid, binding is this person, source scoped for the type, Definition exists, version is the current one, assurance meets the Definition's floor, payload under `max_payload_bytes` (300 KiB), payload decodes with numbers kept as lexemes, closed JSON Schema passes. The first failure names the reason."
+    action: "In order: envelope valid, binding is this subject, source scoped for the type, Definition exists, version is the current one, assurance meets the Definition's floor, payload under `max_payload_bytes` (300 KiB), payload decodes with numbers kept as lexemes, closed JSON Schema passes. The first failure names the reason."
     reads: [/data-structures/definition-manifest.md]
     resource: internal/def/check.go#Check
     anchor: "if err := d.schema.Validate(doc); err != nil {"

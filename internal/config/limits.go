@@ -139,7 +139,7 @@ const (
 	DefaultMaxAbsentIDs = 1000
 	// DefaultMaxAbsentJudged: a few seconds of queries on the NAS.
 	DefaultMaxAbsentJudged = 5000
-	// DefaultMaxResponseBytes: the whole-person timeline is about 5 MB today; this
+	// DefaultMaxResponseBytes: the whole-record timeline is about 5 MB today; this
 	// leaves it room to grow tenfold.
 	DefaultMaxResponseBytes = 64 << 20
 	// DefaultNetworkMargin: the home network's round trip, many times over.

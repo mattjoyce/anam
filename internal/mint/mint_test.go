@@ -434,7 +434,7 @@ func TestLoad_RefusesBytesThatAreNotTheValueTheyClaim(t *testing.T) {
 	}
 }
 
-// composeAll loads every head and composes them: the whole-person read from
+// composeAll loads every head and composes them: the whole-record read from
 // checkpoints alone.
 func (h *harness) composeAll(t *testing.T) fold.Value {
 	t.Helper()

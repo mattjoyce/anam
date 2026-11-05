@@ -1,7 +1,7 @@
 // Package serve publishes a projection and honours a receipt — the two halves of
 // R7's claim, kept in one place because they must stay each other's inverse.
 //
-// Serving reads: the person at the head watermark, composed from the last mint run and
+// Serving reads: the whole record at the head watermark, composed from the last mint run and
 // the tail after it when the checkpoint log is to hand and folded from the beginning
 // when it is not, pruned through the selected template and the consent gate; the
 // served value and its receipt are written to the operational store. It writes nothing to
@@ -127,7 +127,7 @@ type Served struct {
 	Written bool
 }
 
-// canonical is the whole-person value at a watermark and how it was reached.
+// canonical is the whole-record value at a watermark and how it was reached.
 type canonical struct {
 	W     ledger.Watermark
 	Value fold.Value

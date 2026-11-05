@@ -4,14 +4,14 @@
 // A bucket is a window of fact-time. Every Facet is a member of exactly one, by
 // arithmetic on its fact-time — there is no membership table and no lookup. Buckets
 // tile: they partition fact-time with no overlaps and no gaps, which is what makes the
-// whole-person view a plain union of bucket values rather than an interval-cover
+// whole-record view a plain union of bucket values rather than an interval-cover
 // problem.
 //
 // A bucket is invisible above this package. Nobody reads one, names one, or bookmarks
 // one. It exists only to bound how far a read must replay.
 //
 // Contrast the *derived* span (`[from, to]`, a saved bookmark, "everything"), which a
-// person names and Anam never mints. And contrast **cadence** — how often a checkpoint
+// reader names and Anam never mints. And contrast **cadence** — how often a checkpoint
 // is taken, which is a different knob entirely: width bounds the cost of *making* one,
 // cadence the cost of *using* one.
 package span

@@ -62,8 +62,8 @@ func (d Definition) timeAt(doc any, tf TimeField) (time.Time, error) {
 	}
 	// The source's clock is read in the zone the fact names, or the Definition's. A
 	// layout that carries its own offset keeps it; a zoneless one, which is what every
-	// local export writes, lands at the instant the person lived it rather than ten
-	// hours away.
+	// local export writes, lands at the instant it happened rather than ten hours
+	// away.
 	loc, err := d.zoneOf(doc)
 	if err != nil {
 		return time.Time{}, err

@@ -26,7 +26,7 @@ references:
 | `template`, `template_version` | string, int | the exact pruning; verify replays the catalog's file at that version, refusing one whose body moved; once the catalog no longer holds that version, the body filed in `template_body` under `template_hash` (card 257; the table was `inline_projection` before schema 10, card 260); else answers unable to verify |
 | `definition_set_version` | string | hash of the bundled manifests, provenance only |
 | `served_at` | string | the clock layout |
-| `span` | string | `whole-person` or `fact-time[from,to)` |
+| `span` | string | `whole-record` or `fact-time[from,to)`; receipts filed before card 270a carry the old name of `whole-record` (docs/API.md says which), and verify reads neither |
 | `query` | object, optional | `{from, before, at, type}` a read narrowed by after the template; nil for a whole serve |
 | `template_inline` | bool, optional | the template was an inline projection a query carried (card 211): `template` is then `inline`, `template_version` 1, and `template_hash` the address of the body filed in the `template_body` table. Last, left out when false, so every earlier receipt keeps its bytes and hash |
 | `principal` | string, optional | the name, from the importers file, of the principal whose read this files, for a token set to record every read (card 216). Last and left out when empty, so every receipt cut before it has the same bytes and hash and still verifies |

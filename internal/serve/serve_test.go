@@ -47,7 +47,7 @@ func TestRun_ServesAndPublishes(t *testing.T) {
 	if r.Template != "measures" || r.TemplateVersion != 1 {
 		t.Errorf("receipt names %s v%d", r.Template, r.TemplateVersion)
 	}
-	if r.Span != "whole-person" {
+	if r.Span != "whole-record" {
 		t.Errorf("receipt span %q", r.Span)
 	}
 	if r.ServedAt != "2026-07-25T09:00:00.000000000Z" {
@@ -338,6 +338,57 @@ func TestVerify_MissingServedValueIsNotTampering(t *testing.T) {
 	}
 	if !strings.Contains(res.Summary(), "not present") {
 		t.Errorf("the summary does not distinguish absent from altered:\n%s", res.Summary())
+	}
+}
+
+// A receipt filed before card 270a says span whole-person, the old name of
+// whole-record. Its bytes, and so its hash, keep the label it was written with, and it
+// verifies on a build that writes the new one: verify reads the span of neither.
+func TestVerify_AcceptsTheOldSpanLabel(t *testing.T) {
+	t.Parallel()
+	h := newHarness(t)
+	h.seed(t)
+	ctx := context.Background()
+
+	out, err := serve.Run(ctx, h.deps, "measures", false)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if out.Receipt.Span != "whole-record" {
+		t.Fatalf("a new receipt says span %q, want whole-record", out.Receipt.Span)
+	}
+
+	old := out.Receipt
+	old.Span = "whole-person"
+	ob, err := old.Bytes()
+	if err != nil {
+		t.Fatalf("Bytes: %v", err)
+	}
+	oldHash, err := h.db.Put(ctx, receipt.Kind, ob)
+	if err != nil {
+		t.Fatalf("Put the old receipt: %v", err)
+	}
+	if oldHash == out.ReceiptHash {
+		t.Fatal("the old label gave the same receipt hash; the test would verify the new receipt twice")
+	}
+
+	for _, c := range []struct{ label, hash string }{
+		{"whole-record", out.ReceiptHash},
+		{"whole-person", oldHash},
+	} {
+		r, res, err := serve.Verify(ctx, h.deps, c.hash)
+		if err != nil {
+			t.Fatalf("%s: Verify: %v", c.label, err)
+		}
+		if r.Span != c.label {
+			t.Errorf("%s: the filed receipt reads span %q", c.label, r.Span)
+		}
+		if !res.Reproduced || !res.Intact {
+			t.Errorf("%s: Reproduced=%v Intact=%v, want both:\n%s", c.label, res.Reproduced, res.Intact, res.Summary())
+		}
+		if len(res.Notes) != 0 {
+			t.Errorf("%s: verify noted %q, want no note", c.label, res.Notes)
+		}
 	}
 }
 

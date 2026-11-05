@@ -33,7 +33,7 @@ func newRoot(info BuildInfo) *cobra.Command {
 
 	root := &cobra.Command{
 		Use:           "anam",
-		Short:         "anam — a personal, longitudinal context store",
+		Short:         "anam — a longitudinal record of one subject, kept as immutable facts",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

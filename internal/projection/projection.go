@@ -130,9 +130,12 @@ type Template struct {
 // Span describes the derived span a template serves, for the receipt to record (§9).
 // It is the template's fact-time window rendered as one deterministic string, so a
 // receipt stays self-describing when read years later without the binary that made it.
+// A template with no window serves the whole record. Receipts filed before card 270a
+// carry the old name of that label (docs/API.md, "The span label"); they keep it, and
+// verify reads neither.
 func (t Template) Span() string {
 	if t.From == "" && t.To == "" {
-		return "whole-person"
+		return "whole-record"
 	}
 	from, to := t.From, t.To
 	if from == "" {

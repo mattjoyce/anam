@@ -17,7 +17,7 @@ Hold the tension; do not average it.
   - Anam is **Datomic-shaped**: append-only accreting **immutable facts**, epochal time
     (fact-time / anam-time), **current state derived as a fold**. Never overwrite a fact. Never
     store a fact's current status as mutable place — derive it.
-  - The **substrate is accidental**, not essential — the problem is a personal longitudinal record, not a
+  - The **substrate is accidental**, not essential — the problem is a longitudinal record of one subject, not a
     store. Only `internal/store` may name SQLite or `database/sql`; `scripts/check.sh` enforces
     it. Anam reads no source itself: every source reaches it through an importer, over the envelope
     API (card 119). The ledger is the record, in a SQLite file of its own; files
@@ -197,7 +197,7 @@ of ten (`health`, `activity`, `place`, `record`, `mind`, `org` and `money`, with
 `work` reserved), so growth is in the concept, in a specialisation after it, and in `family`, not in new
 heads (`health.blood-pressure`, `social.message`, `media.play`). A head is added only by a logged
 decision, as `mind` was for self-reported inner states, `org` for relationships with
-organisations and `money` for what the person paid. Which of those a distinction
+organisations and `money` for what was paid. Which of those a distinction
 belongs in is written down in `docs/explainer/bundle/decisions/where-a-distinction-is-encoded.md`.
 Payload keys stay snake_case; the dotted facet type is deliberate and lives here so it doesn't drift.
 

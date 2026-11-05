@@ -280,7 +280,7 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// With none kept it opens the last 30 days ending today, in the server's zone, so
-	// the first look is recent; "?view=whole" is the whole person (card 263).
+	// the first look is recent; "?view=whole" is the whole record (card 263).
 	if r.URL.RawQuery == "" {
 		s.redirectLastMonth(w, r)
 		return

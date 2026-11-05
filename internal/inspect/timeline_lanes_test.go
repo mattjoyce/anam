@@ -175,7 +175,7 @@ func TestTimeline_AnOpenedLaneRoundTripsThroughTheAddress(t *testing.T) {
 			t.Errorf("%s link does not carry the open lane: %v", id, m)
 		}
 	}
-	// Closing it again is the lane's own link, back to the whole person.
+	// Closing it again is the lane's own link, back to the whole record.
 	var closeLink string
 	for _, m := range toggleRe.FindAllStringSubmatch(openBand, -1) {
 		if m[1] == "health" {

@@ -27,7 +27,7 @@ func serveCmd(cfgPath *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "serve [projection]",
 		Short: "publish a projection of the canonical, with a receipt",
-		Long: `Serve prunes the whole-person canonical through a projection template and
+		Long: `Serve prunes the whole-record canonical through a projection template and
 publishes the result: the served value and its receipt, each written to the
 artifact directory under the SHA-256 of its own bytes.
 

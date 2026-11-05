@@ -123,7 +123,7 @@ type Daemon struct {
 }
 
 // Open opens both stores for writing and the ledger once more for reading. The ledger
-// must exist, belong to cfg's person and hold this build's schema; the operational
+// must exist, belong to cfg's subject and hold this build's schema; the operational
 // store must match its schema and bucket width; and this build's bundled Definitions
 // must not re-key what the store last saw. Any mismatch refuses to start.
 //
@@ -347,7 +347,7 @@ func (d *Daemon) Handler() http.Handler {
 }
 
 // healthz is ready when the ledger's head can be read within the deadline. The ledger's
-// person and schema were checked at Open, and the file cannot change schema under a
+// subject and schema were checked at Open, and the file cannot change schema under a
 // running daemon, so a readable head is the remaining question. It answers ready or
 // not and nothing more.
 func (d *Daemon) healthz(w http.ResponseWriter, r *http.Request) {

@@ -106,7 +106,7 @@ func TestHandoff_CarriesTheTypeFilter(t *testing.T) {
 	if want := "/select?from=2026-10-12&to=2026-10-12&type=test.measure&type=test.reading&zone=Australia%2FSydney"; got != want {
 		t.Errorf("select in this range = %s, want %s", got, want)
 	}
-	// A filter with nothing to say opens the whole person.
+	// A filter with nothing to say opens the whole record.
 	_, bare, _ := fetch(t, srv.URL+"/select")
 	if got := link(bare, "show-on-timeline"); got != "/?view=whole" {
 		t.Errorf("an empty filter shows on the timeline at %s", got)

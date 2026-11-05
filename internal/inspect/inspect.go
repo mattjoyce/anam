@@ -118,7 +118,7 @@ type Server struct {
 	// the inspector only reads, and the entry routes do not exist (card 188).
 	bench Workbench
 
-	// The fold cache, keyed by watermark: a whole-person read is one replay plus
+	// The fold cache, keyed by watermark: a whole-record read is one replay plus
 	// one fetch per live facet, too dear to repeat per page view. Every request
 	// still reads the head (one cheap call), so a moved W is never served stale —
 	// the cache holds a *value*, and values don't go stale, they get replaced.
@@ -248,7 +248,7 @@ func (s *Server) templates() (*projection.Registry, error) {
 	return s.catalog.Projections(), nil
 }
 
-// read returns the whole person at the current head, from cache when the
+// read returns the whole record at the current head, from cache when the
 // watermark has not moved.
 func (s *Server) read(ctx context.Context) (fold.Result, error) {
 	head, err := s.ledger.Head(ctx)

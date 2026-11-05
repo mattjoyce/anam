@@ -70,13 +70,13 @@ steps:
     anchor: "if !need && !d.buckets[id] && sized {"
   - actor: /components/mint.md
     label: stream the whole hash, value the window
-    action: The whole-person hash is streamed over every bucket's inner bytes joined in time order, so it equals the hash of the full value without decoding it. Only the overlapping buckets' entries become the window's value.
+    action: The whole-record hash is streamed over every bucket's inner bytes joined in time order, so it equals the hash of the full value without decoding it. Only the overlapping buckets' entries become the window's value.
     reads: [/data-structures/fold-entry.md]
     resource: internal/mint/window.go#ReadWindow
     anchor: 'win.Hash = "sha256:" + hex.EncodeToString(h.Sum(nil))'
   - actor: /components/read.md
     label: filter the window, write the header
-    action: Entries are kept when inside `[from, to)` and of the requested type; the header carries W, the live count and the whole-person hash as `Canonical`, and the version of each shown facet.
+    action: Entries are kept when inside `[from, to)` and of the requested type; the header carries W, the live count and the whole-record hash as `Canonical`, and the version of each shown facet.
     resource: internal/read/timeline.go#describe
     anchor: "t.Live, t.Canonical = v.whole.Live, v.whole.Hash"
   - actor: /components/read.md
@@ -108,7 +108,7 @@ steps:
     anchor: 'fmt.Fprintln(w, "FACT TIME\tTYPE\tV\tSTATUS\tSOURCE REF\tID")'
 ---
 
-The read is where the mint pays for itself: a window read decodes only the buckets it overlaps and the ones a late correction dirtied, and still reports the whole-person hash. The fallback to a full fold is not an error path but the oracle: every composed read is tested equal to it at every watermark.
+The read is where the mint pays for itself: a window read decodes only the buckets it overlaps and the ones a late correction dirtied, and still reports the whole-record hash. The fallback to a full fold is not an error path but the oracle: every composed read is tested equal to it at every watermark.
 
 Without a window (`anam timeline` bare) the read takes `mint.ReadAt`, which loads every leaf checkpoint and applies the tail. With `--projection` or `--at` the whole value is read and then pruned. With `--explain` the checkpoints are dropped on purpose so displaced versions can be listed.
 

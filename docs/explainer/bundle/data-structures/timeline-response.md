@@ -1,7 +1,7 @@
 ---
 type: data-structure
 title: Timeline response
-description: "What GET /v1/timeline answers: the watermark, counts, the whole-person hash, the shown entries with their versions, and verdicts when a projection or explain was asked for."
+description: "What GET /v1/timeline answers: the watermark, counts, the whole-record hash, the shown entries with their versions, and verdicts when a projection or explain was asked for."
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/api/timeline.go#Timeline
 anchor: "type Timeline struct {"
@@ -18,7 +18,7 @@ references:
 |---|---|
 | `w` | the watermark the read ran at |
 | `live`, `shown` | live facets in the whole value, and how many the window and type kept |
-| `canonical` | the whole-person hash at W, not the window's |
+| `canonical` | the whole-record hash at W, not the window's |
 | `as_of`, `at`, `at_hash` | the knowledge and fact-time points named, and the snapshot's hash |
 | `projection` | the template served through, if any |
 | `entries` | fold entries, in fact-time order |

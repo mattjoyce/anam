@@ -37,7 +37,7 @@ func (c *countingLedger) Versions(ctx context.Context, refs []ledger.VersionRef)
 }
 
 // denseServer seeds forty heart-rate readings ten minutes apart on 2026-07-05, a
-// blood pressure reading in 2024 to stretch the whole-person window over years,
+// blood pressure reading in 2024 to stretch the whole-record window over years,
 // 1,500 daily weights, and one tombstoned facet. It returns the server and the
 // counting ledger behind it.
 func denseServer(t *testing.T) (*httptest.Server, *countingLedger) {
@@ -96,14 +96,14 @@ func TestTimeline_DenseMarksDrawAsARunUntilZoomedIn(t *testing.T) {
 	// Health is a closed lane, so its two types share one line: the morning's readings
 	// fall inside the weights' stretch and join its run (card 245).
 	if n := strings.Count(band, `class="run"`); n != 1 {
-		t.Fatalf("%d runs on the collapsed whole-person band, want 1 (all of health)", n)
+		t.Fatalf("%d runs on the collapsed whole-record band, want 1 (all of health)", n)
 	}
 	if n := strings.Count(band, `/facet?id=`); n != 1 {
-		t.Errorf("%d marks on the whole-person band, want the 2024 reading alone", n)
+		t.Errorf("%d marks on the whole-record band, want the 2024 reading alone", n)
 	}
 	for _, want := range []string{"1540 × health (2 types)", "1541 facets in this window, 1 run", "click to zoom in", `<text x="`} {
 		if !strings.Contains(whole, want) {
-			t.Errorf("collapsed whole-person band missing %q", want)
+			t.Errorf("collapsed whole-record band missing %q", want)
 		}
 	}
 	// Opened, each type has a lane of its own: the morning and the weights are two runs.
@@ -142,7 +142,7 @@ func TestTimeline_DenseMarksDrawAsARunUntilZoomedIn(t *testing.T) {
 		t.Error("the day's strip is not drawn square by square")
 	}
 	if len(whole) >= len(day) {
-		t.Errorf("whole-person page (%d bytes) is not smaller than the day's (%d)", len(whole), len(day))
+		t.Errorf("whole-record page (%d bytes) is not smaller than the day's (%d)", len(whole), len(day))
 	}
 }
 
@@ -219,7 +219,7 @@ func TestTimeline_NoneUnchecksEveryType(t *testing.T) {
 }
 
 // A view is a URL, so "make this my default" keeps its query in a cookie and a bare
-// "/" opens it; "forget" returns "/" to the last month, and the whole person stays reachable.
+// "/" opens it; "forget" returns "/" to the last month, and the whole record stays reachable.
 func TestTimeline_DefaultViewIsACookieOverTheQuery(t *testing.T) {
 	t.Parallel()
 	srv, bpID, _ := seededServer(t)
@@ -241,7 +241,7 @@ func TestTimeline_DefaultViewIsACookieOverTheQuery(t *testing.T) {
 		t.Error("a view without a default does not offer to become one")
 	}
 	if !strings.Contains(page, `id="whole"`) {
-		t.Error("a zoomed view has no way back to the whole person")
+		t.Error("a zoomed view has no way back to the whole record")
 	}
 
 	form := url.Values{"view": {view}}
@@ -277,7 +277,7 @@ func TestTimeline_DefaultViewIsACookieOverTheQuery(t *testing.T) {
 		}
 	}
 
-	// The whole person is still a page, and an explicit query never redirects.
+	// The whole record is still a page, and an explicit query never redirects.
 	req, _ = http.NewRequest(http.MethodGet, srv.URL+"/?view=whole", nil)
 	req.AddCookie(cookie)
 	resp, page = do(req)
@@ -356,6 +356,6 @@ func TestTimeline_BareRootOpensTheLastMonth(t *testing.T) {
 
 	code, page := get(t, srv.URL+"/?view=whole")
 	if code != http.StatusOK || strings.Contains(page, "this view is your default") {
-		t.Errorf("GET /?view=whole = %d, want the whole person", code)
+		t.Errorf("GET /?view=whole = %d, want the whole record", code)
 	}
 }

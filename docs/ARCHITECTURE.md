@@ -9,10 +9,11 @@
 
 ## 1. Purpose and boundary
 
-Anam is a **personal, longitudinal context store** over one person's own source systems. It assembles a
-versioned, chronological, evidence-backed account of that person from fragmented sources (a health
-database, a blood-pressure export, and — later — anything else), and serves it back to the person and
-to agents acting for them.
+Anam is a **longitudinal context store** about one **subject**, over the subject's own source systems.
+The subject is what the record is about, which might be a person; in the author's deployment it is the
+author. Anam assembles a versioned, chronological, evidence-backed account of that subject from
+fragmented sources (a health database, a blood-pressure export, and — later — anything else), and
+serves it back to the people who keep the record and to agents acting for them.
 
 One invariant governs every decision below:
 
@@ -35,14 +36,14 @@ So state it plainly: **Anam owns no fact, and Anam owns the continuity.** The co
 while Anam is switched off. That is the whole product, and it is why the ledger's order, its watermarks
 and its checkpoints are backed up rather than assumed rebuildable.
 
-### The whole-person read (read this before anything else)
+### The whole-record read (read this before anything else)
 
-A person is unbounded and a life has no edges, so a store of one is pulled toward being a system of
-record: *longitudinal is system-of-record gravity.* A personal record *wants* to be longitudinal, so
-Anam makes the Person the substrate and accepts the gravity, knowingly, at the scale of one life,
-where the cost is affordable.
+A subject's history is unbounded (a life has no edges, and neither does a machine's service), so a
+store of one subject is pulled toward being a system of record: *longitudinal is system-of-record
+gravity.* A record of one subject *wants* to be longitudinal, so Anam makes the Subject the substrate
+and accepts the gravity, knowingly, at the scale of one subject, where the cost is affordable.
 
-> **The whole-person timeline read is Anam's default and normal mode.**
+> **The whole-record timeline read is Anam's default and normal mode.**
 
 Two things follow that are easy to conflate, and must not be:
 
@@ -50,7 +51,7 @@ Two things follow that are easy to conflate, and must not be:
   (a trip, an illness, a training block) you impose to focus.
 - **The mint unit is bounded.** Minting is **per span**, never whole-life. Anam's
   default mintable span is a **time bucket** (§7). The lifelong view **composes** bucket checkpoints; it
-  never re-folds the person.
+  never re-folds the record.
 
 *"There is no required span, therefore the mint unit is the whole timeline"* is a conflation of the
 two. Removing the span as a **required read filter** never required removing it as a **mint unit**.
@@ -62,16 +63,16 @@ mint, fold, and projections.
 
 ## 2. Topology
 
-Information flows **upward**: the person's source systems at the base, Anam composing context in the
-middle, the person and their agents consuming it at the top.
+Information flows **upward**: the subject's source systems at the base, Anam composing context in the
+middle, the people who keep the record and their agents consuming it at the top.
 
 ```text
             You · agents acting for you · views · exports
                                   ▲
                                   │  governed projections + receipts
  ┌─────────────────────────────────────────────────────────────────┐
- │  ANAM — personal episodic context                                 │
- │    Canonical person account  →  governed projections    ▲ serve   │
+ │  ANAM — episodic context about one subject                        │
+ │    Canonical subject account →  governed projections    ▲ serve   │
  │    Mint          (checkpoints over the whole timeline)  │         │
  │    Append-only ledger        (Anam's log)               │         │
  │    Ingest gate   (the only ingress; resolve → commit)   ▲ ingest  │
@@ -152,14 +153,15 @@ distinction goes, in the name or elsewhere, is the decision [where a distinction
 
 ---
 
-## 4. The person timeline — substrate and default access
+## 4. The subject timeline — substrate and default access
 
-Storage is **partitioned by the person**: a ledger file is pinned to one `person_id`, and all their
-facets are co-located on one **timeline**, in **fact-time** order. The person is the **substrate**.
+Storage is **partitioned by the subject**: a ledger file is pinned to one subject id (`subject_id` in
+config), and all the subject's facets are co-located on one **timeline**, in **fact-time** order. The
+subject is the **substrate**.
 
-**Access is the person timeline, read whole by default.** There is no required
-span filter and no fail-closed on a whole-person read — a longitudinal record is the point.
-A read is "my facts, in time order," optionally narrowed.
+**Access is the subject timeline, read whole by default.** There is no required
+span filter and no fail-closed on a whole-record read — a longitudinal record is the point.
+A read is "the subject's facts, in time order," optionally narrowed.
 
 ### Two kinds of Span, and they are not the same thing
 
@@ -169,15 +171,15 @@ Conflating these would produce a whole-timeline mint, which §1 rules out. Anam 
 | Tier | What it is | Minted? |
 |---|---|---|
 | **Bucket span** | a calendar window over **fact-time**, **one month** by default (`bucket_width` in config, `span.Default`; weekly is also implemented). Every facet is a member of exactly one, by arithmetic on its `fact_time` — no lookup. Invisible to the reader; nobody asks for it. | **minted** — the unit of checkpointing (§7) |
-| **Derived span** | an inclusive interval the person names — `[from, to]`, optionally narrowed to some facet types; a saved bookmark; or "everything" | **never minted.** Composed on demand from bucket values; materialised only when a receipt is served |
+| **Derived span** | an inclusive interval a reader names — `[from, to]`, optionally narrowed to some facet types; a saved bookmark; or "everything" | **never minted.** Composed on demand from bucket values; materialised only when a receipt is served |
 
 A derived span is a **lens**, not a unit of consistency: composed on demand, never stored as one, never
 pulsed. A saved bookmark (`span#<id>`) is a stored *query*, nothing more. The whole-life span is
 expressible and of limited use — a life is what you compose, not what you mint.
 
-Because there is one person, there is **no identity graph and no merge**.
+Because there is one subject, there is **no identity graph and no merge**.
 
-What keeps a person-partitioned, longitudinally-read store honest is **not** a span filter (Anam removed
+What keeps a subject-partitioned, longitudinally-read store honest is **not** a span filter (Anam removed
 that) but the invariant of §1: **Anam owns no source fact; every payload is verbatim-from-source and
 rebuildable** — while owning, and taking responsibility for, the continuity.
 
@@ -258,7 +260,7 @@ The consequence is a division of labour worth stating plainly:
   published artifact? That is what `as-of`, `changes_since` and the watermark exist for, and their
   resolution is exactly right for it.
 - **Fact-time is the history instrument.** It has full resolution because it comes from the source, and
-  it is the axis the person actually experienced.
+  it is the axis the subject's history actually ran on.
 
 Anam-time gains real resolution only when ingest becomes incremental — worth knowing before minting
 (§7), because checkpoints are cut against watermarks.
@@ -298,7 +300,7 @@ sound. `changes_since` is built from anam-time (§9).
 ## 6. The admission gate — the only ingress
 
 Nothing enters the ledger except through the gate, which enforces **three pillars**,
-simplified for a single person but kept in shape:
+simplified for a single subject but kept in shape:
 
 1. **Facet-compliant** — the payload meets its Facet Definition (schema, envelope, time semantics,
    validation bar). *This is where "validate all external input" lives* — source rows are external
@@ -307,8 +309,8 @@ simplified for a single person but kept in shape:
    only the facet type(s) it is scoped for (least privilege); the injector identity becomes part of the
    facet's provenance. The scope is real credentials: each importer's own token, held by the daemon
    as a hash beside its source and types (`importers_file`, docs/IMPORTERS.md §8).
-3. **Associated** — the facet **binds** to the person. With one person this is near-trivial, but the
-   shape holds: assurance is *high* when the source explicitly scopes to the person, *medium* when
+3. **Associated** — the facet **binds** to the subject. With one subject this is near-trivial, but the
+   shape holds: assurance is *high* when the source explicitly scopes to the subject, *medium* when
    defaulted, *review* when a carried identity element contradicts. A `span_hint` may be recorded if a
    source declares one, but **binding never requires a span**.
 
@@ -444,7 +446,7 @@ read, paid by a range-scan; it is not bought by a periodic tick.
     to be re-checked, not inherited. Measured again at 11,246 live facets (2026-10-06, the first
     mint): **34 monthly buckets, mean 330, worst 744, thinnest 19**; a dry run of every bucket took
     0.8 s wall.
-- **The lifelong / derived view composes, it never re-folds.** A Span the person names (`--from/--to`, a
+- **The lifelong / derived view composes, it never re-folds.** A Span a reader names (`--from/--to`, a
   saved bookmark, "everything") is a **derived span**: computed on demand by stitching bucket values,
   materialised only when a receipt is served. It is never pulsed and never minted.
   Built 2026-10-09 (card 59): a timeline read starts from the checkpoints of the latest mint run at or
@@ -660,7 +662,7 @@ answers the fixed forms; everything richer is computed over what they return.
 > may, over the served copy, through a projection (decided 2026-10-17, card 173). "Every reading with
 > systolic over 140" is a query answered by opening each served payload the projection admitted,
 > not an index lookup the ledger performs, and the distinction is what keeps opacity a storage rule
-> rather than a ceiling on what a person may ask of their own record.
+> rather than a ceiling on what a reader may ask of the record.
 >
 > The accurate description is **an entity, a governed envelope, an opaque payload, and two clocks**
 > (§5) — a datom with a fat, opaque value. Bare "EAVT" is one letter-string standing in for a design it
@@ -707,8 +709,8 @@ the unit SQLite deletes, locks and opens read-only by:
 - deleting the operational file and replaying proves the derived tier is derived, because nothing of the
   ledger could have been inside it.
 
-The ledger's `person_id` is pinned in `ledger_meta` at `init`, and a ledger pinned to another person is
-refused on every open. `ledger_meta` is write-once like every other ledger row, so the schema version is
+The subject's id is pinned in `ledger_meta` at `init`, under the key `person_id` (its stored name until
+card 270b), and a ledger pinned to another subject is refused on every open. `ledger_meta` is write-once like every other ledger row, so the schema version is
 not a pin that moves: `schema_version` is the version the file was **created** at, each migration applied
 since adds a `schema_migration:<n>` row beside it, and the file's effective version is the highest of
 them. A migration only ever adds (a column with a default, an index), never rewrites a row, and runs as
@@ -847,8 +849,8 @@ Superseded and tombstoned facets are *excluded from the value* — they remain i
   current status (`admitted` / `superseded` / `tombstoned` / `endorsed` / `rejected`), keeping the live
   ones. Liveness ⇔ the current artifact version's status is live.
 - The **normal serve path** is *nearest checkpoint + replay-since* (§7), so a read is as fresh as ingest.
-- The **whole-person timeline** — Anam's default read — is a **derived span composed** from bucket
-  checkpoints plus the open bucket's replay. It never re-folds the person.
+- The **whole-record timeline** — Anam's default read — is a **derived span composed** from bucket
+  checkpoints plus the open bucket's replay. It never re-folds the record.
 
 **Retraction is a command, never a side effect of ingest** (`anam retract <source>`, 2026-10-07). Ingest
 admits and supersedes; a row's absence from one scan and a source's absence look alike from inside an
@@ -866,7 +868,7 @@ and its explanation says *displaced by* or *closed by* which facet. It runs afte
 what they admitted, so the window's `to` is the snapshot's "at". Filtering is on **metadata only, never
 the payload**; a projection includes or excludes **whole Facets**. A consumer **selects** a projection;
 it never defines one — which is why shape is a template knob and not a read-time flag. (`timeline --at`
-is the person's own un-published view of the same read; `serve meds` is the published one.)
+is the operator's own un-published view of the same read; `serve meds` is the published one.)
 
 Defining is the **operator's** act, not a release's (decided 2026-10-11, built 2026-10-13, card 125).
 Templates are **bundled or registered**: the bundled ones ship with the binary as the floor, and the
@@ -948,10 +950,11 @@ something Anam learned about the fact.
 
 ---
 
-## 10. Consent and classification (kept in shape, trivial for one person)
+## 10. Consent and classification (kept in shape, trivial for one reader)
 
-Anam is single-user, so consent is **default-allow** — but the *shape* is preserved so the seam exists
-for a future where Anam serves facets to third-party agents:
+Each deployment today has one operator reading their own record, so consent is **default-allow** — but
+the *shape* is preserved so the seam exists for a future where Anam serves facets to third-party
+agents, or a record is read by more than one party (a machine's owner and its repair contractor):
 
 - Every facet carries a **`classification`** (`Normal` / `Confidential` / `Sensitive`).
 - A projection passes through a `consent.Evaluate()` gate that today returns *allow*; the hook is real
@@ -985,7 +988,7 @@ Anam later as an ordinary source fact.
   and rebuildable. **Anam does own the continuity**, which is re-derivable but held nowhere else (§1).
 - What is Anam-authored — governing metadata, the ledger order, watermarks, checkpoints, receipts, and
   provisional derived findings — is **authored, never authoritative**; backed up, not rebuilt.
-- **Storage is partitioned by the person (one timeline).** The **whole-person read is the default**; a
+- **Storage is partitioned by the subject (one timeline).** The **whole-record read is the default**; a
   Span is an optional derived *read* filter. **Minting is per span, never whole-life** — the two are
   different concerns and must not be conflated (§1, §7).
 - **The ledger is the system of record**; the library's files hold documents; SQLite is Anam's **operational

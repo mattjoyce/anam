@@ -27,7 +27,7 @@ type TimelineQuery struct {
 	Zone string `json:"zone"`
 }
 
-// Timeline is one read of the person: what it was read at and through, the hashes
+// Timeline is one read of the record: what it was read at and through, the hashes
 // that identify it, and the entries that survived the narrowing. With Explain it
 // carries Verdicts instead of Entries.
 type Timeline struct {
@@ -41,7 +41,7 @@ type Timeline struct {
 	// hash; both empty for a log read.
 	At     string `json:"at,omitempty"`
 	AtHash string `json:"at_hash,omitempty"`
-	// Canonical is the whole-person value's hash at W, whatever the narrowing.
+	// Canonical is the whole-record value's hash at W, whatever the narrowing.
 	Canonical  string          `json:"canonical"`
 	Projection *ProjectionRead `json:"projection,omitempty"`
 

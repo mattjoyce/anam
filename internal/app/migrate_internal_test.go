@@ -90,7 +90,7 @@ func admitAs(t *testing.T, path, source string, defs *def.Registry, recs []recor
 	bindings := make([]facet.Binding, len(recs))
 	for i, r := range recs {
 		types[i] = r.typ
-		envs[i] = facet.Envelope{Type: r.typ, Source: source, Injector: source, Payload: []byte(r.payload), AssertedPerson: "matt"}
+		envs[i] = facet.Envelope{Type: r.typ, Source: source, Injector: source, Payload: []byte(r.payload), AssertedSubject: "matt"}
 	}
 	g := gate.New(l, defs, gate.StaticScopes{source: types}, clock.Real{}, "matt",
 		gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})

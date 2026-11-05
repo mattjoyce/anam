@@ -198,13 +198,34 @@ func decodeSubmission(w http.ResponseWriter, r *http.Request, imp config.Princip
 		if e.DefinitionVersion < 1 {
 			return nil, nil, fmt.Errorf("envelope %d (%s): definition_version is required", i, e.Type)
 		}
+		asserted, err := assertedSubjectOf(i, e)
+		if err != nil {
+			return nil, nil, err
+		}
 		envs[i] = facet.Envelope{
 			Type: facet.Type(e.Type), Source: source, Injector: source, SourceRef: e.SourceRef,
 			Payload: e.Payload, DefinitionVersion: e.DefinitionVersion,
-			AssertedPerson: e.AssertedPerson, SpanHint: e.SpanHint,
+			AssertedSubject: asserted, SpanHint: e.SpanHint,
 		}
 	}
 	return envs, sub.Snapshot, nil
+}
+
+// assertedSubjectOf settles envelope i's asserted subject from its two wire names
+// (card 270a): asserted_subject, and asserted_person, its old name, read until a later
+// release removes it. Either alone, or both equal, is the value; neither is empty. The
+// two set to different values refuse the batch, since the gate cannot tell which one
+// the source meant.
+func assertedSubjectOf(i int, e api.SubmittedEnvelope) (string, error) {
+	switch {
+	case e.AssertedSubject == "":
+		return e.AssertedPerson, nil
+	case e.AssertedPerson != "" && e.AssertedPerson != e.AssertedSubject:
+		return "", fmt.Errorf("envelope %d (%s): asserted_subject (%q) and its old name asserted_person (%q) differ; send asserted_subject only",
+			i, e.Type, e.AssertedSubject, e.AssertedPerson)
+	default:
+		return e.AssertedSubject, nil
+	}
 }
 
 // atEOF is nil once dec has nothing left but whitespace. Anything else is the error:

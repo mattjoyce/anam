@@ -84,7 +84,7 @@ func TestResolve_TheThreeAssuranceArms(t *testing.T) {
 	}
 	for _, tc := range cases {
 		env := bpEnvelope(bpPayload)
-		env.AssertedPerson = tc.asserted
+		env.AssertedSubject = tc.asserted
 		b, err := g.Resolve(env)
 		if err != nil {
 			t.Fatalf("Resolve(%q): %v", tc.asserted, err)

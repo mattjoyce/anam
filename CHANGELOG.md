@@ -9,6 +9,21 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- The wire names the subject (card 270a, slice 2). `GET /v1/status` answers `subject`, the
+  configured `subject_id`, and still answers `person` with the same value; `person` is
+  deprecated in `openapi.yaml` and a later release removes it, so a reader should move to
+  `subject`. `anam status` prints `(subject <id>)` from `subject`. An envelope in
+  `POST /v1/envelopes` names its subject as `asserted_subject`. `asserted_person` is its
+  deprecated old name, read until the same later release: either alone, or both equal, binds as
+  before (the record's subject high, none medium, another subject review). The two set to
+  different values refuse the whole batch, 400, nothing admitted:
+  `envelope <i> (<type>): asserted_subject ("a") and its old name asserted_person ("b") differ; send asserted_subject only`.
+  A daemon before this change refuses `asserted_subject` as an unknown field, so an importer
+  sends it only once the daemon it talks to answers `subject` on `/v1/status`. Nothing hashed
+  moves: facet ids, content hashes and receipts are the same under either name, and so is a
+  snapshot part's digest, so a complete resend that straddles an importer's switch sees no
+  changed part.
+
 - The configured id is the subject, not the person (card 270a, slice 1). The key is
   `subject_id` and its variable `ANAM_SUBJECT_ID`: what the record is about, which might be
   a person. The old names still work until a later release removes them. `person_id` or

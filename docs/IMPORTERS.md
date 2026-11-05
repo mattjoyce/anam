@@ -387,7 +387,10 @@ shaped to another version. A Definition with no `label` needs none: it is option
 - `type`, `definition_version` and `payload` are required. `definition_version` must be the type's
   current version: the gate refuses a payload shaped to any other.
 - `source_ref` is optional. The gate composes it from the Definition's `identity_key`; sent, it must
-  match. `asserted_person` and `span_hint` are optional.
+  match. `asserted_subject` and `span_hint` are optional. `asserted_subject` names what the
+  observation is about: the record's subject binds at high assurance, another subject at review,
+  which the default floor (medium) refuses. `asserted_person` is its old name, read until a later release removes it; sent
+  with `asserted_subject` at a different value, the batch is refused (400).
 - There is no `source` field, and an unknown field is a 400: the token names the source.
 - A batch holds 1 to 49 envelopes, at most one per facet. Send more as more batches.
 

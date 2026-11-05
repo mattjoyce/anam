@@ -281,10 +281,10 @@ type Envelope struct {
 	// version; any other value must be that version.
 	DefinitionVersion int
 
-	// AssertedPerson and SpanHint are optional; a source may volunteer either, and
+	// AssertedSubject and SpanHint are optional; a source may volunteer either, and
 	// neither is required to bind.
-	AssertedPerson string
-	SpanHint       string
+	AssertedSubject string
+	SpanHint        string
 }
 
 // Validate checks that an Envelope is structurally well-formed. Source rows are

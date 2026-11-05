@@ -46,7 +46,10 @@ type TooLarge struct {
 type Status struct {
 	// Version is the build that answered: the daemon's, or the CLI's own when it read
 	// local files.
-	Version  string `json:"version"`
+	Version string `json:"version"`
+	// Subject is what the record is about, the configured subject_id. Person is its
+	// old name, answered with the same value until a later release removes it.
+	Subject  string `json:"subject"`
 	Person   string `json:"person"`
 	LedgerID string `json:"ledger_id"`
 	W        int64  `json:"w"`

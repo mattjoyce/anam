@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -267,3 +268,81 @@ func sameSet(a, b []string) bool {
 
 // Keep the roles' spelling tied to the config's, so a renamed role fails here.
 var _ = []config.Role{config.RoleReader, config.RoleImporter, config.RoleOperator}
+
+// Card 270a, slice 2: the document names the new fields and marks their old names
+// deprecated. Status requires subject and still requires person, deprecated; an envelope
+// takes asserted_subject, and asserted_person is deprecated. The examples use the new
+// names.
+func TestOpenAPI_SubjectAndItsOldNames(t *testing.T) {
+	t.Parallel()
+	type property struct {
+		Deprecated bool `yaml:"deprecated"`
+	}
+	type schema struct {
+		Required   []string            `yaml:"required"`
+		Properties map[string]property `yaml:"properties"`
+	}
+	// Read through a node: the document defines components.schemas.Entry twice (the
+	// fold's entry and POST /v1/entry's answer), which a map decode refuses.
+	var root yaml.Node
+	if err := yaml.Unmarshal(openAPI, &root); err != nil {
+		t.Fatalf("openapi.yaml: %v", err)
+	}
+	schemas := mappingValue(mappingValue(root.Content[0], "components"), "schemas")
+	var status, envelope schema
+	for name, into := range map[string]*schema{"Status": &status, "Envelope": &envelope} {
+		n := mappingValue(schemas, name)
+		if n == nil {
+			t.Fatalf("components.schemas.%s is missing", name)
+		}
+		if err := n.Decode(into); err != nil {
+			t.Fatalf("components.schemas.%s: %v", name, err)
+		}
+	}
+	// person stays required while it is answered: a client that reads it today, as
+	// anam-mcp does, can rely on it until the release that removes it.
+	if !slices.Contains(status.Required, "subject") || !slices.Contains(status.Required, "person") {
+		t.Errorf("Status requires %v, want subject and person", status.Required)
+	}
+	for _, c := range []struct {
+		schema, field string
+		props         map[string]property
+		deprecated    bool
+	}{
+		{"Status", "subject", status.Properties, false},
+		{"Status", "person", status.Properties, true},
+		{"Envelope", "asserted_subject", envelope.Properties, false},
+		{"Envelope", "asserted_person", envelope.Properties, true},
+	} {
+		p, ok := c.props[c.field]
+		if !ok || p.Deprecated != c.deprecated {
+			t.Errorf("%s.%s: present %v, deprecated %v; want present, deprecated %v", c.schema, c.field, ok, p.Deprecated, c.deprecated)
+		}
+	}
+
+	s := loadSpec(t)
+	status200 := s.Paths["/v1/status"]["get"].Responses["200"].Content["application/json"].Example
+	envs := s.Paths["/v1/envelopes"]["post"].RequestBody.Content["application/json"].Example
+	for name, ex := range map[string]any{"GET /v1/status": status200, "POST /v1/envelopes": envs} {
+		raw, err := json.Marshal(ex)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bytes.Contains(raw, []byte(`"person"`)) || bytes.Contains(raw, []byte(`"asserted_person"`)) {
+			t.Errorf("%s example still uses an old name: %s", name, raw)
+		}
+	}
+}
+
+// mappingValue is the value under key in the mapping node n, or nil.
+func mappingValue(n *yaml.Node, key string) *yaml.Node {
+	if n == nil || n.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		if n.Content[i].Value == key {
+			return n.Content[i+1]
+		}
+	}
+	return nil
+}

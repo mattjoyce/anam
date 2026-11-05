@@ -201,7 +201,7 @@ func (g *Gate) Resolve(env facet.Envelope) (facet.Binding, error) {
 		return facet.Binding{}, err
 	}
 	b := facet.Binding{SubjectID: g.subjectID, SpanHint: env.SpanHint}
-	switch env.AssertedPerson {
+	switch env.AssertedSubject {
 	case g.subjectID:
 		b.Assurance = facet.AssuranceHigh
 	case "":

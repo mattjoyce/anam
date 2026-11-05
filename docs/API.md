@@ -379,7 +379,7 @@ unbounded computation or storage. Large operator work uses an operation handle.
 
 | Operation | Inputs | Result |
 |---|---|---|
-| `DescribeRecord` | Optional governed scope | API version, person label, current time/zone, ledger position, enabled capabilities, limits, known limitations |
+| `DescribeRecord` | Optional governed scope | API version, subject label, current time/zone, ledger position, enabled capabilities, limits, known limitations |
 | `ListProjections` | Cursor | Authorized template IDs, versions, descriptions, supported read modes and parameters. Built 2026-10-13 as `GET /v1/projections`: name, origin, newest version, every version held, description, types, shape, hash |
 | `GetProjection` | Template ID/version | Immutable definition, type coverage, restrictions, examples, supported narrowing. Built as `GET /v1/projections/{name}[/{version}]`, the manifest as canonical JSON; `POST /v1/projections` registers one under the operator's token, 201 new, 200 the same body again, 409 another body at a held version or a version behind, 422 a bad manifest or a type with no Definition |
 | `ListFacetTypes` | Optional projection, cursor | Available types, human descriptions, read/write eligibility, definition versions |

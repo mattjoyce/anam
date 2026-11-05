@@ -231,6 +231,6 @@ func (pr Pair) envelope(r reading) (facet.Envelope, error) {
 	}
 	return facet.Envelope{
 		Type: pr.def.Type, Source: source, Injector: source,
-		SourceRef: ref, Payload: payload, AssertedPerson: Subject,
+		SourceRef: ref, Payload: payload, AssertedSubject: Subject,
 	}, nil
 }

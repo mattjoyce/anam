@@ -80,7 +80,7 @@ paths:
               schema: { $ref: "#/components/schemas/Status" }
               example:
                 version: v0.336-265c26c
-                person: matt
+                subject: matt
                 ledger_id: 0d1e2f3a-4b5c-5d6e-8f90-a1b2c3d4e5f6
                 w: 33378
                 since: "2026-10-18T19:00:12.000000000Z"
@@ -1130,7 +1130,7 @@ paths:
                 - type: health.weight
                   definition_version: 3
                   payload: { id: "conversation:weight/2026-10-19", date: "2026-10-19 07:30", kg: 80.5 }
-                  asserted_person: matt
+                  asserted_subject: matt
       responses:
         "200":
           description: admitted; an outcome for every envelope and W after
@@ -1557,10 +1557,16 @@ components:
         next_cursor: { type: string }
     Status:
       type: object
-      required: [version, person, ledger_id, w, sources]
+      required: [version, subject, person, ledger_id, w, sources]
       properties:
         version: { type: string }
-        person: { type: string }
+        subject: { type: string, description: "what the record is about, the configured subject_id" }
+        person:
+          type: string
+          deprecated: true
+          description: >-
+            the old name of subject, answered with the same value since 2026-11-05 (card
+            270a) and removed in a later release; read subject
         ledger_id: { type: string, format: uuid }
         w: { type: integer, format: int64, description: the watermark, the newest anam-event's seq }
         since: { type: string, description: when the daemon started }
@@ -2141,7 +2147,18 @@ components:
         definition_version: { type: integer, description: the type's current version }
         source_ref: { type: string, description: optional; the gate composes it from the identity key and checks it when sent }
         payload: { description: the fact, shaped to the Definition }
-        asserted_person: { type: string, description: the person's id; set, the binding is high assurance }
+        asserted_subject:
+          type: string
+          description: >-
+            the subject the observation is about; equal to the record's subject, the binding
+            is high assurance, and another subject is the review arm
+        asserted_person:
+          type: string
+          deprecated: true
+          description: >-
+            the old name of asserted_subject, read since 2026-11-05 (card 270a) until a later
+            release removes it. Either alone, or both equal, is the asserted subject; the two
+            set to different values refuse the batch (400). Send asserted_subject
         span_hint: { type: string }
     SnapshotPart:
       type: object

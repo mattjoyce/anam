@@ -58,10 +58,14 @@ type SubmittedEnvelope struct {
 	DefinitionVersion int `json:"definition_version"`
 	// SourceRef is optional: the gate composes it from the Definition's identity_key,
 	// and checks it against that when it is sent.
-	SourceRef      string          `json:"source_ref,omitempty"`
-	Payload        json.RawMessage `json:"payload"`
-	AssertedPerson string          `json:"asserted_person,omitempty"`
-	SpanHint       string          `json:"span_hint,omitempty"`
+	SourceRef string          `json:"source_ref,omitempty"`
+	Payload   json.RawMessage `json:"payload"`
+	// AssertedSubject is the subject the source says the observation is about.
+	// AssertedPerson is its old name, read until a later release removes it; the
+	// daemon settles the two in assertedSubjectOf.
+	AssertedSubject string `json:"asserted_subject,omitempty"`
+	AssertedPerson  string `json:"asserted_person,omitempty"`
+	SpanHint        string `json:"span_hint,omitempty"`
 }
 
 // Admission is the answer to a batch the gate took: an outcome for every envelope,

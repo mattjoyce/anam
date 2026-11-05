@@ -105,7 +105,7 @@ with the test code in the payload, not a type per test.
 as an anam-event. **Never writes back** into source systems. See *Derived facet*.
 
 **Envelope** — The message an importer hands the gate: `{type, source, injector, source_ref?,
-payload, asserted_person?, span_hint?}`. Left out, `source_ref` is composed by the gate from the
+payload, asserted_subject?, span_hint?}`. Left out, `source_ref` is composed by the gate from the
 Definition's `identity_key`. The **only ingress**; importers share nothing with the
 ledger except through it. See *Admission gate*.
 

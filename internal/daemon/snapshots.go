@@ -79,7 +79,7 @@ func partDigest(envs []facet.Envelope) string {
 			payload = c.Bytes()
 		}
 		lines[i] = strings.Join([]string{string(e.Type), strconv.Itoa(e.DefinitionVersion), e.SourceRef,
-			e.AssertedPerson, e.SpanHint, string(payload)}, "\x00")
+			e.AssertedSubject, e.SpanHint, string(payload)}, "\x00")
 	}
 	sort.Strings(lines)
 	h := sha256.New()

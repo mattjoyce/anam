@@ -144,7 +144,7 @@ func TestEnvelopeValidate(t *testing.T) {
 	}{
 		{"valid", func(*facet.Envelope) {}, false},
 		{"valid with optional fields", func(e *facet.Envelope) {
-			e.AssertedPerson = "matt"
+			e.AssertedSubject = "matt"
 			e.SpanHint = "2026-01"
 		}, false},
 		{"missing type", func(e *facet.Envelope) { e.Type = "" }, true},

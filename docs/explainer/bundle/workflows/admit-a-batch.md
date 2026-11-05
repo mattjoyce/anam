@@ -31,7 +31,7 @@ steps:
     action: "`envelope` yields `{type: health.blood-pressure, definition_version: 5, payload, asserted_person}` and nothing else: no source, no source_ref."
     writes: [/data-structures/envelope.md]
     resource: ../anam-importers/anam_importer/envelopes.py#envelope
-    anchor: 'env["asserted_person"] = asserted_person'
+    anchor: 'def envelope('
   - actor: /components/importer-base.md
     caller: /components/importer-bp-csv.md
     label: validate locally with jsonschema

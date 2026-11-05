@@ -22,7 +22,7 @@ references:
 | `SourceRef` | string | optional | the gate composes it, or refuses a mismatch |
 | `Payload` | []byte | raw JSON | non-empty, at most `max_payload_bytes` (300 KiB), canonicalisable, passes the schema |
 | `DefinitionVersion` | int | required at the daemon | must equal the type's current version; the gate alone accepts 0 as unstated |
-| `AssertedPerson` | string | optional | drives binding assurance |
+| `AssertedSubject` | string | optional, from `asserted_subject` or its old name `asserted_person` | drives binding assurance |
 | `SpanHint` | string | optional | advisory, copied to the binding |
 
 On the wire it is the [batch submission](/data-structures/batch-submission.md)'s element; the importer builds it with `anam_importer.envelope`, which names no source and no source ref.

@@ -67,7 +67,7 @@ func admitUnder(ctx context.Context, l *ledger.Ledger, defs *def.Registry, recs 
 		types[i] = r.typ
 		envs[i] = facet.Envelope{
 			Type: r.typ, Source: "records", Injector: "records",
-			Payload: []byte(r.payload), AssertedPerson: "matt",
+			Payload: []byte(r.payload), AssertedSubject: "matt",
 		}
 	}
 	g := gate.New(l, defs, gate.StaticScopes{"records": types}, clock.Real{}, "matt", gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})

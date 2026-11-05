@@ -34,7 +34,7 @@ func seedReadings(t *testing.T, cfg config.Config) {
 		`{"at": "2026-01-24 06:36:00", "seq": 1, "count": 114.0, "source_time": {"value": "2026-01-24 06:36:00", "zone": "Europe/Berlin", "basis": "source"}, "note": "70.0"}`,
 		`{"at": "2026-02-10 05:04:00", "seq": 1, "count": 102.0, "source_time": {"value": "2026-02-10 05:04:00", "zone": "Europe/Berlin", "basis": "source"}, "note": "68.0"}`,
 	} {
-		env := facet.Envelope{Type: "test.measure", Source: "records", Injector: "records", Payload: []byte(p), AssertedPerson: cfg.SubjectID}
+		env := facet.Envelope{Type: "test.measure", Source: "records", Injector: "records", Payload: []byte(p), AssertedSubject: cfg.SubjectID}
 		b, err := g.Resolve(env)
 		if err != nil {
 			t.Fatal(err)

@@ -1,6 +1,8 @@
 package app
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -8,6 +10,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
+	"github.com/mattjoyce/anam/internal/api"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
@@ -58,5 +64,40 @@ func TestInit_SubjectPinUnderEitherConfigName(t *testing.T) {
 	}
 	if want := `ledger is pinned to "matt", config says "other"`; !strings.Contains(err.Error(), want) {
 		t.Errorf("error = %v, want it to read %s", err, want)
+	}
+}
+
+// TestWriteStatus_NamesTheSubjectField is card 270a's slice 2 in the CLI: anam status
+// prints the subject from the status's subject field, so it keeps working against a
+// daemon that no longer answers person. The status here carries subject alone.
+func TestWriteStatus_NamesTheSubjectField(t *testing.T) {
+	t.Parallel()
+	cmd := &cobra.Command{}
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	s := api.Status{Version: "v", Subject: "thinkpad-t14s", LedgerID: "0d1e2f3a", W: 7}
+	if err := writeStatus(cmd, s, "http://anam"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "ledger  0d1e2f3a (subject thinkpad-t14s)\n") {
+		t.Errorf("status output:\n%s", out.String())
+	}
+}
+
+// TestLocalStatus_AnswersSubjectAndItsOldName: a status read from local files carries
+// the configured id under both names, as the daemon's does.
+func TestLocalStatus_AnswersSubjectAndItsOldName(t *testing.T) {
+	t.Parallel()
+	f := newLedgerFixture(t)
+	cfg, err := config.Load(f.cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := localStatus(context.Background(), cfg, BuildInfo{Version: "v"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Subject != "matt" || s.Person != "matt" {
+		t.Errorf("local status subject %q, person %q; want both matt", s.Subject, s.Person)
 	}
 }

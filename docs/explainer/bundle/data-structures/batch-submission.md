@@ -27,7 +27,7 @@ A submitted envelope:
 | `definition_version` | yes, at least 1 |
 | `payload` | yes, raw JSON |
 | `source_ref` | no |
-| `asserted_person` | no |
+| `asserted_subject` | no; `asserted_person` is its deprecated old name, and the two at different values refuse the batch |
 | `span_hint` | no |
 
 There is no `source` field. The body is bounded at 49 × `max_payload_bytes` plus 1 MiB (about 16 MB by default) and must be exactly one JSON value. The snapshot id is 1 to 128 of letters, digits and `. _ : -`; every type in it must be the importer's and every envelope's type one of them. Answered by the [admission response](/data-structures/admission-response.md).

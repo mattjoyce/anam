@@ -30,16 +30,16 @@ func TestRetract_PlansAnImportersSourceFromItsSnapshot(t *testing.T) {
 	dir := t.TempDir()
 	cfg := config.Config{
 		LedgerPath: filepath.Join(dir, "ledger.db"), DBPath: filepath.Join(dir, "tracking.db"),
-		PersonID:    "matt",
+		SubjectID:   "matt",
 		BucketWidth: span.Default, Timeout: testTimeout, Limits: config.DefaultLimits(),
 	}
 	catalogtest.Engine.Config(t, &cfg)
-	l, err := ledger.Create(ctx, cfg.LedgerPath, cfg.PersonID)
+	l, err := ledger.Create(ctx, cfg.LedgerPath, cfg.SubjectID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = l.Close() }()
-	g := gate.New(l, catalogtest.Engine.Definitions(t), gate.StaticScopes{"scale-import": {"test.reading"}}, clock.Real{}, cfg.PersonID, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
+	g := gate.New(l, catalogtest.Engine.Definitions(t), gate.StaticScopes{"scale-import": {"test.reading"}}, clock.Real{}, cfg.SubjectID, gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	admit := func(id string) string {
 		t.Helper()
 		env := facet.Envelope{Type: "test.reading", Source: "scale-import", Injector: "scale-import",

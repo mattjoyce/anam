@@ -23,18 +23,18 @@ import (
 func seedReadings(t *testing.T, cfg config.Config) {
 	t.Helper()
 	ctx := context.Background()
-	l, err := ledger.Open(ctx, cfg.LedgerPath, cfg.PersonID)
+	l, err := ledger.Open(ctx, cfg.LedgerPath, cfg.SubjectID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = l.Close() }()
-	g := gate.New(l, catalogtest.Engine.Definitions(t), gate.StaticScopes{"records": {"test.measure"}}, clock.Real{}, cfg.PersonID,
+	g := gate.New(l, catalogtest.Engine.Definitions(t), gate.StaticScopes{"records": {"test.measure"}}, clock.Real{}, cfg.SubjectID,
 		gate.Limits{MaxPayloadBytes: config.DefaultMaxPayloadBytes, MaxRetries: config.DefaultCommitRetries})
 	for _, p := range []string{
 		`{"at": "2026-01-24 06:36:00", "seq": 1, "count": 114.0, "source_time": {"value": "2026-01-24 06:36:00", "zone": "Europe/Berlin", "basis": "source"}, "note": "70.0"}`,
 		`{"at": "2026-02-10 05:04:00", "seq": 1, "count": 102.0, "source_time": {"value": "2026-02-10 05:04:00", "zone": "Europe/Berlin", "basis": "source"}, "note": "68.0"}`,
 	} {
-		env := facet.Envelope{Type: "test.measure", Source: "records", Injector: "records", Payload: []byte(p), AssertedPerson: cfg.PersonID}
+		env := facet.Envelope{Type: "test.measure", Source: "records", Injector: "records", Payload: []byte(p), AssertedPerson: cfg.SubjectID}
 		b, err := g.Resolve(env)
 		if err != nil {
 			t.Fatal(err)

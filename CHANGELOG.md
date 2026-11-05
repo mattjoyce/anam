@@ -9,6 +9,26 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- The configured id is the subject, not the person (card 270a, slice 1). The key is
+  `subject_id` and its variable `ANAM_SUBJECT_ID`: what the record is about, which might be
+  a person. The old names still work until a later release removes them. `person_id` or
+  `ANAM_PERSON_ID` alone is read, with
+  `WARN config: person_id is the old name of subject_id; set subject_id (ANAM_SUBJECT_ID) instead`.
+  Both names set to the same value is read with
+  `INFO config: subject_id and its old name person_id are both set and equal; drop person_id`,
+  so a deployment can carry both while it moves without its startup check meeting a WARN.
+  The two set to different values, in one layer or across the file, the environment and a
+  flag, refuse to load: `subject_id ("a") and its old name person_id ("b") differ; set subject_id only`.
+  With neither, the refusal reads `subject_id is required (ANAM_SUBJECT_ID)`. The startup
+  line is `daemon: serving ... subject=<id>`, and `anam daemon`, `anam init`, `anam status`
+  and `anam inspect` print `(subject <id>)`. A ledger opened under another subject is
+  refused with `ledger: file belongs to a different subject`, the `ledger is pinned to`
+  suffix unchanged. `anam query check` and `scripts/souffle-diff.py` take `--subject`, with
+  `--person` kept as a deprecated alias; `anam-bench` takes `--subject` only. Nothing stored
+  changes: the ledger keeps its `person_id` pin and its `binding_person_id` column, and the
+  ledger schema stays at version 3. The wire (`/v1/status`, `asserted_person`) is unchanged
+  in this slice.
+
 - The binary carries no catalog (card 255, R4b, slice 5). The Definitions and projection
   templates that were built into it, with their history, are gone from the engine, along with the
   registered templates under `projections/`, the rename tables under `renames/`, the IEEE 1752

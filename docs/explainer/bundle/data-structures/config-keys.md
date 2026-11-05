@@ -13,7 +13,7 @@ references: []
 
 | Key | Env | Default |
 |---|---|---|
-| `person_id` | `ANAM_PERSON_ID` | none on purpose; pinned into the ledger at init |
+| `subject_id` | `ANAM_SUBJECT_ID` | none on purpose; pinned into the ledger at init |
 | `ledger_path` | `ANAM_LEDGER_PATH` | `~/.local/share/anam/ledger.db` |
 | `db_path` | `ANAM_DB_PATH` | `~/.local/share/anam/tracking.db`; must differ from the ledger |
 | `library_dir` | `ANAM_LIBRARY_DIR` | `documents/` beside the ledger |

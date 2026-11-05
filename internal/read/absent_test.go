@@ -58,7 +58,7 @@ func absentFixture(source, ftype, ref string, at time.Time) facet.Facet {
 		ID: facet.NewID(sourceRef), Type: facet.Type(ftype), Confidence: 1,
 		Classification: facet.ClassificationNormal, ArtifactVersion: 1, DefinitionVersion: 1,
 		FactTime:   at,
-		Binding:    facet.Binding{PersonID: "matt", Assurance: facet.AssuranceHigh},
+		Binding:    facet.Binding{SubjectID: "matt", Assurance: facet.AssuranceHigh},
 		Provenance: facet.Provenance{Source: source, Injector: source, SourceRef: sourceRef},
 		Descriptor: facet.Descriptor{
 			SourceSchema: "test", SchemaVersion: 1, ContentHash: facet.ContentHash(canonical),

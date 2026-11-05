@@ -102,7 +102,7 @@ func (d *Daemon) admitBatch(ctx context.Context, who config.Principal, b intake,
 		// Inside the write, where a registration cannot land between this and the
 		// admission.
 		reg := d.defs.current.Load()
-		g := gate.New(s.Ledger, reg, policy.ScopesOf(who), clock.Real{}, d.cfg.PersonID, gateLimits(d.cfg))
+		g := gate.New(s.Ledger, reg, policy.ScopesOf(who), clock.Real{}, d.cfg.SubjectID, gateLimits(d.cfg))
 		bindings := make([]facet.Binding, len(b.envs))
 		for i, env := range b.envs {
 			// A malformed envelope binds to nothing; the gate's first check refuses it

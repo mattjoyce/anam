@@ -153,9 +153,9 @@ func (a BindingAssurance) Valid() bool {
 	return false
 }
 
-// Binding is a Facet's resolution to the person, produced by the gate's resolve call.
+// Binding is a Facet's resolution to the subject, produced by the gate's resolve call.
 type Binding struct {
-	PersonID  string
+	SubjectID string
 	Assurance BindingAssurance
 
 	// SpanHint records a span a source volunteered. It is advisory only: binding never

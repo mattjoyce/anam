@@ -62,7 +62,7 @@ func TestLoadOverridingPrecedence(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("ANAM_PERSON_ID", "matt")
+			t.Setenv("ANAM_SUBJECT_ID", "matt")
 			t.Setenv("ANAM_LONG_WRITE_TIMEOUT", "")
 			t.Setenv("ANAM_INGEST_TIMEOUT", "")
 			for k, v := range tt.env {
@@ -72,7 +72,7 @@ func TestLoadOverridingPrecedence(t *testing.T) {
 			var path string
 			if tt.body != "" {
 				path = filepath.Join(t.TempDir(), "anam.yaml")
-				if err := os.WriteFile(path, []byte("person_id: matt\n"+tt.body), 0o600); err != nil {
+				if err := os.WriteFile(path, []byte("subject_id: matt\n"+tt.body), 0o600); err != nil {
 					t.Fatalf("write config: %v", err)
 				}
 			}

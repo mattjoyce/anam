@@ -31,7 +31,7 @@ func initCmd(cfgPath *string) *cobra.Command {
 			if _, err := loadCatalog(ctx, cfg); err != nil {
 				return err
 			}
-			l, err := ledger.Create(ctx, cfg.LedgerPath, cfg.PersonID)
+			l, err := ledger.Create(ctx, cfg.LedgerPath, cfg.SubjectID)
 			if err != nil {
 				return err
 			}
@@ -47,8 +47,8 @@ func initCmd(cfgPath *string) *cobra.Command {
 			defer func() { _ = db.Close() }()
 
 			_, err = fmt.Fprintf(cmd.OutOrStdout(),
-				"ledger %s ready (person %s); operational store %s ready\n",
-				cfg.LedgerPath, cfg.PersonID, cfg.DBPath)
+				"ledger %s ready (subject %s); operational store %s ready\n",
+				cfg.LedgerPath, cfg.SubjectID, cfg.DBPath)
 			return err
 		},
 	}
@@ -59,7 +59,7 @@ func initCmd(cfgPath *string) *cobra.Command {
 func openLedgerForWrite(ctx context.Context, cfg config.Config) (*ledger.Ledger, error) {
 	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
 	defer cancel()
-	return ledger.Open(ctx, cfg.LedgerPath, cfg.PersonID)
+	return ledger.Open(ctx, cfg.LedgerPath, cfg.SubjectID)
 }
 
 // registryOf is the catalog's Definitions with those importers registered, as db

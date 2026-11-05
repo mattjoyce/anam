@@ -167,11 +167,11 @@ func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error)
 	ctx, cancel := context.WithTimeout(parent, cfg.Timeout)
 	defer cancel()
 
-	w, err := ledger.Open(ctx, cfg.LedgerPath, cfg.PersonID)
+	w, err := ledger.Open(ctx, cfg.LedgerPath, cfg.SubjectID)
 	if err != nil {
 		return nil, err
 	}
-	r, err := ledger.OpenReadOnly(ctx, cfg.LedgerPath, cfg.PersonID)
+	r, err := ledger.OpenReadOnly(ctx, cfg.LedgerPath, cfg.SubjectID)
 	if err != nil {
 		_ = w.Close()
 		return nil, err
@@ -412,7 +412,7 @@ func (d *Daemon) Serve(ctx context.Context, ln net.Listener) error {
 
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()
-	slog.Info("daemon: serving", "addr", ln.Addr().String(), "ledger", d.cfg.LedgerPath, "person", d.cfg.PersonID)
+	slog.Info("daemon: serving", "addr", ln.Addr().String(), "ledger", d.cfg.LedgerPath, "subject", d.cfg.SubjectID)
 
 	var serveErr error
 	select {

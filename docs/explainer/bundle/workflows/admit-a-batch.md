@@ -97,7 +97,7 @@ steps:
     action: "A fresh gate is built for the batch with scopes `{bp-csv: [health.blood-pressure]}` and the registry snapshot read inside the write. `Resolve` validates the envelope and binds it to the configured person with assurance medium (no asserted person) or high (asserted and equal)."
     reads: [/data-structures/envelope.md]
     resource: internal/gate/gate.go#Resolve
-    anchor: "case g.personID:"
+    anchor: "case g.subjectID:"
   - actor: /components/gate.md
     caller: /components/daemon.md
     label: commit prepares every envelope first

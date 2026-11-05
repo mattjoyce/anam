@@ -98,7 +98,7 @@ func (o migrateOptions) run(cmd *cobra.Command, cfg config.Config) error {
 		return err
 	}
 	p := migrate.Params{
-		Person: cfg.PersonID, Timeout: cfg.Timeout, Phase: cfg.LongWriteTimeout,
+		Subject: cfg.SubjectID, Timeout: cfg.Timeout, Phase: cfg.LongWriteTimeout,
 		Limits: renameLimits(cfg), Catalog: cat,
 	}
 	out := cmd.OutOrStdout()

@@ -74,7 +74,7 @@ func (d *Daemon) retractFacet(ctx context.Context, source, id string, budget tim
 		}
 		reg := d.defs.current.Load()
 		// A tombstone admits nothing, so the gate needs no scopes for it.
-		g := gate.New(s.Ledger, reg, gate.StaticScopes{}, clock.Real{}, d.cfg.PersonID, gateLimits(d.cfg))
+		g := gate.New(s.Ledger, reg, gate.StaticScopes{}, clock.Real{}, d.cfg.SubjectID, gateLimits(d.cfg))
 		res, head, err := g.Retract(ctx, id)
 		if err != nil {
 			return err

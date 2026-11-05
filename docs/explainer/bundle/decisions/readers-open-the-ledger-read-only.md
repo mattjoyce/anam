@@ -4,7 +4,7 @@ title: Commands that only read open the ledger read-only
 description: Every read command and every daemon read route uses a mode=ro handle, so SQLite itself refuses a write; only init, retract --yes and the daemon open it read-write.
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/store/ledger/ledger.go#OpenReadOnly
-anchor: "return openExisting(ctx, path, personID, modeReadOnly)"
+anchor: "return openExisting(ctx, path, subjectID, modeReadOnly)"
 basis: code
 tier: detail
 tested_by:

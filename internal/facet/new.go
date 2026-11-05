@@ -97,8 +97,8 @@ func (p NewParams) validate() error {
 	case p.Envelope.SourceRef == "":
 		// The envelope may leave it to the gate; a facet may not leave it at all.
 		return fmt.Errorf("%w: no source_ref", ErrInvalidFacet)
-	case p.Binding.PersonID == "":
-		return fmt.Errorf("%w: binding has no person", ErrInvalidFacet)
+	case p.Binding.SubjectID == "":
+		return fmt.Errorf("%w: binding has no subject", ErrInvalidFacet)
 	case !p.Binding.Assurance.Valid():
 		return fmt.Errorf("%w: binding assurance %q", ErrInvalidFacet, p.Binding.Assurance)
 	case p.Payload.Len() == 0:

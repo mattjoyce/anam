@@ -36,7 +36,7 @@ func Main(ctx context.Context, build string) error {
 // definitions_dir and projections_dir of the anam config found as anam finds it
 // (--config, ANAM_CONFIG, the user config directory) and the environment, the
 // empty catalog for either left empty. The bench takes nothing else from the
-// config, so a setting it does not read (a daemon's timeout, a person) neither
+// config, so a setting it does not read (a daemon's timeout, a subject) neither
 // needs to be there nor to be valid.
 func loadCatalog(cmd *cobra.Command, explicit string) (*catalog.Catalog, error) {
 	path, origin, err := config.Resolve(explicit)
@@ -160,7 +160,7 @@ a record, never at one a daemon holds.`,
 	cmd.Flags().StringVar(&dir, "dir", "", "the record's directory")
 	cmd.Flags().StringVar(&o.Name, "name", "", "the dataset's name, for the report")
 	cmd.Flags().StringVar(&o.Label, "label", "baseline", "what this run is, for the report")
-	cmd.Flags().StringVar(&o.Person, "person", Person, "whose ledger it is (synthetic records are "+Person+")")
+	cmd.Flags().StringVar(&o.Subject, "subject", Subject, "the subject the ledger is pinned to (synthetic records are "+Subject+")")
 	cmd.Flags().IntVar(&o.Reps, "reps", 5, "runs of each scenario")
 	cmd.Flags().DurationVar(&o.Timeout, "timeout", 10*time.Minute, "bound on one run of one scenario")
 	cmd.Flags().StringVar(&out, "out", "", "write the report as JSON here")
@@ -171,7 +171,7 @@ a record, never at one a daemon holds.`,
 }
 
 func mintCmd() *cobra.Command {
-	var dir, person string
+	var dir, subject string
 	budget := 0
 	cmd := &cobra.Command{
 		Use:   "mint",
@@ -181,7 +181,7 @@ a composed read can start from it. Use it on a copy of a real record, whose chec
 were minted before runs were recorded.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			n, w, err := MintRecord(cmd.Context(), PathsIn(dir), person, budget)
+			n, w, err := MintRecord(cmd.Context(), PathsIn(dir), subject, budget)
 			if err != nil {
 				return err
 			}
@@ -190,7 +190,7 @@ were minted before runs were recorded.`,
 		},
 	}
 	cmd.Flags().StringVar(&dir, "dir", "", "the record's directory")
-	cmd.Flags().StringVar(&person, "person", Person, "whose ledger it is")
+	cmd.Flags().StringVar(&subject, "subject", Subject, "the subject the ledger is pinned to")
 	cmd.Flags().IntVar(&budget, "budget", 0, "checkpoint_budget in bytes; 0 is the fixed monthly width")
 	_ = cmd.MarkFlagRequired("dir")
 	return cmd

@@ -574,7 +574,7 @@ anam migrate --from <old ledger.db> --from-store <old tracking.db> \
              [--program <file defining pick/1>] [--yes]
 ```
 
-It needs `person_id` like any command (`ANAM_PERSON_ID`), and touches no daemon.
+It needs `subject_id` like any command (`ANAM_SUBJECT_ID`), and touches no daemon.
 
 **What it carries.** Every live facet of the old ledger at its head, as it folds: the current version
 of each, under its own type, source, source ref, binding and payload, through the gate. Superseded

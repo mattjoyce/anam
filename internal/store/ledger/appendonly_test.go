@@ -40,7 +40,7 @@ func seeded(t *testing.T) (*Ledger, string, facet.Facet) {
 		ID: facet.NewID("bp-csv:seed"), Type: "health.blood-pressure", Confidence: 1,
 		Classification: facet.ClassificationNormal, ArtifactVersion: 1, DefinitionVersion: 1,
 		FactTime:   time.Date(2026, 7, 5, 6, 30, 0, 0, time.UTC),
-		Binding:    facet.Binding{PersonID: internalPerson, Assurance: facet.AssuranceHigh},
+		Binding:    facet.Binding{SubjectID: internalPerson, Assurance: facet.AssuranceHigh},
 		Provenance: facet.Provenance{Source: "bp-csv", Injector: "bp-csv", SourceRef: "bp-csv:seed"},
 		Descriptor: facet.Descriptor{
 			SourceSchema: "bp-csv/reading", SchemaVersion: 1,

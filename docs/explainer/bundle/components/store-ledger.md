@@ -4,7 +4,7 @@ title: Ledger store (internal/store/ledger)
 description: "The append-only SQLite file: facet artifacts, anam-events and ledger_meta, with triggers that refuse update and delete for every writer."
 timestamp: 2026-10-11T00:00:00Z
 resource: internal/store/ledger/ledger.go#Open
-anchor: "func Open(ctx context.Context, path, personID string) (*Ledger, error) {"
+anchor: "func Open(ctx context.Context, path, subjectID string) (*Ledger, error) {"
 basis: code
 tier: core
 group: kernel

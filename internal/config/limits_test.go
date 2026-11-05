@@ -46,7 +46,7 @@ func TestLimitsOverrideAndRange(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.env+"="+tt.value, func(t *testing.T) {
-			t.Setenv("ANAM_PERSON_ID", "matt")
+			t.Setenv("ANAM_SUBJECT_ID", "matt")
 			t.Setenv(tt.env, tt.value)
 			got, err := config.Load("")
 			if !tt.ok {
@@ -68,7 +68,7 @@ func TestLimitsOverrideAndRange(t *testing.T) {
 // The defaults Load resolves are the ones DefaultLimits names, and they pass their own
 // range checks.
 func TestDefaultLimits(t *testing.T) {
-	t.Setenv("ANAM_PERSON_ID", "matt")
+	t.Setenv("ANAM_SUBJECT_ID", "matt")
 	got, err := config.Load("")
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)

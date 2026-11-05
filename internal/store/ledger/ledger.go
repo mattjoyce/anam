@@ -75,18 +75,18 @@ var (
 	// a new path. It is never deletion: this file is the record.
 	ErrSchemaMismatch = errors.New("ledger: file holds a different schema")
 
-	// ErrPersonMismatch: the ledger belongs to a different person than the one
-	// configured. A wrong person_id must fail loudly, not write into someone else's
-	// timeline.
-	ErrPersonMismatch = errors.New("ledger: file belongs to a different person")
+	// ErrSubjectMismatch: the ledger belongs to a different subject than the one
+	// configured. A wrong subject_id must fail loudly, not write into another
+	// subject's timeline.
+	ErrSubjectMismatch = errors.New("ledger: file belongs to a different subject")
 )
 
-// Ledger is a handle on one person's timeline in one file. Every method takes the
+// Ledger is a handle on one subject's timeline in one file. Every method takes the
 // caller's context and inherits its deadline: the store never sets its own (§8).
 type Ledger struct {
-	db     *sql.DB
-	path   string
-	person string
+	db      *sql.DB
+	path    string
+	subject string
 }
 
 // The open modes, as SQLite's URI `mode` parameter spells them.
@@ -107,15 +107,15 @@ const (
 const busyTimeoutMS = 3000
 
 // Create opens the ledger at path for writing, creating the file and its parent
-// directories if absent, and initialises it for personID. It is idempotent: on an
+// directories if absent, and initialises it for subjectID. It is idempotent: on an
 // existing ledger it verifies the pins and changes nothing.
-func Create(ctx context.Context, path, personID string) (*Ledger, error) {
+func Create(ctx context.Context, path, subjectID string) (*Ledger, error) {
 	if dir := filepath.Dir(path); dir != "." {
 		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return nil, fmt.Errorf("ledger: create data dir: %w", err)
 		}
 	}
-	l, err := open(path, personID, modeCreate)
+	l, err := open(path, subjectID, modeCreate)
 	if err != nil {
 		return nil, err
 	}
@@ -128,25 +128,25 @@ func Create(ctx context.Context, path, personID string) (*Ledger, error) {
 
 // Open opens an existing ledger for writing. It creates nothing: a missing file is
 // ErrNotInitialised, so a mistyped path fails instead of starting an empty record.
-func Open(ctx context.Context, path, personID string) (*Ledger, error) {
-	return openExisting(ctx, path, personID, modeReadWrite)
+func Open(ctx context.Context, path, subjectID string) (*Ledger, error) {
+	return openExisting(ctx, path, subjectID, modeReadWrite)
 }
 
 // OpenReadOnly opens an existing ledger for reading. SQLite refuses every write on the
 // handle, so a reader cannot alter the record even by mistake. Every command that only
 // reads the ledger opens it this way.
-func OpenReadOnly(ctx context.Context, path, personID string) (*Ledger, error) {
-	return openExisting(ctx, path, personID, modeReadOnly)
+func OpenReadOnly(ctx context.Context, path, subjectID string) (*Ledger, error) {
+	return openExisting(ctx, path, subjectID, modeReadOnly)
 }
 
-func openExisting(ctx context.Context, path, personID, mode string) (*Ledger, error) {
+func openExisting(ctx context.Context, path, subjectID, mode string) (*Ledger, error) {
 	if _, err := os.Stat(path); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("%w: no file at %s", ErrNotInitialised, path)
 		}
 		return nil, fmt.Errorf("ledger: stat %q: %w", path, err)
 	}
-	l, err := open(path, personID, mode)
+	l, err := open(path, subjectID, mode)
 	if err != nil {
 		return nil, err
 	}
@@ -172,15 +172,15 @@ func (l *Ledger) ensureIndexes(ctx context.Context) error {
 	return nil
 }
 
-func open(path, personID, mode string) (*Ledger, error) {
-	if personID == "" {
-		return nil, fmt.Errorf("ledger: person id is required")
+func open(path, subjectID, mode string) (*Ledger, error) {
+	if subjectID == "" {
+		return nil, fmt.Errorf("ledger: subject id is required")
 	}
 	db, err := sql.Open("sqlite", dsn(path, mode))
 	if err != nil {
 		return nil, fmt.Errorf("ledger: open %q: %w", path, err)
 	}
-	return &Ledger{db: db, path: path, person: personID}, nil
+	return &Ledger{db: db, path: path, subject: subjectID}, nil
 }
 
 // dsn builds the connection string for one open mode.
@@ -204,7 +204,7 @@ func dsn(path, mode string) string {
 }
 
 // Init idempotently prepares the ledger: it applies the schema and pins the schema
-// version, the person, and a fresh ledger id. A ledger written by an earlier schema
+// version, the subject, and a fresh ledger id. A ledger written by an earlier schema
 // is migrated forward here, step by step (migrate.go); this is the one place a
 // ledger's schema moves, and it only ever adds.
 //
@@ -244,7 +244,7 @@ func (l *Ledger) initPins(ctx context.Context) (int, error) {
 
 	for _, p := range []struct{ key, want string }{
 		{metaSchemaVersion, strconv.Itoa(schemaVersion)},
-		{metaPersonID, l.person},
+		{metaPersonID, l.subject},
 		{metaLedgerID, uuid.NewString()},
 	} {
 		stored, err := pin(ctx, tx, p.key, p.want)
@@ -305,12 +305,12 @@ func pin(ctx context.Context, tx *sql.Tx, key, value string) (string, error) {
 // judged by effectiveVersion, after the migration records are counted.
 func checkPin(key, stored, want string) error {
 	if key == metaPersonID && stored != want {
-		return fmt.Errorf("%w: ledger is pinned to %q, config says %q", ErrPersonMismatch, stored, want)
+		return fmt.Errorf("%w: ledger is pinned to %q, config says %q", ErrSubjectMismatch, stored, want)
 	}
 	return nil
 }
 
-// verify checks an opened file is an initialised ledger for this person and this
+// verify checks an opened file is an initialised ledger for this subject and this
 // schema. It writes nothing, so it runs on a read-only handle too.
 func (l *Ledger) verify(ctx context.Context) error {
 	pins, err := readPins(ctx, l.db)
@@ -323,7 +323,7 @@ func (l *Ledger) verify(ctx context.Context) error {
 
 	for _, p := range []struct{ key, want string }{
 		{metaSchemaVersion, ""},
-		{metaPersonID, l.person},
+		{metaPersonID, l.subject},
 		{metaLedgerID, ""},
 	} {
 		stored, ok := pins[p.key]

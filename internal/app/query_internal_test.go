@@ -26,7 +26,7 @@ func TestQueryCheck_OverARealLedger(t *testing.T) {
 		}
 	}
 
-	out, _, err = cli(t, f.cfgPath, "query", "check", "--every", "2", "--projection", "measures", "--ledger", f.ledgerPath, "--person", "matt")
+	out, _, err = cli(t, f.cfgPath, "query", "check", "--every", "2", "--projection", "measures", "--ledger", f.ledgerPath, "--subject", "matt")
 	if err != nil {
 		t.Fatalf("query check --every 2 --projection measures: %v\n%s", err, out)
 	}
@@ -34,6 +34,16 @@ func TestQueryCheck_OverARealLedger(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("output omits %q:\n%s", want, out)
 		}
+	}
+
+	// --person is the old name of --subject (card 270a): read alone, and refused when
+	// the two disagree, before any file is opened.
+	if out, _, err := cli(t, f.cfgPath, "query", "check", "--ledger", f.ledgerPath, "--person", "matt"); err != nil {
+		t.Errorf("query check --person matt: %v\n%s", err, out)
+	}
+	if _, _, err := cli(t, f.cfgPath, "query", "check", "--subject", "matt", "--person", "other"); err == nil ||
+		!strings.Contains(err.Error(), "--subject") || !strings.Contains(err.Error(), "--person") {
+		t.Errorf("--subject and --person differing = %v, want a refusal naming both", err)
 	}
 
 	if _, _, err := cli(t, f.cfgPath, "query", "check", "--projection", "course"); err == nil || !strings.Contains(err.Error(), "snapshot-shaped") {

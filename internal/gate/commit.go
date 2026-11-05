@@ -312,8 +312,8 @@ func (g *Gate) admitChecks(env facet.Envelope, binding facet.Binding, resolve re
 	if err := env.Validate(); err != nil {
 		return facet.Envelope{}, def.Definition{}, nil, err
 	}
-	if binding.PersonID != g.personID {
-		return facet.Envelope{}, def.Definition{}, nil, fmt.Errorf("%w: binding is for %q", ErrAssuranceBelowFloor, binding.PersonID)
+	if binding.SubjectID != g.subjectID {
+		return facet.Envelope{}, def.Definition{}, nil, fmt.Errorf("%w: binding is for %q", ErrAssuranceBelowFloor, binding.SubjectID)
 	}
 	if !g.scopes.Allowed(env.Source, env.Type) {
 		return facet.Envelope{}, def.Definition{}, nil, fmt.Errorf("%w: %s → %s", ErrNotAuthorized, env.Source, env.Type)

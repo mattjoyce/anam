@@ -12,14 +12,14 @@ import (
 	"github.com/mattjoyce/anam/internal/span"
 )
 
-// TestLoadWithoutPersonIDFails guards the person pin. person_id has no default:
-// defaulting it would pin a ledger to a person nobody chose.
-func TestLoadWithoutPersonIDFails(t *testing.T) {
-	t.Setenv("ANAM_PERSON_ID", "") // hermetic: ignore the developer's own environment
+// TestLoadWithoutSubjectIDFails guards the subject pin. subject_id has no default:
+// defaulting it would pin a ledger to a subject nobody chose.
+func TestLoadWithoutSubjectIDFails(t *testing.T) {
+	t.Setenv("ANAM_SUBJECT_ID", "") // hermetic: ignore the developer's own environment
 
 	_, err := config.Load("")
 	if err == nil {
-		t.Fatal("Load() = nil error with no person_id, want error")
+		t.Fatal("Load() = nil error with no subject_id, want error")
 	}
 	if !errors.Is(err, config.ErrInvalid) {
 		t.Errorf("Load() error = %v, want it to wrap ErrInvalid", err)
@@ -27,7 +27,7 @@ func TestLoadWithoutPersonIDFails(t *testing.T) {
 }
 
 func TestLoadDefaults(t *testing.T) {
-	t.Setenv("ANAM_PERSON_ID", "matt")
+	t.Setenv("ANAM_SUBJECT_ID", "matt")
 	t.Setenv("XDG_DATA_HOME", "/data")
 
 	got, err := config.Load("")
@@ -36,7 +36,7 @@ func TestLoadDefaults(t *testing.T) {
 	}
 
 	want := config.Config{
-		PersonID:           "matt",
+		SubjectID:          "matt",
 		LedgerPath:         "/data/anam/ledger.db",
 		DBPath:             "/data/anam/tracking.db",
 		LibraryDir:         "/data/anam/documents",
@@ -72,24 +72,24 @@ func TestDefaultDataPaths(t *testing.T) {
 	}
 }
 
-// TestPersonIDComesFromEnvWithoutADefault pins the reason person_id is bound rather
+// TestSubjectIDComesFromEnvWithoutADefault pins the reason subject_id is bound rather
 // than left alone: a key with no default and no config entry is unknown to viper, so
-// Unmarshal would silently ignore ANAM_PERSON_ID.
-func TestPersonIDComesFromEnvWithoutADefault(t *testing.T) {
-	t.Setenv("ANAM_PERSON_ID", "someone-else")
+// Unmarshal would silently ignore ANAM_SUBJECT_ID.
+func TestSubjectIDComesFromEnvWithoutADefault(t *testing.T) {
+	t.Setenv("ANAM_SUBJECT_ID", "someone-else")
 
 	got, err := config.Load("")
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if got.PersonID != "someone-else" {
-		t.Errorf("PersonID = %q, want the environment value %q", got.PersonID, "someone-else")
+	if got.SubjectID != "someone-else" {
+		t.Errorf("SubjectID = %q, want the environment value %q", got.SubjectID, "someone-else")
 	}
 }
 
 func TestLoadFromFile(t *testing.T) {
 	path := writeConfig(t, `
-person_id: matt
+subject_id: matt
 ledger_path: /srv/anam/ledger.db
 db_path: /srv/anam/tracking.db
 timeout: 12s
@@ -102,7 +102,7 @@ bucket_width: weekly
 	}
 
 	want := config.Config{
-		PersonID:           "matt",
+		SubjectID:          "matt",
 		LedgerPath:         "/srv/anam/ledger.db",
 		DBPath:             "/srv/anam/tracking.db",
 		LibraryDir:         "/srv/anam/documents",
@@ -124,7 +124,7 @@ bucket_width: weekly
 
 func TestLoadFileLeavesUnsetKeysAtDefaults(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", "/data")
-	path := writeConfig(t, "person_id: matt\nledger_path: /srv/partial/ledger.db\n")
+	path := writeConfig(t, "subject_id: matt\nledger_path: /srv/partial/ledger.db\n")
 
 	got, err := config.Load(path)
 	if err != nil {
@@ -136,8 +136,8 @@ func TestLoadFileLeavesUnsetKeysAtDefaults(t *testing.T) {
 	if got.DBPath != "/data/anam/tracking.db" {
 		t.Errorf("DBPath = %q, want the default", got.DBPath)
 	}
-	if got.PersonID != "matt" {
-		t.Errorf("PersonID = %q, want the file value %q", got.PersonID, "matt")
+	if got.SubjectID != "matt" {
+		t.Errorf("SubjectID = %q, want the file value %q", got.SubjectID, "matt")
 	}
 	if got.Timeout != 5*time.Second {
 		t.Errorf("Timeout = %s, want the default 5s", got.Timeout)
@@ -145,7 +145,7 @@ func TestLoadFileLeavesUnsetKeysAtDefaults(t *testing.T) {
 }
 
 func TestEnvOverridesFileAndDefaults(t *testing.T) {
-	path := writeConfig(t, "person_id: from-file\nledger_path: /from-file/ledger.db\n")
+	path := writeConfig(t, "subject_id: from-file\nledger_path: /from-file/ledger.db\n")
 
 	t.Setenv("ANAM_LEDGER_PATH", "/from-env/ledger.db")
 	t.Setenv("ANAM_TIMEOUT", "30s")
@@ -162,8 +162,8 @@ func TestEnvOverridesFileAndDefaults(t *testing.T) {
 	if got.Timeout != 30*time.Second {
 		t.Errorf("Timeout = %s, want the environment to override the default", got.Timeout)
 	}
-	if got.PersonID != "from-file" {
-		t.Errorf("PersonID = %q, want the file value where the environment is silent", got.PersonID)
+	if got.SubjectID != "from-file" {
+		t.Errorf("SubjectID = %q, want the file value where the environment is silent", got.SubjectID)
 	}
 	if got.LibraryFolderLimit != 250 {
 		t.Errorf("LibraryFolderLimit = %d, want the environment to override the default", got.LibraryFolderLimit)
@@ -211,7 +211,7 @@ func TestLoadMissingFile(t *testing.T) {
 }
 
 func TestLoadMalformedFile(t *testing.T) {
-	path := writeConfig(t, "person_id: [unclosed\n")
+	path := writeConfig(t, "subject_id: [unclosed\n")
 
 	if _, err := config.Load(path); err == nil {
 		t.Fatal("Load() = nil error for malformed YAML, want error")
@@ -219,11 +219,11 @@ func TestLoadMalformedFile(t *testing.T) {
 }
 
 func TestLoadRejectsInvalidConfig(t *testing.T) {
-	path := writeConfig(t, "person_id: \"\"\n")
+	path := writeConfig(t, "subject_id: \"\"\n")
 
 	_, err := config.Load(path)
 	if err == nil {
-		t.Fatal("Load() = nil error for an empty person_id, want error")
+		t.Fatal("Load() = nil error for an empty subject_id, want error")
 	}
 	if !errors.Is(err, config.ErrInvalid) {
 		t.Errorf("Load() error = %v, want it to wrap ErrInvalid", err)
@@ -234,7 +234,7 @@ func TestValidate(t *testing.T) {
 	t.Parallel()
 
 	valid := config.Config{
-		PersonID:           "matt",
+		SubjectID:          "matt",
 		LedgerPath:         "/srv/ledger.db",
 		DBPath:             "/srv/tracking.db",
 		LibraryDir:         "/srv/documents",
@@ -252,9 +252,9 @@ func TestValidate(t *testing.T) {
 		wantErr bool
 	}{
 		{"valid", func(*config.Config) {}, false},
-		{"missing person_id", func(c *config.Config) { c.PersonID = "" }, true},
-		{"no person_id for a client of a daemon", func(c *config.Config) {
-			c.PersonID, c.Server = "", "http://192.168.20.4:8787"
+		{"missing subject_id", func(c *config.Config) { c.SubjectID = "" }, true},
+		{"no subject_id for a client of a daemon", func(c *config.Config) {
+			c.SubjectID, c.Server = "", "http://192.168.20.4:8787"
 		}, false},
 		{"https server", func(c *config.Config) { c.Server = "https://anam.example:443/" }, false},
 		{"server without scheme", func(c *config.Config) { c.Server = "192.168.20.4:8787" }, true},
@@ -332,7 +332,7 @@ func TestLongWriteTimeoutReadsItsOldName(t *testing.T) {
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
-			path := writeConfig(t, "person_id: matt\n"+tt.body)
+			path := writeConfig(t, "subject_id: matt\n"+tt.body)
 
 			got, err := config.Load(path)
 			if tt.wantErr {
@@ -371,7 +371,7 @@ func writeConfig(t *testing.T, body string) string {
 // path instead, it would write months of real-looking bucket ids under a width nobody
 // chose — and nothing downstream could tell them from correct ones.
 func TestLoadRejectsAnUnknownBucketWidth(t *testing.T) {
-	path := writeConfig(t, "person_id: matt\nbucket_width: fortnightly\n")
+	path := writeConfig(t, "subject_id: matt\nbucket_width: fortnightly\n")
 
 	_, err := config.Load(path)
 	if !errors.Is(err, config.ErrInvalid) {
@@ -411,7 +411,7 @@ func TestZoneName(t *testing.T) {
 }
 
 func TestCheckpointBudget(t *testing.T) {
-	t.Setenv("ANAM_PERSON_ID", "matt")
+	t.Setenv("ANAM_SUBJECT_ID", "matt")
 	t.Setenv("ANAM_CHECKPOINT_BUDGET", "")
 	c, err := config.Load("")
 	if err != nil || c.CheckpointBudget != config.DefaultCheckpointBudget {

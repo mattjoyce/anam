@@ -53,7 +53,7 @@ func testFacet(t *testing.T, sourceRef, payload string, version int) facet.Facet
 		DefinitionVersion: 1,
 		FactTime:          factTime,
 		Binding: facet.Binding{
-			PersonID:  person,
+			SubjectID: person,
 			Assurance: facet.AssuranceHigh,
 		},
 		Provenance: facet.Provenance{

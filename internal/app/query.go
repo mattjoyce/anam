@@ -30,7 +30,7 @@ and check holds the bundled rules to the fold over a real ledger.`,
 }
 
 func queryCheckCmd(cfgPath *string) *cobra.Command {
-	var ledgerPath, person, projName string
+	var ledgerPath, subject, person, projName string
 	var every int
 	cmd := &cobra.Command{
 		Use:   "check",
@@ -46,11 +46,15 @@ nothing and moves no watermark. The first disagreement ends the run with the ids
 each side holds; otherwise it reports how many instants agreed and how long each
 took.
 
---ledger and --person point it at a copy of a record rather than the configured
+--ledger and --subject point it at a copy of a record rather than the configured
 one; the bundled Definitions and projections are used either way.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cfg, err := checkConfig(*cfgPath, cmd, ledgerPath, person)
+			id, err := subjectFlag(subject, person)
+			if err != nil {
+				return err
+			}
+			cfg, err := checkConfig(*cfgPath, cmd, ledgerPath, id)
 			if err != nil {
 				return err
 			}
@@ -58,17 +62,33 @@ one; the bundled Definitions and projections are used either way.`,
 		},
 	}
 	cmd.Flags().StringVar(&ledgerPath, "ledger", "", "ledger file to check (default: the configured ledger_path)")
-	cmd.Flags().StringVar(&person, "person", "", "the person the ledger is pinned to (default: the configured person_id)")
+	cmd.Flags().StringVar(&subject, "subject", "", "the subject the ledger is pinned to (default: the configured subject_id)")
+	// --person is the old name of --subject (card 270a), kept until the alias-removal
+	// release. Cobra prints the deprecation when it is used and hides it from help.
+	cmd.Flags().StringVar(&person, "person", "", "old name of --subject")
+	_ = cmd.Flags().MarkDeprecated("person", "use --subject") // only fails for a flag not defined above
 	cmd.Flags().StringVar(&projName, "projection", "", "a log-shaped projection to serve through (default: the whole canonical)")
 	cmd.Flags().IntVar(&every, "every", 1, "compare every Nth distinct fact-time; 1 compares them all")
 	return cmd
 }
 
-// checkConfig is the command's config, with --ledger and --person overriding the
+// subjectFlag settles --subject and its old name --person: whichever is given, and
+// a refusal when both are given with different values, as the config keys are.
+func subjectFlag(subject, person string) (string, error) {
+	switch {
+	case subject != "" && person != "" && subject != person:
+		return "", fmt.Errorf("--subject (%q) and its old name --person (%q) differ; pass --subject only", subject, person)
+	case subject == "":
+		return person, nil
+	}
+	return subject, nil
+}
+
+// checkConfig is the command's config, with --ledger and --subject overriding the
 // file the way --server does, so a copy of a record can be checked from a machine
 // with no config of its own. With a configured server and no --ledger the daemon owns
 // the configured files, and the command refuses as every local command does.
-func checkConfig(explicit string, cmd *cobra.Command, ledgerPath, person string) (config.Config, error) {
+func checkConfig(explicit string, cmd *cobra.Command, ledgerPath, subject string) (config.Config, error) {
 	path, origin, err := config.Resolve(explicit)
 	if err != nil {
 		return config.Config{}, err
@@ -80,8 +100,8 @@ func checkConfig(explicit string, cmd *cobra.Command, ledgerPath, person string)
 	if ledgerPath != "" {
 		set["ledger_path"] = ledgerPath
 	}
-	if person != "" {
-		set["person_id"] = person
+	if subject != "" {
+		set["subject_id"] = subject
 	}
 	cfg, err := config.LoadOverriding(path, set)
 	if err != nil {

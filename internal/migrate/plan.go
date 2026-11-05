@@ -33,11 +33,11 @@ import (
 	"github.com/mattjoyce/anam/internal/store/ops"
 )
 
-// Params are the choices a run is given by whoever loaded the config: the person the
+// Params are the choices a run is given by whoever loaded the config: the subject the
 // ledgers belong to, the gate's two limits, and the two time bounds.
 type Params struct {
-	Person string
-	Limits gate.Limits
+	Subject string
+	Limits  gate.Limits
 	// Catalog is the provisioned catalog the run reads the old record under: its
 	// Definitions, with the old store's registered ones beside them.
 	Catalog *catalog.Catalog
@@ -179,7 +179,7 @@ func Read(ctx context.Context, src Source, program string, p Params) (Plan, erro
 func openSource(ctx context.Context, src Source, p Params) (*ledger.Ledger, *ops.DB, error) {
 	octx, cancel := context.WithTimeout(ctx, p.Timeout)
 	defer cancel()
-	l, err := ledger.OpenReadOnly(octx, src.Ledger, p.Person)
+	l, err := ledger.OpenReadOnly(octx, src.Ledger, p.Subject)
 	if err != nil {
 		return nil, nil, fmt.Errorf("migrate: old ledger: %w", err)
 	}
@@ -267,7 +267,7 @@ func carryOf(f facet.Facet, version int) gate.Carry {
 // type and nothing else, as the rename scopes its carry, with the Definition versions
 // the old store holds. The authenticated pillar still runs, scoped to the run.
 func carryGate(plan Plan, facets []facet.Facet, p Params, l gate.Ledger) *gate.Gate {
-	return gate.New(l, plan.current, scopesOf(facets), clock.Real{}, p.Person, p.Limits).Holding(plan.held)
+	return gate.New(l, plan.current, scopesOf(facets), clock.Real{}, p.Subject, p.Limits).Holding(plan.held)
 }
 
 // vet asks the gate what it would make of a facet and decides the version it is

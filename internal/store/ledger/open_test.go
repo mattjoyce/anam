@@ -36,23 +36,23 @@ func TestOpen_MissingFileIsNotInitialisedAndCreatesNothing(t *testing.T) {
 	}
 }
 
-// The person is pinned in the file. A wrong person_id fails loudly on every way in.
-func TestOpen_RefusesADifferentPerson(t *testing.T) {
+// The subject is pinned in the file. A wrong subject_id fails loudly on every way in.
+func TestOpen_RefusesADifferentSubject(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	path := newLedger(t).Path()
 
-	if l, err := ledger.Open(ctx, path, "someone-else"); !errors.Is(err, ledger.ErrPersonMismatch) {
+	if l, err := ledger.Open(ctx, path, "someone-else"); !errors.Is(err, ledger.ErrSubjectMismatch) {
 		closeIfOpen(l)
-		t.Errorf("Open as another person = %v, want ErrPersonMismatch", err)
+		t.Errorf("Open as another subject = %v, want ErrSubjectMismatch", err)
 	}
-	if l, err := ledger.OpenReadOnly(ctx, path, "someone-else"); !errors.Is(err, ledger.ErrPersonMismatch) {
+	if l, err := ledger.OpenReadOnly(ctx, path, "someone-else"); !errors.Is(err, ledger.ErrSubjectMismatch) {
 		closeIfOpen(l)
-		t.Errorf("OpenReadOnly as another person = %v, want ErrPersonMismatch", err)
+		t.Errorf("OpenReadOnly as another subject = %v, want ErrSubjectMismatch", err)
 	}
-	if l, err := ledger.Create(ctx, path, "someone-else"); !errors.Is(err, ledger.ErrPersonMismatch) {
+	if l, err := ledger.Create(ctx, path, "someone-else"); !errors.Is(err, ledger.ErrSubjectMismatch) {
 		closeIfOpen(l)
-		t.Errorf("Create as another person = %v, want ErrPersonMismatch", err)
+		t.Errorf("Create as another subject = %v, want ErrSubjectMismatch", err)
 	}
 }
 

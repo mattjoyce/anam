@@ -104,7 +104,7 @@ func newLedgerFixture(t *testing.T) ledgerFixture {
 		cfgPath:    filepath.Join(dir, "config.yaml"),
 		ledgerPath: filepath.Join(dir, "ledger.db"),
 	}
-	cfg := fmt.Sprintf("person_id: matt\nledger_path: %s\ndb_path: %s\ntimeout: %s\n",
+	cfg := fmt.Sprintf("subject_id: matt\nledger_path: %s\ndb_path: %s\ntimeout: %s\n",
 		f.ledgerPath, filepath.Join(dir, "tracking.db"), testTimeout) + catalogKeys(t)
 	if err := os.WriteFile(f.cfgPath, []byte(cfg), 0o600); err != nil {
 		t.Fatal(err)

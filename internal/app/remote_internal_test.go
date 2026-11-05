@@ -171,7 +171,7 @@ func TestStatus_AsksTheDaemon(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"(person matt)", "W       3"} {
+	for _, want := range []string{"(subject matt)", "W       3"} {
 		if !strings.Contains(local, want) || !strings.Contains(remote, want) {
 			t.Errorf("want %q in both\n--- local\n%s--- remote\n%s", want, local, remote)
 		}

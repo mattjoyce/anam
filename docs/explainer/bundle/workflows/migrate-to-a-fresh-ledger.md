@@ -69,7 +69,7 @@ steps:
     label: create the new pair
     action: "`ledger.Create`, the code `anam init` runs, makes the new ledger with a fresh ledger id; `ops.Open` makes the new operational store. A run that fails after this removes the files it made, so a rerun finds none."
     resource: internal/migrate/carry.go#createTarget
-    anchor: "ledger.Create(ctx, to.Ledger, p.Person)"
+    anchor: "ledger.Create(ctx, to.Ledger, p.Subject)"
   - actor: /components/store-ops.md
     caller: /components/cli.md
     label: Definitions first

@@ -14,7 +14,7 @@ import (
 // environment and the file both set them, a relative path is from the working
 // directory whichever layer won, and provenance names the winning origin.
 func TestResolvedCatalogDirs(t *testing.T) {
-	t.Setenv("ANAM_PERSON_ID", "matt")
+	t.Setenv("ANAM_SUBJECT_ID", "matt")
 	keys := []string{"definitions_dir", "projections_dir"}
 
 	t.Run("unset is empty with the default origin", func(t *testing.T) {
@@ -52,7 +52,7 @@ func TestResolvedCatalogDirs(t *testing.T) {
 
 	t.Run("file beats default and keeps its origin after expansion", func(t *testing.T) {
 		d := t.TempDir()
-		path := writeCfg(t, "person_id: matt\nprojections_dir: "+d+"\n")
+		path := writeCfg(t, "subject_id: matt\nprojections_dir: "+d+"\n")
 		r, err := config.LoadResolved(path)
 		if err != nil {
 			t.Fatal(err)
@@ -67,7 +67,7 @@ func TestResolvedCatalogDirs(t *testing.T) {
 	})
 
 	t.Run("an empty setting selects the built-in catalog and keeps its origin", func(t *testing.T) {
-		path := writeCfg(t, "person_id: matt\ndefinitions_dir: \"\"\n")
+		path := writeCfg(t, "subject_id: matt\ndefinitions_dir: \"\"\n")
 		r, err := config.LoadResolved(path)
 		if err != nil {
 			t.Fatal(err)
@@ -88,7 +88,7 @@ func TestResolvedCatalogDirs(t *testing.T) {
 		}
 		cfgDir := t.TempDir() // a config beside which a relative path must NOT resolve
 		path := filepath.Join(cfgDir, "anam.yaml")
-		if err := os.WriteFile(path, []byte("person_id: matt\ndefinitions_dir: cat/defs\n"), 0o600); err != nil {
+		if err := os.WriteFile(path, []byte("subject_id: matt\ndefinitions_dir: cat/defs\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		t.Setenv("ANAM_PROJECTIONS_DIR", "cat/projs")
@@ -110,7 +110,7 @@ func TestResolvedCatalogDirs(t *testing.T) {
 // expands them the same way, but does not validate settings it does not return: a
 // config a daemon would refuse still names its catalog. Strict decoding still holds.
 func TestCatalogDirs(t *testing.T) {
-	for _, k := range []string{"ANAM_PERSON_ID", "ANAM_DEFINITIONS_DIR", "ANAM_PROJECTIONS_DIR"} {
+	for _, k := range []string{"ANAM_SUBJECT_ID", "ANAM_DEFINITIONS_DIR", "ANAM_PROJECTIONS_DIR"} {
 		t.Setenv(k, "")
 	}
 	dir := t.TempDir()
@@ -125,7 +125,7 @@ func TestCatalogDirs(t *testing.T) {
 	defs := filepath.Join(dir, "definitions")
 	write("timeout: 0s\nbucket_width: fortnight\ndefinitions_dir: " + defs + "\n")
 	if _, err := config.Load(path); err == nil {
-		t.Fatal("Load accepted a config with no person_id, a zero timeout and an unknown bucket width")
+		t.Fatal("Load accepted a config with no subject_id, a zero timeout and an unknown bucket width")
 	}
 	gotDefs, gotProjs, err := config.CatalogDirs(path)
 	if err != nil {

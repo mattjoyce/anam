@@ -49,6 +49,12 @@ const schemaVersion = 3
 // is a refactor or a hurried shell session, and against that the database refusing the
 // write is stronger than a test that has to be run.
 //
+// The facet column binding_person_id holds the subject the gate bound a fact to. Its
+// name is the one stored name of the old word left in ledger.sql, and it is not renamed
+// here: a column rename is a schema version with a carry, which is card 270b. This
+// comment stands in for one in ledger.sql, whose text is pinned and stored in every
+// ledger file, so 270a leaves it byte for byte.
+//
 //go:embed ledger.sql
 var schema string
 
@@ -78,9 +84,13 @@ DROP TABLE IF EXISTS ledger_meta;
 // The ledger_meta keys. schema_version is the version the file was created at and
 // never changes, because ledger_meta is write-once; each migration applied since adds
 // a schema_migration:<n> key, and the effective version is the highest of them all.
+//
+// metaPersonID is the key the subject is pinned under. It keeps the old name because it
+// is stored in every ledger file; renaming it is card 270b, behind a schema version and
+// a carry. Everything above the store says subject.
 const (
 	metaSchemaVersion   = "schema_version"
-	metaPersonID        = "person_id"
+	metaPersonID        = "person_id" // the subject's pin, under its stored name until card 270b
 	metaLedgerID        = "ledger_id"
 	metaMigrationPrefix = "schema_migration:"
 )

@@ -4,7 +4,7 @@ title: Admission gate
 description: "The only ingress: resolve binds an envelope to the person, commit validates it against its Definition, composes identity, and appends through the ledger idempotently."
 timestamp: 2026-10-17T00:00:00Z
 resource: internal/gate/gate.go#New
-anchor: "func New(l Ledger, defs Definitions, scopes TokenScopes, clock Clock, personID string, limits Limits) *Gate {"
+anchor: "func New(l Ledger, defs Definitions, scopes TokenScopes, clock Clock, subjectID string, limits Limits) *Gate {"
 basis: code
 tier: core
 group: kernel

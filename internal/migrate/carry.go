@@ -142,7 +142,7 @@ func Carry(ctx context.Context, plan Plan, to Target, p Params) (done Carried, e
 // createTarget makes the new ledger as `anam init` does, and the operational store
 // beside it.
 func createTarget(ctx context.Context, to Target, p Params) (*ledger.Ledger, *ops.DB, error) {
-	l, err := ledger.Create(ctx, to.Ledger, p.Person)
+	l, err := ledger.Create(ctx, to.Ledger, p.Subject)
 	if err != nil {
 		return nil, nil, fmt.Errorf("migrate: new ledger: %w", err)
 	}
@@ -197,7 +197,7 @@ const maxMismatches = 10
 // reported as moves; the version is not part of a fact's identity.
 func Prove(ctx context.Context, plan Plan, newLedger string, p Params) (Proof, error) {
 	octx, cancel := context.WithTimeout(ctx, p.Timeout)
-	l, err := ledger.OpenReadOnly(octx, newLedger, p.Person)
+	l, err := ledger.OpenReadOnly(octx, newLedger, p.Subject)
 	cancel()
 	if err != nil {
 		return Proof{}, fmt.Errorf("migrate: new ledger: %w", err)

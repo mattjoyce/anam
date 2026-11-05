@@ -276,7 +276,8 @@ var _ = []config.Role{config.RoleReader, config.RoleImporter, config.RoleOperato
 func TestOpenAPI_SubjectAndItsOldNames(t *testing.T) {
 	t.Parallel()
 	type property struct {
-		Deprecated bool `yaml:"deprecated"`
+		Deprecated  bool   `yaml:"deprecated"`
+		Description string `yaml:"description"`
 	}
 	type schema struct {
 		Required   []string            `yaml:"required"`
@@ -308,15 +309,21 @@ func TestOpenAPI_SubjectAndItsOldNames(t *testing.T) {
 		schema, field string
 		props         map[string]property
 		deprecated    bool
+		description   string
 	}{
-		{"Status", "subject", status.Properties, false},
-		{"Status", "person", status.Properties, true},
-		{"Envelope", "asserted_subject", envelope.Properties, false},
-		{"Envelope", "asserted_person", envelope.Properties, true},
+		{"Status", "subject", status.Properties, false, "what the record is about, the configured subject_id"},
+		{"Status", "person", status.Properties, true, "the old name of subject, answered with the same value since 2026-11-05"},
+		{"Envelope", "asserted_subject", envelope.Properties, false, "the subject the observation is about; equal to the record's subject"},
+		{"Envelope", "asserted_person", envelope.Properties, true, "the old name of asserted_subject, read since 2026-11-05"},
 	} {
 		p, ok := c.props[c.field]
 		if !ok || p.Deprecated != c.deprecated {
 			t.Errorf("%s.%s: present %v, deprecated %v; want present, deprecated %v", c.schema, c.field, ok, p.Deprecated, c.deprecated)
+		}
+		// An unquoted comma in a flow-mapping description ends the description there
+		// and makes the rest a key of its own, so the text is checked to its end.
+		if !strings.HasPrefix(p.Description, c.description) {
+			t.Errorf("%s.%s description = %q, want it to begin %q", c.schema, c.field, p.Description, c.description)
 		}
 	}
 

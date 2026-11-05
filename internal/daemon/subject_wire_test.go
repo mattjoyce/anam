@@ -43,6 +43,18 @@ func TestEnvelopes_AssertedSubjectAndItsOldName(t *testing.T) {
 		{"new name", `"asserted_subject": "matt"`, facet.AssuranceHigh},
 		{"both, equal", `"asserted_subject": "matt", "asserted_person": "matt"`, facet.AssuranceHigh},
 		{"neither", ``, facet.AssuranceMedium},
+		// An explicit empty string or null is an absent assertion, under either name
+		// and beside the other: a client that always sends the key is not refused.
+		{"old name empty", `"asserted_person": ""`, facet.AssuranceMedium},
+		{"old name null", `"asserted_person": null`, facet.AssuranceMedium},
+		{"new name empty", `"asserted_subject": ""`, facet.AssuranceMedium},
+		{"new name null", `"asserted_subject": null`, facet.AssuranceMedium},
+		{"both empty", `"asserted_subject": "", "asserted_person": ""`, facet.AssuranceMedium},
+		{"both null", `"asserted_subject": null, "asserted_person": null`, facet.AssuranceMedium},
+		{"new empty, old set", `"asserted_subject": "", "asserted_person": "matt"`, facet.AssuranceHigh},
+		{"new null, old set", `"asserted_subject": null, "asserted_person": "matt"`, facet.AssuranceHigh},
+		{"new set, old empty", `"asserted_subject": "matt", "asserted_person": ""`, facet.AssuranceHigh},
+		{"new set, old null", `"asserted_subject": "matt", "asserted_person": null`, facet.AssuranceHigh},
 	}
 	for i, tc := range admitted {
 		var a api.Admission

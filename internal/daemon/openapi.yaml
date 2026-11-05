@@ -1560,7 +1560,7 @@ components:
       required: [version, subject, person, ledger_id, w, sources]
       properties:
         version: { type: string }
-        subject: { type: string, description: what the record is about, the configured subject_id }
+        subject: { type: string, description: "what the record is about, the configured subject_id" }
         person:
           type: string
           deprecated: true

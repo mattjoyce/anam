@@ -70,7 +70,7 @@ func writeStatus(cmd *cobra.Command, s api.Status, server string) error {
 	if server != "" {
 		where = "daemon at " + server
 	}
-	_, _ = fmt.Fprintf(out, "ledger  %s (subject %s)\n", s.LedgerID, s.Subject)
+	_, _ = fmt.Fprintf(out, "ledger  %s (subject %s)\n", s.LedgerID, subjectOf(s))
 	_, _ = fmt.Fprintf(out, "W       %d\n", s.W)
 	_, _ = fmt.Fprintf(out, "build   %s, %s\n", s.Version, where)
 	if len(s.Held) > 0 {
@@ -95,4 +95,14 @@ func writeStatus(cmd *cobra.Command, s api.Status, server string) error {
 		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", src.Source, src.LastScanAt, last)
 	}
 	return w.Flush()
+}
+
+// subjectOf is the status's subject, read from subject and, when that is empty, from
+// person, its old name (card 270a). A daemon before 270a answers person alone, and the
+// CLI is often newer than the daemon it asks.
+func subjectOf(s api.Status) string {
+	if s.Subject != "" {
+		return s.Subject
+	}
+	return s.Person
 }

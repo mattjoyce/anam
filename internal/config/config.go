@@ -268,8 +268,16 @@ func (c Config) Validate() error {
 // invalidSetting gives validation a pointer without requiring file IO. The loader
 // supplies the effective node's origin after the same validator accepts Config.
 func invalidSetting(key, format string, args ...any) error {
-	return ashlar.NewError(ErrInvalid, ashlar.NewPointer(key), ashlar.Origin{}, fmt.Sprintf(format, args...), nil)
+	return settingError{ashlar.NewError(ErrInvalid, ashlar.NewPointer(key), ashlar.Origin{}, fmt.Sprintf(format, args...), nil)}
 }
+
+// settingError carries the key's pointer so a resolved config can name the file
+// and line that set it, and reads as the plain message when nothing has located
+// it yet, as Validate on a programmatic Config.
+type settingError struct{ diagnostic *ashlar.Error }
+
+func (e settingError) Error() string { return fmt.Sprintf("%v: %s", ErrInvalid, e.diagnostic.Message) }
+func (e settingError) Unwrap() error { return e.diagnostic }
 
 // checkServer accepts an http or https URL naming a host, and nothing else: no path,
 // query or user, which the client would otherwise drop or send somewhere unexpected.

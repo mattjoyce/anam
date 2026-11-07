@@ -63,6 +63,10 @@ func (r Resolved) validationError(err error) error {
 	} else if p, ok := r.provenance[strings.TrimPrefix(string(diagnostic.Pointer), "/")]; ok {
 		// Retired keys have been adopted under their canonical names.
 		located.Origin = p.Effective
+	} else if diagnostic.Origin.String() == "" {
+		// No file set this key (a default), so a bare pointer prefix would point at
+		// nothing. Keep the error as it reads unlocated.
+		return err
 	}
 	return &located
 }

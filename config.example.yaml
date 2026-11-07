@@ -23,6 +23,8 @@
 # directory. A leading slash means that config root, not the host filesystem.
 # Missing files, cycles, repeated targets and escapes through .. or symlinks fail.
 # include: null means no includes; null entries in an include list are errors.
+# Each entry names a file. A directory is refused, so a file dropped into one
+# cannot change the config unseen.
 # Blank, comment-only and null documents contribute no settings. Top-level null
 # settings leave the earlier layer in place. Application paths, including catalog
 # directories, still resolve from the working directory in every fragment.

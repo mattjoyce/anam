@@ -160,6 +160,9 @@ func TestIncludeFailures(t *testing.T) {
 		{"lexical escape", "include: ../outside.yaml", "", "", ashlar.ErrComposition},
 		{"absolute lexical escape", "include: /../outside.yaml", "", "", ashlar.ErrComposition},
 		{"nested lexical escape", "include: sub/child.yaml", "include: ../../outside.yaml", "", ashlar.ErrComposition},
+		{"nested absolute lexical escape", "include: sub/child.yaml", "include: /../outside.yaml", "", ashlar.ErrComposition},
+		{"directory", "include: sub", "timeout: 3s", "", ashlar.ErrComposition},
+		{"nested directory", "include: sub/child.yaml", "include: /sub", "", ashlar.ErrComposition},
 		{"null array entry", "include: [null]", "", "", ashlar.ErrComposition},
 		{"child null array entry", "include: sub/child.yaml", "include: [nested.yaml, null]", "", ashlar.ErrComposition},
 		{"kind conflict", "timeout: {}\ninclude: sub/child.yaml", "timeout: 1s", "", ashlar.ErrComposition},
@@ -304,5 +307,57 @@ func TestIncludeValidationPointers(t *testing.T) {
 				t.Fatalf("wrong diagnostic = %v", err)
 			}
 		})
+	}
+}
+
+// The root config may be a symlink. Includes resolve beside its target, not
+// beside the link, so a decoy next to the link is never read.
+func TestIncludeRootConfigSymlink(t *testing.T) {
+	t.Parallel()
+	file := includeFiles(t, map[string]string{"config.yaml": "subject_id: test\ninclude: child.yaml", "child.yaml": "timeout: 19s"})
+	links := t.TempDir()
+	if err := os.WriteFile(filepath.Join(links, "child.yaml"), []byte("timeout: 99s"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(links, "config.yaml")
+	if err := os.Symlink(file, link); err != nil {
+		t.Fatal(err)
+	}
+	got, err := config.Load(link)
+	if err != nil || got.Timeout != 19*time.Second {
+		t.Fatalf("symlinked root timeout = %s, error = %v, want 19s from the target's directory", got.Timeout, err)
+	}
+}
+
+// The operator named the root file, so its read and syntax errors carry its full
+// path and the plain filesystem cause, as before includes.
+func TestRootConfigErrorsNameThePath(t *testing.T) {
+	t.Parallel()
+	file := includeFiles(t, map[string]string{"config.yaml": "subject_id: test\ntimeout: [\n"})
+	_, err := config.LoadResolved(file)
+	if err == nil || !strings.Contains(err.Error(), file) {
+		t.Fatalf("syntax error = %v, want the absolute path %s", err, file)
+	}
+	if os.Geteuid() == 0 {
+		t.Skip("root reads a mode-000 file")
+	}
+	if err := os.WriteFile(file, []byte("subject_id: test\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(file, 0); err != nil {
+		t.Fatal(err)
+	}
+	_, err = config.LoadResolved(file)
+	if !errors.Is(err, os.ErrPermission) || !strings.Contains(err.Error(), file) || !strings.Contains(err.Error(), "permission denied") {
+		t.Fatalf("unreadable root error = %v, want permission denied naming %s", err, file)
+	}
+}
+
+// A setting no file supplied has no origin to print, so its error keeps the plain
+// message rather than a bare pointer prefix.
+func TestValidationWithoutOriginIsPlain(t *testing.T) {
+	err := config.Config{}.Validate()
+	if err == nil || !errors.Is(err, config.ErrInvalid) || !strings.HasPrefix(err.Error(), "invalid config: ") {
+		t.Fatalf("Validate() on an empty Config = %v, want a plain invalid config message", err)
 	}
 }

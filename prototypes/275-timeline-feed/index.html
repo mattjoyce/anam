@@ -598,7 +598,8 @@ function renderSidebar() {
         var fr = srow(f, fams[f].reduce(function (n, t) { return n + (D.typeCount[t] || 0); }, 0), all, { 'data-act': 'fam', 'data-types': fams[f].join(','), class: 'srow fam', title: 'Tick every type in ' + f });
         if (some) fr.classList.add('mixed'); box.appendChild(fr); }
       fams[f].sort().forEach(function (t) {
-        box.appendChild(srow(t, D.typeCount[t] || 0, L('type').indexOf(t) >= 0, { 'data-act': 'chip', 'data-dim': 'type', 'data-val': t, class: 'srow mono' }));
+        // the domain is the parent row, so a type shows without its head: "medication.dose" under health
+        box.appendChild(srow(t.slice(dom.length + 1), D.typeCount[t] || 0, L('type').indexOf(t) >= 0, { 'data-act': 'chip', 'data-dim': 'type', 'data-val': t, title: t, class: 'srow mono' }));
       });
     });
     if (!box.firstChild) box.appendChild(h('div', { class: 'muted', text: 'Nothing in this window.' }));

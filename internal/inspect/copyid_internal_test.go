@@ -13,7 +13,7 @@ func TestFacetIDFragment_EscapesTheID(t *testing.T) {
 	const hostile = `"><script>alert(1)</script>&x=1`
 	for _, name := range []string{"facetid", "facetidplain", "copyid"} {
 		var buf bytes.Buffer
-		if err := pagesFor(Build{}, false).ExecuteTemplate(&buf, name, hostile); err != nil {
+		if err := pagesFor(Build{}, false, false).ExecuteTemplate(&buf, name, hostile); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
 		out := buf.String()
@@ -32,7 +32,7 @@ func TestResultPage_FacetIDHasACopyButton(t *testing.T) {
 	t.Parallel()
 	var buf bytes.Buffer
 	data := resultData{Heading: "retracted", Kind: "tombstoned", Facet: "abc-123", Detail: " is tombstoned."}
-	if err := pagesFor(Build{}, false).ExecuteTemplate(&buf, "result.html", data); err != nil {
+	if err := pagesFor(Build{}, false, false).ExecuteTemplate(&buf, "result.html", data); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(buf.String(), `data-copy="abc-123"`) {

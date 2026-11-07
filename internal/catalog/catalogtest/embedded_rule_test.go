@@ -26,6 +26,7 @@ type exempt struct {
 // deleted with it in R4b slice 5 or moved to the deployment's overlay
 // (anam_mattjoyce/engine-tests).
 var emptyOnPurpose = []exempt{
+	{file: "internal/daemon/spatial_test.go", fn: "TestSpatialEmptyCatalogThenRegistration", reason: "spatial selection can start on an empty catalog and draw later registered data without restart"},
 	{file: "internal/catalog/empty_test.go", fn: "TestLoadNoDirectoriesIsEmpty",
 		reason: "both directories empty is the empty catalog: none, no bodies, the empty V"},
 	{file: "internal/catalog/empty_test.go", fn: "TestLoadOneDirectoryEmpty",

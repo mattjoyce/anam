@@ -10,11 +10,12 @@ import (
 	"github.com/mattjoyce/anam/internal/facet"
 )
 
-// Spec is the optional nonspatial inspector configuration.
+// Spec is the optional inspector configuration.
 type Spec struct {
-	Domains  []DomainSpec `yaml:"domains"`
-	Families []Family     `yaml:"families"`
-	Types    []Override   `yaml:"types"`
+	TrackType facet.Type   `yaml:"track_type"`
+	Domains   []DomainSpec `yaml:"domains"`
+	Families  []Family     `yaml:"families"`
+	Types     []Override   `yaml:"types"`
 }
 
 // DomainSpec names an ordered domain with an optional palette slot.
@@ -56,14 +57,19 @@ func invalid(section string, i int, key, message string) error {
 
 // Value is immutable. Its zero value gives neutral hues and no preferred ordering.
 type Value struct {
-	domains  []Domain
-	families []Family
-	types    []Override
+	trackType facet.Type
+	domains   []Domain
+	families  []Family
+	types     []Override
 }
 
 // Compile validates the whole spec and copies its data. Errors return no partial value.
 func Compile(s Spec) (Value, error) {
 	var v Value
+	if s.TrackType != "" && !s.TrackType.Valid() {
+		return Value{}, &Error{"/inspector/track_type", "invalid type"}
+	}
+	v.trackType = s.TrackType
 	seen := map[string]bool{}
 	for i, d := range s.Domains {
 		if !identifier(d.ID) || seen[d.ID] {
@@ -153,3 +159,6 @@ func (v Value) Hue(id string) string {
 	}
 	return "hx"
 }
+
+// TrackType returns the selected hourly track type, or empty when disabled.
+func (v Value) TrackType() facet.Type { return v.trackType }

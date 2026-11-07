@@ -16,7 +16,7 @@ func TestInspectorStrictSchema(t *testing.T) {
 	t.Parallel()
 	tests := []struct{ yaml, pointer string }{
 		{"[]", "/inspector"},
-		{"{track_type: place.track}", "/inspector/track_type"},
+		{"{track_type: invalid}", "/inspector/track_type"},
 		{"{unknown: []}", "/inspector/unknown"},
 		{"{domains: {}}", "/inspector/domains"},
 		{"{families: 1}", "/inspector/families"},
@@ -215,5 +215,57 @@ func TestInspectorAbsentDefaults(t *testing.T) {
 		if p.Hue("health") != "hx" || len(p.Domains())+len(p.Families())+len(p.Overrides()) != 0 {
 			t.Fatal("absent policy carries personal defaults")
 		}
+	}
+}
+
+func TestInspectorTrackType(t *testing.T) {
+	t.Parallel()
+	for _, value := range []string{"null", "''", "place.track", "custom.route"} {
+		t.Run(value, func(t *testing.T) {
+			t.Parallel()
+			file := includeFiles(t, map[string]string{"config.yaml": "subject_id: test\ninclude: child.yaml\n", "child.yaml": "inspector: {track_type: " + value + "}\n"})
+			cfg, err := config.Load(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := value
+			if value == "null" || value == "''" {
+				want = ""
+			}
+			if string(cfg.Presentation().TrackType()) != want {
+				t.Fatalf("selector = %s", cfg.Presentation().TrackType())
+			}
+		})
+	}
+	for _, value := range []string{"1", "true", "[]", "{}", "invalid", "' place.track'", "Place.track"} {
+		t.Run("invalid "+value, func(t *testing.T) {
+			t.Parallel()
+			file := includeFiles(t, map[string]string{"config.yaml": "subject_id: test\ninclude: child.yaml\n", "child.yaml": "inspector: {track_type: " + value + "}\n"})
+			_, err := config.Load(file)
+			if err == nil || !strings.Contains(err.Error(), "/inspector/track_type") || !strings.Contains(err.Error(), "child.yaml") {
+				t.Fatalf("error = %v", err)
+			}
+		})
+	}
+}
+
+func TestInspectorTrackIncludeReplacement(t *testing.T) {
+	t.Parallel()
+	for _, pair := range [][2]string{{"place.track", "null"}, {"null", "custom.route"}, {"place.track", "''"}, {"place.track", "custom.route"}} {
+		t.Run(pair[0]+" to "+pair[1], func(t *testing.T) {
+			t.Parallel()
+			file := includeFiles(t, map[string]string{"config.yaml": "subject_id: test\ninspector: {track_type: " + pair[0] + "}\ninclude: child.yaml\n", "child.yaml": "inspector: {track_type: " + pair[1] + "}\n"})
+			c, err := config.Load(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := pair[1]
+			if want == "null" || want == "''" {
+				want = ""
+			}
+			if string(c.Presentation().TrackType()) != want {
+				t.Fatal("selector was not replaced")
+			}
+		})
 	}
 }

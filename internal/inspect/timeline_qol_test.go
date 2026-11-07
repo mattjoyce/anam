@@ -151,7 +151,7 @@ func TestTimeline_DenseMarksDrawAsARunUntilZoomedIn(t *testing.T) {
 func TestTimeline_LiveByDefaultLeavesTheDeadUnread(t *testing.T) {
 	t.Parallel()
 	srv, cl := denseServer(t)
-	get(t, srv.URL+"/location") // warm the fold's cache: its own batch read is not under test
+	get(t, srv.URL+"/facets") // warm the fold's cache: its own batch read is not under test
 	cl.versionReads.Store(0)
 
 	_, body := get(t, srv.URL+"/?view=whole")

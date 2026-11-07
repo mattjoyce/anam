@@ -329,6 +329,12 @@ func TestTimeline_BareRootOpensTheLastMonth(t *testing.T) {
 		{"health.heart-rate", time.Date(2026, 10, 20, 6, 0, 0, 0, time.UTC)},
 		{"activity.walk", time.Date(2026, 11, 3, 10, 0, 0, 0, time.UTC)},
 		{"record.note", time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)},
+		// Two active heads the presentation does not configure open after the
+		// configured ones, sorted, whatever order the ledger gives them.
+		{"zeta.thing", time.Date(2026, 10, 21, 6, 0, 0, 0, time.UTC)},
+		{"media.clip", time.Date(2026, 10, 22, 6, 0, 0, 0, time.UTC)},
+		{"social.call", time.Date(2026, 10, 23, 6, 0, 0, 0, time.UTC)},
+		{"alpha.thing", time.Date(2026, 10, 24, 6, 0, 0, 0, time.UTC)},
 	} {
 		f := seedFacet(t, fmt.Sprintf("test:lastmonth:%d", i), c.typ, `{"n": 1}`)
 		f.FactTime = c.at
@@ -349,7 +355,7 @@ func TestTimeline_BareRootOpensTheLastMonth(t *testing.T) {
 		t.Fatalf("GET /: %v", err)
 	}
 	_ = resp.Body.Close()
-	want := "/?from=2026-10-04&open=health&open=activity&to=2026-11-03&zone=Australia%2FSydney"
+	want := "/?from=2026-10-04&open=health&open=activity&open=alpha&open=media&open=social&open=zeta&to=2026-11-03&zone=Australia%2FSydney"
 	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != want {
 		t.Fatalf("GET / = %d %s, want 303 to %s", resp.StatusCode, resp.Header.Get("Location"), want)
 	}

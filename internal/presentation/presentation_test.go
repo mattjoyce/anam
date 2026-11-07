@@ -32,6 +32,18 @@ func TestCompileIsolation(t *testing.T) {
 	if !reflect.DeepEqual(p.Domains(), wantD) || !reflect.DeepEqual(p.Families(), wantF) || !reflect.DeepEqual(p.Overrides(), wantT) || p.Hue("custom") != "h0" {
 		t.Fatal("caller mutated compiled presentation")
 	}
+	// wantD, wantF and wantT came from the accessors under test, so check each
+	// against a literal too: an accessor returning its backing slice would move
+	// both sides of the comparison above.
+	if d := p.Domains()[0]; d.ID != "custom" || d.Hue != 0 {
+		t.Fatalf("Domains() leaked its backing slice: %+v", d)
+	}
+	if f := p.Families()[0]; f.Label != " <Label> " {
+		t.Fatalf("Families() leaked its backing slice: %+v", f)
+	}
+	if o, ok := p.Lookup("custom.arrival"); !ok || o.Shape != "star" || p.Overrides()[0].Shape != "star" {
+		t.Fatalf("Overrides() leaked its backing slice: %+v", o)
+	}
 	if p.Hue("unconfigured") != "hx" {
 		t.Fatal("unconfigured domain inherited a hue")
 	}
@@ -59,5 +71,18 @@ func TestZeroPresentation(t *testing.T) {
 	var p presentation.Value
 	if p.Hue("health") != "hx" || len(p.Domains())+len(p.Families())+len(p.Overrides()) != 0 {
 		t.Fatal("zero value carries preferences")
+	}
+}
+
+// Identifiers are unique within a section, not across sections: a domain and a
+// family may share a name.
+func TestCompileSameIDAcrossSections(t *testing.T) {
+	t.Parallel()
+	_, err := presentation.Compile(presentation.Spec{
+		Domains:  []presentation.DomainSpec{{ID: "sleep"}},
+		Families: []presentation.Family{{ID: "sleep"}},
+	})
+	if err != nil {
+		t.Fatalf("a domain and a family named sleep were refused: %v", err)
 	}
 }

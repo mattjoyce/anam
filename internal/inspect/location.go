@@ -226,7 +226,7 @@ func hourHue(p trackPoint) string {
 
 // facetTrack draws one place.track facet for its page; nil for any other type,
 // or a payload the drawing cannot read.
-func facetTrack(f facet.Facet) *trackView {
+func facetTrack(f facet.Facet, hue string) *trackView {
 	if f.Type != typeLocationTrack {
 		return nil
 	}
@@ -234,7 +234,7 @@ func facetTrack(f facet.Facet) *trackView {
 	if err != nil || len(pts) == 0 {
 		return nil
 	}
-	v := layoutTrack(pts, func(trackPoint) string { return "h1" })
+	v := layoutTrack(pts, func(trackPoint) string { return hue })
 	v.Device, v.Hours = device, 1
 	return &v
 }

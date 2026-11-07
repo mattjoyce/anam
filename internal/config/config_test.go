@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -51,7 +52,7 @@ func TestLoadDefaults(t *testing.T) {
 		LibraryFolderLimit: config.DefaultLibraryFolderLimit,
 		Limits:             config.DefaultLimits(),
 	}
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Load() = %+v, want %+v", got, want)
 	}
 }
@@ -117,7 +118,7 @@ bucket_width: weekly
 		LibraryFolderLimit: config.DefaultLibraryFolderLimit,
 		Limits:             config.DefaultLimits(),
 	}
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Load() = %+v, want %+v", got, want)
 	}
 }

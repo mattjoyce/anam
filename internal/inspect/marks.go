@@ -8,6 +8,7 @@ import (
 
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
+	"github.com/mattjoyce/anam/internal/presentation"
 )
 
 // The timeline encodes a facet's type three ways, because nineteen types cannot
@@ -35,40 +36,6 @@ const (
 	otherFamilyID       = "other"
 )
 
-// family is one row of the band.
-type family struct {
-	ID    string
-	Label string
-}
-
-// hueNeutral is the grey outside the eight palette slots, taken by a head with no
-// hue of its own (lanes.go).
-const hueNeutral = -1
-
-// families in row order, top to bottom within a domain's lane: the families the
-// Definitions declare (card 147). A family carries no colour of its own since card 245:
-// colour follows the domain (lanes.go), and a family is told apart by its row and its
-// shapes. A family can span heads, so a row is keyed by domain and family.
-var families = []family{
-	{"vitals", "vitals"},
-	{"body", "body"},
-	{"sleep", "sleep"},
-	{"movement", "movement"},
-	{"exercise", "exercise"},
-	{"labs", "labs"},
-	{"conditions", "conditions"},
-	{"meds", "meds"},
-	{"intake", "intake"},
-	{"clinical", "clinical"},
-	{"location", "location"},
-	{"trips", "trips"},
-	{"attention", "attention"},
-	{"employment", "employment"},
-	{"purchases", "purchases"},
-	{"notes", "notes"},
-	{"documents", "documents"},
-}
-
 // kind is what sort of fact a type records.
 type kind int
 
@@ -84,107 +51,45 @@ type typeStyle struct {
 	Kind   kind
 }
 
-// typeStyles is the shapes: the types whose mark is not the one their kind takes by
-// default (shapeFor), so that within a row a start, an end, a miss and an alert are
-// told apart. Row and kind come from the Definition's family and kind (card 176); an
-// entry here only lends the shape, and a type not listed draws its kind's default.
-// Since card 147 every bundled Definition declares both, so the table no longer
-// places a type, except the three retired health-db types, which are left as they
-// were written and draw only in a read as-of before card 55.
-var typeStyles = map[facet.Type]typeStyle{
-	"health.heart-rate":   {"vitals", shapeCircle, kindMeasure},
-	"health.sleep":        {"sleep", shapeCircle, kindMeasure},
-	"health.metric-group": {"movement", shapeCircle, kindMeasure},
-
-	"health.blood-pressure":   {"vitals", shapeSquare, kindReading},
-	"health.heart-rate-alert": {"vitals", shapeAlert, kindEvent},
-
-	"health.weight": {"body", shapeSquare, kindReading},
-	// A Withings row, named for its vendor since card 195. A read as-of before the run
-	// draws health.measurement by its Definition's kind and family alone.
-	"health.measurement.withings": {"body", shapeDiamond, kindReading},
-
-	"activity.gym-visit": {"exercise", shapeSquare, kindEvent},
-
-	"health.lab-panel": {"labs", shapeSquare, kindEvent},
-
-	"health.medication.started":     {"meds", shapeTriUp, kindEvent},
-	"health.medication.stopped":     {"meds", shapeTriDown, kindEvent},
-	"health.medication.dose-missed": {"meds", shapeCross, kindEvent},
-	// A dose taken (card 179): the moment of an intake, a filled square among the
-	// regimen's triangles.
-	"health.medication.dose": {"meds", shapeSquare, kindEvent},
-
-	"health.illness.started": {"conditions", shapeTriUp, kindEvent},
-	"health.illness.ended":   {"conditions", shapeTriDown, kindEvent},
-
-	// A declared stretch of attention (card 222): a start and an end, as an illness has.
-	// The row is grey like the other self-reports, since the eight hues are all spent.
-	"mind.attention.started": {"attention", shapeTriUp, kindEvent},
-	"mind.attention.ended":   {"attention", shapeTriDown, kindEvent},
-
-	// Employment (card 239): a start, a change of role and an end, rows of one period of
-	// work. The row is grey, since the eight hues are all spent.
-	"org.employment.started":      {"employment", shapeTriUp, kindEvent},
-	"org.employment.role-changed": {"employment", shapeDiamond, kindEvent},
-	"org.employment.ended":        {"employment", shapeTriDown, kindEvent},
-
-	// Purchases (card 241): one order or receipt. The row is grey, since the eight hues
-	// are all spent.
-	"money.purchase": {"purchases", shapeDiamond, kindEvent},
-
-	"health.encounter": {"clinical", shapeSquare, kindEvent},
-	"health.donation":  {"clinical", shapeStar, kindEvent},
-
-	"place.trip.departed": {"trips", shapeTriUp, kindEvent},
-	"place.trip.arrived":  {"trips", shapeTriDown, kindEvent},
-	"place.trip.flight":   {"trips", shapeCross, kindEvent},
-
-	"record.document": {"documents", shapeSquare, kindEvent},
-	// A file Anam remembers but does not hold (card 165), registered by the links
-	// importer: a document the library has no bytes for.
-	"record.link": {"documents", shapeCross, kindEvent},
-}
-
-// styles resolves a type's place on the band for one render (card 176). A Definition
-// that declares kind and family is read first, so a type the table never named draws
-// on its family's row with its kind's marker, with no change to this file. A type
-// the table names keeps its shape unless the Definition's kind disagrees. A type
-// neither declares nor the table names goes to the "other" row as a grey circle.
+// styles combines a render's registry snapshot with immutable presentation policy.
+// Definition metadata wins over legacy fallbacks; guarded shapes apply only when
+// the effective kind agrees. Unknown types draw as measures in other.
 type styles struct {
-	lookup func(facet.Type) (def.Definition, bool)
+	presentation presentation.Value
+	lookup       func(facet.Type) (def.Definition, bool)
 	// all lists every Definition in force, so a domain with a type has a lane before
 	// it has a facet (card 245).
 	all func() []def.Definition
 }
 
-// newStyles reads declared kind and family from reg. A nil registry declares
-// nothing, so every type draws from the table as it did before card 176.
-func newStyles(reg *def.Registry) styles {
+// newStyles captures the registry supplied for this render and one accepted presentation.
+func newStyles(reg *def.Registry, p presentation.Value) styles {
 	if reg == nil {
-		return styles{lookup: func(facet.Type) (def.Definition, bool) { return def.Definition{}, false }, all: func() []def.Definition { return nil }}
+		return styles{presentation: p, lookup: func(facet.Type) (def.Definition, bool) { return def.Definition{}, false }, all: func() []def.Definition { return nil }}
 	}
-	return styles{lookup: reg.Lookup, all: reg.All}
+	return styles{presentation: p, lookup: reg.Lookup, all: reg.All}
 }
 
 func (s styles) of(t facet.Type) typeStyle {
-	st, listed := typeStyles[t]
-	if !listed {
-		st = typeStyle{Family: otherFamilyID, Shape: shapeCircle, Kind: kindMeasure}
+	o, listed := s.presentation.Lookup(t)
+	st := typeStyle{Family: otherFamilyID, Kind: kindMeasure}
+	if o.LegacyFamily != "" {
+		st.Family = o.LegacyFamily
 	}
-	d, ok := s.lookup(t)
-	if !ok {
-		return st
+	if o.LegacyKind != "" {
+		st.Kind = kindOf(def.Kind(o.LegacyKind))
 	}
-	if d.Family != "" {
-		st.Family = d.Family
+	if d, ok := s.lookup(t); ok {
+		if d.Family != "" {
+			st.Family = d.Family
+		}
+		if d.Kind != "" {
+			st.Kind = kindOf(d.Kind)
+		}
 	}
-	if d.Kind == "" {
-		return st
-	}
-	k := kindOf(d.Kind)
-	if !listed || k != st.Kind {
-		st.Kind, st.Shape = k, shapeFor(k)
+	st.Shape = shapeFor(st.Kind)
+	if listed && (o.LegacyKind == "" || kindOf(def.Kind(o.LegacyKind)) == st.Kind) {
+		st.Shape = shape(o.Shape)
 	}
 	return st
 }
@@ -198,9 +103,9 @@ func (s styles) isEvent(t facet.Type) bool { return s.of(t).Kind == kindEvent }
 func (s styles) markClass(t facet.Type) string {
 	st := s.of(t)
 	if st.Kind == kindReading {
-		return hueOf(t) + " hollow"
+		return s.hueOf(t) + " hollow"
 	}
-	return hueOf(t)
+	return s.hueOf(t)
 }
 
 // kindOf maps a Definition's declared kind onto the band's.
@@ -215,7 +120,7 @@ func kindOf(k def.Kind) kind {
 	}
 }
 
-// shapeFor is the marker a kind takes when the table names no shape for the type:
+// shapeFor is the marker a kind takes without an applicable override:
 // the legend's key, a measure a filled circle, a reading a hollow one, an event a
 // filled shape.
 func shapeFor(k kind) shape {
@@ -276,18 +181,15 @@ func markPath(s shape, x, y float64) string {
 	}
 }
 
-// rowsFor lays out the families present among types, in row order, with "other"
-// last if anything fell into it. A family a Definition declares and the table does
-// not know gets a row of its own, under its own word, after the known rows. A row
-// takes the hue of its types' domain. Each row lists its types in a stable order: measures,
-// then readings, then events, each by name.
+// rowsFor orders configured families first, unconfigured IDs lexically, then other.
+// Types sort by effective kind then ID. Every row takes its domain's hue.
 func (s styles) rowsFor(types []facet.Type) []tlRow {
 	byFamily := map[string][]facet.Type{}
 	for _, t := range types {
 		f := s.of(t).Family
 		byFamily[f] = append(byFamily[f], t)
 	}
-	order := append([]family{}, families...)
+	order := s.presentation.Families()
 	known := map[string]bool{otherFamilyID: true}
 	for _, f := range order {
 		known[f.ID] = true
@@ -300,9 +202,9 @@ func (s styles) rowsFor(types []facet.Type) []tlRow {
 	}
 	sort.Strings(declared)
 	for _, f := range declared {
-		order = append(order, family{f, f})
+		order = append(order, presentation.Family{ID: f, Label: f})
 	}
-	order = append(order, family{otherFamilyID, "other"})
+	order = append(order, presentation.Family{ID: otherFamilyID, Label: "other"})
 	var rows []tlRow
 	for _, f := range order {
 		ts := byFamily[f.ID]
@@ -316,7 +218,7 @@ func (s styles) rowsFor(types []facet.Type) []tlRow {
 			}
 			return ts[i] < ts[j]
 		})
-		rows = append(rows, tlRow{Family: f.ID, Label: f.Label, Hue: hueOf(ts[0]), Types: ts})
+		rows = append(rows, tlRow{Family: f.ID, Label: f.Label, Hue: s.hueOf(ts[0]), Types: ts})
 	}
 	return rows
 }

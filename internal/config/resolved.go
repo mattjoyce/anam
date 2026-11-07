@@ -63,6 +63,8 @@ func (r Resolved) validationError(err error) error {
 	} else if p, ok := r.provenance[strings.TrimPrefix(string(diagnostic.Pointer), "/")]; ok {
 		// Retired keys have been adopted under their canonical names.
 		located.Origin = p.Effective
+	} else if p, ok := r.containingProvenance(diagnostic.Pointer); ok {
+		located.Origin = p.Effective
 	} else if diagnostic.Origin.String() == "" {
 		// No file set this key (a default), so a bare pointer prefix would point at
 		// nothing. Keep the error as it reads unlocated.
@@ -128,9 +130,15 @@ func resolve(path string, set map[string]string) (Resolved, error) {
 	}
 
 	r := Resolved{root: root, provenance: configProvenance(root)}
+	if err := validateInspectorNodes(root); err != nil {
+		return Resolved{}, r.validationError(err)
+	}
 	var c Config
 	if err := yamlconfig.DecodeValueStrict(root, &c); err != nil {
 		return Resolved{}, fmt.Errorf("decode config: %w: %w", ErrInvalid, err)
+	}
+	if err := c.CompilePresentation(); err != nil {
+		return Resolved{}, r.validationError(err)
 	}
 	if err := c.adoptLongWriteTimeout(hasKey(root, "long_write_timeout"), hasKey(root, "ingest_timeout")); err != nil {
 		return Resolved{}, r.validationError(err)
@@ -431,4 +439,20 @@ func expandPaths(c *Config) error {
 		*p = expanded
 	}
 	return nil
+}
+
+func (r Resolved) containingProvenance(pointer ashlar.Pointer) (ashlar.Provenance, bool) {
+	// Missing inspector fields are located at their containing sequence entry.
+	// Existing scalar setting diagnostics keep their established fallback behavior.
+	if !strings.HasPrefix(string(pointer), "/inspector/") {
+		return ashlar.Provenance{}, false
+	}
+	path := string(pointer)
+	for strings.Contains(path, "/") {
+		path = path[:strings.LastIndex(path, "/")]
+		if p, ok := r.ProvenanceAt(ashlar.Pointer(path)); ok {
+			return p, true
+		}
+	}
+	return ashlar.Provenance{}, false
 }

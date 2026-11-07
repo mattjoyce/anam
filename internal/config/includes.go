@@ -153,6 +153,10 @@ func restoreFragments(fragments []yamlconfig.Fragment, originals map[string][]by
 		if err != nil {
 			return nil, err
 		}
+		doc, err = normalizeInspectorSections(doc)
+		if err != nil {
+			return nil, err
+		}
 		fragment.Raw, fragment.Root = raw, doc
 		out = append(out, fragment)
 	}

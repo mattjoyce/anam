@@ -122,7 +122,8 @@ func inspectCmd(cfgPath *string) *cobra.Command {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "inspecting ledger %s (subject %s), read-only\nhttp://%s/\n",
 				cfg.LedgerPath, cfg.SubjectID, listen)
 			return inspect.Serve(cmd.Context(), listen, inspect.Deps{
-				Ledger: l, Timeout: cfg.Timeout, Buckets: buckets, Library: cfg.LibraryDir, Catalog: cat,
+				Presentation: cfg.Presentation(),
+				Ledger:       l, Timeout: cfg.Timeout, Buckets: buckets, Library: cfg.LibraryDir, Catalog: cat,
 				CachedReads: cfg.InspectCachedReads, MaxReadBytes: cfg.MaxReadBytes, Zone: zone,
 			}, cfg.HTTPReadHeaderTimeout, cfg.ShutdownGrace)
 		},

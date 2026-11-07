@@ -239,3 +239,19 @@ network_margin: 10s
 
 # How many historical (as-of) reads the inspector keeps folded; 0 keeps none.
 inspect_cached_reads: 4
+
+# Inspector presentation is YAML/include-only. There is no ANAM_INSPECTOR or
+# structured string override. Omit it for neutral, alphabetical rendering.
+# Arrays replace earlier sections; null and [] clear a section through includes.
+# inspector:
+#   domains:
+#     - id: health
+#       hue: 0 # -1 or omitted/null is neutral; 0..7 selects a palette slot
+#   families:
+#     - id: vitals
+#       label: Vitals
+#   types:
+#     - type: health.sample
+#       shape: square
+#       legacy_kind: reading
+#       legacy_family: vitals

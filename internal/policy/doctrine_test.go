@@ -15,9 +15,11 @@ const module = "github.com/mattjoyce/anam/"
 
 // reachable are the packages a policy decision may read, by their path in the module:
 // the importers file's shape (config) and what config itself reads, and facet for the
-// name of a type, never a payload.
+// name of a type, never a payload. Presentation is another pure config dependency;
+// it validates type names and preferences without reading facets or payloads.
 var reachable = []string{
 	"internal/policy", "internal/config", "internal/facet", "internal/safepath", "internal/span",
+	"internal/presentation",
 }
 
 // readsPayload are the packages that read a payload, a fold or a projection, named so a

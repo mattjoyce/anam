@@ -23,16 +23,18 @@ func readConfigFragments(file string) ([]yamlconfig.Fragment, error) {
 	if err != nil {
 		return nil, err
 	}
-	// The operator named the root file, so its own read error is safe to print in
-	// full. Ashlar withholds filesystem errors for include targets only.
-	if _, err := os.ReadFile(real); err != nil { //nolint:gosec // the operator's own config path
-		return nil, fmt.Errorf("read config %q: %w", real, err)
-	}
 	root, err := os.OpenRoot(filepath.Dir(real))
 	if err != nil {
 		return nil, fmt.Errorf("read config %q: %w", real, err)
 	}
 	defer func() { _ = root.Close() }()
+	// The operator named the root file, so its own open error is safe to print in
+	// full. Ashlar withholds filesystem errors for include targets only.
+	f, err := root.Open(filepath.Base(real))
+	if err != nil {
+		return nil, fmt.Errorf("read config %q: %w", real, err)
+	}
+	_ = f.Close()
 	input := graphInput{fsys: root.FS(), original: make(map[string][]byte)}
 	fragments, err := yamlconfig.LoadIncludeGraph(context.Background(), input.fsys, filepath.Base(real), yamlconfig.IncludeOptions{
 		Transformer: input.transform,

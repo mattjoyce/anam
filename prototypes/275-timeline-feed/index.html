@@ -71,12 +71,19 @@ button { font:inherit; color:inherit; }
 .lst { list-style:none; margin:0; padding:0; }
 .srow { display:flex; align-items:center; gap:.4rem; width:100%; border:0; background:transparent; text-align:left; padding:.22rem .4rem; border-radius:6px; cursor:pointer; font-size:.88rem; }
 .srow:hover { background:var(--wash); }
-.srow[aria-pressed=true], .srow.on { background:var(--sel); box-shadow:inset 3px 0 0 var(--accent); font-weight:600; }
+.srow[aria-pressed=true], .srow.on { background:var(--sel); font-weight:600; }
+.srow .lbl { overflow-wrap:anywhere; min-width:0; }
+.srow .cb { flex:none; width:.9rem; height:.9rem; border:1.5px solid var(--line2); border-radius:3px; background:var(--surface); position:relative; }
+.srow[aria-pressed=true] .cb { background:var(--accent); border-color:var(--accent); }
+.srow[aria-pressed=true] .cb::after { content:''; position:absolute; left:.22rem; top:.05rem; width:.25rem; height:.5rem; border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg); }
+.srow.mixed .cb::after { content:''; position:absolute; left:.18rem; top:.33rem; width:.4rem; height:2px; background:var(--accent); }
+.srow.fam { font-weight:500; margin-top:.2rem; }
+.srow.fam + .srow.mono { padding-left:1.4rem; }
+.srow.mono:not(.fam) { padding-left:1.4rem; }
 .srow .n { margin-left:auto; color:var(--muted); font-size:.78rem; font-variant-numeric:tabular-nums; }
 .dot { width:8px; height:8px; border-radius:50%; background:var(--hue,var(--muted)); flex:none; }
 .tree-dom { display:flex; align-items:center; }
 .tree-dom .tog { border:0; background:none; cursor:pointer; width:1.5rem; color:var(--muted); padding:.2rem 0; }
-.fam { margin:.35rem 0 .1rem 1.5rem; font-size:.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:.07em; }
 .types { margin-left:1.5rem; }
 .types .srow { font-size:.83rem; }
 .mono { font-family:var(--mono); }
@@ -548,7 +555,7 @@ function viewKey(st) { return serialize(Object.assign({}, st, { sel: '', open: '
 function sec(title) { return h('div', { class: 'sec' }, h('h4', { text: title })); }
 function srow(label, count, on, attrs, dom) {
   return h('button', Object.assign({ class: 'srow', type: 'button', 'aria-pressed': on ? 'true' : 'false' }, attrs),
-    dom ? h('span', { class: 'dot ' + domClass(dom) }) : null, h('span', { text: label }),
+    attrs && attrs['data-act'] === 'view' ? null : h('span', { class: 'cb', 'aria-hidden': 'true' }), dom ? h('span', { class: 'dot ' + domClass(dom) }) : null, h('span', { class: 'lbl', text: label }),
     count != null ? h('span', { class: 'n', text: fmtInt(count) }) : null);
 }
 function renderSidebar() {
@@ -587,7 +594,9 @@ function renderSidebar() {
     });
     var box = h('div', { class: 'types' });
     Object.keys(fams).sort().forEach(function (f) {
-      if (f) box.appendChild(h('div', { class: 'fam', text: f }));
+      if (f) { var all = fams[f].every(function (t) { return L('type').indexOf(t) >= 0; }), some = !all && fams[f].some(function (t) { return L('type').indexOf(t) >= 0; });
+        var fr = srow(f, fams[f].reduce(function (n, t) { return n + (D.typeCount[t] || 0); }, 0), all, { 'data-act': 'fam', 'data-types': fams[f].join(','), class: 'srow fam', title: 'Tick every type in ' + f });
+        if (some) fr.classList.add('mixed'); box.appendChild(fr); }
       fams[f].sort().forEach(function (t) {
         box.appendChild(srow(t, D.typeCount[t] || 0, L('type').indexOf(t) >= 0, { 'data-act': 'chip', 'data-dim': 'type', 'data-val': t, class: 'srow mono' }));
       });
@@ -1041,6 +1050,9 @@ document.addEventListener('click', function (ev) {
   }
   var d = a.dataset;
   switch (a.dataset.act) {
+    case 'fam': { var ts = d.types.split(','), cur = L('type'), all = ts.every(function (t) { return cur.indexOf(t) >= 0; });
+      var next = all ? cur.filter(function (t) { return ts.indexOf(t) < 0; }) : cur.concat(ts.filter(function (t) { return cur.indexOf(t) < 0; }));
+      go({ type: next.join(',') }); break; }
     case 'chip': go(d.dim === 'status' ? { status: toggleList('status', d.val) } : (function (p) { p[d.dim] = toggleList(d.dim, d.val); return p; })({})); break;
     case 'rm': if (d.dim === 'q') go({ q: '' }); else if (d.dim === 'status') go({ status: d.val === 'live' ? toggleList('status', 'live') : toggleList('status', d.val) }); else { var pr = {}; pr[d.dim] = toggleList(d.dim, d.val); go(pr); } break;
     case 'status': go({ status: toggleList('status', d.val) }); break;

@@ -14,6 +14,7 @@ import (
 
 	"github.com/mattjoyce/ashlar"
 
+	"github.com/mattjoyce/anam/internal/presentation"
 	"github.com/mattjoyce/anam/internal/span"
 )
 
@@ -22,6 +23,10 @@ var ErrInvalid = errors.New("invalid config")
 
 // Config is Anam's resolved runtime configuration.
 type Config struct {
+	// Inspector is YAML/include-only presentation input. Presentation retains the accepted value.
+	Inspector    presentation.Spec `yaml:"inspector"`
+	presentation presentation.Value
+
 	// SubjectID names what the record is about, which might be a person. It is pinned
 	// inside the ledger file when the ledger is initialised, and a ledger pinned to
 	// another subject is refused. Anam serves exactly one subject (§4).
@@ -217,6 +222,9 @@ func (c *Config) adoptSubjectID(newSet, oldSet bool) error {
 
 // Validate reports whether c is usable.
 func (c Config) Validate() error {
+	if _, err := presentation.Compile(c.Inspector); err != nil {
+		return presentationError(err)
+	}
 	switch {
 	case c.SubjectID == "" && c.Server == "":
 		// A client of a daemon names no subject: the daemon serves exactly one.
@@ -405,4 +413,26 @@ func dataPath(rel string) string {
 		return rel
 	}
 	return filepath.Join(home, ".local", "share", "anam", rel)
+}
+
+// CompilePresentation accepts a presentation before startup opens stores or listeners.
+// Programmatic callers use the same compiler as YAML configuration.
+func (c *Config) CompilePresentation() error {
+	value, err := presentation.Compile(c.Inspector)
+	if err != nil {
+		return presentationError(err)
+	}
+	c.presentation = value
+	return nil
+}
+
+// Presentation returns the immutable value accepted at configuration or startup.
+func (c Config) Presentation() presentation.Value { return c.presentation }
+
+func presentationError(err error) error {
+	var e *presentation.Error
+	if errors.As(err, &e) {
+		return settingError{ashlar.NewError(ErrInvalid, ashlar.Pointer(e.Pointer), ashlar.Origin{}, e.Message, nil)}
+	}
+	return err
 }

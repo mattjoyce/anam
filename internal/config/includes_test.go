@@ -166,7 +166,7 @@ func TestIncludeFailures(t *testing.T) {
 		{"null array entry", "include: [null]", "", "", ashlar.ErrComposition},
 		{"child null array entry", "include: sub/child.yaml", "include: [nested.yaml, null]", "", ashlar.ErrComposition},
 		{"kind conflict", "timeout: {}\ninclude: sub/child.yaml", "timeout: 1s", "", ashlar.ErrComposition},
-		{"inspector unknown", "include: sub/child.yaml", "inspector: {}", "", ashlar.ErrUnknownField},
+		{"spatial key unknown", "include: sub/child.yaml", "inspector: {track_type: place.track}", "", ashlar.ErrUnknownField},
 		{"duplicate before null strip", "include: sub/child.yaml", "include: null\ninclude: null", "", ashlar.ErrDuplicateKey},
 		{"alias before null strip", "include: sub/child.yaml", "include: null\ntimeout: &t 3s\nzone: *t", "", ashlar.ErrSyntax},
 		{"documents before null strip", "include: sub/child.yaml", "include: null\n---\n{}", "", ashlar.ErrTrailingContent},

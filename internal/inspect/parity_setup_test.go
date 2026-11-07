@@ -9,8 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
+	"github.com/mattjoyce/anam/internal/presentation"
 	"github.com/mattjoyce/anam/internal/span"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
@@ -22,30 +24,40 @@ import (
 // The compiled presentation must enumerate its ordered domains, its ordered
 // families and its complete override set. An adapter that could only look up the
 // 28 pinned keys would make TestParityGrammar's count check pass by construction.
+func parityPresentation() (presentation.Value, error) {
+	c, err := config.LoadOverriding("testdata/personal-inspector.yaml", map[string]string{"subject_id": "parity-subject", "server": ""})
+	return c.Presentation(), err
+}
+
 func currentParityGrammar() parityGrammar {
 	g := parityGrammar{Overrides: map[string]parityOverride{}}
-	for _, d := range domains {
-		g.Domains = append(g.Domains, parityDomain(d))
+	p, err := parityPresentation()
+	if err != nil {
+		// The independent count check fails on a broken fixture.
+		return g
 	}
-	for _, f := range families {
-		g.Families = append(g.Families, parityFamily(f))
+	for _, d := range p.Domains() {
+		g.Domains = append(g.Domains, parityDomain{d.ID, d.Hue})
 	}
-	for typ, s := range typeStyles {
-		k := fmt.Sprintf("unknown(%d)", s.Kind)
-		switch s.Kind {
-		case kindMeasure:
-			k = "measure"
-		case kindReading:
-			k = "reading"
-		case kindEvent:
-			k = "event"
-		}
-		g.Overrides[string(typ)] = parityOverride{string(typ), s.Family, k, string(s.Shape)}
+	for _, f := range p.Families() {
+		g.Families = append(g.Families, parityFamily{f.ID, f.Label})
+	}
+	for _, o := range p.Overrides() {
+		g.Overrides[string(o.Type)] = parityOverride{string(o.Type), o.LegacyFamily, o.LegacyKind, o.Shape}
 	}
 	return g
 }
 
-func parityHandler(d Deps) http.Handler { return Handler(d) }
+func parityHandler(d Deps) http.Handler {
+	p, err := parityPresentation()
+	if err != nil {
+		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		})
+	}
+	d.Presentation = p
+	return Handler(d)
+}
 
 // These render-only Definitions deliberately include old incomplete metadata.
 // NewRegistry holds them without inventing or rewriting historical manifest bytes.

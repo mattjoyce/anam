@@ -7,6 +7,7 @@ import (
 
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
+	"github.com/mattjoyce/anam/internal/presentation"
 )
 
 // The legend reads the shapes as a key: a filled circle is a measure, and an event
@@ -17,11 +18,13 @@ import (
 func TestTypeStyles_ShapesMeanWhatTheLegendSays(t *testing.T) {
 	t.Parallel()
 	known := map[string]bool{}
-	for _, f := range families {
+	for _, f := range testPresentation(t).Families() {
 		known[f.ID] = true
 	}
 	inRow := map[[2]string]facet.Type{}
-	for typ, st := range typeStyles {
+	for _, o := range testPresentation(t).Overrides() {
+		typ := o.Type
+		st := newStyles(nil, testPresentation(t)).of(typ)
 		if !known[st.Family] {
 			t.Errorf("%s: family %q is not a row", typ, st.Family)
 		}
@@ -55,7 +58,9 @@ func TestTypeStyles_OneShapeMeansOneThingAcrossRows(t *testing.T) {
 			return hasAnySuffix(typ, "-stopped", "-ended", ".stopped", ".ended", ".arrived")
 		},
 	}
-	for typ, st := range typeStyles {
+	for _, o := range testPresentation(t).Overrides() {
+		typ := o.Type
+		st := newStyles(nil, testPresentation(t)).of(typ)
 		for sh, means := range meaning {
 			if means(typ) && st.Shape != sh {
 				t.Errorf("%s: want the %s shape, got %s", typ, sh, st.Shape)
@@ -99,7 +104,7 @@ func TestStyles_DeclaredKindAndFamilyWin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRegistry: %v", err)
 	}
-	st := newStyles(reg)
+	st := newStyles(reg, testPresentation(t))
 
 	if got := st.of("test.pressure"); got.Family != "vitals" || got.Kind != kindReading || got.Shape != shapeCircle {
 		t.Errorf("declared reading in vitals: got %+v", got)
@@ -113,7 +118,7 @@ func TestStyles_DeclaredKindAndFamilyWin(t *testing.T) {
 	if got := st.of("health.medication.started"); got.Shape != shapeTriUp || got.Family != "meds" {
 		t.Errorf("a table type whose Definition agrees keeps its shape, got %+v", got)
 	}
-	if got := newStyles(nil).of("test.pressure"); got.Family != otherFamilyID || got.Kind != kindMeasure {
+	if got := newStyles(nil, testPresentation(t)).of("test.pressure"); got.Family != otherFamilyID || got.Kind != kindMeasure {
 		t.Errorf("without a registry the table decides, got %+v", got)
 	}
 
@@ -164,16 +169,16 @@ func TestMarkPath_AlertOutlineIsItsOwn(t *testing.T) {
 // slot of the eight, never shared; a reserved head takes the grey (card 245).
 func TestDomains_TenHeadsAndHuesAreDistinct(t *testing.T) {
 	t.Parallel()
-	if len(domains) != 10 {
-		t.Fatalf("%d heads, want the closed set of ten", len(domains))
+	if len(testPresentation(t).Domains()) != 10 {
+		t.Fatalf("%d heads, want the closed set of ten", len(testPresentation(t).Domains()))
 	}
 	seen := map[int]string{}
 	grey := map[string]bool{"social": true, "media": true, "work": true}
-	for _, d := range domains {
-		if grey[d.ID] != (d.Hue == hueNeutral) {
+	for _, d := range testPresentation(t).Domains() {
+		if grey[d.ID] != (d.Hue == -1) {
 			t.Errorf("%s: hue %d, but only the reserved heads %v take the grey", d.ID, d.Hue, grey)
 		}
-		if d.Hue == hueNeutral {
+		if d.Hue == -1 {
 			continue
 		}
 		if d.Hue < 0 || d.Hue > 7 {
@@ -231,7 +236,7 @@ func TestTypeFilter(t *testing.T) {
 // of its own there.
 func TestTypeStyles_LinkDrawsInTheDocumentsRow(t *testing.T) {
 	t.Parallel()
-	st := newStyles(nil)
+	st := newStyles(nil, testPresentation(t))
 	got, ref := st.of("record.link"), st.of("record.document")
 	if got.Family != ref.Family || got.Family == otherFamilyID {
 		t.Errorf("record.link is in the %s row, record.document in %s", got.Family, ref.Family)
@@ -248,7 +253,8 @@ func TestTypeStyles_LinkDrawsInTheDocumentsRow(t *testing.T) {
 func TestLanesFor_OnlyTheClosedSetIsDrawnFromDefinitions(t *testing.T) {
 	t.Parallel()
 	st := styles{
-		lookup: func(facet.Type) (def.Definition, bool) { return def.Definition{}, false },
+		presentation: testPresentation(t),
+		lookup:       func(facet.Type) (def.Definition, bool) { return def.Definition{}, false },
 		all: func() []def.Definition {
 			return []def.Definition{{Type: "money.purchase"}, {Type: "sleep.episode"}, {Type: "garmin.day"}, {Type: "location.stay"}}
 		},
@@ -266,4 +272,13 @@ func TestLanesFor_OnlyTheClosedSetIsDrawnFromDefinitions(t *testing.T) {
 	if got := ids("garmin.day", "health.weight"); got != "health,money,garmin" {
 		t.Errorf("lanes %q, want the closed set first and the off-set head its facet makes", got)
 	}
+}
+
+func testPresentation(t *testing.T) presentation.Value {
+	t.Helper()
+	p, err := parityPresentation()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
 }

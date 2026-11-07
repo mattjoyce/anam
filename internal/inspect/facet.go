@@ -202,6 +202,6 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 		Bucket:            s.buckets.Of(f.FactTime).ID(),
 		Payload:           highlightPayload(f.Payload.Bytes()),
 		Events:            mine,
-		Track:             facetTrack(f),
+		Track:             facetTrack(f, s.presentation.Hue(domainOf(f.Type))),
 	})
 }

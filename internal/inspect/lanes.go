@@ -1,8 +1,6 @@
 package inspect
 
 import (
-	"fmt"
-	"slices"
 	"sort"
 	"strings"
 
@@ -14,28 +12,6 @@ import (
 // shows a row for each family beneath it and a sub-lane for each type, as the band did
 // before. Colour follows the domain.
 
-// domainInfo is a head of the closed set of ten (AGENTS.md) and its palette slot.
-type domainInfo struct {
-	ID  string
-	Hue int // palette slot, 0..7, or hueNeutral
-}
-
-// domains in lane order, top to bottom. Seven are in use and take a hue of the eight;
-// the three reserved heads have no type yet and take the grey until a decision gives
-// them a hue, and have no lane until a type exists.
-var domains = []domainInfo{
-	{"health", 7},
-	{"activity", 3},
-	{"place", 1},
-	{"record", 0},
-	{"mind", 6},
-	{"org", 5},
-	{"money", 2},
-	{"social", hueNeutral},
-	{"media", hueNeutral},
-	{"work", hueNeutral},
-}
-
 // domainOf is a type's head: the word before the first dot.
 func domainOf(t facet.Type) string {
 	head, _, _ := strings.Cut(string(t), ".")
@@ -44,22 +20,14 @@ func domainOf(t facet.Type) string {
 
 // inClosedSet says whether a head is one of the ten.
 func inClosedSet(id string) bool {
-	return slices.ContainsFunc(domains, func(d domainInfo) bool { return d.ID == id })
-}
-
-// domainHue is the CSS class that colours a domain's marks; a head outside the
-// palette takes the grey.
-func domainHue(id string) string {
-	for _, d := range domains {
-		if d.ID == id && d.Hue != hueNeutral {
-			return fmt.Sprintf("h%d", d.Hue)
-		}
+	switch id {
+	case "health", "activity", "place", "record", "mind", "org", "money", "social", "media", "work":
+		return true
 	}
-	return "hx"
+	return false
 }
 
-// hueOf is the CSS class that colours a type's marks.
-func hueOf(t facet.Type) string { return domainHue(domainOf(t)) }
+func (s styles) hueOf(t facet.Type) string { return s.presentation.Hue(domainOf(t)) }
 
 // lane is one domain: its types in the ledger, and the family rows they make. The
 // family rows are the same whether the lane is open or closed, so the legend does not
@@ -71,12 +39,9 @@ type lane struct {
 	Types    []facet.Type
 }
 
-// lanesFor lays out the domains: every head of the closed set with a type in the ledger
-// or in the Definitions, in the order of domains, then a head outside the set that a
-// ledger type carries, sorted. A Definition alone gives an off-set head no lane: an
-// old name whose Definition is still held (garmin.day, sleep.episode) would draw an
-// empty lane for a domain that does not exist, while a facet of one still shows, so
-// renamed-away data is not hidden. A head with no type has no lane.
+// lanesFor orders eligible configured domains first, then unconfigured IDs
+// lexically. Ledger heads are eligible regardless of vocabulary. Definitions alone
+// make lanes only for recognized heads; configured retired names create no lane.
 func (s styles) lanesFor(types []facet.Type) []lane {
 	byDomain := map[string][]facet.Type{}
 	present := map[string]bool{}
@@ -92,11 +57,11 @@ func (s styles) lanesFor(types []facet.Type) []lane {
 	}
 	mk := func(id string) lane {
 		ts := byDomain[id]
-		return lane{ID: id, Hue: domainHue(id), Families: s.rowsFor(ts), Types: ts}
+		return lane{ID: id, Hue: s.presentation.Hue(id), Families: s.rowsFor(ts), Types: ts}
 	}
 	var out []lane
 	known := map[string]bool{}
-	for _, d := range domains {
+	for _, d := range s.presentation.Domains() {
 		known[d.ID] = true
 		if present[d.ID] {
 			out = append(out, mk(d.ID))

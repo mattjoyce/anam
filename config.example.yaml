@@ -8,10 +8,25 @@
 #
 # The user config dir is $XDG_CONFIG_HOME if set, otherwise ~/.config.
 #
-# Every key can be overridden by an ANAM_-prefixed environment variable
+# Scalar settings can be overridden by an ANAM_-prefixed environment variable
 # (ANAM_LEDGER_PATH, ANAM_SUBJECT_ID, ...). An unrecognised key is an error, not a
 # shrug: a silently-ignored `ledger_pth` would leave Anam writing to the default
 # ledger while you believed it was writing to yours.
+#
+# Compose YAML fragments with include, a path or a list of paths. The root file
+# loads first, then includes depth-first in declaration order. Later fragments
+# win, mappings merge, and arrays replace. Incompatible container kinds fail.
+# Scalar environment values and explicit overrides win over all YAML fragments.
+# include is YAML-only, with no ANAM_INCLUDE or explicit-string override.
+#
+# Includes resolve from the including file inside the resolved root config
+# directory. A leading slash means that config root, not the host filesystem.
+# Missing files, cycles, repeated targets and escapes through .. or symlinks fail.
+# include: null means no includes; null entries in an include list are errors.
+# Blank, comment-only and null documents contribute no settings. Top-level null
+# settings leave the earlier layer in place. Application paths, including catalog
+# directories, still resolve from the working directory in every fragment.
+# include: [common.yaml, local.yaml]
 #
 # Anam stores in two places and a folder of documents (ARCHITECTURE.md §8): the
 # ledger is the record; the operational store holds what Anam derives and authors,

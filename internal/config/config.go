@@ -1,5 +1,5 @@
 // Package config loads Anam's runtime configuration from defaults, an optional YAML
-// file, and ANAM_-prefixed environment variables, in increasing order of precedence.
+// include graph, and ANAM_-prefixed environment variables, in increasing order of precedence.
 package config
 
 import (
@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mattjoyce/ashlar"
 
 	"github.com/mattjoyce/anam/internal/span"
 )
@@ -148,8 +150,8 @@ type Config struct {
 	Limits `yaml:",inline"`
 }
 
-// Load resolves configuration, reading the YAML file at path when it is non-empty.
-// Environment variables override the file, which overrides the defaults.
+// Load resolves configuration, reading the YAML include graph at path when non-empty.
+// Environment variables override the graph, which overrides the defaults.
 func Load(path string) (Config, error) {
 	r, err := LoadResolved(path)
 	if err != nil {
@@ -178,8 +180,7 @@ func LoadOverriding(path string, set map[string]string) (Config, error) {
 func (c *Config) adoptLongWriteTimeout(newSet, oldSet bool) error {
 	switch {
 	case newSet && oldSet && c.LongWriteTimeout != c.IngestTimeout:
-		return fmt.Errorf("%w: long_write_timeout (%s) and its old name ingest_timeout (%s) differ; set long_write_timeout only",
-			ErrInvalid, c.LongWriteTimeout, c.IngestTimeout)
+		return invalidSetting("long_write_timeout", "long_write_timeout (%s) and its old name ingest_timeout (%s) differ; set long_write_timeout only", c.LongWriteTimeout, c.IngestTimeout)
 	case oldSet:
 		slog.Warn("config: ingest_timeout is the old name of long_write_timeout; set long_write_timeout (ANAM_LONG_WRITE_TIMEOUT) instead",
 			"value", c.IngestTimeout)
@@ -201,8 +202,7 @@ func (c *Config) adoptLongWriteTimeout(newSet, oldSet bool) error {
 func (c *Config) adoptSubjectID(newSet, oldSet bool) error {
 	switch {
 	case newSet && oldSet && c.SubjectID != c.PersonID:
-		return fmt.Errorf("%w: subject_id (%q) and its old name person_id (%q) differ; set subject_id only",
-			ErrInvalid, c.SubjectID, c.PersonID)
+		return invalidSetting("subject_id", "subject_id (%q) and its old name person_id (%q) differ; set subject_id only", c.SubjectID, c.PersonID)
 	case newSet && oldSet:
 		slog.Info("config: subject_id and its old name person_id are both set and equal; drop person_id",
 			"subject", c.SubjectID)
@@ -220,50 +220,55 @@ func (c Config) Validate() error {
 	switch {
 	case c.SubjectID == "" && c.Server == "":
 		// A client of a daemon names no subject: the daemon serves exactly one.
-		return fmt.Errorf("%w: subject_id is required (ANAM_SUBJECT_ID)", ErrInvalid)
+		return invalidSetting("subject_id", "subject_id is required (ANAM_SUBJECT_ID)")
 	case c.LedgerPath == "":
-		return fmt.Errorf("%w: ledger_path is required", ErrInvalid)
+		return invalidSetting("ledger_path", "ledger_path is required")
 	case c.DBPath == "":
-		return fmt.Errorf("%w: db_path is required", ErrInvalid)
+		return invalidSetting("db_path", "db_path is required")
 	case c.LedgerPath == c.DBPath:
 		// The operational store's repair is to delete its file. Sharing a file would
 		// put the ledger inside that repair.
-		return fmt.Errorf("%w: ledger_path and db_path are the same file (%s); the ledger must have its own",
-			ErrInvalid, c.LedgerPath)
+		return invalidSetting("ledger_path", "ledger_path and db_path are the same file (%s); the ledger must have its own", c.LedgerPath)
 	case c.LibraryDir == "":
-		return fmt.Errorf("%w: library_dir is required", ErrInvalid)
+		return invalidSetting("library_dir", "library_dir is required")
 	case c.Timeout <= 0:
-		return fmt.Errorf("%w: timeout must be positive, got %s", ErrInvalid, c.Timeout)
+		return invalidSetting("timeout", "timeout must be positive, got %s", c.Timeout)
 	case c.LongWriteTimeout <= 0:
-		return fmt.Errorf("%w: long_write_timeout must be positive, got %s", ErrInvalid, c.LongWriteTimeout)
+		return invalidSetting("long_write_timeout", "long_write_timeout must be positive, got %s", c.LongWriteTimeout)
 	case c.BackupDir != "" && c.BackupKeep < 1:
-		return fmt.Errorf("%w: backup_keep must be at least 1, got %d", ErrInvalid, c.BackupKeep)
+		return invalidSetting("backup_keep", "backup_keep must be at least 1, got %d", c.BackupKeep)
 	case c.CheckpointBudget < 0:
-		return fmt.Errorf("%w: checkpoint_budget must be 0 or more bytes, got %d", ErrInvalid, c.CheckpointBudget)
+		return invalidSetting("checkpoint_budget", "checkpoint_budget must be 0 or more bytes, got %d", c.CheckpointBudget)
 	case c.MaxReadBytes < 0:
-		return fmt.Errorf("%w: max_read_bytes must be 0 or more bytes, got %d", ErrInvalid, c.MaxReadBytes)
+		return invalidSetting("max_read_bytes", "max_read_bytes must be 0 or more bytes, got %d", c.MaxReadBytes)
 	case c.DefaultProjection != strings.TrimSpace(c.DefaultProjection):
-		return fmt.Errorf("%w: default_projection %q has leading or trailing space", ErrInvalid, c.DefaultProjection)
+		return invalidSetting("default_projection", "default_projection %q has leading or trailing space", c.DefaultProjection)
 	case c.LibraryFolderLimit < 1:
-		return fmt.Errorf("%w: library_folder_limit must be at least 1, got %d", ErrInvalid, c.LibraryFolderLimit)
+		return invalidSetting("library_folder_limit", "library_folder_limit must be at least 1, got %d", c.LibraryFolderLimit)
 	}
 	if err := c.Limits.Validate(); err != nil {
 		return err
 	}
 	if c.Server != "" {
 		if err := checkServer(c.Server); err != nil {
-			return fmt.Errorf("%w: server: %v", ErrInvalid, err)
+			return invalidSetting("server", "server: %v", err)
 		}
 	}
 	// A typo'd width dies here, at startup, where it costs a re-run — not on the ingest
 	// path, where falling back would write months of plausible, wrongly-named buckets.
 	if _, err := span.New(c.BucketWidth); err != nil {
-		return fmt.Errorf("%w: bucket_width: %v", ErrInvalid, err)
+		return invalidSetting("bucket_width", "bucket_width: %v", err)
 	}
 	if _, err := time.LoadLocation(c.Zone); err != nil {
-		return fmt.Errorf("%w: zone %q: %v", ErrInvalid, c.Zone, err)
+		return invalidSetting("zone", "zone %q: %v", c.Zone, err)
 	}
 	return nil
+}
+
+// invalidSetting gives validation a pointer without requiring file IO. The loader
+// supplies the effective node's origin after the same validator accepts Config.
+func invalidSetting(key, format string, args ...any) error {
+	return ashlar.NewError(ErrInvalid, ashlar.NewPointer(key), ashlar.Origin{}, fmt.Sprintf(format, args...), nil)
 }
 
 // checkServer accepts an http or https URL naming a host, and nothing else: no path,

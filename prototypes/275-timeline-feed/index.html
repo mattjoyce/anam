@@ -71,8 +71,8 @@ button { font:inherit; color:inherit; }
 .lst { list-style:none; margin:0; padding:0; }
 .srow { display:flex; align-items:center; gap:.4rem; width:100%; border:0; background:transparent; text-align:left; padding:.22rem .4rem; border-radius:6px; cursor:pointer; font-size:.88rem; }
 .srow:hover { background:var(--wash); }
-.srow[aria-pressed=false] { color:var(--muted); }
-.srow[aria-pressed=false] .lbl { text-decoration:line-through; text-decoration-color:var(--line2); }
+.srow[aria-pressed=false]:not([data-act=view]) { color:var(--muted); }
+.srow[aria-pressed=false]:not([data-act=view]) .lbl { text-decoration:line-through; text-decoration-color:var(--line2); }
 .srow .lbl { overflow-wrap:anywhere; min-width:0; }
 .srow .cb { flex:none; width:.9rem; height:.9rem; border:1.5px solid var(--line2); border-radius:3px; background:var(--surface); position:relative; }
 .srow[aria-pressed=true] .cb { background:var(--accent); border-color:var(--accent); }

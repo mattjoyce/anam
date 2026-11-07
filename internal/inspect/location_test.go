@@ -153,6 +153,11 @@ func TestLocation_DrawsTheNewestDayAndNarrows(t *testing.T) {
 		t.Error("device filter did not narrow to tokay's hours")
 	}
 
+	_, absent := get(t, srv.URL+"/location?from=2026-10-11&to=2026-10-11&device=other")
+	if !strings.Contains(absent, "<option selected>other</option>") {
+		t.Error("a filtered device with no fixes in the window dropped out of the select")
+	}
+
 	_, window := get(t, srv.URL+"/location?from=2026-10-11&to=2026-10-11&device=tokay")
 	if !strings.Contains(window, "1 fix over 1 hour") || !strings.Contains(window, "2026-10-11 22:30Z") {
 		t.Error("window did not narrow to the day before")
@@ -163,7 +168,8 @@ func TestLocation_DrawsTheNewestDayAndNarrows(t *testing.T) {
 	}
 }
 
-// A ledger with no positions says so rather than drawing nothing.
+// A ledger with no positions says so rather than drawing nothing, even while
+// other types are live.
 func TestLocation_EmptyRecordSaysSo(t *testing.T) {
 	t.Parallel()
 	l, err := ledger.Create(context.Background(), filepath.Join(t.TempDir(), "empty.db"), person)
@@ -171,6 +177,10 @@ func TestLocation_EmptyRecordSaysSo(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = l.Close() })
+	other := seedFacet(t, "meter:2026-01-24T06:30:00", "test.measure", `{"count": 1}`)
+	if err := l.Admit(context.Background(), 0, other, event(facet.EventAdmitted, other, 1)); err != nil {
+		t.Fatal(err)
+	}
 	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: time.Second, Presentation: spatialPresentation(t)}))
 	t.Cleanup(srv.Close)
 	code, body := get(t, srv.URL+"/location")

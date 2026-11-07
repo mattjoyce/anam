@@ -74,6 +74,11 @@ func (s *Server) location(w http.ResponseWriter, r *http.Request) {
 
 	pts, seen, omitted := windowPoints(hours, device, from, to)
 	data.Undrawable = omitted
+	if device != "" {
+		// The device asked for stays selectable even with no fixes in this window,
+		// so the select never shows "any" while the filter is on.
+		seen[device] = true
+	}
 	for d := range seen {
 		data.Devices = append(data.Devices, d)
 	}

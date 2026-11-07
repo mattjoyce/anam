@@ -1,6 +1,7 @@
 package inspect
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -70,5 +71,31 @@ func TestParityHistoricalFallback(t *testing.T) {
 				t.Error("fallback is not drawn live at the pinned watermark before the tombstone")
 			}
 		})
+	}
+}
+
+// An in-set head with a Definition and no facet still gets a lane, drawn empty.
+// 256c rewrites the closed-set check against configured domains, which is where
+// this rule could regress, so it is pinned here beside the off-set half in
+// parityRegistry.
+func TestParityDefinitionOnlyInSetLane(t *testing.T) {
+	t.Parallel()
+	reg, err := def.NewRegistry(def.Definition{Type: "money.planned", Family: "purchases", Kind: def.KindEvent})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := parityPage(t, parityLedger(t, []paritySeed{{"health.weight", 2}}), reg, "")
+	band := page.one(t, "svg", "band")
+	var got []string
+	for _, g := range band.find("g", "domain") {
+		got = append(got, fmt.Sprintf("%s empty=%t", g.Attr["data-domain"], g.hasClass("empty")))
+	}
+	if want := []string{"health empty=false", "money empty=true"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Definition-only in-set lane got %v want %v", got, want)
+	}
+	for _, f := range page.find("fieldset", "fam") {
+		if label := parityText(f.one(t, "legend", "")); label == "purchases" {
+			t.Error("a Definition with no facet put its family in the legend")
+		}
 	}
 }

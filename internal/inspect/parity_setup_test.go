@@ -19,6 +19,9 @@ import (
 // currentParityGrammar must read the compiled presentation fixture's queries and
 // parityHandler must supply that same fixture through Deps. Leave the pinned
 // literals and the rendering assertions unchanged. Never set package globals.
+// The compiled presentation must enumerate its ordered domains, its ordered
+// families and its complete override set. An adapter that could only look up the
+// 28 pinned keys would make TestParityGrammar's count check pass by construction.
 func currentParityGrammar() parityGrammar {
 	g := parityGrammar{Overrides: map[string]parityOverride{}}
 	for _, d := range domains {

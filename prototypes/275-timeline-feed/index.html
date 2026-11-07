@@ -71,7 +71,8 @@ button { font:inherit; color:inherit; }
 .lst { list-style:none; margin:0; padding:0; }
 .srow { display:flex; align-items:center; gap:.4rem; width:100%; border:0; background:transparent; text-align:left; padding:.22rem .4rem; border-radius:6px; cursor:pointer; font-size:.88rem; }
 .srow:hover { background:var(--wash); }
-.srow[aria-pressed=true], .srow.on { background:var(--sel); font-weight:600; }
+.srow[aria-pressed=false] { color:var(--muted); }
+.srow[aria-pressed=false] .lbl { text-decoration:line-through; text-decoration-color:var(--line2); }
 .srow .lbl { overflow-wrap:anywhere; min-width:0; }
 .srow .cb { flex:none; width:.9rem; height:.9rem; border:1.5px solid var(--line2); border-radius:3px; background:var(--surface); position:relative; }
 .srow[aria-pressed=true] .cb { background:var(--accent); border-color:var(--accent); }
@@ -585,7 +586,7 @@ function renderSidebar() {
     var isOpen = open.indexOf(dom) >= 0;
     s2.appendChild(h('div', { class: 'tree-dom' },
       h('button', { class: 'tog', type: 'button', 'data-act': 'tree', 'data-dom': dom, 'aria-expanded': isOpen ? 'true' : 'false', 'aria-label': (isOpen ? 'Collapse ' : 'Expand ') + dom, text: isOpen ? '▾' : '▸' }),
-      srow(dom, D.domCount[dom] || 0, L('domain').indexOf(dom) >= 0, { 'data-act': 'chip', 'data-dim': 'domain', 'data-val': dom }, dom)));
+      srow(dom, D.domCount[dom] || 0, ticked('domain', dom), { 'data-act': 'chip', 'data-dim': 'domain', 'data-val': dom }, dom)));
     if (!isOpen) return;
     var fams = {};
     doms[dom].forEach(function (t) {
@@ -594,12 +595,12 @@ function renderSidebar() {
     });
     var box = h('div', { class: 'types' });
     Object.keys(fams).sort().forEach(function (f) {
-      if (f) { var all = fams[f].every(function (t) { return L('type').indexOf(t) >= 0; }), some = !all && fams[f].some(function (t) { return L('type').indexOf(t) >= 0; });
+      if (f) { var all = fams[f].every(function (t) { return ticked('type', t); }), some = !all && fams[f].some(function (t) { return ticked('type', t); });
         var fr = srow(f, fams[f].reduce(function (n, t) { return n + (D.typeCount[t] || 0); }, 0), all, { 'data-act': 'fam', 'data-types': fams[f].join(','), class: 'srow fam', title: 'Tick every type in ' + f });
         if (some) fr.classList.add('mixed'); box.appendChild(fr); }
       fams[f].sort().forEach(function (t) {
         // the domain is the parent row, so a type shows without its head: "medication.dose" under health
-        box.appendChild(srow(t.slice(dom.length + 1), D.typeCount[t] || 0, L('type').indexOf(t) >= 0, { 'data-act': 'chip', 'data-dim': 'type', 'data-val': t, title: t, class: 'srow mono' }));
+        box.appendChild(srow(t.slice(dom.length + 1), D.typeCount[t] || 0, ticked('type', t), { 'data-act': 'chip', 'data-dim': 'type', 'data-val': t, title: t, class: 'srow mono' }));
       });
     });
     if (!box.firstChild) box.appendChild(h('div', { class: 'muted', text: 'Nothing in this window.' }));
@@ -608,12 +609,12 @@ function renderSidebar() {
   frag.appendChild(s2);
 
   var s3 = sec('Sources');
-  SOURCES.forEach(function (s) { if (D.srcCount[s] || L('source').indexOf(s) >= 0) s3.appendChild(srow(s, D.srcCount[s] || 0, L('source').indexOf(s) >= 0, { 'data-act': 'chip', 'data-dim': 'source', 'data-val': s })); });
+  SOURCES.forEach(function (s) { if (D.srcCount[s] || L('source').indexOf(s) >= 0) s3.appendChild(srow(s, D.srcCount[s] || 0, ticked('source', s), { 'data-act': 'chip', 'data-dim': 'source', 'data-val': s })); });
   frag.appendChild(s3);
 
   var topics = Object.keys(D.topicCount).sort(), s4 = sec('Topics');
   L('topic').forEach(function (t) { if (topics.indexOf(t) < 0) topics.push(t); });
-  topics.forEach(function (t) { s4.appendChild(srow(t, D.topicCount[t] || 0, L('topic').indexOf(t) >= 0, { 'data-act': 'chip', 'data-dim': 'topic', 'data-val': t })); });
+  topics.forEach(function (t) { s4.appendChild(srow(t, D.topicCount[t] || 0, ticked('topic', t), { 'data-act': 'chip', 'data-dim': 'topic', 'data-val': t })); });
   if (!topics.length) s4.appendChild(h('div', { class: 'muted', text: 'No topics in this window.' }));
   frag.appendChild(s4);
 
@@ -665,7 +666,13 @@ function renderTop() {
     any = true;
     frag.appendChild(h('button', { class: 'fchip', type: 'button', 'data-act': 'rm', 'data-dim': dim, 'data-val': val, 'aria-label': 'Remove filter ' + label, title: 'Remove this filter', text: label + ' ×' }));
   }
-  ['domain', 'type', 'source', 'topic'].forEach(function (dim) { L(dim).forEach(function (v) { chip(dim, v, dim + ': ' + v); }); });
+  // a list that leaves out fewer than it keeps reads better as what is unticked: "not health ×"
+  ['domain', 'type', 'source', 'topic'].forEach(function (dim) {
+    var l = L(dim); if (!l.length) return;
+    var out = allOf(dim).filter(function (v) { return l.indexOf(v) < 0; });
+    if (out.length && out.length < l.length) out.forEach(function (v) { chip(dim, v, 'not ' + v); });
+    else l.forEach(function (v) { chip(dim, v, dim + ': ' + v); });
+  });
   S.status.split(',').forEach(function (v) { if (v !== 'live') chip('status', v, 'status: ' + v); });
   if (S.status.split(',').indexOf('live') < 0) chip('status', 'live', 'no live');
   if (S.q.trim()) chip('q', S.q, 'search: “' + S.q.trim() + '”');
@@ -994,11 +1001,23 @@ window.addEventListener('popstate', function (ev) {
 var scrollTimer = 0;
 window.addEventListener('scroll', function () { clearTimeout(scrollTimer); scrollTimer = setTimeout(saveScroll, 150); }, { passive: true });
 
+/* An empty type, domain, source or topic filter means everything is ticked. Unticking one row
+ * writes the rest explicitly; ticking the last one back collapses the list to empty again. */
+function allOf(dim) {
+  if (dim === 'type') return Array.from(TYPES.keys());
+  if (dim === 'domain') { var d = {}; TYPES.forEach(function (v) { d[v.dom] = 1; }); return Object.keys(d); }
+  if (dim === 'source') return SOURCES.slice();
+  if (dim === 'topic') { var t = {}; ROWS.forEach(function (r) { r.topics.forEach(function (x) { t[x] = 1; }); }); return Object.keys(t); }
+  return [];
+}
+function ticked(dim, val) { var l = L(dim); return !l.length || l.indexOf(val) >= 0; }
+function collapseFull(dim, l) { var all = allOf(dim); return all.length && all.every(function (x) { return l.indexOf(x) >= 0; }) ? '' : l.join(','); }
 function toggleList(dim, val) {
-  var l = L(dim), i = l.indexOf(val);
-  if (i >= 0) l.splice(i, 1); else l.push(val);
-  if (dim === 'status' && !l.length) l = ['live'];
-  return l.join(',');
+  var l = L(dim), i;
+  if (dim === 'status') { i = l.indexOf(val); if (i >= 0) l.splice(i, 1); else l.push(val); return l.length ? l.join(',') : 'live'; }
+  if (!l.length) l = allOf(dim);
+  i = l.indexOf(val); if (i >= 0) l.splice(i, 1); else l.push(val);
+  return collapseFull(dim, l);
 }
 function goAround(r, clear) {
   var patch = { from: shiftLocal(r.k16, -180), to: shiftLocal(r.k16, 180), sel: r.key };
@@ -1051,9 +1070,9 @@ document.addEventListener('click', function (ev) {
   }
   var d = a.dataset;
   switch (a.dataset.act) {
-    case 'fam': { var ts = d.types.split(','), cur = L('type'), all = ts.every(function (t) { return cur.indexOf(t) >= 0; });
+    case 'fam': { var ts = d.types.split(','), cur = L('type').length ? L('type') : allOf('type'), all = ts.every(function (t) { return cur.indexOf(t) >= 0; });
       var next = all ? cur.filter(function (t) { return ts.indexOf(t) < 0; }) : cur.concat(ts.filter(function (t) { return cur.indexOf(t) < 0; }));
-      go({ type: next.join(',') }); break; }
+      go({ type: collapseFull('type', next) }); break; }
     case 'chip': go(d.dim === 'status' ? { status: toggleList('status', d.val) } : (function (p) { p[d.dim] = toggleList(d.dim, d.val); return p; })({})); break;
     case 'rm': if (d.dim === 'q') go({ q: '' }); else if (d.dim === 'status') go({ status: d.val === 'live' ? toggleList('status', 'live') : toggleList('status', d.val) }); else { var pr = {}; pr[d.dim] = toggleList(d.dim, d.val); go(pr); } break;
     case 'status': go({ status: toggleList('status', d.val) }); break;

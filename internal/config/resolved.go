@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,8 +18,8 @@ import (
 )
 
 // Resolved is Anam's configuration with the composition that produced it. Config is
-// the usable configuration; Value is the layered Ashlar document it was decoded from;
-// Provenance is where each top-level key came from, keyed by its snake_case config key.
+// the usable configuration. Provenance reports each top-level origin by its
+// snake_case key; ProvenanceAt also exposes nested origins in the composed tree.
 //
 // Provenance holds a key only when the key is live and was resolved. An unknown key
 // is absent, a key with no default and no value (subject_id) is absent, and the old
@@ -26,6 +27,7 @@ import (
 // long_write_timeout and subject_id instead.
 type Resolved struct {
 	value      Config
+	root       ashlar.Value
 	provenance map[string]ashlar.Provenance
 }
 
@@ -40,7 +42,36 @@ func (r Resolved) Provenance(key string) (ashlar.Provenance, bool) {
 	return v, ok
 }
 
-// LoadResolved resolves configuration, reading the YAML file at path when it is
+// ProvenanceAt returns the provenance at an effective JSON pointer, including nested
+// fields. It retains source coordinates and the include chain through validation.
+func (r Resolved) ProvenanceAt(pointer ashlar.Pointer) (ashlar.Provenance, bool) {
+	value := r.root.At(pointer)
+	if value.IsOmitted() {
+		return ashlar.Provenance{}, false
+	}
+	return value.Provenance(), true
+}
+
+func (r Resolved) validationError(err error) error {
+	var diagnostic *ashlar.Error
+	if !errors.As(err, &diagnostic) {
+		return err
+	}
+	located := *diagnostic
+	if p, ok := r.ProvenanceAt(diagnostic.Pointer); ok {
+		located.Origin = p.Effective
+	} else if p, ok := r.provenance[strings.TrimPrefix(string(diagnostic.Pointer), "/")]; ok {
+		// Retired keys have been adopted under their canonical names.
+		located.Origin = p.Effective
+	} else if diagnostic.Origin.String() == "" {
+		// No file set this key (a default), so a bare pointer prefix would point at
+		// nothing. Keep the error as it reads unlocated.
+		return err
+	}
+	return &located
+}
+
+// LoadResolved resolves configuration, reading the YAML include graph at path when
 // non-empty. It is Load with the provenance Load discards.
 func LoadResolved(path string) (Resolved, error) { return LoadResolvedOverriding(path, nil) }
 
@@ -52,7 +83,7 @@ func LoadResolvedOverriding(path string, set map[string]string) (Resolved, error
 		return Resolved{}, err
 	}
 	if err := r.value.Validate(); err != nil {
-		return Resolved{}, err
+		return Resolved{}, r.validationError(err)
 	}
 	return r, nil
 }
@@ -96,15 +127,16 @@ func resolve(path string, set map[string]string) (Resolved, error) {
 		return Resolved{}, fmt.Errorf("decode config: %w: %w", ErrInvalid, err)
 	}
 
+	r := Resolved{root: root, provenance: configProvenance(root)}
 	var c Config
 	if err := yamlconfig.DecodeValueStrict(root, &c); err != nil {
 		return Resolved{}, fmt.Errorf("decode config: %w: %w", ErrInvalid, err)
 	}
 	if err := c.adoptLongWriteTimeout(hasKey(root, "long_write_timeout"), hasKey(root, "ingest_timeout")); err != nil {
-		return Resolved{}, err
+		return Resolved{}, r.validationError(err)
 	}
 	if err := c.adoptSubjectID(hasKey(root, "subject_id"), hasKey(root, "person_id")); err != nil {
-		return Resolved{}, err
+		return Resolved{}, r.validationError(err)
 	}
 
 	derivedLibraryDir := c.LibraryDir == ""
@@ -112,46 +144,24 @@ func resolve(path string, set map[string]string) (Resolved, error) {
 		c.LibraryDir = filepath.Join(filepath.Dir(c.LedgerPath), "documents")
 	}
 	if err := expandPaths(&c); err != nil {
-		return Resolved{}, err
+		return Resolved{}, r.validationError(err)
 	}
 
-	provenance := configProvenance(root)
+	provenance := r.provenance
 	if derivedLibraryDir {
 		provenance["library_dir"] = ashlar.NewProvenance(ashlar.DefaultOrigin("library_dir beside ledger_path"), false)
 	}
-	return Resolved{value: c, provenance: provenance}, nil
-}
-
-// readConfigFragments reads path as one strict YAML document. A missing path, an empty
-// file, a comment-only file and a whole-document null are all "no file": Anam resolves
-// its defaults, as it always has. A null member is dropped so the layer beneath it
-// wins, which is what Viper's decode did before the composition existed.
-func readConfigFragments(path string) ([]yamlconfig.Fragment, error) {
-	if path == "" {
-		return nil, nil
-	}
-	raw, err := os.ReadFile(path) // #nosec G304 -- path is Resolve-pinned or empty / caller-provided
-	if err != nil {
-		return nil, fmt.Errorf("read config %q: %w", path, err)
-	}
-	doc, err := readDocument(path, raw)
-	if err != nil {
-		return nil, fmt.Errorf("read config %q: %w", path, err)
-	}
-	if doc.IsOmitted() {
-		return nil, nil
-	}
-	return []yamlconfig.Fragment{{Path: path, Raw: raw, Root: doc}}, nil
+	return Resolved{value: c, root: root, provenance: provenance}, nil
 }
 
 // readDocument parses one strict document, or reports it omitted when the file holds
 // nothing to read. Both readers here (config and importers) use it, so both refuse
 // aliases and a second document in the same way.
-func readDocument(path string, raw []byte) (ashlar.Value, error) {
+func readDocument(path string, raw []byte, via ...ashlar.SourceSpan) (ashlar.Value, error) {
 	if isBlankYAML(raw) {
 		return ashlar.OmittedValue(), nil
 	}
-	doc, err := yamlconfig.Read(path, raw)
+	doc, err := yamlconfig.Read(path, raw, via...)
 	if err != nil {
 		return ashlar.Value{}, err
 	}
@@ -416,7 +426,7 @@ func expandPaths(c *Config) error {
 	for name, p := range paths {
 		expanded, err := safepath.Expand(*p)
 		if err != nil {
-			return fmt.Errorf("%w: %s: %v", ErrInvalid, name, err)
+			return invalidSetting(name, "%s: %v", name, err)
 		}
 		*p = expanded
 	}

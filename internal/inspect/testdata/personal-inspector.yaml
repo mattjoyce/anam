@@ -1,5 +1,6 @@
 # Independently transcribed from the accepted card 256 brief, not Go tables.
 inspector:
+  track_type: place.track
   domains:
     - {id: health, hue: 7}
     - {id: activity, hue: 3}

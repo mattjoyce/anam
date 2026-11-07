@@ -47,6 +47,11 @@ func validateInspectorNodes(root ashlar.Value) error {
 		return inspectorNodeError("/inspector", "want mapping")
 	}
 	for _, section := range inspector.Members() {
+		if section.Key == "track_type" && !section.Value.IsNull() {
+			if _, ok := section.Value.StringVal(); !ok {
+				return inspectorNodeError("/inspector/track_type", "want string or null")
+			}
+		}
 		if section.Key != "domains" && section.Key != "families" && section.Key != "types" {
 			continue
 		}

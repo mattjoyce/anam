@@ -86,3 +86,21 @@ func TestCompileSameIDAcrossSections(t *testing.T) {
 		t.Fatalf("a domain and a family named sleep were refused: %v", err)
 	}
 }
+
+func TestTrackTypeImmutableAndValidated(t *testing.T) {
+	t.Parallel()
+	s := presentation.Spec{TrackType: "custom.route"}
+	p, err := presentation.Compile(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.TrackType = "place.track"
+	if p.TrackType() != "custom.route" || (presentation.Value{}).TrackType() != "" {
+		t.Fatal("selector changed")
+	}
+	s.TrackType = "invalid"
+	p, err = presentation.Compile(s)
+	if err == nil || p.TrackType() != "" {
+		t.Fatal("invalid selector partially accepted")
+	}
+}

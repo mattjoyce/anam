@@ -222,8 +222,8 @@ func TestPresentationEveryColourSurface(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := facet.Facet{Type: "place.track", Payload: payload}
-	track := facetTrack(f, p.Hue("place"))
+	f := facet.Facet{Type: "place.track", Payload: payload, FactTime: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}
+	track := facetTrack(f, compilePolicy(t, presentation.Spec{TrackType: "place.track"}))
 	if track == nil {
 		t.Fatal("no track")
 	}

@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
+	"github.com/mattjoyce/anam/internal/presentation"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
@@ -60,7 +62,7 @@ func locationServer(t *testing.T) (*httptest.Server, string) {
 	admit("owntracks:loc:tokay:2026-10-11T22:00:00Z", "place.track", hourPrev, time.Date(2026, 10, 11, 22, 0, 0, 0, time.UTC))
 	admit("owntracks:loc:other:2026-10-12T02:00:00Z", "place.track", hourOther, time.Date(2026, 10, 12, 2, 0, 0, 0, time.UTC))
 
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Presentation: timelinePresentation(t), Catalog: catalogtest.Engine.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Definitions: trackDefinitions(t)}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Presentation: spatialPresentation(t), Catalog: catalogtest.Engine.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Definitions: trackDefinitions(t)}))
 	t.Cleanup(srv.Close)
 	return srv, a.ID
 }
@@ -164,9 +166,25 @@ func TestLocation_DrawsTheNewestDayAndNarrows(t *testing.T) {
 // A ledger with no positions says so rather than drawing nothing.
 func TestLocation_EmptyRecordSaysSo(t *testing.T) {
 	t.Parallel()
-	srv, _, _ := seededServer(t)
+	l, err := ledger.Create(context.Background(), filepath.Join(t.TempDir(), "empty.db"), person)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = l.Close() })
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: time.Second, Presentation: spatialPresentation(t)}))
+	t.Cleanup(srv.Close)
 	code, body := get(t, srv.URL+"/location")
 	if code != http.StatusOK || !strings.Contains(body, "no place.track facets are live") {
 		t.Errorf("GET /location = %d, body lacks the empty notice", code)
 	}
+}
+
+// This personal fixture opts into spatial rendering without changing the engine defaults.
+func spatialPresentation(t *testing.T) presentation.Value {
+	t.Helper()
+	cfg, err := config.LoadOverriding("testdata/personal-inspector.yaml", map[string]string{"subject_id": person, "server": ""})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cfg.Presentation()
 }

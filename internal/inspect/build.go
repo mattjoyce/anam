@@ -27,10 +27,11 @@ func (b Build) Title() string {
 }
 
 // pagesFor is the templates with the frame's functions answered: the build it shows,
-// and whether the importers page exists to link to.
-func pagesFor(b Build, importers bool) *template.Template {
+// and which optional pages exist to link to.
+func pagesFor(b Build, importers, location bool) *template.Template {
 	return template.Must(tmpl.Clone()).Funcs(template.FuncMap{
 		"build":        func() Build { return b },
 		"hasImporters": func() bool { return importers },
+		"hasLocation":  func() bool { return location },
 	})
 }

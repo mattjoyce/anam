@@ -244,6 +244,7 @@ inspect_cached_reads: 4
 # structured string override. Omit it for neutral, alphabetical rendering.
 # Arrays replace earlier sections; null and [] clear a section through includes.
 # inspector:
+#   track_type: place.track # Optional hourly geographic tracks. Omitted, null or empty disables.
 #   domains:
 #     - id: health
 #       hue: 0 # -1 or omitted/null is neutral; 0..7 selects a palette slot

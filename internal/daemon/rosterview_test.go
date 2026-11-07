@@ -75,6 +75,7 @@ func operatorPage(t *testing.T, base, path string) string {
 func TestWorkbenchFrameShowsTheDaemonsVersion(t *testing.T) {
 	t.Parallel()
 	cfg := holdConfig(t)
+	cfg.Inspector.TrackType = "test.track"
 	_, base := serveBuilt(t, cfg)
 
 	var st api.Status

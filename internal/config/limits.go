@@ -1,9 +1,6 @@
 package config
 
-import (
-	"fmt"
-	"time"
-)
+import "time"
 
 // Limits are the daemon's and the client's opinionated defaults (card 151): each is a
 // choice someone could reasonably make differently, so each is a key, and the
@@ -231,7 +228,7 @@ func (l Limits) Validate() error {
 	}
 	for _, d := range durations {
 		if d.got < d.min {
-			return fmt.Errorf("%w: %s must be at least %s, got %s", ErrInvalid, d.key, d.min, d.got)
+			return invalidSetting(d.key, "%s must be at least %s, got %s", d.key, d.min, d.got)
 		}
 	}
 	counts := []struct {
@@ -252,10 +249,10 @@ func (l Limits) Validate() error {
 	}
 	for _, c := range counts {
 		if c.got < c.min {
-			return fmt.Errorf("%w: %s must be from %d to %d, got %d", ErrInvalid, c.key, c.min, c.max, c.got)
+			return invalidSetting(c.key, "%s must be from %d to %d, got %d", c.key, c.min, c.max, c.got)
 		}
 		if c.got > c.max {
-			return fmt.Errorf("%w: %s must be from %d to %d, got %d", ErrInvalid, c.key, c.min, c.max, c.got)
+			return invalidSetting(c.key, "%s must be from %d to %d, got %d", c.key, c.min, c.max, c.got)
 		}
 	}
 	return nil

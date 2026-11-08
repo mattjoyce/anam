@@ -9,7 +9,7 @@
   .track .scale { stroke: currentColor; stroke-width: 2; }
   .track text { fill: currentColor; font: 11px system-ui, sans-serif; opacity: .75; }
   .track .h0 { fill: #2a78d6; } .track .h1 { fill: #eb6834; } .track .h2 { fill: #1baf7a; } .track .h3 { fill: #eda100; }
-  .track .h4 { fill: #e87ba4; } .track .h5 { fill: #008300; } .track .h6 { fill: #4a3aa7; } .track .h7 { fill: #e34948; }
+  .track .h4 { fill: #e87ba4; } .track .h5 { fill: #008300; } .track .h6 { fill: #4a3aa7; } .track .h7 { fill: #e34948; } .track .hx { fill: #898781; }
 </style>
 <svg class="track" viewBox="0 0 {{.W}} {{.H}}" role="img" aria-label="track of {{.Count}} fixes">
   {{range .Fixes}}{{if gt .R 0.0}}<circle class="ring" cx="{{.X}}" cy="{{.Y}}" r="{{.R}}"/>{{end}}{{end}}

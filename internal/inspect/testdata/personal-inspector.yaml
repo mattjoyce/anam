@@ -1,0 +1,61 @@
+# Independently transcribed from the accepted card 256 brief, not Go tables.
+inspector:
+  track_type: place.track
+  domains:
+    - {id: health, hue: 7}
+    - {id: activity, hue: 3}
+    - {id: place, hue: 1}
+    - {id: record, hue: 0}
+    - {id: mind, hue: 6}
+    - {id: org, hue: 5}
+    - {id: money, hue: 2}
+    - {id: social, hue: -1}
+    - {id: media, hue: -1}
+    - {id: work, hue: -1}
+  families:
+    - {id: vitals}
+    - {id: body}
+    - {id: sleep}
+    - {id: movement}
+    - {id: exercise}
+    - {id: labs}
+    - {id: conditions}
+    - {id: meds}
+    - {id: intake}
+    - {id: clinical}
+    - {id: location}
+    - {id: trips}
+    - {id: attention}
+    - {id: employment}
+    - {id: purchases}
+    - {id: notes}
+    - {id: documents}
+  types:
+    - {type: health.heart-rate, legacy_family: vitals, legacy_kind: measure, shape: circle}
+    - {type: health.sleep, legacy_family: sleep, legacy_kind: measure, shape: circle}
+    - {type: health.metric-group, legacy_family: movement, legacy_kind: measure, shape: circle}
+    - {type: health.blood-pressure, legacy_family: vitals, legacy_kind: reading, shape: square}
+    - {type: health.heart-rate-alert, legacy_family: vitals, legacy_kind: event, shape: alert}
+    - {type: health.weight, legacy_family: body, legacy_kind: reading, shape: square}
+    - {type: health.measurement.withings, legacy_family: body, legacy_kind: reading, shape: diamond}
+    - {type: activity.gym-visit, legacy_family: exercise, legacy_kind: event, shape: square}
+    - {type: health.lab-panel, legacy_family: labs, legacy_kind: event, shape: square}
+    - {type: health.medication.started, legacy_family: meds, legacy_kind: event, shape: tri-up}
+    - {type: health.medication.stopped, legacy_family: meds, legacy_kind: event, shape: tri-down}
+    - {type: health.medication.dose-missed, legacy_family: meds, legacy_kind: event, shape: cross}
+    - {type: health.medication.dose, legacy_family: meds, legacy_kind: event, shape: square}
+    - {type: health.illness.started, legacy_family: conditions, legacy_kind: event, shape: tri-up}
+    - {type: health.illness.ended, legacy_family: conditions, legacy_kind: event, shape: tri-down}
+    - {type: mind.attention.started, legacy_family: attention, legacy_kind: event, shape: tri-up}
+    - {type: mind.attention.ended, legacy_family: attention, legacy_kind: event, shape: tri-down}
+    - {type: org.employment.started, legacy_family: employment, legacy_kind: event, shape: tri-up}
+    - {type: org.employment.role-changed, legacy_family: employment, legacy_kind: event, shape: diamond}
+    - {type: org.employment.ended, legacy_family: employment, legacy_kind: event, shape: tri-down}
+    - {type: money.purchase, legacy_family: purchases, legacy_kind: event, shape: diamond}
+    - {type: health.encounter, legacy_family: clinical, legacy_kind: event, shape: square}
+    - {type: health.donation, legacy_family: clinical, legacy_kind: event, shape: star}
+    - {type: place.trip.departed, legacy_family: trips, legacy_kind: event, shape: tri-up}
+    - {type: place.trip.arrived, legacy_family: trips, legacy_kind: event, shape: tri-down}
+    - {type: place.trip.flight, legacy_family: trips, legacy_kind: event, shape: cross}
+    - {type: record.document, legacy_family: documents, legacy_kind: event, shape: square}
+    - {type: record.link, legacy_family: documents, legacy_kind: event, shape: cross}

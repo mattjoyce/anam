@@ -14,6 +14,7 @@ import (
 	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
+	"github.com/mattjoyce/anam/internal/presentation"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
@@ -42,7 +43,7 @@ func lanesServer(t *testing.T) *httptest.Server {
 	admit("scales:1", "health.weight", `{"kg": 80}`, time.Date(2026, 1, 10, 7, 0, 0, 0, time.UTC))
 	admit("scales:2", "health.weight", `{"kg": 79}`, time.Date(2026, 4, 10, 7, 0, 0, 0, time.UTC))
 	admit("gym:1", "activity.gym-visit", `{"at": "x"}`, time.Date(2026, 3, 1, 7, 0, 0, 0, time.UTC))
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Engine.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Presentation: timelinePresentation(t), Catalog: catalogtest.Engine.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets}))
 	t.Cleanup(srv.Close)
 	return srv
 }
@@ -216,4 +217,23 @@ func TestTimeline_ATypeFilterOpensItsLane(t *testing.T) {
 	if n := len(markIDs(band)); n != 2 {
 		t.Errorf("%d marks, want the two weights", n)
 	}
+}
+
+// Explicit preferences for these synthetic ledger fixtures, not engine defaults.
+func timelinePresentation(t *testing.T) presentation.Value {
+	t.Helper()
+	health, activity := 7, 3
+	p, err := presentation.Compile(presentation.Spec{
+		Domains: []presentation.DomainSpec{{ID: "health", Hue: &health}, {ID: "activity", Hue: &activity}},
+		Types: []presentation.Override{
+			{Type: "health.weight", Shape: "square", LegacyKind: "reading", LegacyFamily: "body"},
+			{Type: "health.heart-rate", Shape: "circle", LegacyKind: "measure", LegacyFamily: "vitals"},
+			{Type: "health.blood-pressure", Shape: "square", LegacyKind: "reading", LegacyFamily: "vitals"},
+			{Type: "activity.gym-visit", Shape: "square", LegacyKind: "event", LegacyFamily: "exercise"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
 }

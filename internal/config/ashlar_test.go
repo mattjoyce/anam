@@ -335,8 +335,9 @@ func TestResolvedIndependentLoads(t *testing.T) {
 	}
 }
 
-// TestResolvedIncludeUnknown confirms that 'include' is rejected as an
-// unknown config key.
+// TestResolvedIncludeUnknown was written when 'include' was an unknown key.
+// Since card 256b include is accepted, so it now confirms a missing include
+// target is refused. TestIncludeFailures covers the include rules in full.
 func TestResolvedIncludeUnknown(t *testing.T) {
 	t.Setenv("ANAM_SUBJECT_ID", "matt")
 	path := writeCfg(t, "subject_id: matt\ninclude: other.yaml\n")

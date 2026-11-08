@@ -130,6 +130,9 @@ type Daemon struct {
 // With a token file configured every request but /healthz must carry the token, and
 // the daemon may listen on any address. Without one it listens on loopback only.
 func Open(ctx context.Context, cfg config.Config, opts Options) (*Daemon, error) {
+	if err := cfg.CompilePresentation(); err != nil {
+		return nil, fmt.Errorf("daemon: %w", err)
+	}
 	// Load has checked the limits; a Config built another way is checked here, so a
 	// zero wait or bound never reaches a request.
 	if err := cfg.Limits.Validate(); err != nil {

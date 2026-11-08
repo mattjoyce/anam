@@ -28,6 +28,7 @@ import (
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/fold"
+	"github.com/mattjoyce/anam/internal/presentation"
 	"github.com/mattjoyce/anam/internal/projection"
 	"github.com/mattjoyce/anam/internal/read"
 	"github.com/mattjoyce/anam/internal/span"
@@ -51,14 +52,15 @@ var templateFS embed.FS
 // function that a parse needs and a Server answers: each Server runs its own clone
 // (Server.pages), with the build it was given.
 var tmpl = template.Must(template.New("").Funcs(template.FuncMap{
-	"build": func() Build { return Build{} }, "hasImporters": func() bool { return false },
+	"build": func() Build { return Build{} }, "hasImporters": func() bool { return false }, "hasLocation": func() bool { return false },
 }).
 	ParseFS(templateFS, "templates/*.html"))
 
 // Server renders the inspector pages. Timeout bounds each request's ledger reads.
 type Server struct {
-	ledger  Ledger
-	timeout time.Duration
+	presentation presentation.Value
+	ledger       Ledger
+	timeout      time.Duration
 
 	// pages is the templates with this server's build answered to the frame.
 	pages *template.Template
@@ -148,16 +150,18 @@ type Server struct {
 // the templates held; nil means Catalog's. Catalog is the provisioned catalog the
 // process loaded.
 type Deps struct {
-	Ledger      Ledger
-	Timeout     time.Duration
-	Buckets     span.Buckets
-	Library     string
-	Catalog     *catalog.Catalog
-	Definitions func() *def.Registry
-	Held        HeldDefinitions
-	Checkpoints Checkpoints
-	Edges       Edges
-	Projections func() *projection.Registry
+	// Presentation is the immutable deployment policy accepted at startup.
+	Presentation presentation.Value
+	Ledger       Ledger
+	Timeout      time.Duration
+	Buckets      span.Buckets
+	Library      string
+	Catalog      *catalog.Catalog
+	Definitions  func() *def.Registry
+	Held         HeldDefinitions
+	Checkpoints  Checkpoints
+	Edges        Edges
+	Projections  func() *projection.Registry
 	// Workbench lets the pages enter, correct and retract facets by hand, through the
 	// daemon's write; nil leaves the inspector read-only (a standalone `anam inspect`).
 	Workbench Workbench
@@ -189,10 +193,11 @@ type Deps struct {
 // Handler returns the inspector's routes on a fresh mux.
 func Handler(d Deps) http.Handler {
 	s := &Server{
-		ledger: d.Ledger, timeout: d.Timeout, buckets: d.Buckets, library: d.Library, catalog: d.Catalog,
+		presentation: d.Presentation,
+		ledger:       d.Ledger, timeout: d.Timeout, buckets: d.Buckets, library: d.Library, catalog: d.Catalog,
 		defs: d.Definitions, heldDefs: d.Held, checkpoints: d.Checkpoints, edges: d.Edges, projections: d.Projections,
 		cachedReads: d.CachedReads, bench: d.Workbench, maxReadBytes: d.MaxReadBytes, selections: d.Selections,
-		roster: d.Roster, zone: deployedZone(d.Zone), now: nowOr(d.Now), pages: pagesFor(d.Build, d.Roster != nil),
+		roster: d.Roster, zone: deployedZone(d.Zone), now: nowOr(d.Now), pages: pagesFor(d.Build, d.Roster != nil, d.Presentation.TrackType() != ""),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.timeline)
@@ -201,7 +206,9 @@ func Handler(d Deps) http.Handler {
 	mux.HandleFunc("POST /view", s.setDefaultView)
 	mux.HandleFunc("GET /facets", s.index)
 	mux.HandleFunc("GET /facet", s.facetPage)
-	mux.HandleFunc("GET /location", s.location)
+	if s.presentation.TrackType() != "" {
+		mux.HandleFunc("GET /location", s.location)
+	}
 	mux.HandleFunc("GET /events", s.events)
 	mux.HandleFunc("GET /projection", s.projectionPage)
 	mux.HandleFunc("GET /select", s.selectPage)

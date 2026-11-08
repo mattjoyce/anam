@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/mattjoyce/anam/internal/catalog/catalogtest"
+	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/def"
 	"github.com/mattjoyce/anam/internal/facet"
 	"github.com/mattjoyce/anam/internal/inspect"
+	"github.com/mattjoyce/anam/internal/presentation"
 	"github.com/mattjoyce/anam/internal/store/ledger"
 )
 
@@ -60,7 +62,7 @@ func locationServer(t *testing.T) (*httptest.Server, string) {
 	admit("owntracks:loc:tokay:2026-10-11T22:00:00Z", "place.track", hourPrev, time.Date(2026, 10, 11, 22, 0, 0, 0, time.UTC))
 	admit("owntracks:loc:other:2026-10-12T02:00:00Z", "place.track", hourOther, time.Date(2026, 10, 12, 2, 0, 0, 0, time.UTC))
 
-	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Catalog: catalogtest.Engine.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Definitions: trackDefinitions(t)}))
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Presentation: spatialPresentation(t), Catalog: catalogtest.Engine.Catalog(t), Ledger: l, Timeout: 30 * time.Second, Buckets: defaultBuckets, Definitions: trackDefinitions(t)}))
 	t.Cleanup(srv.Close)
 	return srv, a.ID
 }
@@ -151,6 +153,11 @@ func TestLocation_DrawsTheNewestDayAndNarrows(t *testing.T) {
 		t.Error("device filter did not narrow to tokay's hours")
 	}
 
+	_, absent := get(t, srv.URL+"/location?from=2026-10-11&to=2026-10-11&device=other")
+	if !strings.Contains(absent, "<option selected>other</option>") {
+		t.Error("a filtered device with no fixes in the window dropped out of the select")
+	}
+
 	_, window := get(t, srv.URL+"/location?from=2026-10-11&to=2026-10-11&device=tokay")
 	if !strings.Contains(window, "1 fix over 1 hour") || !strings.Contains(window, "2026-10-11 22:30Z") {
 		t.Error("window did not narrow to the day before")
@@ -161,12 +168,33 @@ func TestLocation_DrawsTheNewestDayAndNarrows(t *testing.T) {
 	}
 }
 
-// A ledger with no positions says so rather than drawing nothing.
+// A ledger with no positions says so rather than drawing nothing, even while
+// other types are live.
 func TestLocation_EmptyRecordSaysSo(t *testing.T) {
 	t.Parallel()
-	srv, _, _ := seededServer(t)
+	l, err := ledger.Create(context.Background(), filepath.Join(t.TempDir(), "empty.db"), person)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = l.Close() })
+	other := seedFacet(t, "meter:2026-01-24T06:30:00", "test.measure", `{"count": 1}`)
+	if err := l.Admit(context.Background(), 0, other, event(facet.EventAdmitted, other, 1)); err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(inspect.Handler(inspect.Deps{Ledger: l, Timeout: time.Second, Presentation: spatialPresentation(t)}))
+	t.Cleanup(srv.Close)
 	code, body := get(t, srv.URL+"/location")
 	if code != http.StatusOK || !strings.Contains(body, "no place.track facets are live") {
 		t.Errorf("GET /location = %d, body lacks the empty notice", code)
 	}
+}
+
+// This personal fixture opts into spatial rendering without changing the engine defaults.
+func spatialPresentation(t *testing.T) presentation.Value {
+	t.Helper()
+	cfg, err := config.LoadOverriding("testdata/personal-inspector.yaml", map[string]string{"subject_id": person, "server": ""})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cfg.Presentation()
 }

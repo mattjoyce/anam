@@ -53,7 +53,8 @@ func (d *Daemon) inspector() http.Handler {
 	zone, _ := d.cfg.ZoneName()
 	index := guardedIndex{ops: d.readOps, state: &d.index}
 	return inspect.Handler(inspect.Deps{
-		Ledger: d.read, Timeout: d.cfg.Timeout, Buckets: buckets, Library: d.cfg.LibraryDir, Catalog: d.catalog,
+		Presentation: d.cfg.Presentation(),
+		Ledger:       d.read, Timeout: d.cfg.Timeout, Buckets: buckets, Library: d.cfg.LibraryDir, Catalog: d.catalog,
 		Definitions: d.defs.current.Load, Held: d.heldDefinitions, Checkpoints: index, Edges: index,
 		Projections: d.projections.current.Load, CachedReads: d.cfg.InspectCachedReads,
 		Workbench: d.workbenchFor(), MaxReadBytes: d.cfg.MaxReadBytes, Selections: d.selections, Zone: zone,

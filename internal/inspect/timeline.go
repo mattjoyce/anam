@@ -263,11 +263,21 @@ func (s *Server) redirectLastMonth(w http.ResponseWriter, r *http.Request) {
 			active[domainOf(f.Type)] = true
 		}
 	}
-	for _, d := range domains {
+	for _, d := range s.presentation.Domains() {
 		if active[d.ID] {
 			q.Add("open", d.ID)
+			delete(active, d.ID)
 		}
 	}
+	var ids []string
+	for id := range active {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		q.Add("open", id)
+	}
+
 	http.Redirect(w, r, address("/", q), http.StatusSeeOther)
 }
 
@@ -324,13 +334,13 @@ func (s *Server) timeline(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// The Definitions in force say what each type is (kind, family; card 176), so a
-	// registered type draws on the right row before anyone edits the table.
+	// registered type draws on the right row using the accepted presentation.
 	reg, err := s.definitions()
 	if err != nil {
 		httpError(w, err)
 		return
 	}
-	data := buildTimeline(newStyles(reg), res, all, from, to, zoomed, q["type"], q["open"], status, sel)
+	data := buildTimeline(newStyles(reg, s.presentation), res, all, from, to, zoomed, q["type"], q["open"], status, sel)
 	data.CanLink = s.enterable(catchup.EdgeType)
 	data.Zone = zone
 	if zoomed {
@@ -549,7 +559,7 @@ func buildTimeline(st styles, res fold.Result, all []facet.Facet, from, to time.
 			continue
 		}
 		style := st.of(f.Type)
-		hue := hueOf(f.Type)
+		hue := st.hueOf(f.Type)
 		mark := st.markClass(f.Type)
 		when := f.FactTime.UTC().Format("2006-01-02 15:04Z")
 		px, py := x(f.FactTime), yOf[f.Type]
@@ -698,7 +708,7 @@ func tallyStrip(st styles, strip []tlStripEntry, types []facet.Type, from, to ti
 			continue
 		}
 		tally = append(tally, tlTally{
-			Type: t, Hue: hueOf(t), Count: n,
+			Type: t, Hue: st.hueOf(t), Count: n,
 			Href: windowLink(from, to, zoomed, tlView{Types: []facet.Type{t}, Status: view.Status, Sel: view.Sel, Open: view.Open}),
 		})
 	}

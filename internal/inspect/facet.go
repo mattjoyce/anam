@@ -42,7 +42,7 @@ type facetData struct {
 	Payload []jsonToken
 	Events  []facet.AnamEvent
 
-	// Track is a place.track facet's hour drawn (card 133); nil otherwise.
+	// Track is the selected type's hour drawn (card 133); nil otherwise.
 	Track *trackView
 
 	// Links is the live edges touching the facet, read from the edge index through
@@ -202,6 +202,6 @@ func (s *Server) facetPage(w http.ResponseWriter, r *http.Request) {
 		Bucket:            s.buckets.Of(f.FactTime).ID(),
 		Payload:           highlightPayload(f.Payload.Bytes()),
 		Events:            mine,
-		Track:             facetTrack(f),
+		Track:             facetTrack(f, s.presentation),
 	})
 }

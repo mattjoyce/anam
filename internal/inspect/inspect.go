@@ -196,6 +196,8 @@ func Handler(d Deps) http.Handler {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.timeline)
+	mux.Handle("GET /feed", http.RedirectHandler("/feed/", http.StatusMovedPermanently))
+	mux.Handle("GET /feed/", feedHandler())
 	mux.HandleFunc("POST /view", s.setDefaultView)
 	mux.HandleFunc("GET /facets", s.index)
 	mux.HandleFunc("GET /facet", s.facetPage)

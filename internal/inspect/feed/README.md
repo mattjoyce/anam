@@ -1,3 +1,5 @@
+The daemon serves this directory at `/feed/` (card 276). What follows is the prototype's note from card 275.
+
 # Card 275 timeline feed prototype
 
 A browser prototype of the vertical timeline feed. The spec is `DESIGN.md`. No build, no network.

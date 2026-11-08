@@ -1,8 +1,7 @@
 # Anam
 
 > *anam*: clipped from *anamnesis*, Plato's word for recollection, and the old name for the account
-> someone gives of their own history. So, precisely: one's own history, as one holds it. It is also
-> Irish for *soul*.
+> someone gives of their own history. So, precisely: one's own history, as one holds it.
 
 A longitudinal record of one subject, kept as immutable facts. The subject is what the record is
 about. In the author's deployment it is the author, and health readings, workouts, medicines, lab

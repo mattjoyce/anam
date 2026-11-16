@@ -38,16 +38,13 @@ into a crash loop. Successful steps with no log are marked silent. Log IDs refer
 to the exact source strings in the next section. Unless stated under timings,
 there is no verified duration for an individual step.
 
-Three subject refusals, with example runtime values, are:
+The three subject refusals are R0 with R1 or R2, and R3 with R4, below. A refusal of a
+setting read from a file or the environment is prefixed with where it was read and the
+key, before the R0 prefix: a file, line and column such as `c2.yaml:1:13 (/subject_id)`,
+or a variable such as `env:ANAM_SUBJECT_ID (/subject_id)`.
 
-> invalid config: subject_id is required (ANAM_SUBJECT_ID)
-
-> invalid config: subject_id ("a") and its old name person_id ("b") differ; set subject_id only
-
-> ledger: file belongs to a different subject: ledger is pinned to "stored", config says "configured"
-
-R0–R4 below check their source prefixes and format strings. PR #56 changes the
-ledger's stored pin key; the refusal text above is the same at `origin/master`.
+R0–R4 below check their source prefixes and format strings. Card 270b renamed the
+ledger's stored pin key and left this refusal text as it was.
 
 | Step | Owner | Reads / action, in order | Log/output and refusal or degradation |
 |---|---|---|---|

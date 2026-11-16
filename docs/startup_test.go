@@ -164,6 +164,10 @@ func startupExamples(t *testing.T, doc string, quotes map[string]startupQuote) {
 				continue
 			}
 		}
+		if fence == "" && strings.HasPrefix(trimmed, ">") && isDiagnostic(line) {
+			// A blockquote is a rendered example too, and nothing binds it to source.
+			t.Errorf("STARTUP.md: unchecked blockquoted diagnostic: %s", line)
+		}
 		if fence != "" {
 			if isDiagnostic(line) {
 				value, err := strconv.Unquote(trimmed)

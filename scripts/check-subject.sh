@@ -70,7 +70,7 @@ allow internal/daemon/envelopes.go 'AssertedPerson|asserted_person' 'assertedSub
 allow internal/daemon/openapi.yaml '^        person:$|asserted_person|whole-person' 'documents the deprecated fields and the old span label'
 allow docs/API.md                  'whole-person'    'says receipts filed before 270a keep span whole-person'
 allow docs/IMPORTERS.md            'asserted_person' 'documents asserted_person as the deprecated old name'
-allow docs/STARTUP.md              '^\| (C3 \| WARN|C4 \| INFO|R2 \| error format, no level) \| |^> invalid config: subject_id \("a"\) and its old name person_id \("b"\) differ; set subject_id only$' 'quotes current subject config alias diagnostics and refusal verbatim'
+allow docs/STARTUP.md              '^\| (C3 \| WARN|C4 \| INFO|R2 \| error format, no level) \| ' 'quotes current subject config alias diagnostics and refusal verbatim'
 allow docs/explainer/bundle/data-structures/batch-submission.md 'asserted_person' 'documents asserted_person as the deprecated old name'
 allow docs/explainer/bundle/data-structures/envelope.md         'asserted_person' 'documents asserted_person as the deprecated old name'
 # The deprecated --person flags, until the alias-removal release.

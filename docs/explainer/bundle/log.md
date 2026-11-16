@@ -278,5 +278,5 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 ## 2026-11-16, card 270b
 
-- Code: the ledger moves to schema version 4. The facet column is `binding_subject_id` (it was `binding_person_id`), renamed in place by `migrations/0004.sql`, and the subject pin is `ledger_meta.subject_id`. A carried file keeps its `person_id` pin beside it as history, with the same value; a fresh file writes `subject_id` only. Facet ids, content hashes, minted values, receipts, W and the ledger id are unchanged.
+- Code: the ledger moves to schema version 4. The facet column is `binding_subject_id`, renamed in place from the old word by `migrations/0004.sql`, and the subject pin is `ledger_meta.subject_id`. A carried file keeps its schema 3 pin beside it as history, with the same value; a fresh file writes `subject_id` only. Facet ids, content hashes, minted values, receipts, W and the ledger id are unchanged.
 - Bundle: the ledger store and facet artifact pages name `binding_subject_id` and the `subject_id` pin.

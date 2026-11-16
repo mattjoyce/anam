@@ -1894,7 +1894,7 @@ principals:
 </ul>
 <h4>2026-11-16, card 270b</h4>
 <ul>
-<li>Code: the ledger moves to schema version 4. The facet column is <code>binding_subject_id</code> (it was <code>binding_person_id</code>), renamed in place by <code>migrations/0004.sql</code>, and the subject pin is <code>ledger_meta.subject_id</code>. A carried file keeps its <code>person_id</code> pin beside it as history, with the same value; a fresh file writes <code>subject_id</code> only. <a class="ref ref-term" href="#terms-facet">Facet</a> ids, content hashes, minted values, receipts, W and the ledger id are unchanged.
+<li>Code: the ledger moves to schema version 4. The facet column is <code>binding_subject_id</code>, renamed in place from the old word by <code>migrations/0004.sql</code>, and the subject pin is <code>ledger_meta.subject_id</code>. A carried file keeps its schema 3 pin beside it as history, with the same value; a fresh file writes <code>subject_id</code> only. <a class="ref ref-term" href="#terms-facet">Facet</a> ids, content hashes, minted values, receipts, W and the ledger id are unchanged.
 </li>
 <li>Bundle: the ledger store and facet artifact pages name <code>binding_subject_id</code> and the <code>subject_id</code> pin.
 </li>

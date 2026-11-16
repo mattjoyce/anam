@@ -413,7 +413,10 @@ func TestReceipts_SameOverTheDaemon(t *testing.T) {
 
 func TestCheckpoints_SameOverTheDaemon(t *testing.T) {
 	t.Parallel()
-	f := newRemoteFixture(t)
+	// This test mints manually; keep startup's automatic mint quiet until it ends.
+	f := newRemoteFixtureWith(t, "UTC", func(_ *testing.T, _ remoteFixture, cfg *config.Config) {
+		cfg.MintQuiet = time.Hour
+	})
 	f.sameOutput(t, "checkpoint", "list")
 	f.sameOutput(t, "checkpoint", "--dry-run")
 

@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS facet (
   definition_version INTEGER NOT NULL,
   fact_time          TEXT    NOT NULL,
   series             TEXT    NOT NULL DEFAULT '',
-  binding_person_id  TEXT    NOT NULL,
+  binding_subject_id  TEXT    NOT NULL,
   binding_assurance  TEXT    NOT NULL,
   binding_span_hint  TEXT    NOT NULL DEFAULT '',
   prov_source        TEXT    NOT NULL,

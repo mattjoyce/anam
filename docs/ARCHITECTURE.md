@@ -4,6 +4,7 @@
 > `PRFAQ.md` (what and why) and `GLOSSARY.md` (the shared language).
 >
 > Where Anam came from is in `HISTORY.md`. Nothing here depends on it.
+> [STARTUP.md](STARTUP.md) traces process start, readiness and the first facet returned to an MCP client.
 
 ---
 

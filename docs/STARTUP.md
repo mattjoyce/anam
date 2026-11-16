@@ -8,11 +8,9 @@ Verified against engine commit `0cb017b849fbc496f4e0543ea6722f74d44d09be`
 (`origin/master`, 2026-11-16), and the supplied live startup log of
 `anam:v0.826-f95e80e`, restarted at **2026-11-16T10:24:25Z** after a config-only
 change. That log reports the config from `env:ANAM_CONFIG`, catalog admission,
-ledger/subject stdout and serving at 10:24:26 UTC, with no catch-up or mint line in
-the supplied excerpt. It identifies subject `matt`, definitions source
-`/etc/anam/definitions`, projections source `/etc/anam/projections`, and set version
-`sha256:b8cc55e0a2f6d14de76a15a892eaa5cd53577ae857cefff09730bbbcb6d9e969`.
-These are observations from that log, not required deployment paths or identity.
+ledger/subject stdout and a serving line timestamped **10:24:26 UTC**, about one
+second after the container start timestamp above, with no catch-up or mint line
+in the supplied excerpt.
 The live image predates master's `/feed/` route (card 276).
 
 Ownership in the timeline is explicit:
@@ -33,16 +31,28 @@ See also [configuration](../config.example.yaml), [API](API.md) and
 ## Timeline
 
 Steps 3–11 run **in sequence inside `daemon.Open`**, before a listener exists.
-An error there returns to the CLI, which reports it and exits nonzero; no HTTP
-health response is possible. A deployment's restart policy can turn that refusal
+An error there returns to the CLI, which writes `anam: <error>` to stderr and
+exits with status **1** (`cmd/anam/main.go`); no HTTP health response is possible.
+A deployment's restart policy can turn that refusal
 into a crash loop. Successful steps with no log are marked silent. Log IDs refer
 to the exact source strings in the next section. Unless stated under timings,
 there is no verified duration for an individual step.
 
+Three subject refusals, with example runtime values, are:
+
+> invalid config: subject_id is required (ANAM_SUBJECT_ID)
+
+> invalid config: subject_id ("a") and its old name person_id ("b") differ; set subject_id only
+
+> ledger: file belongs to a different subject: ledger is pinned to "stored", config says "configured"
+
+R0–R4 below check their source prefixes and format strings. PR #56 changes the
+ledger's stored pin key; the refusal text above is the same at `origin/master`.
+
 | Step | Owner | Reads / action, in order | Log/output and refusal or degradation |
 |---|---|---|---|
 | 1. Start the process | Engine image; deployment config supplies mounts, environment and overrides | The image runs `/usr/local/bin/anam daemon` on distroless as nonroot (65532). A bare process enters the same CLI. Deployment must supply readable config/catalog/token files and usable store paths; it owns restart policy and permissions. | Silent until config loads. A container runtime can refuse before Anam runs (bad executable or mounts); consult the runtime's error. There is no engine log in that case. |
-| 2. Resolve and load config | Engine; values are deployment config | `--config`, then `ANAM_CONFIG`, then the platform user config directory's `anam/config.yaml`. An explicitly named missing file fails; an absent discovered file uses defaults. Load the include graph, defaults, YAML, nonempty scalar `ANAM_<KEY>` overrides, then explicit overrides. Validate strict keys/types, subject, limits, paths, zone, bucket width and inspector presentation. | C1 or C2 after successful load. Missing/invalid files, unknown keys, invalid limits, missing `subject_id`, unequal subject aliases or unequal timeout aliases exit before stores open. C3–C5 cover compatibility diagnostics. |
+| 2. Resolve and load config | Engine; values are deployment config | `--config`, then `ANAM_CONFIG`, then the platform user config directory's `anam/config.yaml`. An explicitly named missing file fails; an absent discovered file uses defaults. Load the include graph, defaults, YAML, nonempty scalar `ANAM_<KEY>` overrides, then explicit overrides. Validate strict keys/types, subject, limits, paths, zone, bucket width and inspector presentation. | C1 or C2 after successful load. Missing/invalid files, unknown keys, invalid limits, missing `subject_id`, unequal subject aliases or unequal timeout aliases exit before stores open. A configured `server` or `ANAM_SERVER` also refuses daemon startup: local files belong to the configured daemon (`internal/app/app.go`, `loadConfig`). C3–C5 cover compatibility diagnostics. |
 | 3. Validate presentation and limits again | Engine | `cfg.CompilePresentation()` then `cfg.Limits.Validate()`, so programmatic callers of `Open` receive the same checks. | Silent; invalid presentation/limits refuse. |
 | 4. Authenticate the listener configuration | Engine; token/listen are deployment config | Read `token_file` (`ANAM_TOKEN_FILE`), if configured. Otherwise require a loopback `listen` (`ANAM_LISTEN`). Then compile `bucket_width` into the bucket calendar. | Silent; missing, unreadable or invalid token, non-loopback without a token, or invalid bucket width refuses. An explicitly configured missing token never falls back to tokenless mode. |
 | 5. Load one catalog snapshot | Engine; catalog files are deployment config | `catalog.Load(definitions_dir, projections_dir)` reads both configured directories once. The same immutable catalog feeds admission, registries and receipts. Neither directory set means an empty catalog; the binary carries no embedded catalog. | Silent here. A configured missing/unreadable directory, malformed Definition/projection, invalid structural Definition (`record.edge`, `record.document`) or inconsistent catalog refuses before stores open. |
@@ -59,7 +69,7 @@ there is no verified duration for an individual step.
 | 16. Probe readiness (concurrent with 14–15) | Engine; probe schedule/post-flight are deployment config | `GET /healthz` reads only the ledger head under `timeout`, without a token. Image health check runs `anam daemon ready`, which reloads config and calls this route at `listen` (wildcard addresses are probed on loopback). | H1 body with HTTP 200, or H2 body with HTTP 503 and H3 warning. The ready command exits 0 on HTTP 200; it does **not** print a readiness success line. It can fail on config loading, connection, deadline or non-200 response. Docker and deploy post-flight can therefore call the daemon healthy/ready during catch-up and mint. |
 | 17. Start the adapter (independent of engine startup) | MCP adapter; environment and token are deployment config | Adapter reads `ANAM_SERVER`, `ANAM_TOKEN_FILE`, required `ANAM_ZONE`, call timeout/margin/response limit, and optional HTTP/Access settings. It reads its token once and builds the daemon client and MCP server. Optional note token is a separate writer identity. | Adapter diagnostics belong to `anam-mcp`; no engine startup line. Invalid environment or missing/empty/unreadable configured token exits the adapter. Construction does not probe the daemon, so MCP can listen while Anam is unavailable. A bad daemon token may surface only on the first call. |
 | 18. Connect the MCP client | MCP adapter; transport is deployment config | Adapter serves stdio, or Streamable HTTP at `/mcp` with Access configuration. HTTP validates the Access JWT before MCP processing; the client initialises an MCP session and calls a tool. The daemon sees the adapter's own bearer token, not the client's JWT. | No engine log just for connecting MCP. Missing/invalid JWT returns adapter HTTP 401; a busy adapter listen port fails adapter start. The MCP container page owns the tunnel, OAuth and compose setup. |
-| 19. Describe the record | MCP adapter calls engine; reader identity is deployment config | `describe_record` sequentially calls `GET /v1/status`, `/v1/definitions`, `/v1/projections`, then `GET /v1/coverage?w=<status watermark>`. The adapter's token hashes to a `principals` entry with role `reader` in `importers.yaml` (the configured `importers_file`). The description reports `subject`, types, projections, coverage and the advised default projection. | No success log per call. Engine returns 401 for missing/unknown token, 403 for wrong role. First three call failures fail the tool; coverage failure is reported in the description instead. An unreachable engine/deadline becomes an MCP tool error, not an empty record. |
+| 19. Describe the record | MCP adapter calls engine; reader identity is deployment config | `describe_record` sequentially calls `GET /v1/status`, `/v1/definitions`, `/v1/projections`, then `GET /v1/coverage?w=<status watermark>`. The adapter's token hashes to a `principals` entry with role `reader` in `importers.yaml` (the configured `importers_file`). At anam-mcp commit `06ac939`, the description reports `subject`, types, projections, coverage and the advised default projection. The live adapter `v0.67-060b77b` still answers `person`. | No success log per call. Engine returns 401 for missing/unknown token, 403 for wrong role. First three call failures fail the tool; coverage failure is reported in the description instead. An unreachable engine/deadline becomes an MCP tool error, not an empty record. |
 | 20. Return the first facet | MCP adapter calls engine | `read_record` without a projection calls `GET /v1/timeline`; with a named projection it calls `POST /v1/receipts`, which publishes the read and returns its first page and receipt. A principal with `receipts: always` must name a projection; an unprojected request is refused with HTTP 400. Reads use the ledger and read-only operational checkpoints/values; publishing uses the operational write handle outside the write queue and stores `receipt`/`served_value` rows, without adding ledger facts. | No success log per facet. HTTP 200 timeline or HTTP 201 published response carries entries; the adapter returns their payloads and artifact versions as MCP evidence (or a projected frame). That response is where the first facet leaves the daemon; the subsequent MCP tool result is where it reaches the client. Empty/filter-excluded records yield no facet. Bad query/projection is HTTP 400; oversized unreceipted read is 413; busy publication is 503 with `Retry-After`; deadline is 504. |
 
 ## Configuration files that startup actually reads
@@ -120,7 +130,11 @@ escaped newlines where the CLI prints several lines in one call. Expand `%s` and
 other format verbs with runtime values. For structured logs the level and attribute
 keys are separate columns; timestamps and values come from the logger/runtime.
 An attribute value containing spaces may be quoted by the logger. Silent steps
-have no success marker to grep. These strings are checked by `TestStartupQuotedOutput`.
+have no success marker to grep. Each row must contain exactly one backticked Go
+string literal; `TestStartupQuotedOutput` binds its ID to a source file, declaration
+and message argument of the expected emitter. Both G4 call sites are required.
+Slog levels and attribute keys in call order are checked against these columns.
+R0/R3 are error prefixes; R1/R2/R4 are the formats composed with them.
 
 | ID | Level / stream | Source literal or format | Attributes, in call order |
 |---|---|---|---|
@@ -144,10 +158,18 @@ have no success marker to grep. These strings are checked by `TestStartupQuotedO
 | H1 | HTTP body, no level | `"ready"` | newline appended |
 | H2 | HTTP body, no level | `"not ready"` | newline appended |
 | H3 | WARN | `"healthz: ledger head unreadable"` | `err` |
+| R0 | error prefix, no level | `"invalid config"` | none; config validation prefix |
+| R1 | error format, no level | `"subject_id is required (ANAM_SUBJECT_ID)"` | R0 prefix |
+| R2 | error format, no level | `"subject_id (%q) and its old name person_id (%q) differ; set subject_id only"` | R0 prefix, new subject, old alias |
+| R3 | error prefix, no level | `"ledger: file belongs to a different subject"` | none; ledger subject mismatch prefix |
+| R4 | error format, no level | `"%w: ledger is pinned to %q, config says %q"` | R3 error, stored subject, configured subject |
 
 ## Timings and verification limits
 
-The supplied 2026-11-16 live log shows serving about **1 second after restart**.
+The supplied 2026-11-16 live log shows serving about **1 second after restart**:
+the serving line's time is **10:24:26 UTC**, against container start
+**10:24:25Z**. On the same image, `v0.826-f95e80e`, `/v1/status` reports
+`server_since` **2026-11-16T10:24:26.03Z**, consistent with that interval.
 It does not establish Docker health timing, catch-up duration, startup-mint duration,
 or time to the first MCP facet. There is no general startup-time guarantee.
 
@@ -173,11 +195,14 @@ against that deployment's current files.
 
 The [source-literal test](startup_test.go),
 `go test ./docs -run '^TestStartupQuotedOutput$'` (also run by `scripts/check.sh`),
-extracts every double-quoted inline Go string in this document and requires its
-exact decoded literal in production `.go` source under `internal/daemon`,
-`internal/config` or `internal/app`. Test files and comments cannot satisfy it.
-Keep quoted logs/outputs in that form when editing this guide. **Residual risk:**
-ordering, branching, attribute and timing changes can keep the same message literals;
-this check cannot prove those. Re-read the call sites and refresh the verified commit
+requires every reference row to contain exactly one checked literal, bound to its
+production emitter under `internal/daemon`, `internal/config`, `internal/app` or
+`internal/store/ledger`. It checks slog levels and attribute keys, including their
+order. Test files, comments, detached literals and other call sites cannot satisfy
+it. Inline code spans and fenced lines containing a daemon/config/healthz diagnostic
+must be checked literals too; rendered log examples with levels or runtime values
+are rejected. **Residual risk:** ordering, branching, attribute values and timing
+changes can preserve all checked messages, levels and keys; this check cannot
+prove those. Re-read the call sites and refresh the verified commit
 when startup changes. The supplied log checks a real restart, not a new MCP
 end-to-end rehearsal or a rebuild.

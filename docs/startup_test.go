@@ -45,7 +45,7 @@ var startupSites = map[string]startupSite{
 	"R1": {"config/config.go", "Validate", "invalidSetting", 1, 1},
 	"R2": {"config/config.go", "adoptSubjectID", "invalidSetting", 1, 1},
 	"R3": {"store/ledger/ledger.go", "ErrSubjectMismatch", "errors.New", 0, 1},
-	"R4": {"store/ledger/ledger.go", "checkPin", "fmt.Errorf", 0, 1},
+	"R4": {"store/ledger/pins.go", "checkSubjectPin", "fmt.Errorf", 0, 1},
 }
 
 type startupQuote struct {

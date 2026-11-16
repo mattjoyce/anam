@@ -21,9 +21,11 @@ references:
 | `type`, `confidence`, `classification`, `definition_version` | attributes about itself |
 | `fact_time` | fixed-width UTC text, promoted out of the payload at the gate |
 | `series` | the Definition's series stamp, empty when the type has none |
-| `binding_person_id`, `binding_assurance`, `binding_span_hint` | the association pillar's result |
+| `binding_subject_id`, `binding_assurance`, `binding_span_hint` | the association pillar's result |
 | `prov_source`, `prov_injector`, `prov_source_ref`, `prov_method`, `prov_model`, `prov_watermark` | provenance; the derivation fields are empty for a captured fact |
 | `source_schema`, `schema_version`, `content_hash`, `payload_kind`, `media_type` | the payload descriptor |
 | `payload` | BLOB, the canonical bytes; never a JSON column |
 
-Triggers refuse update, delete and an insert over an existing key. The Go value is `facet.Facet`, built only by `facet.New`, which re-derives the id and hash from the bytes so a facet cannot disagree with itself. There is no status column; a test pins that the struct has no status field. `ledger_meta` beside it pins `person_id`, `ledger_id`, `schema_version` and each `schema_migration:<n>`, write-once.
+Triggers refuse update, delete and an insert over an existing key. The Go value is `facet.Facet`, built only by `facet.New`, which re-derives the id and hash from the bytes so a facet cannot disagree with itself. There is no status column; a test pins that the struct has no status field. `ledger_meta` beside it pins `subject_id`, `ledger_id`, `schema_version` and each `schema_migration:<n>`, write-once.
+
+Schema 4 carries the binding column by an in-place rename, keeping every value and its position. The new subject pin is added beside schema 3's original pin; the old pin stays as history. A fresh file writes only the new pin. Neither name is part of a facet id, content hash or receipt, so the carry changes none of them.

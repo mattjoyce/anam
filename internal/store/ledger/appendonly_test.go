@@ -86,7 +86,7 @@ func TestAppendOnly_DatabaseRefusesEveryOverwrite(t *testing.T) {
 		{"delete an artifact", `DELETE FROM facet`, nil},
 		{"replace an artifact", `INSERT OR REPLACE INTO facet (` + facetColumns + `)
 			SELECT facet_id, artifact_version, type, confidence, classification,
-			       definition_version, fact_time, binding_person_id, binding_assurance,
+			       definition_version, fact_time, series, binding_subject_id, binding_assurance,
 			       binding_span_hint, prov_source, prov_injector, prov_source_ref, prov_method,
 			       prov_model, prov_watermark, source_schema, schema_version, content_hash,
 			       payload_kind, media_type, x'00' FROM facet`, nil},
@@ -94,9 +94,9 @@ func TestAppendOnly_DatabaseRefusesEveryOverwrite(t *testing.T) {
 		{"delete an event", `DELETE FROM anam_event`, nil},
 		{"replace an event", `INSERT OR REPLACE INTO anam_event (` + eventColumns + `)
 			VALUES (1, 'tombstoned', 'x', 'x', 1, 0)`, nil},
-		{"update a pin", `UPDATE ledger_meta SET value = 'someone-else' WHERE key = 'person_id'`, nil},
+		{"update a pin", `UPDATE ledger_meta SET value = 'someone-else' WHERE key = 'subject_id'`, nil},
 		{"delete a pin", `DELETE FROM ledger_meta`, nil},
-		{"replace a pin", `INSERT OR REPLACE INTO ledger_meta (key, value) VALUES ('person_id', 'someone-else')`, nil},
+		{"replace a pin", `INSERT OR REPLACE INTO ledger_meta (key, value) VALUES ('subject_id', 'someone-else')`, nil},
 	}
 	for _, s := range statements {
 		if _, err := raw.ExecContext(ctx, s.sql, s.args...); err == nil {

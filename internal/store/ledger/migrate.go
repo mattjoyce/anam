@@ -2,7 +2,6 @@ package ledger
 
 import (
 	"context"
-	"database/sql"
 	_ "embed" // go:embed for the migration files
 	"fmt"
 	"strconv"
@@ -11,10 +10,10 @@ import (
 	"github.com/mattjoyce/anam/internal/clock"
 )
 
-// A migration carries an older ledger file forward one schema version. It is DDL
-// only: it may add to what the file holds and never drops, rewrites or re-keys a
-// row, because the rows are the record. DDL does not fire the append-only triggers,
-// so a migration runs under them untouched.
+// A migration carries an older ledger file forward one schema version. A step may
+// add DDL and ledger_meta pins. It never writes to facet or anam_event, and never
+// rewrites or drops a row, because the rows are the record. DDL does not fire the
+// append-only triggers, so a migration runs under them untouched.
 //
 // Each step runs in one transaction with the ledger_meta key that records it, so a
 // crash leaves the file at the version before the step, never between. The record
@@ -37,12 +36,18 @@ type migration struct {
 //go:embed migrations/0002.sql
 var migration0002 string
 
+// migration0004 renames the stored subject column and adds the subject pin.
+//
+//go:embed migrations/0004.sql
+var migration0004 string
+
 var migrations = []migration{
 	{to: 2, ddl: migration0002},
 	{to: 3, rebuild: "schema 3 changed how a facet's id is composed from its source row and the zone " +
 		"its fact-time is read in; the rows in a schema 2 file were keyed and placed by the old rules. " +
 		"Move this file aside (it stays the record of what Anam knew until now), run `anam init` at " +
 		"the same path, and have each importer resend its source whole: every source still holds its rows"},
+	{to: 4, ddl: migration0004},
 }
 
 // effectiveVersion derives the file's schema version from its pins: the created-at
@@ -122,28 +127,4 @@ func (l *Ledger) migrateOne(ctx context.Context, m migration) error {
 		return classify("commit migration", err)
 	}
 	return nil
-}
-
-// readPins loads ledger_meta whole.
-func readPins(ctx context.Context, q interface {
-	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-}) (map[string]string, error) {
-	rows, err := q.QueryContext(ctx, `SELECT key, value FROM ledger_meta`)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	pins := map[string]string{}
-	for rows.Next() {
-		var k, v string
-		if err := rows.Scan(&k, &v); err != nil {
-			return nil, classify("scan pin", err)
-		}
-		pins[k] = v
-	}
-	if err := rows.Err(); err != nil {
-		return nil, classify("read pins", err)
-	}
-	return pins, nil
 }

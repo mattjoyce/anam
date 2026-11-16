@@ -31,10 +31,11 @@ import (
 // Whether the triggers still hold is not decided here. TestAppendOnly_* and
 // TestSeq_*, TestVersion_Database* in appendonly_test.go do that, against the file.
 const (
-	pinnedSchemaVersion = 3
-	pinnedLedgerSQL     = "906d1cda1bdc769932ef7cc8a9c09ed2845ee5c6437b9c943b007a553e738ea0"
+	pinnedSchemaVersion = 4
+	pinnedLedgerSQL     = "4bf8074d3e15bd760c9a9b217062cd1bde3111e9039a509a3a7f44efb81a4a86"
 	pinnedIndexesSQL    = "24a1caf45c986d7ce20a4aa4e8d96efddde74365b4dbc481ea6764bed4a34eb0"
 	pinnedMigration0002 = "bb8609fad84e40fb945ef825cd9c660074717c6cd3d2381fd4b4f1dae3e1a34e"
+	pinnedMigration0004 = "226ca7ccd96749812f65c6cd82ad4bc31e013d081fe57109961bb715b04cd0e2"
 )
 
 func sha(s string) string {
@@ -66,6 +67,11 @@ func TestMigrationFiles_AreHeldToTheirPins(t *testing.T) {
 		t.Errorf("migrations/0002.sql changed (sha256 %s). A migration is history and an older ledger "+
 			"runs it as written. A change to what it does needs a new migration and a schemaVersion bump; "+
 			"a comment-only change may update pinnedMigration0002 deliberately, saying why in the commit", got)
+	}
+	if got := sha(migration0004); got != pinnedMigration0004 {
+		t.Errorf("migrations/0004.sql changed (sha256 %s). A migration is history; "+
+			"a change to stored meaning needs a new step and schema version. "+
+			"Update pinnedMigration0004 deliberately and say why in the commit", got)
 	}
 }
 

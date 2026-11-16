@@ -19,9 +19,10 @@ import _ "embed" // go:embed for the SQL files beside this one
 //	   the fact-time zone changed what a facet's id and fact_time are. A schema 2
 //	   file holds rows keyed by the old rules and cannot be carried forward; it is
 //	   refused with the remedy, a new ledger from the same sources.
+//	4  binding_subject_id and the subject_id pin, carried in place from schema 3
 //
 // It names the file's layout, so it is never configurable (card 151).
-const schemaVersion = 3
+const schemaVersion = 4
 
 // The ledger's schema, held whole in ledger.sql beside this file and embedded so the
 // binary that checks schemaVersion carries the text it checks. Three tables, and every
@@ -49,11 +50,9 @@ const schemaVersion = 3
 // is a refactor or a hurried shell session, and against that the database refusing the
 // write is stronger than a test that has to be run.
 //
-// The facet column binding_person_id holds the subject the gate bound a fact to. Its
-// name is the one stored name of the old word left in ledger.sql, and it is not renamed
-// here: a column rename is a schema version with a carry, which is card 270b. This
-// comment stands in for one in ledger.sql, whose text is pinned and stored in every
-// ledger file, so 270a leaves it byte for byte.
+// The facet column binding_subject_id holds the subject the gate bound a fact to.
+// Its two spaces before TEXT preserve the SQL an in-place column rename produces,
+// so fresh and carried schema 4 files hold identical schema text.
 //
 //go:embed ledger.sql
 var schema string
@@ -84,13 +83,10 @@ DROP TABLE IF EXISTS ledger_meta;
 // The ledger_meta keys. schema_version is the version the file was created at and
 // never changes, because ledger_meta is write-once; each migration applied since adds
 // a schema_migration:<n> key, and the effective version is the highest of them all.
-//
-// metaPersonID is the key the subject is pinned under. It keeps the old name because it
-// is stored in every ledger file; renaming it is card 270b, behind a schema version and
-// a carry. Everything above the store says subject.
 const (
 	metaSchemaVersion   = "schema_version"
-	metaPersonID        = "person_id" // the subject's pin, under its stored name until card 270b
+	metaSubjectID       = "subject_id"
+	metaLegacySubjectID = "person_id" // schema 3 name, read for the carry and equality check
 	metaLedgerID        = "ledger_id"
 	metaMigrationPrefix = "schema_migration:"
 )

@@ -31,7 +31,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 )
@@ -108,7 +107,7 @@ const busyTimeoutMS = 3000
 
 // Create opens the ledger at path for writing, creating the file and its parent
 // directories if absent, and initialises it for subjectID. It is idempotent: on an
-// existing ledger it verifies the pins and changes nothing.
+// existing ledger it verifies the pins and applies any pending migrations.
 func Create(ctx context.Context, path, subjectID string) (*Ledger, error) {
 	if dir := filepath.Dir(path); dir != "." {
 		if err := os.MkdirAll(dir, 0o750); err != nil {
@@ -206,7 +205,7 @@ func dsn(path, mode string) string {
 // Init idempotently prepares the ledger: it applies the schema and pins the schema
 // version, the subject, and a fresh ledger id. A ledger written by an earlier schema
 // is migrated forward here, step by step (migrate.go); this is the one place a
-// ledger's schema moves, and it only ever adds.
+// ledger's schema moves. It never rewrites or drops a row.
 //
 // A file that already holds tables but no ledger_meta is somebody else's database,
 // most plausibly the operational store reached through a mistyped path. Init refuses
@@ -242,20 +241,7 @@ func (l *Ledger) initPins(ctx context.Context) (int, error) {
 		return 0, classify("apply schema", err)
 	}
 
-	for _, p := range []struct{ key, want string }{
-		{metaSchemaVersion, strconv.Itoa(schemaVersion)},
-		{metaPersonID, l.subject},
-		{metaLedgerID, uuid.NewString()},
-	} {
-		stored, err := pin(ctx, tx, p.key, p.want)
-		if err != nil {
-			return 0, err
-		}
-		if err := checkPin(p.key, stored, p.want); err != nil {
-			return 0, err
-		}
-	}
-	pins, err := readPins(ctx, tx)
+	pins, err := l.initIdentity(ctx, tx)
 	if err != nil {
 		return 0, err
 	}
@@ -282,34 +268,6 @@ func holdsForeignTables(ctx context.Context, tx *sql.Tx) (bool, error) {
 	return tables > 0 && meta == 0, nil
 }
 
-// pin writes key unless it is already pinned, and returns what is stored. It reads
-// before it writes because the insert trigger refuses an existing key outright.
-func pin(ctx context.Context, tx *sql.Tx, key, value string) (string, error) {
-	var stored string
-	err := tx.QueryRowContext(ctx, `SELECT value FROM ledger_meta WHERE key = ?`, key).Scan(&stored)
-	switch {
-	case err == nil:
-		return stored, nil
-	case !errors.Is(err, sql.ErrNoRows):
-		return "", classify("read pin "+key, err)
-	}
-	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO ledger_meta (key, value) VALUES (?, ?)`, key, value); err != nil {
-		return "", classify("write pin "+key, err)
-	}
-	return value, nil
-}
-
-// checkPin compares a stored pin against what this build and this config expect. The
-// ledger id is generated, so whatever is stored is right, and the schema version is
-// judged by effectiveVersion, after the migration records are counted.
-func checkPin(key, stored, want string) error {
-	if key == metaPersonID && stored != want {
-		return fmt.Errorf("%w: ledger is pinned to %q, config says %q", ErrSubjectMismatch, stored, want)
-	}
-	return nil
-}
-
 // verify checks an opened file is an initialised ledger for this subject and this
 // schema. It writes nothing, so it runs on a read-only handle too.
 func (l *Ledger) verify(ctx context.Context) error {
@@ -321,18 +279,20 @@ func (l *Ledger) verify(ctx context.Context) error {
 		return classify("read pins", err)
 	}
 
-	for _, p := range []struct{ key, want string }{
-		{metaSchemaVersion, ""},
-		{metaPersonID, l.subject},
-		{metaLedgerID, ""},
-	} {
-		stored, ok := pins[p.key]
-		if !ok {
-			return fmt.Errorf("%w: %s has no %s pin", ErrNotInitialised, l.path, p.key)
+	for _, key := range []string{metaSchemaVersion, metaLedgerID} {
+		if _, ok := pins[key]; !ok {
+			return fmt.Errorf("%w: %s has no %s pin", ErrNotInitialised, l.path, key)
 		}
-		if err := checkPin(p.key, stored, p.want); err != nil {
-			return err
-		}
+	}
+	subject, ok, err := resolveSubjectPin(pins)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("%w: %s has no %s pin", ErrNotInitialised, l.path, metaSubjectID)
+	}
+	if err := checkSubjectPin(subject, l.subject); err != nil {
+		return err
 	}
 	have, err := effectiveVersion(pins)
 	if err != nil {

@@ -96,3 +96,31 @@ func checkPinOutcome(t *testing.T, kind, subject, opener string, err error) {
 		}
 	}
 }
+
+// A file with neither subject key is not an initialised ledger. Without this branch
+// the empty resolution would read as a ledger pinned to "", and the operator would be
+// told the subject is wrong when the pin is missing.
+func TestSchema4_NeitherSubjectKeyIsNotInitialised(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "ledger.db")
+	db := rawDB(t, path)
+	for _, text := range []string{schemaV3,
+		`INSERT INTO ledger_meta VALUES ('schema_version', '3'), ('ledger_id', 'no-subject')`} {
+		if _, err := db.ExecContext(context.Background(), text); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for name, open := range map[string]func(context.Context, string, string) (*ledger.Ledger, error){
+		"Open": ledger.Open, "OpenReadOnly": ledger.OpenReadOnly,
+	} {
+		l, err := open(context.Background(), path, person)
+		closeIfOpen(l)
+		if !errors.Is(err, ledger.ErrNotInitialised) {
+			t.Errorf("%s with no subject pin = %v, want ErrNotInitialised", name, err)
+			continue
+		}
+		if !strings.Contains(err.Error(), "has no subject_id pin") {
+			t.Errorf("%s error %q does not name the missing pin", name, err)
+		}
+	}
+}

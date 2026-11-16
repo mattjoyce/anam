@@ -18,7 +18,9 @@ account of one instance and carries its data.
   new pin and migration record are one transaction. Facets, events, W, the ledger id and all
   hashed bytes stay unchanged. Older builds refuse the carried file: rollback requires a
   pre-carry backup, not just the old binary. Rehearse on a copy and use the deployment's
-  ledger-schema window procedure for the live file.
+  ledger-schema window procedure for the live file. Never run an older build's `anam init` against a schema 4
+  file: on a fresh file it pins `person_id` before refusing the version, and under another
+  subject that leaves two differing pins, which this build then refuses as damage.
 
 - The default read is the whole-record read (card 270a, slice 3). A receipt for a template with
   no window records span `whole-record`. Receipts filed before this change say `whole-person`,

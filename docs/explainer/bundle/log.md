@@ -275,3 +275,8 @@ Anam at c08bfb5, the merge of the taxonomy (card 147). The purpose page's commit
 
 - Code: receipts for a template with no window say span `whole-record`; receipts filed before say `whole-person` and keep it, and verify reads neither. The timeline's link reads "whole record", and `anam timeline` and `anam serve` help say whole-record.
 - Bundle: the subject replaces the person where the page means what the record is about. The inversion term, the substrate decision and the whole-record invariant keep their file names and say subject and whole-record; the decision's anchor follows the ARCHITECTURE heading, now "The whole-record read". The purpose page, the gate, the three pillars, the fold, the derived span, the envelope term, the timeline response and the receipt's span row are reworded. Pages where a person speaks, types or clicks, and the mind, org, money and intake terms, which describe a person's own facts, still say person.
+
+## 2026-11-16, card 270b
+
+- Code: the ledger moves to schema version 4. The facet column is `binding_subject_id` (it was `binding_person_id`), renamed in place by `migrations/0004.sql`, and the subject pin is `ledger_meta.subject_id`. A carried file keeps its `person_id` pin beside it as history, with the same value; a fresh file writes `subject_id` only. Facet ids, content hashes, minted values, receipts, W and the ledger id are unchanged.
+- Bundle: the ledger store and facet artifact pages name `binding_subject_id` and the `subject_id` pin.

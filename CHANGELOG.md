@@ -9,6 +9,17 @@ account of one instance and carries its data.
 
 ## Unreleased
 
+- The ledger's stored names say subject (card 270b). Ledger schema 4 renames
+  `facet.binding_person_id` to `binding_subject_id` in place and adds `ledger_meta.subject_id`
+  with the value of `person_id`, which stays in carried files as history. A fresh file writes
+  only `subject_id`. Both pins present with different values refuse as damage; a wrong subject
+  still refuses before the schema version. Run `anam init` to carry a schema 3 ledger before
+  starting this daemon; other openers refuse the older version with that remedy. The rename,
+  new pin and migration record are one transaction. Facets, events, W, the ledger id and all
+  hashed bytes stay unchanged. Older builds refuse the carried file: rollback requires a
+  pre-carry backup, not just the old binary. Rehearse on a copy and use the deployment's
+  ledger-schema window procedure for the live file.
+
 - The default read is the whole-record read (card 270a, slice 3). A receipt for a template with
   no window records span `whole-record`. Receipts filed before this change say `whole-person`,
   the old name of the same span, and keep it, since a receipt's hash covers its bytes. Verify

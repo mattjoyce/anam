@@ -15,6 +15,7 @@ import (
 	"github.com/mattjoyce/anam/internal/api"
 	"github.com/mattjoyce/anam/internal/config"
 	"github.com/mattjoyce/anam/internal/span"
+	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
 	"github.com/mattjoyce/anam/internal/store/ops/opstest"
 )
@@ -73,6 +74,15 @@ func carriedSchema9(t *testing.T) (config.Config, opstest.Schema9Paths, schema9E
 
 	cfg := rolesConfig(t)
 	cfg.LedgerPath = p.Ledger
+	// Carry the restored ledger explicitly, as anam init does. The historical
+	// schema-9 fixture itself stays byte-for-byte; its receipts now prove both carries.
+	l, err := ledger.Create(ctx, p.Ledger, cfg.SubjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := l.Close(); err != nil {
+		t.Fatal(err)
+	}
 	cfg.DBPath = filepath.Join(t.TempDir(), "tracking.db")
 	cfg.DefinitionsDir, cfg.ProjectionsDir = p.Definitions, p.Projections
 

@@ -588,8 +588,8 @@ open installs as a separate step and which are not part of what the schema versi
 `internal/store/ops/ops.sql` holds every operational table, view and trigger, each table under its
 `-- tier:` comment. Reading one file shows the whole fresh store, and a schema change shows as a change to
 that file. Each migration's SQL is a file of its own under `migrations/` beside the store, embedded the
-same way. The ledger has `internal/store/ledger/migrations/0002.sql`, named for the version it moves to
-(schema 3 has no file, because it changed no SQL and its step is a rebuild). The operational store has
+same way. The ledger has `internal/store/ledger/migrations/0002.sql` and `0004.sql`, named for the version each
+moves to (schema 3 has no file, because it changed no SQL and its step is a rebuild). The operational store has
 `internal/store/ops/migrations/snapshot-part-digest.sql`, the in-place step for a store written before the
 snapshot digest column, which is a compatibility step and moves no version. The Go keeps what is a
 decision rather than a description: `schemaVersion` in each store, which file runs when and in what
@@ -680,7 +680,7 @@ Grain is **hybrid at the verbatim line** (ADR 0031):
 ledger.db
   facet        PRIMARY KEY (facet_id, artifact_version)   one row per artifact version
   anam_event   PRIMARY KEY (seq)                          one row per anam-event
-  ledger_meta  PRIMARY KEY (key)                          schema_version, person_id, ledger_id, schema_migration:<n>
+  ledger_meta  PRIMARY KEY (key)                          schema_version, subject_id, ledger_id, schema_migration:<n>
 ```
 
 There is no watermark row. `W` is `MAX(seq)`, and a trigger lets an anam-event take only the `seq` after
@@ -709,13 +709,22 @@ the unit SQLite deletes, locks and opens read-only by:
 - deleting the operational file and replaying proves the derived tier is derived, because nothing of the
   ledger could have been inside it.
 
-The subject's id is pinned in `ledger_meta` at `init`, under the key `person_id` (its stored name until
-card 270b), and a ledger pinned to another subject is refused on every open. `ledger_meta` is write-once like every other ledger row, so the schema version is
-not a pin that moves: `schema_version` is the version the file was **created** at, each migration applied
-since adds a `schema_migration:<n>` row beside it, and the file's effective version is the highest of
-them. A migration only ever adds (a column with a default, an index), never rewrites a row, and runs as
-one transaction with its record, so a crash leaves the file at the version before it. `anam init` is the
-one place a ledger's schema moves; every other opener refuses a file behind or ahead of its build. The operational store in turn pins the `ledger_id` it was derived from: a rebuilt
+The subject's id is pinned in `ledger_meta` at `init`, under the key `subject_id`, and the facet
+column `binding_subject_id` holds the subject the gate bound a fact to. Schema 4 renames that column
+in place and adds the new pin beside schema 3's original subject pin, which stays forever. A fresh
+schema 4 file writes only the new key. The pin reader prefers the new key, falls back to the old
+one, and refuses both keys with different values as a damaged file. A ledger pinned to another
+subject is refused on every open, before the schema version is checked.
+
+`ledger_meta` is write-once like every other ledger row, so the schema version is not a pin that
+moves: `schema_version` is the version the file was **created** at, each migration applied since
+adds a `schema_migration:<n>` row beside it, and the file's effective version is the highest of them.
+A migration may add DDL and pins, but never writes to `facet` or `anam_event`, rewrites a row or drops
+one. The schema 4 column rename, subject pin and migration record run in one transaction, so a
+failure after the rename leaves the file at schema 3. Facets, events, W, the ledger id and hashed
+bytes stay unchanged, and fresh and carried schema 4 files hold identical schema SQL. `anam init`
+is the one place a ledger's schema moves; every other opener refuses a file behind or ahead of
+its build. The operational store in turn pins the `ledger_id` it was derived from: a rebuilt
 ledger gets a new id, so a tracking file left over from an earlier ledger is refused instead of being read
 as an index of the new one.
 

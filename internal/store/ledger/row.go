@@ -19,12 +19,11 @@ import (
 // metadata/payload separation of §3 is physically enforced.
 
 // facetColumns is the one column list the insert and every select share, so the
-// writer and the scanner cannot disagree about order. binding_person_id is the stored
-// name of the column Binding.SubjectID is written to and read from; it keeps the old
-// word until card 270b renames it behind a schema version and a carry.
+// writer and the scanner cannot disagree about order. binding_subject_id stores
+// Binding.SubjectID in both fresh and carried schema 4 files.
 const facetColumns = `facet_id, artifact_version, type, confidence, classification,
 	definition_version, fact_time, series,
-	binding_person_id, binding_assurance, binding_span_hint,
+	binding_subject_id, binding_assurance, binding_span_hint,
 	prov_source, prov_injector, prov_source_ref, prov_method, prov_model, prov_watermark,
 	source_schema, schema_version, content_hash, payload_kind, media_type, payload`
 

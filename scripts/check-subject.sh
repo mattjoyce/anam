@@ -77,14 +77,9 @@ allow internal/app/query.go         '--person|"person"'                    'the 
 allow scripts/souffle-diff.py       '--person|ANAM_PERSON_ID'              'the --person argparse alias and ANAM_PERSON_ID'
 allow scripts/check-souffle-diff.sh '--person|person_id|ANAM_PERSON_ID'    'the gate step that proves the wrapper leaves the alias to anam'
 allow scripts/check.sh              'ANAM_PERSON_ID' 'the comment on the check-souffle-diff.sh step'
-# The stored names, until 270b.
-allow internal/store/ledger/schema.go 'person_id|PersonID' 'the ledger_meta key person_id and the binding_person_id column'
-allow internal/store/ledger/ledger.sql 'binding_person_id' 'the stored column, hash-pinned'
-allow internal/store/ledger/row.go    'binding_person_id'  'the stored column in the row codec'
-allow internal/store/ledger/ledger.go 'metaPersonID'       'pins and checks the stored ledger_meta key'
-allow docs/ARCHITECTURE.md            'person_id'          'section 8 documents the stored ledger_meta key'
-allow docs/explainer/bundle/components/store-ledger.md        'person_id'         'the stored ledger_meta key'
-allow docs/explainer/bundle/data-structures/facet-artifact.md 'person_id'         'the stored binding_person_id column and ledger_meta key'
+# The schema 3 names survive only in the carry and its legacy pin reader.
+allow internal/store/ledger/schema.go '^[[:space:]]*metaLegacySubjectID = "person_id" // schema 3 name, read for the carry and equality check$' 'the legacy subject pin'
+allow internal/store/ledger/migrations/0004.sql 'binding_person_id|person_id' 'the schema 3 to 4 carry'
 # Kept names and other repositories.
 allow docs/explainer/bundle/invariants/index.md 'whole-person-read-is-the-default\.md' 'links the decision page, whose file name and anchor ids are kept'
 allow docs/explainer/bundle/components/importer-base.md 'asserted_person' "anam-importers' own envelope() still takes asserted_person"

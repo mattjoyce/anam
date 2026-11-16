@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mattjoyce/anam/internal/store/ledger"
 	"github.com/mattjoyce/anam/internal/store/ops"
 	"github.com/mattjoyce/anam/internal/store/ops/opstest"
 )
@@ -30,6 +31,14 @@ func newSchema9Move(t *testing.T) schema9Move {
 	dir := t.TempDir()
 	p, err := opstest.Schema9(context.Background(), filepath.Join(dir, "old"))
 	if err != nil {
+		t.Fatal(err)
+	}
+	// Carry only this test's restored ledger; keep the historical dumps intact.
+	l, err := ledger.Create(context.Background(), p.Ledger, "matt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := l.Close(); err != nil {
 		t.Fatal(err)
 	}
 	m := schema9Move{Schema9Paths: p, store: filepath.Join(dir, "new", "tracking.db"), folder: filepath.Join(dir, "folder")}
